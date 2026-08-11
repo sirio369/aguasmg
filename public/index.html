@@ -240,7 +240,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="captacao" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>Captação de clientes</h1>
-    <p class="sub">Cadastro de novo cliente durante o recadastramento. <b>Mockup</b> — os campos serão ajustados conforme orientações da COPASA.</p>
+    <p class="sub">Cadastro de novo cliente durante o recadastramento. Os campos serão ajustados conforme orientações da COPASA.</p>
     <div id="capGps" class="banner warn">Obtendo GPS…</div>
 
     <div class="sec">🏠 Imóvel</div>
@@ -684,8 +684,19 @@ document.querySelectorAll('#captacao [data-capfoto]').forEach(inp=>inp.addEventL
 }));
 if($('#capSalvar')) $('#capSalvar').addEventListener('click',()=>{
   if(!gps||gps.acc>PRECISAO_MAX){ toast('GPS insuficiente'); return; }
-  // MOCKUP — backend da captação ainda não existe
-  toast('✓ Captação registrada (mockup)');
+  const g=id=>(((document.getElementById(id)||{}).value)||'').trim()||null;
+  const eco=parseInt(((g('cap_economias')||'').replace(/\D/g,'')),10);
+  const uid=crypto.randomUUID();
+  const item={id:uid,tipo:'captacao',rpc:'app_captacao_registrar',pasta:'captacao',
+    fotos:{p_foto_termo:captFotos.termo,p_foto_fachada:captFotos.fachada,p_foto_doc_frente:captFotos.doc_frente,p_foto_doc_verso:captFotos.doc_verso,p_foto_comprovante:captFotos.comprovante},
+    fields:{p_id:uid,
+      p_matricula:g('cap_matricula'), p_endereco:g('cap_endereco'), p_categoria:g('cap_categoria'),
+      p_economias:isNaN(eco)?null:eco, p_ocupacao:g('cap_ocupacao'),
+      p_nome:g('cap_nome'), p_nome_mae:g('cap_mae'), p_cpf:g('cap_cpf'), p_rg:g('cap_rg'),
+      p_nascimento:g('cap_nasc'), p_email:g('cap_email'), p_telefone:g('cap_tel'), p_observacao:g('cap_obs'),
+      p_lat:gps.lat, p_lon:gps.lon, p_precisao:Math.round(gps.acc*10)/10,
+      p_consorcio:localStorage.getItem('consorcio')||null, p_dispositivo:navigator.userAgent.slice(0,60)}};
+  enviarOuEnfileirar(item,'✓ Captação registrada');
   capReset(); irPara('home');
 });
 if($('#ocTipo')) $('#ocTipo').addEventListener('change',ocSync);
