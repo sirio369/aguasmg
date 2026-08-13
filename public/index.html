@@ -107,6 +107,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="pressao" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Voltar</button></div>
     <h1>Mapeamento de pressão</h1>
+    <button id="prEst" class="btn ghost" style="margin-bottom:10px">🔎 Teste de estanqueidade — pontos a medir</button>
+    <div id="prAlvoBanner" class="hidden" style="align-items:center;gap:8px;background:var(--card);border:1px solid var(--acc);border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:13px;display:flex"><span style="flex:1;min-width:0">🎯 <b id="prAlvoLbl"></b></span><button id="prAlvoX" title="Cancelar" style="all:unset;cursor:pointer;color:var(--mut);font-weight:700;font-size:16px">✕</button></div>
     <div id="gpsBanner" class="banner warn">Obtendo GPS…</div>
 
     <label for="pressao_v">Pressão (mca) *</label>
@@ -128,6 +130,25 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
 
     <button id="salvar" class="btn" disabled>Salvar coleta</button>
+  </main>
+
+  <main id="estanqueidade" class="hidden">
+    <div class="bar"><button class="bk" id="estBack">‹ Pressão</button>
+      <span style="margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px;">
+        <button id="estVwLista" style="all:unset;cursor:pointer;padding:6px 14px;">Lista</button>
+        <button id="estVwMapa" style="all:unset;cursor:pointer;padding:6px 14px;">Mapa</button>
+      </span>
+    </div>
+    <h1>Teste de estanqueidade</h1>
+    <p class="sub">Toque num ponto para bater a pressão ali. Ao salvar, ele muda para <b>medido</b>.</p>
+    <select id="estCons" style="margin-bottom:8px">
+      <option value="todos">Todas as ZAs</option>
+      <option value="ZA1004">ZA1004 — Contagem</option>
+      <option value="ZA0200">ZA0200 — Betim</option>
+    </select>
+    <div id="estFiltros" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px"></div>
+    <div id="estLista"></div>
+    <div id="estMapa" style="display:none;height:60vh;border-radius:12px;overflow:hidden"></div>
   </main>
 
   <main id="loggers" class="hidden">
@@ -418,24 +439,116 @@ $('#salvar').addEventListener('click',async()=>{
     p_consorcio:$('#consorcio').value,p_numero_hd:$('#numero_hd').value||null,
     p_cota_m:gps.alt!=null?Math.round(gps.alt*10)/10:null,p_gps_ts:gps.ts,p_dispositivo:navigator.userAgent.slice(0,60)
   }};
+  if(prAlvo) item.fields.p_ponto_estanqueidade_id=prAlvo.id;
   localStorage.setItem('consorcio',$('#consorcio').value);
   try{
     if(navigator.onLine){
-      try{ await enviar(item); toast('✓ Coleta enviada'); resetForm(); return; }
+      try{ await enviar(item); toast('✓ Coleta enviada'); prAposSalvar(v); resetForm(); return; }
       catch(e){ /* rede falhou — cai pra fila */ }
     }
-    await filaAdd(item); toast('Sem conexão — salvo na fila'); resetForm(); atualizarFila();
+    await filaAdd(item); toast('Sem conexão — salvo na fila'); prAposSalvar(v); resetForm(); atualizarFila();
   }catch(e){ toast('Erro ao salvar: '+e.message); }
   finally{ enviando=false; validar(); }
 });
 function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;$('#foto').value='';$('#fotoPrev').classList.add('hidden');validar();}
 
+// ---------- TESTE DE ESTANQUEIDADE (pontos de referência p/ bater pressão) ----------
+let estData=[], estFiltroS='todos', estView='lista', estMap=null, estMarkers=null, prAlvo=null;
+const EST_SIT={ todos:{lbl:'Todos'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn',cor:'#e0a300'}, medido:{lbl:'Medido',bg:'--ok-bg',fg:'--ok',cor:'#1a7f4b'} };
+function prAlvoRender(){
+  const b=$('#prAlvoBanner'); if(!b) return;
+  if(prAlvo){ $('#prAlvoLbl').textContent=prAlvo.par_id+' ('+prAlvo.posicao+') — bata a pressão aqui'; b.style.display='flex'; b.classList.remove('hidden'); }
+  else { b.style.display='none'; b.classList.add('hidden'); }
+}
+function prAposSalvar(v){
+  if(!prAlvo) return;
+  const p=estData.find(x=>x.id===prAlvo.id);
+  if(p){ p.situacao='medido'; p.n_medicoes=(p.n_medicoes||0)+1; p.ultima_pressao=v; localStorage.setItem('est_cache',JSON.stringify(estData)); }
+  prAlvo=null; prAlvoRender();
+}
+async function estInit(){
+  $('#estLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_estanqueidade_listar'); if(error) throw error;
+    estData=data||[]; localStorage.setItem('est_cache',JSON.stringify(estData));
+  }catch(e){
+    const c=localStorage.getItem('est_cache'); estData=c?JSON.parse(c):[];
+    if(!estData.length){$('#estLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';return;}
+  }
+  estFiltrosRender(); estSetView(estView); estAtualizar();
+}
+function estFiltrada(){
+  const c=$('#estCons')?$('#estCons').value:'todos';
+  return estData.filter(p=>(c==='todos'||p.consorcio===c)&&(estFiltroS==='todos'||p.situacao===estFiltroS));
+}
+function estContar(s){const c=$('#estCons')?$('#estCons').value:'todos';const base=estData.filter(p=>c==='todos'||p.consorcio===c);return s==='todos'?base.length:base.filter(p=>p.situacao===s).length;}
+function estFiltrosRender(){
+  const ordem=['todos','pendente','medido'];
+  $('#estFiltros').innerHTML=ordem.map(s=>`<button class="estf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===estFiltroS?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${EST_SIT[s].lbl} ${estContar(s)}</button>`).join('');
+  $('#estFiltros').querySelectorAll('.estf').forEach(b=>b.addEventListener('click',()=>{estFiltroS=b.dataset.f;estFiltrosRender();estAtualizar();}));
+}
+function estAtualizar(){ estRender(); if(estView==='mapa') estMapaRender(); }
+function estRender(){
+  let arr=estFiltrada();
+  if(gps) arr=arr.slice().sort((a,b)=>((distKm(a.lat,a.lon)??9e9)-(distKm(b.lat,b.lon)??9e9)));
+  if(!arr.length){$('#estLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhum ponto nesse filtro.</p>';return;}
+  $('#estLista').innerHTML=arr.map(p=>{
+    const s=EST_SIT[p.situacao]||{lbl:p.situacao,bg:'--line',fg:'--mut'};
+    const sub=[p.consorcio, p.qt_diametro?('DN'+p.qt_diametro):'', p.cd_material?('Mat.'+p.cd_material):'', distTxt(distKm(p.lat,p.lon)), (p.situacao==='medido'&&p.ultima_pressao!=null)?(p.ultima_pressao+' mca'):''].filter(Boolean).join(' · ');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-est="${p.id}"><div style="font-size:14px;font-weight:600">${p.par_id} <span style="font-weight:400;color:var(--mut)">(${p.posicao})</span></div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span><button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button></div>`;
+  }).join('');
+  $('#estLista').querySelectorAll('[data-est]').forEach(el=>el.addEventListener('click',()=>estSelecionar(el.dataset.est)));
+  $('#estLista').querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();window.open('https://www.google.com/maps/dir/?api=1&destination='+el.dataset.nav,'_blank');}));
+}
+function estSetView(v){
+  estView=v;
+  $('#estLista').style.display=(v==='lista')?'block':'none';
+  $('#estMapa').style.display=(v==='mapa')?'block':'none';
+  $('#estVwLista').style.background=(v==='lista')?'var(--acc)':'transparent';
+  $('#estVwLista').style.color=(v==='lista')?'var(--acc-ink)':'var(--ink)';
+  $('#estVwMapa').style.background=(v==='mapa')?'var(--acc)':'transparent';
+  $('#estVwMapa').style.color=(v==='mapa')?'var(--acc-ink)':'var(--ink)';
+  if(v==='mapa') estMapaRender();
+}
+function estMapaRender(){
+  const cont=$('#estMapa');
+  if(!window.L){cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
+  if(!estMap){ cont.innerHTML=''; estMap=L.map('estMapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(estMap); estMarkers=L.layerGroup().addTo(estMap); }
+  setTimeout(()=>estMap.invalidateSize(),0);
+  estMarkers.clearLayers();
+  const arr=estFiltrada().filter(p=>p.lat&&p.lon); const pts=[];
+  arr.forEach(p=>{
+    const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:(EST_SIT[p.situacao]||{}).cor||'#888',fillOpacity:1});
+    m.on('click',()=>estSelecionar(p.id));
+    m.bindTooltip(p.par_id+' ('+p.posicao+') · '+((EST_SIT[p.situacao]||{}).lbl||''));
+    estMarkers.addLayer(m); pts.push([p.lat,p.lon]);
+  });
+  if(gps){ estMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
+  if(pts.length) estMap.fitBounds(pts,{padding:[28,28],maxZoom:16}); else estMap.setView([-19.93,-44.05],12);
+}
+function estSelecionar(id){
+  const p=estData.find(x=>x.id===id); if(!p) return;
+  prAlvo=p;
+  if($('#consorcio')&&p.consorcio) $('#consorcio').value=p.consorcio;
+  prAlvoRender();
+  toast('Alvo: '+p.par_id+' ('+p.posicao+')');
+  irPara('pressao');
+}
+if($('#prEst')) $('#prEst').addEventListener('click',()=>irPara('estanqueidade'));
+if($('#estBack')) $('#estBack').addEventListener('click',()=>irPara('pressao'));
+if($('#estVwLista')) $('#estVwLista').addEventListener('click',()=>estSetView('lista'));
+if($('#estVwMapa')) $('#estVwMapa').addEventListener('click',()=>estSetView('mapa'));
+if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender();estAtualizar();});
+if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
+
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
   if(id==='loggers') carregarLoggers();
+  if(id==='estanqueidade') estInit();
+  if(id==='pressao') prAlvoRender();
   if(id==='cadastro') cadInit();
   if(id==='pesquisa') pqInit();
   if(id==='ocorrencia') ocSync();
