@@ -712,7 +712,10 @@ if($('#ocFoto')) $('#ocFoto').addEventListener('change',async e=>{
 
 // ---------- CADASTRO TÉCNICO ----------
 let cadMap=null, cadCamadas={}, cadOn={unidades:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
-const CAD_DEF=[{k:'unidades',nome:'Unidades',min:0,cor:'#7a3fb5'},{k:'vrps',nome:'VRPs',min:0,cor:'#c2185b'},{k:'rede',nome:'Rede',min:14,cor:'#1565c0'},{k:'ligacoes',nome:'Ligações',min:16,cor:'#2e7d32'}];
+let cadRendered={}, cadMem={}, cadDeb=null;   // cache: área já renderizada por camada / geojson em memória / timer de debounce
+const CAD_VER='v1|';                          // prefixo p/ invalidar o cache do cadastro se o dado mudar
+// whole:true = camada leve e estática → busca a ZA inteira 1x e cacheia; step = tamanho da célula de cache (graus) p/ camadas pesadas
+const CAD_DEF=[{k:'unidades',nome:'Unidades',min:0,cor:'#7a3fb5',whole:true},{k:'vrps',nome:'VRPs',min:0,cor:'#c2185b',whole:true},{k:'rede',nome:'Rede',min:14,cor:'#1565c0',step:0.008},{k:'ligacoes',nome:'Ligações',min:16,cor:'#2e7d32',step:0.004}];
 function cadInit(){
   if(!window.L){document.getElementById('cadMapa').innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
   if(!cadMap){
@@ -720,7 +723,7 @@ function cadInit(){
     cadMap=L.map('cadMapa');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(cadMap);
     cadMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
-    cadMap.on('moveend',cadAtualizar);
+    cadMap.on('moveend',function(){clearTimeout(cadDeb);cadDeb=setTimeout(cadAtualizar,300);});
     cadFiltrosRender();
   }
   setTimeout(function(){cadMap.invalidateSize();cadAtualizar();},60);
@@ -729,25 +732,44 @@ function cadFiltrosRender(){
   document.getElementById('cadFiltros').innerHTML=CAD_DEF.map(function(d){return '<button class="cadf" data-k="'+d.k+'" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;'+(cadOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);')+'">'+d.nome+'</button>';}).join('');
   document.getElementById('cadFiltros').querySelectorAll('.cadf').forEach(function(b){b.addEventListener('click',function(){cadOn[b.dataset.k]=!cadOn[b.dataset.k];cadFiltrosRender();cadAtualizar();});});
 }
+// ---- cache do cadastro (dado estático → não rebaixar a mesma área) ----
+function cadIdb(){return new Promise(function(res,rej){var r=indexedDB.open('cadcache',1);r.onupgradeneeded=function(){r.result.createObjectStore('tiles');};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+async function cadCacheGet(key){try{var db=await cadIdb();return await new Promise(function(res){var t=db.transaction('tiles','readonly');var q=t.objectStore('tiles').get(key);q.onsuccess=function(){res(q.result||null);};q.onerror=function(){res(null);};});}catch(e){return null;}}
+async function cadCachePut(key,val){try{var db=await cadIdb();await new Promise(function(res){var t=db.transaction('tiles','readwrite');t.objectStore('tiles').put(val,key);t.oncomplete=res;t.onerror=res;});}catch(e){}}
+function cadSnap(v,step,up){return (up?Math.ceil(v/step):Math.floor(v/step))*step;}
+function cadReq(d,b){
+  if(d.whole)return {key:CAD_VER+d.k+'|all',params:{p_layer:d.k,p_minlon:-45.5,p_minlat:-20.6,p_maxlon:-43.5,p_maxlat:-19.0,p_limit:5000}};
+  var s=d.step, w=cadSnap(b.getWest(),s,0),so=cadSnap(b.getSouth(),s,0),e=cadSnap(b.getEast(),s,1),n=cadSnap(b.getNorth(),s,1);
+  return {key:CAD_VER+d.k+'|'+[w,so,e,n].map(function(x){return x.toFixed(4);}).join(','),
+          params:{p_layer:d.k,p_minlon:w,p_minlat:so,p_maxlon:e,p_maxlat:n,p_limit:d.k==='ligacoes'?4000:3000}};
+}
+async function cadData(key,params){
+  if(cadMem[key])return cadMem[key];                       // 1º memória (sessão)
+  var c=await cadCacheGet(key); if(c){cadMem[key]=c;return c;} // 2º IndexedDB (persistente)
+  var r=await sb.rpc('app_cadastro_geojson',params); if(r.error)throw r.error; // 3º rede (só se nunca baixou essa área)
+  cadMem[key]=r.data; cadCachePut(key,r.data); return r.data;
+}
 async function cadAtualizar(){
   if(!cadMap||cadCarregando)return;
   const z=cadMap.getZoom(), b=cadMap.getBounds(), hints=[];
   for(const d of CAD_DEF){
-    if(!cadOn[d.k]||z<d.min){ if(cadCamadas[d.k]){cadMap.removeLayer(cadCamadas[d.k]);delete cadCamadas[d.k];} if(cadOn[d.k]&&z<d.min)hints.push(d.nome); }
+    if(!cadOn[d.k]||z<d.min){ if(cadCamadas[d.k]){cadMap.removeLayer(cadCamadas[d.k]);delete cadCamadas[d.k];delete cadRendered[d.k];} if(cadOn[d.k]&&z<d.min)hints.push(d.nome); }
   }
   document.getElementById('cadHint').textContent=hints.length?('Aproxime o mapa para ver: '+hints.join(', ')):'';
   cadCarregando=true;
   try{
     for(const d of CAD_DEF){
       if(!cadOn[d.k]||z<d.min)continue;
-      const r=await sb.rpc('app_cadastro_geojson',{p_layer:d.k,p_minlon:b.getWest(),p_minlat:b.getSouth(),p_maxlon:b.getEast(),p_maxlat:b.getNorth(),p_limit:d.k==='ligacoes'?4000:3000});
-      if(r.error)throw r.error;
+      const rq=cadReq(d,b);
+      if(cadCamadas[d.k]&&cadRendered[d.k]===rq.key)continue;   // já mostrando essa área → não rebaixa nada
+      const data=await cadData(rq.key,rq.params);
       if(cadCamadas[d.k])cadMap.removeLayer(cadCamadas[d.k]);
-      cadCamadas[d.k]=L.geoJSON(r.data,{
+      cadCamadas[d.k]=L.geoJSON(data,{
         style:{color:d.cor,weight:3},
         pointToLayer:function(f,ll){return L.circleMarker(ll,{radius:d.k==='ligacoes'?3:6,color:'#fff',weight:1,fillColor:d.cor,fillOpacity:1});},
         onEachFeature:function(f,ly){var p=f.properties||{};var ll=ly.getLatLng?ly.getLatLng():(ly.getBounds?ly.getBounds().getCenter():null);var info=Object.keys(p).map(function(k){return '<b>'+k+':</b> '+(p[k]==null?'—':p[k]);}).join('<br>');var nav=ll?('<br><a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>'):'';ly.bindPopup(info+nav);}
       }).addTo(cadMap);
+      cadRendered[d.k]=rq.key;
     }
   }catch(e){toast('Erro no cadastro: '+(e.message||e));}
   finally{cadCarregando=false;}
