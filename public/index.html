@@ -610,7 +610,7 @@ function renderLoggers(){
   if(!arr.length){$('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhum ponto nesse filtro.</p>';return;}
   $('#lgLista').innerHTML=arr.map(p=>{
     const s=LG_SIT[p.situacao]||{lbl:p.situacao,bg:'--line',fg:'--mut'};
-    const sub=[p.zona,distTxt(distKm(p.lat,p.lon)),p.dias_instalado!=null?('há '+p.dias_instalado+' d'):'',p._pendente?'⏳ na fila':''].filter(Boolean).join(' · ');
+    const sub=[p.avulso?'⚡ avulso':'',p.zona,distTxt(distKm(p.lat,p.lon)),p.dias_instalado!=null?('há '+p.dias_instalado+' d'):'',p._pendente?'⏳ na fila':''].filter(Boolean).join(' · ');
     return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${p.label||('#'+p.id)}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span><button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button></div>`;
   }).join('');
   $('#lgLista').querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>abrirDetalhe(+el.dataset.open)));
@@ -645,7 +645,7 @@ function renderMapa(){
   arr.forEach(p=>{
     const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:cor[p.situacao]||'#888',fillOpacity:1});
     m.on('click',()=>abrirDetalhe(p.id));
-    m.bindTooltip((p.label||('#'+p.id))+' · '+((LG_SIT[p.situacao]||{}).lbl||''));
+    m.bindTooltip((p.label||('#'+p.id))+' · '+((LG_SIT[p.situacao]||{}).lbl||'')+(p.avulso?' · ⚡ avulso':''));
     lgMarkers.addLayer(m); pts.push([p.lat,p.lon]);
   });
   if(gps){ lgMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
