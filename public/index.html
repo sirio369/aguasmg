@@ -453,7 +453,7 @@ $('#salvar').addEventListener('click',async()=>{
 function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;$('#foto').value='';$('#fotoPrev').classList.add('hidden');validar();}
 
 // ---------- TESTE DE ESTANQUEIDADE (pontos de referência p/ bater pressão) ----------
-let estData=[], estFiltroS='todos', estView='lista', estMap=null, estMarkers=null, prAlvo=null;
+let estData=[], estFiltroS='todos', estView='lista', estMap=null, estMarkers=null, prAlvo=null, estLimites=null, estLimLayer=null;
 const EST_SIT={ todos:{lbl:'Todos'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn',cor:'#e0a300'}, medido:{lbl:'Medido',bg:'--ok-bg',fg:'--ok',cor:'#1a7f4b'} };
 function prAlvoRender(){
   const b=$('#prAlvoBanner'); if(!b) return;
@@ -515,6 +515,7 @@ function estMapaRender(){
   if(!window.L){cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
   if(!estMap){ cont.innerHTML=''; estMap=L.map('estMapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(estMap); estMarkers=L.layerGroup().addTo(estMap); }
   setTimeout(()=>estMap.invalidateSize(),0);
+  if(!estLimLayer) estDesenharLimites();
   estMarkers.clearLayers();
   const arr=estFiltrada().filter(p=>p.lat&&p.lon); const pts=[];
   arr.forEach(p=>{
@@ -525,6 +526,18 @@ function estMapaRender(){
   });
   if(gps){ estMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
   if(pts.length) estMap.fitBounds(pts,{padding:[28,28],maxZoom:16}); else estMap.setView([-19.93,-44.05],12);
+}
+async function estDesenharLimites(){
+  if(estLimLayer||!estMap||!window.L) return;
+  let gj=estLimites;
+  if(!gj){
+    try{ const {data,error}=await sb.rpc('app_limites_zas'); if(error) throw error; gj=data; estLimites=data; localStorage.setItem('est_limites',JSON.stringify(data)); }
+    catch(e){ const c=localStorage.getItem('est_limites'); if(c){ gj=JSON.parse(c); estLimites=gj; } }
+  }
+  if(gj && estMap && !estLimLayer){
+    estLimLayer=L.geoJSON(gj,{style:{color:'#8e24aa',weight:2,fill:false,dashArray:'5,4',opacity:.9},interactive:false}).addTo(estMap);
+    estLimLayer.bringToBack();
+  }
 }
 function estSelecionar(id){
   const p=estData.find(x=>x.id===id); if(!p) return;
