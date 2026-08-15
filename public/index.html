@@ -70,6 +70,8 @@ body:has(#login:not(.hidden)){background:#f6f8fb}
 .pqlbl:before{display:none!important}
 hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .sec{font-size:14px;font-weight:700;margin:20px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+.supS{all:unset;cursor:pointer;text-align:center;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut);flex:1}
+.supS.sel{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
 </style>
 </head>
 <body>
@@ -102,6 +104,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="pesquisa"><div class="ic">🎧</div><div class="nm">Pesquisa</div></button>
       <button class="mod" data-go="cadastro"><div class="ic">🗺️</div><div class="nm">Cadastro técnico</div></button>
       <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
+      <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Suprimentos</div></button>
       <div class="mod soon"><div class="ic">📐</div><div class="nm">Projetos</div></div>
       <div class="mod soon"><div class="ic">🎛️</div><div class="nm">VRPS</div></div>
       <div class="mod soon"><div class="ic">📚</div><div class="nm">Biblioteca</div></div>
@@ -322,6 +325,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
     <button id="capSalvar" class="btn" disabled>Registrar captação</button>
     <p class="sub" style="text-align:center;margin-top:8px;font-size:12px">* obrigatórios: categoria, economias, nome, CPF, telefone, foto do termo e da fachada.</p>
+  </main>
+
+  <main id="suprimentos" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Suprimentos</h1>
+    <div id="supTabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px"></div>
+    <div id="supView"></div>
   </main>
 
   <nav>
@@ -560,7 +570,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -572,6 +582,7 @@ function irPara(id){
   if(id==='ocorrencia') ocSync();
   if(id==='produtividade') prodInit();
   if(id==='captacao') capInit();
+  if(id==='suprimentos') supInit();
 }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
@@ -1203,6 +1214,269 @@ function capReset(){
   capValidar();
 }
 
+// ---------- MÓDULO SUPRIMENTOS ----------
+let ME=null, supCat=[], supEquipes=[], supTab=null, supCartS=[], supCartC=[];
+const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
+function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
+function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+async function supGetMe(){ if(ME) return ME; try{ const {data,error}=await sb.rpc('app_me'); if(error)throw error; ME=data; }catch(e){ ME={funcao:'campo',is_admin:false,is_almoxarife:false,pode_aprovar:false,equipes:[]}; } return ME; }
+async function supEnviar(item,msgOk,onOk){
+  if(navigator.onLine){
+    const {error}=await sb.rpc(item.rpc,item.fields);
+    if(error){ toast('⚠ '+(error.message||error)); return false; }
+    toast(msgOk); if(onOk)onOk(); return true;
+  }
+  try{ await filaAdd(item); toast('Sem conexão — salvo na fila'); atualizarFila(); if(onOk)onOk(); return true; }
+  catch(e){ toast('Erro ao salvar'); return false; }
+}
+async function supInit(){
+  await supGetMe();
+  try{
+    const [c,e]=await Promise.all([sb.rpc('sup_materiais_listar',{}),sb.rpc('sup_equipes_listar')]);
+    supCat=c.data||[]; supEquipes=e.data||[];
+  }catch(e){}
+  const tabs=supTabsDef();
+  if(!supTab||!tabs.find(t=>t.id===supTab)) supTab=(tabs[0]||{id:'solicitar'}).id;
+  supGo(supTab);
+}
+function supTabsDef(){
+  const t=[{id:'solicitar',l:'Solicitar'},{id:'pedidos',l:'Meus pedidos'},{id:'consumo',l:'Consumo'},{id:'estoque',l:'Estoque'}];
+  if(ME&&ME.pode_aprovar) t.push({id:'aprovar',l:'Aprovações'});
+  if(ME&&ME.is_almoxarife) t.push({id:'almox',l:'Almoxarife'});
+  if(ME&&(ME.pode_aprovar||ME.is_almoxarife)) t.push({id:'painel',l:'Painel'});
+  return t;
+}
+function supTabsRender(){
+  const box=$('#supTabs'); const tabs=supTabsDef();
+  box.innerHTML=tabs.map(t=>`<button class="supt" data-t="${t.id}" style="all:unset;cursor:pointer;padding:6px 12px;border-radius:999px;white-space:nowrap;font-size:13px;${t.id===supTab?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${t.l}</button>`).join('');
+  box.querySelectorAll('.supt').forEach(b=>b.addEventListener('click',()=>{supGo(b.dataset.t);}));
+}
+function supGo(t){
+  supTab=t; supTabsRender();
+  if(t==='solicitar') supVSolicitar();
+  else if(t==='pedidos') supVPedidos();
+  else if(t==='consumo') supVConsumo();
+  else if(t==='estoque') supVEstoque();
+  else if(t==='aprovar') supVAprovar();
+  else if(t==='almox') supVAlmox();
+  else if(t==='painel') supVPainel();
+}
+function supEqOptions(sel){ return supEquipes.map(e=>`<option value="${e.id}" ${String(e.id)===String(sel)?'selected':''}>${e.nome}</option>`).join(''); }
+function supMatOptions(){ return '<option value="">Material…</option>'+supCat.map(m=>`<option value="${m.id}">${m.descricao} (${m.unidade})</option>`).join(''); }
+function supMatById(id){ return supCat.find(m=>String(m.id)===String(id)); }
+function supCartRender(contId,cart,btnId){
+  const c=$('#'+contId);
+  if(!cart.length){ c.innerHTML='<p class="sub" style="margin:6px 0">Nenhum item adicionado.</p>'; if(btnId)$('#'+btnId).disabled=true; return; }
+  c.innerHTML=cart.map((x,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;font-size:14px">${x.descricao}</div><b style="font-size:14px;white-space:nowrap">${supNum(x.quantidade)} ${x.unidade}</b><button data-rm="${i}" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
+  c.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{cart.splice(+b.dataset.rm,1);supCartRender(contId,cart,btnId);}));
+  if(btnId)$('#'+btnId).disabled=false;
+}
+function supEstTable(cont,arr){
+  const c=$('#'+cont);
+  if(!arr.length){ c.innerHTML='<p class="sub">Estoque vazio.</p>'; return; }
+  c.innerHTML='<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+    '<div style="display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:7px 11px;background:var(--card);font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em"><span>Item</span><span style="text-align:right">Saldo</span><span style="text-align:right">Mín</span></div>'+
+    arr.map(x=>`<div style="display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:9px 11px;border-top:1px solid var(--line);font-size:14px;align-items:center${x.abaixo_min?';background:var(--bad-bg)':''}"><span>${x.material}${x.abaixo_min?' ⚠️':''} <span class="sub" style="font-size:11px">${x.unidade}</span></span><b style="text-align:right${x.abaixo_min?';color:var(--bad)':''}">${supNum(x.saldo)}</b><span style="text-align:right;color:var(--mut)">${supNum(x.minimo)}</span></div>`).join('')+'</div>';
+}
+
+// --- tela: Solicitar ---
+function supVSolicitar(){
+  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Você ainda não está vinculado a nenhuma equipe.</p>'; return; }
+  supCartS=[];
+  $('#supView').innerHTML=`
+    <label>Equipe</label><select id="supSEq">${supEqOptions()}</select>
+    <label>Adicionar material</label>
+    <div style="display:flex;gap:6px">
+      <select id="supSMat" style="flex:1;min-width:0">${supMatOptions()}</select>
+      <input id="supSQt" inputmode="decimal" placeholder="Qtd" style="width:74px;text-align:center"/>
+      <button id="supSAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 15px;border-radius:10px;font-size:20px;display:flex;align-items:center">＋</button>
+    </div>
+    <div id="supSCart" style="margin-top:10px"></div>
+    <label>Observação</label><textarea id="supSObs" rows="2"></textarea>
+    <button id="supSSend" class="btn" disabled>Enviar solicitação</button>`;
+  supCartRender('supSCart',supCartS,'supSSend');
+  $('#supSAdd').addEventListener('click',()=>{
+    const id=$('#supSMat').value, q=parseFloat(($('#supSQt').value||'').replace(',','.'));
+    if(!id||isNaN(q)||q<=0) return toast('Escolha material e quantidade');
+    const m=supMatById(id), ex=supCartS.find(x=>String(x.material_id)===String(id));
+    if(ex) ex.quantidade+=q; else supCartS.push({material_id:+id,descricao:m.descricao,unidade:m.unidade,quantidade:q});
+    $('#supSMat').value=''; $('#supSQt').value=''; supCartRender('supSCart',supCartS,'supSSend');
+  });
+  $('#supSSend').addEventListener('click',async()=>{
+    if(!supCartS.length) return;
+    $('#supSSend').disabled=true;
+    const item={id:crypto.randomUUID(),tipo:'sup_solicitar',rpc:'sup_solicitar',fields:{
+      p_equipe_id:+$('#supSEq').value, p_itens:supCartS.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:$('#supSObs').value||null}};
+    const ok=await supEnviar(item,'✓ Solicitação enviada',()=>{supCartS=[];supGo('pedidos');});
+    if(!ok) $('#supSSend').disabled=false;
+  });
+}
+
+// --- tela: Meus pedidos ---
+async function supVPedidos(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_minhas_solicitacoes',{}); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Você ainda não fez solicitações.</p>'; return; }
+    $('#supView').innerHTML=arr.map(s=>{
+      const st=SUP_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
+      const cod=(s.status==='segregada'&&s.codigo_retirada)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${s.codigo_retirada}</b></div>`:'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b> · ${s.equipe}<div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${cod}</div>`;
+    }).join('');
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- tela: Consumo na OS ---
+function supVConsumo(){
+  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe vinculada.</p>'; return; }
+  supCartC=[];
+  $('#supView').innerHTML=`
+    <label>Equipe</label><select id="supCEq">${supEqOptions()}</select>
+    <label>Ordem de Serviço</label><input id="supCOs" placeholder="Ex.: OS 88.421" autocomplete="off"/>
+    <label>Material utilizado</label>
+    <div style="display:flex;gap:6px">
+      <select id="supCMat" style="flex:1;min-width:0">${supMatOptions()}</select>
+      <input id="supCQt" inputmode="decimal" placeholder="Qtd" style="width:74px;text-align:center"/>
+      <button id="supCAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 15px;border-radius:10px;font-size:20px;display:flex;align-items:center">＋</button>
+    </div>
+    <div id="supCCart" style="margin-top:10px"></div>
+    <button id="supCSend" class="btn" disabled>Registrar consumo</button>`;
+  supCartRender('supCCart',supCartC,'supCSend');
+  $('#supCAdd').addEventListener('click',()=>{
+    const id=$('#supCMat').value, q=parseFloat(($('#supCQt').value||'').replace(',','.'));
+    if(!id||isNaN(q)||q<=0) return toast('Escolha material e quantidade');
+    const m=supMatById(id), ex=supCartC.find(x=>String(x.material_id)===String(id));
+    if(ex) ex.quantidade+=q; else supCartC.push({material_id:+id,descricao:m.descricao,unidade:m.unidade,quantidade:q});
+    $('#supCMat').value=''; $('#supCQt').value=''; supCartRender('supCCart',supCartC,'supCSend');
+  });
+  $('#supCSend').addEventListener('click',async()=>{
+    const os=($('#supCOs').value||'').trim(); if(!os) return toast('Informe a OS');
+    if(!supCartC.length) return;
+    $('#supCSend').disabled=true;
+    const item={id:crypto.randomUUID(),tipo:'sup_consumir',rpc:'sup_consumir',fields:{
+      p_equipe_id:+$('#supCEq').value, p_os:os, p_itens:supCartC.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:null}};
+    const ok=await supEnviar(item,'✓ Consumo registrado',()=>{supCartC=[];supGo('estoque');});
+    if(!ok) $('#supCSend').disabled=false;
+  });
+}
+
+// --- tela: Estoque da equipe ---
+function supVEstoque(){
+  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe vinculada.</p>'; return; }
+  $('#supView').innerHTML=`<label>Equipe</label><select id="supEEq">${supEqOptions()}</select><div id="supET" style="margin-top:12px"></div>`;
+  const load=async()=>{
+    $('#supET').innerHTML='<p class="sub">Carregando…</p>';
+    try{ const {data,error}=await sb.rpc('sup_estoque_equipe',{p_equipe_id:+$('#supEEq').value}); if(error)throw error; supEstTable('supET',data||[]); }
+    catch(e){ $('#supET').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+  };
+  $('#supEEq').addEventListener('change',load); load();
+}
+
+// --- tela: Aprovações ---
+async function supVAprovar(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_fila_aprovacao'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação aguardando aprovação.</p>'; return; }
+    $('#supView').innerHTML=arr.map(s=>{
+      const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>${i.material}</span><b style="white-space:nowrap">${supNum(i.qt_solicitada)} ${i.unidade}</b></div>`).join('');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center"><b>#${s.id}</b> · ${s.equipe}<span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
+    }).join('');
+    $('#supView').querySelectorAll('[data-ap]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_aprovar',{p_solicitacao_id:+b.dataset.ap},'Aprovada',supVAprovar)));
+    $('#supView').querySelectorAll('[data-rj]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_rejeitar',{p_solicitacao_id:+b.dataset.rj},'Rejeitada',supVAprovar)));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function supAcao(rpc,params,ok,after){
+  try{ const {error}=await sb.rpc(rpc,params); if(error)throw error; toast('✓ '+ok); if(after)after(); }
+  catch(e){ toast('⚠ '+(e.message||e)); }
+}
+
+// --- tela: Almoxarife (segregar / entregar) ---
+async function supVAlmox(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_fila_almoxarife'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nada na fila do almoxarifado.</p>'; return; }
+    $('#supView').innerHTML=arr.map(supAlmoxCard).join('');
+    supAlmoxWire();
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+function supAlmoxCard(s){
+  const head=`<div style="display:flex;gap:8px;align-items:center"><b>#${s.id}</b> · ${s.equipe}<span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div>`;
+  if(s.status==='segregada'){
+    const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>${i.material}</span><b style="white-space:nowrap">${supNum(i.qt_segregada||0)} ${i.unidade}</b></div>`).join('');
+    return `<div class="supcard" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div><div style="display:flex;gap:6px;margin-top:8px"><input class="supEntCod" data-id="${s.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-ent="${s.id}" style="margin:0;width:auto;padding:12px 16px">Entregar</button></div></div>`;
+  }
+  const itens=(s.itens||[]).map(i=>`
+    <div class="supSegItem" data-mat="${i.material_id}" data-apr="${i.qt_aprovada||0}" style="border-top:1px solid var(--line);padding:8px 0">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.material}</span><span class="sub">aprovado: ${supNum(i.qt_aprovada||0)} ${i.unidade}</span></div>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <span class="supSit" style="display:flex;gap:4px;flex:1">
+          <button type="button" class="supS sel" data-s="existe">Existe</button>
+          <button type="button" class="supS" data-s="parcial">Parcial</button>
+          <button type="button" class="supS" data-s="falta">Falta</button>
+        </span>
+        <input class="supSegQt" inputmode="decimal" value="${supNum(i.qt_aprovada||0)}" style="width:66px;text-align:center"/>
+      </div>
+    </div>`).join('');
+  return `<div class="supcard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin-top:6px">${itens}</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Concluir segregação</button></div>`;
+}
+function supAlmoxWire(){
+  $('#supView').querySelectorAll('.supSegItem').forEach(it=>{
+    it.querySelectorAll('.supS').forEach(b=>b.addEventListener('click',()=>{
+      it.querySelectorAll('.supS').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+      const qt=it.querySelector('.supSegQt');
+      if(b.dataset.s==='falta'){ qt.value='0'; qt.disabled=true; }
+      else { qt.disabled=false; if((qt.value||'0')==='0') qt.value=supNum(+it.dataset.apr); }
+    }));
+  });
+  $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{
+    const card=b.closest('.supcard'); const itens=[];
+    card.querySelectorAll('.supSegItem').forEach(it=>{
+      const selb=it.querySelector('.supS.sel'); const sit=selb?selb.dataset.s:'existe';
+      const qt=parseFloat((it.querySelector('.supSegQt').value||'0').replace(',','.'))||0;
+      itens.push({material_id:+it.dataset.mat, situacao:sit, qt_segregada:sit==='falta'?0:qt});
+    });
+    supAcao('sup_segregar',{p_solicitacao_id:+b.dataset.seg,p_itens:itens},'Segregado',supVAlmox);
+  }));
+  $('#supView').querySelectorAll('[data-ent]').forEach(b=>b.addEventListener('click',()=>{
+    const inp=$('#supView').querySelector('.supEntCod[data-id="'+b.dataset.ent+'"]');
+    const cod=((inp||{}).value||'').trim();
+    if(cod.length!==4) return toast('Digite o código de 4 dígitos');
+    supAcao('sup_entregar',{p_solicitacao_id:+b.dataset.ent,p_codigo:cod},'Entregue',supVAlmox);
+  }));
+}
+
+// --- tela: Painel (movimentação + estoque) ---
+function supVPainel(){
+  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe.</p>'; return; }
+  $('#supView').innerHTML=`
+    <label>Equipe</label><select id="supPEq">${supEqOptions()}</select>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      <span class="sub">De</span><input id="supPDe" type="date" style="flex:1;min-width:0;font-size:13px"/>
+      <span class="sub">até</span><input id="supPAte" type="date" style="flex:1;min-width:0;font-size:13px"/>
+    </div>
+    <button id="supPLoad" class="btn ghost" style="margin-top:10px">Carregar</button>
+    <div id="supPOut" style="margin-top:6px"></div>`;
+  const load=async()=>{
+    $('#supPOut').innerHTML='<p class="sub">Carregando…</p>';
+    try{
+      const {data,error}=await sb.rpc('sup_painel',{p_equipe_id:+$('#supPEq').value,p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
+      const mv=(data&&data.movimentos)||[], est=(data&&data.estoque)||[];
+      $('#supPOut').innerHTML='<div class="sec">📦 Estoque atual</div><div id="supPEst"></div><div class="sec">🔄 Movimentação</div><div id="supPMov"></div>';
+      supEstTable('supPEst',est);
+      $('#supPMov').innerHTML = mv.length? mv.map(m=>{
+        const neg=m.quantidade<0;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px"><div style="flex:1;min-width:0"><b>${m.material}</b><div class="sub">${supData(m.data)} · ${m.tipo}${m.os?(' · '+m.os):''}${m.quem?(' · '+m.quem):''}</div></div><b style="white-space:nowrap;color:${neg?'var(--bad)':'var(--ok)'}">${neg?'':'+'}${supNum(m.quantidade)} ${m.unidade}</b></div>`;
+      }).join('') : '<p class="sub">Sem movimentação no período.</p>';
+    }catch(e){ $('#supPOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+  };
+  $('#supPLoad').addEventListener('click',load); load();
+}
+
 // ---------- auth ----------
 $('#entrar').addEventListener('click',async()=>{
   $('#loginErr').textContent='';
@@ -1227,8 +1501,10 @@ function mostrar(sess){
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
     iniciarGPS(); atualizarFila();
+    ME=null; sb.rpc('app_me').then(({data})=>{ if(data) ME=data; }).catch(()=>{});
     if(navigator.onLine) sincronizar();
   }else{
+    ME=null;
     screens.app.classList.add('hidden'); screens.login.classList.remove('hidden');
   }
 }
