@@ -1225,7 +1225,7 @@ function capReset(){
 
 // ---------- MÓDULO SUPRIMENTOS ----------
 let ME=null, supCat=[], supEquipes=[], supCurrent='home', supCartS=[], supCartC=[], supConEstoque=[];
-const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
+const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 function supSitTag(sit){
@@ -1355,8 +1355,9 @@ async function supVPedidos(){
     $('#supView').innerHTML=arr.map(s=>{
       const st=SUP_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
       const cod=(s.status==='segregada'&&s.codigo_retirada)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${s.codigo_retirada}</b></div>`:'';
-      const lista=(s.status==='segregada'&&Array.isArray(s.lista))?('<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px">'+s.lista.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${i.situacao==='falta'?'—':(supNum(i.qt_segregada||0)+' '+i.unidade)}</b></div>`).join('')+'</div>'):'';
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b> · ${s.equipe}<div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${lista}${cod}</div>`;
+      const emFalta=(s.status==='em_falta')?'<div style="margin-top:8px;background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600">⛔ Sem estoque — toda a solicitação está em falta no almoxarifado.</div>':'';
+      const lista=((s.status==='segregada'||s.status==='em_falta')&&Array.isArray(s.lista))?('<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px">'+s.lista.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${i.situacao==='falta'?'—':(supNum(i.qt_segregada||0)+' '+i.unidade)}</b></div>`).join('')+'</div>'):'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b> · ${s.equipe}<div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${emFalta}${lista}${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
@@ -1473,7 +1474,7 @@ function supAlmoxCard(s){
       </div>
       <div class="supSegMsg" style="font-size:11px;margin-top:5px;font-weight:600"></div>
     </div>`).join('');
-  return `<div class="supcard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin-top:6px">${itens}</div><div class="supSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Todos os itens em falta — não há o que entregar. Nenhum código será gerado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Concluir segregação</button></div>`;
+  return `<div class="supcard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin-top:6px">${itens}</div><div class="supSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Nada disponível — ao concluir, a solicitação será marcada como <b>EM FALTA</b> e o colaborador será avisado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Concluir segregação</button></div>`;
 }
 function supSegRefresh(card){
   if(!card) return;
@@ -1487,9 +1488,13 @@ function supSegRefresh(card){
     else { disp+=qt; if(msg){ msg.textContent=''; } }
   });
   const seg=card.querySelector('[data-seg]'), blk=card.querySelector('.supSegBlock');
-  const bloqueado=disp<=0;
-  if(seg) seg.disabled=bloqueado;
-  if(blk) blk.style.display=bloqueado?'block':'none';
+  const semEstoque=disp<=0;
+  if(seg){
+    seg.disabled=false;
+    seg.textContent = semEstoque ? 'Marcar toda a solicitação em falta' : 'Concluir segregação';
+    seg.style.background = semEstoque ? 'var(--bad)' : '';
+  }
+  if(blk) blk.style.display=semEstoque?'block':'none';
 }
 function supAlmoxWire(){
   $('#supView').querySelectorAll('.supSegItem').forEach(it=>{
@@ -1503,15 +1508,18 @@ function supAlmoxWire(){
     const qi=it.querySelector('.supSegQt'); if(qi) qi.addEventListener('input',()=>supSegRefresh(it.closest('.supcard')));
   });
   $('#supView').querySelectorAll('.supcard[data-id]').forEach(card=>{ if(card.querySelector('.supSegItem')) supSegRefresh(card); });
-  $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{
-    if(b.disabled) return;
+  $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',async()=>{
     const card=b.closest('.supcard'); const itens=[];
     card.querySelectorAll('.supSegItem').forEach(it=>{
       const selb=it.querySelector('.supS.sel'); const sit=selb?selb.dataset.s:'existe';
       const qt=parseFloat((it.querySelector('.supSegQt').value||'0').replace(',','.'))||0;
       itens.push({material_id:+it.dataset.mat, situacao:sit, qt_segregada:sit==='falta'?0:qt});
     });
-    supAcao('sup_segregar',{p_solicitacao_id:+b.dataset.seg,p_itens:itens},'Segregado',supVAlmox);
+    b.disabled=true;
+    const {data,error}=await sb.rpc('sup_segregar',{p_solicitacao_id:+b.dataset.seg,p_itens:itens});
+    if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
+    toast(data&&data.status==='em_falta' ? '✓ Marcada em falta — colaborador avisado' : '✓ Segregado — código gerado');
+    supVAlmox();
   }));
   $('#supView').querySelectorAll('[data-ent]').forEach(b=>b.addEventListener('click',()=>{
     const inp=$('#supView').querySelector('.supEntCod[data-id="'+b.dataset.ent+'"]');
