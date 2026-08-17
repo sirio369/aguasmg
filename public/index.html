@@ -1609,7 +1609,14 @@ function supCfgUsers(){
 }
 function supCfgEquipes(){
   const c=$('#cfgEquipes'); if(!c) return;
-  c.innerHTML = cfgEquipes.length ? cfgEquipes.map(e=>`<div style="display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1"><b>${e.nome}</b>${e.placa?(' · <span class="sub">'+e.placa+'</span>'):''}</span><span class="sub">${e.membros} membro(s)</span></div>`).join('') : '<p class="sub">Nenhum veículo cadastrado.</p>';
+  c.innerHTML = cfgEquipes.length ? cfgEquipes.map(e=>`<div style="display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0"><b>${e.nome}</b>${e.placa?(' · <span class="sub">'+e.placa+'</span>'):''}</span><span class="sub">${e.membros} membro(s)</span><button data-eqdel="${e.id}" data-eqnome="${e.nome}" title="Excluir veículo" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px;padding:2px 4px;flex:0 0 auto">🗑️</button></div>`).join('') : '<p class="sub">Nenhum veículo cadastrado.</p>';
+  c.querySelectorAll('[data-eqdel]').forEach(b=>b.addEventListener('click',()=>supCfgExcluirEquipe(b.dataset.eqdel, b.dataset.eqnome)));
+}
+async function supCfgExcluirEquipe(id, nome){
+  if(!confirm('Excluir o veículo "'+nome+'"?\nOs vínculos de membros serão removidos. Só é possível se não houver materiais/movimentações vinculados a ele.')) return;
+  const {error}=await sb.rpc('sup_admin_equipe_excluir',{p_equipe_id:+id});
+  if(error){ toast('⚠ '+(error.message||error)); return; }
+  toast('✓ Veículo excluído'); supVConfig();
 }
 async function supCfgCriarEquipe(){
   const nome=($('#cfgEqNome').value||'').trim(); const placa=($('#cfgEqPlaca').value||'').trim()||null;
