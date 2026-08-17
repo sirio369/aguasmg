@@ -1228,6 +1228,11 @@ let ME=null, supCat=[], supEquipes=[], supCurrent='home', supCartS=[], supCartC=
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+function supSitTag(sit){
+  if(sit==='falta')   return ' <span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--bad-bg);color:var(--bad);white-space:nowrap">em falta</span>';
+  if(sit==='parcial') return ' <span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn);white-space:nowrap">parcial</span>';
+  return '';
+}
 async function supGetMe(){ if(ME) return ME; try{ const {data,error}=await sb.rpc('app_me'); if(error)throw error; ME=data; }catch(e){ ME={funcao:'campo',is_admin:false,is_almoxarife:false,pode_aprovar:false,equipes:[]}; } return ME; }
 async function supEnviar(item,msgOk,onOk){
   if(navigator.onLine){
@@ -1350,7 +1355,8 @@ async function supVPedidos(){
     $('#supView').innerHTML=arr.map(s=>{
       const st=SUP_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
       const cod=(s.status==='segregada'&&s.codigo_retirada)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${s.codigo_retirada}</b></div>`:'';
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b> · ${s.equipe}<div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${cod}</div>`;
+      const lista=(s.status==='segregada'&&Array.isArray(s.lista))?('<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px">'+s.lista.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${i.situacao==='falta'?'—':(supNum(i.qt_segregada||0)+' '+i.unidade)}</b></div>`).join('')+'</div>'):'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b> · ${s.equipe}<div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${lista}${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
@@ -1451,7 +1457,7 @@ async function supVAlmox(){
 function supAlmoxCard(s){
   const head=`<div style="display:flex;gap:8px;align-items:center"><b>#${s.id}</b> · ${s.equipe}<span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div>`;
   if(s.status==='segregada'){
-    const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>${i.material}</span><b style="white-space:nowrap">${supNum(i.qt_segregada||0)} ${i.unidade}</b></div>`).join('');
+    const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${supNum(i.qt_segregada||0)} ${i.unidade}</b></div>`).join('');
     return `<div class="supcard" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div><div style="display:flex;gap:6px;margin-top:8px"><input class="supEntCod" data-id="${s.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-ent="${s.id}" style="margin:0;width:auto;padding:12px 16px">Entregar</button></div></div>`;
   }
   const itens=(s.itens||[]).map(i=>`
@@ -1465,8 +1471,25 @@ function supAlmoxCard(s){
         </span>
         <input class="supSegQt" inputmode="decimal" value="${supNum(i.qt_aprovada||0)}" style="width:66px;text-align:center"/>
       </div>
+      <div class="supSegMsg" style="font-size:11px;margin-top:5px;font-weight:600"></div>
     </div>`).join('');
-  return `<div class="supcard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin-top:6px">${itens}</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Concluir segregação</button></div>`;
+  return `<div class="supcard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin-top:6px">${itens}</div><div class="supSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Todos os itens em falta — não há o que entregar. Nenhum código será gerado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Concluir segregação</button></div>`;
+}
+function supSegRefresh(card){
+  if(!card) return;
+  let disp=0;
+  card.querySelectorAll('.supSegItem').forEach(it=>{
+    const selb=it.querySelector('.supS.sel'); const sit=selb?selb.dataset.s:'existe';
+    const qt=parseFloat((it.querySelector('.supSegQt').value||'0').replace(',','.'))||0;
+    const apr=+it.dataset.apr||0; const msg=it.querySelector('.supSegMsg');
+    if(sit==='falta'){ if(msg){ msg.textContent='⛔ Em falta — não entra na retirada'; msg.style.color='var(--bad)'; } }
+    else if(sit==='parcial'){ disp+=qt; if(msg){ msg.textContent='⚠️ Parcial — '+supNum(qt)+' de '+supNum(apr); msg.style.color='var(--warn)'; } }
+    else { disp+=qt; if(msg){ msg.textContent=''; } }
+  });
+  const seg=card.querySelector('[data-seg]'), blk=card.querySelector('.supSegBlock');
+  const bloqueado=disp<=0;
+  if(seg) seg.disabled=bloqueado;
+  if(blk) blk.style.display=bloqueado?'block':'none';
 }
 function supAlmoxWire(){
   $('#supView').querySelectorAll('.supSegItem').forEach(it=>{
@@ -1475,9 +1498,13 @@ function supAlmoxWire(){
       const qt=it.querySelector('.supSegQt');
       if(b.dataset.s==='falta'){ qt.value='0'; qt.disabled=true; }
       else { qt.disabled=false; if((qt.value||'0')==='0') qt.value=supNum(+it.dataset.apr); }
+      supSegRefresh(it.closest('.supcard'));
     }));
+    const qi=it.querySelector('.supSegQt'); if(qi) qi.addEventListener('input',()=>supSegRefresh(it.closest('.supcard')));
   });
+  $('#supView').querySelectorAll('.supcard[data-id]').forEach(card=>{ if(card.querySelector('.supSegItem')) supSegRefresh(card); });
   $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',()=>{
+    if(b.disabled) return;
     const card=b.closest('.supcard'); const itens=[];
     card.querySelectorAll('.supSegItem').forEach(it=>{
       const selb=it.querySelector('.supS.sel'); const sit=selb?selb.dataset.s:'existe';
