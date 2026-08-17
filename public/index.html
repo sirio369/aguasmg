@@ -328,9 +328,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="suprimentos" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
-    <h1>Suprimentos</h1>
-    <div id="supTabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px"></div>
+    <div class="bar"><button class="bk" id="supBack">‹ Início</button><b id="supTitle" style="font-size:16px"></b></div>
     <div id="supView"></div>
   </main>
 
@@ -1215,7 +1213,7 @@ function capReset(){
 }
 
 // ---------- MÓDULO SUPRIMENTOS ----------
-let ME=null, supCat=[], supEquipes=[], supTab=null, supCartS=[], supCartC=[];
+let ME=null, supCat=[], supEquipes=[], supCurrent='home', supCartS=[], supCartC=[], supConEstoque=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -1235,31 +1233,48 @@ async function supInit(){
     const [c,e]=await Promise.all([sb.rpc('sup_materiais_listar',{}),sb.rpc('sup_equipes_listar')]);
     supCat=c.data||[]; supEquipes=e.data||[];
   }catch(e){}
-  const tabs=supTabsDef();
-  if(!supTab||!tabs.find(t=>t.id===supTab)) supTab=(tabs[0]||{id:'solicitar'}).id;
-  supGo(supTab);
+  supHome();
 }
-function supTabsDef(){
-  const t=[{id:'solicitar',l:'Solicitar'},{id:'pedidos',l:'Meus pedidos'},{id:'consumo',l:'Consumo'},{id:'estoque',l:'Estoque'}];
-  if(ME&&ME.pode_aprovar) t.push({id:'aprovar',l:'Aprovações'});
-  if(ME&&ME.is_almoxarife) t.push({id:'almox',l:'Almoxarife'});
-  if(ME&&(ME.pode_aprovar||ME.is_almoxarife)) t.push({id:'painel',l:'Painel'});
-  return t;
+const SUP_ACTS={
+  solicitar:{ic:'🧺',lbl:'Solicitar material',fn:()=>supVSolicitar()},
+  pedidos:{ic:'📦',lbl:'Meus pedidos',fn:()=>supVPedidos()},
+  consumo:{ic:'🛠️',lbl:'Registrar consumo',fn:()=>supVConsumo()},
+  estoque:{ic:'🚐',lbl:'Estoque da equipe',fn:()=>supVEstoque()},
+  aprovar:{ic:'🖊️',lbl:'Aprovar solicitações',fn:()=>supVAprovar()},
+  almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVAlmox()},
+  painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()}
+};
+function supBlocks(){
+  const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
+  return [
+    {t:'Campo',ic:'🧑‍🔧',papel:'Colaborador',acts:[
+      {id:'solicitar',on:true},{id:'pedidos',on:true},{id:'consumo',on:true},{id:'estoque',on:true}]},
+    {t:'Aprovação',ic:'✅',papel:'Encarregado',acts:[{id:'aprovar',on:podeAp}]},
+    {t:'Almoxarifado',ic:'📦',papel:'Almoxarife',acts:[{id:'almox',on:almox}]},
+    {t:'Gestão',ic:'📊',papel:'Encarregado / Almoxarife',acts:[{id:'painel',on:gestao}]}
+  ];
 }
-function supTabsRender(){
-  const box=$('#supTabs'); const tabs=supTabsDef();
-  box.innerHTML=tabs.map(t=>`<button class="supt" data-t="${t.id}" style="all:unset;cursor:pointer;padding:6px 12px;border-radius:999px;white-space:nowrap;font-size:13px;${t.id===supTab?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${t.l}</button>`).join('');
-  box.querySelectorAll('.supt').forEach(b=>b.addEventListener('click',()=>{supGo(b.dataset.t);}));
+function supHome(){
+  supCurrent='home';
+  const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
+  const tt=$('#supTitle'); if(tt) tt.textContent='';
+  $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma etapa</p>'+
+    supBlocks().map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
+      b.acts.map(a=>{
+        const A=SUP_ACTS[a.id];
+        return a.on
+          ? `<button class="mod" data-supact="${a.id}"><div class="ic">${A.ic}</div><div class="nm">${A.lbl}</div></button>`
+          : `<button class="mod soon" data-suplock="${b.papel}"><div class="ic">${A.ic}</div><div class="nm">${A.lbl}</div><span class="tag">${b.papel}</span></button>`;
+      }).join('')+'</div>').join('');
+  $('#supView').querySelectorAll('[data-supact]').forEach(el=>el.addEventListener('click',()=>supOpen(el.dataset.supact)));
+  $('#supView').querySelectorAll('[data-suplock]').forEach(el=>el.addEventListener('click',()=>toast('Etapa de '+el.dataset.suplock)));
 }
-function supGo(t){
-  supTab=t; supTabsRender();
-  if(t==='solicitar') supVSolicitar();
-  else if(t==='pedidos') supVPedidos();
-  else if(t==='consumo') supVConsumo();
-  else if(t==='estoque') supVEstoque();
-  else if(t==='aprovar') supVAprovar();
-  else if(t==='almox') supVAlmox();
-  else if(t==='painel') supVPainel();
+function supOpen(id){
+  const A=SUP_ACTS[id]; if(!A) return;
+  supCurrent=id;
+  const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  const tt=$('#supTitle'); if(tt) tt.textContent=A.lbl;
+  $('#supView').innerHTML=''; A.fn();
 }
 function supEqOptions(sel){ return supEquipes.map(e=>`<option value="${e.id}" ${String(e.id)===String(sel)?'selected':''}>${e.nome}</option>`).join(''); }
 function supMatOptions(){ return '<option value="">Material…</option>'+supCat.map(m=>`<option value="${m.id}">${m.descricao} (${m.unidade})</option>`).join(''); }
@@ -1307,7 +1322,7 @@ function supVSolicitar(){
     $('#supSSend').disabled=true;
     const item={id:crypto.randomUUID(),tipo:'sup_solicitar',rpc:'sup_solicitar',fields:{
       p_equipe_id:+$('#supSEq').value, p_itens:supCartS.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:$('#supSObs').value||null}};
-    const ok=await supEnviar(item,'✓ Solicitação enviada',()=>{supCartS=[];supGo('pedidos');});
+    const ok=await supEnviar(item,'✓ Solicitação enviada',()=>{supCartS=[];supOpen('pedidos');});
     if(!ok) $('#supSSend').disabled=false;
   });
 }
@@ -1327,27 +1342,31 @@ async function supVPedidos(){
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
-// --- tela: Consumo na OS ---
+// --- tela: Consumo na OS (materiais limitados ao saldo da equipe) ---
 function supVConsumo(){
   if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe vinculada.</p>'; return; }
-  supCartC=[];
+  supCartC=[]; supConEstoque=[];
   $('#supView').innerHTML=`
     <label>Equipe</label><select id="supCEq">${supEqOptions()}</select>
     <label>Ordem de Serviço</label><input id="supCOs" placeholder="Ex.: OS 88.421" autocomplete="off"/>
-    <label>Material utilizado</label>
+    <label>Material utilizado <span class="sub">(somente com saldo)</span></label>
     <div style="display:flex;gap:6px">
-      <select id="supCMat" style="flex:1;min-width:0">${supMatOptions()}</select>
+      <select id="supCMat" style="flex:1;min-width:0"><option value="">Carregando…</option></select>
       <input id="supCQt" inputmode="decimal" placeholder="Qtd" style="width:74px;text-align:center"/>
       <button id="supCAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 15px;border-radius:10px;font-size:20px;display:flex;align-items:center">＋</button>
     </div>
     <div id="supCCart" style="margin-top:10px"></div>
     <button id="supCSend" class="btn" disabled>Registrar consumo</button>`;
   supCartRender('supCCart',supCartC,'supCSend');
+  $('#supCEq').addEventListener('change',()=>{ supCartC=[]; supCartRender('supCCart',supCartC,'supCSend'); supConLoad(); });
   $('#supCAdd').addEventListener('click',()=>{
     const id=$('#supCMat').value, q=parseFloat(($('#supCQt').value||'').replace(',','.'));
     if(!id||isNaN(q)||q<=0) return toast('Escolha material e quantidade');
-    const m=supMatById(id), ex=supCartC.find(x=>String(x.material_id)===String(id));
-    if(ex) ex.quantidade+=q; else supCartC.push({material_id:+id,descricao:m.descricao,unidade:m.unidade,quantidade:q});
+    const st=supConEstoque.find(x=>String(x.material_id)===String(id)); if(!st) return;
+    const jah=(supCartC.find(x=>String(x.material_id)===String(id))||{}).quantidade||0;
+    if(q+jah>+st.saldo) return toast('Máx. disponível: '+supNum(st.saldo)+' '+st.unidade);
+    const ex=supCartC.find(x=>String(x.material_id)===String(id));
+    if(ex) ex.quantidade+=q; else supCartC.push({material_id:+id,descricao:st.material,unidade:st.unidade,quantidade:q});
     $('#supCMat').value=''; $('#supCQt').value=''; supCartRender('supCCart',supCartC,'supCSend');
   });
   $('#supCSend').addEventListener('click',async()=>{
@@ -1356,9 +1375,21 @@ function supVConsumo(){
     $('#supCSend').disabled=true;
     const item={id:crypto.randomUUID(),tipo:'sup_consumir',rpc:'sup_consumir',fields:{
       p_equipe_id:+$('#supCEq').value, p_os:os, p_itens:supCartC.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:null}};
-    const ok=await supEnviar(item,'✓ Consumo registrado',()=>{supCartC=[];supGo('estoque');});
+    const ok=await supEnviar(item,'✓ Consumo registrado',()=>{supCartC=[];supOpen('estoque');});
     if(!ok) $('#supCSend').disabled=false;
   });
+  supConLoad();
+}
+async function supConLoad(){
+  const sel=$('#supCMat'); if(!sel) return;
+  sel.innerHTML='<option value="">Carregando…</option>';
+  try{
+    const {data,error}=await sb.rpc('sup_estoque_equipe',{p_equipe_id:+$('#supCEq').value}); if(error)throw error;
+    supConEstoque=(data||[]).filter(x=>+x.saldo>0);
+    sel.innerHTML = supConEstoque.length
+      ? '<option value="">Material…</option>'+supConEstoque.map(x=>`<option value="${x.material_id}">${x.material} — ${supNum(x.saldo)} ${x.unidade}</option>`).join('')
+      : '<option value="">Sem saldo em estoque</option>';
+  }catch(e){ sel.innerHTML='<option value="">Erro ao carregar</option>'; }
 }
 
 // --- tela: Estoque da equipe ---
@@ -1476,6 +1507,8 @@ function supVPainel(){
   };
   $('#supPLoad').addEventListener('click',load); load();
 }
+
+if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else supHome(); });
 
 // ---------- auth ----------
 $('#entrar').addEventListener('click',async()=>{
