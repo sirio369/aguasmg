@@ -72,6 +72,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .sec{font-size:14px;font-weight:700;margin:20px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .supS{all:unset;cursor:pointer;text-align:center;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut);flex:1}
 .supS.sel{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
+.pick{display:flex;gap:8px}
+.pickb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;padding:11px;border:1px solid var(--line);border-radius:10px;color:var(--acc);background:var(--card)}
+.pickb input{display:none}
+.pickb:active{transform:scale(.98)}
 </style>
 </head>
 <body>
@@ -132,7 +136,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
     <label>Foto do manômetro *</label>
     <div class="photo">
-      <input id="foto" type="file" accept="image/*" style="border:none;padding:0;font-size:14px"/>
+      <div class="pick">
+        <label class="pickb">📷 Câmera<input class="fFoto" type="file" accept="image/*" capture="environment"/></label>
+        <label class="pickb">🖼️ Galeria<input class="fFoto" type="file" accept="image/*"/></label>
+      </div>
       <img id="fotoPrev" class="hidden" alt=""/>
     </div>
 
@@ -240,7 +247,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </select>
     <label>Foto (opcional)</label>
     <div class="photo">
-      <input id="ocFoto" type="file" accept="image/*" style="border:none;padding:0;font-size:14px"/>
+      <div class="pick">
+        <label class="pickb">📷 Câmera<input class="ocF" type="file" accept="image/*" capture="environment"/></label>
+        <label class="pickb">🖼️ Galeria<input class="ocF" type="file" accept="image/*"/></label>
+      </div>
       <img id="ocPrev" class="hidden" alt=""/>
     </div>
     <label for="ocObs">Observação</label>
@@ -310,15 +320,15 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
     <div class="sec">📎 Documentos e fotos</div>
     <label>Foto do termo assinado *</label>
-    <div class="photo"><input type="file" accept="image/*" data-capfoto="termo" style="border:none;padding:0;font-size:14px"/><img data-cprev="termo" class="hidden" alt=""/></div>
+    <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-capfoto="termo"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-capfoto="termo"/></label></div><img data-cprev="termo" class="hidden" alt=""/></div>
     <label>Foto da fachada do imóvel *</label>
-    <div class="photo"><input type="file" accept="image/*" data-capfoto="fachada" style="border:none;padding:0;font-size:14px"/><img data-cprev="fachada" class="hidden" alt=""/></div>
+    <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-capfoto="fachada"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-capfoto="fachada"/></label></div><img data-cprev="fachada" class="hidden" alt=""/></div>
     <label>Documento com foto — frente</label>
-    <div class="photo"><input type="file" accept="image/*" data-capfoto="doc_frente" style="border:none;padding:0;font-size:14px"/><img data-cprev="doc_frente" class="hidden" alt=""/></div>
+    <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-capfoto="doc_frente"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-capfoto="doc_frente"/></label></div><img data-cprev="doc_frente" class="hidden" alt=""/></div>
     <label>Documento com foto — verso</label>
-    <div class="photo"><input type="file" accept="image/*" data-capfoto="doc_verso" style="border:none;padding:0;font-size:14px"/><img data-cprev="doc_verso" class="hidden" alt=""/></div>
+    <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-capfoto="doc_verso"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-capfoto="doc_verso"/></label></div><img data-cprev="doc_verso" class="hidden" alt=""/></div>
     <label>Comprovante de residência</label>
-    <div class="photo"><input type="file" accept="image/*" data-capfoto="comprovante" style="border:none;padding:0;font-size:14px"/><img data-cprev="comprovante" class="hidden" alt=""/></div>
+    <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-capfoto="comprovante"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-capfoto="comprovante"/></label></div><img data-cprev="comprovante" class="hidden" alt=""/></div>
 
     <label for="cap_obs">Observação</label>
     <textarea id="cap_obs" rows="2"></textarea>
@@ -431,12 +441,12 @@ async function comprimir(file){
     return (blob&&blob.size<file.size)?blob:file;
   }catch(e){ return file; }
 }
-$('#foto').addEventListener('change',async e=>{
+document.querySelectorAll('#pressao .fFoto').forEach(fi=>fi.addEventListener('change',async e=>{
   const f=e.target.files[0]||null; const img=$('#fotoPrev');
   if(f){ fotoBlob=await comprimir(f); img.src=URL_obj(fotoBlob); img.classList.remove('hidden'); }
   else { fotoBlob=null; img.classList.add('hidden'); }
   validar();
-});
+}));
 function URL_obj(b){return window.URL.createObjectURL(b);}
 
 $('#salvar').addEventListener('click',async()=>{
@@ -463,7 +473,7 @@ $('#salvar').addEventListener('click',async()=>{
   }catch(e){ toast('Erro ao salvar: '+e.message); }
   finally{ enviando=false; validar(); }
 });
-function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;$('#foto').value='';$('#fotoPrev').classList.add('hidden');validar();}
+function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;document.querySelectorAll('#pressao .fFoto').forEach(i=>i.value='');$('#fotoPrev').classList.add('hidden');validar();}
 
 // ---------- TESTE DE ESTANQUEIDADE (pontos de referência p/ bater pressão) ----------
 let estData=[], estFiltroS='todos', estView='lista', estMap=null, estMarkers=null, prAlvo=null, estLimites=null, estLimLayer=null;
@@ -666,7 +676,7 @@ function nav_btn(p){return `<button class="btn ghost" data-navp="${p.lat},${p.lo
 function cInput(l,id,v){return `<label>${l}</label><input id="${id}" value="${v||''}"/>`;}
 function cNum(l,id){return `<label>${l}</label><input id="${id}" inputmode="decimal" class="lgnum"/>`;}
 function cArea(l,id){return `<label>${l}</label><textarea id="${id}" rows="2"></textarea>`;}
-function cFoto(l,k){return `<label>${l}</label><div class="photo"><input type="file" accept="image/*" data-foto="${k}" style="border:none;padding:0;font-size:14px"/><img class="prev-${k} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/></div>`;}
+function cFoto(l,k){return `<label>${l}</label><div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-foto="${k}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-foto="${k}"/></label></div><img class="prev-${k} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/></div>`;}
 function abrirDetalhe(id){
   detPonto=loggersData.find(p=>p.id===id); detFotos={}; if(!detPonto) return;
   const p=detPonto; let h;
@@ -886,12 +896,12 @@ if($('#capSalvar')) $('#capSalvar').addEventListener('click',()=>{
 if($('#ocTipo')) $('#ocTipo').addEventListener('change',ocSync);
 if($('#ocLocal')) $('#ocLocal').addEventListener('change',ocSync);
 if($('#ocSalvar')) $('#ocSalvar').addEventListener('click',ocRegistrar);
-if($('#ocFoto')) $('#ocFoto').addEventListener('change',async e=>{
+document.querySelectorAll('#ocorrencia .ocF').forEach(fi=>fi.addEventListener('change',async e=>{
   const f=e.target.files[0]||null, img=$('#ocPrev');
   if(f){ ocFotoBlob=await comprimir(f); img.src=window.URL.createObjectURL(ocFotoBlob); img.classList.remove('hidden'); }
   else { ocFotoBlob=null; img.classList.add('hidden'); }
   ocSync();
-});
+}));
 
 // ---------- CADASTRO TÉCNICO ----------
 let cadMap=null, cadCamadas={}, cadOn={unidades:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
@@ -1094,7 +1104,7 @@ function pqOcorrencia(){
   document.getElementById('ocTipo').value='';
   document.getElementById('ocLocal').value='';
   document.getElementById('ocObs').value='';
-  ocFotoBlob=null; document.getElementById('ocFoto').value=''; document.getElementById('ocPrev').classList.add('hidden');
+  ocFotoBlob=null; document.querySelectorAll('#ocorrencia .ocF').forEach(i=>i.value=''); document.getElementById('ocPrev').classList.add('hidden');
   irPara('ocorrencia');
 }
 function ocSync(){
