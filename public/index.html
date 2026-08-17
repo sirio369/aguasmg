@@ -338,7 +338,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="suprimentos" class="hidden">
-    <div class="bar"><button class="bk" id="supBack">‹ Início</button><b id="supTitle" style="font-size:16px"></b></div>
+    <div class="bar"><button class="bk" id="supBack">‹ Início</button><b id="supTitle" style="font-size:16px"></b><button id="supCfg" class="hidden" title="Configurações" style="margin-left:auto;all:unset;cursor:pointer;font-size:20px;padding:4px 6px">⚙️</button></div>
     <div id="supView"></div>
   </main>
 
@@ -1276,6 +1276,7 @@ function supHome(){
   supCurrent='home';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
   const tt=$('#supTitle'); if(tt) tt.textContent='';
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
   $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma etapa</p>'+
     supBlocks().map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
       b.acts.map(a=>{
@@ -1292,6 +1293,7 @@ function supOpen(id){
   supCurrent=id;
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
   const tt=$('#supTitle'); if(tt) tt.textContent=A.lbl;
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   $('#supView').innerHTML=''; A.fn();
 }
 function supEqOptions(sel){ return supEquipes.map(e=>`<option value="${e.id}" ${String(e.id)===String(sel)?'selected':''}>${e.nome}</option>`).join(''); }
@@ -1555,6 +1557,102 @@ function supVPainel(){
   };
   $('#supPLoad').addEventListener('click',load); load();
 }
+
+// --- tela: Configurações (admin) ---
+let cfgUsers=[], cfgEquipes=[];
+const CFG_FUN={campo:'Campo',almoxarife:'Almoxarife',admin:'Admin'};
+function supAbrirConfig(){
+  supCurrent='config';
+  const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  const tt=$('#supTitle'); if(tt) tt.textContent='Configurações';
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  supVConfig();
+}
+async function supVConfig(){
+  try{
+    const [u,e]=await Promise.all([sb.rpc('sup_admin_usuarios'),sb.rpc('sup_admin_equipes')]);
+    if(u.error) throw u.error; if(e.error) throw e.error;
+    cfgUsers=u.data||[]; cfgEquipes=e.data||[];
+  }catch(err){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(err.message||err)+'</div>'; return; }
+  supCfgRender();
+}
+function supCfgRender(){
+  $('#supView').innerHTML=`
+    <div class="sec">👤 Função dos usuários</div>
+    <p class="sub" style="margin-top:2px">Almoxarife e Admin valem no sistema todo. Coletor/Aprovador é por veículo (abaixo).</p>
+    <div id="cfgUsers"></div>
+    <div class="sec">🚐 Veículos</div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input id="cfgEqNome" placeholder="Nome (ex.: VAN-05)" style="flex:1;min-width:0"/>
+      <input id="cfgEqPlaca" placeholder="Placa" style="width:92px"/>
+      <button id="cfgEqAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600">Criar</button>
+    </div>
+    <div id="cfgEquipes" style="margin-top:8px"></div>
+    <div class="sec">🔗 Membros por veículo</div>
+    <select id="cfgMEq" style="margin-top:8px">${cfgEquipes.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('')}</select>
+    <div id="cfgMembros" style="margin-top:8px"></div>`;
+  supCfgUsers(); supCfgEquipes(); supCfgMembros();
+  $('#cfgEqAdd').addEventListener('click',supCfgCriarEquipe);
+  const meq=$('#cfgMEq'); if(meq) meq.addEventListener('change',supCfgMembros);
+}
+function supCfgUsers(){
+  const c=$('#cfgUsers'); if(!c) return;
+  if(!cfgUsers.length){ c.innerHTML='<p class="sub">Nenhum usuário.</p>'; return; }
+  c.innerHTML=cfgUsers.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div><div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email||''}</div></div><select data-fu="${u.id}" style="width:auto;font-size:13px;padding:7px 8px;flex:0 0 auto">${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${u.funcao===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div>`).join('');
+  c.querySelectorAll('[data-fu]').forEach(sel=>sel.addEventListener('change',async()=>{
+    const {error}=await sb.rpc('sup_admin_set_funcao',{p_uid:sel.dataset.fu,p_funcao:sel.value});
+    if(error){ toast('⚠ '+(error.message||error)); const u0=cfgUsers.find(x=>x.id===sel.dataset.fu); if(u0) sel.value=u0.funcao; return; }
+    const u=cfgUsers.find(x=>x.id===sel.dataset.fu); if(u) u.funcao=sel.value;
+    toast('✓ Função atualizada');
+  }));
+}
+function supCfgEquipes(){
+  const c=$('#cfgEquipes'); if(!c) return;
+  c.innerHTML = cfgEquipes.length ? cfgEquipes.map(e=>`<div style="display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1"><b>${e.nome}</b>${e.placa?(' · <span class="sub">'+e.placa+'</span>'):''}</span><span class="sub">${e.membros} membro(s)</span></div>`).join('') : '<p class="sub">Nenhum veículo cadastrado.</p>';
+}
+async function supCfgCriarEquipe(){
+  const nome=($('#cfgEqNome').value||'').trim(); const placa=($('#cfgEqPlaca').value||'').trim()||null;
+  if(!nome) return toast('Informe o nome do veículo');
+  const {error}=await sb.rpc('sup_admin_equipe_criar',{p_nome:nome,p_placa:placa});
+  if(error){ toast('⚠ '+(error.message||error)); return; }
+  toast('✓ Veículo criado'); supVConfig();
+}
+function supCfgMembros(){
+  const c=$('#cfgMembros'); if(!c) return;
+  const eqId=$('#cfgMEq')?$('#cfgMEq').value:'';
+  if(!eqId){ c.innerHTML='<p class="sub">Crie um veículo primeiro.</p>'; return; }
+  const membros=cfgUsers.filter(u=>(u.equipes||[]).some(x=>String(x.equipe_id)===String(eqId)));
+  const naoMembros=cfgUsers.filter(u=>!(u.equipes||[]).some(x=>String(x.equipe_id)===String(eqId)));
+  const lista = membros.length ? membros.map(u=>{
+    const m=(u.equipes||[]).find(x=>String(x.equipe_id)===String(eqId));
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</span><select data-mp="${u.id}" style="width:auto;font-size:12px;padding:6px 8px;flex:0 0 auto"><option value="coletor"${m.papel==='coletor'?' selected':''}>Coletor</option><option value="aprovador"${m.papel==='aprovador'?' selected':''}>Aprovador</option></select><button data-mrm="${u.id}" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px;flex:0 0 auto">✕</button></div>`;
+  }).join('') : '<p class="sub">Nenhum membro neste veículo.</p>';
+  c.innerHTML = lista + `<div style="display:flex;gap:6px;margin-top:10px"><select id="cfgAddU" style="flex:1;min-width:0"><option value="">Adicionar usuário…</option>${naoMembros.map(u=>`<option value="${u.id}">${u.nome||u.email}</option>`).join('')}</select><select id="cfgAddP" style="width:auto;flex:0 0 auto"><option value="coletor">Coletor</option><option value="aprovador">Aprovador</option></select><button id="cfgAddBtn" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600">＋</button></div>`;
+  c.querySelectorAll('[data-mp]').forEach(sel=>sel.addEventListener('change',()=>supCfgSetMembro(eqId,sel.dataset.mp,sel.value,false)));
+  c.querySelectorAll('[data-mrm]').forEach(b=>b.addEventListener('click',()=>supCfgRemMembro(eqId,b.dataset.mrm)));
+  const addBtn=$('#cfgAddBtn'); if(addBtn) addBtn.addEventListener('click',()=>{
+    const uid=$('#cfgAddU').value, papel=$('#cfgAddP').value;
+    if(!uid) return toast('Escolha um usuário');
+    supCfgSetMembro(eqId,uid,papel,true);
+  });
+}
+async function supCfgSetMembro(eqId,uid,papel,isAdd){
+  const {error}=await sb.rpc('sup_admin_membro_set',{p_equipe_id:+eqId,p_uid:uid,p_papel:papel});
+  if(error){ toast('⚠ '+(error.message||error)); return; }
+  const u=cfgUsers.find(x=>x.id===uid);
+  if(u){ u.equipes=u.equipes||[]; const m=u.equipes.find(x=>String(x.equipe_id)===String(eqId)); if(m) m.papel=papel; else u.equipes.push({equipe_id:+eqId,papel}); }
+  if(isAdd){ const e=cfgEquipes.find(x=>String(x.id)===String(eqId)); if(e) e.membros=(e.membros||0)+1; supCfgEquipes(); supCfgMembros(); }
+  toast('✓ Vínculo salvo');
+}
+async function supCfgRemMembro(eqId,uid){
+  const {error}=await sb.rpc('sup_admin_membro_remover',{p_equipe_id:+eqId,p_uid:uid});
+  if(error){ toast('⚠ '+(error.message||error)); return; }
+  const u=cfgUsers.find(x=>x.id===uid); if(u) u.equipes=(u.equipes||[]).filter(x=>String(x.equipe_id)!==String(eqId));
+  const e=cfgEquipes.find(x=>String(x.id)===String(eqId)); if(e) e.membros=Math.max(0,(e.membros||0)-1);
+  supCfgEquipes(); supCfgMembros(); toast('✓ Removido');
+}
+if($('#supCfg')) $('#supCfg').addEventListener('click',supAbrirConfig);
 
 if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else supHome(); });
 
