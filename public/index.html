@@ -68,6 +68,8 @@ body:has(#login:not(.hidden)){background:#f6f8fb}
 .seg button[disabled]{opacity:.4}
 .pqlbl{background:rgba(20,24,29,.82);color:#fff;border:none;font-weight:600;font-size:12px;box-shadow:none;padding:3px 7px;border-radius:6px}
 .pqlbl:before{display:none!important}
+.prlbl{background:rgba(20,24,29,.8);color:#fff;border:none;font-weight:700;font-size:10px;box-shadow:none;padding:1px 5px;border-radius:5px}
+.prlbl:before{display:none!important}
 hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .sec{font-size:14px;font-weight:700;margin:20px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .supS{all:unset;cursor:pointer;text-align:center;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut);flex:1}
@@ -119,6 +121,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-back>‹ Voltar</button></div>
     <h1>Mapeamento de pressão</h1>
     <button id="prEst" class="btn ghost" style="margin-bottom:10px">🔎 Teste de estanqueidade — pontos a medir</button>
+    <button id="prProd" class="btn ghost" style="margin-bottom:10px">📊 Produtividade das pressões</button>
     <div id="prAlvoBanner" class="hidden" style="align-items:center;gap:8px;background:var(--card);border:1px solid var(--acc);border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:13px;display:flex"><span style="flex:1;min-width:0">🎯 <b id="prAlvoLbl"></b></span><button id="prAlvoX" title="Cancelar" style="all:unset;cursor:pointer;color:var(--mut);font-weight:700;font-size:16px">✕</button></div>
     <div id="gpsBanner" class="banner warn">Obtendo GPS…</div>
 
@@ -163,6 +166,30 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="estFiltros" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px"></div>
     <div id="estLista"></div>
     <div id="estMapa" style="display:none;height:60vh;border-radius:12px;overflow:hidden"></div>
+  </main>
+
+  <main id="pr_prod" class="hidden">
+    <div class="bar"><button class="bk" id="prProdBack">‹ Pressão</button></div>
+    <h1>Produtividade — pressões</h1>
+    <select id="prpUser" style="width:100%;font-size:13px;padding:9px 10px;margin-bottom:8px"></select>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <span style="font-size:12px;color:var(--mut)">De</span>
+      <input id="prpDe" type="date" style="flex:1;min-width:0;font-size:13px;padding:8px 8px"/>
+      <span style="font-size:12px;color:var(--mut)">até</span>
+      <input id="prpAte" type="date" style="flex:1;min-width:0;font-size:13px;padding:8px 8px"/>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button id="prpHoje" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Hoje</button>
+      <button id="prpMes" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Este mês</button>
+      <button id="prpTudo" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Tudo</button>
+    </div>
+    <div id="prpCards" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"></div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut);margin-bottom:6px">
+      <span>baixa</span>
+      <span style="flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,#d73027,#ffffbf,#4575b4)"></span>
+      <span>alta</span>
+    </div>
+    <div id="prpMapa" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
   <main id="loggers" class="hidden">
@@ -578,7 +605,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -591,6 +618,7 @@ function irPara(id){
   if(id==='produtividade') prodInit();
   if(id==='captacao') capInit();
   if(id==='suprimentos') supInit();
+  if(id==='pr_prod') prProdInit();
 }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
@@ -1662,6 +1690,85 @@ async function supCfgRemMembro(eqId,uid){
 if($('#supCfg')) $('#supCfg').addEventListener('click',supAbrirConfig);
 
 if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else supHome(); });
+
+// ---------- MÓDULO PRODUTIVIDADE DE PRESSÃO ----------
+let prpMap=null, prpLayer=null;
+const PR_MIN=10, PR_MAX=50;   // faixa da escala de cor (mca) — ajustável
+function prPCor(p){
+  let t=((+p||0)-PR_MIN)/(PR_MAX-PR_MIN); t=Math.max(0,Math.min(1,t));
+  const stops=[[215,48,39],[255,255,191],[69,117,180]];   // vermelho → claro → azul
+  const seg=t<0.5?0:1, lt=t<0.5?t/0.5:(t-0.5)/0.5, a=stops[seg], b=stops[seg+1];
+  return 'rgb('+Math.round(a[0]+(b[0]-a[0])*lt)+','+Math.round(a[1]+(b[1]-a[1])*lt)+','+Math.round(a[2]+(b[2]-a[2])*lt)+')';
+}
+function prpFmt(v){ return (Math.round((+v||0)*10)/10).toString().replace('.',','); }
+function prProdInit(){
+  const cont=document.getElementById('prpMapa');
+  if(window.L && !prpMap){
+    cont.innerHTML='';
+    prpMap=L.map('prpMapa');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(prpMap);
+    prpMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
+  }
+  const de=document.getElementById('prpDe'), ate=document.getElementById('prpAte');
+  if(de && !de.value) de.value=prodMesIniStr();
+  if(ate && !ate.value) ate.value=prodHojeStr();
+  setTimeout(()=>{ if(prpMap) prpMap.invalidateSize(); },60);
+  prProdFiltros().then(prProdAtualizar);
+}
+async function prProdFiltros(){
+  try{
+    const {data}=await sb.rpc('app_pressao_filtros');
+    const us=(data&&data.usuarios)||[];
+    const sel=document.getElementById('prpUser'); if(!sel) return;
+    const meu=$('#nome').textContent;
+    sel.innerHTML=['<option value="__todos">Todos os coletores</option>'].concat(us.map(u=>'<option value="'+u+'">'+u+'</option>')).join('');
+    sel.value = us.indexOf(meu)>=0 ? meu : '__todos';
+  }catch(e){}
+}
+async function prProdAtualizar(){
+  const su=document.getElementById('prpUser'); if(!su) return;
+  const u=su.value==='__todos'?null:su.value;
+  const de=(document.getElementById('prpDe').value||null), ate=(document.getElementById('prpAte').value||null);
+  try{
+    const {data,error}=await sb.rpc('app_pressao_produtividade',{p_usuario:u,p_data_ini:de,p_data_fim:ate});
+    if(error)throw error;
+    prProdCards(data); prProdDesenhar(data);
+  }catch(e){ toast('Erro na produtividade: '+(e.message||e)); }
+}
+function prProdCards(d){
+  const cards=[
+    {ic:'📍',lbl:'Pontos medidos',val:String(d.n_pontos||0)},
+    {ic:'💧',lbl:'Pressão média',val:prpFmt(d.pressao_media)+' mca'},
+    {ic:'⬇️',lbl:'Mínima',val:prpFmt(d.pressao_min)+' mca'},
+    {ic:'⬆️',lbl:'Máxima',val:prpFmt(d.pressao_max)+' mca'}
+  ];
+  document.getElementById('prpCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px"><div style="font-size:12px;color:var(--mut)">'+c.ic+' '+c.lbl+'</div><div style="font-size:22px;font-weight:700;margin-top:4px">'+c.val+'</div></div>').join('');
+}
+function prProdDesenhar(d){
+  if(!prpMap) return;
+  if(prpLayer){ prpMap.removeLayer(prpLayer); prpLayer=null; }
+  const fc=(d.pontos&&d.pontos.features)||[];
+  if(!fc.length) return;
+  prpLayer=L.geoJSON(d.pontos,{
+    pointToLayer:function(f,ll){
+      const p=(f.properties&&f.properties.pressao);
+      const m=L.circleMarker(ll,{radius:9,color:'#fff',weight:1.5,fillColor:prPCor(p),fillOpacity:1});
+      m.bindTooltip(prpFmt(p),{permanent:true,direction:'center',className:'prlbl'});
+      const pr=f.properties||{};
+      m.bindPopup('<b>'+prpFmt(pr.pressao)+' mca</b>'+(pr.numero_hd?('<br>HD '+pr.numero_hd):'')+(pr.data?('<br>'+pr.data):'')+(pr.usuario?('<br>'+pr.usuario):''));
+      return m;
+    }
+  }).addTo(prpMap);
+  try{ prpMap.fitBounds(prpLayer.getBounds(),{padding:[30,30],maxZoom:17}); }catch(e){}
+}
+if($('#prProd')) $('#prProd').addEventListener('click',()=>irPara('pr_prod'));
+if($('#prProdBack')) $('#prProdBack').addEventListener('click',()=>irPara('pressao'));
+if($('#prpUser')) $('#prpUser').addEventListener('change',prProdAtualizar);
+if($('#prpDe')) $('#prpDe').addEventListener('change',prProdAtualizar);
+if($('#prpAte')) $('#prpAte').addEventListener('change',prProdAtualizar);
+if($('#prpHoje')) $('#prpHoje').addEventListener('click',()=>{document.getElementById('prpDe').value=prodHojeStr();document.getElementById('prpAte').value=prodHojeStr();prProdAtualizar();});
+if($('#prpMes')) $('#prpMes').addEventListener('click',()=>{document.getElementById('prpDe').value=prodMesIniStr();document.getElementById('prpAte').value=prodHojeStr();prProdAtualizar();});
+if($('#prpTudo')) $('#prpTudo').addEventListener('click',()=>{document.getElementById('prpDe').value='';document.getElementById('prpAte').value='';prProdAtualizar();});
 
 // ---------- auth ----------
 $('#entrar').addEventListener('click',async()=>{
