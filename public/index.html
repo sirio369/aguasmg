@@ -1258,7 +1258,7 @@ function capReset(){
 }
 
 // ---------- MÓDULO SUPRIMENTOS ----------
-let ME=null, supCat=[], supEquipes=[], supCurrent='home', supCartS=[], supCartC=[], supConEstoque=[];
+let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', supCartS=[], supCartC=[], supConEstoque=[], eqUsuarios=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -1292,7 +1292,11 @@ const SUP_ACTS={
   estoque:{ic:'🚐',lbl:'Estoque da equipe',fn:()=>supVEstoque()},
   aprovar:{ic:'🖊️',lbl:'Aprovar solicitações',fn:()=>supVAprovar()},
   almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVAlmox()},
-  painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()}
+  painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()},
+  eq_meus:{ic:'🧰',lbl:'Meus equipamentos',fn:()=>supVEqMeus()},
+  eq_gerir:{ic:'🏷️',lbl:'Gerir equipamentos',fn:()=>supVEqGerir()},
+  eq_alertas:{ic:'🔧',lbl:'Alertas de manutenção',fn:()=>supVEqAlertas()},
+  eq_painel:{ic:'📋',lbl:'Equipamentos por responsável',fn:()=>supVEqPainel()}
 };
 function supBlocks(){
   const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
@@ -1306,13 +1310,36 @@ function supBlocks(){
       {id:'almox',on:almox,papel:'Almoxarife'}]}
   ];
 }
+function supBlocksEquip(){
+  const almox=!!(ME&&ME.is_almoxarife), gestao=!!(ME&&(ME.pode_aprovar||ME.is_almoxarife));
+  return [
+    {t:'Campo',ic:'🧑‍🔧',acts:[{id:'eq_meus',on:true}]},
+    {t:'Almoxarifado',ic:'📦',acts:[
+      {id:'eq_gerir',on:almox,papel:'Almoxarife'},
+      {id:'eq_alertas',on:almox,papel:'Almoxarife'}]},
+    {t:'Gestão',ic:'📊',acts:[{id:'eq_painel',on:gestao,papel:'Encarregado / Almoxarife'}]}
+  ];
+}
 function supHome(){
   supCurrent='home';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
   const tt=$('#supTitle'); if(tt) tt.textContent='';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
-  $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma etapa</p>'+
-    supBlocks().map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
+  $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma área</p>'+
+    '<div class="grid" style="margin-top:10px">'+
+      '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
+      '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
+    '</div>';
+  $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
+}
+function supArea(cat){
+  supAreaId=cat; supCurrent='area';
+  const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':'Insumos';
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
+  const blocks = cat==='equip'?supBlocksEquip():supBlocks();
+  $('#supView').innerHTML='<p class="sub" style="margin-top:2px">Escolha uma etapa</p>'+
+    blocks.map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
       b.acts.map(a=>{
         const A=SUP_ACTS[a.id];
         return a.on
@@ -1325,7 +1352,7 @@ function supHome(){
 function supOpen(id){
   const A=SUP_ACTS[id]; if(!A) return;
   supCurrent=id;
-  const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  const bk=$('#supBack'); if(bk) bk.textContent = supAreaId==='equip'?'‹ Equipamentos':'‹ Insumos';
   const tt=$('#supTitle'); if(tt) tt.textContent=A.lbl;
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   $('#supView').innerHTML=''; A.fn();
@@ -1592,6 +1619,138 @@ function supVPainel(){
   $('#supPLoad').addEventListener('click',load); load();
 }
 
+// ===== EQUIPAMENTOS =====
+const SUP_EQST={ disponivel:{l:'Disponível',bg:'--ok-bg',fg:'--ok'}, em_uso:{l:'Em uso',bg:'--ok-bg',fg:'--ok'}, manutencao:{l:'Manutenção',bg:'--bad-bg',fg:'--bad'}, baixado:{l:'Baixado',bg:'--line',fg:'--mut'} };
+function eqStatusChip(e){
+  const s = (e.termo_status==='pendente') ? {l:'Aceite pendente',bg:'--warn-bg',fg:'--warn'} : (SUP_EQST[e.status]||{l:e.status,bg:'--line',fg:'--mut'});
+  return `<span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${s.bg});color:var(${s.fg})">${s.l}</span>`;
+}
+
+// --- Meus equipamentos (colaborador) ---
+async function supVEqMeus(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_meus_equipamentos'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Você não tem equipamentos sob sua responsabilidade.</p>'; return; }
+    $('#supView').innerHTML=arr.map(eqMeuCard).join('');
+    supEqMeusWire();
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+function eqMeuCard(e){
+  const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):''].filter(Boolean).join(' · ');
+  let acao='';
+  if(e.termo_status==='pendente'){
+    acao='<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px">Aceite o termo de responsabilidade para ficar com este equipamento.</div><button class="btn" data-aceitar="'+e.termo_id+'" style="margin-top:8px">Li e aceito o termo</button>';
+  } else if(e.manutencao_aberta){
+    acao='<div style="margin-top:8px;font-size:13px;color:var(--bad)">🔧 Manutenção em aberto — aguardando o almoxarife.</div>';
+  } else {
+    acao='<button class="btn ghost" data-report="'+e.equipamento_id+'" style="margin-top:8px">🔧 Reportar manutenção</button><div class="eqBox hidden" data-box="'+e.equipamento_id+'" style="margin-top:8px"><textarea class="eqTxt" rows="2" placeholder="O que houve com o equipamento?"></textarea><button class="btn" data-reportsend="'+e.equipamento_id+'" style="margin-top:6px">Enviar alerta ao almoxarife</button></div>';
+  }
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+'</div>';
+}
+function supEqMeusWire(){
+  $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_aceitar',{p_termo_id:+b.dataset.aceitar},'Termo aceito',supVEqMeus)));
+  $('#supView').querySelectorAll('[data-report]').forEach(b=>b.addEventListener('click',()=>{const x=$('#supView').querySelector('.eqBox[data-box="'+b.dataset.report+'"]'); if(x) x.classList.toggle('hidden');}));
+  $('#supView').querySelectorAll('[data-reportsend]').forEach(b=>b.addEventListener('click',async()=>{
+    const box=$('#supView').querySelector('.eqBox[data-box="'+b.dataset.reportsend+'"]');
+    const txt=box?(box.querySelector('.eqTxt').value||'').trim():'';
+    if(!txt) return toast('Descreva o problema');
+    b.disabled=true;
+    const {error}=await sb.rpc('sup_manut_reportar',{p_equipamento_id:+b.dataset.reportsend,p_descricao:txt});
+    if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
+    toast('✓ Manutenção reportada'); supVEqMeus();
+  }));
+}
+
+// --- Gerir equipamentos (almoxarife) ---
+async function supVEqGerir(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const [l,u]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_usuarios_listar')]);
+    if(l.error)throw l.error;
+    eqUsuarios=u.data||[];
+    $('#supView').innerHTML='<details style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600;font-size:14px;padding:6px 0">➕ Cadastrar equipamento</summary>'+
+      '<label>Nome *</label><input id="eqcNome" autocomplete="off"/>'+
+      '<label>Tipo</label><input id="eqcTipo" autocomplete="off"/>'+
+      '<label>Nº de série / patrimônio</label><input id="eqcSerie" autocomplete="off"/>'+
+      '<label>Preventiva a cada (dias)</label><input id="eqcPrev" inputmode="numeric" placeholder="ex.: 90"/>'+
+      '<button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar</button></details>'+
+      '<div id="eqList"></div>';
+    $('#eqcAdd').addEventListener('click',supEqCadastrar);
+    supEqListRender(l.data||[]);
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function supEqCadastrar(){
+  const nome=($('#eqcNome').value||'').trim(); if(!nome) return toast('Informe o nome');
+  const prev=parseInt(($('#eqcPrev').value||'').replace(/\D/g,''),10);
+  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo:($('#eqcTipo').value||'').trim()||null,p_num_serie:($('#eqcSerie').value||'').trim()||null,p_preventiva_dias:isNaN(prev)?null:prev});
+  if(error){ toast('⚠ '+(error.message||error)); return; }
+  toast('✓ Equipamento cadastrado'); supVEqGerir();
+}
+function supEqListRender(arr){
+  const c=$('#eqList'); if(!c) return;
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhum equipamento cadastrado.</p>'; return; }
+  c.innerHTML=arr.map(eqGerirCard).join('');
+  supEqGerirWire();
+}
+function eqGerirCard(e){
+  const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):''].filter(Boolean).join(' · ');
+  const prev = e.preventiva_vencida ? '<div style="margin-top:6px;font-size:12px;color:var(--bad)">🛠️ Preventiva vencida'+(e.preventiva_proxima?(' (desde '+e.preventiva_proxima+')'):'')+'</div>' : (e.preventiva_proxima?('<div class="sub" style="margin-top:6px;font-size:12px">Próx. preventiva: '+e.preventiva_proxima+'</div>'):'');
+  let acao='';
+  if(e.status==='disponivel'){
+    acao='<button class="btn" data-emitir="'+e.id+'" style="margin-top:8px">Emitir termo…</button><div class="eqBox hidden" data-box="'+e.id+'" style="margin-top:8px"><select class="eqEmitU"><option value="">Responsável…</option>'+eqUsuarios.map(u=>'<option value="'+u.id+'">'+u.nome+'</option>').join('')+'</select><button class="btn" data-emitsend="'+e.id+'" style="margin-top:6px">Emitir termo de responsabilidade</button></div>';
+  } else {
+    const resp=e.responsavel?('com <b>'+e.responsavel+'</b>'+(e.termo_status==='pendente'?' (aceite pendente)':'')):'';
+    acao=(resp?('<div class="sub" style="margin-top:6px">'+resp+'</div>'):'')+'<button class="btn ghost" data-devolver="'+e.id+'" style="margin-top:6px">Registrar devolução</button>';
+  }
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+prev+acao+'</div>';
+}
+function supEqGerirWire(){
+  $('#supView').querySelectorAll('[data-emitir]').forEach(b=>b.addEventListener('click',()=>{const x=$('#supView').querySelector('.eqBox[data-box="'+b.dataset.emitir+'"]'); if(x) x.classList.toggle('hidden');}));
+  $('#supView').querySelectorAll('[data-emitsend]').forEach(b=>b.addEventListener('click',async()=>{
+    const box=$('#supView').querySelector('.eqBox[data-box="'+b.dataset.emitsend+'"]');
+    const uid=box?box.querySelector('.eqEmitU').value:'';
+    if(!uid) return toast('Escolha o responsável');
+    b.disabled=true;
+    const {error}=await sb.rpc('sup_termo_emitir',{p_equipamento_id:+b.dataset.emitsend,p_colaborador_uuid:uid});
+    if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
+    toast('✓ Termo emitido — aguardando aceite'); supVEqGerir();
+  }));
+  $('#supView').querySelectorAll('[data-devolver]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_devolver',{p_equipamento_id:+b.dataset.devolver},'Devolução registrada',supVEqGerir)));
+}
+
+// --- Alertas de manutenção (almoxarife) ---
+async function supVEqAlertas(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_equip_alertas'); if(error)throw error;
+    const cor=(data&&data.corretivas)||[], prev=(data&&data.preventivas)||[];
+    let h='<div class="sec">🔧 Manutenções reportadas</div>';
+    h+= cor.length ? cor.map(m=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:8px 0"><div><b>'+m.equipamento+'</b><div class="sub" style="margin-top:2px">'+(m.descricao||'(sem descrição)')+' · '+(m.reportado_por||'')+' · '+supData(m.aberto_em)+'</div></div><button class="btn" data-mconcluir="'+m.id+'" style="margin-top:8px">Concluir manutenção</button></div>').join('') : '<p class="sub">Nenhuma manutenção reportada.</p>';
+    h+='<div class="sec">🛠️ Preventivas vencidas</div>';
+    h+= prev.length ? prev.map(p=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:8px 0"><div><b>'+p.equipamento+'</b><div class="sub" style="margin-top:2px">venceu em '+p.vence_em+' · '+p.atraso_dias+' dia(s) de atraso</div></div><button class="btn ghost" data-pconcluir="'+p.equipamento_id+'" style="margin-top:8px">Registrar preventiva feita</button></div>').join('') : '<p class="sub">Nenhuma preventiva vencida.</p>';
+    $('#supView').innerHTML=h;
+    $('#supView').querySelectorAll('[data-mconcluir]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_manut_concluir',{p_manutencao_id:+b.dataset.mconcluir},'Manutenção concluída',supVEqAlertas)));
+    $('#supView').querySelectorAll('[data-pconcluir]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_preventiva_concluir',{p_equipamento_id:+b.dataset.pconcluir},'Preventiva registrada',supVEqAlertas)));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- Painel de equipamentos (gestão) ---
+async function supVEqPainel(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_equip_listar'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhum equipamento cadastrado.</p>'; return; }
+    $('#supView').innerHTML=arr.map(e=>{
+      const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):'', e.responsavel?('com '+e.responsavel):'livre'].filter(Boolean).join(' · ');
+      const prev=e.preventiva_vencida?' · <span style="color:var(--bad)">preventiva vencida</span>':'';
+      return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+e.nome+'</b><div class="sub" style="margin-top:2px">'+sub+prev+'</div></div>'+eqStatusChip(e)+'</div></div>';
+    }).join('');
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
 // --- tela: Configurações (admin) ---
 let cfgUsers=[], cfgEquipes=[];
 const CFG_FUN={campo:'Campo',almoxarife:'Almoxarife',admin:'Admin'};
@@ -1695,7 +1854,7 @@ async function supCfgRemMembro(eqId,uid){
 }
 if($('#supCfg')) $('#supCfg').addEventListener('click',supAbrirConfig);
 
-if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else supHome(); });
+if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else if(supCurrent==='area') supHome(); else supArea(supAreaId); });
 
 // ---------- MÓDULO PRODUTIVIDADE DE PRESSÃO ----------
 let prpMap=null, prpLayer=null;
