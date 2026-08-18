@@ -932,11 +932,12 @@ document.querySelectorAll('#ocorrencia .ocF').forEach(fi=>fi.addEventListener('c
 }));
 
 // ---------- CADASTRO TÉCNICO ----------
-let cadMap=null, cadCamadas={}, cadOn={unidades:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
+let cadMap=null, cadCamadas={}, cadOn={reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
 let cadRendered={}, cadMem={}, cadDeb=null;   // cache: área já renderizada por camada / geojson em memória / timer de debounce
-const CAD_VER='v1|';                          // prefixo p/ invalidar o cache do cadastro se o dado mudar
+const CAD_VER='v2|';                          // prefixo p/ invalidar o cache do cadastro se o dado mudar (v2: unidades separadas por tipo)
 // whole:true = camada leve e estática → busca a ZA inteira 1x e cacheia; step = tamanho da célula de cache (graus) p/ camadas pesadas
-const CAD_DEF=[{k:'unidades',nome:'Unidades',min:0,cor:'#7a3fb5',whole:true},{k:'vrps',nome:'VRPs',min:0,cor:'#c2185b',whole:true},{k:'rede',nome:'Rede',min:14,cor:'#1565c0',step:0.008},{k:'ligacoes',nome:'Ligações',min:16,cor:'#2e7d32',step:0.004}];
+// Unidades operacionais separadas por tipo (grupo em "2 - infra_agua".unidades_operacionais); resolvidas no RPC app_cadastro_geojson via p_layer.
+const CAD_DEF=[{k:'reservatorio',nome:'Reservatórios',min:0,cor:'#7a3fb5',whole:true},{k:'booster_bomba',nome:'Booster+Bomba',min:0,cor:'#e64a19',whole:true},{k:'elevatoria',nome:'Elevatórias',min:0,cor:'#00897b',whole:true},{k:'poco',nome:'Poços',min:0,cor:'#5d4037',whole:true},{k:'macromedicao',nome:'Macromedição',min:0,cor:'#f9a825',whole:true},{k:'vrps',nome:'VRPs',min:0,cor:'#c2185b',whole:true},{k:'rede',nome:'Rede',min:14,cor:'#1565c0',step:0.008},{k:'ligacoes',nome:'Ligações',min:16,cor:'#2e7d32',step:0.004}];
 function cadInit(){
   if(!window.L){document.getElementById('cadMapa').innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
   if(!cadMap){
@@ -1012,9 +1013,14 @@ async function cadBuscar(){
     box.querySelectorAll('.cadres').forEach(function(el){el.addEventListener('click',function(){cadIrPara(cadBuscaArr[+el.dataset.i],layer);});});
   }catch(e){box.textContent='Erro: '+(e.message||e);}
 }
+function cadGrupoKey(g){switch(g){case 'reservatorio':return 'reservatorio';case 'booster':case 'bomba':return 'booster_bomba';case 'elevatoria':return 'elevatoria';case 'poco':return 'poco';case 'macromedicao':case 'macromedicao_dmc':return 'macromedicao';default:return null;}}
 function cadIrPara(x,layer){
   if(!cadMap||x.lat==null)return;
-  cadOn[layer]=true; cadFiltrosRender();
+  if(layer==='unidades'){                       // busca de unidade → liga o chip do tipo correspondente
+    var gk=cadGrupoKey((x.props||{}).grupo);
+    if(gk)cadOn[gk]=true; else ['reservatorio','booster_bomba','elevatoria','poco','macromedicao'].forEach(function(k){cadOn[k]=true;});
+  } else cadOn[layer]=true;
+  cadFiltrosRender();
   cadMap.setView([x.lat,x.lon],18);
   if(cadDestaque){cadMap.removeLayer(cadDestaque);cadDestaque=null;}
   const props=x.props||{};
