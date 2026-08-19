@@ -1279,10 +1279,7 @@ async function supEnviar(item,msgOk,onOk){
 }
 async function supInit(){
   await supGetMe();
-  try{
-    const [c,e]=await Promise.all([sb.rpc('sup_materiais_listar',{}),sb.rpc('sup_equipes_listar')]);
-    supCat=c.data||[]; supEquipes=e.data||[];
-  }catch(e){}
+  try{ const c=await sb.rpc('sup_materiais_listar',{}); supCat=c.data||[]; }catch(e){}
   supHome();
 }
 const SUP_ACTS={
@@ -1329,14 +1326,16 @@ function supHome(){
     '<div class="grid" style="margin-top:10px">'+
       '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
       '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
+      '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI</div></button>'+
     '</div>';
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
-  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':'Insumos';
+  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI':'Insumos');
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
+  if(cat==='epi'){ $('#supView').innerHTML='<div class="banner warn" style="display:block;line-height:1.4">🦺 Módulo de <b>EPI</b> — em construção. Em breve: entrega de EPI com controle de CA/validade e troca.</div>'; return; }
   const blocks = cat==='equip'?supBlocksEquip():supBlocks();
   $('#supView').innerHTML='<p class="sub" style="margin-top:2px">Escolha uma etapa</p>'+
     blocks.map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
@@ -1377,10 +1376,8 @@ function supEstTable(cont,arr){
 
 // --- tela: Solicitar ---
 function supVSolicitar(){
-  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Você ainda não está vinculado a nenhuma equipe.</p>'; return; }
   supCartS=[];
   $('#supView').innerHTML=`
-    <label>Equipe</label><select id="supSEq">${supEqOptions()}</select>
     <label>Adicionar material</label>
     <div style="display:flex;gap:6px">
       <select id="supSMat" style="flex:1;min-width:0">${supMatOptions()}</select>
@@ -1402,7 +1399,7 @@ function supVSolicitar(){
     if(!supCartS.length) return;
     $('#supSSend').disabled=true;
     const item={id:crypto.randomUUID(),tipo:'sup_solicitar',rpc:'sup_solicitar',fields:{
-      p_equipe_id:+$('#supSEq').value, p_itens:supCartS.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:$('#supSObs').value||null}};
+      p_itens:supCartS.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:$('#supSObs').value||null}};
     const ok=await supEnviar(item,'✓ Solicitação enviada',()=>{supCartS=[];supOpen('pedidos');});
     if(!ok) $('#supSSend').disabled=false;
   });
@@ -1420,17 +1417,15 @@ async function supVPedidos(){
       const cod=(s.status==='segregada'&&s.codigo_retirada)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${s.codigo_retirada}</b></div>`:'';
       const emFalta=(s.status==='em_falta')?'<div style="margin-top:8px;background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600">⛔ Sem estoque — toda a solicitação está em falta no almoxarifado.</div>':'';
       const lista=((s.status==='segregada'||s.status==='em_falta')&&Array.isArray(s.lista))?('<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px">'+s.lista.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${i.situacao==='falta'?'—':(supNum(i.qt_segregada||0)+' '+i.unidade)}</b></div>`).join('')+'</div>'):'';
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b> · ${s.equipe}<div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${emFalta}${lista}${cod}</div>`;
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b><div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${emFalta}${lista}${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
 // --- tela: Consumo na OS (materiais limitados ao saldo da equipe) ---
 function supVConsumo(){
-  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe vinculada.</p>'; return; }
   supCartC=[]; supConEstoque=[];
   $('#supView').innerHTML=`
-    <label>Equipe</label><select id="supCEq">${supEqOptions()}</select>
     <label>Ordem de Serviço</label><input id="supCOs" placeholder="Ex.: OS 88.421" autocomplete="off"/>
     <label>Material utilizado <span class="sub">(somente com saldo)</span></label>
     <div style="display:flex;gap:6px">
@@ -1441,7 +1436,6 @@ function supVConsumo(){
     <div id="supCCart" style="margin-top:10px"></div>
     <button id="supCSend" class="btn" disabled>Registrar consumo</button>`;
   supCartRender('supCCart',supCartC,'supCSend');
-  $('#supCEq').addEventListener('change',()=>{ supCartC=[]; supCartRender('supCCart',supCartC,'supCSend'); supConLoad(); });
   $('#supCAdd').addEventListener('click',()=>{
     const id=$('#supCMat').value, q=parseFloat(($('#supCQt').value||'').replace(',','.'));
     if(!id||isNaN(q)||q<=0) return toast('Escolha material e quantidade');
@@ -1457,7 +1451,7 @@ function supVConsumo(){
     if(!supCartC.length) return;
     $('#supCSend').disabled=true;
     const item={id:crypto.randomUUID(),tipo:'sup_consumir',rpc:'sup_consumir',fields:{
-      p_equipe_id:+$('#supCEq').value, p_os:os, p_itens:supCartC.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:null}};
+      p_os:os, p_itens:supCartC.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:null}};
     const ok=await supEnviar(item,'✓ Consumo registrado',()=>{supCartC=[];supOpen('estoque');});
     if(!ok) $('#supCSend').disabled=false;
   });
@@ -1467,7 +1461,7 @@ async function supConLoad(){
   const sel=$('#supCMat'); if(!sel) return;
   sel.innerHTML='<option value="">Carregando…</option>';
   try{
-    const {data,error}=await sb.rpc('sup_estoque_equipe',{p_equipe_id:+$('#supCEq').value}); if(error)throw error;
+    const {data,error}=await sb.rpc('sup_meu_estoque'); if(error)throw error;
     supConEstoque=(data||[]).filter(x=>+x.saldo>0);
     sel.innerHTML = supConEstoque.length
       ? '<option value="">Material…</option>'+supConEstoque.map(x=>`<option value="${x.material_id}">${x.material} — ${supNum(x.saldo)} ${x.unidade}</option>`).join('')
@@ -1477,14 +1471,12 @@ async function supConLoad(){
 
 // --- tela: Estoque da equipe ---
 function supVEstoque(){
-  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe vinculada.</p>'; return; }
-  $('#supView').innerHTML=`<label>Equipe</label><select id="supEEq">${supEqOptions()}</select><div id="supET" style="margin-top:12px"></div>`;
-  const load=async()=>{
+  $('#supView').innerHTML='<div id="supET"></div>';
+  (async()=>{
     $('#supET').innerHTML='<p class="sub">Carregando…</p>';
-    try{ const {data,error}=await sb.rpc('sup_estoque_equipe',{p_equipe_id:+$('#supEEq').value}); if(error)throw error; supEstTable('supET',data||[]); }
+    try{ const {data,error}=await sb.rpc('sup_meu_estoque'); if(error)throw error; supEstTable('supET',data||[]); }
     catch(e){ $('#supET').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
-  };
-  $('#supEEq').addEventListener('change',load); load();
+  })();
 }
 
 // --- tela: Aprovações ---
@@ -1593,10 +1585,12 @@ function supAlmoxWire(){
 }
 
 // --- tela: Painel (movimentação + estoque) ---
-function supVPainel(){
-  if(!supEquipes.length){ $('#supView').innerHTML='<p class="sub">Sem equipe.</p>'; return; }
+async function supVPainel(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  let us=[];
+  try{ const u=await sb.rpc('sup_usuarios_listar'); us=u.data||[]; }catch(e){}
   $('#supView').innerHTML=`
-    <label>Equipe</label><select id="supPEq">${supEqOptions()}</select>
+    <label>Pessoa</label><select id="supPU">${us.map(u=>`<option value="${u.id}">${u.nome}</option>`).join('')}</select>
     <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
       <span class="sub">De</span><input id="supPDe" type="date" style="flex:1;min-width:0;font-size:13px"/>
       <span class="sub">até</span><input id="supPAte" type="date" style="flex:1;min-width:0;font-size:13px"/>
@@ -1604,19 +1598,20 @@ function supVPainel(){
     <button id="supPLoad" class="btn ghost" style="margin-top:10px">Carregar</button>
     <div id="supPOut" style="margin-top:6px"></div>`;
   const load=async()=>{
+    const uid=$('#supPU').value; if(!uid){ $('#supPOut').innerHTML='<p class="sub">Nenhuma pessoa disponível.</p>'; return; }
     $('#supPOut').innerHTML='<p class="sub">Carregando…</p>';
     try{
-      const {data,error}=await sb.rpc('sup_painel',{p_equipe_id:+$('#supPEq').value,p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
+      const {data,error}=await sb.rpc('sup_painel',{p_colaborador_uuid:uid,p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
       const mv=(data&&data.movimentos)||[], est=(data&&data.estoque)||[];
       $('#supPOut').innerHTML='<div class="sec">📦 Estoque atual</div><div id="supPEst"></div><div class="sec">🔄 Movimentação</div><div id="supPMov"></div>';
       supEstTable('supPEst',est);
       $('#supPMov').innerHTML = mv.length? mv.map(m=>{
         const neg=m.quantidade<0;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px"><div style="flex:1;min-width:0"><b>${m.material}</b><div class="sub">${supData(m.data)} · ${m.tipo}${m.os?(' · '+m.os):''}${m.quem?(' · '+m.quem):''}</div></div><b style="white-space:nowrap;color:${neg?'var(--bad)':'var(--ok)'}">${neg?'':'+'}${supNum(m.quantidade)} ${m.unidade}</b></div>`;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px"><div style="flex:1;min-width:0"><b>${m.material}</b><div class="sub">${supData(m.data)} · ${m.tipo}${m.os?(' · '+m.os):''}</div></div><b style="white-space:nowrap;color:${neg?'var(--bad)':'var(--ok)'}">${neg?'':'+'}${supNum(m.quantidade)} ${m.unidade}</b></div>`;
       }).join('') : '<p class="sub">Sem movimentação no período.</p>';
     }catch(e){ $('#supPOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
   };
-  $('#supPLoad').addEventListener('click',load); load();
+  $('#supPLoad').addEventListener('click',load); if(us.length) load();
 }
 
 // ===== EQUIPAMENTOS =====
@@ -1753,7 +1748,7 @@ async function supVEqPainel(){
 
 // --- tela: Configurações (admin) ---
 let cfgUsers=[], cfgEquipes=[];
-const CFG_FUN={campo:'Campo',almoxarife:'Almoxarife',admin:'Admin'};
+const CFG_FUN={campo:'Campo',aprovador:'Aprovador',almoxarife:'Almoxarife',admin:'Admin'};
 function supAbrirConfig(){
   supCurrent='config';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
@@ -1764,30 +1759,18 @@ function supAbrirConfig(){
 }
 async function supVConfig(){
   try{
-    const [u,e]=await Promise.all([sb.rpc('sup_admin_usuarios'),sb.rpc('sup_admin_equipes')]);
-    if(u.error) throw u.error; if(e.error) throw e.error;
-    cfgUsers=u.data||[]; cfgEquipes=e.data||[];
+    const u=await sb.rpc('sup_admin_usuarios');
+    if(u.error) throw u.error;
+    cfgUsers=u.data||[];
   }catch(err){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(err.message||err)+'</div>'; return; }
   supCfgRender();
 }
 function supCfgRender(){
   $('#supView').innerHTML=`
     <div class="sec">👤 Função dos usuários</div>
-    <p class="sub" style="margin-top:2px">Almoxarife e Admin valem no sistema todo. Coletor/Aprovador é por veículo (abaixo).</p>
-    <div id="cfgUsers"></div>
-    <div class="sec">🚐 Veículos</div>
-    <div style="display:flex;gap:6px;margin-top:8px">
-      <input id="cfgEqNome" placeholder="Nome (ex.: VAN-05)" style="flex:1;min-width:0"/>
-      <input id="cfgEqPlaca" placeholder="Placa" style="width:92px"/>
-      <button id="cfgEqAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600">Criar</button>
-    </div>
-    <div id="cfgEquipes" style="margin-top:8px"></div>
-    <div class="sec">🔗 Membros por veículo</div>
-    <select id="cfgMEq" style="margin-top:8px">${cfgEquipes.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('')}</select>
-    <div id="cfgMembros" style="margin-top:8px"></div>`;
-  supCfgUsers(); supCfgEquipes(); supCfgMembros();
-  $('#cfgEqAdd').addEventListener('click',supCfgCriarEquipe);
-  const meq=$('#cfgMEq'); if(meq) meq.addEventListener('change',supCfgMembros);
+    <p class="sub" style="margin-top:2px">Defina o papel de cada pessoa: Campo, Aprovador, Almoxarife ou Admin. Vale no sistema todo.</p>
+    <div id="cfgUsers"></div>`;
+  supCfgUsers();
 }
 function supCfgUsers(){
   const c=$('#cfgUsers'); if(!c) return;
