@@ -1292,7 +1292,7 @@ const SUP_ACTS={
   painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()},
   eq_meus:{ic:'🧰',lbl:'Meus equipamentos',fn:()=>supVEqMeus()},
   eq_gerir:{ic:'🏷️',lbl:'Gerir equipamentos',fn:()=>supVEqGerir()},
-  eq_alertas:{ic:'🔧',lbl:'Alertas de manutenção',fn:()=>supVEqAlertas()},
+  eq_alertas:{ic:'🛠️',lbl:'Manutenção preventiva',fn:()=>supVEqAlertas()},
   eq_painel:{ic:'📋',lbl:'Equipamentos por responsável',fn:()=>supVEqPainel()}
 };
 function supBlocks(){
@@ -1651,25 +1651,15 @@ function eqMeuCard(e){
   let acao='';
   if(e.termo_status==='pendente'){
     acao='<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px">Aceite o termo de responsabilidade para ficar com este equipamento.</div><button class="btn" data-aceitar="'+e.termo_id+'" style="margin-top:8px">Li e aceito o termo</button>';
-  } else if(e.manutencao_aberta){
-    acao='<div style="margin-top:8px;font-size:13px;color:var(--bad)">🔧 Manutenção em aberto — aguardando o almoxarife.</div>';
-  } else {
-    acao='<button class="btn ghost" data-report="'+e.equipamento_id+'" style="margin-top:8px">🔧 Reportar manutenção</button><div class="eqBox hidden" data-box="'+e.equipamento_id+'" style="margin-top:8px"><textarea class="eqTxt" rows="2" placeholder="O que houve com o equipamento?"></textarea><button class="btn" data-reportsend="'+e.equipamento_id+'" style="margin-top:6px">Enviar alerta ao almoxarife</button></div>';
+  } else if(e.preventiva_vencida){
+    acao='<div style="margin-top:8px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px">🛠️ Manutenção preventiva vencida'+(e.preventiva_proxima?(' (desde '+e.preventiva_proxima+')'):'')+' — leve o equipamento ao almoxarife.</div>';
+  } else if(e.preventiva_proxima){
+    acao='<div class="sub" style="margin-top:8px;font-size:12px">Próxima preventiva: '+e.preventiva_proxima+'</div>';
   }
   return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+'</div>';
 }
 function supEqMeusWire(){
   $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_aceitar',{p_termo_id:+b.dataset.aceitar},'Termo aceito',supVEqMeus)));
-  $('#supView').querySelectorAll('[data-report]').forEach(b=>b.addEventListener('click',()=>{const x=$('#supView').querySelector('.eqBox[data-box="'+b.dataset.report+'"]'); if(x) x.classList.toggle('hidden');}));
-  $('#supView').querySelectorAll('[data-reportsend]').forEach(b=>b.addEventListener('click',async()=>{
-    const box=$('#supView').querySelector('.eqBox[data-box="'+b.dataset.reportsend+'"]');
-    const txt=box?(box.querySelector('.eqTxt').value||'').trim():'';
-    if(!txt) return toast('Descreva o problema');
-    b.disabled=true;
-    const {error}=await sb.rpc('sup_manut_reportar',{p_equipamento_id:+b.dataset.reportsend,p_descricao:txt});
-    if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
-    toast('✓ Manutenção reportada'); supVEqMeus();
-  }));
 }
 
 // --- Gerir equipamentos (almoxarife) ---
@@ -1734,13 +1724,10 @@ async function supVEqAlertas(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_equip_alertas'); if(error)throw error;
-    const cor=(data&&data.corretivas)||[], prev=(data&&data.preventivas)||[];
-    let h='<div class="sec">🔧 Manutenções reportadas</div>';
-    h+= cor.length ? cor.map(m=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:8px 0"><div><b>'+m.equipamento+'</b><div class="sub" style="margin-top:2px">'+(m.descricao||'(sem descrição)')+' · '+(m.reportado_por||'')+' · '+supData(m.aberto_em)+'</div></div><button class="btn" data-mconcluir="'+m.id+'" style="margin-top:8px">Concluir manutenção</button></div>').join('') : '<p class="sub">Nenhuma manutenção reportada.</p>';
-    h+='<div class="sec">🛠️ Preventivas vencidas</div>';
-    h+= prev.length ? prev.map(p=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:8px 0"><div><b>'+p.equipamento+'</b><div class="sub" style="margin-top:2px">venceu em '+p.vence_em+' · '+p.atraso_dias+' dia(s) de atraso</div></div><button class="btn ghost" data-pconcluir="'+p.equipamento_id+'" style="margin-top:8px">Registrar preventiva feita</button></div>').join('') : '<p class="sub">Nenhuma preventiva vencida.</p>';
+    const prev=(data&&data.preventivas)||[];
+    let h='<div class="sec">🛠️ Preventivas vencidas</div>';
+    h+= prev.length ? prev.map(p=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:8px 0"><div><b>'+p.equipamento+'</b><div class="sub" style="margin-top:2px">'+(p.responsavel?('com '+p.responsavel+' · '):'')+'venceu em '+p.vence_em+' · '+p.atraso_dias+' dia(s) de atraso</div></div><button class="btn ghost" data-pconcluir="'+p.equipamento_id+'" style="margin-top:8px">Registrar preventiva feita</button></div>').join('') : '<p class="sub">Nenhuma preventiva vencida. 👍</p>';
     $('#supView').innerHTML=h;
-    $('#supView').querySelectorAll('[data-mconcluir]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_manut_concluir',{p_manutencao_id:+b.dataset.mconcluir},'Manutenção concluída',supVEqAlertas)));
     $('#supView').querySelectorAll('[data-pconcluir]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_preventiva_concluir',{p_equipamento_id:+b.dataset.pconcluir},'Preventiva registrada',supVEqAlertas)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
