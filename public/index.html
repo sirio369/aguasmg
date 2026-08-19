@@ -420,12 +420,20 @@ async function enviarOuEnfileirar(item,msgOk){
 }
 async function sincronizar(){
   const itens=await filaAll();
-  let ok=0;
-  for(const it of itens){ try{ await enviar(it); await filaDel(it.id); ok++; }catch(e){ break; } }
+  let ok=0, falhou=0;
+  for(const it of itens){
+    if(!navigator.onLine) break;                 // sem rede: para e tenta na próxima
+    try{ await enviar(it); await filaDel(it.id); ok++; }
+    catch(e){
+      // erro do Postgres (SQLSTATE de 5 chars) = rejeição de negócio -> descarta p/ não travar a fila
+      if(e && e.code && /^[0-9A-Z]{5}$/.test(String(e.code))){ await filaDel(it.id); falhou++; console.warn('item da fila rejeitado:', it, e); }
+      else break;                                // rede/indefinido -> mantém e tenta depois
+    }
+  }
   await atualizarFila();
   const lg=document.getElementById('loggers');
   if(ok&&lg&&!lg.classList.contains('hidden')) carregarLoggers();
-  return {ok,total:itens.length};
+  return {ok,total:itens.length,falhou};
 }
 async function atualizarFila(){
   const n=(await filaAll()).length;
@@ -1673,9 +1681,13 @@ function eqMeuCard(e){
   return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+'</div>';
 }
 function supEqMeusWire(){
-  $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_aceitar',{p_termo_id:+b.dataset.aceitar},'Termo aceito',supVEqMeus)));
+  $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>{
+    const item={id:crypto.randomUUID(),rpc:'sup_termo_aceitar',fields:{p_termo_id:+b.dataset.aceitar}};
+    supEnviar(item,'✓ Termo aceito',()=>supVEqMeus());
+  }));
   $('#supView').querySelectorAll('[data-devtoggle]').forEach(b=>b.addEventListener('click',()=>{const x=$('#supView').querySelector('.eqDevBox[data-devbox="'+b.dataset.devtoggle+'"]'); if(x) x.classList.toggle('hidden');}));
   $('#supView').querySelectorAll('[data-devreq]').forEach(b=>b.addEventListener('click',async()=>{
+    if(!navigator.onLine) return toast('Solicitar devolução precisa de conexão (gera o código)');
     const box=$('#supView').querySelector('.eqDevBox[data-devbox="'+b.dataset.devreq+'"]');
     const def=box?box.querySelector('.eqDevDef').checked:false;
     const obs=box?(box.querySelector('.eqDevObs').value||'').trim():'';
@@ -1708,11 +1720,14 @@ async function supVEqSolicitar(){
     if(send) send.addEventListener('click',async()=>{
       const eq=$('#eqSolEq').value; if(!eq) return toast('Escolha o equipamento');
       send.disabled=true;
-      const {error}=await sb.rpc('sup_equip_solicitar',{p_equipamento_id:+eq,p_obs:$('#eqSolObs').value||null});
-      if(error){ toast('⚠ '+(error.message||error)); send.disabled=false; return; }
-      toast('✓ Solicitação enviada'); supVEqSolicitar();
+      const item={id:crypto.randomUUID(),rpc:'sup_equip_solicitar',fields:{p_equipamento_id:+eq,p_obs:$('#eqSolObs').value||null}};
+      const ok=await supEnviar(item,'✓ Solicitação enviada',()=>supVEqSolicitar());
+      if(!ok) send.disabled=false;
     });
-    $('#supView').querySelectorAll('[data-solcancel]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_solic_cancelar',{p_solicitacao_id:+b.dataset.solcancel},'Solicitação cancelada',supVEqSolicitar)));
+    $('#supView').querySelectorAll('[data-solcancel]').forEach(b=>b.addEventListener('click',()=>{
+      const item={id:crypto.randomUUID(),rpc:'sup_equip_solic_cancelar',fields:{p_solicitacao_id:+b.dataset.solcancel}};
+      supEnviar(item,'✓ Solicitação cancelada',()=>supVEqSolicitar());
+    }));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
@@ -2115,7 +2130,7 @@ $('#btnSync').addEventListener('click',async()=>{
   if(!navigator.onLine) return toast('Sem conexão');
   toast('Sincronizando…');
   const r=await sincronizar();
-  toast(r.total? `Enviados ${r.ok}/${r.total}` : 'Nada na fila');
+  toast(r.total? (`Enviados ${r.ok}/${r.total}`+(r.falhou?` · ${r.falhou} rejeitado(s)`:'')) : 'Nada na fila');
 });
 
 function mostrar(sess){
