@@ -1294,7 +1294,7 @@ const SUP_ACTS={
   eq_solicitar:{ic:'🙋',lbl:'Solicitar equipamento',fn:()=>supVEqSolicitar()},
   eq_gerir:{ic:'🏷️',lbl:'Cadastrar equipamentos',fn:()=>supVEqGerir()},
   eq_entregar:{ic:'📤',lbl:'Entregar / devolver',fn:()=>supVEqEntregar()},
-  eq_alertas:{ic:'🛠️',lbl:'Manutenção preventiva',fn:()=>supVEqAlertas()},
+  eq_alertas:{ic:'🛠️',lbl:'Manutenção',fn:()=>supVEqAlertas()},
   eq_painel:{ic:'📋',lbl:'Equipamentos por responsável',fn:()=>supVEqPainel()}
 };
 function supBlocks(){
@@ -1664,15 +1664,24 @@ function eqMeuCard(e){
     let prev='';
     if(e.preventiva_vencida) prev='<div style="margin-top:8px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px">🛠️ Manutenção preventiva vencida'+(e.preventiva_proxima?(' (desde '+e.preventiva_proxima+')'):'')+' — leve o equipamento ao almoxarife.</div>';
     else if(e.preventiva_proxima) prev='<div class="sub" style="margin-top:8px;font-size:12px">Próxima preventiva: '+e.preventiva_proxima+'</div>';
-    acao=prev+'<button class="btn ghost" data-devreq="'+e.equipamento_id+'" style="margin-top:8px">Solicitar devolução</button>';
+    acao=prev+'<button class="btn ghost" data-devtoggle="'+e.equipamento_id+'" style="margin-top:8px">Solicitar devolução</button>'
+      +'<div class="eqDevBox hidden" data-devbox="'+e.equipamento_id+'" style="margin-top:8px;border:1px solid var(--line);border-radius:10px;padding:10px">'
+      +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" class="eqDevDef" style="width:auto"/> Equipamento com defeito</label>'
+      +'<textarea class="eqDevObs" rows="2" placeholder="Observação (obrigatória se defeito)" style="margin-top:6px"></textarea>'
+      +'<button class="btn" data-devreq="'+e.equipamento_id+'" style="margin-top:6px">Gerar código de devolução</button></div>';
   }
   return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+'</div>';
 }
 function supEqMeusWire(){
   $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_aceitar',{p_termo_id:+b.dataset.aceitar},'Termo aceito',supVEqMeus)));
+  $('#supView').querySelectorAll('[data-devtoggle]').forEach(b=>b.addEventListener('click',()=>{const x=$('#supView').querySelector('.eqDevBox[data-devbox="'+b.dataset.devtoggle+'"]'); if(x) x.classList.toggle('hidden');}));
   $('#supView').querySelectorAll('[data-devreq]').forEach(b=>b.addEventListener('click',async()=>{
+    const box=$('#supView').querySelector('.eqDevBox[data-devbox="'+b.dataset.devreq+'"]');
+    const def=box?box.querySelector('.eqDevDef').checked:false;
+    const obs=box?(box.querySelector('.eqDevObs').value||'').trim():'';
+    if(def&&!obs) return toast('Descreva o defeito');
     b.disabled=true;
-    const {error}=await sb.rpc('sup_devolucao_solicitar',{p_equipamento_id:+b.dataset.devreq});
+    const {error}=await sb.rpc('sup_devolucao_solicitar',{p_equipamento_id:+b.dataset.devreq,p_defeito:def,p_obs:obs||null});
     if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
     toast('✓ Código gerado — informe ao almoxarife'); supVEqMeus();
   }));
@@ -1718,7 +1727,7 @@ async function supVEqGerir(){
       <p class="sub" style="margin-top:2px">Cadastre o tipo e o intervalo da preventiva. Todo equipamento desse tipo herda o intervalo.</p>
       <input id="eqtNome" placeholder="Nome do tipo (ex.: Furadeira)" autocomplete="off"/>
       <div style="display:flex;gap:6px;margin-top:6px">
-        <input id="eqtPrev" inputmode="numeric" placeholder="Preventiva a cada (dias)" style="flex:1;min-width:0"/>
+        <input id="eqtPrev" inputmode="numeric" placeholder="Preventiva a cada (dias) *" style="flex:1;min-width:0"/>
         <button id="eqtAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600">Criar tipo</button>
       </div>
       <div id="eqTipos" style="margin-top:8px"></div>
@@ -1743,7 +1752,8 @@ function supEqTiposRender(){
 async function supEqTipoCadastrar(){
   const nome=($('#eqtNome').value||'').trim(); if(!nome) return toast('Informe o nome do tipo');
   const prev=parseInt(($('#eqtPrev').value||'').replace(/\D/g,''),10);
-  const {error}=await sb.rpc('sup_equip_tipo_cadastrar',{p_nome:nome,p_preventiva_dias:isNaN(prev)?null:prev});
+  if(isNaN(prev)||prev<=0) return toast('Informe o prazo da preventiva (dias)');
+  const {error}=await sb.rpc('sup_equip_tipo_cadastrar',{p_nome:nome,p_preventiva_dias:prev});
   if(error){ toast('⚠ '+(error.message||error)); return; }
   toast('✓ Tipo criado'); supVEqGerir();
 }
@@ -1751,7 +1761,7 @@ async function supEqCadastrar(){
   const nome=($('#eqcNome').value||'').trim(); if(!nome) return toast('Informe o nome do equipamento');
   const tid=$('#eqcTipo').value; if(!tid) return toast('Escolha o tipo do equipamento');
   const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo_id:+tid,p_num_serie:($('#eqcSerie').value||'').trim()||null});
-  if(error){ toast('⚠ '+(error.message||error)); return; }
+  if(error){ toast(/num_serie|duplicate|unique/i.test(error.message||'')?'⚠ Já existe equipamento com esse nº de série':'⚠ '+(error.message||error)); return; }
   toast('✓ Equipamento cadastrado'); supVEqGerir();
 }
 // --- Entregar / devolver equipamentos (almoxarife) ---
@@ -1763,8 +1773,11 @@ async function supVEqEntregar(){
     eqUsuarios=u.data||[]; const arr=l.data||[]; const solic=sp.data||[];
     const disp=arr.filter(e=>e.status==='disponivel');
     const pend=arr.filter(e=>e.devolucao_solicitada);
+    const aceitePend=arr.filter(e=>e.termo_status==='pendente');
     let h='<div class="sec">📥 Solicitações pendentes</div>';
     h+= solic.length ? solic.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b><div class="sub" style="margin-top:2px">${s.tipo?(s.tipo+' · '):''}pedido por ${s.solicitante||'—'} · ${eqDia(s.criado_em)}</div>${s.obs?('<div class="sub" style="margin-top:2px">Obs: '+s.obs+'</div>'):''}${s.ainda_disponivel?'':'<div style="color:var(--bad);font-size:12px;margin-top:4px">⚠️ equipamento não está mais disponível</div>'}</div></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-atender="${s.id}" style="margin:0"${s.ainda_disponivel?'':' disabled'}>Entregar</button><button class="btn ghost" data-solrej="${s.id}" style="margin:0">Rejeitar</button></div></div>`).join('') : '<p class="sub">Nenhuma solicitação pendente.</p>';
+    h+='<div class="sec" style="margin-top:26px">⏳ Aguardando aceite</div>';
+    h+= aceitePend.length ? aceitePend.map(e=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div><b>${e.nome}</b><div class="sub" style="margin-top:2px">com ${e.responsavel||'—'} · aguardando aceite do termo</div></div><button class="btn ghost" data-cancelemit="${e.id}" style="margin-top:8px">Cancelar emissão</button></div>`).join('') : '<p class="sub">Nenhum termo aguardando aceite.</p>';
     h+='<div class="sec" style="margin-top:26px">📤 Entrega direta</div>';
     if(disp.length){
       h+=`<label>Equipamento disponível</label>
@@ -1794,21 +1807,38 @@ async function supVEqEntregar(){
     }));
     $('#supView').querySelectorAll('[data-atender]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_atender',{p_solicitacao_id:+b.dataset.atender},'Termo emitido — aguardando aceite',supVEqEntregar)));
     $('#supView').querySelectorAll('[data-solrej]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_rejeitar',{p_solicitacao_id:+b.dataset.solrej},'Solicitação rejeitada',supVEqEntregar)));
+    $('#supView').querySelectorAll('[data-cancelemit]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_cancelar',{p_equipamento_id:+b.dataset.cancelemit},'Emissão cancelada',supVEqEntregar)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
-// --- Manutenção preventiva: todos os equipamentos (almoxarife) ---
+// --- Manutenção: corretiva (defeito) + preventiva de todos (almoxarife) ---
 async function supVEqAlertas(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_equip_listar'); if(error)throw error;
     const arr=data||[];
     if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhum equipamento cadastrado.</p>'; return; }
-    const withD=arr.map(e=>({e,dias:eqDiasAte(e.preventiva_proxima)}));
+    const emManut=arr.filter(e=>e.status==='manutencao');
+    const outros=arr.filter(e=>e.status!=='manutencao');
+    const withD=outros.map(e=>({e,dias:eqDiasAte(e.preventiva_proxima)}));
     withD.sort((a,b)=>{ if(a.dias==null&&b.dias==null) return 0; if(a.dias==null) return 1; if(b.dias==null) return -1; return a.dias-b.dias; });
-    $('#supView').innerHTML='<p class="sub" style="margin-bottom:10px">Prazo corrido de cada equipamento até a manutenção preventiva.</p>'+withD.map(({e,dias})=>eqPrevCard(e,dias)).join('');
+    let h='<div class="sec">🔧 Em manutenção (defeito)</div>';
+    h+= emManut.length ? emManut.map(eqManutCard).join('') : '<p class="sub">Nenhum equipamento em manutenção.</p>';
+    h+='<div class="sec" style="margin-top:22px">🛠️ Preventiva</div><p class="sub" style="margin:2px 0 8px">Prazo corrido de cada equipamento até a manutenção preventiva.</p>';
+    h+= withD.length ? withD.map(({e,dias})=>eqPrevCard(e,dias)).join('') : '<p class="sub">Nenhum equipamento.</p>';
+    $('#supView').innerHTML=h;
     $('#supView').querySelectorAll('[data-pconcluir]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_preventiva_concluir',{p_equipamento_id:+b.dataset.pconcluir},'Manutenção registrada',supVEqAlertas)));
+    $('#supView').querySelectorAll('[data-manutok]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_manutencao_concluir',{p_equipamento_id:+b.dataset.manutok},'Equipamento liberado',supVEqAlertas)));
+    $('#supView').querySelectorAll('[data-baixar]').forEach(b=>b.addEventListener('click',()=>{
+      const motivo=prompt('Motivo da baixa do equipamento:'); if(motivo===null) return;
+      supAcao('sup_equip_baixar',{p_equipamento_id:+b.dataset.baixar,p_motivo:motivo||null},'Equipamento baixado',supVEqAlertas);
+    }));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+function eqManutCard(e){
+  const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):''].filter(Boolean).join(' · ');
+  const desc=e.manutencao_desc?('<div style="margin-top:6px;font-size:13px;color:var(--bad)">🔧 '+e.manutencao_desc+'</div>'):'';
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+desc+'<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-manutok="'+e.id+'" style="margin:0">Concluir (disponível)</button><button class="btn ghost" data-baixar="'+e.id+'" style="margin:0">Dar baixa</button></div></div>';
 }
 function eqPrevCard(e,dias){
   const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):'', e.responsavel?('com '+e.responsavel):''].filter(Boolean).join(' · ');
@@ -1831,39 +1861,60 @@ function eqPrevCard(e,dias){
 const EQ_HST={pendente:{l:'Aceite pendente',bg:'--warn-bg',fg:'--warn'},ativo:{l:'Em posse',bg:'--ok-bg',fg:'--ok'},devolvido:{l:'Devolvido',bg:'--line',fg:'--mut'},cancelado:{l:'Cancelado',bg:'--line',fg:'--mut'}};
 async function supVEqPainel(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  let hist=[], histOff=0, histEnd=false; const HLIM=50;
   try{
-    const [l,hi]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_equip_historico')]);
-    if(l.error)throw l.error;
-    eqPainelData=l.data||[]; const hist=hi.data||[];
+    const l=await sb.rpc('sup_equip_listar'); if(l.error)throw l.error;
+    eqPainelData=l.data||[];
     if(!eqPainelData.length){ $('#supView').innerHTML='<p class="sub">Nenhum equipamento cadastrado.</p>'; return; }
     const respMap=new Map();
     eqPainelData.forEach(e=>{ if(e.responsavel_uuid) respMap.set(e.responsavel_uuid,e.responsavel); });
-    hist.forEach(h=>{ if(h.responsavel_uuid) respMap.set(h.responsavel_uuid,h.responsavel); });
-    const resps=[...respMap.entries()].sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
     const tipos=[...new Set(eqPainelData.filter(e=>e.tipo).map(e=>e.tipo))].sort();
     const equips=[...new Map(eqPainelData.map(e=>[e.id,e.nome])).entries()].sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
     $('#supView').innerHTML=`
       <div style="display:flex;gap:6px">
-        <select id="eqPFu" style="flex:1;min-width:0"><option value="">Todos os responsáveis</option>${resps.map(([id,nome])=>`<option value="${id}">${nome}</option>`).join('')}</select>
+        <select id="eqPFu" style="flex:1;min-width:0"><option value="">Todos os responsáveis</option>${[...respMap.entries()].sort((a,b)=>(a[1]||'').localeCompare(b[1]||'')).map(([id,nome])=>`<option value="${id}">${nome}</option>`).join('')}</select>
         <select id="eqPFt" style="flex:1;min-width:0"><option value="">Todos os tipos</option>${tipos.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
       </div>
       <select id="eqPFe" style="margin-top:6px"><option value="">Todos os equipamentos</option>${equips.map(([id,nome])=>`<option value="${id}">${nome}</option>`).join('')}</select>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+        <span class="sub">De</span><input id="eqPDe" type="date" style="flex:1;min-width:0;font-size:13px"/>
+        <span class="sub">até</span><input id="eqPAte" type="date" style="flex:1;min-width:0;font-size:13px"/>
+      </div>
       <div class="sec" style="margin-top:18px">📍 Em posse agora</div>
       <div id="eqPPosse" style="margin-top:6px"></div>
       <div class="sec" style="margin-top:22px">🔄 Movimentações</div>
-      <div id="eqPHist" style="margin-top:6px"></div>`;
-    const render=()=>{
+      <div id="eqPHist" style="margin-top:6px"></div>
+      <button id="eqPMore" class="btn ghost" style="margin-top:8px;display:none">Carregar mais</button>`;
+    const renderPosse=()=>{
       const fu=$('#eqPFu').value, ft=$('#eqPFt').value, fe=$('#eqPFe').value;
       const posse=eqPainelData.filter(e=>e.responsavel&&e.status!=='disponivel'&&e.status!=='baixado'
         &&(!fu||String(e.responsavel_uuid)===fu)&&(!ft||e.tipo===ft)&&(!fe||String(e.id)===fe));
       $('#eqPPosse').innerHTML = posse.length? posse.map(eqPainelCard).join('') : '<p class="sub">Ninguém com equipamento nesse filtro.</p>';
-      const mv=hist.filter(h=>(!fu||String(h.responsavel_uuid)===fu)&&(!ft||h.tipo===ft)&&(!fe||String(h.equipamento_id)===fe));
-      $('#eqPHist').innerHTML = mv.length? mv.map(eqHistCard).join('') : '<p class="sub">Sem movimentações nesse filtro.</p>';
     };
-    $('#eqPFu').addEventListener('change',render);
-    $('#eqPFt').addEventListener('change',render);
-    $('#eqPFe').addEventListener('change',render);
-    render();
+    const renderHist=()=>{
+      const ft=$('#eqPFt').value;
+      const mv=hist.filter(h=>!ft||h.tipo===ft);
+      $('#eqPHist').innerHTML = mv.length? mv.map(eqHistCard).join('') : '<p class="sub">Sem movimentações nesse filtro.</p>';
+      $('#eqPMore').style.display=histEnd?'none':'block';
+    };
+    const loadHist=async(reset)=>{
+      if(reset){ hist=[]; histOff=0; histEnd=false; }
+      const fu=$('#eqPFu').value||null, fe=$('#eqPFe').value?+$('#eqPFe').value:null;
+      const di=$('#eqPDe').value||null, df=$('#eqPAte').value||null;
+      const {data,error}=await sb.rpc('sup_equip_historico',{p_colaborador_uuid:fu,p_equipamento_id:fe,p_data_ini:di,p_data_fim:df,p_limit:HLIM,p_offset:histOff});
+      if(error){ $('#eqPHist').innerHTML='<div class="banner bad">Erro: '+(error.message||error)+'</div>'; return; }
+      const rows=data||[];
+      hist=hist.concat(rows); histOff+=rows.length; histEnd=rows.length<HLIM;
+      rows.forEach(h=>{ if(h.responsavel_uuid && !respMap.has(h.responsavel_uuid)){ respMap.set(h.responsavel_uuid,h.responsavel); const o=document.createElement('option'); o.value=h.responsavel_uuid; o.textContent=h.responsavel; $('#eqPFu').appendChild(o); } });
+      renderHist();
+    };
+    $('#eqPFu').addEventListener('change',()=>{ renderPosse(); loadHist(true); });
+    $('#eqPFe').addEventListener('change',()=>{ renderPosse(); loadHist(true); });
+    $('#eqPFt').addEventListener('change',()=>{ renderPosse(); renderHist(); });
+    $('#eqPDe').addEventListener('change',()=>loadHist(true));
+    $('#eqPAte').addEventListener('change',()=>loadHist(true));
+    $('#eqPMore').addEventListener('click',()=>loadHist(false));
+    renderPosse(); loadHist(true);
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 function eqPainelCard(e){
