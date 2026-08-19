@@ -1347,6 +1347,20 @@ function supArea(cat){
       }).join('')+'</div>').join('');
   $('#supView').querySelectorAll('[data-supact]').forEach(el=>el.addEventListener('click',()=>supOpen(el.dataset.supact)));
   $('#supView').querySelectorAll('[data-suplock]').forEach(el=>el.addEventListener('click',()=>toast('Etapa de '+el.dataset.suplock)));
+  if(cat==='equip') supEquipAviso();
+}
+async function supEquipAviso(){
+  try{
+    const {data}=await sb.rpc('sup_meus_equipamentos');
+    const pend=(data||[]).filter(x=>x.termo_status==='pendente').length;
+    if(pend>0 && supCurrent==='area' && supAreaId==='equip'){
+      const b=document.createElement('div');
+      b.className='banner warn'; b.style.cssText='display:block;cursor:pointer;margin-bottom:12px';
+      b.innerHTML='🔔 <b>'+pend+'</b> equipamento(s) aguardando seu aceite — toque para aceitar o termo.';
+      b.addEventListener('click',()=>supOpen('eq_meus'));
+      const v=$('#supView'); v.insertBefore(b, v.firstChild);
+    }
+  }catch(e){}
 }
 function supOpen(id){
   const A=SUP_ACTS[id]; if(!A) return;
