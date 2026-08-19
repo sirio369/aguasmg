@@ -1258,7 +1258,7 @@ function capReset(){
 }
 
 // ---------- MÓDULO SUPRIMENTOS ----------
-let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', supCartS=[], supCartC=[], supConEstoque=[], eqUsuarios=[];
+let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', supCartS=[], supCartC=[], supConEstoque=[], eqUsuarios=[], eqTipos=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -1666,24 +1666,51 @@ function supEqMeusWire(){
 async function supVEqGerir(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const [l,u]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_usuarios_listar')]);
+    const [l,u,t]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_usuarios_listar'),sb.rpc('sup_equip_tipos_listar')]);
     if(l.error)throw l.error;
-    eqUsuarios=u.data||[];
-    $('#supView').innerHTML='<details style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600;font-size:14px;padding:6px 0">➕ Cadastrar equipamento</summary>'+
-      '<label>Nome *</label><input id="eqcNome" autocomplete="off"/>'+
-      '<label>Tipo</label><input id="eqcTipo" autocomplete="off"/>'+
-      '<label>Nº de série / patrimônio</label><input id="eqcSerie" autocomplete="off"/>'+
-      '<label>Preventiva a cada (dias)</label><input id="eqcPrev" inputmode="numeric" placeholder="ex.: 90"/>'+
-      '<button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar</button></details>'+
-      '<div id="eqList"></div>';
+    eqUsuarios=u.data||[]; eqTipos=t.data||[];
+    $('#supView').innerHTML=`
+      <div class="sec">🏷️ Tipos de equipamento</div>
+      <p class="sub" style="margin-top:2px">Cadastre primeiro o tipo (ex.: Furadeira, Manômetro).</p>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input id="eqtNome" placeholder="Novo tipo" autocomplete="off" style="flex:1;min-width:0"/>
+        <button id="eqtAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600">Criar tipo</button>
+      </div>
+      <div id="eqTipos" style="margin-top:8px"></div>
+
+      <div class="sec" style="margin-top:26px">➕ Adicionar equipamento</div>
+      <label>Tipo *</label>
+      <select id="eqcTipo">${eqTipos.length?('<option value="">Selecione…</option>'+eqTipos.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')):'<option value="">— cadastre um tipo acima —</option>'}</select>
+      <label>Nome / identificação *</label><input id="eqcNome" autocomplete="off" placeholder="ex.: Furadeira 01"/>
+      <label>Nº de série / patrimônio</label><input id="eqcSerie" autocomplete="off"/>
+      <label>Preventiva a cada (dias)</label><input id="eqcPrev" inputmode="numeric" placeholder="ex.: 90"/>
+      <button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar equipamento</button>
+
+      <div class="sec" style="margin-top:26px">📋 Equipamentos</div>
+      <div id="eqList"></div>`;
+    $('#eqtAdd').addEventListener('click',supEqTipoCadastrar);
     $('#eqcAdd').addEventListener('click',supEqCadastrar);
+    supEqTiposRender();
     supEqListRender(l.data||[]);
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
+function supEqTiposRender(){
+  const c=$('#eqTipos'); if(!c) return;
+  c.innerHTML = eqTipos.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px">'+eqTipos.map(t=>`<span style="font-size:12px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px">${t.nome}${t.qtd?(' · '+t.qtd):''}</span>`).join('')+'</div>'
+    : '<p class="sub">Nenhum tipo cadastrado ainda.</p>';
+}
+async function supEqTipoCadastrar(){
+  const nome=($('#eqtNome').value||'').trim(); if(!nome) return toast('Informe o nome do tipo');
+  const {error}=await sb.rpc('sup_equip_tipo_cadastrar',{p_nome:nome});
+  if(error){ toast('⚠ '+(error.message||error)); return; }
+  toast('✓ Tipo criado'); supVEqGerir();
+}
 async function supEqCadastrar(){
-  const nome=($('#eqcNome').value||'').trim(); if(!nome) return toast('Informe o nome');
+  const nome=($('#eqcNome').value||'').trim(); if(!nome) return toast('Informe o nome do equipamento');
+  const tid=$('#eqcTipo').value; if(!tid) return toast('Escolha o tipo do equipamento');
   const prev=parseInt(($('#eqcPrev').value||'').replace(/\D/g,''),10);
-  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo:($('#eqcTipo').value||'').trim()||null,p_num_serie:($('#eqcSerie').value||'').trim()||null,p_preventiva_dias:isNaN(prev)?null:prev});
+  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo_id:+tid,p_num_serie:($('#eqcSerie').value||'').trim()||null,p_preventiva_dias:isNaN(prev)?null:prev});
   if(error){ toast('⚠ '+(error.message||error)); return; }
   toast('✓ Equipamento cadastrado'); supVEqGerir();
 }
