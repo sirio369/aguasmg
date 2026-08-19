@@ -730,7 +730,7 @@ function formCriar(){
   <label>Consórcio</label><select id="cr_cons"><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
   ${cInput('Zona (opcional)','cr_zona','')}
   ${cInput('Número do logger *','di_logger','')}${cInput('Número do HD','di_hd','')}${cNum('Leitura do HD na instalação *','di_leitura')}
-  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}
+  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}
   ${cArea('Observação (opcional)','di_obs')}
   <button id="lgSalvar" class="btn" disabled>Criar logger</button>`;
 }
@@ -746,7 +746,7 @@ function formInstalar(p){
   <div class="banner ok" style="margin-bottom:10px">${[p.zona,p.pressao_modelo?('pressão modelo '+p.pressao_modelo+' mca'):''].filter(Boolean).join(' · ')||'ponto planejado'}</div>
   ${nav_btn(p)}<div id="lgGps" class="banner warn">Obtendo GPS…</div>
   ${cInput('Número do logger *','di_logger','')}${cInput('Número do HD','di_hd','')}${cNum('Leitura do HD na instalação *','di_leitura')}
-  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}
+  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}
   ${cArea('Observação (opcional)','di_obs')}
   <button id="lgSalvar" class="btn" disabled>Confirmar instalação</button>`;
 }
@@ -790,11 +790,11 @@ function lgValidar(){
     const lb=(document.getElementById('cr_label')||{}).value;
     const lg=(document.getElementById('di_logger')||{}).value;
     const lt=parseFloat(((document.getElementById('di_leitura')||{}).value||'').replace(',','.'));
-    ok=okGps&&!!lb&&!!lg&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_cav&&!!detFotos.f_fach;
+    ok=okGps&&!!lb&&!!lg&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_leitura&&!!detFotos.f_numeracao&&!!detFotos.f_cav&&!!detFotos.f_fach;
   }else if(p.situacao==='pendente'){
     const lg=(document.getElementById('di_logger')||{}).value;
     const lt=parseFloat(((document.getElementById('di_leitura')||{}).value||'').replace(',','.'));
-    ok=okGps&&!!lg&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_cav&&!!detFotos.f_fach;
+    ok=okGps&&!!lg&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_leitura&&!!detFotos.f_numeracao&&!!detFotos.f_cav&&!!detFotos.f_fach;
   }else{
     const lt=parseFloat(((document.getElementById('dr_leitura')||{}).value||'').replace(',','.'));
     ok=okGps&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_cav;
@@ -836,7 +836,7 @@ async function submeterLogger(){
   if(p.novo){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     const item={id:uid,tipo:'logger',rpc:'app_logger_criar',pasta:'logger',
-      fotos:{p_foto_hd:detFotos.f_hd,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach},
+      fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach},
       fields:{p_client_uuid:uid,
         p_label:(document.getElementById('cr_label').value||null),
         p_consorcio:(document.getElementById('cr_cons').value||null),
@@ -854,7 +854,7 @@ async function submeterLogger(){
   if(p.situacao==='pendente'){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     item={id:uid,tipo:'logger',rpc:'app_logger_instalar',pasta:'logger',
-      fotos:{p_foto_hd:detFotos.f_hd,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach},
+      fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach},
       fields:{...comum,p_leitura:lt,p_numero_logger:(document.getElementById('di_logger').value||null),p_numero_hd:(document.getElementById('di_hd').value||null),p_observacao:(document.getElementById('di_obs').value||null)}};
     novaSit='instalado'; msg='✓ Instalação registrada';
   }else{
