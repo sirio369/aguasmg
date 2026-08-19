@@ -1291,7 +1291,8 @@ const SUP_ACTS={
   almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVAlmox()},
   painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()},
   eq_meus:{ic:'🧰',lbl:'Meus equipamentos',fn:()=>supVEqMeus()},
-  eq_gerir:{ic:'🏷️',lbl:'Gerir equipamentos',fn:()=>supVEqGerir()},
+  eq_solicitar:{ic:'🙋',lbl:'Solicitar equipamento',fn:()=>supVEqSolicitar()},
+  eq_gerir:{ic:'🏷️',lbl:'Cadastrar equipamentos',fn:()=>supVEqGerir()},
   eq_entregar:{ic:'📤',lbl:'Entregar / devolver',fn:()=>supVEqEntregar()},
   eq_alertas:{ic:'🛠️',lbl:'Manutenção preventiva',fn:()=>supVEqAlertas()},
   eq_painel:{ic:'📋',lbl:'Equipamentos por responsável',fn:()=>supVEqPainel()}
@@ -1311,7 +1312,7 @@ function supBlocks(){
 function supBlocksEquip(){
   const almox=!!(ME&&ME.is_almoxarife), gestao=!!(ME&&(ME.pode_aprovar||ME.is_almoxarife));
   return [
-    {t:'Campo',ic:'🧑‍🔧',acts:[{id:'eq_meus',on:true}]},
+    {t:'Campo',ic:'🧑‍🔧',acts:[{id:'eq_meus',on:true},{id:'eq_solicitar',on:true}]},
     {t:'Almoxarifado',ic:'📦',acts:[
       {id:'eq_gerir',on:almox,papel:'Almoxarife'},
       {id:'eq_entregar',on:almox,papel:'Almoxarife'},
@@ -1639,6 +1640,7 @@ function eqStatusChip(e){
 }
 function eqDiasAte(iso){ if(!iso) return null; const d=new Date(iso+'T00:00:00'); const h=new Date(); h.setHours(0,0,0,0); return Math.round((d-h)/86400000); }
 function eqDiasCorridos(iso){ const d=eqDiasAte(iso); return d==null?null:-d; }
+function eqDia(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString('pt-BR'); }catch(e){ return '—'; } }
 
 // --- Meus equipamentos (colaborador) ---
 async function supVEqMeus(){
@@ -1674,6 +1676,35 @@ function supEqMeusWire(){
     if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
     toast('✓ Código gerado — informe ao almoxarife'); supVEqMeus();
   }));
+}
+
+// --- Solicitar equipamento (colaborador) ---
+async function supVEqSolicitar(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const [d,m]=await Promise.all([sb.rpc('sup_equip_disponiveis'),sb.rpc('sup_minhas_solic_equip')]);
+    if(d.error)throw d.error;
+    const disp=d.data||[], minhas=m.data||[];
+    let h='<div class="sec">🙋 Solicitar equipamento</div><p class="sub" style="margin-top:2px">Só aparecem equipamentos disponíveis (não estão em uso).</p>';
+    if(disp.length){
+      h+=`<label>Equipamento</label>
+      <select id="eqSolEq"><option value="">Selecione…</option>${disp.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}${e.num_serie?(' · nº '+e.num_serie):''}</option>`).join('')}</select>
+      <label>Observação</label><textarea id="eqSolObs" rows="2" placeholder="Ex.: para a OS 88.421"></textarea>
+      <button id="eqSolSend" class="btn" style="margin-top:10px">Enviar solicitação</button>`;
+    } else { h+='<p class="sub">Nenhum equipamento disponível no momento.</p>'; }
+    h+='<div class="sec" style="margin-top:26px">📨 Minhas solicitações pendentes</div>';
+    h+= minhas.length ? minhas.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b>${s.tipo?('<div class="sub" style="margin-top:2px">'+s.tipo+' · '+eqDia(s.criado_em)+'</div>'):''}</div><button class="btn ghost" data-solcancel="${s.id}" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Cancelar</button></div></div>`).join('') : '<p class="sub">Você não tem solicitações pendentes.</p>';
+    $('#supView').innerHTML=h;
+    const send=$('#eqSolSend');
+    if(send) send.addEventListener('click',async()=>{
+      const eq=$('#eqSolEq').value; if(!eq) return toast('Escolha o equipamento');
+      send.disabled=true;
+      const {error}=await sb.rpc('sup_equip_solicitar',{p_equipamento_id:+eq,p_obs:$('#eqSolObs').value||null});
+      if(error){ toast('⚠ '+(error.message||error)); send.disabled=false; return; }
+      toast('✓ Solicitação enviada'); supVEqSolicitar();
+    });
+    $('#supView').querySelectorAll('[data-solcancel]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_solic_cancelar',{p_solicitacao_id:+b.dataset.solcancel},'Solicitação cancelada',supVEqSolicitar)));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
 // --- Gerir equipamentos (almoxarife) ---
@@ -1727,12 +1758,14 @@ async function supEqCadastrar(){
 async function supVEqEntregar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const [l,u]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_usuarios_listar')]);
+    const [l,u,sp]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_usuarios_listar'),sb.rpc('sup_equip_solicitacoes_pendentes')]);
     if(l.error)throw l.error;
-    eqUsuarios=u.data||[]; const arr=l.data||[];
+    eqUsuarios=u.data||[]; const arr=l.data||[]; const solic=sp.data||[];
     const disp=arr.filter(e=>e.status==='disponivel');
     const pend=arr.filter(e=>e.devolucao_solicitada);
-    let h='<div class="sec">📤 Entregar equipamento</div>';
+    let h='<div class="sec">📥 Solicitações pendentes</div>';
+    h+= solic.length ? solic.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b><div class="sub" style="margin-top:2px">${s.tipo?(s.tipo+' · '):''}pedido por ${s.solicitante||'—'} · ${eqDia(s.criado_em)}</div>${s.obs?('<div class="sub" style="margin-top:2px">Obs: '+s.obs+'</div>'):''}${s.ainda_disponivel?'':'<div style="color:var(--bad);font-size:12px;margin-top:4px">⚠️ equipamento não está mais disponível</div>'}</div></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-atender="${s.id}" style="margin:0"${s.ainda_disponivel?'':' disabled'}>Entregar</button><button class="btn ghost" data-solrej="${s.id}" style="margin:0">Rejeitar</button></div></div>`).join('') : '<p class="sub">Nenhuma solicitação pendente.</p>';
+    h+='<div class="sec" style="margin-top:26px">📤 Entrega direta</div>';
     if(disp.length){
       h+=`<label>Equipamento disponível</label>
       <select id="eqEntEq"><option value="">Selecione…</option>${disp.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}</option>`).join('')}</select>
@@ -1759,6 +1792,8 @@ async function supVEqEntregar(){
       if(cod.length!==4) return toast('Digite o código de 4 dígitos');
       supAcao('sup_equip_devolver',{p_equipamento_id:+b.dataset.devconf,p_codigo:cod},'Devolução registrada',supVEqEntregar);
     }));
+    $('#supView').querySelectorAll('[data-atender]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_atender',{p_solicitacao_id:+b.dataset.atender},'Termo emitido — aguardando aceite',supVEqEntregar)));
+    $('#supView').querySelectorAll('[data-solrej]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_rejeitar',{p_solicitacao_id:+b.dataset.solrej},'Solicitação rejeitada',supVEqEntregar)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
@@ -1792,30 +1827,42 @@ function eqPrevCard(e,dias){
   return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+barra+botao+'</div>';
 }
 
-// --- Painel de equipamentos por responsável (gestão) ---
+// --- Painel de equipamentos por responsável + histórico (gestão) ---
+const EQ_HST={pendente:{l:'Aceite pendente',bg:'--warn-bg',fg:'--warn'},ativo:{l:'Em posse',bg:'--ok-bg',fg:'--ok'},devolvido:{l:'Devolvido',bg:'--line',fg:'--mut'},cancelado:{l:'Cancelado',bg:'--line',fg:'--mut'}};
 async function supVEqPainel(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const {data,error}=await sb.rpc('sup_equip_listar'); if(error)throw error;
-    eqPainelData=data||[];
+    const [l,hi]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_equip_historico')]);
+    if(l.error)throw l.error;
+    eqPainelData=l.data||[]; const hist=hi.data||[];
     if(!eqPainelData.length){ $('#supView').innerHTML='<p class="sub">Nenhum equipamento cadastrado.</p>'; return; }
-    const resps=[...new Set(eqPainelData.filter(e=>e.responsavel).map(e=>e.responsavel))].sort();
+    const respMap=new Map();
+    eqPainelData.forEach(e=>{ if(e.responsavel_uuid) respMap.set(e.responsavel_uuid,e.responsavel); });
+    hist.forEach(h=>{ if(h.responsavel_uuid) respMap.set(h.responsavel_uuid,h.responsavel); });
+    const resps=[...respMap.entries()].sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
     const tipos=[...new Set(eqPainelData.filter(e=>e.tipo).map(e=>e.tipo))].sort();
+    const equips=[...new Map(eqPainelData.map(e=>[e.id,e.nome])).entries()].sort((a,b)=>(a[1]||'').localeCompare(b[1]||''));
     $('#supView').innerHTML=`
       <div style="display:flex;gap:6px">
-        <select id="eqPFu" style="flex:1;min-width:0"><option value="">Todos os responsáveis</option>${resps.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+        <select id="eqPFu" style="flex:1;min-width:0"><option value="">Todos os responsáveis</option>${resps.map(([id,nome])=>`<option value="${id}">${nome}</option>`).join('')}</select>
         <select id="eqPFt" style="flex:1;min-width:0"><option value="">Todos os tipos</option>${tipos.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
       </div>
-      <div id="eqPCount" class="sub" style="margin-top:8px"></div>
-      <div id="eqPList" style="margin-top:4px"></div>`;
+      <select id="eqPFe" style="margin-top:6px"><option value="">Todos os equipamentos</option>${equips.map(([id,nome])=>`<option value="${id}">${nome}</option>`).join('')}</select>
+      <div class="sec" style="margin-top:18px">📍 Em posse agora</div>
+      <div id="eqPPosse" style="margin-top:6px"></div>
+      <div class="sec" style="margin-top:22px">🔄 Movimentações</div>
+      <div id="eqPHist" style="margin-top:6px"></div>`;
     const render=()=>{
-      const fu=$('#eqPFu').value, ft=$('#eqPFt').value;
-      const list=eqPainelData.filter(e=>(!fu||e.responsavel===fu)&&(!ft||e.tipo===ft));
-      $('#eqPCount').textContent=list.length+' equipamento(s)';
-      $('#eqPList').innerHTML = list.length? list.map(eqPainelCard).join('') : '<p class="sub">Nenhum equipamento com esse filtro.</p>';
+      const fu=$('#eqPFu').value, ft=$('#eqPFt').value, fe=$('#eqPFe').value;
+      const posse=eqPainelData.filter(e=>e.responsavel&&e.status!=='disponivel'&&e.status!=='baixado'
+        &&(!fu||String(e.responsavel_uuid)===fu)&&(!ft||e.tipo===ft)&&(!fe||String(e.id)===fe));
+      $('#eqPPosse').innerHTML = posse.length? posse.map(eqPainelCard).join('') : '<p class="sub">Ninguém com equipamento nesse filtro.</p>';
+      const mv=hist.filter(h=>(!fu||String(h.responsavel_uuid)===fu)&&(!ft||h.tipo===ft)&&(!fe||String(h.equipamento_id)===fe));
+      $('#eqPHist').innerHTML = mv.length? mv.map(eqHistCard).join('') : '<p class="sub">Sem movimentações nesse filtro.</p>';
     };
     $('#eqPFu').addEventListener('change',render);
     $('#eqPFt').addEventListener('change',render);
+    $('#eqPFe').addEventListener('change',render);
     render();
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
@@ -1823,6 +1870,14 @@ function eqPainelCard(e){
   const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):'', e.responsavel?('com '+e.responsavel):'livre'].filter(Boolean).join(' · ');
   const prev=e.preventiva_vencida?' · <span style="color:var(--bad)">preventiva vencida</span>':'';
   return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+e.nome+'</b><div class="sub" style="margin-top:2px">'+sub+prev+'</div></div>'+eqStatusChip(e)+'</div></div>';
+}
+function eqHistCard(h){
+  const s=EQ_HST[h.status]||{l:h.status,bg:'--line',fg:'--mut'};
+  const chip='<span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var('+s.bg+');color:var('+s.fg+')">'+s.l+'</span>';
+  const entregue=eqDia(h.aceito_em||h.emitido_em);
+  const devol=h.devolvido_em?eqDia(h.devolvido_em):'em posse';
+  const sub=[h.tipo, h.responsavel?('com '+h.responsavel):''].filter(Boolean).join(' · ');
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+h.equipamento+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'<div class="sub" style="margin-top:3px;font-size:12px">📤 '+entregue+' · 📥 '+devol+'</div></div>'+chip+'</div></div>';
 }
 
 // --- tela: Configurações (admin) ---
