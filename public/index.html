@@ -721,21 +721,15 @@ function abrirDetalhe(id){
   else if(p.situacao==='removido') h=formFinalizar(p);
   else h=resumo(p);
   $('#lgDet').innerHTML=h; ligarDetalhe(p);
-  if(p.situacao && p.situacao!=='pendente'){
-    const wrap=document.createElement('div'); wrap.style.marginTop='10px';
-    wrap.innerHTML='<label class="pickb" style="display:inline-flex;cursor:pointer">📎 Importar dados do logger (.json)<input id="lgImp" type="file" accept=".json,application/json" style="display:none"></label><div id="lgImpMsg" class="sub" style="margin-top:6px"></div>';
-    $('#lgDet').appendChild(wrap);
-    wrap.querySelector('#lgImp').addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f); });
-  }
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
   $('#lgDet').appendChild(rb);
   irPara('logger_det');
 }
-async function importarDadosLogger(p,file){
-  const msg=document.getElementById('lgImpMsg');
+async function importarDadosLogger(p,file,msgSel,onOk){
+  const msg=document.querySelector(msgSel||'#fzMsg');
   const set=t=>{ if(msg) msg.textContent=t; };
-  if(!navigator.onLine){ set('Sem conexão — conecte para importar.'); return; }
+  if(!navigator.onLine){ set('Sem conexão — conecte para importar os dados.'); return; }
   set('Lendo arquivo…');
   let arr;
   try{ arr=JSON.parse(await file.text()); }
@@ -746,13 +740,14 @@ async function importarDadosLogger(p,file){
   let ins=0; const CH=500;
   try{
     for(let i=0;i<rows.length;i+=CH){
-      set('Enviando '+Math.min(i+CH,rows.length)+'/'+rows.length+'…');
-      const {data,error}=await sb.rpc('logger_leitura_importar',{p_logger_id:p.id,p_rows:rows.slice(i,i+CH)});
+      set('Processando '+Math.min(i+CH,rows.length)+'/'+rows.length+'…');
+      const {data,error}=await sb.rpc('logger_pressao_importar',{p_logger_id:p.id,p_rows:rows.slice(i,i+CH)});
       if(error) throw error;
       ins+=(data&&data.inseridos)||0;
     }
-    set('✓ '+ins+' leitura(s) nova(s) importada(s) de '+rows.length+'. O relatório já mostra a pressão.');
-    toast('✓ '+ins+' leituras importadas');
+    set('✓ '+rows.length+' leitura(s) processada(s) ('+ins+' nova(s)). Pode concluir.');
+    toast('✓ Dados do logger importados');
+    if(onOk) onOk(ins);
   }catch(e){ set('Erro: '+(e.message||e)); toast('⚠ '+(e.message||e)); }
 }
 function formCriar(){
@@ -799,9 +794,10 @@ function formRemover(p){
 function formFinalizar(p){
   return `<h1>Finalizar · ${p.label||('#'+p.id)}</h1>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:12px;color:var(--mut);line-height:1.6;margin-bottom:12px"><b style="color:var(--ink)">Removido — dados pendentes</b><br>Logger ${p.numero_logger||'—'} · volume ${p.volume??'—'} m³<br>Removido por ${p.usuario_remocao||'—'}</div>
-  <p class="sub">Baixe os dados do logger, suba no SharePoint e informe o link + a OS SIGOS.</p>
-  <label>Link dos dados (SharePoint) *</label><input id="fzLink" inputmode="url" placeholder="https://…"/>
-  <label>OS SIGOS *</label><input id="fzOs" autocomplete="off"/>
+  <p class="sub">Anexe o arquivo do logger (.json). Os dados são lidos e salvos no banco (pressão em kPa e mca) e passam a alimentar o relatório.</p>
+  <label class="pickb" style="display:inline-flex;cursor:pointer">📎 Anexar arquivo do logger (.json)<input id="fzFile" type="file" accept=".json,application/json" style="display:none"></label>
+  <div id="fzMsg" class="sub" style="margin-top:6px"></div>
+  <label>OS SIGOS (opcional)</label><input id="fzOs" autocomplete="off"/>
   <button id="lgFinalizar" class="btn" disabled>Concluir</button>`;
 }
 function resumo(p){
@@ -924,7 +920,7 @@ async function relInjectPressao(p){
   const box=document.getElementById('relPressao'); if(!box) return;
   if(!navigator.onLine){ box.innerHTML='<div class="relPend">Conecte-se para carregar o histórico de pressão.</div>'; return; }
   try{
-    const {data,error}=await sb.rpc('logger_leitura_stats',{p_logger_id:p.id}); if(error) throw error;
+    const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
     if(!data||!data.n){ box.innerHTML='<div class="relPend">Nenhum dado de pressão importado para este ponto.</div>'; return; }
     box.innerHTML=relPressaoHtml(data);
   }catch(e){ box.innerHTML='<div class="relPend">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
@@ -1057,9 +1053,12 @@ function ligarDetalhe(p){
   const cc=document.getElementById('cr_cons'); if(cc) cc.addEventListener('change',lgValidar);
   const sv=document.getElementById('lgSalvar'); if(sv) sv.addEventListener('click',submeterLogger);
   const fz=document.getElementById('lgFinalizar');
-  if(fz){const lk=document.getElementById('fzLink'),os=document.getElementById('fzOs');
-    const chk=()=>fz.disabled=!(/^https?:\/\//i.test((lk.value||'').trim())&&(os.value||'').trim());
-    lk.addEventListener('input',chk); os.addEventListener('input',chk); fz.addEventListener('click',finalizarLogger);}
+  if(fz){
+    const file=document.getElementById('fzFile');
+    if(file) file.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f,'#fzMsg',()=>{ fz.disabled=false; }); });
+    fz.addEventListener('click',finalizarLogger);
+    (async()=>{ if(!navigator.onLine) return; try{ const {data}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(data&&data.n){ const m=document.getElementById('fzMsg'); if(m) m.textContent=data.n+' amostra(s) de pressão já importada(s).'; fz.disabled=false; } }catch(e){} })();
+  }
   lgOnGps();
 }
 function marcarLocal(p,sit){
@@ -1107,14 +1106,12 @@ async function submeterLogger(){
   lgEnviando=false;
 }
 async function finalizarLogger(){
-  const p=detPonto, link=((document.getElementById('fzLink')||{}).value||'').trim(), os=((document.getElementById('fzOs')||{}).value||'').trim();
-  if(!/^https?:\/\//i.test(link)){toast('Cole um link válido');return;}
-  if(!os){toast('Informe a OS SIGOS');return;}
+  const p=detPonto, os=((document.getElementById('fzOs')||{}).value||'').trim()||null;
   const btn=document.getElementById('lgFinalizar'); if(btn) btn.disabled=true;
   try{
-    const {error}=await sb.rpc('app_logger_finalizar',{p_id:p.id,p_link:link,p_os_sigos:os});
+    const {error}=await sb.rpc('app_logger_finalizar',{p_id:p.id,p_os_sigos:os});
     if(error) throw error; toast('✓ Concluído'); await carregarLoggers(); irPara('loggers');
-  }catch(e){toast('Erro: '+(e.message||e)); if(btn) btn.disabled=false;}
+  }catch(e){toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false;}
 }
 if($('#lgBack')) $('#lgBack').addEventListener('click',()=>irPara('loggers'));
 if($('#lgNovo')) $('#lgNovo').addEventListener('click',abrirCriar);
