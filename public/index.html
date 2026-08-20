@@ -721,10 +721,39 @@ function abrirDetalhe(id){
   else if(p.situacao==='removido') h=formFinalizar(p);
   else h=resumo(p);
   $('#lgDet').innerHTML=h; ligarDetalhe(p);
+  if(p.situacao && p.situacao!=='pendente'){
+    const wrap=document.createElement('div'); wrap.style.marginTop='10px';
+    wrap.innerHTML='<label class="pickb" style="display:inline-flex;cursor:pointer">📎 Importar dados do logger (.json)<input id="lgImp" type="file" accept=".json,application/json" style="display:none"></label><div id="lgImpMsg" class="sub" style="margin-top:6px"></div>';
+    $('#lgDet').appendChild(wrap);
+    wrap.querySelector('#lgImp').addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f); });
+  }
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
   $('#lgDet').appendChild(rb);
   irPara('logger_det');
+}
+async function importarDadosLogger(p,file){
+  const msg=document.getElementById('lgImpMsg');
+  const set=t=>{ if(msg) msg.textContent=t; };
+  if(!navigator.onLine){ set('Sem conexão — conecte para importar.'); return; }
+  set('Lendo arquivo…');
+  let arr;
+  try{ arr=JSON.parse(await file.text()); }
+  catch(e){ set('Arquivo inválido (não é JSON).'); return; }
+  if(!Array.isArray(arr)||!arr.length){ set('Arquivo vazio ou fora do formato esperado.'); return; }
+  const rows=arr.filter(r=>r&&r.timestamp!=null).map(r=>({timestamp:r.timestamp,time:r.time,pressure:r.pressure,pressure2:r.pressure2,temperature:r.temperature,temperature2:r.temperature2,battery:r.battery,battery_mv:r.battery_mv,digital_in:r.digital_in,count_pa0:r.count_pa0,count_pa4:r.count_pa4,_slot_index:r._slot_index,_block_index:r._block_index}));
+  if(!rows.length){ set('Nenhuma leitura com timestamp encontrada.'); return; }
+  let ins=0; const CH=500;
+  try{
+    for(let i=0;i<rows.length;i+=CH){
+      set('Enviando '+Math.min(i+CH,rows.length)+'/'+rows.length+'…');
+      const {data,error}=await sb.rpc('logger_leitura_importar',{p_logger_id:p.id,p_rows:rows.slice(i,i+CH)});
+      if(error) throw error;
+      ins+=(data&&data.inseridos)||0;
+    }
+    set('✓ '+ins+' leitura(s) nova(s) importada(s) de '+rows.length+'. O relatório já mostra a pressão.');
+    toast('✓ '+ins+' leituras importadas');
+  }catch(e){ set('Erro: '+(e.message||e)); toast('⚠ '+(e.message||e)); }
 }
 function formCriar(){
   return `<h1>Novo logger</h1>
@@ -807,6 +836,12 @@ const REL_CSS=`
 .relPhotos figure{margin:0;text-align:center}
 .relPhotos img{width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:4px;background:#eee}
 .relPhotos figcaption{font-size:10px;color:#666;margin-top:2px}
+.relCards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.relCard{border:1px solid #d7dde5;border-radius:8px;padding:9px 8px;text-align:center;background:#f8fafc}
+.relCardT{font-size:10px;color:#777;text-transform:uppercase;letter-spacing:.03em}
+.relCardV{font-size:19px;font-weight:700;color:#0a7d5e;margin-top:2px}
+.relCardV span{font-size:11px;font-weight:600;color:#888}
+.relCardS{font-size:11px;color:#999;margin-top:1px}
 .relFoot{margin:22px 30px 0;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#999;display:flex;justify-content:space-between}
 @media print{
   @page{size:A4;margin:11mm}
@@ -815,9 +850,8 @@ const REL_CSS=`
   #relatorio{position:absolute;left:0;top:0;width:100%;background:#fff;overflow:visible}
   #relToolbar{display:none!important}
   #relDoc{box-shadow:none!important;margin:0!important;max-width:none!important}
-  .relTop{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .relBadge,.relNum{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .relSec,.relPhotos figure,.relMapWrap{break-inside:avoid}
+  .relTop,.relBadge,.relNum,.relCard,.relCardV{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .relSec,.relPhotos figure,.relMapWrap,.relCards,svg{break-inside:avoid}
 }`;
 function relFmtData(s){ if(!s) return '—'; try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } }
 function relV(v){ return (v===null||v===undefined||v==='')?'—':v; }
@@ -865,6 +899,9 @@ function relDocHtml(p){
   if(temFin){
     h+='<div class="relGrid">'+relField('OS SIGOS',p.os_sigos)+relField('Data de finalização',relFmtData(p.data_finalizacao))+relField('Responsável',p.usuario_finalizacao)+(p.link_dados_sharepoint?relWide('Link dos dados (SharePoint)',p.link_dados_sharepoint):'')+'</div>';
   } else h+='<div class="relPend">Aguardando finalização (dados / SharePoint).</div>';
+  // 5 · Pressão (dados importados do logger)
+  h+='<div class="relSec"><span class="relNum">5</span> Pressão (histórico do logger)</div>';
+  h+='<div id="relPressao"><div class="relMapPh">Carregando dados de pressão…</div></div>';
   h+='</div>';
   h+='<div class="relFoot"><span>AcquaHub · relatório gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
@@ -879,6 +916,39 @@ function emitirRelatorio(p){
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
   relDesenharMapa(p);
+  relInjectPressao(p);
+}
+function relNum(v,d){ return (v==null)?'—':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function relCard(t,mca,kpa){ return '<div class="relCard"><div class="relCardT">'+t+'</div><div class="relCardV">'+relNum(mca,2)+' <span>mca</span></div><div class="relCardS">'+relNum(kpa,1)+' kPa</div></div>'; }
+async function relInjectPressao(p){
+  const box=document.getElementById('relPressao'); if(!box) return;
+  if(!navigator.onLine){ box.innerHTML='<div class="relPend">Conecte-se para carregar o histórico de pressão.</div>'; return; }
+  try{
+    const {data,error}=await sb.rpc('logger_leitura_stats',{p_logger_id:p.id}); if(error) throw error;
+    if(!data||!data.n){ box.innerHTML='<div class="relPend">Nenhum dado de pressão importado para este ponto.</div>'; return; }
+    box.innerHTML=relPressaoHtml(data);
+  }catch(e){ box.innerHTML='<div class="relPend">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
+}
+function relPressaoHtml(d){
+  const cards='<div class="relCards">'+relCard('Mínima',d.min_mca,d.min_kpa)+relCard('Média',d.media_mca,d.media_kpa)+relCard('Mediana',d.mediana_mca,d.mediana_kpa)+relCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
+  const info='<div class="sub" style="font-size:11px;margin-top:7px;color:#666">'+d.n+' amostra(s) de pressão (> 0) · '+relFmtData(d.primeiro)+' → '+relFmtData(d.ultimo)+'</div>';
+  return cards+relPressaoSVG(d.serie||[])+info;
+}
+function relPressaoSVG(s){
+  if(!s.length) return '';
+  const W=760,H=250,pl=46,pr=12,pt=16,pb=28,iw=W-pl-pr,ih=H-pt-pb;
+  const ts=s.map(p=>p.t), ms=s.map(p=>p.mca);
+  const t0=Math.min(...ts),t1=Math.max(...ts),y0=Math.min(...ms),y1=Math.max(...ms);
+  const yLo=Math.floor(y0-1), yHi=Math.ceil(y1+1)||(yLo+1);
+  const X=t=> t1===t0? pl+iw/2 : pl+(t-t0)/(t1-t0)*iw;
+  const Y=v=> pt+ih-(v-yLo)/((yHi-yLo)||1)*ih;
+  let g=''; for(let i=0;i<=4;i++){ const v=yLo+(yHi-yLo)*i/4; const y=Y(v); g+='<line x1="'+pl+'" y1="'+y.toFixed(1)+'" x2="'+(W-pr)+'" y2="'+y.toFixed(1)+'" stroke="#e5e9f0"/><text x="'+(pl-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-size="10" fill="#888">'+v.toFixed(0)+'</text>'; }
+  const xl=[t0,(t0+t1)/2,t1].map(t=>{ const d=new Date(t); const lb=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}); return '<text x="'+X(t).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#888">'+lb+'</text>'; }).join('');
+  const pts=s.map(p=>X(p.t).toFixed(1)+','+Y(p.mca).toFixed(1)).join(' ');
+  const line=s.length>1?'<polyline points="'+pts+'" fill="none" stroke="#0a7d5e" stroke-width="2"/>':'';
+  const dots=(s.length>1&&s.length<=60)?s.map(p=>'<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.mca).toFixed(1)+'" r="2.5" fill="#0a7d5e"/>').join(''):'';
+  const single=s.length===1?'<circle cx="'+X(s[0].t)+'" cy="'+Y(s[0].mca)+'" r="4" fill="#0a7d5e"/>':'';
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;margin-top:10px;background:#fff;border:1px solid #e2e8f0;border-radius:6px"><text x="'+pl+'" y="11" font-size="10" fill="#aaa">Pressão (mca)</text>'+g+line+dots+single+xl+'</svg>';
 }
 function relHaversine(la1,lo1,la2,lo2){
   const R=6371000, r=Math.PI/180, dla=(la2-la1)*r, dlo=(lo2-lo1)*r;
