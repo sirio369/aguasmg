@@ -720,7 +720,11 @@ function abrirDetalhe(id){
   else if(p.situacao==='instalado'||p.situacao==='remocao_autorizada') h=formRemover(p);
   else if(p.situacao==='removido') h=formFinalizar(p);
   else h=resumo(p);
-  $('#lgDet').innerHTML=h; ligarDetalhe(p); irPara('logger_det');
+  $('#lgDet').innerHTML=h; ligarDetalhe(p);
+  const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
+  rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
+  $('#lgDet').appendChild(rb);
+  irPara('logger_det');
 }
 function formCriar(){
   return `<h1>Novo logger</h1>
@@ -774,6 +778,80 @@ function formFinalizar(p){
 function resumo(p){
   return `<h1>${p.label||('#'+p.id)} · concluído</h1>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;line-height:1.9">Logger ${p.numero_logger||'—'} · HD ${p.numero_hd||'—'}<br>Leitura ${p.leitura_hd_instalacao} → ${p.leitura_hd_remocao} · <b>volume ${p.volume} m³</b><br>Intervalo ${p.intervalo_volume_d?Number(p.intervalo_volume_d).toFixed(1):'—'} dias<br>Instalado por ${p.usuario_instalacao||'—'}<br>Removido por ${p.usuario_remocao||'—'}<br>${p.os_sigos?('OS SIGOS '+p.os_sigos+'<br>'):''}${p.link_dados_sharepoint?('<a href="'+p.link_dados_sharepoint+'" target="_blank">Abrir dados (SharePoint)</a>'):''}</div>`;
+}
+// ---------- Relatório do ponto (PDF via impressão) ----------
+const REL_CONS={ZA1004:'Consórcio Águas Integradas · Contagem/MG', ZA0200:'Consórcio Eficiência Hídrica · Betim/MG'};
+const REL_ST={pendente:'Pendente — aguardando instalação',instalado:'Instalado',remocao_autorizada:'Instalado — remoção autorizada',removido:'Removido — dados pendentes',concluido:'Concluído'};
+const REL_CSS=`
+#relatorio{position:fixed;inset:0;background:#f3f4f6;overflow:auto;z-index:9999;display:none}
+#relToolbar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#111;z-index:2}
+#relToolbar button{flex:1;padding:12px;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+#relDoc{background:#fff;color:#111;max-width:820px;margin:14px auto;padding:26px 30px;font-family:Arial,Helvetica,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+#relDoc h1{font-size:19px;margin:0 0 2px}
+#relDoc .sub{color:#555;font-size:12px}
+.relSec{margin-top:18px;border-top:2px solid #0aa07a;padding-top:6px;font-weight:700;color:#0a7d5e;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+.relGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;margin-top:8px}
+.relF .l{color:#777;font-size:10px;text-transform:uppercase;letter-spacing:.03em}
+.relF .v{font-size:14px;font-weight:600;color:#111}
+.relPend{color:#b45309;font-style:italic;font-size:12px;margin-top:6px}
+.relPhotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.relPhotos figure{margin:0;text-align:center}
+.relPhotos img{width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:4px;background:#eee}
+.relPhotos figcaption{font-size:10px;color:#666;margin-top:2px}
+@media print{
+  @page{size:A4;margin:12mm}
+  body{visibility:hidden}
+  #relatorio,#relatorio *{visibility:visible}
+  #relatorio{position:absolute;left:0;top:0;width:100%;background:#fff;overflow:visible}
+  #relToolbar{display:none!important}
+  #relDoc{box-shadow:none!important;margin:0!important;max-width:none!important;padding:0!important}
+  .relSec,.relPhotos figure{break-inside:avoid}
+}`;
+function relFmtData(s){ if(!s) return '—'; try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } }
+function relV(v){ return (v===null||v===undefined||v==='')?'—':v; }
+function relField(l,v){ return '<div class="relF"><div class="l">'+l+'</div><div class="v">'+relV(v)+'</div></div>'; }
+function relWide(l,v){ return '<div class="relF" style="grid-column:1/-1"><div class="l">'+l+'</div><div class="v" style="word-break:break-word">'+relV(v)+'</div></div>'; }
+function relFotos(arr){
+  const its=arr.filter(f=>f[1]);
+  if(!its.length) return '<div class="relPend">Sem fotos nesta etapa.</div>';
+  return '<div class="relPhotos">'+its.map(f=>'<figure><img src="'+fotoURL(f[1])+'" onerror="this.style.display=\'none\'"/><figcaption>'+f[0]+'</figcaption></figure>').join('')+'</div>';
+}
+function relDocHtml(p){
+  const cons=REL_CONS[p.consorcio]||p.consorcio||'—';
+  const st=REL_ST[p.situacao]||p.situacao||'—';
+  const temInst=!!p.data_instalacao, temRem=!!p.data_remocao, temFin=!!(p.link_dados_sharepoint||p.os_sigos||p.data_finalizacao);
+  const gpsReal=(p.geom_real&&p.lat!=null&&p.lon!=null)?(Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)):'—';
+  const sug=(p.lat_sugerida!=null&&p.lon_sugerida!=null)?(Number(p.lat_sugerida).toFixed(6)+', '+Number(p.lon_sugerida).toFixed(6)):'—';
+  let h='<h1>Relatório de Ponto — Logger de Vazão</h1><div class="sub">'+cons+'</div>';
+  h+='<div class="relGrid">'+relField('Identificação',p.label)+relField('Status atual',st)+relField('Zona',p.zona)+relField('Origem',p.origem)+relWide('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  h+='<div class="relSec">1 · Ponto de instalação sugerido</div>';
+  h+='<div class="relGrid">'+relField('Coordenadas sugeridas',sug)+relField('Pressão de modelo',p.pressao_modelo!=null?(p.pressao_modelo+' mca'):'—')+'</div>';
+  h+='<div class="relSec">2 · Instalação</div>';
+  if(temInst){
+    h+='<div class="relGrid">'+relField('Nº do logger',p.numero_logger)+relField('Nº do HD',p.numero_hd)+relField('Leitura inicial do HD',p.leitura_hd_instalacao)+relField('Data da instalação',relFmtData(p.data_instalacao))+relField('Responsável',p.usuario_instalacao)+relField('GPS real (instalação)',gpsReal)+relField('Precisão GPS',p.gps_precisao_inst!=null?(p.gps_precisao_inst+' m'):'—')+relField('Dias instalado',p.dias_instalado!=null?(p.dias_instalado+' d'):'—')+(p.observacao_instalacao?relWide('Observação',p.observacao_instalacao):'')+'</div>';
+    h+=relFotos([['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada]]);
+  } else h+='<div class="relPend">Aguardando instalação — dados a preencher.</div>';
+  h+='<div class="relSec">3 · Remoção</div>';
+  if(temRem){
+    h+='<div class="relGrid">'+relField('Leitura final do HD',p.leitura_hd_remocao)+relField('Data da remoção',relFmtData(p.data_remocao))+relField('Responsável',p.usuario_remocao)+relField('Volume medido',p.volume!=null?(p.volume+' m³'):'—')+relField('Intervalo',p.intervalo_volume_d!=null?(Number(p.intervalo_volume_d).toFixed(1)+' dias'):'—')+(p.observacao_remocao?relWide('Observação',p.observacao_remocao):'')+'</div>';
+    h+=relFotos([['HD na remoção',p.foto_hd_remocao],['Cavalete na remoção',p.foto_cavalete_remocao]]);
+  } else h+='<div class="relPend">Aguardando remoção.</div>';
+  h+='<div class="relSec">4 · Finalização</div>';
+  if(temFin){
+    h+='<div class="relGrid">'+relField('OS SIGOS',p.os_sigos)+relField('Data de finalização',relFmtData(p.data_finalizacao))+relField('Responsável',p.usuario_finalizacao)+(p.link_dados_sharepoint?relWide('Link dos dados (SharePoint)',p.link_dados_sharepoint):'')+'</div>';
+  } else h+='<div class="relPend">Aguardando finalização (dados / SharePoint).</div>';
+  h+='<div style="margin-top:22px;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#999">AcquaHub · relatório gerado do banco de dados</div>';
+  return h;
+}
+function emitirRelatorio(p){
+  if(!p) return;
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio');
+  if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relDocHtml(p)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
 }
 function lgOnGps(){
   const b=document.getElementById('lgGps'); if(!b) return;
