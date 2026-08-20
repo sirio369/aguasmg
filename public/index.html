@@ -783,29 +783,41 @@ function resumo(p){
 const REL_CONS={ZA1004:'Consórcio Águas Integradas · Contagem/MG', ZA0200:'Consórcio Eficiência Hídrica · Betim/MG'};
 const REL_ST={pendente:'Pendente — aguardando instalação',instalado:'Instalado',remocao_autorizada:'Instalado — remoção autorizada',removido:'Removido — dados pendentes',concluido:'Concluído'};
 const REL_CSS=`
-#relatorio{position:fixed;inset:0;background:#f3f4f6;overflow:auto;z-index:9999;display:none}
+#relatorio{position:fixed;inset:0;background:#e5e7eb;overflow:auto;z-index:9999;display:none}
 #relToolbar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#111;z-index:2}
 #relToolbar button{flex:1;padding:12px;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
-#relDoc{background:#fff;color:#111;max-width:820px;margin:14px auto;padding:26px 30px;font-family:Arial,Helvetica,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.15)}
-#relDoc h1{font-size:19px;margin:0 0 2px}
-#relDoc .sub{color:#555;font-size:12px}
-.relSec{margin-top:18px;border-top:2px solid #0aa07a;padding-top:6px;font-weight:700;color:#0a7d5e;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
-.relGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;margin-top:8px}
+#relDoc{background:#fff;color:#1a1a1a;max-width:820px;margin:14px auto;padding:0 0 24px;font-family:Arial,Helvetica,sans-serif;box-shadow:0 2px 14px rgba(0,0,0,.18)}
+.relTop{background:#0a7d5e;color:#fff;padding:16px 30px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.relTop h1{font-size:18px;margin:0;line-height:1.2}
+.relTop .sub{color:#cdeee2;font-size:12px;margin-top:3px}
+.relBadge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;background:#fff}
+.relBody{padding:16px 30px 0}
+.relSec{margin-top:18px;padding-bottom:5px;border-bottom:2px solid #0a7d5e;font-weight:700;color:#0a7d5e;font-size:12px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center}
+.relNum{display:inline-flex;width:19px;height:19px;border-radius:50%;background:#0a7d5e;color:#fff;font-size:11px;align-items:center;justify-content:center;margin-right:8px;flex:0 0 auto}
+.relGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px 24px;margin-top:10px}
 .relF .l{color:#777;font-size:10px;text-transform:uppercase;letter-spacing:.03em}
-.relF .v{font-size:14px;font-weight:600;color:#111}
-.relPend{color:#b45309;font-style:italic;font-size:12px;margin-top:6px}
+.relF .v{font-size:14px;font-weight:600;color:#111;margin-top:1px}
+.relPend{color:#b45309;font-style:italic;font-size:12px;margin-top:8px}
+.relMapWrap{margin-top:10px;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;min-height:120px;background:#eef2f7}
+.relMap{width:100%;display:block}
+.relMapPh{padding:34px;text-align:center;color:#8a94a6;font-size:12px}
+.relLeg{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;margin-top:7px;color:#444;align-items:center}
+.relDot{display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #999;vertical-align:middle;margin-right:4px}
 .relPhotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .relPhotos figure{margin:0;text-align:center}
 .relPhotos img{width:100%;height:120px;object-fit:cover;border:1px solid #ccc;border-radius:4px;background:#eee}
 .relPhotos figcaption{font-size:10px;color:#666;margin-top:2px}
+.relFoot{margin:22px 30px 0;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#999;display:flex;justify-content:space-between}
 @media print{
-  @page{size:A4;margin:12mm}
+  @page{size:A4;margin:11mm}
   body{visibility:hidden}
   #relatorio,#relatorio *{visibility:visible}
   #relatorio{position:absolute;left:0;top:0;width:100%;background:#fff;overflow:visible}
   #relToolbar{display:none!important}
-  #relDoc{box-shadow:none!important;margin:0!important;max-width:none!important;padding:0!important}
-  .relSec,.relPhotos figure{break-inside:avoid}
+  #relDoc{box-shadow:none!important;margin:0!important;max-width:none!important}
+  .relTop{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .relBadge,.relNum{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .relSec,.relPhotos figure,.relMapWrap{break-inside:avoid}
 }`;
 function relFmtData(s){ if(!s) return '—'; try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } }
 function relV(v){ return (v===null||v===undefined||v==='')?'—':v; }
@@ -816,31 +828,45 @@ function relFotos(arr){
   if(!its.length) return '<div class="relPend">Sem fotos nesta etapa.</div>';
   return '<div class="relPhotos">'+its.map(f=>'<figure><img src="'+fotoURL(f[1])+'" onerror="this.style.display=\'none\'"/><figcaption>'+f[0]+'</figcaption></figure>').join('')+'</div>';
 }
+const REL_STCLR={pendente:'#b45309',instalado:'#0a7d5e',remocao_autorizada:'#c2410c',removido:'#7c3aed',concluido:'#0a58ca'};
 function relDocHtml(p){
   const cons=REL_CONS[p.consorcio]||p.consorcio||'—';
   const st=REL_ST[p.situacao]||p.situacao||'—';
+  const clr=REL_STCLR[p.situacao]||'#555';
   const temInst=!!p.data_instalacao, temRem=!!p.data_remocao, temFin=!!(p.link_dados_sharepoint||p.os_sigos||p.data_finalizacao);
   const gpsReal=(p.geom_real&&p.lat!=null&&p.lon!=null)?(Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)):'—';
   const sug=(p.lat_sugerida!=null&&p.lon_sugerida!=null)?(Number(p.lat_sugerida).toFixed(6)+', '+Number(p.lon_sugerida).toFixed(6)):'—';
-  let h='<h1>Relatório de Ponto — Logger de Vazão</h1><div class="sub">'+cons+'</div>';
-  h+='<div class="relGrid">'+relField('Identificação',p.label)+relField('Status atual',st)+relField('Zona',p.zona)+relField('Origem',p.origem)+relWide('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
-  h+='<div class="relSec">1 · Ponto de instalação sugerido</div>';
-  h+='<div class="relGrid">'+relField('Coordenadas sugeridas',sug)+relField('Pressão de modelo',p.pressao_modelo!=null?(p.pressao_modelo+' mca'):'—')+'</div>';
-  h+='<div class="relSec">2 · Instalação</div>';
+  let dist='—';
+  if(p.lat_sugerida!=null&&p.lon_sugerida!=null&&p.geom_real&&p.lat!=null&&p.lon!=null){
+    const d=relHaversine(+p.lat_sugerida,+p.lon_sugerida,+p.lat,+p.lon); dist=d<1000?(Math.round(d)+' m'):((d/1000).toFixed(2)+' km');
+  }
+  let h='<div class="relTop"><div><h1>Relatório de Ponto · Logger de Vazão</h1><div class="sub">'+cons+'</div></div><div class="relBadge" style="color:'+clr+'">'+st+'</div></div>';
+  h+='<div class="relBody">';
+  h+='<div class="relGrid">'+relField('Identificação',p.label)+relField('Zona',p.zona)+relField('Origem',p.origem)+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  // 1 · Localização (sugerido × instalado + mapa)
+  h+='<div class="relSec"><span class="relNum">1</span> Localização</div>';
+  h+='<div class="relGrid">'+relField('Coordenada sugerida',sug)+relField('Coordenada instalada',gpsReal)+relField('Pressão de modelo',p.pressao_modelo!=null?(p.pressao_modelo+' mca'):'—')+relField('Distância sugerido → instalado',dist)+'</div>';
+  h+='<div id="relMapa" class="relMapWrap"><div class="relMapPh">Preparando mapa…</div></div>';
+  h+='<div class="relLeg"><span><span class="relDot" style="background:#1d6fe0"></span>Ponto sugerido</span><span><span class="relDot" style="background:#e11d1d"></span>Ponto instalado (GPS real)</span></div>';
+  // 2 · Instalação
+  h+='<div class="relSec"><span class="relNum">2</span> Instalação</div>';
   if(temInst){
-    h+='<div class="relGrid">'+relField('Nº do logger',p.numero_logger)+relField('Nº do HD',p.numero_hd)+relField('Leitura inicial do HD',p.leitura_hd_instalacao)+relField('Data da instalação',relFmtData(p.data_instalacao))+relField('Responsável',p.usuario_instalacao)+relField('GPS real (instalação)',gpsReal)+relField('Precisão GPS',p.gps_precisao_inst!=null?(p.gps_precisao_inst+' m'):'—')+relField('Dias instalado',p.dias_instalado!=null?(p.dias_instalado+' d'):'—')+(p.observacao_instalacao?relWide('Observação',p.observacao_instalacao):'')+'</div>';
+    h+='<div class="relGrid">'+relField('Nº do logger',p.numero_logger)+relField('Nº do HD',p.numero_hd)+relField('Leitura inicial do HD',p.leitura_hd_instalacao)+relField('Data da instalação',relFmtData(p.data_instalacao))+relField('Responsável',p.usuario_instalacao)+relField('Precisão GPS',p.gps_precisao_inst!=null?(p.gps_precisao_inst+' m'):'—')+relField('Dias instalado',p.dias_instalado!=null?(p.dias_instalado+' d'):'—')+(p.observacao_instalacao?relWide('Observação',p.observacao_instalacao):'')+'</div>';
     h+=relFotos([['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada]]);
   } else h+='<div class="relPend">Aguardando instalação — dados a preencher.</div>';
-  h+='<div class="relSec">3 · Remoção</div>';
+  // 3 · Remoção
+  h+='<div class="relSec"><span class="relNum">3</span> Remoção</div>';
   if(temRem){
     h+='<div class="relGrid">'+relField('Leitura final do HD',p.leitura_hd_remocao)+relField('Data da remoção',relFmtData(p.data_remocao))+relField('Responsável',p.usuario_remocao)+relField('Volume medido',p.volume!=null?(p.volume+' m³'):'—')+relField('Intervalo',p.intervalo_volume_d!=null?(Number(p.intervalo_volume_d).toFixed(1)+' dias'):'—')+(p.observacao_remocao?relWide('Observação',p.observacao_remocao):'')+'</div>';
     h+=relFotos([['HD na remoção',p.foto_hd_remocao],['Cavalete na remoção',p.foto_cavalete_remocao]]);
   } else h+='<div class="relPend">Aguardando remoção.</div>';
-  h+='<div class="relSec">4 · Finalização</div>';
+  // 4 · Finalização
+  h+='<div class="relSec"><span class="relNum">4</span> Finalização</div>';
   if(temFin){
     h+='<div class="relGrid">'+relField('OS SIGOS',p.os_sigos)+relField('Data de finalização',relFmtData(p.data_finalizacao))+relField('Responsável',p.usuario_finalizacao)+(p.link_dados_sharepoint?relWide('Link dos dados (SharePoint)',p.link_dados_sharepoint):'')+'</div>';
   } else h+='<div class="relPend">Aguardando finalização (dados / SharePoint).</div>';
-  h+='<div style="margin-top:22px;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#999">AcquaHub · relatório gerado do banco de dados</div>';
+  h+='</div>';
+  h+='<div class="relFoot"><span>AcquaHub · relatório gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
 }
 function emitirRelatorio(p){
@@ -852,6 +878,70 @@ function emitirRelatorio(p){
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
+  relDesenharMapa(p);
+}
+function relHaversine(la1,lo1,la2,lo2){
+  const R=6371000, r=Math.PI/180, dla=(la2-la1)*r, dlo=(lo2-lo1)*r;
+  const a=Math.sin(dla/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dlo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function relPtsDe(p){
+  const sug=(p.lat_sugerida!=null&&p.lon_sugerida!=null)?{lat:+p.lat_sugerida,lon:+p.lon_sugerida,tipo:'sug'}:null;
+  const inst=(p.geom_real&&p.lat!=null&&p.lon!=null)?{lat:+p.lat,lon:+p.lon,tipo:'inst'}:null;
+  return [sug,inst].filter(Boolean);
+}
+async function relDesenharMapa(p){
+  const box=document.getElementById('relMapa'); if(!box) return;
+  const pts=relPtsDe(p);
+  if(!pts.length){ box.innerHTML='<div class="relMapPh">Sem coordenadas para exibir.</div>'; return; }
+  try{ const url=await relComporMapa(pts,760,320); box.innerHTML='<img class="relMap" src="'+url+'"/>'; }
+  catch(e){ box.innerHTML=relMapaSVG(pts); }
+}
+function relComporMapa(pts,W,H){
+  return new Promise((resolve,reject)=>{
+    const lon2px=(lon,z)=>(lon+180)/360*256*Math.pow(2,z);
+    const lat2px=(lat,z)=>{ const s=Math.sin(lat*Math.PI/180); return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*256*Math.pow(2,z); };
+    const lons=pts.map(p=>p.lon), lats=pts.map(p=>p.lat);
+    const minLon=Math.min(...lons),maxLon=Math.max(...lons),minLat=Math.min(...lats),maxLat=Math.max(...lats);
+    let z=17;
+    if(pts.length>1){ for(z=18;z>11;z--){ const dx=Math.abs(lon2px(maxLon,z)-lon2px(minLon,z)); const dy=Math.abs(lat2px(minLat,z)-lat2px(maxLat,z)); if(dx<W-90&&dy<H-90) break; } }
+    const cx=(lon2px(minLon,z)+lon2px(maxLon,z))/2, cy=(lat2px(minLat,z)+lat2px(maxLat,z))/2;
+    const ox=cx-W/2, oy=cy-H/2, n=Math.pow(2,z);
+    const tx0=Math.floor(ox/256), tx1=Math.floor((ox+W)/256), ty0=Math.floor(oy/256), ty1=Math.floor((oy+H)/256);
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
+    ctx.fillStyle='#e8edf2'; ctx.fillRect(0,0,W,H);
+    const jobs=[];
+    for(let tx=tx0;tx<=tx1;tx++) for(let ty=ty0;ty<=ty1;ty++){
+      if(ty<0||ty>=n) continue;
+      const xx=((tx%n)+n)%n;
+      jobs.push(new Promise((res,rej)=>{
+        const im=new Image(); im.crossOrigin='anonymous';
+        im.onload=()=>{ try{ ctx.drawImage(im, Math.round(tx*256-ox), Math.round(ty*256-oy)); }catch(_){} res(); };
+        im.onerror=()=>rej(new Error('tile'));
+        im.src='https://tile.openstreetmap.org/'+z+'/'+xx+'/'+ty+'.png';
+      }));
+    }
+    const fail=setTimeout(()=>reject(new Error('timeout')),7000);
+    Promise.all(jobs).then(()=>{
+      clearTimeout(fail);
+      if(pts.length===2){ ctx.setLineDash([7,5]); ctx.strokeStyle='#111'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(lon2px(pts[0].lon,z)-ox,lat2px(pts[0].lat,z)-oy); ctx.lineTo(lon2px(pts[1].lon,z)-ox,lat2px(pts[1].lat,z)-oy); ctx.stroke(); ctx.setLineDash([]); }
+      pts.forEach(pt=>{ const x=lon2px(pt.lon,z)-ox, y=lat2px(pt.lat,z)-oy; ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.fillStyle=pt.tipo==='inst'?'#e11d1d':'#1d6fe0'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#fff'; ctx.stroke(); });
+      ctx.font='10px Arial'; ctx.fillStyle='rgba(255,255,255,.82)'; ctx.fillRect(0,H-15,132,15); ctx.fillStyle='#333'; ctx.fillText('© OpenStreetMap',4,H-4);
+      try{ resolve(cv.toDataURL('image/png')); }catch(e){ reject(e); }
+    }).catch(e=>{ clearTimeout(fail); reject(e); });
+  });
+}
+function relMapaSVG(pts){
+  const W=760,H=240,pad=46;
+  const lons=pts.map(p=>p.lon),lats=pts.map(p=>p.lat);
+  const minLon=Math.min(...lons),maxLon=Math.max(...lons),minLat=Math.min(...lats),maxLat=Math.max(...lats);
+  const sx=v=>pad+((maxLon===minLon)?0.5:(v-minLon)/(maxLon-minLon))*(W-2*pad);
+  const sy=v=>(H-pad)-((maxLat===minLat)?0.5:(v-minLat)/(maxLat-minLat))*(H-2*pad);
+  let g=''; for(let i=1;i<6;i++){ const gx=pad+i*(W-2*pad)/6; g+='<line x1="'+gx+'" y1="'+pad+'" x2="'+gx+'" y2="'+(H-pad)+'" stroke="#d5dce6" stroke-width="1"/>'; }
+  for(let i=1;i<4;i++){ const gy=pad+i*(H-2*pad)/4; g+='<line x1="'+pad+'" y1="'+gy+'" x2="'+(W-pad)+'" y2="'+gy+'" stroke="#d5dce6" stroke-width="1"/>'; }
+  const line=pts.length===2?'<line x1="'+sx(pts[0].lon)+'" y1="'+sy(pts[0].lat)+'" x2="'+sx(pts[1].lon)+'" y2="'+sy(pts[1].lat)+'" stroke="#111" stroke-width="2" stroke-dasharray="7 5"/>':'';
+  const dots=pts.map(p=>'<circle cx="'+sx(p.lon)+'" cy="'+sy(p.lat)+'" r="8" fill="'+(p.tipo==='inst'?'#e11d1d':'#1d6fe0')+'" stroke="#fff" stroke-width="3"/>').join('');
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;background:#eef2f7"><rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#eef2f7"/>'+g+line+dots+'<text x="10" y="18" font-size="11" fill="#94a3b8">Sem conexão — esquema relativo (sem ruas)</text></svg>';
 }
 function lgOnGps(){
   const b=document.getElementById('lgGps'); if(!b) return;
