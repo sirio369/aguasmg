@@ -1544,8 +1544,7 @@ const SUP_ACTS={
   epi_meus:{ic:'🦺',lbl:'Meus EPIs',fn:()=>supVEpiMeus()},
   epi_aprovar:{ic:'🖊️',lbl:'Aprovar EPI',fn:()=>supVEpiAprovar()},
   epi_entregar:{ic:'📤',lbl:'Entregar EPI',fn:()=>supVEpiEntregar()},
-  epi_substituir:{ic:'🔁',lbl:'Substituir por uso',fn:()=>supVEpiSubstituir()},
-  epi_catalogo:{ic:'🏷️',lbl:'Cadastrar EPI',fn:()=>supVEpiCatalogo()}
+  epi_substituir:{ic:'🔁',lbl:'Substituir por uso',fn:()=>supVEpiSubstituir()}
 };
 function supBlocks(){
   const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
@@ -1577,8 +1576,7 @@ function supBlocksEpi(){
     {t:'Gestão',ic:'📊',acts:[{id:'epi_aprovar',on:podeAp,papel:'Encarregado'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
       {id:'epi_entregar',on:almox,papel:'Almoxarife'},
-      {id:'epi_substituir',on:almox,papel:'Almoxarife'},
-      {id:'epi_catalogo',on:almox,papel:'Almoxarife'}]}
+      {id:'epi_substituir',on:almox,papel:'Almoxarife'}]}
   ];
 }
 function supHome(){
@@ -2282,28 +2280,6 @@ async function supVEpiAprovar(){
     $('#supView').querySelectorAll('[data-ap]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_epi_aprovar',{p_solicitacao_id:+b.dataset.ap},'Aprovada',supVEpiAprovar)));
     $('#supView').querySelectorAll('[data-rj]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_epi_rejeitar',{p_solicitacao_id:+b.dataset.rj},'Rejeitada',supVEpiAprovar)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
-}
-
-// --- Catálogo de EPI (almox) ---
-async function supVEpiCatalogo(){
-  $('#supView').innerHTML='<p class="sub">Carregando…</p>'; await supEpiCatLoad();
-  $('#supView').innerHTML=`
-    <div class="sec">🏷️ Cadastrar EPI</div>
-    <label>Nome *</label><input id="epcNome" autocomplete="off" placeholder="ex.: Luva nitrílica"/>
-    <div style="display:flex;gap:6px">
-      <div style="flex:1"><label>CA</label><input id="epcCa" autocomplete="off" placeholder="nº do CA"/></div>
-      <div style="flex:1"><label>Prazo de troca (dias) *</label><input id="epcVal" inputmode="numeric" placeholder="ex.: 30"/></div>
-    </div>
-    <button id="epcAdd" class="btn" style="margin-top:10px">Cadastrar EPI</button>
-    <div class="sec" style="margin-top:22px">📋 EPIs cadastrados</div>
-    <div id="epcList" style="margin-top:6px">${epiCat.length?epiCat.map(e=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px"><b>${e.nome}</b><div class="sub">${e.ca?('CA '+e.ca+' · '):''}troca a cada ${e.validade_dias}d</div></div>`).join(''):'<p class="sub">Nenhum EPI cadastrado.</p>'}</div>`;
-  $('#epcAdd').addEventListener('click',async()=>{
-    const nome=($('#epcNome').value||'').trim(); if(!nome) return toast('Informe o nome');
-    const val=parseInt(($('#epcVal').value||'').replace(/\D/g,''),10); if(isNaN(val)||val<=0) return toast('Informe o prazo de troca (dias)');
-    const {error}=await sb.rpc('sup_epi_cadastrar',{p_nome:nome,p_ca:($('#epcCa').value||'').trim()||null,p_validade_dias:val});
-    if(error){ toast('⚠ '+(error.message||error)); return; }
-    toast('✓ EPI cadastrado'); supVEpiCatalogo();
-  });
 }
 
 // --- captura foto + assinatura (reutilizável) ---
