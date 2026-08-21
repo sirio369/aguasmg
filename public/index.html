@@ -1501,7 +1501,7 @@ function capReset(){
 }
 
 // ---------- MÓDULO SUPRIMENTOS ----------
-let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', supCartS=[], supCartC=[], supConEstoque=[], eqUsuarios=[], eqTipos=[], eqPainelData=[], epiCat=[], epiCartS=[], epiFotoBlob={};
+let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', supCartS=[], supCartC=[], supConEstoque=[], eqUsuarios=[], eqTipos=[], eqPainelData=[], epiCat=[], epiCartS=[], epiFotoBlob={}, epiPainelData={}, epiEntregas=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -1544,7 +1544,8 @@ const SUP_ACTS={
   epi_meus:{ic:'🦺',lbl:'Meus EPIs',fn:()=>supVEpiMeus()},
   epi_aprovar:{ic:'🖊️',lbl:'Aprovar EPI',fn:()=>supVEpiAprovar()},
   epi_entregar:{ic:'📤',lbl:'Entregar EPI',fn:()=>supVEpiEntregar()},
-  epi_substituir:{ic:'🔁',lbl:'Substituir por uso',fn:()=>supVEpiSubstituir()}
+  epi_substituir:{ic:'🔁',lbl:'Substituir por uso',fn:()=>supVEpiSubstituir()},
+  epi_painel:{ic:'📋',lbl:'EPIs por colaborador',fn:()=>supVEpiPainel()}
 };
 function supBlocks(){
   const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
@@ -1570,10 +1571,12 @@ function supBlocksEquip(){
   ];
 }
 function supBlocksEpi(){
-  const almox=!!(ME&&ME.is_almoxarife), podeAp=!!(ME&&ME.pode_aprovar);
+  const almox=!!(ME&&ME.is_almoxarife), podeAp=!!(ME&&ME.pode_aprovar), gestao=podeAp||almox;
   return [
     {t:'Campo',ic:'🧑‍🔧',acts:[{id:'epi_solicitar',on:true},{id:'epi_pedidos',on:true},{id:'epi_meus',on:true}]},
-    {t:'Gestão',ic:'📊',acts:[{id:'epi_aprovar',on:podeAp,papel:'Encarregado'}]},
+    {t:'Gestão',ic:'📊',acts:[
+      {id:'epi_aprovar',on:podeAp,papel:'Encarregado'},
+      {id:'epi_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
       {id:'epi_entregar',on:almox,papel:'Almoxarife'},
       {id:'epi_substituir',on:almox,papel:'Almoxarife'}]}
@@ -2351,6 +2354,69 @@ async function supVEpiSubstituir(){
     epiCapturaWire();
     $('#supView').querySelectorAll('[data-item]').forEach(b=>b.addEventListener('click',()=>epiConfirmar('s'+b.dataset.item,'sup_epi_substituir',{p_entrega_item_id:+b.dataset.item},'Substituição registrada',supVEpiSubstituir)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- Gestão de EPIs por colaborador + comprovante ---
+async function supVEpiPainel(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  let cols=[];
+  try{ const c=await sb.rpc('sup_epi_gestao_colaboradores'); if(c.error)throw c.error; cols=c.data||[]; }
+  catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  if(!cols.length){ $('#supView').innerHTML='<p class="sub">Nenhum EPI entregue ainda.</p>'; return; }
+  $('#supView').innerHTML=`
+    <label>Colaborador</label>
+    <select id="epPU">${cols.map(c=>`<option value="${c.uuid}">${c.nome||'—'} — ${c.ativos} ativo(s)${c.a_substituir?(' · ⚠️ '+c.a_substituir+' a trocar'):''}</option>`).join('')}</select>
+    <div id="epPOut" style="margin-top:12px"></div>`;
+  const load=async()=>{
+    const uid=$('#epPU').value; if(!uid) return;
+    $('#epPOut').innerHTML='<p class="sub">Carregando…</p>';
+    try{ const {data,error}=await sb.rpc('sup_epi_gestao_colaborador',{p_colaborador_uuid:uid}); if(error)throw error;
+      epiPainelData=data||{}; renderEpiPainel();
+    }catch(e){ $('#epPOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+  };
+  $('#epPU').addEventListener('change',load); load();
+}
+function renderEpiPainel(){
+  const d=epiPainelData||{}; const atuais=d.atuais||[]; epiEntregas=d.entregas||[];
+  let h='<div class="sec">🦺 EPIs em posse</div>';
+  h+= atuais.length? atuais.map(v=>{ const st=epiVenc(v);
+    const sub=[v.ca?('CA '+v.ca):'','entregue '+eqDia(v.entregue_em),v.vence_em?('troca '+eqDia(v.vence_em)):''].filter(Boolean).join(' · ');
+    return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+v.epi+'</b>'+(v.quantidade?(' ×'+supNum(v.quantidade)):'')+'<div class="sub" style="margin-top:2px">'+sub+'</div></div>'+epiChip(st)+'</div></div>';
+  }).join('') : '<p class="sub">Sem EPIs em posse.</p>';
+  h+='<div class="sec" style="margin-top:20px">📄 Entregas e substituições</div>';
+  h+= epiEntregas.length? epiEntregas.map(e=>{
+    const itens=(e.itens||[]).map(i=>i.epi+' ×'+supNum(i.qt)).join(', ');
+    const tp=e.tipo==='substituicao'?'🔁 Substituição':'📤 Entrega';
+    return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+tp+'</b><div class="sub" style="margin-top:2px">'+itens+' · '+supData(e.entregue_em)+(e.entregue_por?(' · por '+e.entregue_por):'')+'</div></div><button class="btn ghost" data-comp="'+e.id+'" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Comprovante</button></div></div>';
+  }).join('') : '<p class="sub">Nenhuma entrega registrada.</p>';
+  $('#epPOut').innerHTML=h;
+  $('#epPOut').querySelectorAll('[data-comp]').forEach(b=>b.addEventListener('click',()=>{ const e=epiEntregas.find(x=>String(x.id)===String(b.dataset.comp)); if(e) epiComprovante(e); }));
+}
+function epiComprovante(e){
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+epiComprovanteHtml(e)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+function epiComprovanteHtml(e){
+  const nome=(epiPainelData&&epiPainelData.colaborador)||'—';
+  const tp=e.tipo==='substituicao'?'Substituição por tempo de uso':'Entrega';
+  const clr=e.tipo==='substituicao'?'#7c3aed':'#0a58ca';
+  const itens=(e.itens||[]).map(i=>relField(i.epi+(i.ca?(' · CA '+i.ca):''),'×'+relNum(i.qt,0)+(i.validade_dias?(' · troca '+i.validade_dias+'d'):''))).join('');
+  let h='<div class="relTop"><div><h1>Comprovante de Entrega de EPI</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge" style="color:'+clr+'">'+tp+'</div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('Colaborador',nome)+relField('Data da entrega',relFmtData(e.entregue_em))+relField('Entregue por',e.entregue_por)+relField('Nº do registro','#'+e.id)+'</div>';
+  h+='<div class="relSec"><span class="relNum">1</span> EPIs entregues</div><div class="relGrid">'+itens+'</div>';
+  if(e.obs) h+='<div class="sub" style="margin-top:8px">Obs: '+e.obs+'</div>';
+  h+='<div class="relSec"><span class="relNum">2</span> Registro fotográfico e assinatura</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">'
+    +'<figure style="margin:0;text-align:center"><img src="'+fotoURL(e.foto_path)+'" style="width:100%;border:1px solid #ccc;border-radius:6px" onerror="this.style.display=\'none\'"/><figcaption style="font-size:11px;color:#666;margin-top:3px">Foto da entrega</figcaption></figure>'
+    +'<figure style="margin:0;text-align:center"><img src="'+fotoURL(e.assinatura_path)+'" style="width:100%;border:1px solid #ccc;border-radius:6px;background:#fff" onerror="this.style.display=\'none\'"/><figcaption style="font-size:11px;color:#666;margin-top:3px">Assinatura do colaborador</figcaption></figure>'
+    +'</div>';
+  h+='<div style="margin-top:16px;font-size:11px;color:#555;line-height:1.5">Declaro ter recebido o(s) EPI(s) acima, em bom estado e adequado(s) ao uso, comprometendo-me a utilizá-lo(s) conforme as normas de segurança e a comunicar qualquer dano ou necessidade de substituição.</div>';
+  h+='</div><div class="relFoot"><span>AcquaHub · comprovante gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  return h;
 }
 
 // --- tela: Configurações (admin) ---
