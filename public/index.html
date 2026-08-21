@@ -2283,7 +2283,16 @@ function epiChip(s){ return '<span style="font-size:11px;padding:3px 9px;border-
 async function supVEpiSolicitar(){
   epiCartS=[]; $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   await supEpiCatLoad();
-  $('#supView').innerHTML=`
+  let cargos=[], meuCargo=null;
+  try{ const [c,m]=await Promise.all([sb.rpc('sup_cargos_ativos'),sb.rpc('sup_meu_cargo')]); cargos=c.data||[]; meuCargo=m.data&&m.data.cargo_id; }catch(e){}
+  const cargoSel = cargos.length?`
+    <label>Minha função</label>
+    <div style="display:flex;gap:6px">
+      <select id="epSCargo" style="flex:1;min-width:0"><option value="">Selecione…</option>${cargos.map(c=>`<option value="${c.id}"${String(meuCargo)===String(c.id)?' selected':''}>${c.nome}</option>`).join('')}</select>
+      <button id="epSCesta" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600;font-size:13px;display:flex;align-items:center;white-space:nowrap">🧺 Cesta</button>
+    </div>
+    <p class="sub" style="margin:4px 0 14px">Carregue a cesta padrão de EPI do seu cargo. Você pode ajustar antes de enviar.</p>`:'';
+  $('#supView').innerHTML=cargoSel+`
     <label>Adicionar EPI</label>
     <div style="display:flex;gap:6px">
       <select id="epSMat" style="flex:1;min-width:0"><option value="">EPI…</option>${epiCat.map(e=>`<option value="${e.id}">${e.nome}${e.ca?(' · CA '+e.ca):''}</option>`).join('')}</select>
@@ -2294,6 +2303,17 @@ async function supVEpiSolicitar(){
     <label>Observação</label><textarea id="epSObs" rows="2"></textarea>
     <button id="epSSend" class="btn" disabled>Enviar solicitação</button>`;
   epiCartRender();
+  const cestaBtn=$('#epSCesta'); if(cestaBtn) cestaBtn.addEventListener('click',async()=>{
+    const cid=$('#epSCargo').value; if(!cid) return toast('Escolha sua função');
+    cestaBtn.disabled=true;
+    try{
+      sb.rpc('sup_perfil_set_cargo',{p_cargo_id:+cid});
+      const {data,error}=await sb.rpc('sup_cesta_do_cargo',{p_cargo_id:+cid}); if(error) throw error;
+      const cesta=data||[]; if(!cesta.length){ toast('Nenhum EPI configurado para este cargo'); return; }
+      let add=0; cesta.forEach(it=>{ if(!epiCartS.find(x=>String(x.epi_id)===String(it.epi_id))){ epiCartS.push({epi_id:it.epi_id,nome:it.nome,quantidade:it.quantidade}); add++; } });
+      epiCartRender(); toast(add?('✓ '+add+' EPI(s) da cesta'):'Cesta já está no carrinho');
+    }catch(e){ toast('⚠ '+(e.message||e)); } finally{ cestaBtn.disabled=false; }
+  });
   $('#epSAdd').addEventListener('click',()=>{
     const id=$('#epSMat').value, q=parseFloat(($('#epSQt').value||'').replace(',','.'));
     if(!id||isNaN(q)||q<=0) return toast('Escolha o EPI e a quantidade');
@@ -2585,7 +2605,7 @@ function epiComprovanteHtml(e){
 }
 
 // --- tela: Configurações (admin) ---
-let cfgUsers=[], cfgEquipes=[];
+let cfgUsers=[], cfgEquipes=[], cfgCargos=[], cfgEpiCat=[];
 const CFG_FUN={campo:'Campo',aprovador:'Aprovador',almoxarife:'Almoxarife',admin:'Admin'};
 function supAbrirConfig(){
   supCurrent='config';
@@ -2607,8 +2627,62 @@ function supCfgRender(){
   $('#supView').innerHTML=`
     <div class="sec">👤 Função dos usuários</div>
     <p class="sub" style="margin-top:2px">Defina o papel de cada pessoa: Campo, Aprovador, Almoxarife ou Admin. Vale no sistema todo.</p>
-    <div id="cfgUsers"></div>`;
+    <div id="cfgUsers"></div>
+    <div class="sec" style="margin-top:26px">🦺 Cargos e cesta de EPI</div>
+    <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
+    <div id="cfgCargos"></div>`;
   supCfgUsers();
+  supCfgCargos();
+}
+async function supCfgCargos(){
+  const c=$('#cfgCargos'); if(!c) return;
+  c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const [cg,ct]=await Promise.all([sb.rpc('sup_cargos_admin'),sb.rpc('sup_epi_catalogo')]); cfgCargos=cg.data||[]; cfgEpiCat=ct.data||[]; }
+  catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  supCfgCargosRender();
+}
+function supCfgCargosRender(){
+  const c=$('#cfgCargos'); if(!c) return;
+  const lista = cfgCargos.length? cfgCargos.map(cg=>`<div style="border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;padding:8px 0"><span style="flex:1;min-width:0;font-size:14px"><b>${cg.nome}</b> <span class="sub">· ${cg.epis} EPI(s)</span></span><button class="btn ghost" data-cesta="${cg.id}" style="margin:0;width:auto;padding:6px 10px;font-size:12px">🧺 Cesta</button><button data-cgdel="${cg.id}" data-cgn="${cg.nome}" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px;padding:2px 4px">🗑️</button></div><div id="cesta-${cg.id}"></div></div>`).join('') : '<p class="sub">Nenhum cargo cadastrado.</p>';
+  c.innerHTML=lista+`<div style="display:flex;gap:6px;margin-top:10px"><input id="cfgCgNome" placeholder="Novo cargo (ex.: Encanador)" style="flex:1;min-width:0"/><button id="cfgCgAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600">＋</button></div>`;
+  c.querySelectorAll('[data-cesta]').forEach(b=>b.addEventListener('click',()=>supCfgCestaToggle(+b.dataset.cesta)));
+  c.querySelectorAll('[data-cgdel]').forEach(b=>b.addEventListener('click',()=>supCfgCargoExcluir(+b.dataset.cgdel,b.dataset.cgn)));
+  const add=$('#cfgCgAdd'); if(add) add.addEventListener('click',supCfgCargoCriar);
+}
+async function supCfgCargoCriar(){
+  const nome=($('#cfgCgNome').value||'').trim(); if(!nome) return toast('Informe o nome do cargo');
+  const {error}=await sb.rpc('sup_cargo_salvar',{p_id:null,p_nome:nome});
+  if(error) return toast('⚠ '+(error.message||error));
+  toast('✓ Cargo criado'); supCfgCargos();
+}
+async function supCfgCargoExcluir(id,nome){
+  if(!confirm('Excluir o cargo "'+nome+'"? A cesta dele será removida.')) return;
+  const {error}=await sb.rpc('sup_cargo_excluir',{p_id:id});
+  if(error) return toast('⚠ '+(error.message||error));
+  toast('✓ Cargo excluído'); supCfgCargos();
+}
+async function supCfgCestaToggle(cargoId){
+  const box=$('#cesta-'+cargoId); if(!box) return;
+  if(box.innerHTML.trim()){ box.innerHTML=''; return; }
+  box.innerHTML='<p class="sub" style="padding:6px 0">Carregando…</p>';
+  let cesta=[];
+  try{ const {data,error}=await sb.rpc('sup_cesta_do_cargo',{p_cargo_id:cargoId}); if(error) throw error; cesta=data||[]; }
+  catch(e){ box.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  if(!cfgEpiCat.length){ box.innerHTML='<p class="sub" style="padding:6px 0">Catálogo de EPI vazio — cadastre os EPIs (via base) para montar a cesta.</p>'; return; }
+  const qMap={}; cesta.forEach(it=>qMap[it.epi_id]=it.quantidade);
+  box.innerHTML=`<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin:2px 0 10px">
+    <p class="sub" style="margin:0 0 8px">Quantidade de cada EPI na cesta (0 = fora):</p>
+    ${cfgEpiCat.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="flex:1;min-width:0;font-size:13px">${e.nome}${e.ca?(' <span class="sub">· CA '+e.ca+'</span>'):''}</span><input class="cfgCq" data-epi="${e.id}" inputmode="numeric" value="${qMap[e.id]!=null?supNum(qMap[e.id]):0}" style="width:56px;text-align:center;padding:6px"/></div>`).join('')}
+    <button class="btn" data-cestasave="${cargoId}" style="margin-top:8px">Salvar cesta</button>
+  </div>`;
+  box.querySelector('[data-cestasave]').addEventListener('click',()=>supCfgCestaSalvar(cargoId,box));
+}
+async function supCfgCestaSalvar(cargoId,box){
+  const itens=[]; box.querySelectorAll('.cfgCq').forEach(inp=>{ const q=parseFloat((inp.value||'').replace(',','.')); if(!isNaN(q)&&q>0) itens.push({epi_id:+inp.dataset.epi,quantidade:q}); });
+  const btn=box.querySelector('[data-cestasave]'); if(btn) btn.disabled=true;
+  const {error}=await sb.rpc('sup_cesta_set',{p_cargo_id:cargoId,p_itens:itens});
+  if(error){ toast('⚠ '+(error.message||error)); if(btn) btn.disabled=false; return; }
+  toast('✓ Cesta salva'); supCfgCargos();
 }
 function supCfgUsers(){
   const c=$('#cfgUsers'); if(!c) return;
