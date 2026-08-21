@@ -1614,7 +1614,7 @@ const SUP_ACTS={
   epi_meus:{ic:'🦺',lbl:'Meus EPIs',fn:()=>supVEpiMeus()},
   epi_aprovar:{ic:'🖊️',lbl:'Aprovar EPI',fn:()=>supVEpiAprovar()},
   epi_entregar:{ic:'📤',lbl:'Entregar EPI',fn:()=>supVEpiEntregar()},
-  epi_substituir:{ic:'🔁',lbl:'Substituir por uso',fn:()=>supVEpiSubstituir()},
+  epi_baixa:{ic:'🔁',lbl:'Devolver / Trocar EPI',fn:()=>supVEpiBaixa()},
   epi_painel:{ic:'📋',lbl:'EPIs por colaborador',fn:()=>supVEpiPainel()}
 };
 function supBlocks(){
@@ -1649,7 +1649,7 @@ function supBlocksEpi(){
       {id:'epi_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
       {id:'epi_entregar',on:almox,papel:'Almoxarife'},
-      {id:'epi_substituir',on:almox,papel:'Almoxarife'}]}
+      {id:'epi_baixa',on:almox,papel:'Almoxarife'}]}
   ];
 }
 function supHome(){
@@ -2390,13 +2390,25 @@ async function epiConfirmar(id,rpc,params,okMsg,after){
   if(!navigator.onLine) return toast('Entrega precisa de conexão (foto e assinatura)');
   const foto=epiFotoBlob[id]; if(!foto) return toast('Tire a foto da entrega');
   const cv=$('#supView').querySelector('.epiSig[data-cap="'+id+'"]'); if(!cv||!cv._drawn()) return toast('Colete a assinatura do colaborador');
+  const extra = (typeof params==='function')?params():params; if(extra===false) return;
   const btn=$('#supView').querySelector('[data-confirm="'+id+'"]'); if(btn) btn.disabled=true;
   try{
     const fp=await epiUpload(foto,'foto.jpg');
     const ap=await epiUpload(await epiCanvasBlob(cv),'assinatura.png');
-    const {error}=await sb.rpc(rpc, Object.assign({},params,{p_foto:fp,p_assinatura:ap})); if(error) throw error;
+    const {error}=await sb.rpc(rpc, Object.assign({},extra,{p_foto:fp,p_assinatura:ap})); if(error) throw error;
     delete epiFotoBlob[id]; toast('✓ '+okMsg); if(after) after();
   }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
+}
+// --- captura de foto avulsa (rótulo customizável), guarda em epiFotoBlob[cap] ---
+function epiFotoBlock(cap,label){ return `
+  <label>${label}</label>
+  <div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="epiFoto" data-cap="${cap}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="epiFoto" data-cap="${cap}"/></label></div>
+  <img class="epiFotoPrev-${cap} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/>`;
+}
+function epiSigBlock(cap,label){ return `
+  <label style="margin-top:10px">${label||'Assinatura do colaborador *'}</label>
+  <div style="border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden"><canvas class="epiSig" data-cap="${cap}" width="600" height="180" style="width:100%;height:180px;touch-action:none;display:block"></canvas></div>
+  <button type="button" class="btn ghost epiSigClear" data-cap="${cap}" style="margin-top:6px">Limpar assinatura</button>`;
 }
 
 // --- Entregar EPI (almox: foto + assinatura) ---
@@ -2405,25 +2417,93 @@ async function supVEpiEntregar(){
   try{ const {data,error}=await sb.rpc('sup_epi_fila_entrega'); if(error)throw error;
     const arr=data||[]; if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma entrega de EPI pendente.</p>'; return; }
     $('#supView').innerHTML=arr.map(s=>{ const cid='e'+s.id;
-      const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>${i.epi} <span class="sub">(troca ${i.validade_dias}d)</span></span><b>×${supNum(i.qt)}</b></div>`).join('');
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:12px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">para ${s.solicitante||'—'}</span></div><div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<button class="btn" data-confirm="${cid}" data-sol="${s.id}" style="margin-top:10px">Confirmar entrega</button></div>`;
+      const itens=(s.itens||[]).map(i=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.epi} <span class="sub">(troca ${i.validade_dias}d)</span></span><b>×${supNum(i.qt)}</b></div><input class="epiCA" data-sol="${s.id}" data-epi="${i.epi_id}" value="${i.ca||''}" placeholder="Nº do CA (Certificado de Aprovação)" style="margin-top:5px;font-size:13px;padding:7px 9px"/></div>`).join('');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:12px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">para ${s.solicitante||'—'}</span></div><div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<button class="btn" data-confirm="${cid}" data-econf="${s.id}" style="margin-top:10px">Confirmar entrega</button></div>`;
     }).join('');
     epiCapturaWire();
-    $('#supView').querySelectorAll('[data-sol]').forEach(b=>b.addEventListener('click',()=>epiConfirmar('e'+b.dataset.sol,'sup_epi_entregar',{p_solicitacao_id:+b.dataset.sol},'Entrega registrada',supVEpiEntregar)));
+    $('#supView').querySelectorAll('[data-econf]').forEach(b=>b.addEventListener('click',()=>{ const sid=+b.dataset.econf;
+      epiConfirmar('e'+sid,'sup_epi_entregar',()=>{ const cas=[]; $('#supView').querySelectorAll('.epiCA[data-sol="'+sid+'"]').forEach(inp=>cas.push({epi_id:+inp.dataset.epi,ca:(inp.value||'').trim()})); return {p_solicitacao_id:sid,p_cas:cas}; },'Entrega registrada',supVEpiEntregar);
+    }));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
-// --- Substituir EPI por tempo de uso (almox: foto + assinatura) ---
-async function supVEpiSubstituir(){
+// --- Devolver / Trocar EPI (almox) — devolução = fim; troca = devolução + nova entrega ---
+let epiBaixaCols=[], epiPosse=[];
+async function supVEpiBaixa(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('sup_epi_a_substituir'); if(error)throw error;
-    const arr=data||[]; if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhum EPI a substituir por tempo de uso. 👍</p>'; return; }
-    $('#supView').innerHTML=arr.map(x=>{ const cid='s'+x.entrega_item_id;
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:12px"><div><b>${x.epi}</b>${x.ca?(' · CA '+x.ca):''}<div class="sub" style="margin-top:2px">com ${x.colaborador||'—'} · venceu ${eqDia(x.vence_em)} · ${x.atraso_dias} dia(s) de atraso</div></div>${epiCapturaHtml(cid)}<button class="btn" data-confirm="${cid}" data-item="${x.entrega_item_id}" style="margin-top:10px">Registrar substituição</button></div>`;
-    }).join('');
+  try{ const c=await sb.rpc('sup_epi_gestao_colaboradores'); if(c.error)throw c.error; epiBaixaCols=c.data||[]; }
+  catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  if(!epiBaixaCols.length){ $('#supView').innerHTML='<p class="sub">Nenhum EPI em posse de colaboradores.</p>'; return; }
+  $('#supView').innerHTML=`
+    <label>Colaborador</label>
+    <select id="epBU">${epiBaixaCols.map(c=>`<option value="${c.uuid}">${c.nome||'—'} — ${c.ativos} em posse${c.a_substituir?(' · ⚠️ '+c.a_substituir+' vencido(s)'):''}</option>`).join('')}</select>
+    <div id="epBOut" style="margin-top:12px"></div>`;
+  const load=async()=>{
+    const uid=$('#epBU').value; if(!uid) return;
+    $('#epBOut').innerHTML='<p class="sub">Carregando…</p>';
+    try{ const {data,error}=await sb.rpc('sup_epi_em_posse',{p_colaborador_uuid:uid}); if(error)throw error;
+      epiPosse=data||[]; epiBaixaRenderLista(uid);
+    }catch(e){ $('#epBOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+  };
+  $('#epBU').addEventListener('change',load); load();
+}
+function epiBaixaRenderLista(uid){
+  const c=$('#epBOut'); if(!c) return;
+  if(!epiPosse.length){ c.innerHTML='<p class="sub">Este colaborador não tem EPIs em posse.</p>'; return; }
+  c.innerHTML=epiPosse.map(x=>{
+    const venc = x.vencido?'<span class="sub" style="color:var(--bad)"> · vencido</span>':(x.dias_restantes!=null?('<span class="sub"> · faltam '+x.dias_restantes+'d</span>'):'');
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div><b>${x.epi}</b>${x.ca?(' · CA '+x.ca):''}${x.quantidade?(' ×'+supNum(x.quantidade)):''}<div class="sub" style="margin-top:2px">entregue ${eqDia(x.entregue_em)}${x.vence_em?(' · troca '+eqDia(x.vence_em)):''}${venc}</div></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost" data-troca="${x.entrega_item_id}" style="margin:0">🔁 Trocar</button><button class="btn ghost" data-dev="${x.entrega_item_id}" style="margin:0;color:var(--bad)">↩️ Devolver</button></div></div>`;
+  }).join('');
+  c.querySelectorAll('[data-dev]').forEach(b=>b.addEventListener('click',()=>epiBaixaCapturar('dev',+b.dataset.dev,uid)));
+  c.querySelectorAll('[data-troca]').forEach(b=>b.addEventListener('click',()=>epiBaixaCapturar('troca',+b.dataset.troca,uid)));
+}
+function epiBaixaCapturar(mode,itemId,uid){
+  const x=epiPosse.find(p=>p.entrega_item_id===itemId)||{};
+  const back='<button class="btn ghost" id="epBBack" style="margin-bottom:10px">‹ Voltar</button>';
+  if(mode==='dev'){
+    $('#supView').innerHTML=back+`<div class="sec">↩️ Devolução (encerra o EPI)</div><p class="sub">${x.epi}${x.ca?(' · CA '+x.ca):''}</p>
+      ${epiFotoBlock('d'+itemId,'Foto do EPI devolvido *')}
+      <label style="margin-top:10px">Observação</label><textarea id="epBObs" rows="2"></textarea>
+      <button class="btn" id="epBGo" style="margin-top:10px;background:var(--bad)">Confirmar devolução</button>`;
     epiCapturaWire();
-    $('#supView').querySelectorAll('[data-item]').forEach(b=>b.addEventListener('click',()=>epiConfirmar('s'+b.dataset.item,'sup_epi_substituir',{p_entrega_item_id:+b.dataset.item},'Substituição registrada',supVEpiSubstituir)));
-  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+    $('#epBGo').addEventListener('click',()=>epiDevolverGo(itemId));
+  } else {
+    $('#supView').innerHTML=back+`<div class="sec">🔁 Troca por tempo de uso</div><p class="sub">Devolve ${x.epi}${x.ca?(' · CA '+x.ca):''} e entrega uma nova unidade.</p>
+      <label style="margin-top:10px">Nº do CA da unidade nova *</label><input id="epBCa" value="${x.ca||''}" placeholder="Certificado de Aprovação"/>
+      ${epiFotoBlock('td'+itemId,'Foto do EPI devolvido *')}
+      ${epiFotoBlock('tn'+itemId,'Foto do EPI novo entregue *')}
+      ${epiSigBlock('ts'+itemId,'Assinatura do colaborador *')}
+      <label style="margin-top:10px">Observação</label><textarea id="epBObs" rows="2"></textarea>
+      <button class="btn" id="epBGo" style="margin-top:10px">Confirmar troca</button>`;
+    epiCapturaWire();
+    $('#epBGo').addEventListener('click',()=>epiTrocarGo(itemId));
+  }
+  $('#epBBack').addEventListener('click',()=>epiBaixaRenderLista(uid));
+}
+async function epiDevolverGo(itemId){
+  if(!navigator.onLine) return toast('Devolução precisa de conexão (foto)');
+  const foto=epiFotoBlob['d'+itemId]; if(!foto) return toast('Tire a foto do EPI devolvido');
+  const btn=$('#epBGo'); if(btn) btn.disabled=true;
+  try{
+    const fp=await epiUpload(foto,'devolucao.jpg');
+    const {error}=await sb.rpc('sup_epi_devolver',{p_entrega_item_id:itemId,p_foto:fp,p_obs:($('#epBObs').value||null)}); if(error) throw error;
+    delete epiFotoBlob['d'+itemId]; toast('✓ EPI devolvido'); supVEpiBaixa();
+  }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
+}
+async function epiTrocarGo(itemId){
+  if(!navigator.onLine) return toast('Troca precisa de conexão (fotos e assinatura)');
+  const ca=($('#epBCa').value||'').trim(); if(!ca) return toast('Informe o CA da unidade nova');
+  const fd=epiFotoBlob['td'+itemId]; if(!fd) return toast('Tire a foto do EPI devolvido');
+  const fn=epiFotoBlob['tn'+itemId]; if(!fn) return toast('Tire a foto do EPI novo');
+  const cv=$('#supView').querySelector('.epiSig[data-cap="ts'+itemId+'"]'); if(!cv||!cv._drawn()) return toast('Colete a assinatura do colaborador');
+  const btn=$('#epBGo'); if(btn) btn.disabled=true;
+  try{
+    const pd=await epiUpload(fd,'devolvido.jpg');
+    const pn=await epiUpload(fn,'novo.jpg');
+    const pa=await epiUpload(await epiCanvasBlob(cv),'assinatura.png');
+    const {error}=await sb.rpc('sup_epi_substituir',{p_entrega_item_id:itemId,p_ca:ca,p_foto_novo:pn,p_foto_devolvido:pd,p_assinatura:pa,p_obs:($('#epBObs').value||null)}); if(error) throw error;
+    delete epiFotoBlob['td'+itemId]; delete epiFotoBlob['tn'+itemId]; toast('✓ Troca registrada'); supVEpiBaixa();
+  }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
 }
 
 // --- Gestão de EPIs por colaborador + comprovante ---
@@ -2453,12 +2533,13 @@ function renderEpiPainel(){
     const sub=[v.ca?('CA '+v.ca):'','entregue '+eqDia(v.entregue_em),v.vence_em?('troca '+eqDia(v.vence_em)):''].filter(Boolean).join(' · ');
     return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+v.epi+'</b>'+(v.quantidade?(' ×'+supNum(v.quantidade)):'')+'<div class="sub" style="margin-top:2px">'+sub+'</div></div>'+epiChip(st)+'</div></div>';
   }).join('') : '<p class="sub">Sem EPIs em posse.</p>';
-  h+='<div class="sec" style="margin-top:20px">📄 Entregas e substituições</div>';
+  h+='<div class="sec" style="margin-top:20px">📄 Movimentações</div>';
   h+= epiEntregas.length? epiEntregas.map(e=>{
-    const itens=(e.itens||[]).map(i=>i.epi+' ×'+supNum(i.qt)).join(', ');
-    const tp=e.tipo==='substituicao'?'🔁 Substituição':'📤 Entrega';
+    const dev=e.devolvido;
+    const itens=(e.tipo==='devolucao')?(dev?(dev.epi+' ×'+supNum(dev.qt)):'—'):(e.itens||[]).map(i=>i.epi+' ×'+supNum(i.qt)).join(', ');
+    const tp=e.tipo==='substituicao'?'🔁 Troca':(e.tipo==='devolucao'?'↩️ Devolução':'📤 Entrega');
     return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+tp+'</b><div class="sub" style="margin-top:2px">'+itens+' · '+supData(e.entregue_em)+(e.entregue_por?(' · por '+e.entregue_por):'')+'</div></div><button class="btn ghost" data-comp="'+e.id+'" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Comprovante</button></div></div>';
-  }).join('') : '<p class="sub">Nenhuma entrega registrada.</p>';
+  }).join('') : '<p class="sub">Nenhuma movimentação registrada.</p>';
   $('#epPOut').innerHTML=h;
   $('#epPOut').querySelectorAll('[data-comp]').forEach(b=>b.addEventListener('click',()=>{ const e=epiEntregas.find(x=>String(x.id)===String(b.dataset.comp)); if(e) epiComprovante(e); }));
 }
@@ -2472,19 +2553,33 @@ function epiComprovante(e){
 }
 function epiComprovanteHtml(e){
   const nome=(epiPainelData&&epiPainelData.colaborador)||'—';
-  const tp=e.tipo==='substituicao'?'Substituição por tempo de uso':'Entrega';
-  const clr=e.tipo==='substituicao'?'#7c3aed':'#0a58ca';
-  const itens=(e.itens||[]).map(i=>relField(i.epi+(i.ca?(' · CA '+i.ca):''),'×'+relNum(i.qt,0)+(i.validade_dias?(' · troca '+i.validade_dias+'d'):''))).join('');
-  let h='<div class="relTop"><div><h1>Comprovante de Entrega de EPI</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge" style="color:'+clr+'">'+tp+'</div></div><div class="relBody">';
-  h+='<div class="relGrid">'+relField('Colaborador',nome)+relField('Data da entrega',relFmtData(e.entregue_em))+relField('Entregue por',e.entregue_por)+relField('Nº do registro','#'+e.id)+'</div>';
-  h+='<div class="relSec"><span class="relNum">1</span> EPIs entregues</div><div class="relGrid">'+itens+'</div>';
+  const isDev=e.tipo==='devolucao', isTroca=e.tipo==='substituicao';
+  const tp=isTroca?'Troca por tempo de uso':(isDev?'Devolução':'Entrega');
+  const clr=isTroca?'#7c3aed':(isDev?'#b02a2a':'#0a58ca');
+  const titulo=isDev?'Comprovante de Devolução de EPI':'Comprovante de Entrega de EPI';
+  const dev=e.devolvido;
+  const fig=(path,cap,white)=>'<figure style="margin:0;text-align:center"><img src="'+fotoURL(path)+'" style="width:100%;border:1px solid #ccc;border-radius:6px'+(white?';background:#fff':'')+'" onerror="this.style.display=\'none\'"/><figcaption style="font-size:11px;color:#666;margin-top:3px">'+cap+'</figcaption></figure>';
+  let h='<div class="relTop"><div><h1>'+titulo+'</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge" style="color:'+clr+'">'+tp+'</div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('Colaborador',nome)+relField('Data',relFmtData(e.entregue_em))+relField('Responsável',e.entregue_por)+relField('Nº do registro','#'+e.id)+'</div>';
+  if(isDev){
+    h+='<div class="relSec"><span class="relNum">1</span> EPI devolvido</div><div class="relGrid">'+(dev?relField(dev.epi+(dev.ca?(' · CA '+dev.ca):''),'×'+relNum(dev.qt,0)):'<div class="sub">—</div>')+'</div>';
+  } else {
+    const itens=(e.itens||[]).map(i=>relField(i.epi+(i.ca?(' · CA '+i.ca):''),'×'+relNum(i.qt,0)+(i.validade_dias?(' · troca '+i.validade_dias+'d'):''))).join('');
+    h+='<div class="relSec"><span class="relNum">1</span> EPI'+(isTroca?' entregue (novo)':'s entregues')+'</div><div class="relGrid">'+itens+'</div>';
+    if(isTroca&&dev) h+='<div class="sub" style="margin-top:6px">↩️ Devolvido na troca: <b>'+dev.epi+(dev.ca?(' · CA '+dev.ca):'')+'</b></div>';
+  }
   if(e.obs) h+='<div class="sub" style="margin-top:8px">Obs: '+e.obs+'</div>';
-  h+='<div class="relSec"><span class="relNum">2</span> Registro fotográfico e assinatura</div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">'
-    +'<figure style="margin:0;text-align:center"><img src="'+fotoURL(e.foto_path)+'" style="width:100%;border:1px solid #ccc;border-radius:6px" onerror="this.style.display=\'none\'"/><figcaption style="font-size:11px;color:#666;margin-top:3px">Foto da entrega</figcaption></figure>'
-    +'<figure style="margin:0;text-align:center"><img src="'+fotoURL(e.assinatura_path)+'" style="width:100%;border:1px solid #ccc;border-radius:6px;background:#fff" onerror="this.style.display=\'none\'"/><figcaption style="font-size:11px;color:#666;margin-top:3px">Assinatura do colaborador</figcaption></figure>'
-    +'</div>';
-  h+='<div style="margin-top:16px;font-size:11px;color:#555;line-height:1.5">Declaro ter recebido o(s) EPI(s) acima, em bom estado e adequado(s) ao uso, comprometendo-me a utilizá-lo(s) conforme as normas de segurança e a comunicar qualquer dano ou necessidade de substituição.</div>';
+  h+='<div class="relSec"><span class="relNum">2</span> Registro fotográfico'+(isDev?'':' e assinatura')+'</div>';
+  let figs='';
+  if(isDev){ figs=fig(e.foto_devolucao_path,'Foto do EPI devolvido'); }
+  else if(isTroca){ figs=fig(e.foto_path,'EPI novo entregue')+fig(e.foto_devolucao_path,'EPI devolvido')+fig(e.assinatura_path,'Assinatura do colaborador',true); }
+  else { figs=fig(e.foto_path,'Foto da entrega')+fig(e.assinatura_path,'Assinatura do colaborador',true); }
+  const cols=isDev?1:(isTroca?3:2);
+  h+='<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:10px;margin-top:10px">'+figs+'</div>';
+  const decl=isDev
+    ? 'Declaro a devolução do(s) EPI(s) acima ao almoxarifado, encerrando a responsabilidade sobre o(s) mesmo(s).'
+    : 'Declaro ter recebido o(s) EPI(s) acima, em bom estado e adequado(s) ao uso, comprometendo-me a utilizá-lo(s) conforme as normas de segurança e a comunicar qualquer dano ou necessidade de substituição.';
+  h+='<div style="margin-top:16px;font-size:11px;color:#555;line-height:1.5">'+decl+'</div>';
   h+='</div><div class="relFoot"><span>AcquaHub · comprovante gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
 }
