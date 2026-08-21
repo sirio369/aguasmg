@@ -310,40 +310,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Cadastro de novo cliente durante o recadastramento. Os campos serão ajustados conforme orientações da COPASA.</p>
     <div id="capGps" class="banner warn">Obtendo GPS…</div>
 
-    <div class="sec">🏠 Imóvel</div>
-    <label for="cap_matricula">Matrícula COPASA</label>
-    <input id="cap_matricula" inputmode="numeric" autocomplete="off"/>
-    <label for="cap_endereco">Endereço</label>
-    <input id="cap_endereco" autocomplete="off"/>
-    <label for="cap_categoria">Categoria *</label>
-    <select id="cap_categoria">
-      <option value="">Selecione…</option>
-      <option>Residencial</option><option>Comercial</option><option>Industrial</option>
-      <option>Pública</option><option>Mista</option>
-    </select>
-    <label for="cap_economias">Nº de economias *</label>
-    <input id="cap_economias" inputmode="numeric"/>
-    <label for="cap_ocupacao">Situação de ocupação</label>
-    <select id="cap_ocupacao">
-      <option value="">Selecione…</option>
-      <option>Ocupado</option><option>Vago</option><option>Em construção</option>
-    </select>
-
-    <div class="sec">👤 Cliente</div>
-    <label for="cap_nome">Nome completo *</label>
-    <input id="cap_nome" autocomplete="off"/>
-    <label for="cap_mae">Nome da mãe</label>
-    <input id="cap_mae" autocomplete="off"/>
-    <label for="cap_cpf">CPF *</label>
-    <input id="cap_cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00"/>
-    <label for="cap_rg">RG</label>
-    <input id="cap_rg" inputmode="numeric" autocomplete="off"/>
-    <label for="cap_nasc">Data de nascimento</label>
-    <input id="cap_nasc" type="date"/>
-    <label for="cap_email">E-mail</label>
-    <input id="cap_email" type="email" inputmode="email" autocomplete="off"/>
-    <label for="cap_tel">Telefone *</label>
-    <input id="cap_tel" type="tel" inputmode="tel" autocomplete="off" placeholder="(31) 90000-0000"/>
+    <div id="capForm"></div>
 
     <div class="sec">📎 Documentos e fotos</div>
     <label>Foto do termo assinado *</label>
@@ -361,7 +328,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <textarea id="cap_obs" rows="2"></textarea>
 
     <button id="capSalvar" class="btn" disabled>Registrar captação</button>
-    <p class="sub" style="text-align:center;margin-top:8px;font-size:12px">* obrigatórios: categoria, economias, nome, CPF, telefone, foto do termo e da fachada.</p>
+    <p class="sub" style="text-align:center;margin-top:8px;font-size:12px">Obrigatórios: GPS, imóvel localizado, nome do cliente e CPF/CNPJ. Demais campos conforme o caso.</p>
   </main>
 
   <main id="suprimentos" class="hidden">
@@ -1149,16 +1116,10 @@ document.querySelectorAll('#captacao [data-capfoto]').forEach(inp=>inp.addEventL
 }));
 if($('#capSalvar')) $('#capSalvar').addEventListener('click',()=>{
   if(!gps||gps.acc>PRECISAO_MAX){ toast('GPS insuficiente'); return; }
-  const g=id=>(((document.getElementById(id)||{}).value)||'').trim()||null;
-  const eco=parseInt(((g('cap_economias')||'').replace(/\D/g,'')),10);
   const uid=crypto.randomUUID();
   const item={id:uid,tipo:'captacao',rpc:'app_captacao_registrar',pasta:'captacao',
     fotos:{p_foto_termo:captFotos.termo,p_foto_fachada:captFotos.fachada,p_foto_doc_frente:captFotos.doc_frente,p_foto_doc_verso:captFotos.doc_verso,p_foto_comprovante:captFotos.comprovante},
-    fields:{p_id:uid,
-      p_matricula:g('cap_matricula'), p_endereco:g('cap_endereco'), p_categoria:g('cap_categoria'),
-      p_economias:isNaN(eco)?null:eco, p_ocupacao:g('cap_ocupacao'),
-      p_nome:g('cap_nome'), p_nome_mae:g('cap_mae'), p_cpf:g('cap_cpf'), p_rg:g('cap_rg'),
-      p_nascimento:g('cap_nasc'), p_email:g('cap_email'), p_telefone:g('cap_tel'), p_observacao:g('cap_obs'),
+    fields:{p_id:uid, p_respostas:capCollect(),
       p_lat:gps.lat, p_lon:gps.lon, p_precisao:Math.round(gps.acc*10)/10,
       p_consorcio:localStorage.getItem('consorcio')||null, p_dispositivo:navigator.userAgent.slice(0,60)}};
   enviarOuEnfileirar(item,'✓ Captação registrada');
@@ -1474,7 +1435,118 @@ function prodDesenhar(d){
 
 // ---------- MÓDULO CAPTAÇÃO DE CLIENTES (mockup) ----------
 let captFotos={};
-function capInit(){ capOnGps(); }
+// Questionário COPASA (código, rótulo amigável, tipo, condicional)
+const CAP_Q=[
+  {s:'📍 Localização e cliente'},
+  {c:'_99',l:'Imóvel localizado?',t:'sn'},
+  {c:'_80',l:'Nome do cliente (sem abreviar)',t:'txt'},
+  {c:'340',l:'Cliente é proprietário do imóvel?',t:'sn'},
+  {c:'906',l:'CPF / CNPJ',t:'num'},
+  {c:'577',l:'Data de nascimento',t:'date',if:a=>capDoc(a)==='CPF'},
+  {c:'824',l:'Nome da mãe',t:'txt',if:a=>capDoc(a)==='CPF'},
+  {c:'549',l:'Nome fantasia',t:'txt',if:a=>capDoc(a)==='CNPJ'},
+  {c:'923',l:'DDD do celular',t:'num'},
+  {c:'924',l:'Telefone celular',t:'num'},
+  {c:'962',l:'Permite envio de SMS?',t:'sn'},
+  {c:'929',l:'E-mail',t:'txt'},
+  {c:'517',l:'Permite envio de faturas por e-mail?',t:'sn'},
+  {c:'523',l:'Número de pessoas no imóvel',t:'num'},
+  {s:'🏠 Endereço'},
+  {c:'_72',l:'Endereço',t:'txt'},
+  {c:'_47',l:'Número do imóvel',t:'txt'},
+  {c:'_16',l:'Complemento do endereço (tipo)',t:'txt'},
+  {c:'802',l:'Possui caixa de correspondência?',t:'sn'},
+  {c:'201',l:'Número do imóvel anterior',t:'txt'},
+  {c:'202',l:'Número do imóvel posterior',t:'txt'},
+  {c:'IMV_ESQ',l:'Imóvel à esquerda (referência p/ codificação futura)',t:'txt'},
+  {c:'IMV_DIR',l:'Imóvel à direita (referência p/ codificação futura)',t:'txt'},
+  {s:'🏢 Características do imóvel'},
+  {c:'__6',l:'Possui reservatório?',t:'sn'},
+  {c:'__7',l:'Possui piscina?',t:'sn'},
+  {c:'140',l:'Possui fonte alternativa de água?',t:'sn'},
+  {c:'_12',l:'Tipo de fonte alternativa',t:'txt',if:a=>a['140']==='S'},
+  {c:'510',l:'Porte do imóvel',t:'txt'},
+  {c:'__8',l:'Condição do imóvel',t:'txt'},
+  {s:'🏷️ Categoria e economias'},
+  {c:'189',l:'Categoria / economia',t:'txt'},
+  {c:'115',l:'Economias — Residencial (água)',t:'num'},
+  {c:'116',l:'Economias — Comercial (água)',t:'num'},
+  {c:'117',l:'Economias — Industrial (água)',t:'num'},
+  {c:'118',l:'Economias — Pública (água)',t:'num'},
+  {c:'119',l:'Economias — Residencial (esgoto)',t:'num'},
+  {c:'120',l:'Economias — Comercial (esgoto)',t:'num'},
+  {c:'121',l:'Economias — Industrial (esgoto)',t:'num'},
+  {c:'122',l:'Economias — Pública (esgoto)',t:'num'},
+  {c:'__1',l:'Ramo de atividade',t:'txt'},
+  {c:'569',l:'Ramo de atividade (detalhe)',t:'txt'},
+  {s:'🚰 Hidrômetro'},
+  {c:'123',l:'Numeração do hidrômetro',t:'txt'},
+  {c:'498',l:'Capacidade do hidrômetro',t:'txt'},
+  {c:'667',l:'Ano do hidrômetro',t:'num'},
+  {c:'503',l:'Marca do hidrômetro',t:'txt'},
+  {c:'528',l:'Sequencial do hidrômetro',t:'txt'},
+  {c:'391',l:'Qtde de dígitos/ponteiros pretos',t:'num'},
+  {c:'393',l:'Hidrômetro lacrado?',t:'sn'},
+  {c:'530',l:'Lacre do hidrômetro',t:'txt',if:a=>a['393']==='S'},
+  {c:'_30',l:'Leitura do hidrômetro',t:'txt'},
+  {c:'710',l:'Lacre da caixa de policarbonato',t:'txt'},
+  {c:'715',l:'Número do lacre da virola',t:'txt'},
+  {s:'💧 Situação — Água'},
+  {c:'_19',l:'Localização do padrão',t:'txt'},
+  {c:'_10',l:'Situação do imóvel (água)',t:'sel:Real|Factível|Potencial|Inativo'},
+  {c:'_11',l:'Classificação (água)',t:'sel:Real|Factível|Potencial'},
+  {c:'541',l:'Motivo — situação factível (água)',t:'txt',if:a=>a['_11']==='Factível'},
+  {c:'545',l:'Motivo — situação potencial (água)',t:'txt',if:a=>a['_11']==='Potencial'},
+  {c:'126',l:'Motivo — situação inativo (água)',t:'txt',if:a=>a['_10']==='Inativo'},
+  {c:'_78',l:'Ligação tamponada?',t:'sn'},
+  {c:'998',l:'Há suspeita de irregularidades?',t:'sn'},
+  {s:'🚽 Situação — Esgoto'},
+  {c:'_13',l:'Situação do imóvel (esgoto)',t:'sel:Real|Factível|Potencial|Inativo'},
+  {c:'886',l:'Classificação (esgoto)',t:'sel:Real|Factível|Potencial'},
+  {c:'887',l:'Motivo — situação factível (esgoto)',t:'txt',if:a=>a['886']==='Factível'},
+  {c:'_93',l:'Motivo — situação potencial (esgoto)',t:'txt',if:a=>a['886']==='Potencial'},
+  {c:'821',l:'Motivo — situação inativo (esgoto)',t:'txt',if:a=>a['_13']==='Inativo'},
+  {c:'999',l:'Imóvel esgota na rede COPASA?',t:'sn'},
+  {c:'144',l:'Onde é lançado o esgoto?',t:'txt',if:a=>a['999']==='N'},
+  {c:'191',l:'O imóvel possui PL?',t:'sn'},
+  {c:'851',l:'Esgoto coletivo?',t:'sn'},
+  {c:'853',l:'Endereço do imóvel (esgoto coletivo)',t:'txt',if:a=>a['851']==='S'},
+  {c:'852',l:'Matrícula do imóvel (esgoto coletivo)',t:'txt',if:a=>a['851']==='S'},
+  {s:'🕒 Atendimento'},
+  {c:'225',l:'Hora do atendimento',t:'time'}
+];
+const CAP_IF={}; CAP_Q.forEach(q=>{ if(q.if) CAP_IF[q.c]=q.if; });
+function capDoc(a){ const d=(a['906']||'').replace(/\D/g,''); return d.length===14?'CNPJ':(d.length===11?'CPF':(d.length>11?'CNPJ':'')); }
+function capField(q){
+  const id='cq_'+q.c; let ctrl;
+  if(q.t==='sn') ctrl='<select id="'+id+'" data-c="'+q.c+'"><option value="">—</option><option value="S">Sim</option><option value="N">Não</option></select>';
+  else if(q.t==='date') ctrl='<input id="'+id+'" data-c="'+q.c+'" type="date"/>';
+  else if(q.t==='time') ctrl='<input id="'+id+'" data-c="'+q.c+'" type="time"/>';
+  else if(q.t==='num') ctrl='<input id="'+id+'" data-c="'+q.c+'" inputmode="numeric" autocomplete="off"/>';
+  else if(q.t&&q.t.slice(0,4)==='sel:') ctrl='<select id="'+id+'" data-c="'+q.c+'"><option value="">—</option>'+q.t.slice(4).split('|').map(o=>'<option>'+o+'</option>').join('')+'</select>';
+  else ctrl='<input id="'+id+'" data-c="'+q.c+'" autocomplete="off"/>';
+  return '<div class="capQ" data-qc="'+q.c+'"><label for="'+id+'">'+q.l+'</label>'+ctrl+'</div>';
+}
+function capRender(){
+  const el=document.getElementById('capForm'); if(!el) return;
+  el.innerHTML=CAP_Q.map(q=>q.s?('<div class="sec">'+q.s+'</div>'):capField(q)).join('');
+  el.addEventListener('input',capRecalc); el.addEventListener('change',capRecalc);
+  capRecalc();
+}
+function capAnswersAll(){ const a={}; document.querySelectorAll('#capForm [data-c]').forEach(el=>{ const v=(el.value||'').trim(); if(v) a[el.dataset.c]=v; }); return a; }
+function capRecalc(){
+  const a=capAnswersAll();
+  document.querySelectorAll('#capForm .capQ[data-qc]').forEach(w=>{ const fn=CAP_IF[w.dataset.qc]; if(fn) w.style.display=fn(a)?'':'none'; });
+  capValidar();
+}
+function capCollect(){
+  const a={};
+  CAP_Q.forEach(q=>{ if(!q.c) return; const w=document.querySelector('#capForm .capQ[data-qc="'+q.c+'"]'); if(w && w.style.display==='none') return;
+    const el=document.getElementById('cq_'+q.c); const v=el?(el.value||'').trim():''; if(v) a[q.c]=v; });
+  const obs=((document.getElementById('cap_obs')||{}).value||'').trim(); if(obs) a['obs']=obs;
+  return a;
+}
+function capInit(){ if(!document.querySelector('#capForm [data-c]')) capRender(); capOnGps(); }
 function capOnGps(){
   const b=document.getElementById('capGps'); if(!b) return;
   if(!gps){b.className='banner bad';b.textContent='Sem sinal de GPS';capValidar();return;}
@@ -1486,14 +1558,12 @@ function capOnGps(){
 function capValidar(){
   const btn=document.getElementById('capSalvar'); if(!btn) return;
   const okGps=gps&&gps.acc<=PRECISAO_MAX;
-  const req=['cap_categoria','cap_economias','cap_nome','cap_cpf','cap_tel']
-    .every(id=>(((document.getElementById(id)||{}).value)||'').trim());
-  const okFotos=!!captFotos.termo && !!captFotos.fachada;
-  btn.disabled=!(okGps&&req&&okFotos);
+  const v=c=>{const e=document.getElementById('cq_'+c);return e&&(e.value||'').trim();};
+  btn.disabled=!(okGps && v('_99') && v('_80') && v('906'));
 }
 function capReset(){
-  ['cap_matricula','cap_endereco','cap_categoria','cap_economias','cap_ocupacao','cap_nome','cap_mae','cap_cpf','cap_rg','cap_nasc','cap_email','cap_tel','cap_obs']
-    .forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  capRender();
+  document.getElementById('cap_obs') && (document.getElementById('cap_obs').value='');
   captFotos={};
   document.querySelectorAll('#captacao [data-capfoto]').forEach(inp=>{inp.value='';});
   document.querySelectorAll('#captacao [data-cprev]').forEach(img=>img.classList.add('hidden'));
