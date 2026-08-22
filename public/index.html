@@ -2561,7 +2561,7 @@ async function supVEpiPainel(){
     <select id="epPU">${cols.map(c=>`<option value="${c.uuid}">${c.nome||'—'} — ${c.ativos} ativo(s)${c.a_substituir?(' · ⚠️ '+c.a_substituir+' a trocar'):''}</option>`).join('')}</select>
     <div id="epPOut" style="margin-top:12px"></div>`;
   const load=async()=>{
-    const uid=$('#epPU').value; if(!uid) return;
+    const uid=$('#epPU').value; if(!uid) return; epiPainelUuid=uid;
     $('#epPOut').innerHTML='<p class="sub">Carregando…</p>';
     try{ const {data,error}=await sb.rpc('sup_epi_gestao_colaborador',{p_colaborador_uuid:uid}); if(error)throw error;
       epiPainelData=data||{}; renderEpiPainel();
@@ -2569,9 +2569,10 @@ async function supVEpiPainel(){
   };
   $('#epPU').addEventListener('change',load); load();
 }
+let epiPainelUuid=null;
 function renderEpiPainel(){
   const d=epiPainelData||{}; const atuais=d.atuais||[]; epiEntregas=d.entregas||[];
-  let h='<div class="sec">🦺 EPIs em posse</div>';
+  let h='<button class="btn ghost" id="epFichaBtn" style="width:100%;margin:0 0 14px">📋 Ficha de EPI (consolidada)</button><div class="sec">🦺 EPIs em posse</div>';
   h+= atuais.length? atuais.map(v=>{ const st=epiVenc(v);
     const sub=[v.ca?('CA '+v.ca):'','entregue '+eqDia(v.entregue_em),v.vence_em?('troca '+eqDia(v.vence_em)):''].filter(Boolean).join(' · ');
     return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+v.epi+'</b>'+(v.quantidade?(' ×'+supNum(v.quantidade)):'')+'<div class="sub" style="margin-top:2px">'+sub+'</div></div>'+epiChip(st)+'</div></div>';
@@ -2584,7 +2585,56 @@ function renderEpiPainel(){
     return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+tp+'</b><div class="sub" style="margin-top:2px">'+itens+' · '+supData(e.entregue_em)+(e.entregue_por?(' · por '+e.entregue_por):'')+'</div></div><button class="btn ghost" data-comp="'+e.id+'" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Comprovante</button></div></div>';
   }).join('') : '<p class="sub">Nenhuma movimentação registrada.</p>';
   $('#epPOut').innerHTML=h;
+  const fb=$('#epFichaBtn'); if(fb) fb.addEventListener('click',()=>epiFicha(epiPainelUuid));
   $('#epPOut').querySelectorAll('[data-comp]').forEach(b=>b.addEventListener('click',()=>{ const e=epiEntregas.find(x=>String(x.id)===String(b.dataset.comp)); if(e) epiComprovante(e); }));
+}
+// --- Ficha de EPI consolidada (por colaborador) ---
+async function epiFicha(uid){
+  if(!uid) return;
+  let d;
+  try{ const {data,error}=await sb.rpc('sup_epi_ficha',{p_colaborador_uuid:uid}); if(error) throw error; d=data||{}; }
+  catch(e){ return toast('⚠ '+(e.message||e)); }
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+epiFichaHtml(d)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+function epiFichaHtml(d){
+  const itens=d.itens||[];
+  const td='border:1px solid #bbb;padding:5px 6px;font-size:11px;vertical-align:top';
+  const th='border:1px solid #bbb;padding:5px 6px;font-size:10px;text-transform:uppercase;background:#f0f0f0;text-align:left;letter-spacing:.02em';
+  const rows = itens.length? itens.map((i,idx)=>{
+    const saida = i.saida_em?(relFmtData(i.saida_em)+'<br><span style="color:#777">'+(i.saida_tipo||'')+'</span>'):'<span style="color:#0a7">Em posse</span>';
+    const origem = i.tipo==='substituicao'?'Troca':'Entrega';
+    return '<tr>'
+      +'<td style="'+td+';text-align:center">'+(idx+1)+'</td>'
+      +'<td style="'+td+'"><b>'+i.epi+'</b><br><span style="color:#777">'+origem+(i.entregue_por?(' · '+i.entregue_por):'')+'</span></td>'
+      +'<td style="'+td+'">'+(i.ca||'—')+'</td>'
+      +'<td style="'+td+';text-align:center">'+(i.tamanho||'—')+'</td>'
+      +'<td style="'+td+';text-align:center">'+relNum(i.quantidade,0)+'</td>'
+      +'<td style="'+td+'">'+relFmtData(i.entregue_em)+'</td>'
+      +'<td style="'+td+';text-align:center">'+(i.validade_dias?i.validade_dias+'d':'—')+'</td>'
+      +'<td style="'+td+'">'+(i.vence_em?relFmtData(i.vence_em):'—')+'</td>'
+      +'<td style="'+td+'">'+saida+'</td>'
+      +'</tr>';
+  }).join('') : '<tr><td colspan="9" style="'+td+';text-align:center;color:#777">Nenhuma entrega registrada.</td></tr>';
+  let h='<div class="relTop"><div><h1>Ficha de Controle de Entrega de EPI e Uniforme</h1><div class="sub">AcquaHub · Suprimentos · referência NR-6</div></div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('Colaborador',d.colaborador)+relField('Cargo / Função',d.cargo)+relField('Emitida em',relFmtData(new Date().toISOString()))+relField('Itens no histórico',String(itens.length))+'</div>';
+  h+='<div class="relSec"><span class="relNum">1</span> Histórico de entregas</div>';
+  h+='<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+    +['#','EPI / Uniforme','CA','Tam','Qtd','Entregue em','Prazo','Vence em','Saída'].map(x=>'<th style="'+th+'">'+x+'</th>').join('')
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  h+='<div class="relSec"><span class="relNum">2</span> Termo de responsabilidade</div>';
+  h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro, para os devidos fins, que recebi gratuitamente os Equipamentos de Proteção Individual (EPI) e uniformes relacionados nesta ficha, e que fui treinado e orientado quanto ao seu uso correto, guarda e conservação. Comprometo-me a: (a) usá-los apenas para a finalidade a que se destinam; (b) responsabilizar-me por sua guarda e conservação; (c) comunicar ao empregador qualquer alteração que os torne impróprios para uso; (d) mantê-los higienizados e em boas condições; e (e) devolvê-los quando solicitado ou ao término do uso. Estou ciente de que o uso é obrigatório e de que a recusa injustificada ao uso do EPI constitui ato faltoso (CLT, art. 158).</div>';
+  h+='<div class="sub" style="margin-top:10px;font-size:10px">Cada entrega listada foi assinada eletronicamente pelo colaborador no ato do recebimento; os registros (foto e assinatura) constam nos comprovantes individuais.</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:34px">'
+    +'<div style="text-align:center;border-top:1px solid #333;padding-top:5px;font-size:11px">Colaborador</div>'
+    +'<div style="text-align:center;border-top:1px solid #333;padding-top:5px;font-size:11px">Responsável pela entrega</div>'
+    +'</div>';
+  h+='</div><div class="relFoot"><span>AcquaHub · ficha gerada do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  return h;
 }
 function epiComprovante(e){
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
