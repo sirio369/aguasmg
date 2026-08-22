@@ -2677,16 +2677,17 @@ async function supCfgCestaToggle(cargoId){
   try{ const {data,error}=await sb.rpc('sup_cesta_do_cargo',{p_cargo_id:cargoId}); if(error) throw error; cesta=data||[]; }
   catch(e){ box.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   if(!cfgEpiCat.length){ box.innerHTML='<p class="sub" style="padding:6px 0">Catálogo de EPI vazio — cadastre os EPIs (via base) para montar a cesta.</p>'; return; }
-  const qMap={}; cesta.forEach(it=>qMap[it.epi_id]=it.quantidade);
+  const qMap={}, pMap={}; cesta.forEach(it=>{ qMap[it.epi_id]=it.quantidade; pMap[it.epi_id]=it.validade_dias; });
   box.innerHTML=`<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin:2px 0 10px">
-    <p class="sub" style="margin:0 0 8px">Quantidade de cada EPI na cesta (0 = fora):</p>
-    ${cfgEpiCat.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="flex:1;min-width:0;font-size:13px">${e.nome}${e.ca?(' <span class="sub">· CA '+e.ca+'</span>'):''}</span><input class="cfgCq" data-epi="${e.id}" inputmode="numeric" value="${qMap[e.id]!=null?supNum(qMap[e.id]):0}" style="width:56px;text-align:center;padding:6px"/></div>`).join('')}
-    <button class="btn" data-cestasave="${cargoId}" style="margin-top:8px">Salvar cesta</button>
+    <p class="sub" style="margin:0 0 8px">Defina, por EPI, a <b>quantidade</b> (0 = fora da cesta) e a <b>periodicidade</b> de troca em dias:</p>
+    <div style="display:flex;gap:6px;padding:0 0 4px"><span style="flex:1"></span><span class="sub" style="width:48px;text-align:center;font-size:10px;text-transform:uppercase">Qtd</span><span class="sub" style="width:64px;text-align:center;font-size:10px;text-transform:uppercase">Dias</span></div>
+    ${cfgEpiCat.map(e=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid var(--line)"><span style="flex:1;min-width:0;font-size:13px">${e.nome}${e.ca?(' <span class="sub">· CA '+e.ca+'</span>'):''}</span><input class="cfgCq" data-epi="${e.id}" inputmode="numeric" value="${qMap[e.id]!=null?supNum(qMap[e.id]):0}" title="Quantidade" style="width:48px;text-align:center;padding:6px"/><span style="display:flex;align-items:center;gap:2px;width:64px"><input class="cfgCp" data-epi="${e.id}" inputmode="numeric" value="${pMap[e.id]!=null?pMap[e.id]:(e.validade_dias||'')}" title="Periodicidade de troca (dias)" style="width:48px;text-align:center;padding:6px"/><span class="sub" style="font-size:11px">d</span></span></div>`).join('')}
+    <button class="btn" data-cestasave="${cargoId}" style="margin-top:10px">Salvar cesta</button>
   </div>`;
   box.querySelector('[data-cestasave]').addEventListener('click',()=>supCfgCestaSalvar(cargoId,box));
 }
 async function supCfgCestaSalvar(cargoId,box){
-  const itens=[]; box.querySelectorAll('.cfgCq').forEach(inp=>{ const q=parseFloat((inp.value||'').replace(',','.')); if(!isNaN(q)&&q>0) itens.push({epi_id:+inp.dataset.epi,quantidade:q}); });
+  const itens=[]; box.querySelectorAll('.cfgCq').forEach(inp=>{ const q=parseFloat((inp.value||'').replace(',','.')); if(!isNaN(q)&&q>0){ const pel=box.querySelector('.cfgCp[data-epi="'+inp.dataset.epi+'"]'); const per=pel?parseInt((pel.value||'').replace(/\D/g,''),10):NaN; itens.push({epi_id:+inp.dataset.epi,quantidade:q,periodicidade_dias:(!isNaN(per)&&per>0)?per:null}); } });
   const btn=box.querySelector('[data-cestasave]'); if(btn) btn.disabled=true;
   const {error}=await sb.rpc('sup_cesta_set',{p_cargo_id:cargoId,p_itens:itens});
   if(error){ toast('⚠ '+(error.message||error)); if(btn) btn.disabled=false; return; }
