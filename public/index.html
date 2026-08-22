@@ -2283,15 +2283,13 @@ function epiChip(s){ return '<span style="font-size:11px;padding:3px 9px;border-
 async function supVEpiSolicitar(){
   epiCartS=[]; $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   await supEpiCatLoad();
-  let cargos=[], meuCargo=null;
-  try{ const [c,m]=await Promise.all([sb.rpc('sup_cargos_ativos'),sb.rpc('sup_meu_cargo')]); cargos=c.data||[]; meuCargo=m.data&&m.data.cargo_id; }catch(e){}
-  const cargoSel = cargos.length?`
-    <label>Minha função</label>
-    <div style="display:flex;gap:6px">
-      <select id="epSCargo" style="flex:1;min-width:0"><option value="">Selecione…</option>${cargos.map(c=>`<option value="${c.id}"${String(meuCargo)===String(c.id)?' selected':''}>${c.nome}</option>`).join('')}</select>
-      <button id="epSCesta" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-weight:600;font-size:13px;display:flex;align-items:center;white-space:nowrap">🧺 Cesta</button>
-    </div>
-    <p class="sub" style="margin:4px 0 14px">Carregue a cesta padrão de EPI do seu cargo. Você pode ajustar antes de enviar.</p>`:'';
+  let meuCargoId=null, meuCargoNome=null;
+  try{ const m=await sb.rpc('sup_meu_cargo'); meuCargoId=m.data&&m.data.cargo_id; meuCargoNome=m.data&&m.data.cargo_nome; }catch(e){}
+  const cargoSel = meuCargoId?`
+    <div style="display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px">
+      <div style="flex:1;min-width:0"><div class="sub" style="font-size:11px">Seu cargo</div><b style="font-size:14px">${meuCargoNome||'—'}</b></div>
+      <button id="epSCesta" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap">🧺 Carregar minha cesta</button>
+    </div>`:'';
   $('#supView').innerHTML=cargoSel+`
     <label>Adicionar EPI</label>
     <div style="display:flex;gap:6px">
@@ -2304,12 +2302,10 @@ async function supVEpiSolicitar(){
     <button id="epSSend" class="btn" disabled>Enviar solicitação</button>`;
   epiCartRender();
   const cestaBtn=$('#epSCesta'); if(cestaBtn) cestaBtn.addEventListener('click',async()=>{
-    const cid=$('#epSCargo').value; if(!cid) return toast('Escolha sua função');
     cestaBtn.disabled=true;
     try{
-      sb.rpc('sup_perfil_set_cargo',{p_cargo_id:+cid});
-      const {data,error}=await sb.rpc('sup_cesta_do_cargo',{p_cargo_id:+cid}); if(error) throw error;
-      const cesta=data||[]; if(!cesta.length){ toast('Nenhum EPI configurado para este cargo'); return; }
+      const {data,error}=await sb.rpc('sup_cesta_do_cargo',{p_cargo_id:meuCargoId}); if(error) throw error;
+      const cesta=data||[]; if(!cesta.length){ toast('Nenhum EPI configurado para o seu cargo'); return; }
       let add=0; cesta.forEach(it=>{ if(!epiCartS.find(x=>String(x.epi_id)===String(it.epi_id))){ epiCartS.push({epi_id:it.epi_id,nome:it.nome,quantidade:it.quantidade,requer_tamanho:!!it.requer_tamanho,validade_dias:it.validade_dias,tamanho:null}); add++; } });
       epiCartRender(); toast(add?('✓ '+add+' EPI(s) da cesta'):'Cesta já está no carrinho');
     }catch(e){ toast('⚠ '+(e.message||e)); } finally{ cestaBtn.disabled=false; }
