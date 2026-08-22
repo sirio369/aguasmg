@@ -1661,14 +1661,14 @@ function supHome(){
     '<div class="grid" style="margin-top:10px">'+
       '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
       '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
-      '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI</div></button>'+
+      '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI / Uniforme</div></button>'+
     '</div>';
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
-  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI':'Insumos');
+  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI / Uniforme':'Insumos');
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   const blocks = cat==='equip'?supBlocksEquip():(cat==='epi'?supBlocksEpi():supBlocks());
   $('#supView').innerHTML='<p class="sub" style="margin-top:2px">Escolha uma etapa</p>'+
@@ -2344,21 +2344,50 @@ async function supVEpiPedidos(){
     $('#supView').innerHTML=arr.map(s=>{
       const st=EPI_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
       const itens=(s.itens||[]).map(i=>i.epi+' ×'+supNum(i.qt)).join(', ');
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>#${s.id}</b><div class="sub" style="margin-top:2px">${itens} · ${supData(s.criado_em)}</div></div>${epiChip(st)}</div></div>`;
+      const cod=(s.status==='aprovada'&&s.codigo)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:8px 11px;font-size:14px">Código de retirada: <b style="letter-spacing:3px">${s.codigo}</b> <span class="sub">— informe ao almoxarife na entrega</span></div>`:'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>#${s.id}</b><div class="sub" style="margin-top:2px">${itens} · ${supData(s.criado_em)}</div></div>${epiChip(st)}</div>${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
-// --- Meus EPIs (colaborador) ---
+// --- Meus EPIs (colaborador) — pode solicitar devolução/troca ---
 async function supVEpiMeus(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('sup_epi_meus'); if(error)throw error;
-    const arr=data||[]; if(!arr.length){ $('#supView').innerHTML='<p class="sub">Você não tem EPIs registrados.</p>'; return; }
+  try{ const [m,b]=await Promise.all([sb.rpc('sup_epi_meus'),sb.rpc('sup_epi_minhas_baixas')]);
+    if(m.error)throw m.error;
+    const arr=m.data||[], baixas=b.data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Você não tem EPIs registrados.</p>'; return; }
+    const bmap={}; baixas.forEach(x=>bmap[x.entrega_item_id]=x);
     $('#supView').innerHTML=arr.map(v=>{ const st=epiVenc(v);
       const sub=[v.ca?('CA '+v.ca):'','entregue '+eqDia(v.entregue_em),v.vence_em?('troca '+eqDia(v.vence_em)):''].filter(Boolean).join(' · ');
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>${v.epi}</b>${v.quantidade?(' ×'+supNum(v.quantidade)):''}<div class="sub" style="margin-top:2px">${sub}</div></div>${epiChip(st)}</div></div>`;
+      const ped=bmap[v.entrega_item_id];
+      let acao;
+      if(ped){
+        const tl=ped.tipo==='troca'?'Troca':'Devolução';
+        acao=`<div style="margin-top:8px;background:var(--warn-bg);border-radius:8px;padding:9px 11px"><div style="font-size:13px">⏳ ${tl} solicitada — aguardando o almoxarife</div><div style="font-size:14px;margin-top:3px">Código: <b style="letter-spacing:3px">${ped.codigo}</b> <span class="sub">— mostre ao almoxarife</span></div><button class="btn ghost" data-cancel="${ped.id}" style="margin:8px 0 0;width:auto;padding:6px 11px;font-size:12px">Cancelar solicitação</button></div>`;
+      } else {
+        acao=`<div style="display:flex;gap:8px;margin-top:9px"><button class="btn ghost" data-troca="${v.entrega_item_id}" style="margin:0;padding:7px 11px;font-size:13px">🔁 Solicitar troca</button><button class="btn ghost" data-dev="${v.entrega_item_id}" style="margin:0;padding:7px 11px;font-size:13px;color:var(--bad)">↩️ Solicitar devolução</button></div>`;
+      }
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>${v.epi}</b>${v.quantidade?(' ×'+supNum(v.quantidade)):''}<div class="sub" style="margin-top:2px">${sub}</div></div>${epiChip(st)}</div>${acao}</div>`;
     }).join('');
+    $('#supView').querySelectorAll('[data-troca]').forEach(b=>b.addEventListener('click',()=>epiSolicitarBaixa(+b.dataset.troca,'troca')));
+    $('#supView').querySelectorAll('[data-dev]').forEach(b=>b.addEventListener('click',()=>epiSolicitarBaixa(+b.dataset.dev,'devolucao')));
+    $('#supView').querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>epiCancelarBaixa(+b.dataset.cancel)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function epiSolicitarBaixa(itemId,tipo){
+  if(!navigator.onLine) return toast('Precisa de conexão para gerar o código');
+  const lbl=tipo==='troca'?'troca':'devolução';
+  if(!confirm('Solicitar '+lbl+' deste EPI?\nO almoxarife receberá o pedido e você validará a entrega com um código.')) return;
+  const {data,error}=await sb.rpc('sup_epi_baixa_solicitar',{p_entrega_item_id:itemId,p_tipo:tipo,p_obs:null});
+  if(error) return toast('⚠ '+(error.message||error));
+  toast('✓ Solicitação enviada · código '+((data&&data.codigo)||'')); supVEpiMeus();
+}
+async function epiCancelarBaixa(pedId){
+  if(!confirm('Cancelar esta solicitação?')) return;
+  const {error}=await sb.rpc('sup_epi_baixa_cancelar',{p_pedido_id:pedId});
+  if(error) return toast('⚠ '+(error.message||error));
+  toast('✓ Solicitação cancelada'); supVEpiMeus();
 }
 
 // --- Aprovar EPI ---
@@ -2438,91 +2467,80 @@ async function supVEpiEntregar(){
     const arr=data||[]; if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma entrega de EPI pendente.</p>'; return; }
     $('#supView').innerHTML=arr.map(s=>{ const cid='e'+s.id;
       const itens=(s.itens||[]).map(i=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.epi} <span class="sub">(troca ${i.validade_dias}d)</span></span><b>×${supNum(i.qt)}</b></div><input class="epiCA" data-sol="${s.id}" data-epi="${i.epi_id}" value="${i.ca||''}" placeholder="Nº do CA (Certificado de Aprovação)" style="margin-top:5px;font-size:13px;padding:7px 9px"/></div>`).join('');
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:12px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">para ${s.solicitante||'—'}</span></div><div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<button class="btn" data-confirm="${cid}" data-econf="${s.id}" style="margin-top:10px">Confirmar entrega</button></div>`;
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:12px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">para ${s.solicitante||'—'}</span></div><div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<label style="margin-top:10px">Código de validação (o colaborador mostra no app) *</label><input id="epEcod-${s.id}" inputmode="numeric" maxlength="4" placeholder="4 dígitos" style="letter-spacing:4px;font-size:16px;text-align:center"/><button class="btn" data-confirm="${cid}" data-econf="${s.id}" style="margin-top:10px">Confirmar entrega</button></div>`;
     }).join('');
     epiCapturaWire();
     $('#supView').querySelectorAll('[data-econf]').forEach(b=>b.addEventListener('click',()=>{ const sid=+b.dataset.econf;
-      epiConfirmar('e'+sid,'sup_epi_entregar',()=>{ const cas=[]; $('#supView').querySelectorAll('.epiCA[data-sol="'+sid+'"]').forEach(inp=>cas.push({epi_id:+inp.dataset.epi,ca:(inp.value||'').trim()})); return {p_solicitacao_id:sid,p_cas:cas}; },'Entrega registrada',supVEpiEntregar);
+      epiConfirmar('e'+sid,'sup_epi_entregar',()=>{ const cod=($('#epEcod-'+sid).value||'').trim(); if(!cod){ toast('Informe o código do colaborador'); return false; } const cas=[]; $('#supView').querySelectorAll('.epiCA[data-sol="'+sid+'"]').forEach(inp=>cas.push({epi_id:+inp.dataset.epi,ca:(inp.value||'').trim()})); return {p_solicitacao_id:sid,p_cas:cas,p_codigo:cod}; },'Entrega registrada',supVEpiEntregar);
     }));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
-// --- Devolver / Trocar EPI (almox) — devolução = fim; troca = devolução + nova entrega ---
-let epiBaixaCols=[], epiPosse=[];
+// --- Devolver / Trocar EPI (almox) — processa PEDIDOS do colaborador, valida com código ---
+let epiPedidos=[];
 async function supVEpiBaixa(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const c=await sb.rpc('sup_epi_gestao_colaboradores'); if(c.error)throw c.error; epiBaixaCols=c.data||[]; }
-  catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
-  if(!epiBaixaCols.length){ $('#supView').innerHTML='<p class="sub">Nenhum EPI em posse de colaboradores.</p>'; return; }
-  $('#supView').innerHTML=`
-    <label>Colaborador</label>
-    <select id="epBU">${epiBaixaCols.map(c=>`<option value="${c.uuid}">${c.nome||'—'} — ${c.ativos} em posse${c.a_substituir?(' · ⚠️ '+c.a_substituir+' vencido(s)'):''}</option>`).join('')}</select>
-    <div id="epBOut" style="margin-top:12px"></div>`;
-  const load=async()=>{
-    const uid=$('#epBU').value; if(!uid) return;
-    $('#epBOut').innerHTML='<p class="sub">Carregando…</p>';
-    try{ const {data,error}=await sb.rpc('sup_epi_em_posse',{p_colaborador_uuid:uid}); if(error)throw error;
-      epiPosse=data||[]; epiBaixaRenderLista(uid);
-    }catch(e){ $('#epBOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
-  };
-  $('#epBU').addEventListener('change',load); load();
+  try{ const {data,error}=await sb.rpc('sup_epi_baixa_fila'); if(error)throw error;
+    epiPedidos=data||[];
+    if(!epiPedidos.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação de devolução/troca pendente. 👍</p>'; return; }
+    $('#supView').innerHTML='<p class="sub" style="margin-bottom:10px">Solicitações feitas pelos colaboradores. Confirme no ato com o <b>código</b> que ele mostra no app.</p>'+epiPedidos.map(x=>{
+      const tp=x.tipo==='troca'?'🔁 Troca':'↩️ Devolução';
+      const venc=x.vencido?'<span class="sub" style="color:var(--bad)"> · vencido</span>':'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center"><b>${tp}</b><span class="sub" style="margin-left:auto">${supData(x.criado_em)}</span></div><div style="margin-top:6px"><b>${x.epi}</b>${x.ca?(' · CA '+x.ca):''}${x.quantidade?(' ×'+supNum(x.quantidade)):''}<div class="sub" style="margin-top:2px">${x.colaborador||'—'}${x.vence_em?(' · troca '+eqDia(x.vence_em)):''}${venc}</div></div>${x.obs?('<div class="sub" style="margin-top:4px">Obs: '+x.obs+'</div>'):''}<button class="btn" data-proc="${x.id}" style="margin-top:10px">Processar</button></div>`;
+    }).join('');
+    $('#supView').querySelectorAll('[data-proc]').forEach(b=>b.addEventListener('click',()=>{ const x=epiPedidos.find(p=>String(p.id)===b.dataset.proc); if(x) epiBaixaCapturar(x); }));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
-function epiBaixaRenderLista(uid){
-  const c=$('#epBOut'); if(!c) return;
-  if(!epiPosse.length){ c.innerHTML='<p class="sub">Este colaborador não tem EPIs em posse.</p>'; return; }
-  c.innerHTML=epiPosse.map(x=>{
-    const venc = x.vencido?'<span class="sub" style="color:var(--bad)"> · vencido</span>':(x.dias_restantes!=null?('<span class="sub"> · faltam '+x.dias_restantes+'d</span>'):'');
-    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div><b>${x.epi}</b>${x.ca?(' · CA '+x.ca):''}${x.quantidade?(' ×'+supNum(x.quantidade)):''}<div class="sub" style="margin-top:2px">entregue ${eqDia(x.entregue_em)}${x.vence_em?(' · troca '+eqDia(x.vence_em)):''}${venc}</div></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost" data-troca="${x.entrega_item_id}" style="margin:0">🔁 Trocar</button><button class="btn ghost" data-dev="${x.entrega_item_id}" style="margin:0;color:var(--bad)">↩️ Devolver</button></div></div>`;
-  }).join('');
-  c.querySelectorAll('[data-dev]').forEach(b=>b.addEventListener('click',()=>epiBaixaCapturar('dev',+b.dataset.dev,uid)));
-  c.querySelectorAll('[data-troca]').forEach(b=>b.addEventListener('click',()=>epiBaixaCapturar('troca',+b.dataset.troca,uid)));
-}
-function epiBaixaCapturar(mode,itemId,uid){
-  const x=epiPosse.find(p=>p.entrega_item_id===itemId)||{};
-  const back='<button class="btn ghost" id="epBBack" style="margin-bottom:10px">‹ Voltar</button>';
-  if(mode==='dev'){
-    $('#supView').innerHTML=back+`<div class="sec">↩️ Devolução (encerra o EPI)</div><p class="sub">${x.epi}${x.ca?(' · CA '+x.ca):''}</p>
-      ${epiFotoBlock('d'+itemId,'Foto do EPI devolvido *')}
+function epiBaixaCapturar(x){
+  const pid=x.id, back='<button class="btn ghost" id="epBBack" style="margin-bottom:10px">‹ Voltar</button>';
+  const codInput='<label style="margin-top:10px">Código de validação (o colaborador mostra no app) *</label><input id="epBCod" inputmode="numeric" maxlength="4" placeholder="4 dígitos" style="letter-spacing:4px;font-size:16px;text-align:center"/>';
+  if(x.tipo==='devolucao'){
+    $('#supView').innerHTML=back+`<div class="sec">↩️ Devolução (encerra o EPI)</div><p class="sub">${x.epi}${x.ca?(' · CA '+x.ca):''} · ${x.colaborador||''}</p>
+      ${epiFotoBlock('d'+pid,'Foto do EPI devolvido *')}
+      ${codInput}
       <label style="margin-top:10px">Observação</label><textarea id="epBObs" rows="2"></textarea>
       <button class="btn" id="epBGo" style="margin-top:10px;background:var(--bad)">Confirmar devolução</button>`;
     epiCapturaWire();
-    $('#epBGo').addEventListener('click',()=>epiDevolverGo(itemId));
+    $('#epBGo').addEventListener('click',()=>epiDevolverGo(pid));
   } else {
-    $('#supView').innerHTML=back+`<div class="sec">🔁 Troca por tempo de uso</div><p class="sub">Devolve ${x.epi}${x.ca?(' · CA '+x.ca):''} e entrega uma nova unidade.</p>
+    $('#supView').innerHTML=back+`<div class="sec">🔁 Troca por tempo de uso</div><p class="sub">Devolve ${x.epi}${x.ca?(' · CA '+x.ca):''} e entrega uma nova unidade · ${x.colaborador||''}</p>
       <label style="margin-top:10px">Nº do CA da unidade nova *</label><input id="epBCa" value="${x.ca||''}" placeholder="Certificado de Aprovação"/>
-      ${epiFotoBlock('td'+itemId,'Foto do EPI devolvido *')}
-      ${epiFotoBlock('tn'+itemId,'Foto do EPI novo entregue *')}
-      ${epiSigBlock('ts'+itemId,'Assinatura do colaborador *')}
+      ${epiFotoBlock('td'+pid,'Foto do EPI devolvido *')}
+      ${epiFotoBlock('tn'+pid,'Foto do EPI novo entregue *')}
+      ${epiSigBlock('ts'+pid,'Assinatura do colaborador *')}
+      ${codInput}
       <label style="margin-top:10px">Observação</label><textarea id="epBObs" rows="2"></textarea>
       <button class="btn" id="epBGo" style="margin-top:10px">Confirmar troca</button>`;
     epiCapturaWire();
-    $('#epBGo').addEventListener('click',()=>epiTrocarGo(itemId));
+    $('#epBGo').addEventListener('click',()=>epiTrocarGo(pid));
   }
-  $('#epBBack').addEventListener('click',()=>epiBaixaRenderLista(uid));
+  $('#epBBack').addEventListener('click',()=>supVEpiBaixa());
 }
-async function epiDevolverGo(itemId){
+async function epiDevolverGo(pid){
   if(!navigator.onLine) return toast('Devolução precisa de conexão (foto)');
-  const foto=epiFotoBlob['d'+itemId]; if(!foto) return toast('Tire a foto do EPI devolvido');
+  const foto=epiFotoBlob['d'+pid]; if(!foto) return toast('Tire a foto do EPI devolvido');
+  const cod=($('#epBCod').value||'').trim(); if(!cod) return toast('Informe o código do colaborador');
   const btn=$('#epBGo'); if(btn) btn.disabled=true;
   try{
     const fp=await epiUpload(foto,'devolucao.jpg');
-    const {error}=await sb.rpc('sup_epi_devolver',{p_entrega_item_id:itemId,p_foto:fp,p_obs:($('#epBObs').value||null)}); if(error) throw error;
-    delete epiFotoBlob['d'+itemId]; toast('✓ EPI devolvido'); supVEpiBaixa();
+    const {error}=await sb.rpc('sup_epi_devolver',{p_pedido_id:pid,p_foto:fp,p_codigo:cod,p_obs:($('#epBObs').value||null)}); if(error) throw error;
+    delete epiFotoBlob['d'+pid]; toast('✓ EPI devolvido'); supVEpiBaixa();
   }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
 }
-async function epiTrocarGo(itemId){
+async function epiTrocarGo(pid){
   if(!navigator.onLine) return toast('Troca precisa de conexão (fotos e assinatura)');
   const ca=($('#epBCa').value||'').trim(); if(!ca) return toast('Informe o CA da unidade nova');
-  const fd=epiFotoBlob['td'+itemId]; if(!fd) return toast('Tire a foto do EPI devolvido');
-  const fn=epiFotoBlob['tn'+itemId]; if(!fn) return toast('Tire a foto do EPI novo');
-  const cv=$('#supView').querySelector('.epiSig[data-cap="ts'+itemId+'"]'); if(!cv||!cv._drawn()) return toast('Colete a assinatura do colaborador');
+  const fd=epiFotoBlob['td'+pid]; if(!fd) return toast('Tire a foto do EPI devolvido');
+  const fn=epiFotoBlob['tn'+pid]; if(!fn) return toast('Tire a foto do EPI novo');
+  const cv=$('#supView').querySelector('.epiSig[data-cap="ts'+pid+'"]'); if(!cv||!cv._drawn()) return toast('Colete a assinatura do colaborador');
+  const cod=($('#epBCod').value||'').trim(); if(!cod) return toast('Informe o código do colaborador');
   const btn=$('#epBGo'); if(btn) btn.disabled=true;
   try{
     const pd=await epiUpload(fd,'devolvido.jpg');
     const pn=await epiUpload(fn,'novo.jpg');
     const pa=await epiUpload(await epiCanvasBlob(cv),'assinatura.png');
-    const {error}=await sb.rpc('sup_epi_substituir',{p_entrega_item_id:itemId,p_ca:ca,p_foto_novo:pn,p_foto_devolvido:pd,p_assinatura:pa,p_obs:($('#epBObs').value||null)}); if(error) throw error;
-    delete epiFotoBlob['td'+itemId]; delete epiFotoBlob['tn'+itemId]; toast('✓ Troca registrada'); supVEpiBaixa();
+    const {error}=await sb.rpc('sup_epi_substituir',{p_pedido_id:pid,p_ca:ca,p_foto_novo:pn,p_foto_devolvido:pd,p_assinatura:pa,p_codigo:cod,p_obs:($('#epBObs').value||null)}); if(error) throw error;
+    delete epiFotoBlob['td'+pid]; delete epiFotoBlob['tn'+pid]; toast('✓ Troca registrada'); supVEpiBaixa();
   }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
 }
 
