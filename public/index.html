@@ -2605,7 +2605,7 @@ function epiComprovanteHtml(e){
 }
 
 // --- tela: Configurações (admin) ---
-let cfgUsers=[], cfgEquipes=[], cfgCargos=[], cfgEpiCat=[];
+let cfgUsers=[], cfgEquipes=[], cfgCargos=[], cfgEpiCat=[], cfgCargoOpts=[];
 const CFG_FUN={campo:'Campo',aprovador:'Aprovador',almoxarife:'Almoxarife',admin:'Admin'};
 function supAbrirConfig(){
   supCurrent='config';
@@ -2617,16 +2617,16 @@ function supAbrirConfig(){
 }
 async function supVConfig(){
   try{
-    const u=await sb.rpc('sup_admin_usuarios');
+    const [u,cg]=await Promise.all([sb.rpc('sup_admin_usuarios'),sb.rpc('sup_cargos_ativos')]);
     if(u.error) throw u.error;
-    cfgUsers=u.data||[];
+    cfgUsers=u.data||[]; cfgCargoOpts=cg.data||[];
   }catch(err){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(err.message||err)+'</div>'; return; }
   supCfgRender();
 }
 function supCfgRender(){
   $('#supView').innerHTML=`
-    <div class="sec">👤 Função dos usuários</div>
-    <p class="sub" style="margin-top:2px">Defina o papel de cada pessoa: Campo, Aprovador, Almoxarife ou Admin. Vale no sistema todo.</p>
+    <div class="sec">👤 Usuários</div>
+    <p class="sub" style="margin-top:2px"><b>Acesso</b> = o que a pessoa pode fazer no app (Campo, Aprovador, Almoxarife, Admin) — vale nos 3 módulos. <b>Cargo</b> = a ocupação dela, usada para carregar a cesta de EPI.</p>
     <div id="cfgUsers"></div>
     <div class="sec" style="margin-top:26px">🦺 Cargos e cesta de EPI</div>
     <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
@@ -2687,12 +2687,19 @@ async function supCfgCestaSalvar(cargoId,box){
 function supCfgUsers(){
   const c=$('#cfgUsers'); if(!c) return;
   if(!cfgUsers.length){ c.innerHTML='<p class="sub">Nenhum usuário.</p>'; return; }
-  c.innerHTML=cfgUsers.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div><div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email||''}</div></div><select data-fu="${u.id}" style="width:auto;font-size:13px;padding:7px 8px;flex:0 0 auto">${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${u.funcao===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div>`).join('');
+  c.innerHTML=cfgUsers.map(u=>`<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div><div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">${u.email||''}</div><div style="display:flex;gap:6px"><div style="flex:1;min-width:0"><div class="sub" style="font-size:10px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Acesso</div><select data-fu="${u.id}" style="width:100%;font-size:13px;padding:7px 8px">${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${u.funcao===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div><div style="flex:1.3;min-width:0"><div class="sub" style="font-size:10px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Cargo</div><select data-cu="${u.id}" style="width:100%;font-size:13px;padding:7px 8px"><option value="">—</option>${cfgCargoOpts.map(cg=>`<option value="${cg.id}"${String(u.cargo_id)===String(cg.id)?' selected':''}>${cg.nome}</option>`).join('')}</select></div></div></div>`).join('');
   c.querySelectorAll('[data-fu]').forEach(sel=>sel.addEventListener('change',async()=>{
     const {error}=await sb.rpc('sup_admin_set_funcao',{p_uid:sel.dataset.fu,p_funcao:sel.value});
     if(error){ toast('⚠ '+(error.message||error)); const u0=cfgUsers.find(x=>x.id===sel.dataset.fu); if(u0) sel.value=u0.funcao; return; }
     const u=cfgUsers.find(x=>x.id===sel.dataset.fu); if(u) u.funcao=sel.value;
-    toast('✓ Função atualizada');
+    toast('✓ Acesso atualizado');
+  }));
+  c.querySelectorAll('[data-cu]').forEach(sel=>sel.addEventListener('change',async()=>{
+    const val=sel.value?+sel.value:null;
+    const {error}=await sb.rpc('sup_admin_set_cargo',{p_uid:sel.dataset.cu,p_cargo_id:val});
+    if(error){ toast('⚠ '+(error.message||error)); const u0=cfgUsers.find(x=>x.id===sel.dataset.cu); if(u0) sel.value=u0.cargo_id||''; return; }
+    const u=cfgUsers.find(x=>x.id===sel.dataset.cu); if(u) u.cargo_id=val;
+    toast('✓ Cargo atualizado');
   }));
 }
 function supCfgEquipes(){
