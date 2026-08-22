@@ -2596,7 +2596,13 @@ async function epiFicha(uid){
   catch(e){ return toast('⚠ '+(e.message||e)); }
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+epiFichaHtml(d)+'</div>';
+  let html=epiFichaHtml(d);
+  const eventos=((epiPainelData&&epiPainelData.entregas)||[]).slice().reverse(); // cronológico (mais antigo → recente)
+  if(eventos.length){
+    html+='<div style="page-break-before:always;padding-top:8px"><div class="relSec" style="margin-top:0"><span class="relNum">📎</span> Anexos — comprovantes individuais de retirada e movimentação</div><div class="sub" style="margin-top:4px">'+eventos.length+' comprovante(s). Cada um traz foto e assinatura do ato.</div></div>';
+    html+=eventos.map(e=>'<div style="page-break-before:always;padding-top:6px">'+epiComprovanteHtml(e)+'</div>').join('');
+  }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+html+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
@@ -2628,11 +2634,7 @@ function epiFichaHtml(d){
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   h+='<div class="relSec"><span class="relNum">2</span> Termo de responsabilidade</div>';
   h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro, para os devidos fins, que recebi gratuitamente os Equipamentos de Proteção Individual (EPI) e uniformes relacionados nesta ficha, e que fui treinado e orientado quanto ao seu uso correto, guarda e conservação. Comprometo-me a: (a) usá-los apenas para a finalidade a que se destinam; (b) responsabilizar-me por sua guarda e conservação; (c) comunicar ao empregador qualquer alteração que os torne impróprios para uso; (d) mantê-los higienizados e em boas condições; e (e) devolvê-los quando solicitado ou ao término do uso. Estou ciente de que o uso é obrigatório e de que a recusa injustificada ao uso do EPI constitui ato faltoso (CLT, art. 158).</div>';
-  h+='<div class="sub" style="margin-top:10px;font-size:10px">Cada entrega listada foi assinada eletronicamente pelo colaborador no ato do recebimento; os registros (foto e assinatura) constam nos comprovantes individuais.</div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:34px">'
-    +'<div style="text-align:center;border-top:1px solid #333;padding-top:5px;font-size:11px">Colaborador</div>'
-    +'<div style="text-align:center;border-top:1px solid #333;padding-top:5px;font-size:11px">Responsável pela entrega</div>'
-    +'</div>';
+  h+='<div class="sub" style="margin-top:10px;font-size:10px">Cada entrega listada foi assinada eletronicamente pelo colaborador no ato do recebimento; os comprovantes individuais (com foto e assinatura) seguem em anexo nesta ficha.</div>';
   h+='</div><div class="relFoot"><span>AcquaHub · ficha gerada do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
 }
