@@ -1598,7 +1598,7 @@ async function supEnviar(item,msgOk,onOk){
 }
 async function supInit(){
   await supGetMe();
-  try{ const c=await sb.rpc('sup_materiais_listar',{}); supCat=c.data||[]; }catch(e){}
+  if(!supCat.length){ try{ const c=await sb.rpc('sup_materiais_listar',{}); supCat=c.data||[]; }catch(e){} }
   supHome();
 }
 const SUP_ACTS={
@@ -1728,26 +1728,49 @@ function supEstTable(cont,arr){
     arr.map(x=>`<div style="display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:9px 11px;border-top:1px solid var(--line);font-size:14px;align-items:center${x.abaixo_min?';background:var(--bad-bg)':''}"><span>${x.material}${x.abaixo_min?' ⚠️':''} <span class="sub" style="font-size:11px">${x.unidade}</span></span><b style="text-align:right${x.abaixo_min?';color:var(--bad)':''}">${supNum(x.saldo)}</b><span style="text-align:right;color:var(--mut)">${supNum(x.minimo)}</span></div>`).join('')+'</div>';
 }
 
+// --- busca de material (texto livre → dropdown filtrado) ---
+function _matNorm(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function supMatFiltrar(termo){
+  const t=_matNorm(termo).trim(); if(!t) return [];
+  const toks=t.split(/\s+/), out=[];
+  for(const m of supCat){
+    if(!m._s) m._s=_matNorm(m.descricao+' '+(m.sinonimo||'')+' '+(m.sku||'')+' '+(m.categoria||''));
+    if(toks.every(tk=>m._s.includes(tk))){ out.push(m); if(out.length>=200) break; }
+  }
+  return out;
+}
+function supMatBuscaFill(){
+  const termo=$('#supSBusca')?$('#supSBusca').value:''; const sel=$('#supSMat'), hint=$('#supSHint');
+  if(!sel) return;
+  const res=supMatFiltrar(termo);
+  if(!termo.trim()){ sel.innerHTML='<option value="">Digite acima para buscar…</option>'; if(hint) hint.textContent=supCat.length+' materiais no catálogo'; return; }
+  sel.innerHTML = res.length? res.map(m=>`<option value="${m.id}">${m.descricao} (${m.unidade})</option>`).join('') : '<option value="">Nenhum material encontrado</option>';
+  if(hint) hint.textContent = res.length? (res.length>=200?'Mostrando os 200 primeiros — refine a busca':res.length+' encontrado(s)') : 'Nada encontrado para "'+termo+'"';
+}
 // --- tela: Solicitar ---
 function supVSolicitar(){
   supCartS=[];
   $('#supView').innerHTML=`
-    <label>Adicionar material</label>
-    <div style="display:flex;gap:6px">
-      <select id="supSMat" style="flex:1;min-width:0">${supMatOptions()}</select>
+    <label>Buscar material</label>
+    <input id="supSBusca" autocomplete="off" placeholder="Ex.: cotovelo, tubo 32, registro esfera…"/>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <select id="supSMat" style="flex:1;min-width:0"><option value="">Digite acima para buscar…</option></select>
       <input id="supSQt" inputmode="decimal" placeholder="Qtd" style="width:74px;text-align:center"/>
       <button id="supSAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 15px;border-radius:10px;font-size:20px;display:flex;align-items:center">＋</button>
     </div>
+    <div class="sub" id="supSHint" style="margin-top:4px;font-size:11px"></div>
     <div id="supSCart" style="margin-top:10px"></div>
     <label>Observação</label><textarea id="supSObs" rows="2"></textarea>
     <button id="supSSend" class="btn" disabled>Enviar solicitação</button>`;
   supCartRender('supSCart',supCartS,'supSSend');
+  supMatBuscaFill();
+  $('#supSBusca').addEventListener('input',supMatBuscaFill);
   $('#supSAdd').addEventListener('click',()=>{
     const id=$('#supSMat').value, q=parseFloat(($('#supSQt').value||'').replace(',','.'));
     if(!id||isNaN(q)||q<=0) return toast('Escolha material e quantidade');
     const m=supMatById(id), ex=supCartS.find(x=>String(x.material_id)===String(id));
     if(ex) ex.quantidade+=q; else supCartS.push({material_id:+id,descricao:m.descricao,unidade:m.unidade,quantidade:q});
-    $('#supSMat').value=''; $('#supSQt').value=''; supCartRender('supSCart',supCartS,'supSSend');
+    $('#supSQt').value=''; supCartRender('supSCart',supCartS,'supSSend');
   });
   $('#supSSend').addEventListener('click',async()=>{
     if(!supCartS.length) return;
