@@ -307,18 +307,24 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="entrevistadores" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>Entrevistadores</h1>
-    <p class="sub">Escolha uma atividade</p>
+    <div class="sec">👷 Entrevistadores de Campo</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
-      <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Abertura de serviços</div></button>
-      <button class="mod hidden" id="entProg" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Programação de serviços</div></button>
+      <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Solicitação de serviços</div></button>
+    </div>
+    <div id="entRet" class="hidden">
+      <div class="sec" style="margin-top:20px">🏢 Retaguarda</div>
+      <div class="grid" style="margin-top:10px">
+        <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
+        <button class="mod" data-go="matriculas"><div class="ic">🆕</div><div class="nm">Criação de matrículas</div></button>
+      </div>
     </div>
   </main>
 
   <main id="abertura_servicos" class="hidden">
     <div class="bar"><button class="bk" id="asBack">‹ Entrevistadores</button></div>
-    <h1>Abertura de serviços</h1>
-    <p class="sub">Solicite a abertura de um serviço para o time interno de programação.</p>
+    <h1>Solicitação de serviços</h1>
+    <p class="sub">Solicite a abertura de um serviço para a retaguarda.</p>
     <div id="asGps" class="banner warn">Obtendo GPS…</div>
     <label for="as_tipo">Tipo de serviço *</label>
     <select id="as_tipo">
@@ -334,17 +340,25 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <label>Foto do HD *</label>
     <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="asFoto"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="asFoto"/></label></div><img id="asPrev" class="hidden" alt=""/></div>
     <label for="as_obs">Observação</label><textarea id="as_obs" rows="2"></textarea>
-    <button id="asSalvar" class="btn" disabled>Solicitar abertura</button>
+    <button id="asSalvar" class="btn" disabled>Solicitar serviço</button>
     <div class="sec" style="margin-top:22px">Minhas solicitações</div>
     <div id="asLista"></div>
   </main>
 
   <main id="programacao_servicos" class="hidden">
     <div class="bar"><button class="bk" id="pgBack">‹ Entrevistadores</button></div>
-    <h1>Programação de serviços</h1>
+    <h1>Abertura de serviços</h1>
     <p class="sub">Lance o número da OS criada no sistema da COPASA.</p>
     <div id="pgFiltros" style="display:flex;gap:6px;margin:8px 0 12px"></div>
     <div id="pgLista"></div>
+  </main>
+
+  <main id="matriculas" class="hidden">
+    <div class="bar"><button class="bk" id="mtBack">‹ Entrevistadores</button></div>
+    <h1>Criação de matrículas</h1>
+    <p class="sub">Lance a matrícula criada na COPASA para cada captação de cliente.</p>
+    <div id="mtFiltros" style="display:flex;gap:6px;margin:8px 0 12px"></div>
+    <div id="mtLista"></div>
   </main>
 
   <main id="captacao" class="hidden">
@@ -628,7 +642,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -646,8 +660,9 @@ function irPara(id){
   if(id==='abertura_servicos') asInit();
   if(id==='entrevistadores') entInit();
   if(id==='programacao_servicos') pgInit();
+  if(id==='matriculas') mtInit();
 }
-function entInit(){ const b=document.getElementById('entProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 
@@ -1310,6 +1325,45 @@ async function pgSalvarOs(id){
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
 if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('entrevistadores'));
+
+// ---------- CRIAÇÃO DE MATRÍCULAS (Retaguarda) ----------
+let mtFiltro='pendente';
+const MT_FILTROS=[['pendente','Pendentes'],['criada','Matrícula criada'],['todas','Todas']];
+function mtInit(){ mtRenderFiltros(); mtCarregar(); }
+function mtRenderFiltros(){
+  const c=document.getElementById('mtFiltros'); if(!c) return;
+  c.innerHTML=MT_FILTROS.map(f=>`<button class="btn ghost" data-mtf="${f[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${mtFiltro===f[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${f[1]}</button>`).join('');
+  c.querySelectorAll('[data-mtf]').forEach(b=>b.addEventListener('click',()=>{ mtFiltro=b.dataset.mtf; mtRenderFiltros(); mtCarregar(); }));
+}
+async function mtCarregar(){
+  const c=document.getElementById('mtLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_captacao_fila',{p_filtro:mtFiltro}); if(error)throw error; const arr=data||[];
+    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma captação'+(mtFiltro==='pendente'?' pendente':(mtFiltro==='criada'?' com matrícula':''))+'.</p>'; return; }
+    c.innerHTML=arr.map(s=>{
+      const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
+      const fotos=[['foto_termo','Termo'],['foto_fachada','Fachada'],['foto_doc_frente','Doc frente'],['foto_doc_verso','Doc verso'],['foto_comprovante','Comprovante']].filter(f=>s[f[0]]).map(f=>`<a href="${fotoURL(s[f[0]])}" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap">📄 ${f[1]}</a>`).join(' · ');
+      const mapa=(s.lat&&s.lon)?`<a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+      const info=[s.cpf_cnpj?('CPF/CNPJ '+s.cpf_cnpj):'',s.endereco||'',s.consorcio||''].filter(Boolean).join(' · ');
+      const viz=[s.imovel_esquerda?('◀ '+s.imovel_esquerda):'',s.imovel_direita?('▶ '+s.imovel_direita):''].filter(Boolean).join(' · ');
+      const done=s.matricula_criada?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ Matrícula <b>${s.matricula_criada}</b>${s.matricula_por?(' · por '+s.matricula_por):''}</div>`:'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center"><b>${s.nome||'—'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
+        <div class="sub" style="margin-top:3px">${info}</div>
+        ${viz?('<div class="sub" style="margin-top:2px">Vizinhos: '+viz+'</div>'):''}
+        <div class="sub" style="margin-top:2px">Entrevistador: ${s.entrevistador||'—'}${fotos?(' · '+fotos):''}${mapa?(' · '+mapa):''}</div>
+        ${done}
+        <div style="display:flex;gap:6px;margin-top:8px"><input class="mtM" data-id="${s.id}" value="${(s.matricula_criada||'').replace(/"/g,'&quot;')}" placeholder="Nº da matrícula na COPASA" style="flex:1;min-width:0"/><button class="btn" data-mtsave="${s.id}" style="margin:0;width:auto;padding:9px 14px">Salvar</button></div>
+      </div>`;
+    }).join('');
+    c.querySelectorAll('[data-mtsave]').forEach(b=>b.addEventListener('click',()=>mtSalvar(b.dataset.mtsave)));
+  }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function mtSalvar(id){
+  const inp=document.querySelector('.mtM[data-id="'+id+'"]'); const m=inp?inp.value:'';
+  try{ const {error}=await sb.rpc('app_captacao_matricula',{p_id:id,p_matricula:m}); if(error)throw error; toast('✓ Matrícula salva'); mtCarregar(); }
+  catch(e){ toast('⚠ '+(e.message||e)); }
+}
+if($('#mtBack')) $('#mtBack').addEventListener('click',()=>irPara('entrevistadores'));
 if($('#ocTipo')) $('#ocTipo').addEventListener('change',ocSync);
 if($('#ocLocal')) $('#ocLocal').addEventListener('change',ocSync);
 if($('#ocSalvar')) $('#ocSalvar').addEventListener('click',ocRegistrar);
