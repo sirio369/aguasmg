@@ -109,7 +109,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="loggers"><div class="ic">📟</div><div class="nm">Loggers temporários</div></button>
       <button class="mod" data-go="pesquisa"><div class="ic">🎧</div><div class="nm">Pesquisa</div></button>
       <button class="mod" data-go="cadastro"><div class="ic">🗺️</div><div class="nm">Cadastro técnico</div></button>
-      <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
+      <button class="mod" data-go="entrevistadores"><div class="ic">🧑‍💼</div><div class="nm">Entrevistadores</div></button>
       <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Suprimentos</div></button>
       <div class="mod soon"><div class="ic">📐</div><div class="nm">Projetos</div></div>
       <div class="mod soon"><div class="ic">🎛️</div><div class="nm">VRPS</div></div>
@@ -304,8 +304,42 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="prodMapa" style="height:42vh;min-height:250px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
-  <main id="captacao" class="hidden">
+  <main id="entrevistadores" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Entrevistadores</h1>
+    <p class="sub">Escolha uma atividade</p>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
+      <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Abertura de serviços</div></button>
+    </div>
+  </main>
+
+  <main id="abertura_servicos" class="hidden">
+    <div class="bar"><button class="bk" id="asBack">‹ Entrevistadores</button></div>
+    <h1>Abertura de serviços</h1>
+    <p class="sub">Solicite a abertura de um serviço para o time interno de programação.</p>
+    <div id="asGps" class="banner warn">Obtendo GPS…</div>
+    <label for="as_tipo">Tipo de serviço *</label>
+    <select id="as_tipo">
+      <option value="">Selecione…</option>
+      <option value="106000">106000 — Mudança de Padrão</option>
+      <option value="1480000">1480000 — Vazamento de água na rua</option>
+      <option value="1490000">1490000 — Vazamento de água no padrão de água</option>
+      <option value="FAT0900">FAT0900 — Alteração de titularidade</option>
+      <option value="3020000">3020000 — Vistoria de ligação de esgoto</option>
+    </select>
+    <label for="as_matricula">Matrícula *</label><input id="as_matricula" autocomplete="off"/>
+    <label for="as_hd">Número do HD *</label><input id="as_hd" autocomplete="off"/>
+    <label>Foto do HD *</label>
+    <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="asFoto"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="asFoto"/></label></div><img id="asPrev" class="hidden" alt=""/></div>
+    <label for="as_obs">Observação</label><textarea id="as_obs" rows="2"></textarea>
+    <button id="asSalvar" class="btn" disabled>Solicitar abertura</button>
+    <div class="sec" style="margin-top:22px">Minhas solicitações</div>
+    <div id="asLista"></div>
+  </main>
+
+  <main id="captacao" class="hidden">
+    <div class="bar"><button class="bk" id="capBack">‹ Entrevistadores</button></div>
     <h1>Captação de clientes</h1>
     <p class="sub">Cadastro de novo cliente durante o recadastramento. Os campos serão ajustados conforme orientações da COPASA.</p>
     <div id="capGps" class="banner warn">Obtendo GPS…</div>
@@ -420,7 +454,7 @@ function iniciarGPS(){
     const a=Math.round(gps.acc);
     if(gps.acc<=PRECISAO_MAX) banner('ok',`GPS ${a} m · dentro da tolerância`);
     else banner('warn',`GPS ${a} m · aguardando ≤ ${PRECISAO_MAX} m`);
-    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps();
+    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps();
   },err=>{ banner('bad','Sem sinal de GPS — ative a localização'); },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 function banner(cls,txt){const b=$('#gpsBanner');b.className='banner '+cls;b.textContent=txt;}
@@ -585,7 +619,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -600,6 +634,7 @@ function irPara(id){
   if(id==='suprimentos') supInit();
   if(id==='pr_prod') prProdInit();
   if(id==='biblioteca') bibInit();
+  if(id==='abertura_servicos') asInit();
 }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
@@ -1180,6 +1215,50 @@ if($('#capSalvar')) $('#capSalvar').addEventListener('click',()=>{
       p_consorcio:localStorage.getItem('consorcio')||null, p_dispositivo:navigator.userAgent.slice(0,60)}};
   enviarOuEnfileirar(item,'✓ Captação registrada');
   capReset(); irPara('home');
+});
+// ---------- ABERTURA DE SERVIÇOS (Entrevistadores) ----------
+let asFotoBlob=null;
+function asOnGps(){ const b=document.getElementById('asGps'); if(!b) return; const ok=gps&&gps.acc<=PRECISAO_MAX;
+  b.className='banner '+(ok?'ok':'warn'); b.textContent = gps?('GPS '+Math.round(gps.acc)+' m'+(ok?' · dentro da tolerância':' · aguardando ≤ '+PRECISAO_MAX+' m')):'Obtendo GPS…'; asValidar(); }
+function asValidar(){ const btn=document.getElementById('asSalvar'); if(!btn) return;
+  const okGps=gps&&gps.acc<=PRECISAO_MAX;
+  btn.disabled=!(okGps && $('#as_tipo').value && $('#as_matricula').value.trim() && $('#as_hd').value.trim() && !!asFotoBlob); }
+function asReset(){ ['as_tipo','as_matricula','as_hd','as_obs'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+  asFotoBlob=null; const p=document.getElementById('asPrev'); if(p){p.classList.add('hidden');p.src='';}
+  document.querySelectorAll('#abertura_servicos .asFoto').forEach(i=>i.value=''); asValidar(); }
+function asInit(){ asOnGps(); asRenderLista(); }
+async function asRenderLista(){
+  const c=document.getElementById('asLista'); if(!c) return;
+  try{ const {data,error}=await sb.rpc('app_abertura_servico_minhas'); if(error)throw error; const arr=data||[];
+    c.innerHTML = arr.length? arr.map(s=>{ const dt=s.data_hora?new Date(s.data_hora).toLocaleDateString('pt-BR'):'';
+      const sub=[s.matricula?('Matrícula '+s.matricula):'',s.numero_hd?('HD '+s.numero_hd):'',dt].filter(Boolean).join(' · ');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${s.tipo||'—'}</b><div class="sub" style="margin-top:2px">${sub}</div></div>`;
+    }).join('') : '<p class="sub">Você ainda não solicitou serviços.</p>';
+  }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar suas solicitações.</p>'; }
+}
+document.querySelectorAll('#abertura_servicos .asFoto').forEach(inp=>inp.addEventListener('change',async e=>{
+  const f=e.target.files[0], img=document.getElementById('asPrev');
+  if(f){ asFotoBlob=await comprimir(f); if(img){img.src=window.URL.createObjectURL(asFotoBlob);img.classList.remove('hidden');} }
+  else { asFotoBlob=null; if(img) img.classList.add('hidden'); }
+  asValidar();
+}));
+['as_tipo','as_matricula','as_hd'].forEach(id=>{ const e=document.getElementById(id); if(e){ e.addEventListener('input',asValidar); e.addEventListener('change',asValidar); } });
+if($('#asBack')) $('#asBack').addEventListener('click',()=>irPara('entrevistadores'));
+if($('#capBack')) $('#capBack').addEventListener('click',()=>irPara('entrevistadores'));
+if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
+  if(!gps||gps.acc>PRECISAO_MAX) return toast('GPS insuficiente');
+  if(!$('#as_tipo').value) return toast('Escolha o tipo de serviço');
+  if(!$('#as_matricula').value.trim()) return toast('Informe a matrícula');
+  if(!$('#as_hd').value.trim()) return toast('Informe o número do HD');
+  if(!asFotoBlob) return toast('Tire a foto do HD');
+  const uid=crypto.randomUUID();
+  const item={id:uid,tipo:'abertura_servico',rpc:'app_abertura_servico_registrar',pasta:'abertura',
+    fotos:{p_foto_hd:asFotoBlob},
+    fields:{p_id:uid,p_tipo:$('#as_tipo').value,p_matricula:$('#as_matricula').value,p_numero_hd:$('#as_hd').value,
+      p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,p_consorcio:localStorage.getItem('consorcio')||null,
+      p_dispositivo:navigator.userAgent.slice(0,60),p_observacao:$('#as_obs').value||null}};
+  enviarOuEnfileirar(item,'✓ Serviço solicitado');
+  asReset(); irPara('entrevistadores');
 });
 if($('#ocTipo')) $('#ocTipo').addEventListener('change',ocSync);
 if($('#ocLocal')) $('#ocLocal').addEventListener('change',ocSync);
