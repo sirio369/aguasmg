@@ -697,7 +697,56 @@ function abrirDetalhe(id){
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
   $('#lgDet').appendChild(rb);
+  if(ME&&ME.is_admin&&!p.novo){ const eb=document.createElement('button'); eb.className='btn ghost'; eb.style.marginTop='10px';
+    eb.textContent='✏️ Corrigir dados digitados'; eb.addEventListener('click',()=>editarLogger(p)); $('#lgDet').appendChild(eb); }
   irPara('logger_det');
+}
+function formEditarLogger(p){
+  const v=s=>(s==null?'':String(s)).replace(/"/g,'&quot;');
+  const ta=s=>(s==null?'':String(s)).replace(/</g,'&lt;');
+  let h=`<div class="bar"><button class="bk" id="edCancel">‹ Cancelar</button></div>
+  <h1>Corrigir dados — ${p.label||('#'+p.id)}</h1>
+  <p class="sub" style="margin-top:-6px">Corrija apenas os campos digitados em campo. Coordenadas e datas (capturadas pelo GPS) não são editáveis aqui.</p>
+  <div class="sec">Identificação</div>
+  <label>Identificação / local</label><input id="edLabel" value="${v(p.label)}"/>
+  <label>Consórcio</label><select id="edCons"><option value="ZA1004"${p.consorcio==='ZA1004'?' selected':''}>ZA1004 — Contagem</option><option value="ZA0200"${p.consorcio==='ZA0200'?' selected':''}>ZA0200 — Betim</option></select>
+  <label>Zona</label><input id="edZona" value="${v(p.zona)}"/>
+  <label>Número do logger</label><input id="edNumL" value="${v(p.numero_logger)}"/>
+  <label>Número do HD</label><input id="edNumHd" value="${v(p.numero_hd)}"/>`;
+  if(p.data_instalacao){
+    h+=`<div class="sec" style="margin-top:16px">Instalação</div>
+    <label>Leitura do HD na instalação</label><input id="edLeitI" inputmode="decimal" value="${v(p.leitura_hd_instalacao)}"/>
+    <label>Observação da instalação</label><textarea id="edObsI" rows="2">${ta(p.observacao_instalacao)}</textarea>`;
+  }
+  if(p.data_remocao){
+    h+=`<div class="sec" style="margin-top:16px">Remoção</div>
+    <label>Leitura do HD na remoção</label><input id="edLeitR" inputmode="decimal" value="${v(p.leitura_hd_remocao)}"/>
+    <label>Observação da remoção</label><textarea id="edObsR" rows="2">${ta(p.observacao_remocao)}</textarea>
+    <div class="sec" style="margin-top:16px">Finalização</div>
+    <label>OS SIGOS</label><input id="edOs" value="${v(p.os_sigos)}"/>`;
+  }
+  h+=`<button id="edSalvar" class="btn" style="margin-top:14px">Salvar correções</button>`;
+  return h;
+}
+function editarLogger(p){
+  $('#lgDet').innerHTML=formEditarLogger(p);
+  document.getElementById('edCancel').addEventListener('click',()=>abrirDetalhe(p.id));
+  document.getElementById('edSalvar').addEventListener('click',()=>salvarEdicaoLogger(p));
+  $('#lgDet').scrollIntoView&&window.scrollTo(0,0);
+}
+async function salvarEdicaoLogger(p){
+  if(!navigator.onLine) return toast('Correção precisa de conexão');
+  const campos={};
+  const setIf=(id,key)=>{ const el=document.getElementById(id); if(el) campos[key]=el.value; };
+  setIf('edLabel','label'); setIf('edCons','consorcio'); setIf('edZona','zone'); setIf('edNumL','numero_logger'); setIf('edNumHd','numero_hd');
+  setIf('edLeitI','leitura_hd_instalacao'); setIf('edObsI','observacao_instalacao');
+  setIf('edLeitR','leitura_hd_remocao'); setIf('edObsR','observacao_remocao'); setIf('edOs','os_sigos');
+  ['leitura_hd_instalacao','leitura_hd_remocao'].forEach(k=>{ if(campos[k]!=null) campos[k]=String(campos[k]).replace(',','.').trim(); });
+  const btn=document.getElementById('edSalvar'); if(btn) btn.disabled=true;
+  try{
+    const {error}=await sb.rpc('app_logger_editar',{p_id:p.id,p_campos:campos}); if(error) throw error;
+    toast('✓ Dados corrigidos'); await carregarLoggers(); abrirDetalhe(p.id);
+  }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
 }
 async function importarDadosLogger(p,file,msgSel,onOk){
   const msg=document.querySelector(msgSel||'#fzMsg');
