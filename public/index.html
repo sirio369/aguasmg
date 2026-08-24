@@ -113,7 +113,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Suprimentos</div></button>
       <div class="mod soon"><div class="ic">📐</div><div class="nm">Projetos</div></div>
       <div class="mod soon"><div class="ic">🎛️</div><div class="nm">VRPS</div></div>
-      <div class="mod soon"><div class="ic">📚</div><div class="nm">Biblioteca</div></div>
+      <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
     </div>
   </main>
 
@@ -334,6 +334,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="suprimentos" class="hidden">
     <div class="bar"><button class="bk" id="supBack">‹ Início</button><b id="supTitle" style="font-size:16px"></b><button id="supCfg" class="hidden" title="Configurações" style="all:unset;margin-left:auto;cursor:pointer;font-size:25px;line-height:1;padding:2px 4px">⚙️</button></div>
     <div id="supView"></div>
+  </main>
+
+  <main id="biblioteca" class="hidden">
+    <div class="bar"><button class="bk" id="bibBack">‹ Início</button><b id="bibTitle" style="font-size:16px">Biblioteca</b><button id="bibCfg" class="hidden" title="Gerir biblioteca" style="all:unset;margin-left:auto;cursor:pointer;font-size:23px;line-height:1;padding:2px 4px">⚙️</button></div>
+    <div id="bibView"></div>
   </main>
 
   <nav>
@@ -580,7 +585,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -594,6 +599,7 @@ function irPara(id){
   if(id==='captacao') capInit();
   if(id==='suprimentos') supInit();
   if(id==='pr_prod') prProdInit();
+  if(id==='biblioteca') bibInit();
 }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
@@ -2818,6 +2824,103 @@ async function supCfgRemMembro(eqId,uid){
 if($('#supCfg')) $('#supCfg').addEventListener('click',supAbrirConfig);
 
 if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else if(supCurrent==='area') supHome(); else supArea(supAreaId); });
+
+// ---------- MÓDULO BIBLIOTECA ----------
+const BIB_CATS=['Procedimentos (POPs)','Termo de Referência','Normas Técnicas','Formulários e Modelos','Segurança (NR)','Contrato','Outros'];
+const BIB_CONS=[['','Geral (todos os consórcios)'],['ZA1004','ZA1004 — Contagem'],['ZA0200','ZA0200 — Betim']];
+let bibDocs=[], bibAdmDocs=[], bibBusca='', bibFcons='';
+function bibInit(){
+  const cfg=$('#bibCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
+  const tt=$('#bibTitle'); if(tt) tt.textContent='Biblioteca';
+  bibViewLista();
+}
+async function bibViewLista(){
+  const tt=$('#bibTitle'); if(tt) tt.textContent='Biblioteca';
+  const cfg=$('#bibCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
+  $('#bibView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('biblioteca_listar'); if(error)throw error; bibDocs=data||[]; }
+  catch(e){ $('#bibView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h=`<div style="display:flex;gap:6px;margin-bottom:6px"><input id="bibBusca" placeholder="🔎 Buscar documento…" style="flex:1;min-width:0"/><select id="bibFcons" style="width:auto"><option value="">Todos</option>${BIB_CONS.slice(1).map(c=>`<option value="${c[0]}">${c[0]}</option>`).join('')}</select></div><div id="bibList"></div>`;
+  $('#bibView').innerHTML=h;
+  $('#bibBusca').value=bibBusca; $('#bibFcons').value=bibFcons;
+  $('#bibBusca').addEventListener('input',()=>{ bibBusca=$('#bibBusca').value; bibRenderDocs(); });
+  $('#bibFcons').addEventListener('change',()=>{ bibFcons=$('#bibFcons').value; bibRenderDocs(); });
+  bibRenderDocs();
+}
+function bibRenderDocs(){
+  const el=$('#bibList'); if(!el) return;
+  const busca=(bibBusca||'').toLowerCase().trim();
+  let docs=bibDocs.filter(d=>(!bibFcons || !d.consorcio || d.consorcio===bibFcons));
+  if(busca) docs=docs.filter(d=>(d.titulo+' '+(d.descricao||'')+' '+d.categoria).toLowerCase().includes(busca));
+  if(!docs.length){ el.innerHTML='<p class="sub" style="margin-top:14px">Nenhum documento'+(bibDocs.length?' para este filtro.':' cadastrado ainda.')+'</p>'; return; }
+  const cats={}; docs.forEach(d=>{(cats[d.categoria]=cats[d.categoria]||[]).push(d);});
+  const catOrder=BIB_CATS.filter(c=>cats[c]).concat(Object.keys(cats).filter(c=>!BIB_CATS.includes(c)));
+  el.innerHTML=catOrder.map(cat=>`<div class="sec" style="margin-top:14px">${cat}</div>`+cats[cat].map(d=>{
+    const tag=d.consorcio?`<span class="sub" style="font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-left:6px">${d.consorcio}</span>`:'';
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>${d.titulo}</b>${tag}${d.descricao?('<div class="sub" style="margin-top:2px">'+d.descricao+'</div>'):''}</div><button class="btn ghost" data-open="${(d.url||'').replace(/"/g,'&quot;')}" style="margin:0;width:auto;padding:8px 14px;font-size:13px;white-space:nowrap">📄 Abrir</button></div></div>`;
+  }).join('')).join('');
+  el.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{ if(b.dataset.open) window.open(b.dataset.open,'_blank','noopener'); }));
+}
+async function bibViewAdmin(){
+  const tt=$('#bibTitle'); if(tt) tt.textContent='Gerir biblioteca';
+  $('#bibView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('biblioteca_admin_listar'); if(error)throw error; bibAdmDocs=data||[]; }
+  catch(e){ $('#bibView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  bibAdmRender();
+}
+function bibAdmRender(edit){
+  const d=edit||{};
+  const h=`<button class="btn ghost" id="bibVoltarLista" style="margin:0 0 12px">‹ Ver biblioteca</button>
+  <div class="sec">${d.id?'✏️ Editar documento':'➕ Novo documento'}</div>
+  <label>Título *</label><input id="bibfTit" value="${(d.titulo||'').replace(/"/g,'&quot;')}"/>
+  <label>Categoria *</label><select id="bibfCat">${BIB_CATS.map(c=>`<option${d.categoria===c?' selected':''}>${c}</option>`).join('')}</select>
+  <label>Consórcio</label><select id="bibfCons">${BIB_CONS.map(c=>`<option value="${c[0]}"${(d.consorcio||'')===c[0]?' selected':''}>${c[1]}</option>`).join('')}</select>
+  <label>Descrição</label><textarea id="bibfDesc" rows="2">${d.descricao||''}</textarea>
+  <label>Arquivo PDF ${d.id?'(enviar um novo substitui o link)':'*'}</label>
+  <div class="pick"><label class="pickb">📄 Escolher PDF<input type="file" accept="application/pdf" id="bibfFile"/></label></div>
+  <div id="bibfFileName" class="sub" style="margin-top:4px;word-break:break-all">${d.url?('Link atual salvo'):''}</div>
+  <label style="margin-top:8px">…ou cole um link</label><input id="bibfUrl" value="${(d.url||'').replace(/"/g,'&quot;')}" placeholder="https://…"/>
+  <div style="display:flex;gap:8px;margin-top:6px"><div style="flex:1"><label>Ordem</label><input id="bibfOrd" inputmode="numeric" value="${d.ordem!=null?d.ordem:0}"/></div><div style="flex:1"><label>Ativo</label><select id="bibfAtivo"><option value="1"${d.ativo!==false?' selected':''}>Sim</option><option value="0"${d.ativo===false?' selected':''}>Não</option></select></div></div>
+  <button class="btn" id="bibfSalvar" style="margin-top:12px">${d.id?'Salvar alterações':'Adicionar documento'}</button>
+  <div class="sec" style="margin-top:24px">📚 Documentos cadastrados (${bibAdmDocs.length})</div><div id="bibAdmList"></div>`;
+  $('#bibView').innerHTML=h;
+  $('#bibfFile').addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) $('#bibfFileName').textContent='Selecionado: '+f.name; });
+  $('#bibVoltarLista').addEventListener('click',bibViewLista);
+  $('#bibfSalvar').addEventListener('click',()=>bibSalvar(d.id||null));
+  const el=$('#bibAdmList');
+  el.innerHTML = bibAdmDocs.length? bibAdmDocs.map(x=>`<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><b style="font-size:14px">${x.titulo}</b>${x.ativo?'':' <span class="sub" style="color:var(--bad)">(inativo)</span>'}<div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.categoria}${x.consorcio?(' · '+x.consorcio):''}</div></div><button class="btn ghost" data-edit="${x.id}" style="margin:0;width:auto;padding:6px 10px;font-size:12px">Editar</button><button data-del="${x.id}" data-tit="${(x.titulo||'').replace(/"/g,'&quot;')}" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px;padding:2px 4px">🗑️</button></div>`).join('') : '<p class="sub">Nenhum documento cadastrado.</p>';
+  el.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{ const x=bibAdmDocs.find(y=>String(y.id)===b.dataset.edit); if(x) bibAdmRender(x); }));
+  el.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>bibExcluir(+b.dataset.del,b.dataset.tit)));
+}
+async function bibSalvar(id){
+  const tit=($('#bibfTit').value||'').trim(); if(!tit) return toast('Informe o título');
+  const cat=$('#bibfCat').value, cons=$('#bibfCons').value, desc=$('#bibfDesc').value;
+  const ord=parseInt(($('#bibfOrd').value||'').replace(/\D/g,''),10)||0, ativo=$('#bibfAtivo').value==='1';
+  let url=($('#bibfUrl').value||'').trim();
+  const f=$('#bibfFile').files[0];
+  const btn=$('#bibfSalvar'); btn.disabled=true;
+  try{
+    if(f){
+      if(!navigator.onLine){ toast('Envio do PDF precisa de conexão'); btn.disabled=false; return; }
+      const path=Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_');
+      const up=await sb.storage.from('biblioteca').upload(path,f,{contentType:'application/pdf',upsert:true});
+      if(up.error) throw up.error;
+      url=sb.storage.from('biblioteca').getPublicUrl(path).data.publicUrl;
+    }
+    if(!url){ toast('Envie um PDF ou cole um link'); btn.disabled=false; return; }
+    const {error}=await sb.rpc('biblioteca_salvar',{p_id:id,p_titulo:tit,p_categoria:cat,p_descricao:desc,p_url:url,p_consorcio:cons||null,p_ordem:ord,p_ativo:ativo});
+    if(error) throw error;
+    toast('✓ Documento salvo'); bibViewAdmin();
+  }catch(e){ toast('⚠ '+(e.message||e)); btn.disabled=false; }
+}
+async function bibExcluir(id,tit){
+  if(!confirm('Excluir "'+tit+'" da biblioteca?\n(O arquivo no Storage não é apagado.)')) return;
+  const {error}=await sb.rpc('biblioteca_excluir',{p_id:id});
+  if(error) return toast('⚠ '+(error.message||error));
+  toast('✓ Documento excluído'); bibViewAdmin();
+}
+if($('#bibCfg')) $('#bibCfg').addEventListener('click',bibViewAdmin);
+if($('#bibBack')) $('#bibBack').addEventListener('click',()=>irPara('home'));
 
 // ---------- MÓDULO PRODUTIVIDADE DE PRESSÃO ----------
 let prpMap=null, prpLayer=null;
