@@ -311,6 +311,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
       <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Abertura de serviços</div></button>
+      <button class="mod hidden" id="entProg" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Programação de serviços</div></button>
     </div>
   </main>
 
@@ -336,6 +337,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <button id="asSalvar" class="btn" disabled>Solicitar abertura</button>
     <div class="sec" style="margin-top:22px">Minhas solicitações</div>
     <div id="asLista"></div>
+  </main>
+
+  <main id="programacao_servicos" class="hidden">
+    <div class="bar"><button class="bk" id="pgBack">‹ Entrevistadores</button></div>
+    <h1>Programação de serviços</h1>
+    <p class="sub">Lance o número da OS criada no sistema da COPASA.</p>
+    <div id="pgFiltros" style="display:flex;gap:6px;margin:8px 0 12px"></div>
+    <div id="pgLista"></div>
   </main>
 
   <main id="captacao" class="hidden">
@@ -619,7 +628,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -635,7 +644,10 @@ function irPara(id){
   if(id==='pr_prod') prProdInit();
   if(id==='biblioteca') bibInit();
   if(id==='abertura_servicos') asInit();
+  if(id==='entrevistadores') entInit();
+  if(id==='programacao_servicos') pgInit();
 }
+function entInit(){ const b=document.getElementById('entProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 
@@ -1232,7 +1244,8 @@ async function asRenderLista(){
   try{ const {data,error}=await sb.rpc('app_abertura_servico_minhas'); if(error)throw error; const arr=data||[];
     c.innerHTML = arr.length? arr.map(s=>{ const dt=s.data_hora?new Date(s.data_hora).toLocaleDateString('pt-BR'):'';
       const sub=[s.matricula?('Matrícula '+s.matricula):'',s.numero_hd?('HD '+s.numero_hd):'',dt].filter(Boolean).join(' · ');
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${s.tipo||'—'}</b><div class="sub" style="margin-top:2px">${sub}</div></div>`;
+      const os=s.os_numero?`<div style="margin-top:4px;font-size:12px;color:var(--ok)">✓ OS ${s.os_numero}</div>`:'<div class="sub" style="margin-top:4px;font-size:12px">⏳ aguardando OS</div>';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${s.tipo||'—'}</b><div class="sub" style="margin-top:2px">${sub}</div>${os}</div>`;
     }).join('') : '<p class="sub">Você ainda não solicitou serviços.</p>';
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar suas solicitações.</p>'; }
 }
@@ -1260,6 +1273,43 @@ if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
   enviarOuEnfileirar(item,'✓ Serviço solicitado');
   asReset(); irPara('entrevistadores');
 });
+// ---------- PROGRAMAÇÃO DE SERVIÇOS (aprovador/admin) ----------
+let pgFiltro='pendente';
+const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Todas']];
+function pgInit(){ pgRenderFiltros(); pgCarregar(); }
+function pgRenderFiltros(){
+  const c=document.getElementById('pgFiltros'); if(!c) return;
+  c.innerHTML=PG_FILTROS.map(f=>`<button class="btn ghost" data-pgf="${f[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${pgFiltro===f[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${f[1]}</button>`).join('');
+  c.querySelectorAll('[data-pgf]').forEach(b=>b.addEventListener('click',()=>{ pgFiltro=b.dataset.pgf; pgRenderFiltros(); pgCarregar(); }));
+}
+async function pgCarregar(){
+  const c=document.getElementById('pgLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_abertura_fila',{p_filtro:pgFiltro}); if(error)throw error; const arr=data||[];
+    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma solicitação'+(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':''))+'.</p>'; return; }
+    c.innerHTML=arr.map(s=>{
+      const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
+      const foto=s.foto_hd?`<a href="${fotoURL(s.foto_hd)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto do HD</a>`:'';
+      const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+      const info=[s.matricula?('Matrícula '+s.matricula):'',s.numero_hd?('HD '+s.numero_hd):'',s.consorcio||''].filter(Boolean).join(' · ');
+      const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center"><b>${s.tipo||'—'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
+        <div class="sub" style="margin-top:3px">${info}</div>
+        <div class="sub" style="margin-top:2px">Por ${s.solicitante||'—'} · ${foto}${mapa}</div>
+        ${s.observacao?('<div class="sub" style="margin-top:3px">Obs: '+s.observacao+'</div>'):''}
+        ${done}
+        <div style="display:flex;gap:6px;margin-top:8px"><input class="pgOs" data-id="${s.id}" value="${(s.os_numero||'').replace(/"/g,'&quot;')}" placeholder="Nº da OS na COPASA" style="flex:1;min-width:0"/><button class="btn" data-save="${s.id}" style="margin:0;width:auto;padding:9px 14px">Salvar</button></div>
+      </div>`;
+    }).join('');
+    c.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>pgSalvarOs(b.dataset.save)));
+  }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function pgSalvarOs(id){
+  const inp=document.querySelector('.pgOs[data-id="'+id+'"]'); const os=inp?inp.value:'';
+  try{ const {error}=await sb.rpc('app_abertura_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); pgCarregar(); }
+  catch(e){ toast('⚠ '+(e.message||e)); }
+}
+if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('entrevistadores'));
 if($('#ocTipo')) $('#ocTipo').addEventListener('change',ocSync);
 if($('#ocLocal')) $('#ocLocal').addEventListener('change',ocSync);
 if($('#ocSalvar')) $('#ocSalvar').addEventListener('click',ocRegistrar);
