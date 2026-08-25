@@ -1,5 +1,5 @@
-const CACHE = 'coleta-v45';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.png', './logo.png'];
+const CACHE = 'coleta-v46';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.png', './logo.png', './painel-compras.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
