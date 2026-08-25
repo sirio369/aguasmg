@@ -125,6 +125,12 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Suprimentos</div></button>
       <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
     </div>
+    <div id="homeAnalises" class="hidden">
+      <div class="sec" style="margin-top:20px">📊 Análises</div>
+      <div class="grid" style="margin-top:10px">
+        <button class="mod" data-go="painel_compras"><div class="ic">🛒</div><div class="nm">Painel de Compras</div></button>
+      </div>
+    </div>
   </main>
 
   <main id="pressao" class="hidden">
@@ -409,7 +415,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="painel_compras" class="hidden">
-    <div class="bar"><button class="bk" id="pcBack">‹ Suprimentos</button><b style="font-size:16px">Painel de Compras</b><button id="pcCfg" title="Atualizar dados" style="all:unset;margin-left:auto;cursor:pointer;font-size:22px;line-height:1;padding:2px 4px">⬆️</button></div>
+    <div class="bar"><button class="bk" id="pcBack">‹ Início</button><b style="font-size:16px">Painel de Compras</b><button id="pcCfg" title="Atualizar dados" style="all:unset;margin-left:auto;cursor:pointer;font-size:22px;line-height:1;padding:2px 4px">⬆️</button></div>
     <div id="pcUpload" class="hidden"></div>
     <div id="pcMsg" style="font-size:13px;color:var(--mut);margin:6px 0"></div>
     <div id="pcMount"></div>
@@ -681,6 +687,7 @@ function irPara(id){
   if(id==='painel_compras') pcInit();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+function homeGate(){ const a=document.getElementById('homeAnalises'); if(a) a.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 
@@ -1914,16 +1921,13 @@ function supHome(){
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
   const tt=$('#supTitle'); if(tt) tt.textContent='';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
-  const podeAp=!!(ME&&ME.pode_aprovar);
   $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma área</p>'+
     '<div class="grid" style="margin-top:10px">'+
       '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
       '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
       '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI / Uniforme</div></button>'+
-      (podeAp?'<button class="mod" data-supgo="painel_compras"><div class="ic">📊</div><div class="nm">Painel de Compras</div></button>':'')+
     '</div>';
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
-  $('#supView').querySelectorAll('[data-supgo]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.supgo)));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
@@ -3302,7 +3306,7 @@ function mostrar(sess){
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
     iniciarGPS(); atualizarFila();
-    ME=null; sb.rpc('app_me').then(({data})=>{ if(data) ME=data; }).catch(()=>{});
+    ME=null; homeGate(); sb.rpc('app_me').then(({data})=>{ if(data) ME=data; homeGate(); }).catch(()=>{ homeGate(); });
     if(navigator.onLine) sincronizar();
   }else{
     ME=null;
@@ -3447,7 +3451,7 @@ function pcEmpty(){ const d=document.createElement('div'); d.className='card'; d
 async function pcInit(){
   await supGetMe();
   if(!(ME&&ME.pode_aprovar)){ $('#pcMount').innerHTML='<p class="sub" style="padding:16px 0">Sem permissão para o Painel de Compras.</p>'; return; }
-  const bk=$('#pcBack'); if(bk&&!bk._w){ bk._w=1; bk.addEventListener('click',()=>irPara('suprimentos')); }
+  const bk=$('#pcBack'); if(bk&&!bk._w){ bk._w=1; bk.addEventListener('click',()=>irPara('home')); }
   const cfg=$('#pcCfg'); if(cfg&&!cfg._w){ cfg._w=1; cfg.addEventListener('click',()=>{ const u=$('#pcUpload'); const hid=u.classList.toggle('hidden'); if(!hid) pcRenderUpload(); }); }
   $('#pcUpload').classList.add('hidden');
   pcRefreshDash();
