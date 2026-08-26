@@ -408,13 +408,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="bibView"></div>
   </main>
 
-  <main id="painel_compras" class="hidden">
-    <div class="bar"><button class="bk" id="pcBack">‹ Início</button><b style="font-size:16px">Painel de Compras</b><button id="pcCfg" title="Atualizar dados" style="all:unset;margin-left:auto;cursor:pointer;font-size:22px;line-height:1;padding:2px 4px">⬆️</button></div>
-    <div id="pcUpload" class="hidden"></div>
-    <div id="pcMsg" style="font-size:13px;color:var(--mut);margin:6px 0"></div>
-    <div id="pcMount"></div>
-  </main>
-
   <nav>
     <button class="on" data-go="home"><span class="ic">🏠</span>Início</button>
     <button id="btnSync"><span class="ic">🔄</span><span id="syncLbl">Sincronizar</span></button>
@@ -659,7 +652,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas','painel_compras'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -678,7 +671,6 @@ function irPara(id){
   if(id==='entrevistadores') entInit();
   if(id==='programacao_servicos') pgInit();
   if(id==='matriculas') mtInit();
-  if(id==='painel_compras') pcInit();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
@@ -3457,141 +3449,6 @@ function net(){const c=$('#net');const on=navigator.onLine;c.className='chip '+(
 window.addEventListener('online',net);window.addEventListener('offline',net);net();
 let tId; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div');t.id='tst';t.className='toast';document.body.appendChild(t);}t.textContent=m;clearTimeout(tId);tId=setTimeout(()=>t.remove(),2600);}
 window.toast=toast;
-
-// ---------- MÓDULO PAINEL DE COMPRAS (Suprimentos · Fase 1: Solicitações) ----------
-let pcLibP=null, pcXlsxP=null, pcParsed=null;
-function pcLoadLib(){ if(window.PainelCompras) return Promise.resolve(); if(pcLibP) return pcLibP;
-  pcLibP=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='./painel-compras.js'; s.onload=res; s.onerror=()=>rej(new Error('falha ao carregar painel')); document.head.appendChild(s); }); return pcLibP; }
-function pcLoadXlsx(){ if(window.XLSX) return Promise.resolve(); if(pcXlsxP) return pcXlsxP;
-  pcXlsxP=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload=res; s.onerror=()=>rej(new Error('falha ao carregar leitor de planilha (precisa de conexão)')); document.head.appendChild(s); }); return pcXlsxP; }
-
-const PC_PROJ={ '1120250034':['ZA1004','ZA1004 · Águas Integradas','Contagem'], '1120250050':['ZA0200','ZA0200 · Eficiência Hídrica','Betim'] };
-function pcProj(o){ o=o||''; for(const k in PC_PROJ){ if(o.indexOf(k)>=0) return PC_PROJ[k]; } return [o||'N/D', o||'N/D', '']; }
-function pcCs(v){ if(v==null) return null; v=String(v).trim(); return v||null; }
-function pcDate(v){ if(v==null||v==='') return null;
-  if(v instanceof Date){ if(isNaN(v)) return null; return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0'); }
-  v=String(v).trim(); if(!v) return null;
-  let m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if(m) return m[3]+'-'+m[2]+'-'+m[1];
-  m=v.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3]; return null; }
-function pcNum(v){ if(v==null||v==='') return null; if(typeof v==='number') return isNaN(v)?null:v;
-  let s=String(v).trim(); if(!s) return null; s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?null:n; }
-function pcMoney(v){ if(v==null||v==='') return null; if(typeof v==='number') return isNaN(v)?null:v;
-  let s=String(v).replace(/R\$/g,'').replace(/ /g,'').trim(); if(!s) return null; s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?null:n; }
-function pcParseCSV(text){ // separador ';', respeita aspas
-  const rows=[]; let row=[], cur='', q=false;
-  for(let i=0;i<text.length;i++){ const c=text[i];
-    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
-    else { if(c==='"') q=true; else if(c===';'){ row.push(cur); cur=''; } else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; } else if(c==='\r'){} else cur+=c; } }
-  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
-  return rows;
-}
-function pcRowsFromMatrix(m){ // m = array de arrays (linha 0 = cabeçalho)
-  const out=[]; for(let i=1;i<m.length;i++){ const r=m[i]||[]; if(!r.some(c=>c!=null&&String(c).trim()!=='')) continue;
-    const g=idx=> idx<r.length? r[idx] : null; const p=pcProj(pcCs(g(2))||'');
-    out.push({ rowIdx:i, reqId:pcCs(g(0)), projCode:p[0], projShort:p[1], projCity:p[2],
-      itemCode:pcCs(g(5)), itemDesc:pcCs(g(6))||'(sem descrição)', groupCode:pcCs(g(7)), group:pcCs(g(8))||'(sem grupo)',
-      distBuyer:pcCs(g(9)), detail:pcCs(g(10)), brand:pcCs(g(11)), qtyReq:pcNum(g(12)), unit:pcCs(g(13)),
-      reqDate:pcDate(g(14)), requester:pcCs(g(15))||'(não informado)', reqStatusRaw:pcCs(g(16)), neededDate:pcDate(g(17)),
-      reqAuthDate:pcDate(g(18)), itemAuthStatus:pcCs(g(19)), reqApproval:pcCs(g(20)), orderNum:pcCs(g(21)),
-      orderDate:pcDate(g(22)), orderStatus:pcCs(g(23)), buyer:pcCs(g(24)), supplierCode:pcCs(g(25)), supplier:pcCs(g(26)),
-      deliveryForecast:pcDate(g(27)), orderAuthDate:pcDate(g(28)), orderAuthStatus:pcCs(g(29)), orderApproval:pcCs(g(30)),
-      qtyDelivered:pcNum(g(31)), balance:pcNum(g(32)), invoiceDate:pcDate(g(33)), invoiceNum:pcCs(g(34)), invoiceValue:pcMoney(g(35)),
-      installments:pcCs(g(38)), paymentStatus:pcCs(g(39)), siteDeliveryDate:pcDate(g(40)) }); }
-  return out;
-}
-async function pcParseFile(file){
-  const name=file.name||''; const ext=name.toLowerCase().split('.').pop();
-  let matrix;
-  if(ext==='csv'){
-    const buf=await file.arrayBuffer(); let txt=new TextDecoder('utf-8').decode(buf);
-    if(txt.indexOf('�')>=0){ txt=new TextDecoder('windows-1252').decode(buf); } // fallback latin
-    matrix=pcParseCSV(txt);
-  } else {
-    await pcLoadXlsx();
-    const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    matrix=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
-  }
-  const rows=pcRowsFromMatrix(matrix);
-  // asof pela do nome do arquivo (sienge_relatorio-YYYYMMDD-HHMMSS) ou hoje
-  let asof=null, asof_time=null; const mm=name.match(/(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
-  if(mm){ asof=mm[1]+'-'+mm[2]+'-'+mm[3]; asof_time=mm[4]+':'+mm[5]; }
-  return { rows, asof, asof_time, arquivo:name };
-}
-function pcRenderUpload(){
-  const el=$('#pcUpload'); if(!el) return;
-  el.innerHTML=`<div class="card" style="margin-bottom:10px">
-    <b>Atualizar dados — Solicitações de Compra</b>
-    <p class="sub" style="margin-top:2px">Exporte o relatório de <b>Solicitações</b> do SIENGE (.csv ou .xlsx) e envie aqui. Cada envio substitui o snapshot atual do painel.</p>
-    <input type="file" id="pcFile" accept=".csv,.xlsx,text/csv" style="margin:6px 0"/>
-    <div id="pcFileInfo" class="sub" style="min-height:18px"></div>
-    <label>Data de referência do export</label><input type="date" id="pcAsof"/>
-    <button class="btn" id="pcSend" disabled style="margin-top:8px">Enviar e atualizar painel</button>
-    <div id="pcHist" style="margin-top:12px"></div>
-  </div>`;
-  $('#pcFile').addEventListener('change', async (e)=>{
-    const f=e.target.files[0]; if(!f) return; pcParsed=null; $('#pcSend').disabled=true;
-    $('#pcFileInfo').textContent='Lendo arquivo…';
-    try{ const p=await pcParseFile(f);
-      if(!p.rows.length){ $('#pcFileInfo').textContent='Nenhuma linha reconhecida no arquivo.'; return; }
-      pcParsed=p; if(p.asof) $('#pcAsof').value=p.asof;
-      const obras=[...new Set(p.rows.map(r=>r.projCode))].join(', ');
-      $('#pcFileInfo').innerHTML=`<span style="color:var(--ok)">✔ ${p.rows.length} linhas · obras: ${obras}</span>`;
-      $('#pcSend').disabled=false;
-    }catch(err){ $('#pcFileInfo').textContent='⚠ '+(err.message||err); }
-  });
-  $('#pcSend').addEventListener('click', pcSend);
-  pcLoadCargas();
-}
-async function pcSend(){
-  if(!pcParsed) return; if(!navigator.onLine) return toast('Precisa de conexão para atualizar');
-  const btn=$('#pcSend'); btn.disabled=true; const asof=$('#pcAsof').value || pcParsed.asof || new Date().toISOString().slice(0,10);
-  $('#pcMsg').textContent='Enviando… (0%)';
-  try{
-    const { data:cargaId, error:e1 }=await sb.rpc('app_compras_upload_iniciar',{p_arquivo:pcParsed.arquivo, p_asof:asof, p_asof_time:pcParsed.asof_time});
-    if(e1) throw e1;
-    const rows=pcParsed.rows, CH=300;
-    for(let i=0;i<rows.length;i+=CH){ const chunk=rows.slice(i,i+CH);
-      const { error:e2 }=await sb.rpc('app_compras_upload_linhas',{p_carga_id:cargaId, p_rows:chunk}); if(e2) throw e2;
-      $('#pcMsg').textContent=`Enviando… (${Math.min(100,Math.round(100*(i+chunk.length)/rows.length))}%)`; }
-    const { error:e3 }=await sb.rpc('app_compras_upload_concluir',{p_carga_id:cargaId}); if(e3) throw e3;
-    $('#pcMsg').textContent=''; toast('Painel atualizado ✔'); pcParsed=null;
-    $('#pcUpload').classList.add('hidden'); await pcRefreshDash(); pcLoadCargas();
-  }catch(err){ $('#pcMsg').textContent=''; toast('⚠ '+(err.message||err)); btn.disabled=false; }
-}
-async function pcLoadCargas(){
-  const host=$('#pcHist'); if(!host) return;
-  try{ const { data, error }=await sb.rpc('app_compras_cargas'); if(error) throw error;
-    if(!data||!data.length){ host.innerHTML='<p class="sub">Nenhum envio ainda.</p>'; return; }
-    host.innerHTML='<div class="sub" style="margin-bottom:4px">Envios recentes</div>'+data.slice(0,6).map(c=>{
-      const dt=c.uploaded_at?new Date(c.uploaded_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-      return `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px">
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.arquivo||'—'} · ${c.nrows} linhas</span>
-        ${c.latest?'<span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--ok-bg);color:var(--ok)">atual</span>':''}
-        <span style="color:var(--mut)">${c.por||''} · ${dt}</span></div>`;
-    }).join('');
-  }catch(e){ host.innerHTML='<p class="sub">Não foi possível carregar o histórico.</p>'; }
-}
-async function pcRefreshDash(){
-  const mount=$('#pcMount');
-  mount.innerHTML='<p class="sub" style="padding:16px 0">Carregando painel…</p>';
-  try{
-    await pcLoadLib();
-    const { data, error }=await sb.rpc('app_compras_dashboard'); if(error) throw error;
-    if(!data || data.empty){ mount.innerHTML=''; mount.appendChild(pcEmpty()); return; }
-    window.PainelCompras.mount(mount, data);
-  }catch(e){ mount.innerHTML=''; const d=document.createElement('div'); d.className='sub'; d.style.padding='16px 0'; d.textContent='⚠ '+(e.message||e)+' — verifique a conexão.'; mount.appendChild(d); }
-}
-function pcEmpty(){ const d=document.createElement('div'); d.className='card'; d.style.textAlign='center'; d.style.padding='26px'; d.style.color='var(--mut)';
-  d.innerHTML='📊 Nenhum dado carregado ainda.<br><span class="sub">Toque em ⬆️ (canto superior) para enviar o relatório de Solicitações do SIENGE.</span>'; return d; }
-async function pcInit(){
-  await supGetMe();
-  if(!(ME&&ME.pode_aprovar)){ $('#pcMount').innerHTML='<p class="sub" style="padding:16px 0">Sem permissão para o Painel de Compras.</p>'; return; }
-  const bk=$('#pcBack'); if(bk&&!bk._w){ bk._w=1; bk.addEventListener('click',()=>irPara('home')); }
-  const cfg=$('#pcCfg'); if(cfg&&!cfg._w){ cfg._w=1; cfg.addEventListener('click',()=>{ const u=$('#pcUpload'); const hid=u.classList.toggle('hidden'); if(!hid) pcRenderUpload(); }); }
-  $('#pcUpload').classList.add('hidden');
-  pcRefreshDash();
-}
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
