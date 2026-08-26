@@ -2290,9 +2290,34 @@ function eqMeuCard(e){
       +'<textarea class="eqDevObs" rows="2" placeholder="Observação (obrigatória se defeito)" style="margin-top:6px"></textarea>'
       +'<button class="btn" data-devreq="'+e.equipamento_id+'" style="margin-top:6px">Gerar código de devolução</button></div>';
   }
-  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+'</div>';
+  const verTermo=e.termo_id?'<button class="btn ghost" data-vertermo="'+e.termo_id+'" style="margin-top:8px;width:auto;padding:7px 12px;font-size:13px">📄 Ver termo</button>':'';
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+verTermo+'</div>';
+}
+async function eqTermoVer(termoId){
+  let d;
+  try{ const {data,error}=await sb.rpc('sup_termo_ver',{p_termo_id:termoId}); if(error)throw error; d=data||{}; }
+  catch(e){ return toast('⚠ '+(e.message||e)); }
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+eqTermoHtml(d)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+function eqTermoHtml(d){
+  const statusLbl=d.status==='pendente'?'Aguardando aceite':(d.status==='ativo'?'Aceito':(d.status||''));
+  let h='<div class="relTop"><div><h1>Termo de Responsabilidade de Equipamento</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge">'+statusLbl+'</div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('Equipamento',d.equipamento)+relField('Tipo',d.tipo||'—')+relField('Nº de série / patrimônio',d.num_serie||'—')+relField('Nº do termo','#'+d.id)+'</div>';
+  h+='<div class="relGrid">'+relField('Responsável',d.colaborador)+relField('Emitido por',d.emitido_por||'—')+relField('Emitido em',relFmtData(d.emitido_em))+relField('Aceito em',d.aceito_em?relFmtData(d.aceito_em):'—')+'</div>';
+  if(d.obs) h+='<div class="sub" style="margin-top:8px">Obs: '+d.obs+'</div>';
+  h+='<div class="relSec"><span class="relNum">1</span> Termo</div>';
+  h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro que recebi o equipamento acima identificado, em condições de uso, comprometendo-me a: (a) utilizá-lo exclusivamente para as atividades de trabalho; (b) zelar pela sua guarda, conservação e uso correto; (c) comunicar imediatamente ao almoxarifado qualquer defeito, avaria, perda ou furto; (d) submetê-lo às manutenções preventivas nos prazos definidos; e (e) devolvê-lo quando solicitado ou ao término do uso. Estou ciente de que respondo pela sua guarda enquanto estiver sob minha responsabilidade.</div>';
+  h+='<div class="sub" style="margin-top:10px;font-size:10px">'+(d.status==='ativo'?('Aceite eletrônico registrado no app em '+relFmtData(d.aceito_em)+'.'):'Termo ainda não aceito pelo colaborador.')+'</div>';
+  h+='</div><div class="relFoot"><span>AcquaHub · termo gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  return h;
 }
 function supEqMeusWire(){
+  $('#supView').querySelectorAll('[data-vertermo]').forEach(b=>b.addEventListener('click',()=>eqTermoVer(+b.dataset.vertermo)));
   $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>{
     const item={id:crypto.randomUUID(),rpc:'sup_termo_aceitar',fields:{p_termo_id:+b.dataset.aceitar}};
     supEnviar(item,'✓ Termo aceito',()=>supVEqMeus());
@@ -2326,7 +2351,7 @@ async function supVEqSolicitar(){
       <button id="eqSolSend" class="btn" style="margin-top:10px">Enviar solicitação</button>`;
     } else { h+='<p class="sub">Nenhum equipamento disponível no momento.</p>'; }
     h+='<div class="sec" style="margin-top:26px">📨 Minhas solicitações pendentes</div>';
-    h+= minhas.length ? minhas.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b>${s.tipo?('<div class="sub" style="margin-top:2px">'+s.tipo+' · '+eqDia(s.criado_em)+'</div>'):''}</div><button class="btn ghost" data-solcancel="${s.id}" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Cancelar</button></div></div>`).join('') : '<p class="sub">Você não tem solicitações pendentes.</p>';
+    h+= minhas.length ? minhas.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b>${s.tipo?('<div class="sub" style="margin-top:2px">'+s.tipo+' · '+eqDia(s.criado_em)+'</div>'):''}</div><button class="btn ghost" data-solcancel="${s.id}" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Cancelar</button></div>${s.codigo?('<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:18px;letter-spacing:3px;color:var(--acc)">'+s.codigo+'</b> <span class="sub">— informe ao almoxarife</span></div>'):''}</div>`).join('') : '<p class="sub">Você não tem solicitações pendentes.</p>';
     $('#supView').innerHTML=h;
     const send=$('#eqSolSend');
     if(send) send.addEventListener('click',async()=>{
@@ -2391,48 +2416,40 @@ async function supEqCadastrar(){
   if(error){ toast(/num_serie|duplicate|unique/i.test(error.message||'')?'⚠ Já existe equipamento com esse nº de série':'⚠ '+(error.message||error)); return; }
   toast('✓ Equipamento cadastrado'); supVEqGerir();
 }
-// --- Entregar / devolver equipamentos (almoxarife) ---
+// --- Atender solicitações / devolver equipamentos (almoxarife) ---
 async function supVEqEntregar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const [l,u,sp]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_usuarios_listar'),sb.rpc('sup_equip_solicitacoes_pendentes')]);
+    const [l,sp]=await Promise.all([sb.rpc('sup_equip_listar'),sb.rpc('sup_equip_solicitacoes_pendentes')]);
     if(l.error)throw l.error;
-    eqUsuarios=u.data||[]; const arr=l.data||[]; const solic=sp.data||[];
-    const disp=arr.filter(e=>e.status==='disponivel');
+    const arr=l.data||[]; const solic=sp.data||[];
     const pend=arr.filter(e=>e.devolucao_solicitada);
     const aceitePend=arr.filter(e=>e.termo_status==='pendente');
-    let h='<div class="sec">📥 Solicitações pendentes</div>';
-    h+= solic.length ? solic.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b><div class="sub" style="margin-top:2px">${s.tipo?(s.tipo+' · '):''}pedido por ${s.solicitante||'—'} · ${eqDia(s.criado_em)}</div>${s.obs?('<div class="sub" style="margin-top:2px">Obs: '+s.obs+'</div>'):''}${s.ainda_disponivel?'':'<div style="color:var(--bad);font-size:12px;margin-top:4px">⚠️ equipamento não está mais disponível</div>'}</div></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-atender="${s.id}" style="margin:0"${s.ainda_disponivel?'':' disabled'}>Entregar</button><button class="btn ghost" data-solrej="${s.id}" style="margin:0">Rejeitar</button></div></div>`).join('') : '<p class="sub">Nenhuma solicitação pendente.</p>';
+    let h='<div class="sec">📥 Solicitações de retirada</div>';
+    h+= solic.length ? solic.map(s=>{
+      const info=`<div style="flex:1;min-width:0"><b>${s.equipamento}</b><div class="sub" style="margin-top:2px">${s.tipo?(s.tipo+' · '):''}pedido por ${s.solicitante||'—'} · ${eqDia(s.criado_em)}</div>${s.obs?('<div class="sub" style="margin-top:2px">Obs: '+s.obs+'</div>'):''}${s.ainda_disponivel?'':'<div style="color:var(--bad);font-size:12px;margin-top:4px">⚠️ equipamento não está mais disponível</div>'}</div>`;
+      const acao = s.ainda_disponivel
+        ? `<div style="display:flex;gap:6px;margin-top:8px"><input class="eqAtCod" data-id="${s.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-atender="${s.id}" style="margin:0;width:auto;padding:12px 16px">Entregar</button></div><button class="btn ghost" data-solrej="${s.id}" style="margin-top:6px;width:auto;padding:7px 12px;font-size:13px">Rejeitar</button>`
+        : `<button class="btn ghost" data-solrej="${s.id}" style="margin-top:8px">Rejeitar</button>`;
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px">${info}</div>${acao}</div>`;
+    }).join('') : '<p class="sub">Nenhuma solicitação pendente.</p>';
     h+='<div class="sec" style="margin-top:26px">⏳ Aguardando aceite</div>';
     h+= aceitePend.length ? aceitePend.map(e=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div><b>${e.nome}</b><div class="sub" style="margin-top:2px">com ${e.responsavel||'—'} · aguardando aceite do termo</div></div><button class="btn ghost" data-cancelemit="${e.id}" style="margin-top:8px">Cancelar emissão</button></div>`).join('') : '<p class="sub">Nenhum termo aguardando aceite.</p>';
-    h+='<div class="sec" style="margin-top:26px">📤 Entrega direta</div>';
-    if(disp.length){
-      h+=`<label>Equipamento disponível</label>
-      <select id="eqEntEq"><option value="">Selecione…</option>${disp.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}</option>`).join('')}</select>
-      <label>Responsável</label>
-      <select id="eqEntU"><option value="">Selecione…</option>${eqUsuarios.map(u=>`<option value="${u.id}">${u.nome}</option>`).join('')}</select>
-      <button id="eqEntSend" class="btn" style="margin-top:10px">Emitir termo de responsabilidade</button>`;
-    } else { h+='<p class="sub">Nenhum equipamento disponível para entrega.</p>'; }
     h+='<div class="sec" style="margin-top:26px">🔁 Devoluções pendentes</div>';
     h+= pend.length ? pend.map(e=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div><b>${e.nome}</b>${e.responsavel?('<div class="sub" style="margin-top:2px">com '+e.responsavel+'</div>'):''}</div><div style="display:flex;gap:6px;margin-top:8px"><input class="eqDevCod" data-id="${e.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-devconf="${e.id}" style="margin:0;width:auto;padding:12px 16px">Confirmar</button></div></div>`).join('') : '<p class="sub">Nenhuma devolução pendente.</p>';
     $('#supView').innerHTML=h;
-    const sendBtn=$('#eqEntSend');
-    if(sendBtn) sendBtn.addEventListener('click',async()=>{
-      const eq=$('#eqEntEq').value, uid=$('#eqEntU').value;
-      if(!eq) return toast('Escolha o equipamento');
-      if(!uid) return toast('Escolha o responsável');
-      sendBtn.disabled=true;
-      const {error}=await sb.rpc('sup_termo_emitir',{p_equipamento_id:+eq,p_colaborador_uuid:uid});
-      if(error){ toast('⚠ '+(error.message||error)); sendBtn.disabled=false; return; }
-      toast('✓ Termo emitido — aguardando aceite'); supVEqEntregar();
-    });
     $('#supView').querySelectorAll('[data-devconf]').forEach(b=>b.addEventListener('click',()=>{
       const inp=$('#supView').querySelector('.eqDevCod[data-id="'+b.dataset.devconf+'"]');
       const cod=((inp||{}).value||'').trim();
       if(cod.length!==4) return toast('Digite o código de 4 dígitos');
       supAcao('sup_equip_devolver',{p_equipamento_id:+b.dataset.devconf,p_codigo:cod},'Devolução registrada',supVEqEntregar);
     }));
-    $('#supView').querySelectorAll('[data-atender]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_atender',{p_solicitacao_id:+b.dataset.atender},'Termo emitido — aguardando aceite',supVEqEntregar)));
+    $('#supView').querySelectorAll('[data-atender]').forEach(b=>b.addEventListener('click',()=>{
+      const inp=$('#supView').querySelector('.eqAtCod[data-id="'+b.dataset.atender+'"]');
+      const cod=((inp||{}).value||'').trim();
+      if(cod.length!==4) return toast('Digite o código de 4 dígitos do colaborador');
+      supAcao('sup_equip_atender',{p_solicitacao_id:+b.dataset.atender,p_codigo:cod},'Termo emitido — aguardando aceite',supVEqEntregar);
+    }));
     $('#supView').querySelectorAll('[data-solrej]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_rejeitar',{p_solicitacao_id:+b.dataset.solrej},'Solicitação rejeitada',supVEqEntregar)));
     $('#supView').querySelectorAll('[data-cancelemit]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_cancelar',{p_equipamento_id:+b.dataset.cancelemit},'Emissão cancelada',supVEqEntregar)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
