@@ -2612,7 +2612,7 @@ async function supVEpiSolicitar(){
     try{
       const {data,error}=await sb.rpc('sup_cesta_do_cargo',{p_cargo_id:meuCargoId}); if(error) throw error;
       const cesta=data||[]; if(!cesta.length){ toast('Nenhum EPI configurado para o seu cargo'); return; }
-      let add=0; cesta.forEach(it=>{ if(!epiCartS.find(x=>String(x.epi_id)===String(it.epi_id))){ epiCartS.push({epi_id:it.epi_id,nome:it.nome,quantidade:it.quantidade,requer_tamanho:!!it.requer_tamanho,validade_dias:it.validade_dias,tamanho:null}); add++; } });
+      let add=0; cesta.forEach(it=>{ if(!epiCartS.find(x=>String(x.epi_id)===String(it.epi_id))){ epiCartS.push({epi_id:it.epi_id,nome:it.nome,quantidade:it.quantidade,requer_tamanho:!!it.requer_tamanho,tamanho_escala:it.tamanho_escala,validade_dias:it.validade_dias,tamanho:null}); add++; } });
       epiCartRender(); toast(add?('✓ '+add+' EPI(s) da cesta'):'Cesta já está no carrinho');
     }catch(e){ toast('⚠ '+(e.message||e)); } finally{ cestaBtn.disabled=false; }
   });
@@ -2620,7 +2620,7 @@ async function supVEpiSolicitar(){
     const id=$('#epSMat').value, q=parseFloat(($('#epSQt').value||'').replace(',','.'));
     if(!id||isNaN(q)||q<=0) return toast('Escolha o EPI e a quantidade');
     const e=epiCat.find(x=>String(x.id)===String(id)), ex=epiCartS.find(x=>String(x.epi_id)===String(id));
-    if(ex) ex.quantidade+=q; else epiCartS.push({epi_id:+id,nome:e.nome,quantidade:q,requer_tamanho:!!e.requer_tamanho,validade_dias:e.validade_dias,tamanho:null});
+    if(ex) ex.quantidade+=q; else epiCartS.push({epi_id:+id,nome:e.nome,quantidade:q,requer_tamanho:!!e.requer_tamanho,tamanho_escala:e.tamanho_escala,validade_dias:e.validade_dias,tamanho:null});
     $('#epSMat').value=''; $('#epSQt').value='1'; epiCartRender();
   });
   $('#epSSend').addEventListener('click',async()=>{
@@ -2634,11 +2634,13 @@ async function supVEpiSolicitar(){
   });
 }
 const EPI_TAMS=['P','M','G','GG','EXG'];
+const EPI_TAMS_NUM=['36','37','38','39','40','41','42','43','44','45'];
+function epiTamsDe(x){ return (x&&x.tamanho_escala==='numero')?EPI_TAMS_NUM:EPI_TAMS; }
 function epiCartRender(){
   const c=$('#epSCart'); if(!c) return;
   if(!epiCartS.length){ c.innerHTML='<p class="sub" style="margin:6px 0">Nenhum EPI adicionado.</p>'; if($('#epSSend'))$('#epSSend').disabled=true; return; }
   c.innerHTML=epiCartS.map((x,i)=>{
-    const sz = x.requer_tamanho?`<select data-sz="${i}" style="width:auto;font-size:12px;padding:5px 6px">${EPI_TAMS.map(s=>`<option value="${s}"${x.tamanho===s?' selected':''}>${s}</option>`).join('')}<option value=""${!x.tamanho?' selected':''}>Tam?</option></select>`:'';
+    const sz = x.requer_tamanho?`<select data-sz="${i}" style="width:auto;font-size:12px;padding:5px 6px">${epiTamsDe(x).map(s=>`<option value="${s}"${x.tamanho===s?' selected':''}>${s}</option>`).join('')}<option value=""${!x.tamanho?' selected':''}>Tam?</option></select>`:'';
     const alerta = x.requer_tamanho&&!x.tamanho?' <span style="color:var(--bad);font-size:11px">informe o tamanho</span>':'';
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:14px">${x.nome}${alerta}</div>${sz}<b style="font-size:14px">×${supNum(x.quantidade)}</b><button data-rm="${i}" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`;
   }).join('');
