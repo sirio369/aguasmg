@@ -408,8 +408,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="bibView"></div>
   </main>
 
+  <main id="notificacoes" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Avisos</b><button id="ntfMarcar" class="hidden" style="all:unset;margin-left:auto;cursor:pointer;font-size:12px;color:var(--acc);padding:4px 6px">marcar todas lidas</button></div>
+    <div id="ntfView"></div>
+  </main>
+
   <nav>
     <button class="on" data-go="home"><span class="ic">🏠</span>Início</button>
+    <button id="btnNotif"><span class="ic" style="position:relative;display:inline-block">🔔<span id="ntfBadge" style="display:none;position:absolute;top:-5px;right:-9px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;border-radius:999px;padding:0 3px;text-align:center">0</span></span>Avisos</button>
     <button id="btnSync"><span class="ic">🔄</span><span id="syncLbl">Sincronizar</span></button>
     <button id="btnSair"><span class="ic">🚪</span>Sair</button>
   </nav>
@@ -652,7 +658,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas'];
+const SCREENS=['home','pressao','loggers','logger_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas','notificacoes'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -671,6 +677,8 @@ function irPara(id){
   if(id==='entrevistadores') entInit();
   if(id==='programacao_servicos') pgInit();
   if(id==='matriculas') mtInit();
+  if(id==='notificacoes') ntfInit();
+  if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
@@ -3433,7 +3441,7 @@ function mostrar(sess){
     const c=localStorage.getItem('consorcio'); if(c){$('#consorcio').value=c;}
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
-    iniciarGPS(); atualizarFila();
+    iniciarGPS(); atualizarFila(); ntfBadge();
     ME=null; sb.rpc('app_me').then(({data})=>{ if(data) ME=data; }).catch(()=>{});
     if(navigator.onLine) sincronizar();
   }else{
@@ -3449,6 +3457,48 @@ function net(){const c=$('#net');const on=navigator.onLine;c.className='chip '+(
 window.addEventListener('online',net);window.addEventListener('offline',net);net();
 let tId; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div');t.id='tst';t.className='toast';document.body.appendChild(t);}t.textContent=m;clearTimeout(tId);tId=setTimeout(()=>t.remove(),2600);}
 window.toast=toast;
+
+// ---------- NOTIFICAÇÕES (inbox + badge) ----------
+const NTF_ICON={solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰'};
+async function ntfBadge(){
+  try{ const {data}=await sb.rpc('app_notif_contador'); const n=+data||0; const b=$('#ntfBadge'); if(!b) return;
+    if(n>0){ b.textContent=n>99?'99+':String(n); b.style.display='inline-block'; } else b.style.display='none';
+  }catch(e){}
+}
+function ntfTempo(iso){ const d=new Date(iso), s=Math.round((Date.now()-d)/1000);
+  if(s<60) return 'agora'; const m=Math.round(s/60); if(m<60) return 'há '+m+' min';
+  const h=Math.round(m/60); if(h<24) return 'há '+h+' h'; const dd=Math.round(h/24); if(dd<7) return 'há '+dd+' d';
+  try{ return d.toLocaleDateString('pt-BR'); }catch(e){ return ''; } }
+let ntfData=[];
+async function ntfInit(){
+  $('#ntfView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_notif_listar',{p_limit:40}); if(error)throw error;
+    ntfData=data||[];
+    const mk=$('#ntfMarcar');
+    if(!ntfData.length){ $('#ntfView').innerHTML='<p class="sub" style="padding:24px 0;text-align:center">Nenhum aviso por aqui. 🔔</p>'; if(mk) mk.classList.add('hidden'); return; }
+    if(mk) mk.classList.toggle('hidden', !ntfData.some(n=>!n.lida));
+    $('#ntfView').innerHTML=ntfData.map(n=>{
+      const ic=NTF_ICON[n.tipo]||'🔔';
+      return `<div data-ntf="${n.id}" data-link="${n.link||''}" style="${n.link?'cursor:pointer;':''}display:flex;gap:10px;padding:11px 12px;margin-bottom:8px;border-radius:12px;background:var(${n.lida?'--card':'--ok-bg'});border:1px solid var(--line)"><div style="font-size:20px">${ic}</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:${n.lida?'500':'700'}">${n.titulo}</div>${n.texto?('<div class="sub" style="margin-top:2px">'+n.texto+'</div>'):''}<div class="sub" style="font-size:11px;margin-top:3px">${ntfTempo(n.criado_em)}</div></div>${n.lida?'':'<span style="width:8px;height:8px;border-radius:50%;background:var(--acc);align-self:center;flex:none"></span>'}</div>`;
+    }).join('');
+    $('#ntfView').querySelectorAll('[data-ntf]').forEach(el=>el.addEventListener('click',()=>{
+      const id=+el.dataset.ntf, link=el.dataset.link;
+      sb.rpc('app_notif_marcar_lidas',{p_ids:[id]}).then(()=>ntfBadge()).catch(()=>{});
+      if(link) supGoAct(link); else ntfInit();
+    }));
+  }catch(e){ $('#ntfView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function ntfMarcarTodas(){ try{ await sb.rpc('app_notif_marcar_lidas',{}); }catch(e){} toast('✓ Avisos marcados como lidos'); ntfBadge(); ntfInit(); }
+async function supGoAct(act){
+  try{ await supGetMe(); }catch(e){}
+  SCREENS.forEach(s=>{ const el=$('#'+s); if(el) el.classList.toggle('hidden', s!=='suprimentos'); });
+  document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.remove('on'));
+  supAreaId = act.indexOf('eq_')===0?'equip':(act.indexOf('epi_')===0?'epi':'insumos');
+  if(SUP_ACTS[act]) supOpen(act); else supHome();
+}
+const _btnNotif=$('#btnNotif'); if(_btnNotif) _btnNotif.addEventListener('click',()=>irPara('notificacoes'));
+const _ntfMk=$('#ntfMarcar'); if(_ntfMk) _ntfMk.addEventListener('click',ntfMarcarTodas);
+setInterval(()=>{ if(!screens.app.classList.contains('hidden')) ntfBadge(); }, 60000);
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
