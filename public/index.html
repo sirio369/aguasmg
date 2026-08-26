@@ -2044,8 +2044,17 @@ async function supVPedidos(){
       const st=SUP_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
       const cod=(s.status==='segregada'&&s.codigo_retirada)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${s.codigo_retirada}</b></div>`:'';
       const emFalta=(s.status==='em_falta')?'<div style="margin-top:8px;background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600">⛔ Sem estoque — toda a solicitação está em falta no almoxarifado.</div>':'';
-      const lista=((s.status==='segregada'||s.status==='em_falta')&&Array.isArray(s.lista))?('<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px">'+s.lista.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${i.situacao==='falta'?'—':(supNum(i.qt_segregada||0)+' '+i.unidade)}</b></div>`).join('')+'</div>'):'';
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b><div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${emFalta}${lista}${cod}</div>`;
+      const det=(['entregue','segregada','em_falta'].includes(s.status)&&Array.isArray(s.lista))?('<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px">'+s.lista.map(i=>{
+        const entregueView=s.status==='entregue';
+        const real=entregueView?(+i.qt_entregue||0):(+i.qt_segregada||0);
+        const falta=(i.situacao==='falta')||real<=0;
+        const parcial=!falta&&real<(+i.qt_solicitada||0);
+        const tag=falta?' <span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--bad-bg);color:var(--bad);white-space:nowrap">não entregue</span>':(parcial?' <span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn);white-space:nowrap">parcial</span>':'');
+        const lbl=entregueView?'entregue':'separado';
+        const realTxt=falta?('<b style="color:var(--bad)">0 '+i.unidade+'</b>'):('<b>'+supNum(real)+' '+i.unidade+'</b>');
+        return `<div style="padding:4px 0"><div style="font-size:13px">${i.material}${tag}</div><div class="sub" style="font-size:11.5px">solicitado ${supNum(i.qt_solicitada)} ${i.unidade} → ${lbl} ${realTxt}</div></div>`;
+      }).join('')+'</div>'):'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b><div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${emFalta}${det}${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
