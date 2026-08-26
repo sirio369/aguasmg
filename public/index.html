@@ -1914,13 +1914,16 @@ function supHome(){
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
   const tt=$('#supTitle'); if(tt) tt.textContent='';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
+  const almox=!!(ME&&(ME.is_almoxarife||ME.is_admin));
   $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma área</p>'+
     '<div class="grid" style="margin-top:10px">'+
       '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
       '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
       '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI / Uniforme</div></button>'+
+      (almox?'<button class="mod" data-supbaixas="1"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div></button>':'')+
     '</div>';
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
+  $('#supView').querySelectorAll('[data-supbaixas]').forEach(el=>el.addEventListener('click',()=>supVBaixas()));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
@@ -2249,6 +2252,55 @@ async function supVPainel(){
     }catch(e){ $('#supPOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
   };
   $('#supPLoad').addEventListener('click',load); if(us.length) load();
+}
+
+// --- Baixas / Conferência (almoxarife): consolidado de entregas por período ---
+async function supVBaixas(){
+  supCurrent='area'; const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  const tt=$('#supTitle'); if(tt) tt.textContent='Baixas / Conferência';
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const hoje=new Date(), ini=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+  $('#supView').innerHTML=`
+    <p class="sub" style="margin-top:2px">Confira as entregas por período e marque o que já deu baixa no SIENGE. Consolidado por código (insumos) e por nome + tamanho (EPIs).</p>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      <span class="sub">De</span><input id="bxDe" type="date" value="${iso(ini)}" style="flex:1;min-width:0;font-size:13px"/>
+      <span class="sub">até</span><input id="bxAte" type="date" value="${iso(hoje)}" style="flex:1;min-width:0;font-size:13px"/>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <select id="bxTipo" style="flex:1;min-width:0"><option value="todos">Insumos e EPIs</option><option value="insumo">Só insumos</option><option value="epi">Só EPIs</option></select>
+      <select id="bxStatus" style="flex:1;min-width:0"><option value="pendente">Pendente de baixa</option><option value="realizada">Baixa realizada</option></select>
+    </div>
+    <div id="bxOut" style="margin-top:10px"></div>`;
+  const load=async()=>{
+    const de=$('#bxDe').value, ate=$('#bxAte').value, tipo=$('#bxTipo').value, status=$('#bxStatus').value;
+    if(!de||!ate){ $('#bxOut').innerHTML='<p class="sub">Informe o período.</p>'; return; }
+    $('#bxOut').innerHTML='<p class="sub">Carregando…</p>';
+    try{
+      const {data,error}=await sb.rpc('sup_baixas_relatorio',{p_de:de,p_ate:ate,p_tipo:tipo,p_status:status}); if(error)throw error;
+      const arr=data||[], realizada=status==='realizada';
+      if(!arr.length){ $('#bxOut').innerHTML='<p class="sub">Nada '+(realizada?'com baixa realizada':'pendente de baixa')+' nesse período.</p>'; return; }
+      const totQ=arr.reduce((a,r)=>a+(+r.qt_total||0),0), totE=arr.reduce((a,r)=>a+(+r.n||0),0);
+      $('#bxOut').innerHTML='<div class="sub" style="margin-bottom:6px">'+arr.length+' item(ns) · '+totE+' entrega(s)</div>'+arr.map((r,idx)=>{
+        const nome=r.descricao+(r.tamanho?(' <b>['+r.tamanho+']</b>'):'');
+        const codigo=r.codigo?('<span class="sub" style="font-size:11px">cód. '+r.codigo+'</span>'):'<span class="sub" style="font-size:11px">EPI</span>';
+        const chip='<span style="font-size:10px;padding:1px 7px;border-radius:999px;white-space:nowrap;background:var('+(realizada?'--ok-bg':'--warn-bg')+');color:var('+(realizada?'--ok':'--warn')+')">'+(realizada?'Baixa realizada':'Pendente de baixa')+'</span>';
+        const btn=realizada
+          ? '<button class="btn ghost" data-bx="'+idx+'" data-baix="false" style="margin:0;width:auto;padding:7px 11px;font-size:12px">↩ Reabrir</button>'
+          : '<button class="btn" data-bx="'+idx+'" data-baix="true" style="margin:0;width:auto;padding:8px 12px;font-size:13px">✓ Baixa realizada</button>';
+        return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><div style="font-size:14px">'+nome+'</div><div style="margin-top:2px">'+codigo+' · <b>'+supNum(r.qt_total)+' '+r.unidade+'</b> · '+r.n+' entrega(s)</div></div>'+chip+'</div><div style="margin-top:8px;display:flex;justify-content:flex-end">'+btn+'</div></div>';
+      }).join('');
+      $('#bxOut').querySelectorAll('[data-bx]').forEach(b=>b.addEventListener('click',async()=>{
+        if(!navigator.onLine) return toast('Marcar baixa precisa de conexão');
+        const r=arr[+b.dataset.bx], baix=b.dataset.baix==='true'; b.disabled=true;
+        const {error}=await sb.rpc('sup_baixas_marcar',{p_tipo:r.tipo,p_ids:r.ids,p_baixado:baix});
+        if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
+        toast(baix?'✓ Baixa registrada':'↩ Reaberto'); load();
+      }));
+    }catch(e){ $('#bxOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+  };
+  ['bxDe','bxAte','bxTipo','bxStatus'].forEach(id=>$('#'+id).addEventListener('change',load));
+  load();
 }
 
 // ===== EQUIPAMENTOS =====
