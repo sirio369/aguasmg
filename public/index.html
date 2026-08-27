@@ -2276,34 +2276,51 @@ function supAlmoxWire(){
   }));
 }
 
-// --- tela: Painel (movimentação + estoque) ---
+// --- tela: Painel das equipes (multi-seleção: estoque agregado + por equipe + movimentações) ---
 async function supVPainel(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   let us=[];
   try{ const u=await sb.rpc('sup_usuarios_listar'); us=u.data||[]; }catch(e){}
+  if(!us.length){ $('#supView').innerHTML='<p class="sub">Nenhuma equipe/pessoa disponível.</p>'; return; }
+  const sel=new Set();
   $('#supView').innerHTML=`
-    <label>Pessoa</label><select id="supPU">${us.map(u=>`<option value="${u.id}">${u.nome}</option>`).join('')}</select>
-    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+    <div class="sec">📋 Painel das equipes</div>
+    <p class="sub" style="margin:2px 0 8px">Selecione uma ou mais equipes para ver o estoque agregado, o estoque por equipe e as movimentações.</p>
+    <div style="display:flex;gap:12px;margin-bottom:6px"><a id="pnAll" style="cursor:pointer;color:var(--acc);font-weight:600;font-size:13px">Todas</a><a id="pnNone" style="cursor:pointer;color:var(--acc);font-weight:600;font-size:13px">Limpar</a></div>
+    <div id="pnChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:10px">
       <span class="sub">De</span><input id="supPDe" type="date" style="flex:1;min-width:0;font-size:13px"/>
       <span class="sub">até</span><input id="supPAte" type="date" style="flex:1;min-width:0;font-size:13px"/>
     </div>
-    <button id="supPLoad" class="btn ghost" style="margin-top:10px">Carregar</button>
-    <div id="supPOut" style="margin-top:6px"></div>`;
+    <button id="supPLoad" class="btn" style="margin-top:10px">Carregar</button>
+    <div id="supPOut" style="margin-top:10px"></div>`;
+  const chips=()=>{
+    $('#pnChips').innerHTML=us.map(u=>{ const on=sel.has(u.id);
+      return `<button type="button" class="pnChip" data-u="${u.id}" style="all:unset;cursor:pointer;padding:6px 11px;border-radius:999px;font-size:13px;${on?'background:var(--acc);color:#fff':'background:var(--card);border:1px solid var(--line)'}">${u.nome}</button>`; }).join('');
+    $('#pnChips').querySelectorAll('.pnChip').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.u; if(sel.has(id)) sel.delete(id); else sel.add(id); chips(); }));
+  };
+  chips();
+  $('#pnAll').addEventListener('click',()=>{ us.forEach(u=>sel.add(u.id)); chips(); });
+  $('#pnNone').addEventListener('click',()=>{ sel.clear(); chips(); });
   const load=async()=>{
-    const uid=$('#supPU').value; if(!uid){ $('#supPOut').innerHTML='<p class="sub">Nenhuma pessoa disponível.</p>'; return; }
+    if(!sel.size){ $('#supPOut').innerHTML='<p class="sub">Selecione ao menos uma equipe acima.</p>'; return; }
     $('#supPOut').innerHTML='<p class="sub">Carregando…</p>';
     try{
-      const {data,error}=await sb.rpc('sup_painel',{p_colaborador_uuid:uid,p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
-      const mv=(data&&data.movimentos)||[], est=(data&&data.estoque)||[];
-      $('#supPOut').innerHTML='<div class="sec">📦 Estoque atual</div><div id="supPEst"></div><div class="sec">🔄 Movimentação</div><div id="supPMov"></div>';
-      supEstTable('supPEst',est);
-      $('#supPMov').innerHTML = mv.length? mv.map(m=>{
-        const neg=m.quantidade<0;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px"><div style="flex:1;min-width:0"><b>${m.material}</b><div class="sub">${supData(m.data)} · ${m.tipo}${m.os?(' · '+m.os):''}</div></div><b style="white-space:nowrap;color:${neg?'var(--bad)':'var(--ok)'}">${neg?'':'+'}${supNum(m.quantidade)} ${m.unidade}</b></div>`;
+      const {data,error}=await sb.rpc('sup_painel_multi',{p_colaboradores:[...sel],p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
+      const agg=(data&&data.agregado)||[], por=(data&&data.por_equipe)||[], mv=(data&&data.movimentos)||[];
+      let h='<div class="sec">📦 Estoque agregado <span class="sub" style="font-weight:400">('+por.length+' equipe'+(por.length!==1?'s':'')+')</span></div><div id="pnAgg"></div>';
+      h+='<div class="sec" style="margin-top:20px">🚐 Estoque por equipe</div><div id="pnPor"></div>';
+      h+='<div class="sec" style="margin-top:20px">🔄 Movimentações</div><div id="pnMov"></div>';
+      $('#supPOut').innerHTML=h;
+      supEstTable('pnAgg',agg);
+      $('#pnPor').innerHTML=por.map((e,ix)=>`<div style="margin-bottom:12px"><div style="font-weight:700;font-size:13px;margin-bottom:4px">${e.nome}</div><div id="pnPor${ix}"></div></div>`).join('');
+      por.forEach((e,ix)=>supEstTable('pnPor'+ix, e.estoque||[]));
+      $('#pnMov').innerHTML = mv.length? mv.map(m=>{ const neg=m.quantidade<0;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px"><div style="flex:1;min-width:0"><b>${m.material}</b><div class="sub">${m.equipe} · ${supData(m.data)} · ${m.tipo}${m.os?(' · '+m.os):''}</div></div><b style="white-space:nowrap;color:${neg?'var(--bad)':'var(--ok)'}">${neg?'':'+'}${supNum(m.quantidade)} ${m.unidade}</b></div>`;
       }).join('') : '<p class="sub">Sem movimentação no período.</p>';
     }catch(e){ $('#supPOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
   };
-  $('#supPLoad').addEventListener('click',load); if(us.length) load();
+  $('#supPLoad').addEventListener('click',load);
 }
 
 // --- Baixas / Conferência (almoxarife): consolidado de entregas por período ---
