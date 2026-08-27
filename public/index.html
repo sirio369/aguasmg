@@ -2170,11 +2170,17 @@ async function supVAprovar(){
     const {data,error}=await sb.rpc('sup_fila_aprovacao'); if(error)throw error;
     const arr=data||[];
     if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação aguardando aprovação.</p>'; return; }
-    $('#supView').innerHTML=arr.map(s=>{
-      const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>${i.material}</span><b style="white-space:nowrap">${supNum(i.qt_solicitada)} ${i.unidade}</b></div>`).join('');
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px;align-items:center"><b>#${s.id}</b> · ${s.equipe}<span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
+    $('#supView').innerHTML='<div class="sec">📝 Solicitações de material</div><p class="sub" style="margin:2px 0 10px">Você pode ajustar a quantidade ou cancelar itens (✕). O que for aprovado segue para a segregação do almoxarife.</p>'+arr.map(s=>{
+      const itens=(s.itens||[]).map(i=>`<div class="inApItem" data-material="${i.material_id}" data-qs="${i.qt_solicitada}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.material}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt_solicitada)} ${i.unidade||''}</div></div><input class="inApQt" inputmode="decimal" value="${supNum(i.qt_solicitada)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="inApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
+      return `<div class="inApCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:4px 0 6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
     }).join('');
-    $('#supView').querySelectorAll('[data-ap]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_aprovar',{p_solicitacao_id:+b.dataset.ap},'Aprovada',supVAprovar)));
+    $('#supView').querySelectorAll('.inApX').forEach(b=>b.addEventListener('click',()=>{ const it=b.closest('.inApItem'); const q=it.querySelector('.inApQt'); const canc=it.classList.toggle('inCanc'); if(canc){ q.value='0'; q.disabled=true; it.style.opacity=.5; b.textContent='↩'; } else { q.value=supNum(+it.dataset.qs); q.disabled=false; it.style.opacity=1; b.textContent='✕'; } }));
+    $('#supView').querySelectorAll('[data-ap]').forEach(b=>b.addEventListener('click',()=>{
+      const card=b.closest('.inApCard'); const itens=[];
+      card.querySelectorAll('.inApItem').forEach(it=>{ const q=parseFloat((it.querySelector('.inApQt').value||'0').replace(',','.'))||0; itens.push({material_id:+it.dataset.material,qtd:q}); });
+      if(!itens.some(i=>i.qtd>0)) return toast('Aprove ao menos 1 item, ou rejeite a solicitação');
+      supAcao('sup_aprovar',{p_solicitacao_id:+b.dataset.ap,p_ajustes:itens},'Aprovada',supVAprovar);
+    }));
     $('#supView').querySelectorAll('[data-rj]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_rejeitar',{p_solicitacao_id:+b.dataset.rj},'Rejeitada',supVAprovar)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
@@ -2200,7 +2206,9 @@ function supAlmoxCard(s){
     const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${supNum(i.qt_segregada||0)} ${i.unidade}</b></div>`).join('');
     return `<div class="supcard" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div><div style="display:flex;gap:6px;margin-top:8px"><input class="supEntCod" data-id="${s.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-ent="${s.id}" style="margin:0;width:auto;padding:12px 16px">Entregar</button></div></div>`;
   }
-  const itens=(s.itens||[]).map(i=>`
+  const itens=(s.itens||[]).map(i=>{ if((+i.qt_aprovada||0)<=0) return `
+    <div style="border-top:1px solid var(--line);padding:8px 0;font-size:12.5px;opacity:.65"><span style="text-decoration:line-through">${i.material}</span> · <span class="sub">cancelado na aprovação</span></div>`;
+    return `
     <div class="supSegItem" data-mat="${i.material_id}" data-apr="${i.qt_aprovada||0}" style="border-top:1px solid var(--line);padding:8px 0">
       <div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.material}</span><span class="sub">aprovado: ${supNum(i.qt_aprovada||0)} ${i.unidade}</span></div>
       <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
@@ -2212,7 +2220,7 @@ function supAlmoxCard(s){
         <input class="supSegQt" inputmode="decimal" value="${supNum(i.qt_aprovada||0)}" style="width:66px;text-align:center"/>
       </div>
       <div class="supSegMsg" style="font-size:11px;margin-top:5px;font-weight:600"></div>
-    </div>`).join('');
+    </div>`; }).join('');
   return `<div class="supcard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin-top:6px">${itens}</div><div class="supSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Nada disponível — ao concluir, a solicitação será marcada como <b>EM FALTA</b> e o colaborador será avisado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Concluir segregação</button></div>`;
 }
 function supSegRefresh(card){
