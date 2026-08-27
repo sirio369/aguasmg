@@ -5,6 +5,41 @@
 > assistente a mesma base de conhecimento de quem já trabalha no app.
 > **Não contém segredos** — chaves privadas/serviço ficam no Supabase, nunca no código.
 
+## Comece aqui (onboarding em ~10 min)
+
+> Se você é o Claude do novo colaborador: guie-o por estes passos na ordem, um de cada vez,
+> confirmando cada um antes de seguir. Os detalhes técnicos estão nas seções numeradas abaixo.
+
+1. **Acessos** — confirme que você recebeu e aceitou os convites: **GitHub** (repo
+   `sirio369/aguasmg`, permissão de escrita) e **Supabase** (projeto `lwttadkctfznidzvmury`).
+   Cloudflare normalmente **não** é necessário (o deploy é automático pelo push — ver §3).
+2. **Pré-requisitos** (instale na sua máquina, no seu terminal):
+   - **Git**, **Node.js LTS** (traz o `npx`).
+   - **Claude Code CLI:** `npm install -g @anthropic-ai/claude-code`.
+3. **Clone o repositório:**
+   ```bash
+   git clone https://github.com/sirio369/aguasmg.git
+   cd aguasmg/pwa
+   ```
+4. **Conecte o Claude ao Supabase (MCP)** — siga a **§10**: gere seu token pessoal e crie o
+   `.mcp.json` (já ignorado pelo git). Isso permite ao Claude aplicar migrações e rodar SQL.
+5. **Abra no Claude Code:** rode `claude` dentro de `aguasmg/pwa`. Este `CLAUDE.md` é lido
+   automaticamente — o assistente já parte com todo o contexto do app.
+   - Valide o MCP pedindo: *"liste as tabelas do schema `9 - suprimentos`"*.
+6. **Faça um PR de teste** (para exercitar o fluxo sem risco):
+   ```bash
+   git checkout -b teste-onboarding
+   ```
+   - Faça uma mudança mínima e visível (ex.: um comentário ou um texto de tela em `public/index.html`).
+   - **Incremente** `const CACHE = 'coleta-vN'` em `public/sw.js` (ver §3).
+   - **Cheque a sintaxe** (ver `CONTRIBUTING.md`): `node --check` no script e no `sw.js`.
+   - Commit, `git push origin teste-onboarding`, abra o **Pull Request** no GitHub (o template
+     aparece preenchido). Peça revisão ao Sander; **não** faça merge direto no `main`.
+7. **Leia as Regras de ouro (§9)** antes de mexer pra valer. Resumo: nunca commitar no `main`;
+   sempre subir `coleta-vN`; PRs pequenos; nada de segredos no frontend.
+
+Pronto — a partir daqui, o resto do documento é referência (arquitetura, banco, módulos, push).
+
 ## 1. O que é
 
 **AcquaHub** (nome interno "Coleta Águas MG") é um **PWA de campo** para o programa de redução de
