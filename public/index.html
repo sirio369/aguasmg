@@ -2373,7 +2373,7 @@ function eqMeuCard(e){
   const sub=[e.tipo, e.num_serie?('nº '+e.num_serie):''].filter(Boolean).join(' · ');
   let acao='';
   if(e.termo_status==='pendente'){
-    acao='<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px">Aceite o termo de responsabilidade para ficar com este equipamento.</div><button class="btn" data-aceitar="'+e.termo_id+'" style="margin-top:8px">Li e aceito o termo</button>';
+    acao='<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:8px">Aceite o termo de responsabilidade para ficar com este equipamento.</div><button class="btn" data-aceitartermo="'+e.termo_id+'" style="margin-top:8px">📄 Abrir termo para aceitar</button>';
   } else if(e.devolucao_solicitada){
     acao='<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:8px 10px;font-size:13px">🔁 Devolução solicitada — informe este código ao almoxarife:<div style="font-size:22px;letter-spacing:3px;color:var(--acc);font-weight:700;margin-top:2px">'+(e.devolucao_codigo||'')+'</div></div>';
   } else {
@@ -2386,19 +2386,33 @@ function eqMeuCard(e){
       +'<textarea class="eqDevObs" rows="2" placeholder="Observação (obrigatória se defeito)" style="margin-top:6px"></textarea>'
       +'<button class="btn" data-devreq="'+e.equipamento_id+'" style="margin-top:6px">Gerar código de devolução</button></div>';
   }
-  const verTermo=e.termo_id?'<button class="btn ghost" data-vertermo="'+e.termo_id+'" style="margin-top:8px;width:auto;padding:7px 12px;font-size:13px">📄 Ver termo</button>':'';
+  const verTermo=(e.termo_id&&e.termo_status!=='pendente')?'<button class="btn ghost" data-vertermo="'+e.termo_id+'" style="margin-top:8px;width:auto;padding:7px 12px;font-size:13px">📄 Ver termo</button>':'';
   return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+e.nome+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'</div>'+eqStatusChip(e)+'</div>'+acao+verTermo+'</div>';
 }
-async function eqTermoVer(termoId){
+async function eqTermoVer(termoId, canAccept){
   let d;
   try{ const {data,error}=await sb.rpc('sup_termo_ver',{p_termo_id:termoId}); if(error)throw error; d=data||{}; }
   catch(e){ return toast('⚠ '+(e.message||e)); }
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+eqTermoHtml(d)+'</div>';
+  const paint=()=>{
+    ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+eqTermoHtml(d, canAccept)+'</div>';
+    document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+    document.getElementById('relPrint').onclick=()=>window.print();
+    const ab=document.getElementById('termoAceitar');
+    if(ab) ab.addEventListener('click',async()=>{
+      if(!navigator.onLine) return toast('Aceitar o termo precisa de conexão');
+      ab.disabled=true; ab.textContent='Registrando…';
+      const {error}=await sb.rpc('sup_termo_aceitar',{p_termo_id:termoId});
+      if(error){ toast('⚠ '+(error.message||error)); ab.disabled=false; ab.textContent='✅ Li e aceito o termo'; return; }
+      toast('✓ Termo aceito');
+      try{ const {data}=await sb.rpc('sup_termo_ver',{p_termo_id:termoId}); if(data) d=data; }catch(e){}
+      canAccept=false; paint(); ov.scrollTop=0;
+      try{ if(typeof supVEqMeus==='function') supVEqMeus(); }catch(e){}
+    });
+  };
+  paint();
   ov.style.display='block'; ov.scrollTop=0;
-  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
-  document.getElementById('relPrint').onclick=()=>window.print();
 }
 const TERMO_CSS=`
 .termoWrap.pend .relTop{background:#b3261e}
@@ -2409,7 +2423,7 @@ const TERMO_CSS=`
 .termoAviso{margin:0 0 2px;padding:11px 14px;font-size:13px;font-weight:700;text-align:center}
 .termoWrap.pend .termoAviso{background:#fdecea;color:#b3261e;border:1px solid #f3b4ad}
 .termoWrap.ok .termoAviso{background:#e7f6ef;color:#0a7d5e;border:1px solid #b6e2cf}`;
-function eqTermoHtml(d){
+function eqTermoHtml(d, canAccept){
   const aceito=d.status==='ativo';
   const cls=aceito?'ok':'pend';
   const statusLbl=d.status==='pendente'?'Aguardando aceite':(aceito?'Aceito':(d.status||''));
@@ -2423,16 +2437,16 @@ function eqTermoHtml(d){
   h+='<div class="relSec"><span class="relNum">1</span> Termo</div>';
   h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro que recebi o equipamento acima identificado, em condições de uso, comprometendo-me a: (a) utilizá-lo exclusivamente para as atividades de trabalho; (b) zelar pela sua guarda, conservação e uso correto; (c) comunicar imediatamente ao almoxarifado qualquer defeito, avaria, perda ou furto; (d) submetê-lo às manutenções preventivas nos prazos definidos; e (e) devolvê-lo quando solicitado ou ao término do uso. Estou ciente de que respondo pela sua guarda enquanto estiver sob minha responsabilidade.</div>';
   h+='<div class="sub" style="margin-top:10px;font-size:10px">'+(aceito?('Aceite eletrônico registrado no app em '+relFmtData(d.aceito_em)+'.'):'Termo ainda não aceito pelo colaborador.')+'</div>';
+  if(canAccept && !aceito){
+    h+='<div style="margin-top:16px"><button id="termoAceitar" style="all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;text-align:center;padding:13px;border-radius:10px;background:#0a7d5e;color:#fff;font-weight:700;font-size:15px">✅ Li e aceito o termo</button><div style="text-align:center;color:#777;font-size:11px;margin-top:6px">Ao clicar, seu aceite eletrônico é registrado e o termo passa a valer.</div></div>';
+  }
   h+='</div><div class="relFoot"><span>AcquaHub · termo gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   h+='</div>';
   return h;
 }
 function supEqMeusWire(){
-  $('#supView').querySelectorAll('[data-vertermo]').forEach(b=>b.addEventListener('click',()=>eqTermoVer(+b.dataset.vertermo)));
-  $('#supView').querySelectorAll('[data-aceitar]').forEach(b=>b.addEventListener('click',()=>{
-    const item={id:crypto.randomUUID(),rpc:'sup_termo_aceitar',fields:{p_termo_id:+b.dataset.aceitar}};
-    supEnviar(item,'✓ Termo aceito',()=>supVEqMeus());
-  }));
+  $('#supView').querySelectorAll('[data-vertermo]').forEach(b=>b.addEventListener('click',()=>eqTermoVer(+b.dataset.vertermo,false)));
+  $('#supView').querySelectorAll('[data-aceitartermo]').forEach(b=>b.addEventListener('click',()=>eqTermoVer(+b.dataset.aceitartermo,true)));
   $('#supView').querySelectorAll('[data-devtoggle]').forEach(b=>b.addEventListener('click',()=>{const x=$('#supView').querySelector('.eqDevBox[data-devbox="'+b.dataset.devtoggle+'"]'); if(x) x.classList.toggle('hidden');}));
   $('#supView').querySelectorAll('[data-devreq]').forEach(b=>b.addEventListener('click',async()=>{
     if(!navigator.onLine) return toast('Solicitar devolução precisa de conexão (gera o código)');
