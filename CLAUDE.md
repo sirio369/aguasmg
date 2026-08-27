@@ -189,3 +189,56 @@ para o almoxarife). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→fu
    privada em qualquer coisa externa.
 6. **Reaproveite** funções e variáveis CSS existentes; siga o estilo e a densidade de comentários do
    arquivo. É um arquivo enorme editado por poucas pessoas — **PRs pequenos** evitam conflito.
+
+## 10. Conectar o Claude ao Supabase (MCP) — setup do colaborador
+
+Para o Claude aplicar migrações e rodar SQL neste projeto (como quem já trabalha no app), configure o
+**Supabase MCP**. Faça isso uma vez, na sua máquina.
+
+**Pré-requisitos**
+- **Node.js LTS** instalado (dá acesso ao `npx`).
+- **Claude Code CLI** (`npm install -g @anthropic-ai/claude-code`).
+- Acesso ao projeto Supabase (você já foi adicionado ao projeto `lwttadkctfznidzvmury`).
+
+**1) Gere o SEU token pessoal** (não use o de outra pessoa):
+Supabase Dashboard → canto superior direito (conta) → **Account → Access Tokens** →
+**Generate new token** → copie o valor `sbp_...`. Guarde — ele só aparece uma vez.
+
+**2) Configure o MCP** no arquivo `.mcp.json` (na raiz do projeto onde você roda o Claude Code, ou no
+seu config de usuário do Claude). ⚠️ O fluxo OAuth novo do Supabase (`https://mcp.supabase.com/mcp`)
+**está quebrado** ("Unrecognized client_id"); use o método por `npx` + token:
+
+```jsonc
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=lwttadkctfznidzvmury"
+        // opcional: "--read-only"  → só leitura, se você só quer inspecionar
+      ],
+      "env": { "SUPABASE_ACCESS_TOKEN": "sbp_COLE_SEU_TOKEN_AQUI" }
+    }
+  }
+}
+```
+
+- `--project-ref` **trava o MCP neste projeto** (recomendado).
+- Reinicie o Claude Code; peça algo como "liste as tabelas do schema `9 - suprimentos`" para validar.
+
+**3) Segurança do token** (importante):
+- O token fica em **texto puro** no `.mcp.json`. **Nunca** commite/compartilhe esse arquivo — este repo
+  já ignora `.mcp.json` no `.gitignore`.
+- Se vazar, **revogue** no mesmo lugar em que foi gerado (Account → Access Tokens) e gere outro.
+- O token dá **acesso administrativo** ao projeto via API de gestão — trate como senha.
+
+**Como o Claude trabalha no banco depois de conectado** (ver também §4):
+- DDL → `apply_migration`; consultas/scripts → `execute_sql` (retorna só o resultado da **última**
+  instrução → combine com `jsonb_build_object`).
+- Valide RPC com **rollback E2E** antes de expor; conceda `execute` a `authenticated`, revogue de
+  `anon`/`public`.
+- **Edge Functions** (ex.: `push-send`) são publicadas via `deploy_edge_function`.
+- Rode `get_advisors` de vez em quando (checa RLS/segurança).
+- Há também um **MCP do QGIS** (opcional) que fala com o mesmo PostGIS, para trabalho de GIS/cadastro.
