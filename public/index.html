@@ -1912,7 +1912,8 @@ const SUP_ACTS={
   epi_pedidos:{ic:'📋',lbl:'Meus pedidos',fn:()=>supVEpiPedidos()},
   epi_meus:{ic:'🦺',lbl:'Meus EPIs',fn:()=>supVEpiMeus()},
   epi_aprovar:{ic:'🖊️',lbl:'Aprovar EPI',fn:()=>supVEpiAprovar()},
-  epi_entregar:{ic:'📤',lbl:'Entregar EPI',fn:()=>supVEpiEntregar()},
+  epi_segregar:{ic:'🏷️',lbl:'Separar EPI',fn:()=>supVEpiSegregar()},
+  epi_entregar:{ic:'📤',lbl:'Entregar EPI (retirada)',fn:()=>supVEpiEntregar()},
   epi_baixa:{ic:'🔁',lbl:'Devolver / Trocar EPI',fn:()=>supVEpiBaixa()},
   epi_painel:{ic:'📋',lbl:'EPIs por colaborador',fn:()=>supVEpiPainel()}
 };
@@ -1947,6 +1948,7 @@ function supBlocksEpi(){
       {id:'epi_aprovar',on:podeAp,papel:'Encarregado'},
       {id:'epi_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
+      {id:'epi_segregar',on:almox,papel:'Almoxarife'},
       {id:'epi_entregar',on:almox,papel:'Almoxarife'},
       {id:'epi_baixa',on:almox,papel:'Almoxarife'}]}
   ];
@@ -2398,16 +2400,31 @@ async function eqTermoVer(termoId){
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
 }
+const TERMO_CSS=`
+.termoWrap.pend .relTop{background:#b3261e}
+.termoWrap.pend .relTop .sub{color:#f6cfcb}
+.termoWrap.pend .relBadge{color:#b3261e}
+.termoWrap.pend .relSec{border-bottom-color:#b3261e;color:#b3261e}
+.termoWrap.pend .relNum{background:#b3261e}
+.termoAviso{margin:0 0 2px;padding:11px 14px;font-size:13px;font-weight:700;text-align:center}
+.termoWrap.pend .termoAviso{background:#fdecea;color:#b3261e;border:1px solid #f3b4ad}
+.termoWrap.ok .termoAviso{background:#e7f6ef;color:#0a7d5e;border:1px solid #b6e2cf}`;
 function eqTermoHtml(d){
-  const statusLbl=d.status==='pendente'?'Aguardando aceite':(d.status==='ativo'?'Aceito':(d.status||''));
-  let h='<div class="relTop"><div><h1>Termo de Responsabilidade de Equipamento</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge">'+statusLbl+'</div></div><div class="relBody">';
+  const aceito=d.status==='ativo';
+  const cls=aceito?'ok':'pend';
+  const statusLbl=d.status==='pendente'?'Aguardando aceite':(aceito?'Aceito':(d.status||''));
+  let h='<style>'+TERMO_CSS+'</style><div class="termoWrap '+cls+'">';
+  h+='<div class="relTop"><div><h1>Termo de Responsabilidade de Equipamento</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge">'+statusLbl+'</div></div>';
+  h+='<div class="termoAviso">'+(aceito?('✅ Termo aceito pelo colaborador em '+relFmtData(d.aceito_em)):'⚠ Termo AINDA NÃO aceito pelo colaborador')+'</div>';
+  h+='<div class="relBody">';
   h+='<div class="relGrid">'+relField('Equipamento',d.equipamento)+relField('Tipo',d.tipo||'—')+relField('Nº de série / patrimônio',d.num_serie||'—')+relField('Nº do termo','#'+d.id)+'</div>';
   h+='<div class="relGrid">'+relField('Responsável',d.colaborador)+relField('Emitido por',d.emitido_por||'—')+relField('Emitido em',relFmtData(d.emitido_em))+relField('Aceito em',d.aceito_em?relFmtData(d.aceito_em):'—')+'</div>';
   if(d.obs) h+='<div class="sub" style="margin-top:8px">Obs: '+d.obs+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span> Termo</div>';
   h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro que recebi o equipamento acima identificado, em condições de uso, comprometendo-me a: (a) utilizá-lo exclusivamente para as atividades de trabalho; (b) zelar pela sua guarda, conservação e uso correto; (c) comunicar imediatamente ao almoxarifado qualquer defeito, avaria, perda ou furto; (d) submetê-lo às manutenções preventivas nos prazos definidos; e (e) devolvê-lo quando solicitado ou ao término do uso. Estou ciente de que respondo pela sua guarda enquanto estiver sob minha responsabilidade.</div>';
-  h+='<div class="sub" style="margin-top:10px;font-size:10px">'+(d.status==='ativo'?('Aceite eletrônico registrado no app em '+relFmtData(d.aceito_em)+'.'):'Termo ainda não aceito pelo colaborador.')+'</div>';
+  h+='<div class="sub" style="margin-top:10px;font-size:10px">'+(aceito?('Aceite eletrônico registrado no app em '+relFmtData(d.aceito_em)+'.'):'Termo ainda não aceito pelo colaborador.')+'</div>';
   h+='</div><div class="relFoot"><span>AcquaHub · termo gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  h+='</div>';
   return h;
 }
 function supEqMeusWire(){
@@ -2666,11 +2683,13 @@ function eqHistCard(h){
   const entregue=eqDia(h.aceito_em||h.emitido_em);
   const devol=h.devolvido_em?eqDia(h.devolvido_em):'em posse';
   const sub=[h.tipo, h.responsavel?('com '+h.responsavel):''].filter(Boolean).join(' · ');
-  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+h.equipamento+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'<div class="sub" style="margin-top:3px;font-size:12px">📤 '+entregue+' · 📥 '+devol+'</div></div>'+chip+'</div></div>';
+  const quebra=h.defeito?'<div style="margin-top:8px;background:var(--bad-bg);border:1px solid var(--bad);border-radius:9px;padding:8px 10px"><div style="color:var(--bad);font-weight:700;font-size:12px">⚠ Devolvido com quebra/defeito</div>'+(h.defeito_obs?('<div style="font-size:12px;color:var(--bad);margin-top:2px">'+h.defeito_obs+'</div>'):'')+'</div>':'';
+  const brd=h.defeito?'border:1px solid var(--bad)':'border:1px solid var(--line)';
+  return '<div style="background:var(--card);'+brd+';border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>'+h.equipamento+'</b>'+(h.defeito?' <span title="quebra">🛠️</span>':'')+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+'<div class="sub" style="margin-top:3px;font-size:12px">📤 '+entregue+' · 📥 '+devol+'</div></div>'+chip+'</div>'+quebra+'</div>';
 }
 
 // ===== EPI =====
-const EPI_ST={solicitada:{l:'Solicitada',bg:'--warn-bg',fg:'--warn'},aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'},rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'},entregue:{l:'Entregue',bg:'--ok-bg',fg:'--ok'},cancelada:{l:'Cancelada',bg:'--line',fg:'--mut'}};
+const EPI_ST={solicitada:{l:'Solicitada',bg:'--warn-bg',fg:'--warn'},aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'},segregada:{l:'Pronto p/ retirada',bg:'--ok-bg',fg:'--ok'},rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'},entregue:{l:'Entregue',bg:'--ok-bg',fg:'--ok'},cancelada:{l:'Cancelada',bg:'--line',fg:'--mut'}};
 async function supEpiCatLoad(){ try{ const c=await sb.rpc('sup_epi_catalogo'); epiCat=c.data||[]; }catch(e){ epiCat=[]; } }
 function epiVenc(v){
   if(v.vencido) return {l:'Vencido — substituir',bg:'--bad-bg',fg:'--bad'};
@@ -2751,7 +2770,7 @@ async function supVEpiPedidos(){
     $('#supView').innerHTML=arr.map(s=>{
       const st=EPI_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
       const itens=(s.itens||[]).map(i=>i.epi+(i.tamanho?(' ['+i.tamanho+']'):'')+' ×'+supNum(i.qt)).join(', ');
-      const cod=(s.status==='aprovada'&&s.codigo)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:8px 11px;font-size:14px">Código de retirada: <b style="letter-spacing:3px">${s.codigo}</b> <span class="sub">— informe ao almoxarife na entrega</span></div>`:'';
+      const cod=(s.status==='segregada'&&s.codigo)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:8px 11px;font-size:14px">🎫 Pronto para retirada · código: <b style="letter-spacing:3px">${s.codigo}</b> <span class="sub">— retire no almoxarifado e informe o código</span></div>`:'';
       return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>#${s.id}</b><div class="sub" style="margin-top:2px">${itens} · ${supData(s.criado_em)}</div></div>${epiChip(st)}</div>${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
@@ -2863,7 +2882,7 @@ async function supVEpiAprovar(){
 
 // --- captura foto + assinatura (reutilizável) ---
 function epiCapturaHtml(id){ return `
-  <label>Foto da entrega *</label>
+  <label>Foto do colaborador com os EPIs *</label>
   <div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="epiFoto" data-cap="${id}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="epiFoto" data-cap="${id}"/></label></div>
   <img class="epiFotoPrev-${id} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/>
   <label style="margin-top:10px">Assinatura do colaborador *</label>
@@ -2917,17 +2936,37 @@ function epiSigBlock(cap,label){ return `
   <button type="button" class="btn ghost epiSigClear" data-cap="${cap}" style="margin-top:6px">Limpar assinatura</button>`;
 }
 
-// --- Entregar EPI (almox): resumo → detalhe (foto + assinatura) ---
+// --- Separar EPI (almox): segrega o pedido aprovado e gera o código de retirada ---
+let epiSegFila=[];
+async function supVEpiSegregar(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('sup_epi_fila_segregar'); if(error)throw error;
+    epiSegFila=data||[]; if(!epiSegFila.length){ $('#supView').innerHTML='<p class="sub">Nenhum EPI aprovado aguardando separação. 👍</p>'; return; }
+    $('#supView').innerHTML='<div class="sec">🏷️ EPIs aprovados a separar</div><p class="sub" style="margin:2px 0 10px">Separe os itens e gere o código. O colaborador é avisado para retirar no almoxarifado.</p>'+
+      epiSegFila.map(s=>{
+        const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-top:1px solid var(--line)"><span>${i.epi}${i.tamanho?(' <b>['+i.tamanho+']</b>'):''}</span><b>×${supNum(i.qt)}</b></div>`).join('');
+        return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||'—'}</span></div><div style="margin:6px 0">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<button class="btn" data-seg="${s.id}" style="margin-top:8px">Separar e gerar código</button></div>`;
+      }).join('');
+    $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',async()=>{
+      b.disabled=true;
+      const {data,error}=await sb.rpc('sup_epi_segregar',{p_solicitacao_id:+b.dataset.seg});
+      if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
+      toast('✓ Separado — código '+((data&&data.codigo)||'')); supVEpiSegregar();
+    }));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- Entregar/Retirar EPI (almox): resumo → detalhe (código + foto do colaborador + assinatura) ---
 let epiEntregaFila=[];
 async function supVEpiEntregar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('sup_epi_fila_entrega'); if(error)throw error;
-    epiEntregaFila=data||[]; if(!epiEntregaFila.length){ $('#supView').innerHTML='<p class="sub">Nenhuma entrega de EPI pendente. 👍</p>'; return; }
+    epiEntregaFila=data||[]; if(!epiEntregaFila.length){ $('#supView').innerHTML='<p class="sub">Nenhuma retirada de EPI pendente. 👍</p>'; return; }
     epiEntregaLista();
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 function epiEntregaLista(){
-  $('#supView').innerHTML='<p class="sub" style="margin-bottom:8px">'+epiEntregaFila.length+' entrega(s) pendente(s). Toque para ver o detalhamento e entregar.</p>'+
+  $('#supView').innerHTML='<p class="sub" style="margin-bottom:8px">'+epiEntregaFila.length+' retirada(s) pendente(s). Toque para conferir o código, fotografar e coletar a assinatura.</p>'+
     epiEntregaFila.map(s=>{
       const nit=(s.itens||[]).length; const tot=(s.itens||[]).reduce((a,i)=>a+(+i.qt||0),0);
       const resumo=(s.itens||[]).slice(0,3).map(i=>i.epi+(i.tamanho?(' ['+i.tamanho+']'):'')).join(', ')+(nit>3?'…':'');
@@ -2938,11 +2977,11 @@ function epiEntregaLista(){
 function epiEntregaDetalhe(id){
   const s=epiEntregaFila.find(x=>String(x.id)===String(id)); if(!s) return; const cid='e'+s.id;
   const itens=(s.itens||[]).map(i=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.epi}${i.tamanho?(' <b>['+i.tamanho+']</b>'):''} <span class="sub">(troca ${i.validade_dias}d)</span></span><b>×${supNum(i.qt)}</b></div><input class="epiCA" data-sol="${s.id}" data-epi="${i.epi_id}" value="${i.ca||''}" placeholder="Nº do CA (Certificado de Aprovação)" style="margin-top:5px;font-size:13px;padding:7px 9px"/></div>`).join('');
-  $('#supView').innerHTML=`<button class="btn ghost" id="epEntBack" style="margin-bottom:10px">‹ Voltar</button><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">para ${s.solicitante||'—'}</span></div>${s.obs?('<div class="sub" style="margin-top:4px">Obs: '+s.obs+'</div>'):''}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<label style="margin-top:10px">Código de validação (o colaborador mostra no app) *</label><input id="epEcod-${s.id}" inputmode="numeric" maxlength="4" placeholder="4 dígitos" style="letter-spacing:4px;font-size:16px;text-align:center"/><button class="btn" data-confirm="${cid}" data-econf="${s.id}" style="margin-top:10px">Confirmar entrega</button></div>`;
+  $('#supView').innerHTML=`<button class="btn ghost" id="epEntBack" style="margin-bottom:10px">‹ Voltar</button><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">para ${s.solicitante||'—'}</span></div>${s.obs?('<div class="sub" style="margin-top:4px">Obs: '+s.obs+'</div>'):''}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<label style="margin-top:10px">Código de validação (o colaborador mostra no app) *</label><input id="epEcod-${s.id}" inputmode="numeric" maxlength="4" placeholder="4 dígitos" style="letter-spacing:4px;font-size:16px;text-align:center"/><button class="btn" data-confirm="${cid}" data-econf="${s.id}" style="margin-top:10px">Confirmar retirada</button></div>`;
   epiCapturaWire();
   $('#epEntBack').addEventListener('click',()=>epiEntregaLista());
   $('#supView').querySelector('[data-econf]').addEventListener('click',()=>{ const sid=+s.id;
-    epiConfirmar('e'+sid,'sup_epi_entregar',()=>{ const cod=($('#epEcod-'+sid).value||'').trim(); if(!cod){ toast('Informe o código do colaborador'); return false; } const cas=[]; $('#supView').querySelectorAll('.epiCA[data-sol="'+sid+'"]').forEach(inp=>cas.push({epi_id:+inp.dataset.epi,ca:(inp.value||'').trim()})); return {p_solicitacao_id:sid,p_cas:cas,p_codigo:cod}; },'Entrega registrada',supVEpiEntregar);
+    epiConfirmar('e'+sid,'sup_epi_entregar',()=>{ const cod=($('#epEcod-'+sid).value||'').trim(); if(!cod){ toast('Informe o código do colaborador'); return false; } const cas=[]; $('#supView').querySelectorAll('.epiCA[data-sol="'+sid+'"]').forEach(inp=>cas.push({epi_id:+inp.dataset.epi,ca:(inp.value||'').trim()})); return {p_solicitacao_id:sid,p_cas:cas,p_codigo:cod}; },'Retirada registrada',supVEpiEntregar);
   });
 }
 
@@ -3501,7 +3540,7 @@ let tId; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div'
 window.toast=toast;
 
 // ---------- NOTIFICAÇÕES (inbox + badge) ----------
-const NTF_ICON={solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰'};
+const NTF_ICON={solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰',pronto:'🎫'};
 async function ntfBadge(){
   try{ const {data}=await sb.rpc('app_notif_contador'); const n=+data||0; const b=$('#ntfBadge'); if(!b) return;
     if(n>0){ b.textContent=n>99?'99+':String(n); b.style.display='inline-block'; } else b.style.display='none';
