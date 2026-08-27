@@ -212,6 +212,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <h1>Loggers temporários</h1>
     <button id="lgNovo" class="btn ghost" style="margin-bottom:10px">➕ Inserir logger</button>
     <div id="lgFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
+    <div id="lgCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgLista"></div>
     <div id="lgMapa" style="display:none;height:62vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
   </main>
@@ -685,7 +686,9 @@ document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',(
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 
 // ---------- MÓDULO LOGGERS ----------
-let loggersData=[], lgFiltro='todos', detFotos={}, detPonto=null, lgEnviando=false;
+let loggersData=[], lgFiltro='todos', lgCons='todos', detFotos={}, detPonto=null, lgEnviando=false;
+const LG_CONS=[{v:'todos',l:'Ambos'},{v:'ZA1004',l:'Contagem'},{v:'ZA0200',l:'Betim'}];
+function lgMatchC(p){ return lgCons==='todos'||p.consorcio===lgCons; }
 const LG_SIT={
   todos:{lbl:'Todos'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn'},
   instalado:{lbl:'Instalado',bg:'--ok-bg',fg:'--ok'},
@@ -697,7 +700,8 @@ const SBASE='https://lwttadkctfznidzvmury.supabase.co/storage/v1/object/public/f
 function fotoURL(p){return p?SBASE+p:'';}
 function distKm(lat,lon){if(!gps||lat==null)return null;const R=6371,dLat=(lat-gps.lat)*Math.PI/180,dLon=(lon-gps.lon)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(gps.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 function distTxt(d){if(d==null)return '';return d<1?Math.round(d*1000)+' m':d.toFixed(1)+' km';}
-function contar(s){return s==='todos'?loggersData.length:loggersData.filter(p=>p.situacao===s).length;}
+function contar(s){return loggersData.filter(p=>(s==='todos'||p.situacao===s)&&lgMatchC(p)).length;}
+function contarCons(c){return loggersData.filter(p=>(c==='todos'||p.consorcio===c)&&(lgFiltro==='todos'||p.situacao===lgFiltro)).length;}
 async function carregarLoggers(){
   $('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{
@@ -707,15 +711,20 @@ async function carregarLoggers(){
     const c=localStorage.getItem('loggers_cache'); loggersData=c?JSON.parse(c):[];
     if(!loggersData.length){$('#lgLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';$('#lgFiltros').innerHTML='';return;}
   }
-  renderFiltros(); atualizarVista();
+  renderFiltros(); renderConsFiltros(); atualizarVista();
 }
 function renderFiltros(){
   const ordem=['todos','pendente','instalado','remocao_autorizada','removido','concluido'];
   $('#lgFiltros').innerHTML=ordem.map(s=>`<button class="lgf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===lgFiltro?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${LG_SIT[s].lbl} ${contar(s)}</button>`).join('');
-  $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;renderFiltros();atualizarVista();}));
+  $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;renderFiltros();renderConsFiltros();atualizarVista();}));
+}
+function renderConsFiltros(){
+  const c=$('#lgCons'); if(!c) return;
+  c.innerHTML=LG_CONS.map(o=>`<button class="lgc" data-c="${o.v}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o.v===lgCons?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${o.l} ${contarCons(o.v)}</button>`).join('');
+  c.querySelectorAll('.lgc').forEach(b=>b.addEventListener('click',()=>{lgCons=b.dataset.c;renderFiltros();renderConsFiltros();atualizarVista();}));
 }
 function renderLoggers(){
-  let arr=loggersData.filter(p=>lgFiltro==='todos'||p.situacao===lgFiltro);
+  let arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p));
   if(gps) arr=arr.slice().sort((a,b)=>((distKm(a.lat,a.lon)??9e9)-(distKm(b.lat,b.lon)??9e9)));
   if(!arr.length){$('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhum ponto nesse filtro.</p>';return;}
   $('#lgLista').innerHTML=arr.map(p=>{
@@ -750,7 +759,7 @@ function renderMapa(){
   setTimeout(()=>lgMap.invalidateSize(),0);
   lgMarkers.clearLayers();
   const cor={pendente:'#e0a300',instalado:'#0e639c',remocao_autorizada:'#b3261e',removido:'#8a5a00',concluido:'#1a7f4b'};
-  const arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&p.lat&&p.lon);
+  const arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{
     const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:cor[p.situacao]||'#888',fillOpacity:1});
