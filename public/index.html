@@ -2927,7 +2927,7 @@ function eqHistCard(h){
 }
 
 // ===== EPI =====
-const EPI_ST={solicitada:{l:'Solicitada',bg:'--warn-bg',fg:'--warn'},aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'},segregada:{l:'Pronto p/ retirada',bg:'--ok-bg',fg:'--ok'},rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'},entregue:{l:'Entregue',bg:'--ok-bg',fg:'--ok'},cancelada:{l:'Cancelada',bg:'--line',fg:'--mut'}};
+const EPI_ST={solicitada:{l:'Solicitada',bg:'--warn-bg',fg:'--warn'},aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'},segregada:{l:'Pronto p/ retirada',bg:'--ok-bg',fg:'--ok'},em_falta:{l:'Em falta',bg:'--bad-bg',fg:'--bad'},rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'},entregue:{l:'Entregue',bg:'--ok-bg',fg:'--ok'},cancelada:{l:'Cancelada',bg:'--line',fg:'--mut'}};
 async function supEpiCatLoad(){ try{ const c=await sb.rpc('sup_epi_catalogo'); epiCat=c.data||[]; }catch(e){ epiCat=[]; } }
 function epiVenc(v){
   if(v.vencido) return {l:'Vencido — substituir',bg:'--bad-bg',fg:'--bad'};
@@ -3007,9 +3007,17 @@ async function supVEpiPedidos(){
     const arr=data||[]; if(!arr.length){ $('#supView').innerHTML='<p class="sub">Você ainda não solicitou EPIs.</p>'; return; }
     $('#supView').innerHTML=arr.map(s=>{
       const st=EPI_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
-      const itens=(s.itens||[]).map(i=>i.epi+(i.tamanho?(' ['+i.tamanho+']'):'')+' ×'+supNum(i.qt)).join(', ');
-      const cod=(s.status==='segregada'&&s.codigo)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:8px 11px;font-size:14px">🎫 Pronto para retirada · código: <b style="letter-spacing:3px">${s.codigo}</b> <span class="sub">— retire no almoxarifado e informe o código</span></div>`:'';
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>#${s.id}</b><div class="sub" style="margin-top:2px">${itens} · ${supData(s.criado_em)}</div></div>${epiChip(st)}</div>${cod}</div>`;
+      const seg=(s.status==='segregada'||s.status==='em_falta'||s.status==='entregue');
+      const itens=(s.itens||[]).map(i=>{
+        const base=i.epi+(i.tamanho?(' <b>['+i.tamanho+']</b>'):'');
+        if(!seg) return '<div>'+base+' ×'+supNum(i.qt_solicitada)+'</div>';
+        if(i.situacao==='falta') return '<div>'+base+' — <span style="color:var(--bad);font-weight:600">em falta</span></div>';
+        const q=(i.qt_segregada!=null?i.qt_segregada:(i.qt_aprovada!=null?i.qt_aprovada:i.qt_solicitada));
+        const parc=(i.situacao==='parcial')?(' <span style="color:var(--warn)">(parcial de '+supNum(i.qt_solicitada)+')</span>'):'';
+        return '<div>'+base+' ×'+supNum(q)+parc+'</div>';
+      }).join('');
+      const cod=(s.status==='segregada'&&s.codigo)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:8px 11px;font-size:14px">🎫 Pronto para retirada · código: <b style="letter-spacing:3px">${s.codigo}</b> <span class="sub">— retire no almoxarifado e informe o código</span></div>`:(s.status==='em_falta'?'<div style="margin-top:8px;background:var(--bad-bg);border-radius:8px;padding:8px 11px;font-size:13px;color:var(--bad)">⛔ EPIs indisponíveis no momento — o almoxarifado avisará quando houver.</div>':'');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><b>#${s.id}</b><span class="sub" style="margin-left:6px">${supData(s.criado_em)}</span></div>${epiChip(st)}</div><div class="sub" style="margin-top:4px;line-height:1.5">${itens}</div>${cod}</div>`;
     }).join('');
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
@@ -3176,21 +3184,63 @@ function epiSigBlock(cap,label){ return `
 
 // --- Separar EPI (almox): segrega o pedido aprovado e gera o código de retirada ---
 let epiSegFila=[];
+function _epiSbtn(s,cur){ const on=s===cur; const c={existe:'--ok',parcial:'--warn',falta:'--bad'}[s]; const lbl={existe:'Existe',parcial:'Parcial',falta:'Falta'}[s]; return `<button type="button" class="epiS" data-s="${s}" style="all:unset;cursor:pointer;padding:6px 10px;border-radius:8px;font-size:12px;text-align:center;flex:1;${on?('background:var('+c+');color:#fff'):'background:var(--card);border:1px solid var(--line)'}">${lbl}</button>`; }
+function supEpiSegCard(s){
+  const itens=(s.itens||[]).map(i=>{
+    const tam=i.tamanho?(' <b>['+i.tamanho+']</b>'):'';
+    return `<div class="epiSegItem" data-item="${i.item_id}" data-apr="${i.qt}" data-sit="existe" style="border-top:1px solid var(--line);padding:8px 0">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.epi}${tam}</span><span class="sub">aprovado: ${supNum(i.qt)}</span></div>
+      <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+        <span class="epiSit" style="display:flex;gap:4px;flex:1">${_epiSbtn('existe','existe')}${_epiSbtn('parcial','existe')}${_epiSbtn('falta','existe')}</span>
+        <input class="epiSegQt" inputmode="decimal" value="${supNum(i.qt)}" style="width:60px;text-align:center"/>
+      </div>
+      <div class="epiSegMsg" style="font-size:11px;margin-top:5px;font-weight:600"></div>
+    </div>`;
+  }).join('');
+  return `<div class="epiSegCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||'—'}</span></div><div style="margin-top:6px">${itens}</div>${s.obs?('<div class="sub" style="margin-top:6px">Obs: '+s.obs+'</div>'):''}<div class="epiSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Nada disponível — ao separar, o pedido fica <b>EM FALTA</b> e o colaborador é avisado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Separar e gerar código</button></div>`;
+}
+function epiSegRefresh(card){
+  if(!card) return; let disp=0;
+  card.querySelectorAll('.epiSegItem').forEach(it=>{
+    const sit=it.dataset.sit||'existe'; const inp=it.querySelector('.epiSegQt'); const msg=it.querySelector('.epiSegMsg');
+    const qt=parseFloat((inp.value||'0').replace(',','.'))||0; const apr=+it.dataset.apr||0;
+    if(sit==='falta'){ inp.disabled=true; inp.style.opacity=.5; if(msg){msg.textContent='⛔ Em falta — não entra na retirada'; msg.style.color='var(--bad)';} }
+    else { inp.disabled=false; inp.style.opacity=1;
+      if(sit==='parcial'){ disp+=qt; if(msg){msg.textContent='⚠️ Parcial — '+supNum(qt)+' de '+supNum(apr); msg.style.color='var(--warn)';} }
+      else { disp+=qt; if(msg) msg.textContent=''; } }
+  });
+  const seg=card.querySelector('[data-seg]'), blk=card.querySelector('.epiSegBlock'); const vazio=disp<=0;
+  if(seg){ seg.textContent=vazio?'Marcar pedido em falta':'Separar e gerar código'; seg.style.background=vazio?'var(--bad)':''; }
+  if(blk) blk.style.display=vazio?'block':'none';
+}
+function epiSegWire(){
+  $('#supView').querySelectorAll('.epiSegItem').forEach(it=>{
+    it.querySelectorAll('.epiS').forEach(b=>b.addEventListener('click',()=>{
+      it.dataset.sit=b.dataset.s;
+      it.querySelectorAll('.epiS').forEach(x=>{ const on=x.dataset.s===b.dataset.s; const c={existe:'--ok',parcial:'--warn',falta:'--bad'}[x.dataset.s]; x.style.cssText='all:unset;cursor:pointer;padding:6px 10px;border-radius:8px;font-size:12px;text-align:center;flex:1;'+(on?('background:var('+c+');color:#fff'):'background:var(--card);border:1px solid var(--line)'); });
+      const inp=it.querySelector('.epiSegQt');
+      if(b.dataset.s==='falta'){ inp.value='0'; } else if((parseFloat(inp.value)||0)===0){ inp.value=supNum(+it.dataset.apr); }
+      epiSegRefresh(it.closest('.epiSegCard'));
+    }));
+    it.querySelector('.epiSegQt').addEventListener('input',()=>epiSegRefresh(it.closest('.epiSegCard')));
+  });
+  $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',async()=>{
+    const card=b.closest('.epiSegCard'); const itens=[];
+    card.querySelectorAll('.epiSegItem').forEach(it=>{ const sit=it.dataset.sit||'existe'; const qt=parseFloat((it.querySelector('.epiSegQt').value||'0').replace(',','.'))||0; itens.push({item_id:+it.dataset.item, situacao:sit, qt_segregada:sit==='falta'?0:qt}); });
+    b.disabled=true;
+    const {data,error}=await sb.rpc('sup_epi_segregar',{p_solicitacao_id:+b.dataset.seg, p_itens:itens});
+    if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
+    if(data&&data.status==='em_falta') toast('Pedido marcado em falta'); else toast('✓ Separado — código '+((data&&data.codigo)||''));
+    supVEpiSegregar();
+  }));
+}
 async function supVEpiSegregar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('sup_epi_fila_segregar'); if(error)throw error;
     epiSegFila=data||[]; if(!epiSegFila.length){ $('#supView').innerHTML='<p class="sub">Nenhum EPI aprovado aguardando separação. 👍</p>'; return; }
-    $('#supView').innerHTML='<div class="sec">🏷️ EPIs aprovados a separar</div><p class="sub" style="margin:2px 0 10px">Separe os itens e gere o código. O colaborador é avisado para retirar no almoxarifado.</p>'+
-      epiSegFila.map(s=>{
-        const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-top:1px solid var(--line)"><span>${i.epi}${i.tamanho?(' <b>['+i.tamanho+']</b>'):''}</span><b>×${supNum(i.qt)}</b></div>`).join('');
-        return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||'—'}</span></div><div style="margin:6px 0">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<button class="btn" data-seg="${s.id}" style="margin-top:8px">Separar e gerar código</button></div>`;
-      }).join('');
-    $('#supView').querySelectorAll('[data-seg]').forEach(b=>b.addEventListener('click',async()=>{
-      b.disabled=true;
-      const {data,error}=await sb.rpc('sup_epi_segregar',{p_solicitacao_id:+b.dataset.seg});
-      if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
-      toast('✓ Separado — código '+((data&&data.codigo)||'')); supVEpiSegregar();
-    }));
+    $('#supView').innerHTML='<div class="sec">🏷️ EPIs aprovados a separar</div><p class="sub" style="margin:2px 0 10px">Ajuste a quantidade ou marque <b>Falta</b> se não tiver o EPI. O solicitante é avisado do que foi separado.</p>'+
+      epiSegFila.map(supEpiSegCard).join('');
+    epiSegWire();
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
