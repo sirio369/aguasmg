@@ -2485,22 +2485,35 @@ async function supVPainel(){
   $('#supView').innerHTML=`
     <div class="sec">📋 Painel das equipes</div>
     <p class="sub" style="margin:2px 0 8px">Selecione uma ou mais equipes para ver o estoque agregado, o estoque por equipe e as movimentações.</p>
-    <div style="display:flex;gap:12px;margin-bottom:6px"><a id="pnAll" style="cursor:pointer;color:var(--acc);font-weight:600;font-size:13px">Todas</a><a id="pnNone" style="cursor:pointer;color:var(--acc);font-weight:600;font-size:13px">Limpar</a></div>
-    <div id="pnChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <div style="position:relative">
+      <button id="pnSelBtn" type="button" style="all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:14px"><span id="pnSelLbl" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mut)">Selecione as equipes…</span><span style="color:var(--mut)">▾</span></button>
+      <div id="pnSelPanel" class="hidden" style="position:absolute;z-index:20;left:0;right:0;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18);overflow:hidden">
+        <div style="padding:8px;border-bottom:1px solid var(--line)"><input id="pnSearch" placeholder="Buscar equipe…" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px"/></div>
+        <div style="display:flex;gap:14px;padding:7px 12px;border-bottom:1px solid var(--line)"><a id="pnAll" style="cursor:pointer;color:var(--acc);font-weight:600;font-size:12px">Selecionar todas</a><a id="pnNone" style="cursor:pointer;color:var(--acc);font-weight:600;font-size:12px">Limpar</a></div>
+        <div id="pnOpts" style="max-height:44vh;overflow:auto;padding:2px 0"></div>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;align-items:center;margin-top:10px">
       <span class="sub">De</span><input id="supPDe" type="date" style="flex:1;min-width:0;font-size:13px"/>
       <span class="sub">até</span><input id="supPAte" type="date" style="flex:1;min-width:0;font-size:13px"/>
     </div>
     <button id="supPLoad" class="btn" style="margin-top:10px">Carregar</button>
     <div id="supPOut" style="margin-top:10px"></div>`;
-  const chips=()=>{
-    $('#pnChips').innerHTML=us.map(u=>{ const on=sel.has(u.id);
-      return `<button type="button" class="pnChip" data-u="${u.id}" style="all:unset;cursor:pointer;padding:6px 11px;border-radius:999px;font-size:13px;${on?'background:var(--acc);color:#fff':'background:var(--card);border:1px solid var(--line)'}">${u.nome}</button>`; }).join('');
-    $('#pnChips').querySelectorAll('.pnChip').forEach(b=>b.addEventListener('click',()=>{ const id=b.dataset.u; if(sel.has(id)) sel.delete(id); else sel.add(id); chips(); }));
-  };
-  chips();
-  $('#pnAll').addEventListener('click',()=>{ us.forEach(u=>sel.add(u.id)); chips(); });
-  $('#pnNone').addEventListener('click',()=>{ sel.clear(); chips(); });
+  const pnLbl=()=>{ const n=sel.size, el=$('#pnSelLbl'); if(!el) return;
+    if(n===0){ el.textContent='Selecione as equipes…'; el.style.color='var(--mut)'; }
+    else if(n===us.length){ el.textContent='Todas as equipes ('+n+')'; el.style.color='var(--ink)'; }
+    else if(n===1){ const u=us.find(x=>sel.has(x.id)); el.textContent=u?u.nome:'1 equipe'; el.style.color='var(--ink)'; }
+    else { el.textContent=n+' equipes selecionadas'; el.style.color='var(--ink)'; } };
+  const pnOpts=()=>{ const q=_matNorm(($('#pnSearch').value||'').trim());
+    const arr=us.filter(u=>!q||_matNorm(u.nome).includes(q));
+    $('#pnOpts').innerHTML=arr.length?arr.map(u=>{ const on=sel.has(u.id);
+      return `<label style="display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer;font-size:14px"><input type="checkbox" class="pnCk" data-u="${u.id}" ${on?'checked':''} style="width:auto;margin:0;flex:none"/> <span>${u.nome}</span></label>`; }).join(''):'<div class="sub" style="padding:10px 12px">Ninguém encontrado.</div>';
+    $('#pnOpts').querySelectorAll('.pnCk').forEach(c=>c.addEventListener('change',()=>{ const id=c.dataset.u; if(c.checked) sel.add(id); else sel.delete(id); pnLbl(); })); };
+  $('#pnSelBtn').addEventListener('click',()=>{ const p=$('#pnSelPanel'); const abrindo=p.classList.contains('hidden'); p.classList.toggle('hidden'); if(abrindo){ pnOpts(); const s=$('#pnSearch'); if(s) s.focus(); } });
+  $('#pnSearch').addEventListener('input',pnOpts);
+  $('#pnAll').addEventListener('click',()=>{ us.forEach(u=>sel.add(u.id)); pnOpts(); pnLbl(); });
+  $('#pnNone').addEventListener('click',()=>{ sel.clear(); pnOpts(); pnLbl(); });
+  pnLbl();
   const load=async()=>{
     if(!sel.size){ $('#supPOut').innerHTML='<p class="sub">Selecione ao menos uma equipe acima.</p>'; return; }
     $('#supPOut').innerHTML='<p class="sub">Carregando…</p>';
