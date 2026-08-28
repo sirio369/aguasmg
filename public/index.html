@@ -231,6 +231,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <h1>VRPs</h1>
     <p class="sub" style="margin:-4px 0 8px">Levantamento de campo das válvulas redutoras de pressão. Toque numa VRP para preencher a visita.</p>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input id="vrpBusca" placeholder="Buscar por nome ou código…" autocomplete="off" style="flex:1;font-size:14px;padding:9px 10px"/>
+      <button id="vrpBuscaX" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 14px;border-radius:10px;font-size:16px;display:flex;align-items:center">🔎</button>
+    </div>
+    <div id="vrpBuscaRes" style="font-size:13px;margin-bottom:6px"></div>
     <div id="vrpFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="vrpCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="vrpLista"></div>
@@ -1457,7 +1462,7 @@ document.querySelectorAll('#ocorrencia .ocF').forEach(fi=>fi.addEventListener('c
 
 // ---------- MÓDULO VRP (levantamento de visita) ----------
 let vrpData=[], vrpFiltro='todos', vrpCons='todos', vrpView='lista', vrpMap=null, vrpMarkers=null;
-let vrpAtual=null, vrpAns={}, vrpFotos={}, vrpUltima=null, vrpEnviando=false;
+let vrpAtual=null, vrpAns={}, vrpFotos={}, vrpUltima=null, vrpEnviando=false, vrpDestaque=null;
 const VRP_SIT={
   todos:{lbl:'Todas'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn'},
   localizada:{lbl:'Localizada',bg:'--ok-bg',fg:'--ok'},
@@ -1504,6 +1509,7 @@ const VRP_FORM=[
 const VRP_FOTO_KEYS=VRP_FORM.filter(f=>f.t==='foto').map(f=>f.k);
 
 async function vrpCarregar(){
+  { const bx=$('#vrpBusca'); if(bx) bx.value=''; const br=$('#vrpBuscaRes'); if(br) br.innerHTML=''; }
   $('#vrpLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_vrp_listar'); if(error)throw error;
     vrpData=data||[]; localStorage.setItem('vrp_cache',JSON.stringify(vrpData));
@@ -1629,9 +1635,32 @@ async function vrpEnviar(){
     await vrpCarregar(); irPara('vrp');
   }catch(e){ toast('⚠ '+(e.message||e)); vrpEnviando=false; if(btn){ btn.disabled=false; btn.textContent='Enviar visita'; } }
 }
+function vrpBuscar(){
+  const box=$('#vrpBuscaRes'); if(!box) return;
+  const t=_matNorm(($('#vrpBusca').value||'').trim());
+  if(!t){ box.innerHTML=''; return; }
+  const arr=vrpData.filter(p=>_matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t)).slice(0,15);
+  if(!arr.length){ box.textContent='Nada encontrado.'; return; }
+  box.innerHTML=arr.map(p=>{ const cUf=p.consorcio==='ZA1004'?'Contagem':(p.consorcio==='ZA0200'?'Betim':''); const s=VRP_SIT[p.situacao]||{lbl:p.situacao};
+    return `<div class="vrpres" data-id="${p.id}" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--line)"><b>${vEsc(p.label)}</b> <span class="sub">· ${[cUf,p.cd_no_agua,s.lbl].filter(Boolean).join(' · ')}</span></div>`; }).join('');
+  box.querySelectorAll('.vrpres').forEach(el=>el.addEventListener('click',()=>{ const p=vrpData.find(x=>x.id===+el.dataset.id); if(p) vrpIrPara(p); }));
+}
+function vrpIrPara(p){
+  if(p.lat==null){ toast('Esta VRP não tem coordenada no cadastro'); return; }
+  vrpSetView('mapa'); $('#vrpBuscaRes').innerHTML='';
+  setTimeout(()=>{ if(!vrpMap) return; vrpMap.setView([p.lat,p.lon],18);
+    if(vrpDestaque){ try{ vrpMarkers.removeLayer(vrpDestaque); }catch(e){} }
+    vrpDestaque=L.circleMarker([p.lat,p.lon],{radius:11,color:'#ff6d00',weight:3,fillColor:'#ff9800',fillOpacity:.5}).addTo(vrpMarkers);
+    const s=VRP_SIT[p.situacao]||{lbl:p.situacao};
+    vrpDestaque.bindPopup(`<b>${vEsc(p.label)}</b><br>${p.cd_no_agua?('nó '+vEsc(p.cd_no_agua)+'<br>'):''}${s.lbl}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vrpAbrirPop" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher visita</a>`).openPopup();
+    vrpDestaque.on('popupopen',()=>{ const el=document.querySelector('.vrpAbrirPop'); if(el) el.addEventListener('click',()=>vrpAbrir(p.id)); });
+  },140);
+}
 if($('#vrpVwLista')) $('#vrpVwLista').addEventListener('click',()=>vrpSetView('lista'));
 if($('#vrpVwMapa')) $('#vrpVwMapa').addEventListener('click',()=>vrpSetView('mapa'));
 if($('#vrpBack')) $('#vrpBack').addEventListener('click',()=>irPara('vrp'));
+if($('#vrpBusca')) $('#vrpBusca').addEventListener('input',vrpBuscar);
+if($('#vrpBuscaX')) $('#vrpBuscaX').addEventListener('click',vrpBuscar);
 
 // ---------- CADASTRO TÉCNICO ----------
 let cadMap=null, cadCamadas={}, cadOn={reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
