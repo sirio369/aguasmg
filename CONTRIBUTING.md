@@ -47,6 +47,20 @@ Depois do merge, **confirme o deploy** (leva ~30–60 s):
 curl -s https://campo.aguas-mg.workers.dev/sw.js | grep -o 'coleta-v[0-9]*'
 ```
 
+### Se o deploy travar (plano B)
+
+O build automático do Cloudflare às vezes trava/enfila (ex.: vários PRs em sequência). Nesse caso,
+publique direto da sua máquina — mesmo comando, sem depender do runner deles:
+
+```bash
+git checkout main && git pull          # garanta o main atualizado
+npx wrangler login                     # só na 1ª vez (abre o navegador → Allow)
+npx wrangler deploy                    # sobe public/ para o Worker "campo" em segundos
+```
+
+Dica: desmarcar **"Builds for non-production branches"** (Worker → Settings → Builds) faz cada PR
+gerar **1 build** (só no merge do `main`) em vez de 2, reduzindo a fila.
+
 ## PRs pequenos, sempre
 
 O app é essencialmente **um `index.html` gigante**. Dois editando o mesmo arquivo geram conflito com

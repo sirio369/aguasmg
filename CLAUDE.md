@@ -89,6 +89,20 @@ pwa/
 - **Checar sintaxe antes de commitar** (o app não tem build que pegue erros): extraia o bloco
   `<script type="module">` para um `.mjs` e rode `node --check`.
 
+### Deploy manual (plano B — quando o build do Cloudflare travar)
+O build automático do Cloudflare (Workers Builds) roda `npx wrangler deploy` num runner deles e
+**às vezes trava/enfila** (principalmente com vários PRs em sequência). Quando isso acontecer, publique
+direto da sua máquina — é o **mesmo** comando, sem depender do runner:
+```bash
+cd <repo>/pwa
+npx wrangler login     # só na 1ª vez nesta máquina (abre o navegador → Allow)
+npx wrangler deploy    # sobe public/ para o Worker "campo" em segundos
+```
+Confirme com o poll do `sw.js` (o `coleta-vN` deve bater). Isso publica exatamente o que está no seu
+working copy — então garanta que está no `main` atualizado (`git checkout main && git pull`) antes.
+Dica: desmarcar **"Builds for non-production branches"** (Worker → Settings → Builds) reduz a fila
+pela metade (1 build por PR, só no merge do `main`).
+
 ### Service Worker (`sw.js`)
 - `index.html` é **network-first** (online sempre pega a versão nova; offline usa cache).
 - Demais assets: cache-first.
