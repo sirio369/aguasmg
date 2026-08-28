@@ -1509,8 +1509,9 @@ const VRP_FORM=[
 ];
 const VRP_FOTO_KEYS=VRP_FORM.filter(f=>f.t==='foto').map(f=>f.k);
 
+function vrpBuscaReset(){ vrpBuscaTermo=''; const bx=$('#vrpBusca'); if(bx) bx.value=''; const br=$('#vrpBuscaRes'); if(br) br.innerHTML=''; }
 async function vrpCarregar(){
-  { const bx=$('#vrpBusca'); if(bx) bx.value=''; const br=$('#vrpBuscaRes'); if(br) br.innerHTML=''; }
+  vrpBuscaReset();
   $('#vrpLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_vrp_listar'); if(error)throw error;
     vrpData=data||[]; localStorage.setItem('vrp_cache',JSON.stringify(vrpData));
@@ -1522,12 +1523,12 @@ async function vrpCarregar(){
 function vrpRenderFiltros(){
   const ordem=['todos','pendente','localizada','nao_localizada'];
   $('#vrpFiltros').innerHTML=ordem.map(s=>`<button class="vrpf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===vrpFiltro?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${VRP_SIT[s].lbl} ${vrpContar(s)}</button>`).join('');
-  $('#vrpFiltros').querySelectorAll('.vrpf').forEach(b=>b.addEventListener('click',()=>{vrpFiltro=b.dataset.f;vrpRenderFiltros();vrpRenderCons();vrpAtualizar();}));
+  $('#vrpFiltros').querySelectorAll('.vrpf').forEach(b=>b.addEventListener('click',()=>{vrpFiltro=b.dataset.f;vrpBuscaReset();vrpRenderFiltros();vrpRenderCons();vrpAtualizar();}));
 }
 function vrpRenderCons(){
   const c=$('#vrpCons'); if(!c) return;
   c.innerHTML=VRP_CONS.map(o=>`<button class="vrpc" data-c="${o.v}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o.v===vrpCons?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${o.l} ${vrpContarCons(o.v)}</button>`).join('');
-  c.querySelectorAll('.vrpc').forEach(b=>b.addEventListener('click',()=>{vrpCons=b.dataset.c;vrpRenderFiltros();vrpRenderCons();vrpAtualizar();}));
+  c.querySelectorAll('.vrpc').forEach(b=>b.addEventListener('click',()=>{vrpCons=b.dataset.c;vrpBuscaReset();vrpRenderFiltros();vrpRenderCons();vrpAtualizar();}));
 }
 function vrpAtualizar(){ vrpRenderLista(); if(vrpView==='mapa') vrpRenderMapa(); }
 function vrpSetView(v){
