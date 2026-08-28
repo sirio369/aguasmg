@@ -1462,7 +1462,8 @@ document.querySelectorAll('#ocorrencia .ocF').forEach(fi=>fi.addEventListener('c
 
 // ---------- MÓDULO VRP (levantamento de visita) ----------
 let vrpData=[], vrpFiltro='todos', vrpCons='todos', vrpView='lista', vrpMap=null, vrpMarkers=null;
-let vrpAtual=null, vrpAns={}, vrpFotos={}, vrpUltima=null, vrpEnviando=false, vrpDestaque=null;
+let vrpAtual=null, vrpAns={}, vrpFotos={}, vrpUltima=null, vrpEnviando=false, vrpDestaque=null, vrpBuscaTermo='';
+function vrpMatchT(p){ if(!vrpBuscaTermo) return true; const t=vrpBuscaTermo; return _matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t); }
 const VRP_SIT={
   todos:{lbl:'Todas'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn'},
   localizada:{lbl:'Localizada',bg:'--ok-bg',fg:'--ok'},
@@ -1540,7 +1541,7 @@ function vrpSetView(v){
   if(v==='mapa') vrpRenderMapa();
 }
 function vrpRenderLista(){
-  let arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p));
+  let arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p));
   if(gps) arr=arr.slice().sort((a,b)=>((distKm(a.lat,a.lon)??9e9)-(distKm(b.lat,b.lon)??9e9)));
   if(!arr.length){ $('#vrpLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhuma VRP nesse filtro.</p>'; return; }
   $('#vrpLista').innerHTML=arr.map(p=>{
@@ -1558,7 +1559,7 @@ function vrpRenderMapa(){
   if(!vrpMap){ cont.innerHTML=''; vrpMap=L.map('vrpMapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(vrpMap); vrpMarkers=L.layerGroup().addTo(vrpMap); }
   setTimeout(()=>vrpMap.invalidateSize(),0);
   vrpMarkers.clearLayers();
-  const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&p.lat&&p.lon);
+  const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{ const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:VRP_COR[p.situacao]||'#888',fillOpacity:1});
     m.on('click',()=>vrpAbrir(p.id)); m.bindTooltip((p.label||('#'+p.id))+' · '+((VRP_SIT[p.situacao]||{}).lbl||''));
@@ -1638,7 +1639,7 @@ async function vrpEnviar(){
 function vrpBuscar(){
   const box=$('#vrpBuscaRes'); if(!box) return;
   const t=_matNorm(($('#vrpBusca').value||'').trim());
-  if(!t){ box.innerHTML=''; return; }
+  if(!t){ box.innerHTML=''; if(vrpBuscaTermo){ vrpBuscaTermo=''; vrpRenderFiltros(); vrpRenderCons(); vrpAtualizar(); } return; }
   const arr=vrpData.filter(p=>_matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t)).slice(0,15);
   if(!arr.length){ box.textContent='Nada encontrado.'; return; }
   box.innerHTML=arr.map(p=>{ const cUf=p.consorcio==='ZA1004'?'Contagem':(p.consorcio==='ZA0200'?'Betim':''); const s=VRP_SIT[p.situacao]||{lbl:p.situacao};
@@ -1656,11 +1657,21 @@ function vrpIrPara(p){
     vrpDestaque.on('popupopen',()=>{ const el=document.querySelector('.vrpAbrirPop'); if(el) el.addEventListener('click',()=>vrpAbrir(p.id)); });
   },140);
 }
+function vrpBuscaGo(){
+  const t=_matNorm(($('#vrpBusca').value||'').trim());
+  if(!t){ toast('Digite um nome ou código'); return; }
+  const arr=vrpData.filter(p=>_matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t));
+  if(!arr.length){ toast('Nenhuma VRP encontrada'); return; }
+  $('#vrpBuscaRes').innerHTML='';
+  vrpBuscaTermo=t; vrpRenderFiltros(); vrpRenderCons();
+  if(arr.length===1){ vrpIrPara(arr[0]); return; }
+  vrpSetView('mapa'); toast(arr.length+' VRPs no mapa');
+}
 if($('#vrpVwLista')) $('#vrpVwLista').addEventListener('click',()=>vrpSetView('lista'));
 if($('#vrpVwMapa')) $('#vrpVwMapa').addEventListener('click',()=>vrpSetView('mapa'));
 if($('#vrpBack')) $('#vrpBack').addEventListener('click',()=>irPara('vrp'));
-if($('#vrpBusca')) $('#vrpBusca').addEventListener('input',vrpBuscar);
-if($('#vrpBuscaX')) $('#vrpBuscaX').addEventListener('click',vrpBuscar);
+if($('#vrpBusca')){ $('#vrpBusca').addEventListener('input',vrpBuscar); $('#vrpBusca').addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); vrpBuscaGo(); } }); }
+if($('#vrpBuscaX')) $('#vrpBuscaX').addEventListener('click',vrpBuscaGo);
 
 // ---------- CADASTRO TÉCNICO ----------
 let cadMap=null, cadCamadas={}, cadOn={reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
