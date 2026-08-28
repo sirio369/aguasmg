@@ -3593,7 +3593,7 @@ async function supVConfig(){
 function supCfgRender(){
   $('#supView').innerHTML=`
     <div class="sec">👤 Usuários</div>
-    <p class="sub" style="margin-top:2px"><b>Acesso</b> = o que a pessoa pode fazer no app (Campo, Aprovador, Almoxarife, Admin) — vale nos 3 módulos. <b>Cargo</b> = a ocupação dela, usada para carregar a cesta de EPI.</p>
+    <p class="sub" style="margin-top:2px"><b>Acesso</b> = o que a pessoa pode fazer no app (Campo, Aprovador, Almoxarife, Admin) — vale nos 3 módulos. <b>Cargo</b> = a ocupação, usada para a cesta de EPI. <b>Aprovador 1/2</b> = quem recebe as notificações de aprovação dos pedidos dessa pessoa (se vazio, vão para todos os aprovadores/admins). <b>Consórcio</b> = a que consórcio ela pertence.</p>
     <div id="cfgUsers"></div>
     <div class="sec" style="margin-top:26px">🦺 Cargos e cesta de EPI</div>
     <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
@@ -3637,10 +3637,25 @@ async function supCfgCestaSalvar(cargoId,box){
   if(error){ toast('⚠ '+(error.message||error)); if(btn) btn.disabled=false; return; }
   toast('✓ Cesta salva'); supCfgCargos();
 }
+const CFG_LBL='font-size:10px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px';
 function supCfgUsers(){
   const c=$('#cfgUsers'); if(!c) return;
   if(!cfgUsers.length){ c.innerHTML='<p class="sub">Nenhum usuário.</p>'; return; }
-  c.innerHTML=cfgUsers.map(u=>`<div style="padding:9px 0;border-bottom:1px solid var(--line)"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div><div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">${u.email||''}</div><div style="display:flex;gap:6px"><div style="flex:1;min-width:0"><div class="sub" style="font-size:10px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Acesso</div><select data-fu="${u.id}" style="width:100%;font-size:13px;padding:7px 8px">${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${u.funcao===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div><div style="flex:1.3;min-width:0"><div class="sub" style="font-size:10px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">Cargo</div><select data-cu="${u.id}" style="width:100%;font-size:13px;padding:7px 8px"><option value="">—</option>${cfgCargoOpts.map(cg=>`<option value="${cg.id}"${String(u.cargo_id)===String(cg.id)?' selected':''}>${cg.nome}</option>`).join('')}</select></div></div></div>`).join('');
+  const apOpts=(u,sel)=>'<option value="">—</option>'+cfgUsers.filter(x=>x.id!==u.id).map(x=>`<option value="${x.id}"${String(sel||'')===String(x.id)?' selected':''}>${x.nome||x.email}</option>`).join('');
+  const coOpts=(u)=>[['','—'],['ZA1004','Contagem'],['ZA0200','Betim']].map(([v,l])=>`<option value="${v}"${(u.consorcio||'')===v?' selected':''}>${l}</option>`).join('');
+  c.innerHTML=cfgUsers.map(u=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+    <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div>
+    <div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">${u.email||''}</div>
+    <div style="display:flex;gap:6px">
+      <div style="flex:1;min-width:0"><div class="sub" style="${CFG_LBL}">Acesso</div><select data-fu="${u.id}" style="width:100%;font-size:13px;padding:7px 8px">${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${u.funcao===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div>
+      <div style="flex:1.3;min-width:0"><div class="sub" style="${CFG_LBL}">Cargo</div><select data-cu="${u.id}" style="width:100%;font-size:13px;padding:7px 8px"><option value="">—</option>${cfgCargoOpts.map(cg=>`<option value="${cg.id}"${String(u.cargo_id)===String(cg.id)?' selected':''}>${cg.nome}</option>`).join('')}</select></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <div style="flex:1;min-width:0"><div class="sub" style="${CFG_LBL}">Aprovador 1</div><select data-ap1="${u.id}" style="width:100%;font-size:13px;padding:7px 8px">${apOpts(u,u.aprovador_uuid)}</select></div>
+      <div style="flex:1;min-width:0"><div class="sub" style="${CFG_LBL}">Aprovador 2</div><select data-ap2="${u.id}" style="width:100%;font-size:13px;padding:7px 8px">${apOpts(u,u.aprovador2_uuid)}</select></div>
+      <div style="flex:.85;min-width:0"><div class="sub" style="${CFG_LBL}">Consórcio</div><select data-co="${u.id}" style="width:100%;font-size:13px;padding:7px 8px">${coOpts(u)}</select></div>
+    </div>
+  </div>`).join('');
   c.querySelectorAll('[data-fu]').forEach(sel=>sel.addEventListener('change',async()=>{
     const {error}=await sb.rpc('sup_admin_set_funcao',{p_uid:sel.dataset.fu,p_funcao:sel.value});
     if(error){ toast('⚠ '+(error.message||error)); const u0=cfgUsers.find(x=>x.id===sel.dataset.fu); if(u0) sel.value=u0.funcao; return; }
@@ -3653,6 +3668,23 @@ function supCfgUsers(){
     if(error){ toast('⚠ '+(error.message||error)); const u0=cfgUsers.find(x=>x.id===sel.dataset.cu); if(u0) sel.value=u0.cargo_id||''; return; }
     const u=cfgUsers.find(x=>x.id===sel.dataset.cu); if(u) u.cargo_id=val;
     toast('✓ Cargo atualizado');
+  }));
+  const wireAp=(sel)=>sel.addEventListener('change',async()=>{
+    const uid=sel.dataset.ap1||sel.dataset.ap2;
+    const ap1=(c.querySelector('[data-ap1="'+uid+'"]').value)||null;
+    const ap2=(c.querySelector('[data-ap2="'+uid+'"]').value)||null;
+    const {data,error}=await sb.rpc('sup_admin_set_aprovadores',{p_uid:uid,p_ap1:ap1,p_ap2:ap2});
+    if(error){ toast('⚠ '+(error.message||error)); return; }
+    const u=cfgUsers.find(x=>x.id===uid); if(u){ u.aprovador_uuid=(data&&data.aprovador_uuid)||null; u.aprovador2_uuid=(data&&data.aprovador2_uuid)||null; }
+    toast('✓ Aprovador atualizado'); supCfgUsers();
+  });
+  c.querySelectorAll('[data-ap1]').forEach(wireAp);
+  c.querySelectorAll('[data-ap2]').forEach(wireAp);
+  c.querySelectorAll('[data-co]').forEach(sel=>sel.addEventListener('change',async()=>{
+    const val=sel.value||null;
+    const {error}=await sb.rpc('sup_admin_set_consorcio',{p_uid:sel.dataset.co,p_consorcio:val});
+    if(error){ toast('⚠ '+(error.message||error)); const u0=cfgUsers.find(x=>x.id===sel.dataset.co); if(u0) sel.value=u0.consorcio||''; return; }
+    const u=cfgUsers.find(x=>x.id===sel.dataset.co); if(u) u.consorcio=val; toast('✓ Consórcio atualizado');
   }));
 }
 function supCfgEquipes(){
