@@ -1572,7 +1572,51 @@ async function vrpAbrir(id){
   vrpAns={}; vrpFotos={}; vrpUltima=null;
   $('#vrpDet').innerHTML='<p class="sub">Carregando…</p>'; irPara('vrp_det');
   try{ const {data}=await sb.rpc('app_vrp_visita_ver',{p_vrp_id:id}); if(data) vrpUltima=data; }catch(e){}
-  vrpFormRender();
+  if(vrpAtual.situacao!=='pendente' && vrpUltima) vrpResumo(vrpAtual, vrpUltima);
+  else vrpFormRender();
+}
+function vrpRespPairs(u){ const r=(u&&u.respostas)||{}; return VRP_FORM.filter(f=>f.t!=='foto' && r[f.k]!=null && String(r[f.k]).trim()!=='').map(f=>[f.q, r[f.k]]); }
+function vrpFotoPairs(u){ const fo=(u&&u.fotos)||{}; return VRP_FORM.filter(f=>f.t==='foto' && fo[f.k]).map(f=>[f.q, fo[f.k]]); }
+function vrpConsLbl(c){ return c==='ZA1004'?'Contagem (ZA1004)':(c==='ZA0200'?'Betim (ZA0200)':(c||'—')); }
+function vrpResumo(p,u){
+  const s=VRP_SIT[u.situacao]||VRP_SIT[p.situacao]||{lbl:(u.situacao||p.situacao)};
+  const bg=(u.situacao==='nao_localizada')?'--bad-bg':'--ok-bg';
+  let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><h1 style="margin:0;font-size:20px">${vEsc(p.label)}</h1>${p.lat?`<button data-navp="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:20px;margin-left:auto">🧭</button>`:''}</div>
+    <p class="sub" style="margin:0 0 8px">${[vrpConsLbl(p.consorcio),p.cd_no_agua?('nó '+p.cd_no_agua):'',p.diametro?('DN '+p.diametro):''].filter(Boolean).join(' · ')}</p>
+    <div style="background:var(${bg});border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:13px">Situação: <b>${s.lbl}</b>${u.visitado_por?(' · '+vEsc(u.visitado_por)):''}${u.visitado_em?(' · '+relFmtData(u.visitado_em)):''}</div>`;
+  const pairs=vrpRespPairs(u);
+  h+='<div class="sec">📋 Informações preenchidas</div>';
+  h+= pairs.length? pairs.map(([l,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px"><span class="sub" style="flex:1;min-width:0">${l}</span><b style="text-align:right">${vEsc(v)}</b></div>`).join('') : '<p class="sub">Sem respostas registradas.</p>';
+  const fps=vrpFotoPairs(u);
+  if(fps.length){ h+='<div class="sec" style="margin-top:16px">📷 Fotos</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">'+fps.map(([l,path])=>`<figure style="margin:0"><img src="${fotoURL(path)}" style="width:100%;border-radius:8px;background:var(--card)" onerror="this.style.display='none'"/><figcaption class="sub" style="text-align:center;font-size:11px;margin-top:2px">${l}</figcaption></figure>`).join('')+'</div>'; }
+  h+=`<button class="btn" id="vrpRelBtn" style="margin-top:18px">📄 Gerar relatório (PDF)</button>`;
+  $('#vrpDet').innerHTML=h;
+  const nb=$('#vrpDet').querySelector('[data-navp]'); if(nb) nb.addEventListener('click',()=>window.open('https://www.google.com/maps/dir/?api=1&destination='+nb.dataset.navp,'_blank'));
+  $('#vrpRelBtn').addEventListener('click',()=>vrpRelatorio(p,u));
+}
+function vrpRelHtml(p,u){
+  const s=VRP_SIT[u.situacao]||{lbl:u.situacao};
+  const coord=(p.lat!=null&&p.lon!=null)?(Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)):'—';
+  let h='<div class="relTop"><div><h1>Relatório de Visita · VRP</h1><div class="sub">'+vrpConsLbl(p.consorcio)+'</div></div><div class="relBadge">'+s.lbl+'</div></div>';
+  h+='<div class="relBody">';
+  h+='<div class="relGrid">'+relField('VRP',p.label)+relField('Código do nó',p.cd_no_agua||'—')+relField('Diâmetro (cadastro)',p.diametro?('DN '+p.diametro):'—')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  h+='<div class="relGrid">'+relField('Situação',s.lbl)+relField('Visitado por',u.visitado_por||'—')+relField('Visitado em',relFmtData(u.visitado_em))+relField('Coordenada',coord)+'</div>';
+  h+='<div class="relSec"><span class="relNum">1</span> Levantamento</div>';
+  const pairs=vrpRespPairs(u);
+  h+= pairs.length? ('<div class="relGrid">'+pairs.map(([l,v])=>relField(l,v)).join('')+'</div>') : '<div class="relPend">Sem respostas registradas.</div>';
+  h+='<div class="relSec"><span class="relNum">2</span> Fotos</div>';
+  h+=relFotos(vrpFotoPairs(u));
+  h+='</div>';
+  h+='<div class="relFoot"><span>AcquaHub · relatório gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  return h;
+}
+function vrpRelatorio(p,u){
+  if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+vrpRelHtml(p,u)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
 }
 function vrpBanner(){
   if(!vrpUltima) return '';
