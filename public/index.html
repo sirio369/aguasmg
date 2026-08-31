@@ -77,6 +77,10 @@ body:has(#login:not(.hidden)){background:#f6f8fb}
 .pqlbl:before{display:none!important}
 .prlbl{background:rgba(20,24,29,.8);color:#fff;border:none;font-weight:700;font-size:10px;box-shadow:none;padding:1px 5px;border-radius:5px}
 .prlbl:before{display:none!important}
+.rlbl{background:rgba(20,24,29,.6);color:#fff;border:none;font-weight:600;font-size:8px;box-shadow:none;padding:0 3px;border-radius:4px;opacity:.9}
+.rlbl:before{display:none!important}
+.rlbl-big{background:rgba(20,24,29,.9);color:#fff;border:none;font-weight:800;font-size:12px;box-shadow:none;padding:2px 6px;border-radius:6px}
+.rlbl-big:before{display:none!important}
 hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .sec{font-size:14px;font-weight:700;margin:20px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .supS{all:unset;cursor:pointer;text-align:center;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut);flex:1}
@@ -356,6 +360,31 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
         <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
       </div>
     </div>
+    <div class="sec" style="margin-top:20px">🛟 Suporte</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="roteiro"><div class="ic">🗺️</div><div class="nm">Roteiro de leitura</div></button>
+    </div>
+  </main>
+
+  <main id="roteiro" class="hidden">
+    <div class="bar"><button class="bk" id="rlBack">‹ Entrevistadores</button></div>
+    <h1>Roteiro de leitura</h1>
+    <p class="sub">Selecione um percurso para ver seus pontos (matrículas) e trechos no mapa.</p>
+    <label for="rlPerc">Percurso</label>
+    <select id="rlPerc"><option value="">Carregando percursos…</option></select>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="flex:1"><label for="rlTrecho">Trecho</label>
+        <select id="rlTrecho" disabled><option value="">Todos</option></select></div>
+    </div>
+    <label for="rlMat" style="margin-top:8px">Buscar matrícula</label>
+    <div style="display:flex;gap:6px">
+      <input id="rlMat" autocomplete="off" inputmode="numeric" placeholder="nº da matrícula" style="flex:1"/>
+      <button id="rlMatGo" class="btn" style="width:auto;padding:0 16px;margin:0">🔍</button>
+    </div>
+    <div id="rlMsg" class="sub" style="margin:6px 0 0"></div>
+    <div id="rlToggles" style="display:flex;gap:6px;margin:12px 0 8px"></div>
+    <div id="rlMapa" style="height:60vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
+    <div class="sub" style="margin-top:8px">🟢 Início · 🔴 Fim · 🟠 Meio · 🟣 Início/Fim (percurso de 1 ponto). Toque num ponto para detalhes.</div>
   </main>
 
   <main id="abertura_servicos" class="hidden">
@@ -718,7 +747,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas','notificacoes'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas','roteiro','notificacoes'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -738,6 +767,7 @@ function irPara(id){
   if(id==='entrevistadores') entInit();
   if(id==='programacao_servicos') pgInit();
   if(id==='matriculas') mtInit();
+  if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
@@ -1828,6 +1858,111 @@ function cadIrPara(x,layer){
   cadDestaque=L.circleMarker([x.lat,x.lon],{radius:11,color:'#ff6d00',weight:3,fillColor:'#ff9800',fillOpacity:.5}).addTo(cadMap);
   cadDestaque.bindPopup((info?info+'<br>':'')+nav).openPopup();
 }
+
+// ---------- SUPORTE › ROTEIRO DE LEITURA ----------
+let rlMap=null, rlPontosLayer=null, rlLinhasLayer=null, rlDestaque=null;
+let rlPercursos=null, rlPerc='', rlTrecho=null, rlData=null, rlOn={pontos:true,linhas:true}, rlCarregando=false;
+const RL_COR={INICIO:'#2e7d32',FIM:'#b3261e',INICIO_FIM:'#6a1b9a',MEIO:'#ff9800'};
+async function rlInit(){
+  if(!window.L){document.getElementById('rlMapa').innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
+  if(!rlMap){
+    document.getElementById('rlMapa').innerHTML='';
+    rlMap=L.map('rlMapa');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(rlMap);
+    rlMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?13:11);
+  }
+  setTimeout(function(){rlMap.invalidateSize();},60);
+  rlTogglesRender();
+  if(!rlPercursos) rlCarregarPercursos();
+}
+function rlTogglesRender(){
+  const defs=[{k:'pontos',lbl:'📍 Pontos',cor:'#ff9800'},{k:'linhas',lbl:'➰ Linhas',cor:'#1565c0'}];
+  document.getElementById('rlToggles').innerHTML=defs.map(function(d){return '<button class="rltg" data-k="'+d.k+'" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;'+(rlOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);')+'">'+d.lbl+'</button>';}).join('');
+  document.getElementById('rlToggles').querySelectorAll('.rltg').forEach(function(b){b.addEventListener('click',function(){rlOn[b.dataset.k]=!rlOn[b.dataset.k];rlTogglesRender();rlRender();});});
+}
+async function rlCarregarPercursos(){
+  const sel=document.getElementById('rlPerc');
+  try{
+    const r=await sb.rpc('app_roteiro_percursos'); if(r.error)throw r.error;
+    rlPercursos=r.data||[];
+    sel.innerHTML='<option value="">Selecione um percurso…</option>'+rlPercursos.map(function(p){return '<option value="'+p.percurso_id+'">'+p.consorcio+' · '+p.cidade+' · Setor '+p.setor+' · Rota '+p.rota+' ('+p.n_pontos+' pts)</option>';}).join('');
+  }catch(e){sel.innerHTML='<option value="">Erro ao carregar</option>';toast('Erro: '+(e.message||e));}
+}
+async function rlCarregarPercurso(pid){
+  if(!pid){rlData=null;rlPerc='';rlTrecho=null;rlTrechoRender(0);rlRender();return;}
+  rlPerc=pid; rlTrecho=null; rlCarregando=true;
+  document.getElementById('rlMsg').textContent='Carregando percurso…';
+  try{
+    const res=await Promise.all([
+      sb.rpc('app_roteiro_pontos',{p_percurso:pid}),
+      sb.rpc('app_roteiro_linhas',{p_percurso:pid})
+    ]);
+    if(res[0].error)throw res[0].error; if(res[1].error)throw res[1].error;
+    rlData={pontos:res[0].data||{features:[]},linhas:res[1].data||{features:[]}};
+    const nt=(rlData.linhas.features||[]).reduce(function(m,f){return Math.max(m,(f.properties&&f.properties.trecho)||0);},0);
+    rlTrechoRender(nt);
+    document.getElementById('rlMsg').textContent=(rlData.pontos.features||[]).length+' pontos · '+nt+' trechos';
+    rlRender(true);
+  }catch(e){document.getElementById('rlMsg').textContent='Erro: '+(e.message||e);}
+  finally{rlCarregando=false;}
+}
+function rlTrechoRender(nt){
+  const sel=document.getElementById('rlTrecho');
+  if(!nt){sel.innerHTML='<option value="">Todos</option>';sel.disabled=true;return;}
+  let o='<option value="">Todos os trechos</option>';
+  for(let i=1;i<=nt;i++)o+='<option value="'+i+'">Trecho '+i+'</option>';
+  sel.innerHTML=o; sel.disabled=false; sel.value='';
+}
+function rlRender(fit){
+  if(!rlMap)return;
+  [rlPontosLayer,rlLinhasLayer].forEach(function(l){if(l){rlMap.removeLayer(l);}});
+  rlPontosLayer=L.layerGroup(); rlLinhasLayer=L.layerGroup();
+  if(!rlData){return;}
+  const tf=rlTrecho;
+  (rlData.linhas.features||[]).forEach(function(f){
+    const p=f.properties||{}; if(tf&&p.trecho!==tf)return;
+    L.geoJSON(f,{style:{color:'#1565c0',weight:4,opacity:.75}}).bindTooltip('Trecho '+p.trecho+' · '+p.n_pontos+' pts · '+p.comprimento_m+' m').addTo(rlLinhasLayer);
+  });
+  const pts=[];
+  (rlData.pontos.features||[]).forEach(function(f){
+    const p=f.properties||{}; if(tf&&p.trecho!==tf)return;
+    const c=f.geometry.coordinates, ll=[c[1],c[0]]; pts.push(ll);
+    const big=p.marco!=='MEIO';
+    const m=L.circleMarker(ll,{radius:big?9:4,color:'#fff',weight:big?2:1,fillColor:RL_COR[p.marco]||'#ff9800',fillOpacity:1});
+    m.bindTooltip(String(p.matricula),{permanent:true,direction:'top',className:big?'rlbl-big':'rlbl',offset:[0,big?-9:-4]});
+    m.on('click',function(){
+      const nav='<a href="https://www.google.com/maps/dir/?api=1&destination='+ll[0]+','+ll[1]+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>';
+      m.bindPopup('<b>Matrícula:</b> '+p.matricula+'<br><b>Marco:</b> '+p.marco+'<br><b>Trecho:</b> '+p.trecho+'<br><b>Ordem:</b> '+p.ordem+'<br>'+nav).openPopup();
+    });
+    m.addTo(rlPontosLayer);
+  });
+  if(rlOn.linhas)rlLinhasLayer.addTo(rlMap);
+  if(rlOn.pontos)rlPontosLayer.addTo(rlMap);
+  if(fit&&pts.length){try{rlMap.fitBounds(pts,{padding:[30,30]});}catch(e){}}
+}
+async function rlBuscarMat(){
+  const t=(document.getElementById('rlMat').value||'').trim();
+  if(!t){return;}
+  document.getElementById('rlMsg').textContent='Buscando matrícula…';
+  try{
+    const r=await sb.rpc('app_roteiro_matricula',{p_matricula:Number(t)}); if(r.error)throw r.error;
+    const arr=r.data||[];
+    if(!arr.length){document.getElementById('rlMsg').textContent='Matrícula não encontrada.';return;}
+    const x=arr[0];
+    document.getElementById('rlPerc').value=x.percurso_id;
+    await rlCarregarPercurso(x.percurso_id);
+    rlMap.setView([x.lat,x.lon],18);
+    if(rlDestaque){rlMap.removeLayer(rlDestaque);rlDestaque=null;}
+    rlDestaque=L.circleMarker([x.lat,x.lon],{radius:13,color:'#ff6d00',weight:3,fillColor:'#ff9800',fillOpacity:.5}).addTo(rlMap);
+    rlDestaque.bindTooltip('Matrícula '+x.matricula,{permanent:true,direction:'right',className:'rlbl-big'}).openTooltip();
+    document.getElementById('rlMsg').textContent='Matrícula '+x.matricula+' — '+x.cidade+' · Setor '+x.setor+' · Rota '+x.rota;
+  }catch(e){document.getElementById('rlMsg').textContent='Erro: '+(e.message||e);}
+}
+if($('#rlBack')) $('#rlBack').addEventListener('click',function(){irPara('entrevistadores');});
+if($('#rlPerc')) $('#rlPerc').addEventListener('change',function(e){rlCarregarPercurso(e.target.value);});
+if($('#rlTrecho')) $('#rlTrecho').addEventListener('change',function(e){rlTrecho=e.target.value?Number(e.target.value):null;rlRender(true);});
+if($('#rlMatGo')) $('#rlMatGo').addEventListener('click',rlBuscarMat);
+if($('#rlMat')) $('#rlMat').addEventListener('keydown',function(e){if(e.key==='Enter')rlBuscarMat();});
 
 // ---------- MÓDULO PESQUISA (trechos retos + ocorrência) ----------
 let pqMap=null, pqLayer=null, pqYou=null;
