@@ -238,6 +238,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="vrpBuscaRes" style="font-size:13px;margin-bottom:6px"></div>
     <div id="vrpFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="vrpCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
+    <div id="vrpJoaoRow" style="padding-bottom:8px;font-size:12px;"></div>
     <div id="vrpLista"></div>
     <div id="vrpMapa" style="display:none;height:62vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
   </main>
@@ -1464,6 +1465,9 @@ document.querySelectorAll('#ocorrencia .ocF').forEach(fi=>fi.addEventListener('c
 let vrpData=[], vrpFiltro='todos', vrpCons='todos', vrpView='lista', vrpMap=null, vrpMarkers=null;
 let vrpAtual=null, vrpAns={}, vrpFotos={}, vrpUltima=null, vrpEnviando=false, vrpDestaque=null, vrpBuscaTermo='';
 function vrpMatchT(p){ if(!vrpBuscaTermo) return true; const t=vrpBuscaTermo; return _matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t); }
+let vrpJoao=false;
+const VRP_JOAO=new Set(['VRP1435553','VRP1435554','VRP1435620','VRP1435621','VRP1435713','VRP1435714','VRP1250061','VRP1249818','VRP1249902','VRP1249682','VRP1249915','VRP1250062','VRP1250178','VRP1540126','VRP0546055','VRP0730336','VRP0730339','VRP1441995','VRP1556344','VRP0750521','VRP0001320','VRP0557308','VRP1630541','VRP0001182','VRP0575937','VRP0664054','VRP0659572','VRP0687309','VRP0000559','VRP0677817','VRP1120207','VRP1477147','VRP1526918','VRP1526919','VRP1527217','VRP1609102','VRP1634678','VRP0685753','VRP1504637','VRP1484842','VRP1520806','VRP0807757','VRP0748987','VRP0748988','VRP1520807','VRP0692467','VRP0670140','VRP0724520','VRP0749048','VRP0749049','VRP1189226','VRP1189227','VRP1428582','VRP1428583','VRP1489653','VRP1612979','VRP1612980']);
+function vrpMatchJ(p){ return !vrpJoao || VRP_JOAO.has(p.cd_no_agua) || VRP_JOAO.has(p.num_vrp); }
 const VRP_SIT={
   todos:{lbl:'Todas'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn'},
   localizada:{lbl:'Localizada',bg:'--ok-bg',fg:'--ok'},
@@ -1472,8 +1476,8 @@ const VRP_SIT={
 const VRP_CONS=[{v:'todos',l:'Ambos'},{v:'ZA1004',l:'Contagem'},{v:'ZA0200',l:'Betim'}];
 const VRP_COR={pendente:'#e0a300',localizada:'#1a7f4b',nao_localizada:'#b3261e'};
 function vrpMatchC(p){ return vrpCons==='todos'||p.consorcio===vrpCons; }
-function vrpContar(s){ return vrpData.filter(p=>(s==='todos'||p.situacao===s)&&vrpMatchC(p)).length; }
-function vrpContarCons(c){ return vrpData.filter(p=>(c==='todos'||p.consorcio===c)&&(vrpFiltro==='todos'||p.situacao===vrpFiltro)).length; }
+function vrpContar(s){ return vrpData.filter(p=>(s==='todos'||p.situacao===s)&&vrpMatchC(p)&&vrpMatchJ(p)).length; }
+function vrpContarCons(c){ return vrpData.filter(p=>(c==='todos'||p.consorcio===c)&&(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchJ(p)).length; }
 function vEsc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 // --- formulário dinâmico (com condicionais) ---
@@ -1520,17 +1524,23 @@ async function vrpCarregar(){
   }catch(e){ const c=localStorage.getItem('vrp_cache'); vrpData=c?JSON.parse(c):[];
     if(!vrpData.length){ $('#vrpLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>'; return; }
   }
-  vrpRenderFiltros(); vrpRenderCons(); vrpAtualizar();
+  vrpRenderFiltros(); vrpRenderCons(); vrpRenderJoao(); vrpAtualizar();
 }
 function vrpRenderFiltros(){
   const ordem=['todos','pendente','localizada','nao_localizada'];
   $('#vrpFiltros').innerHTML=ordem.map(s=>`<button class="vrpf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===vrpFiltro?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${VRP_SIT[s].lbl} ${vrpContar(s)}</button>`).join('');
-  $('#vrpFiltros').querySelectorAll('.vrpf').forEach(b=>b.addEventListener('click',()=>{vrpFiltro=b.dataset.f;vrpBuscaReset();vrpRenderFiltros();vrpRenderCons();vrpAtualizar();}));
+  $('#vrpFiltros').querySelectorAll('.vrpf').forEach(b=>b.addEventListener('click',()=>{vrpFiltro=b.dataset.f;vrpBuscaReset();vrpRenderFiltros();vrpRenderCons();vrpRenderJoao();vrpAtualizar();}));
 }
 function vrpRenderCons(){
   const c=$('#vrpCons'); if(!c) return;
   c.innerHTML=VRP_CONS.map(o=>`<button class="vrpc" data-c="${o.v}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o.v===vrpCons?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${o.l} ${vrpContarCons(o.v)}</button>`).join('');
-  c.querySelectorAll('.vrpc').forEach(b=>b.addEventListener('click',()=>{vrpCons=b.dataset.c;vrpBuscaReset();vrpRenderFiltros();vrpRenderCons();vrpAtualizar();}));
+  c.querySelectorAll('.vrpc').forEach(b=>b.addEventListener('click',()=>{vrpCons=b.dataset.c;vrpBuscaReset();vrpRenderFiltros();vrpRenderCons();vrpRenderJoao();vrpAtualizar();}));
+}
+function vrpRenderJoao(){
+  const el=$('#vrpJoaoRow'); if(!el) return;
+  const n=vrpData.filter(p=>VRP_JOAO.has(p.cd_no_agua)||VRP_JOAO.has(p.num_vrp)).length;
+  el.innerHTML=`<button class="vrpjb" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${vrpJoao?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">🎯 Filtro João ${n}</button>`;
+  el.querySelector('.vrpjb').addEventListener('click',()=>{ vrpJoao=!vrpJoao; vrpBuscaReset(); vrpRenderFiltros(); vrpRenderCons(); vrpRenderJoao(); vrpAtualizar(); });
 }
 function vrpAtualizar(){ vrpRenderLista(); if(vrpView==='mapa') vrpRenderMapa(); }
 function vrpSetView(v){
@@ -1544,7 +1554,7 @@ function vrpSetView(v){
   if(v==='mapa') vrpRenderMapa();
 }
 function vrpRenderLista(){
-  let arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p));
+  let arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&vrpMatchJ(p));
   if(gps) arr=arr.slice().sort((a,b)=>((distKm(a.lat,a.lon)??9e9)-(distKm(b.lat,b.lon)??9e9)));
   if(!arr.length){ $('#vrpLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhuma VRP nesse filtro.</p>'; return; }
   $('#vrpLista').innerHTML=arr.map(p=>{
@@ -1562,7 +1572,7 @@ function vrpRenderMapa(){
   if(!vrpMap){ cont.innerHTML=''; vrpMap=L.map('vrpMapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(vrpMap); vrpMarkers=L.layerGroup().addTo(vrpMap); }
   setTimeout(()=>vrpMap.invalidateSize(),0);
   vrpMarkers.clearLayers();
-  const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&p.lat&&p.lon);
+  const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&vrpMatchJ(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{ const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:VRP_COR[p.situacao]||'#888',fillOpacity:1});
     m.on('click',()=>vrpAbrir(p.id)); m.bindTooltip((p.label||('#'+p.id))+' · '+((VRP_SIT[p.situacao]||{}).lbl||''));
