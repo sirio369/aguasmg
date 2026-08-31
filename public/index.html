@@ -77,10 +77,6 @@ body:has(#login:not(.hidden)){background:#f6f8fb}
 .pqlbl:before{display:none!important}
 .prlbl{background:rgba(20,24,29,.8);color:#fff;border:none;font-weight:700;font-size:10px;box-shadow:none;padding:1px 5px;border-radius:5px}
 .prlbl:before{display:none!important}
-.rlbl{background:rgba(20,24,29,.6);color:#fff;border:none;font-weight:600;font-size:8px;box-shadow:none;padding:0 3px;border-radius:4px;opacity:.9}
-.rlbl:before{display:none!important}
-.rlbl-big{background:rgba(20,24,29,.9);color:#fff;border:none;font-weight:800;font-size:12px;box-shadow:none;padding:2px 6px;border-radius:6px}
-.rlbl-big:before{display:none!important}
 hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .sec{font-size:14px;font-weight:700;margin:20px 0 2px;padding-bottom:5px;border-bottom:1px solid var(--line)}
 .supS{all:unset;cursor:pointer;text-align:center;font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut);flex:1}
@@ -384,7 +380,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="rlMsg" class="sub" style="margin:6px 0 0"></div>
     <div id="rlToggles" style="display:flex;gap:6px;margin:12px 0 8px"></div>
     <div id="rlMapa" style="height:60vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
-    <div class="sub" style="margin-top:8px">🟢 Início · 🔴 Fim · 🟠 Meio · 🟣 Início/Fim (percurso de 1 ponto). Toque num ponto para detalhes.</div>
+    <div class="sub" style="margin-top:8px">🟢 Início · 🔴 Fim (bolinha <b>grande</b> = percurso, <b>média</b> = trecho) · 🟠 Meio. Toque num ponto para ver a matrícula.</div>
   </main>
 
   <main id="abertura_servicos" class="hidden">
@@ -1923,16 +1919,29 @@ function rlRender(fit){
     const p=f.properties||{}; if(tf&&p.trecho!==tf)return;
     L.geoJSON(f,{style:{color:'#1565c0',weight:4,opacity:.75}}).bindTooltip('Trecho '+p.trecho+' · '+p.n_pontos+' pts · '+p.comprimento_m+' m').addTo(rlLinhasLayer);
   });
+  // limites (início/fim) de cada trecho — derivados da menor/maior ordem, já que não há marco de trecho
+  const tb={};
+  (rlData.pontos.features||[]).forEach(function(f){
+    const p=f.properties||{}, t=p.trecho;
+    if(tb[t]==null)tb[t]={min:p.ordem,max:p.ordem};
+    else{ if(p.ordem<tb[t].min)tb[t].min=p.ordem; if(p.ordem>tb[t].max)tb[t].max=p.ordem; }
+  });
   const pts=[];
   (rlData.pontos.features||[]).forEach(function(f){
     const p=f.properties||{}; if(tf&&p.trecho!==tf)return;
     const c=f.geometry.coordinates, ll=[c[1],c[0]]; pts.push(ll);
-    const big=p.marco!=='MEIO';
-    const m=L.circleMarker(ll,{radius:big?9:4,color:'#fff',weight:big?2:1,fillColor:RL_COR[p.marco]||'#ff9800',fillOpacity:1});
-    m.bindTooltip(String(p.matricula),{permanent:true,direction:'top',className:big?'rlbl-big':'rlbl',offset:[0,big?-9:-4]});
+    const percEnd=p.marco!=='MEIO';                 // início/fim do percurso (grande)
+    const b=tb[p.trecho]||{};
+    const trIni=!percEnd && p.ordem===b.min;         // início do trecho (médio)
+    const trFim=!percEnd && p.ordem===b.max;         // fim do trecho (médio)
+    let cor='#ff9800', rad=4, wt=1, pos='';
+    if(percEnd){ cor=RL_COR[p.marco]||'#ff9800'; rad=9; wt=2; pos=p.marco==='INICIO'?'Início do percurso':(p.marco==='FIM'?'Fim do percurso':'Início/Fim do percurso'); }
+    else if(trIni){ cor=RL_COR.INICIO; rad=6; wt=2; pos='Início do trecho '+p.trecho; }
+    else if(trFim){ cor=RL_COR.FIM; rad=6; wt=2; pos='Fim do trecho '+p.trecho; }
+    const m=L.circleMarker(ll,{radius:rad,color:'#fff',weight:wt,fillColor:cor,fillOpacity:1});
     m.on('click',function(){
       const nav='<a href="https://www.google.com/maps/dir/?api=1&destination='+ll[0]+','+ll[1]+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>';
-      m.bindPopup('<b>Matrícula:</b> '+p.matricula+'<br><b>Marco:</b> '+p.marco+'<br><b>Trecho:</b> '+p.trecho+'<br><b>Ordem:</b> '+p.ordem+'<br>'+nav).openPopup();
+      m.bindPopup('<b>Matrícula:</b> '+p.matricula+(pos?'<br><b>Posição:</b> '+pos:'')+'<br><b>Trecho:</b> '+p.trecho+'<br><b>Ordem:</b> '+p.ordem+'<br>'+nav).openPopup();
     });
     m.addTo(rlPontosLayer);
   });
@@ -1954,7 +1963,7 @@ async function rlBuscarMat(){
     rlMap.setView([x.lat,x.lon],18);
     if(rlDestaque){rlMap.removeLayer(rlDestaque);rlDestaque=null;}
     rlDestaque=L.circleMarker([x.lat,x.lon],{radius:13,color:'#ff6d00',weight:3,fillColor:'#ff9800',fillOpacity:.5}).addTo(rlMap);
-    rlDestaque.bindTooltip('Matrícula '+x.matricula,{permanent:true,direction:'right',className:'rlbl-big'}).openTooltip();
+    rlDestaque.bindPopup('<b>Matrícula:</b> '+x.matricula+'<br><b>Cidade:</b> '+x.cidade+'<br><b>Setor:</b> '+x.setor+' · <b>Rota:</b> '+x.rota).openPopup();
     document.getElementById('rlMsg').textContent='Matrícula '+x.matricula+' — '+x.cidade+' · Setor '+x.setor+' · Rota '+x.rota;
   }catch(e){document.getElementById('rlMsg').textContent='Erro: '+(e.message||e);}
 }
