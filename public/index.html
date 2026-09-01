@@ -584,7 +584,7 @@ function iniciarGPS(){
     const a=Math.round(gps.acc);
     if(gps.acc<=PRECISAO_MAX) banner('ok',`GPS ${a} m · dentro da tolerância`);
     else banner('warn',`GPS ${a} m · aguardando ≤ ${PRECISAO_MAX} m`);
-    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps();
+    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof cadOnGps==='function') cadOnGps();
   },err=>{ banner('bad','Sem sinal de GPS — ative a localização'); },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 function banner(cls,txt){const b=$('#gpsBanner');b.className='banner '+cls;b.textContent=txt;}
@@ -1820,6 +1820,12 @@ if($('#vrpBuscaX')) $('#vrpBuscaX').addEventListener('click',vrpBuscaGo);
 // ---------- CADASTRO TÉCNICO ----------
 let cadMap=null, cadCamadas={}, cadOn={reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
 let cadRendered={}, cadMem={}, cadDeb=null;   // cache: área já renderizada por camada / geojson em memória / timer de debounce
+let cadVoce=null;                             // marcador da posição do usuário (GPS)
+function cadOnGps(){
+  if(!cadMap||!gps) return;
+  if(cadVoce) cadVoce.setLatLng([gps.lat,gps.lon]);
+  else cadVoce=L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você').addTo(cadMap);
+}
 const CAD_VER='v4|';                          // prefixo p/ invalidar o cache do cadastro se o dado mudar (v4: vrps cd_no_agua completo p/ Contagem via GPKG)
 // whole:true = camada leve e estática → busca a ZA inteira 1x e cacheia; step = tamanho da célula de cache (graus) p/ camadas pesadas
 // Unidades operacionais separadas por tipo (grupo em "2 - infra_agua".unidades_operacionais); resolvidas no RPC app_cadastro_geojson via p_layer.
@@ -1834,7 +1840,7 @@ function cadInit(){
     cadMap.on('moveend',function(){clearTimeout(cadDeb);cadDeb=setTimeout(cadAtualizar,300);});
     cadFiltrosRender();
   }
-  setTimeout(function(){cadMap.invalidateSize();cadAtualizar();},60);
+  setTimeout(function(){cadMap.invalidateSize();cadAtualizar();cadOnGps();},60);
 }
 function cadFiltrosRender(){
   document.getElementById('cadFiltros').innerHTML=CAD_DEF.map(function(d){return '<button class="cadf" data-k="'+d.k+'" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;'+(cadOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);')+'">'+d.nome+'</button>';}).join('');
