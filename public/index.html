@@ -1873,8 +1873,12 @@ async function rlInit(){
 }
 function rlTogglesRender(){
   const defs=[{k:'pontos',lbl:'📍 Pontos',cor:'#ff9800'},{k:'linhas',lbl:'➰ Linhas',cor:'#1565c0'}];
-  document.getElementById('rlToggles').innerHTML=defs.map(function(d){return '<button class="rltg" data-k="'+d.k+'" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;'+(rlOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);')+'">'+d.lbl+'</button>';}).join('');
-  document.getElementById('rlToggles').querySelectorAll('.rltg').forEach(function(b){b.addEventListener('click',function(){rlOn[b.dataset.k]=!rlOn[b.dataset.k];rlTogglesRender();rlRender();});});
+  const cont=document.getElementById('rlToggles');
+  const pode=!!(ME&&ME.pode_aprovar);
+  const btn='<button id="rlExp" '+(pode?'':'disabled')+' title="'+(pode?'Exportar matrículas filtradas (.txt)':'Apenas aprovadores podem exportar')+'" style="margin-left:auto;all:unset;padding:5px 11px;border-radius:999px;'+(pode?'cursor:pointer;background:var(--acc);color:#fff;':'cursor:not-allowed;background:var(--card);border:1px solid var(--line);color:var(--mut);opacity:.6;')+'">⬇️ Exportar TXT</button>';
+  cont.innerHTML=defs.map(function(d){return '<button class="rltg" data-k="'+d.k+'" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;'+(rlOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);')+'">'+d.lbl+'</button>';}).join('')+btn;
+  cont.querySelectorAll('.rltg').forEach(function(b){b.addEventListener('click',function(){rlOn[b.dataset.k]=!rlOn[b.dataset.k];rlTogglesRender();rlRender();});});
+  const e=document.getElementById('rlExp'); if(e&&pode)e.addEventListener('click',rlExportarTxt);
 }
 async function rlCarregarPercursos(){
   const sel=document.getElementById('rlPerc');
@@ -1905,9 +1909,28 @@ async function rlCarregarPercurso(pid){
 function rlTrechoRender(nt){
   const sel=document.getElementById('rlTrecho');
   if(!nt){sel.innerHTML='<option value="">Todos</option>';sel.disabled=true;return;}
+  const cnt={};
+  ((rlData&&rlData.pontos&&rlData.pontos.features)||[]).forEach(function(f){var t=(f.properties||{}).trecho;if(t)cnt[t]=(cnt[t]||0)+1;});
   let o='<option value="">Todos os trechos</option>';
-  for(let i=1;i<=nt;i++)o+='<option value="'+i+'">Trecho '+i+'</option>';
+  for(let i=1;i<=nt;i++)o+='<option value="'+i+'">Trecho '+i+' ('+(cnt[i]||0)+' pts)</option>';
   sel.innerHTML=o; sel.disabled=false; sel.value='';
+}
+function rlExportarTxt(){
+  if(!(ME&&ME.pode_aprovar)){toast('Apenas aprovadores podem exportar.');return;}
+  if(!rlData||!rlPerc){toast('Selecione um percurso primeiro.');return;}
+  const tf=rlTrecho;
+  const feats=(rlData.pontos.features||[]).filter(function(f){return !tf||(f.properties||{}).trecho===tf;})
+    .slice().sort(function(a,b){return ((a.properties||{}).ordem||0)-((b.properties||{}).ordem||0);});
+  if(!feats.length){toast('Nada para exportar.');return;}
+  const mats=feats.map(function(f){return (f.properties||{}).matricula;});
+  const nome='roteiro_'+rlPerc+(tf?('_T'+tf):'')+'.txt';
+  try{
+    const blob=new Blob([mats.join('\n')+'\n'],{type:'text/plain;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=nome; document.body.appendChild(a); a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1500);
+    toast(mats.length+' matrículas exportadas ('+nome+')');
+  }catch(e){toast('Erro ao exportar: '+(e.message||e));}
 }
 function rlRender(fit){
   if(!rlMap)return;
