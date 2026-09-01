@@ -778,7 +778,6 @@ function lgMatchC(p){ return lgCons==='todos'||p.consorcio===lgCons; }
 const LG_SIT={
   todos:{lbl:'Todos'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn'},
   instalado:{lbl:'Instalado',bg:'--ok-bg',fg:'--ok'},
-  remocao_autorizada:{lbl:'Remover',bg:'--bad-bg',fg:'--bad'},
   removido:{lbl:'Dados pendentes',bg:'--warn-bg',fg:'--warn'},
   concluido:{lbl:'Concluído',bg:'--ok-bg',fg:'--ok'}
 };
@@ -800,7 +799,7 @@ async function carregarLoggers(){
   renderFiltros(); renderConsFiltros(); atualizarVista();
 }
 function renderFiltros(){
-  const ordem=['todos','pendente','instalado','remocao_autorizada','removido','concluido'];
+  const ordem=['todos','pendente','instalado','removido','concluido'];
   $('#lgFiltros').innerHTML=ordem.map(s=>`<button class="lgf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===lgFiltro?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${LG_SIT[s].lbl} ${contar(s)}</button>`).join('');
   $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;renderFiltros();renderConsFiltros();atualizarVista();}));
 }
@@ -861,6 +860,7 @@ function cInput(l,id,v){return `<label>${l}</label><input id="${id}" value="${v|
 function cNum(l,id){return `<label>${l}</label><input id="${id}" inputmode="decimal" class="lgnum"/>`;}
 function cArea(l,id){return `<label>${l}</label><textarea id="${id}" rows="2"></textarea>`;}
 function cFoto(l,k){return `<label>${l}</label><div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-foto="${k}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-foto="${k}"/></label></div><img class="prev-${k} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/></div>`;}
+function cFotoEd(l,param,cur){return `<label>${l}</label><div class="photo">${cur?`<img src="${fotoURL(cur)}" style="max-width:100%;border-radius:8px;margin-bottom:6px" onerror="this.style.display='none'"/>`:''}<div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-foto="${param}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-foto="${param}"/></label></div><img class="prev-${param} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/><div style="font-size:11px;color:var(--mut);margin-top:2px">${cur?'Selecionar substitui a atual.':'Ainda não enviada.'}</div></div>`;}
 function abrirDetalhe(id){
   detPonto=loggersData.find(p=>p.id===id); detFotos={}; if(!detPonto) return;
   const p=detPonto; let h;
@@ -900,29 +900,55 @@ function formEditarLogger(p){
     <div class="sec" style="margin-top:16px">Finalização</div>
     <label>OS SIGOS</label><input id="edOs" value="${v(p.os_sigos)}"/>`;
   }
+  h+=`<div class="sec" style="margin-top:16px">OS COPASA</div>
+  <label>OS COPASA de instalação</label><input id="edOsInst" value="${v(p.os_copasa_instalacao)}"/>
+  <label>OS COPASA de remoção</label><input id="edOsRem" value="${v(p.os_copasa_remocao)}"/>
+  <label>OS COPASA social</label><input id="edOsSocial" value="${v(p.os_copasa_social)}"/>`;
+  if(p.data_instalacao){
+    h+=`<div class="sec" style="margin-top:16px">Fotos da instalação</div>
+    <p class="sub" style="margin-top:-4px">Selecionar substitui a foto; slots vazios permitem anexar fotos que não foram enviadas antes.</p>
+    ${cFotoEd('Foto do HD','p_foto_hd_instalacao',p.foto_hd_instalacao)}
+    ${cFotoEd('Foto da leitura do HD','p_foto_leitura_hd_instalacao',p.foto_leitura_hd_instalacao)}
+    ${cFotoEd('Foto da numeração do HD','p_foto_numeracao_hd_instalacao',p.foto_numeracao_hd_instalacao)}
+    ${cFotoEd('Foto do cavalete pós-instalação','p_foto_cavalete_instalacao',p.foto_cavalete_instalacao)}
+    ${cFotoEd('Foto da fachada','p_foto_fachada',p.foto_fachada)}
+    ${cFotoEd('Foto extra','p_foto_extra',p.foto_extra)}`;
+  }
+  if(p.data_remocao){
+    h+=`<div class="sec" style="margin-top:16px">Fotos da remoção</div>
+    ${cFotoEd('Foto do HD na remoção','p_foto_hd_remocao',p.foto_hd_remocao)}
+    ${cFotoEd('Foto do cavalete pós-remoção','p_foto_cavalete_remocao',p.foto_cavalete_remocao)}`;
+  }
   h+=`<button id="edSalvar" class="btn" style="margin-top:14px">Salvar correções</button>`;
   return h;
 }
 function editarLogger(p){
   const eb=document.getElementById('lgEdit'); if(eb) eb.classList.add('hidden');
   $('#lgDet').innerHTML=formEditarLogger(p);
+  detFotos={};
+  $('#lgDet').querySelectorAll('[data-foto]').forEach(inp=>inp.addEventListener('change',async ev=>{
+    const k=inp.dataset.foto, f=ev.target.files[0];
+    if(f){detFotos[k]=await comprimir(f);const img=$('#lgDet').querySelector('.prev-'+k);if(img){img.src=window.URL.createObjectURL(detFotos[k]);img.classList.remove('hidden');}}else detFotos[k]=null;
+  }));
   document.getElementById('edCancel').addEventListener('click',()=>abrirDetalhe(p.id));
   document.getElementById('edSalvar').addEventListener('click',()=>salvarEdicaoLogger(p));
   $('#lgDet').scrollIntoView&&window.scrollTo(0,0);
 }
 async function salvarEdicaoLogger(p){
-  if(!navigator.onLine) return toast('Correção precisa de conexão');
   const campos={};
   const setIf=(id,key)=>{ const el=document.getElementById(id); if(el) campos[key]=el.value; };
   setIf('edLabel','label'); setIf('edCons','consorcio'); setIf('edZona','zone'); setIf('edNumL','numero_logger'); setIf('edNumHd','numero_hd');
   setIf('edLeitI','leitura_hd_instalacao'); setIf('edObsI','observacao_instalacao');
   setIf('edLeitR','leitura_hd_remocao'); setIf('edObsR','observacao_remocao'); setIf('edOs','os_sigos');
+  setIf('edOsInst','os_copasa_instalacao'); setIf('edOsRem','os_copasa_remocao'); setIf('edOsSocial','os_copasa_social');
   ['leitura_hd_instalacao','leitura_hd_remocao'].forEach(k=>{ if(campos[k]!=null) campos[k]=String(campos[k]).replace(',','.').trim(); });
+  const fotos={}; let temFoto=false;
+  Object.keys(detFotos||{}).forEach(k=>{ if(detFotos[k]){ fotos[k]=detFotos[k]; temFoto=true; } });
   const btn=document.getElementById('edSalvar'); if(btn) btn.disabled=true;
-  try{
-    const {error}=await sb.rpc('app_logger_editar',{p_id:p.id,p_campos:campos}); if(error) throw error;
-    toast('✓ Dados corrigidos'); await carregarLoggers(); abrirDetalhe(p.id);
-  }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
+  const item={id:crypto.randomUUID(),tipo:'logger',rpc:'app_logger_editar',pasta:'logger',
+    fotos:temFoto?fotos:null, fields:{p_id:p.id,p_campos:campos}};
+  const ok=await enviarOuEnfileirar(item,'✓ Dados corrigidos');
+  if(ok){ await carregarLoggers(); abrirDetalhe(p.id); } else if(btn){ btn.disabled=false; }
 }
 async function importarDadosLogger(p,file,msgSel,onOk){
   const msg=document.querySelector(msgSel||'#fzMsg');
@@ -956,7 +982,7 @@ function formCriar(){
   <label>Consórcio</label><select id="cr_cons"><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
   ${cInput('Zona (opcional)','cr_zona','')}
   ${cInput('Número do logger *','di_logger','')}${cInput('Número do HD','di_hd','')}${cNum('Leitura do HD na instalação *','di_leitura')}
-  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}
+  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}${cFoto('Foto extra (opcional)','f_extra')}
   ${cArea('Observação (opcional)','di_obs')}
   <button id="lgSalvar" class="btn" disabled>Criar logger</button>`;
 }
@@ -972,7 +998,7 @@ function formInstalar(p){
   <div class="banner ok" style="margin-bottom:10px">${[p.zona,p.pressao_modelo?('pressão modelo '+p.pressao_modelo+' mca'):''].filter(Boolean).join(' · ')||'ponto planejado'}</div>
   ${nav_btn(p)}<div id="lgGps" class="banner warn">Obtendo GPS…</div>
   ${cInput('Número do logger *','di_logger','')}${cInput('Número do HD','di_hd','')}${cNum('Leitura do HD na instalação *','di_leitura')}
-  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}
+  ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}${cFoto('Foto extra (opcional)','f_extra')}
   ${cArea('Observação (opcional)','di_obs')}
   <button id="lgSalvar" class="btn" disabled>Confirmar instalação</button>`;
 }
@@ -1071,6 +1097,7 @@ function relDocHtml(p){
   let h='<div class="relTop"><div><h1>Relatório de Ponto · Logger de Vazão</h1><div class="sub">'+cons+'</div></div><div class="relBadge" style="color:'+clr+'">'+st+'</div></div>';
   h+='<div class="relBody">';
   h+='<div class="relGrid">'+relField('Identificação',p.label)+relField('Zona',p.zona)+relField('Origem',p.origem)+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  h+='<div class="relGrid" style="margin-top:10px">'+relField('OS COPASA instalação',p.os_copasa_instalacao)+relField('OS COPASA remoção',p.os_copasa_remocao)+relField('OS COPASA social',p.os_copasa_social)+'</div>';
   // 1 · Localização (sugerido × instalado + mapa)
   h+='<div class="relSec"><span class="relNum">1</span> Localização</div>';
   h+='<div class="relGrid">'+relField('Coordenada sugerida',sug)+relField('Coordenada instalada',gpsReal)+relField('Pressão de modelo',p.pressao_modelo!=null?(p.pressao_modelo+' mca'):'—')+relField('Distância sugerido → instalado',dist)+'</div>';
@@ -1080,7 +1107,7 @@ function relDocHtml(p){
   h+='<div class="relSec"><span class="relNum">2</span> Instalação</div>';
   if(temInst){
     h+='<div class="relGrid">'+relField('Nº do logger',p.numero_logger)+relField('Nº do HD',p.numero_hd)+relField('Leitura inicial do HD',p.leitura_hd_instalacao)+relField('Data da instalação',relFmtData(p.data_instalacao))+relField('Responsável',p.usuario_instalacao)+relField('Precisão GPS',p.gps_precisao_inst!=null?(p.gps_precisao_inst+' m'):'—')+relField('Dias instalado',p.dias_instalado!=null?(p.dias_instalado+' d'):'—')+(p.observacao_instalacao?relWide('Observação',p.observacao_instalacao):'')+'</div>';
-    h+=relFotos([['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada]]);
+    h+=relFotos([['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada],['Foto extra',p.foto_extra]]);
   } else h+='<div class="relPend">Aguardando instalação — dados a preencher.</div>';
   // 3 · Remoção
   h+='<div class="relSec"><span class="relNum">3</span> Remoção</div>';
@@ -1271,7 +1298,7 @@ async function submeterLogger(){
   if(p.novo){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     const item={id:uid,tipo:'logger',rpc:'app_logger_criar',pasta:'logger',
-      fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach},
+      fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach,p_foto_extra:detFotos.f_extra},
       fields:{p_client_uuid:uid,
         p_label:(document.getElementById('cr_label').value||null),
         p_consorcio:(document.getElementById('cr_cons').value||null),
@@ -1289,7 +1316,7 @@ async function submeterLogger(){
   if(p.situacao==='pendente'){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     item={id:uid,tipo:'logger',rpc:'app_logger_instalar',pasta:'logger',
-      fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach},
+      fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach,p_foto_extra:detFotos.f_extra},
       fields:{...comum,p_leitura:lt,p_numero_logger:(document.getElementById('di_logger').value||null),p_numero_hd:(document.getElementById('di_hd').value||null),p_observacao:(document.getElementById('di_obs').value||null)}};
     novaSit='instalado'; msg='✓ Instalação registrada';
   }else{
