@@ -11,3 +11,4 @@
 - [ ] `node --check` passou em `index.html` e `sw.js`
 - [ ] Sem segredos no frontend; RLS/grants corretos em RPCs novas
 - [ ] PR pequeno e focado (evita conflito no `index.html`)
+- [ ] **Documentação atualizada neste PR** (`docs/MODULOS.md` — seção do módulo/"cuidados" — e `CLAUDE.md` se o panorama mudou)

@@ -59,10 +59,25 @@ facilidade. Então: PRs pequenos e frequentes, e combinem quem mexe em qual bloc
 - Conceda `execute` a `authenticated`; revogue de `anon`/`public`.
 - **Nunca** coloque `service_role`, chave VAPID privada ou segredos no frontend.
 
+## Documentação anda junto com o código (obrigatório)
+
+A documentação é o **espelho do que está em produção** — se o código muda e a doc não, ela vira
+mentira e o próximo (humano ou Claude) erra. Por isso, **no mesmo PR** que altera comportamento,
+telas, fluxo, RPCs ou tabelas de um módulo, atualize:
+
+- [`docs/MODULOS.md`](docs/MODULOS.md) — a **seção do módulo** afetado (telas, estado, funções, RPCs,
+  tabelas/colunas) e os **"cuidados"**. Tela nova → documente e registre em `SCREENS`.
+- [`CLAUDE.md`](CLAUDE.md) — só se o **panorama** mudou (mapa de módulos §6, regras §9, ou §0 de
+  invariantes/armadilhas novas em `docs/MODULOS.md`).
+
+Antes de editar um módulo, **releia a seção dele em `docs/MODULOS.md`**. PR que muda o app sem
+atualizar a doc **não deve ser mergeado**.
+
 ## Checklist antes de pedir revisão
 
 - [ ] Testado no app real (celular e/ou desktop), console limpo.
 - [ ] `coleta-vN` incrementado (e `CAD_VER` se aplicável).
 - [ ] `node --check` passou em `index.html` e `sw.js`.
 - [ ] Sem segredos no código; RLS/grants corretos nas RPCs novas.
+- [ ] **`docs/MODULOS.md` (e `CLAUDE.md` se aplicável) atualizados neste PR.**
 - [ ] Descrição do PR explica o quê e por quê.

@@ -244,6 +244,12 @@ para o almoxarife). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→fu
    privada em qualquer coisa externa.
 6. **Reaproveite** funções e variáveis CSS existentes; siga o estilo e a densidade de comentários do
    arquivo. É um arquivo enorme editado por poucas pessoas — **PRs pequenos** evitam conflito.
+7. **Documentação junto com o código (obrigatório).** Toda mudança que altere comportamento, telas,
+   fluxo, RPCs, tabelas/colunas ou regras de um módulo **deve atualizar, no MESMO PR**:
+   [`docs/MODULOS.md`](docs/MODULOS.md) (a seção do módulo + os "cuidados") e, se o panorama mudou, o
+   **mapa de módulos** (§6) e/ou estas regras. Criou tela nova? Documente-a e registre-a em `SCREENS`.
+   Novo invariante/armadilha aprendida? Acrescente em `docs/MODULOS.md §0`. **PR que muda o app sem
+   atualizar a doc não deve ser mergeado.** A doc é sempre o espelho do estado atual em produção.
 
 ## 10. Conectar o Claude ao Supabase (MCP) — setup do colaborador
 
