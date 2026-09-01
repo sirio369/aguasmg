@@ -154,9 +154,14 @@ pwa/
 
 **Coleta de campo** (schema `8 - obras & servicos`):
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
-- **Loggers temporários** (`loggers`/`logger_det`) — ciclo de vida (planejado→instalado→finalizado),
-  5 fotos, relatório PDF; view `vw_loggers` (tem `consorcio`, geom real × planejada). Filtro por
-  situação **e por consórcio** (ZA1004/ZA0200). RPCs `app_logger_*`.
+- **Loggers temporários** (`loggers`/`logger_det`) — ciclo: **pendente → instalado → dados pendentes
+  (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após
+  7 dias). Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
+  View `vw_loggers` (tem `consorcio`, geom real × planejada; `situacao_atual` é **derivada** das datas —
+  não há coluna `situacao` na tabela base `instalacao_logger_calibracao`). Filtro por situação **e por
+  consórcio** (ZA1004/ZA0200). No **lápis** (aprovador/admin) dá pra editar/anexar todas as fotos e 3
+  campos de **OS COPASA** (instalação/remoção/social). RPCs `app_logger_*` (`_criar`/`_instalar` têm
+  `p_foto_extra`; `_editar` recebe paths de foto + OS via `p_campos`).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
 - **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`)
   e **Solicitação/Abertura de serviços** (`abertura_servicos`/`programacao_servicos`/`matriculas`).
