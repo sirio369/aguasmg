@@ -753,7 +753,7 @@ const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
-  if(id==='home'){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+  if(id==='home') homeGate();
   if(id==='loggers') carregarLoggers();
   if(id==='vrp') vrpCarregar();
   if(id==='estanqueidade') estInit();
@@ -775,6 +775,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 
@@ -4192,7 +4193,7 @@ function mostrar(sess){
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
     iniciarGPS(); atualizarFila(); ntfBadge(); pushAutoSync();
-    ME=null; sb.rpc('app_me').then(({data})=>{ if(data) ME=data; }).catch(()=>{});
+    ME=null; sb.rpc('app_me').then(({data})=>{ if(data){ ME=data; homeGate(); } }).catch(()=>{});
     if(navigator.onLine) sincronizar();
   }else{
     ME=null;
