@@ -152,6 +152,10 @@ pwa/
 
 ## 6. Mapa de módulos (tela → funções/RPCs principais)
 
+> **Detalhe granular por módulo** (telas, estado, funções-chave, RPCs com args, tabelas/colunas e
+> "cuidados") em **[`docs/MODULOS.md`](docs/MODULOS.md)**. **Leia a seção do módulo que você vai
+> editar antes de mexer** — este mapa aqui é só o panorama.
+
 **Coleta de campo** (schema `8 - obras & servicos`):
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
 - **Loggers temporários** (`loggers`/`logger_det`) — ciclo: **pendente → instalado → dados pendentes
