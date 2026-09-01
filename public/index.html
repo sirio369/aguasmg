@@ -124,6 +124,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="cadastro"><div class="ic">🗺️</div><div class="nm">Cadastro técnico</div></button>
       <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Suprimentos</div></button>
       <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
+      <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
     </div>
   </main>
 
@@ -349,13 +350,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
       <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Solicitação de serviços</div></button>
     </div>
-    <div id="entRet" class="hidden">
-      <div class="sec" style="margin-top:20px">🏢 Retaguarda</div>
-      <div class="grid" style="margin-top:10px">
-        <button class="mod" data-go="matriculas"><div class="ic">🆕</div><div class="nm">Criação de matrículas</div></button>
-        <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
-      </div>
-    </div>
     <div class="sec" style="margin-top:20px">🛟 Suporte</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="roteiro"><div class="ic">🗺️</div><div class="nm">Roteiro de leitura</div></button>
@@ -383,6 +377,15 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sub" style="margin-top:8px">🟢 Início · 🔴 Fim (bolinha <b>grande</b> = percurso, <b>média</b> = trecho) · 🟠 Meio. Toque num ponto para ver a matrícula.</div>
   </main>
 
+  <main id="auxiliar_programacao" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Auxiliar de Programação</h1>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="matriculas"><div class="ic">🆕</div><div class="nm">Criação de matrículas</div></button>
+      <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
+    </div>
+  </main>
+
   <main id="abertura_servicos" class="hidden">
     <div class="bar"><button class="bk" id="asBack">‹ Entrevistadores</button></div>
     <h1>Solicitação de serviços</h1>
@@ -408,15 +411,18 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="programacao_servicos" class="hidden">
-    <div class="bar"><button class="bk" id="pgBack">‹ Entrevistadores</button></div>
+    <div class="bar"><button class="bk" id="pgBack">‹ Auxiliar de Programação</button></div>
     <h1>Abertura de serviços</h1>
     <p class="sub">Lance o número da OS criada no sistema da COPASA.</p>
     <div id="pgFiltros" style="display:flex;gap:6px;margin:8px 0 12px"></div>
-    <div id="pgLista"></div>
+    <div class="sec">🧾 Solicitações de serviço</div>
+    <div id="pgLista" style="margin-top:8px"></div>
+    <div class="sec" style="margin-top:22px">⚠️ Ocorrências — pesquisa de vazamentos</div>
+    <div id="pgOcLista" style="margin-top:8px"></div>
   </main>
 
   <main id="matriculas" class="hidden">
-    <div class="bar"><button class="bk" id="mtBack">‹ Entrevistadores</button></div>
+    <div class="bar"><button class="bk" id="mtBack">‹ Auxiliar de Programação</button></div>
     <h1>Criação de matrículas</h1>
     <p class="sub">Lance a matrícula criada na COPASA para cada captação de cliente.</p>
     <div id="mtFiltros" style="display:flex;gap:6px;margin:8px 0 12px"></div>
@@ -743,10 +749,11 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','abertura_servicos','programacao_servicos','matriculas','roteiro','notificacoes'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','matriculas','roteiro','notificacoes'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
+  if(id==='home'){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
   if(id==='loggers') carregarLoggers();
   if(id==='vrp') vrpCarregar();
   if(id==='estanqueidade') estInit();
@@ -1431,11 +1438,11 @@ if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
 // ---------- PROGRAMAÇÃO DE SERVIÇOS (aprovador/admin) ----------
 let pgFiltro='pendente';
 const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Todas']];
-function pgInit(){ pgRenderFiltros(); pgCarregar(); }
+function pgInit(){ pgRenderFiltros(); pgCarregar(); pgCarregarOc(); }
 function pgRenderFiltros(){
   const c=document.getElementById('pgFiltros'); if(!c) return;
   c.innerHTML=PG_FILTROS.map(f=>`<button class="btn ghost" data-pgf="${f[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${pgFiltro===f[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${f[1]}</button>`).join('');
-  c.querySelectorAll('[data-pgf]').forEach(b=>b.addEventListener('click',()=>{ pgFiltro=b.dataset.pgf; pgRenderFiltros(); pgCarregar(); }));
+  c.querySelectorAll('[data-pgf]').forEach(b=>b.addEventListener('click',()=>{ pgFiltro=b.dataset.pgf; pgRenderFiltros(); pgCarregar(); pgCarregarOc(); }));
 }
 async function pgCarregar(){
   const c=document.getElementById('pgLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
@@ -1464,7 +1471,34 @@ async function pgSalvarOs(id){
   try{ const {error}=await sb.rpc('app_abertura_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); pgCarregar(); }
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
-if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('entrevistadores'));
+async function pgCarregarOc(){
+  const c=document.getElementById('pgOcLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; const arr=data||[];
+    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':''))+'.</p>'; return; }
+    c.innerHTML=arr.map(s=>{
+      const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
+      const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto</a>`:'';
+      const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+      const info=[s.local?('Local: '+s.local):'',s.consorcio||''].filter(Boolean).join(' · ');
+      const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center"><b>⚠️ ${s.tipo||'Ocorrência'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
+        <div class="sub" style="margin-top:3px">${info}</div>
+        <div class="sub" style="margin-top:2px">Por ${s.usuario||'—'} · ${foto}${mapa}</div>
+        ${s.observacao?('<div class="sub" style="margin-top:3px">Obs: '+s.observacao+'</div>'):''}
+        ${done}
+        <div style="display:flex;gap:6px;margin-top:8px"><input class="pgOcOs" data-id="${s.id}" value="${(s.os_numero||'').replace(/"/g,'&quot;')}" placeholder="Nº da OS na COPASA" style="flex:1;min-width:0"/><button class="btn" data-ocsave="${s.id}" style="margin:0;width:auto;padding:9px 14px">Salvar</button></div>
+      </div>`;
+    }).join('');
+    c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
+  }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+async function pgSalvarOcOs(id){
+  const inp=document.querySelector('.pgOcOs[data-id="'+id+'"]'); const os=inp?inp.value:'';
+  try{ const {error}=await sb.rpc('app_ocorrencia_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); pgCarregarOc(); }
+  catch(e){ toast('⚠ '+(e.message||e)); }
+}
+if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
 
 // ---------- CRIAÇÃO DE MATRÍCULAS (Retaguarda) ----------
 let mtFiltro='pendente';
@@ -1503,7 +1537,7 @@ async function mtSalvar(id){
   try{ const {error}=await sb.rpc('app_captacao_matricula',{p_id:id,p_matricula:m}); if(error)throw error; toast('✓ Matrícula salva'); mtCarregar(); }
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
-if($('#mtBack')) $('#mtBack').addEventListener('click',()=>irPara('entrevistadores'));
+if($('#mtBack')) $('#mtBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
 if($('#ocTipo')) $('#ocTipo').addEventListener('change',ocSync);
 if($('#ocLocal')) $('#ocLocal').addEventListener('change',ocSync);
 if($('#ocSalvar')) $('#ocSalvar').addEventListener('click',ocRegistrar);
