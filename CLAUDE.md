@@ -152,6 +152,10 @@ pwa/
 
 ## 6. Mapa de módulos (tela → funções/RPCs principais)
 
+> **Detalhe granular por módulo** (telas, estado, funções-chave, RPCs com args, tabelas/colunas e
+> "cuidados") em **[`docs/MODULOS.md`](docs/MODULOS.md)**. **Leia a seção do módulo que você vai
+> editar antes de mexer** — este mapa aqui é só o panorama.
+
 **Coleta de campo** (schema `8 - obras & servicos`):
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
 - **Loggers temporários** (`loggers`/`logger_det`) — ciclo: **pendente → instalado → dados pendentes
@@ -163,11 +167,22 @@ pwa/
   campos de **OS COPASA** (instalação/remoção/social). RPCs `app_logger_*` (`_criar`/`_instalar` têm
   `p_foto_extra`; `_editar` recebe paths de foto + OS via `p_campos`).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
-- **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`)
-  e **Solicitação/Abertura de serviços** (`abertura_servicos`/`programacao_servicos`/`matriculas`).
+  As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
+  `"8 - obras & servicos".ocorrencia`) alimentam a fila de **Abertura de serviços** (ver Auxiliar de
+  Programação), onde recebem nº de OS.
+- **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
+  **Solicitação de serviços** de campo (`abertura_servicos`) e, na subdivisão **🛟 Suporte**,
+  **Roteiro de leitura** (`roteiro`) — mapa por percurso/trecho sobre `vw_roteiro_leitura`(_linha),
+  com filtro de percurso/trecho/matrícula e export TXT (só aprovador). RPCs `app_roteiro_*`.
+- **Auxiliar de Programação** (`auxiliar_programacao`, na Home › 🧰 Suporte; **só aprovador/admin**,
+  botão liberado por `homeGate()` quando o `ME` carrega) — reúne a **retaguarda**:
+  **Criação de matrículas** (`matriculas`, fila de captações `app_captacao_fila`/`_os`) e
+  **Abertura de serviços** (`programacao_servicos`), que lança o nº da OS da COPASA para as
+  **solicitações** (`app_abertura_fila`/`app_abertura_os`) **e** para as **ocorrências da pesquisa**
+  (`app_ocorrencia_fila`/`app_ocorrencia_os`).
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
-  com busca. RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB
-  versionado por `CAD_VER`.
+  com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
+  `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
 - **Biblioteca** (`biblioteca`) — documentos de referência (bucket Storage `biblioteca`).
 
 **Suprimentos** (`suprimentos`) — ver §8.
