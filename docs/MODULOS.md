@@ -377,7 +377,22 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   exclusivo **nasce vazio mesmo em edição** (não tem como pré-preencher e-mail a partir do nome que a
   RPC retorna); deixar em branco **mantém** o condutor já vinculado (frontend reusa
   `vExistente.condutor_exclusivo_id`), só troca se alguém digitar um e-mail novo.
-- **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend, frotasCondutores`.
+- **Painel** (`frotasRenderPainel` → 4 listas: `frotasRenderPainelLista('movimentacoes'|'abastecimentos'|
+  'lavagens'|'ocorrencias')`, `frotas`/admin): histórico **completo** de toda a frota (não filtrado por
+  veículo/condutor — é justamente o que falta nas outras telas, que só mostram "meu" ou "pendente").
+  RPCs `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`,
+  `app_frota_lavagens_listar`, `app_frota_ocorrencias_listar` (esta última difere de
+  `app_frota_ocorrencia_pendentes`: traz **todo** status, não só `pendente`, e não é filtrada por
+  `sup_aprovadores_de` — é visão gerencial da Frotas, não fila de aprovação pessoal). **"Tempo real"
+  aqui significa só "sempre atualizado quando abre a tela"** — sem Supabase Realtime/websocket
+  (decisão de produto confirmada com a Geovana: nenhum módulo do app usa isso hoje, não valia o
+  risco/esforço só pra este painel). Cadastros de condutor/veículo e status de aprovação **não têm
+  telas próprias no Painel** — já existem em §6.2 (lista de veículos) e "Condutores" logo acima; o
+  Painel só cobre o que ainda não tinha visão nenhuma (movimentações/abastecimentos/lavagens/
+  ocorrências completas). Manutenções/multas/custos (também pedidos no painel) ainda não existem —
+  entram nas próximas fases.
+- **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend,
+  frotasCondutores, frotasPainelCache`.
 
 ### 6.3 QSMS — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
 - Tela só pra `funcao='qsms'`/admin (RPCs recusam com `raise exception 'sem permissao'` pra quem não é
@@ -475,6 +490,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 **Condutor/Frotas/QSMS (ver §6):** `app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh`,
 `app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`,
 `app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
+`app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
+`app_frota_ocorrencias_listar` (painel gerencial, §6.2),
 `app_frota_equipes_listar/equipe_salvar`,
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
 `app_frota_emprestimo_criar/devolver/solicitar_devolucao`, `app_frota_meus_emprestimos`,
