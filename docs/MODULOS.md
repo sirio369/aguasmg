@@ -87,7 +87,7 @@
 
 ### Relatórios PDF — `REL_CSS` / overlay `#relatorio`
 - Padrão: monta HTML num overlay `#relatorio` e chama `window.print()` (CSS `@media print`).
-  Usado por loggers (§Loggers), VRP e comprovantes de suprimentos.
+  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos e relatório de veículo (§6.2).
 
 ---
 
@@ -278,8 +278,20 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   `(p_cnh_numero, p_cnh_categoria, p_cnh_validade, p_cnh_foto)`. Foto via `uploadFoto2(...,'cnh')`
   → bucket `fotos-campo` (**mesmo bucket público das fotos de campo** — sem storage dedicado/privado
   para CNH; se isso virar problema de privacidade, é o primeiro lugar a mexer).
-- **Alerta de vencimento:** `app_condutor_meu` retorna `cnh_vencendo` (validade ≤ hoje+30). Exibido
-  como banner em `condRenderHome` quando `status` é `apto`/`ativo`.
+- **Histórico da CNH:** as duas RPCs acima **também** inserem uma linha em
+  `frota_condutor_cnh_historico` a cada chamada (1ª vez ou atualização) — tabela **append-only**,
+  nunca `UPDATE`, mesmo padrão do histórico de aluguel (§6.2). `app_condutor_cnh_historico()` devolve
+  o histórico do próprio condutor (`condRenderCnhHistorico`, botão "Histórico" ao lado de "Atualizar
+  CNH"). Condutores que já existiam antes desta RPC existir foram **migrados uma vez** (uma linha
+  inicial com os dados atuais de `frota_condutor` no momento da migração) — não há como reconstruir
+  atualizações anteriores a isso.
+- **Ver a própria CNH:** `condRenderHome` mostra link "Ver foto da CNH" (`SBASE+cnh_foto`) quando
+  `condData.cnh_foto` existe — mesmo padrão do link que o gestor já via na fila de aprovação
+  (`condPendentes`).
+- **Alerta de vencimento:** `app_condutor_meu` retorna `cnh_vencendo` (validade ≤ hoje+30) **e**
+  `cnh_dias_para_vencer` (`cnh_validade - current_date`, pode ser negativo se já venceu). Exibido
+  como banner (com a contagem de dias) em `condRenderHome` quando `status` é `apto`/`ativo`, e como
+  texto ao lado da validade sempre que a CNH existe.
 - **Aprovação (gestor):** `condPendentes` vem de `app_condutor_pendentes()` — só quem está em
   `sup_aprovadores_de(condutor.id)` (ou admin) vê a lista. Botão liga a `condAprovar` →
   `app_condutor_aprovar(p_condutor_id, p_aprovado, p_motivo)`.
@@ -330,7 +342,7 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   for aprovador, ou os próprios veículos se for condutor comum); `frotasRenderHome` decide o conteúdo
   completo (`const full = ME.funcao==='frotas'||ME.is_admin`) — CRUD de veículo/equipe só aparece pra
   `full`. **O backend também gateia** (`app_frota_veiculos_listar` já filtra por função — ver §6.4).
-- **Veículo** (`frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` → `app_frota_veiculo_salvar`, 21 params
+- **Veículo** (`frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` → `app_frota_veiculo_salvar`, 23 params
   incl. dados de locação `fornecedor/contrato_numero/data_inicio/data_fim_prevista`, uso
   `uso_tipo ∈ {equipe,exclusivo}` com `equipe_id` **xor** `condutor_exclusivo_id`, e os campos de
   cadastro: `tipo` (`select` fixo — `TIPOS_VEICULO`: picape/utilitario/hatch/sedan/suv/caminhao/moto),
@@ -347,6 +359,18 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   `vigente_desde`) + botões "Reajustar" e "Ver histórico" (`app_frota_veiculo_aluguel_historico`).
   Devolução à locadora: `app_frota_veiculo_devolver(p_id, p_data_fim_real, p_valor_devolucao)` (botão
   só aparece se `!data_fim_real`; `prompt()` pede o valor, mesmo padrão de `condAprovar`).
+  **`p_fotos` (até 3, `fvfFoto1/2/3` + `wireFotoPick`) e `p_km_inicial`** — `fotos` é `coalesce`ado
+  na edição (não envia nada → mantém as fotos atuais; envia → **substitui todas**, não anexa uma a
+  uma). `km_inicial` só é gravado **na criação** (semeia também `km_atual`) — não editável depois, é
+  um retrato do que o veículo tinha ao entrar no sistema; veículos cadastrados antes disso ficam com
+  `km_inicial` nulo, sem como reconstruir retroativamente.
+- **Relatório do veículo** (`frotasRelatorioVeiculo`/`frotasRelatorioHtml` → `app_frota_veiculo_relatorio(p_veiculo_id)`,
+  botão "📄 Relatório" no card): reaproveita o overlay `#relatorio`/`REL_CSS` compartilhado (§1, mesmo
+  padrão de loggers/VRP/comprovantes de Suprimentos) — identificação, locação, km inicial × atual,
+  condutor(es) principal(is) (exclusivo, ou membros da equipe), fotos e o **mesmo cálculo de gastos**
+  de `app_frota_custos_por_veiculo` (§6.2 "Custos", Fase 6) só que filtrado a **um** veículo — RPCs
+  irmãs, lógica duplicada de propósito (SQL não compartilha CTE entre funções sem view/função auxiliar
+  extra) — **se mudar a fórmula de custo numa, muda na outra**.
 - **Equipe** (`frotasRenderEquipes`/`feqCarregar` → `app_frota_equipe_salvar(p_id,p_nome,p_membros[])`,
   `app_frota_equipes_listar`; tabelas `frota_equipe`/`frota_equipe_membro`). **Não confundir com** a
   seção "Equipes" de Suprimentos ⚙️ Configurações (`sup_admin_equipe_*`) — aquilo é código morto (RPC
@@ -473,7 +497,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 ### Tabelas (`"10 - Frotas"`)
 `frota_veiculo` (locação, uso exclusivo/equipe, cadastro/combustível/consórcio — §6.2),
 `frota_veiculo_aluguel_historico` (1 linha por reajuste, nunca `UPDATE` — histórico do aluguel),
-`frota_condutor` (PK = `perfil.id`, status/CNH), `frota_equipe` + `frota_equipe_membro`,
+`frota_condutor` (PK = `perfil.id`, status/CNH), `frota_condutor_cnh_historico` (append-only, 1 linha
+por envio/atualização de CNH — §6.1), `frota_equipe` + `frota_equipe_membro`,
 `frota_checklist_situacao`, `frota_checklist_abastecimento`, `frota_lavagem`,
 `frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1),
 `frota_ocorrencia` (+ `condutor_no_momento_id`/`motivo_infracao`, multa — §6.2), `frota_manutencao`
@@ -527,8 +552,9 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `app_abertura_servico_minhas`, `app_captacao_fila`, `app_captacao_matricula`
 (registro via `app_abertura_servico_registrar`, `app_captacao_registrar`).
 **Suprimentos:** prefixo `sup_*` (ver §5).
-**Condutor/Frotas/QSMS (ver §6):** `app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh`,
-`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`,
+**Condutor/Frotas/QSMS (ver §6):**
+`app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh/cnh_historico`,
+`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver/veiculo_relatorio`,
 `app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
 `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
 `app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar`, `app_frota_custos_por_veiculo`
