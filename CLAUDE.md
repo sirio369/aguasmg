@@ -108,8 +108,12 @@ pwa/
 - Helpers de papel (schema `"9 - suprimentos"`): `sup_funcao(uuid)`, `sup_e_almox(uuid)`
   (= almoxarife/admin), `sup_pode_aprovar(uuid)` (= aprovador/admin).
 - **Perfil/roles:** tabela `public.perfil` (id, email, nome, cargo, **funcao**, ...). Funções:
-  `admin`, `campo`, `aprovador`, `almoxarife`. O app carrega o próprio perfil via RPC `app_me`
-  (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`).
+  `admin`, `campo`, `aprovador`, `almoxarife`, `frotas`, `qsms`. O app carrega o próprio perfil via RPC
+  `app_me` (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`).
+- **Aprovação/notificação é única pro app inteiro** (não crie hierarquia paralela por módulo):
+  `perfil.aprovador_uuid`/`aprovador2_uuid` (config. em Suprimentos ⚙️) + `sup_aprovadores_de(uid)`
+  + `sup_notificar(...)` disparado por **trigger** na tabela de negócio (nunca inline na RPC). Ver
+  docs/MODULOS.md §0.9 e §6.4 (segundo módulo a reaproveitar isso, depois de Suprimentos).
 - **Geometria:** PostGIS, **SRID 31983** (UTM, metros). Distâncias em metros direto com `ST_Distance`
   (não converta pra `geography`: dá erro "Only lon/lat supported"). Para exibir no mapa, transforme
   para 4326.
@@ -131,9 +135,10 @@ pwa/
 | `1 - suporte_geografico` | limites, apoio |
 | `2 - infra_agua` | rede, nós de água (`nos_agua`), unidades operacionais, **`vrps`** |
 | `3 - comercial` | ligações |
-| `4 - redes_terceiros`, `5 - info_copasa`, `6 - analises`, `10 - Frotas` | apoio/cadastro |
+| `4 - redes_terceiros`, `5 - info_copasa`, `6 - analises` | apoio/cadastro |
 | `8 - obras & servicos` | coleta de campo (pressão, loggers, pesquisa, captação, abertura de serviços) |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) |
+| `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 ## 5. Convenções do frontend (`index.html`)
@@ -186,6 +191,14 @@ pwa/
 - **Biblioteca** (`biblioteca`) — documentos de referência (bucket Storage `biblioteca`).
 
 **Suprimentos** (`suprimentos`) — ver §8.
+
+**Frotas / Condutor / QSMS** (`frotas`/`condutor`/`qsms`, schema `10 - Frotas`) — condutor se
+auto-cadastra (CNH) → gestor aprova → **apto** (10 dias p/ treinamento) → QSMS agenda e dá baixa →
+**ativo**; alerta de CNH vencendo em 30 dias. **Frotas** (`funcao='frotas'`/admin) cadastra veículos
+(locação, uso exclusivo/equipe) e aprova ocorrências (manutenção/sinistro/multa/lavagem — valor só
+visível a quem aprova). Empréstimo de veículo entre condutores, com devolução confirmada por quem
+recebeu. Aprovação/notificação **reaproveita** o mecanismo de Suprimentos (não é hierarquia própria)
+— ver docs/MODULOS.md §6 (detalhe completo) e §0.9/§6.4 (o mecanismo em si).
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 

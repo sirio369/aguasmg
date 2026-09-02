@@ -26,6 +26,13 @@
 7. **`execute_sql` (MCP) retorna só o resultado da ÚLTIMA instrução** → combine com `jsonb_build_object`.
 8. **Geometria PostGIS = SRID 31983** (UTM, metros). Para o mapa/lat-lon, `ST_Transform(...,4326)`.
    Distância em metros direto com `ST_Distance` (não converta para `geography`).
+9. **Aprovação/notificação: um único mecanismo para o app inteiro.** `perfil.aprovador_uuid` /
+   `aprovador2_uuid` (configurados em Suprimentos ⚙️ Configurações) + `"9 - suprimentos".sup_aprovadores_de(uid)`
+   (fallback: todo `aprovador`/`admin` ativo) + `"9 - suprimentos".sup_notificar(...)` **disparado por
+   trigger** `AFTER INSERT/UPDATE` na tabela de negócio — nunca inline na RPC. Regra de ouro:
+   notificação **pessoal** (ao próprio interessado) nunca leva `p_exceto`; notificação de **grupo**
+   sempre leva `p_exceto = auth.uid()` (ator). **Módulo novo que precisa de aprovação/notificação →
+   reaproveite isso, não crie hierarquia paralela.** Ver §5.5 (origem) e §6.4 (segundo uso, Frotas).
 
 ---
 
@@ -45,8 +52,9 @@
 
 ### Perfil / papéis — objeto `ME`
 - Carregado por `sb.rpc('app_me')` → `ME = {id,nome,email,cargo,funcao,is_admin,is_almoxarife,pode_aprovar,equipes[]}`.
-- `funcao ∈ {admin, campo, aprovador, almoxarife}`. `pode_aprovar` = aprovador **ou** admin.
-  `is_almoxarife` = almoxarife **ou** admin.
+- `funcao ∈ {admin, campo, aprovador, almoxarife, frotas, qsms}`. `pode_aprovar` = aprovador **ou**
+  admin. `is_almoxarife` = almoxarife **ou** admin. `frotas` libera o CRUD completo de veículos/equipes
+  em **Frotas** (§6); `qsms` libera a tela **QSMS** (agendar/dar baixa em treinamento, §6.3).
 - `supGetMe()` (~L2412) carrega sob demanda e faz fallback `campo` se falhar. No login (§Auth) o `ME`
   é carregado globalmente e dispara os gates.
 - **Cuidado:** `ME` pode ser `null` no início. Sempre teste `!!(ME&&ME.pode_aprovar)`.
@@ -59,7 +67,9 @@
   `fields[param] = path`; depois chama `sb.rpc(item.rpc, fields)`.
   - **Regra de ouro das fotos:** a **chave** de `item.fotos` tem que ser **exatamente o nome do
     parâmetro** da RPC (ex.: `p_foto_hd`). Blobs falsy são pulados (foto opcional = ok).
-  - `item = {id, tipo, rpc, pasta, fotos:{p_x:Blob}, fields:{...}}`.
+  - `item = {id, tipo, rpc, pasta, fotos:{p_x:Blob}, fields:{...}}`. Se algum `p_x` é **array**
+    (`text[]`) em vez de path escalar, acrescente `fotosArray:['p_x', ...]` — `enviar()` envolve o path
+    resultante em `[path]` só para esses params (ver Frotas §6.1, primeiro uso).
 - `sincronizar()`: erros com `code` SQLSTATE (5 chars) = rejeição de negócio → descarta o item;
   erro de rede → mantém e tenta depois.
 - `comprimir(file)` (~L598): reduz p/ ~1600px/JPEG 0.7 antes do upload.
@@ -251,11 +261,120 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
 
 ---
 
-## 6. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
+## 6. Frotas / Condutor / QSMS — schema `"10 - Frotas"` · telas `condutor` / `frotas` / `qsms`
+
+Três telas, três públicos, um fluxo só: colaborador vira **condutor** (auto-cadastro de CNH →
+aprovação do gestor → treinamento de direção defensiva → ativo), **Frotas** (`funcao='frotas'`/admin)
+cadastra veículos e aprova ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos
+treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mundo vê), 🦺 QSMS
+(`#cardQsms`, nasce `hidden`, revelado por `homeGate()` — mesmo padrão do §1/§4).
+
+### 6.1 Condutor — `// condutor/frotas/qsms` (~L4275) · tela `condutor`
+- **Ciclo de status** (`frota_condutor.status`): `pendente` → (gestor aprova) → `apto` (banner com
+  prazo de **10 dias**, `prazo_treinamento`) → (QSMS agenda + dá baixa no treinamento) → `ativo`.
+  Reprovação → `reprovado` (`motivo_reprovacao`), pode reenviar.
+- **Auto-cadastro:** `condRenderCadastro`/`condSalvarCnh` → `app_condutor_solicitar` (1º envio) ou
+  `app_condutor_atualizar_cnh` (já `apto`/`ativo`, ex.: CNH renovada) — mesma assinatura
+  `(p_cnh_numero, p_cnh_categoria, p_cnh_validade, p_cnh_foto)`. Foto via `uploadFoto2(...,'cnh')`
+  → bucket `fotos-campo` (**mesmo bucket público das fotos de campo** — sem storage dedicado/privado
+  para CNH; se isso virar problema de privacidade, é o primeiro lugar a mexer).
+- **Alerta de vencimento:** `app_condutor_meu` retorna `cnh_vencendo` (validade ≤ hoje+30). Exibido
+  como banner em `condRenderHome` quando `status` é `apto`/`ativo`.
+- **Aprovação (gestor):** `condPendentes` vem de `app_condutor_pendentes()` — só quem está em
+  `sup_aprovadores_de(condutor.id)` (ou admin) vê a lista. Botão liga a `condAprovar` →
+  `app_condutor_aprovar(p_condutor_id, p_aprovado, p_motivo)`.
+- **Meu veículo / situação / abastecimento / empréstimo:** `condVeiculos` = `app_frota_veiculos_listar()`
+  (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,status`, filtrado a exclusivo-meu ou
+  da minha equipe). Sub-telas `condRenderSituacao`/`condRenderAbastecimento` salvam via
+  `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar` (tabelas `frota_checklist_situacao` /
+  `frota_checklist_abastecimento`; ambas levam `p_consorcio` **ZA1004/ZA0200** e foto opcional).
+  **Offline-first** (igual ao resto da coleta de campo, §1): `condSalvarSituacao`/`condSalvarAbastecimento`
+  montam um `item` e chamam `enviarOuEnfileirar` — sem sinal, a ação entra na fila IndexedDB e sincroniza
+  depois. `p_fotos` de situação é **array** (`text[]`); como o helper genérico `enviar()` só resolve
+  path escalar, o `item` leva `fotosArray:['p_fotos']` (lista de params cujo path deve virar `[path]`
+  após o upload) — **convenção nova em `enviar()`, reaproveitável por outro módulo com foto array**.
+  `p_foto_cupom` do abastecimento é escalar, sem precisar de `fotosArray`.
+- **Empréstimo:** `condRenderEmprestimo`/`condSalvarEmprestimo` — condutor busca o destinatário por
+  e-mail (`app_perfil_por_email`) e chama `app_frota_emprestimo_criar(p_veiculo_id,
+  p_para_condutor_id, p_data_inicio, p_data_fim_prevista)`. **Não valida se o destino é condutor
+  cadastrado** — qualquer `perfil` serve. Lista "Meus empréstimos" (`app_frota_meus_emprestimos`,
+  campo `sou_recebedor`) mostra "Devolver veículo" só pra quem recebeu e está `ativo`; devolução via
+  `app_frota_emprestimo_devolver(p_id)`.
+- **Estado:** `condSub, condVeiculoSel, condData, condPendentes, condVeiculos, condEmprestimos`.
+
+### 6.2 Frotas — `// condutor/frotas/qsms` (~L4446) · tela `frotas`
+- **Gate de tela vs. gate de conteúdo:** todo mundo entra na tela (pra ver ocorrências pendentes se
+  for aprovador, ou os próprios veículos se for condutor comum); `frotasRenderHome` decide o conteúdo
+  completo (`const full = ME.funcao==='frotas'||ME.is_admin`) — CRUD de veículo/equipe só aparece pra
+  `full`. **O backend também gateia** (`app_frota_veiculos_listar` já filtra por função — ver §6.4).
+- **Veículo** (`frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` → `app_frota_veiculo_salvar`, 16 params
+  incl. dados de locação `fornecedor/contrato_numero/data_inicio/data_fim_prevista` e uso
+  `uso_tipo ∈ {equipe,exclusivo}` com `equipe_id` **xor** `condutor_exclusivo_id`). Devolução à
+  locadora: `app_frota_veiculo_devolver(p_id, p_data_fim_real)` (botão só aparece se `!data_fim_real`).
+- **Equipe** (`frotasRenderEquipes`/`feqCarregar` → `app_frota_equipe_salvar(p_id,p_nome,p_membros[])`,
+  `app_frota_equipes_listar`; tabelas `frota_equipe`/`frota_equipe_membro`). **Não confundir com** a
+  seção "Equipes" de Suprimentos ⚙️ Configurações (`sup_admin_equipe_*`) — aquilo é código morto (RPC
+  não existe no banco); esta aqui, de Frotas, é real e funcional.
+- **Ocorrências** (manutenção/sinistro/multa/lavagem): `frotasRenderOcorrencia` → 
+  `app_frota_ocorrencia_reportar(p_veiculo_id,p_tipo,p_descricao,p_valor,p_data_ocorrencia,p_fotos[])`
+  (tabela `frota_ocorrencia`). Fila de aprovação `frotasOcorPend` = `app_frota_ocorrencia_pendentes()`
+  — só quem está em `sup_aprovadores_de(condutor_exclusivo_do_veiculo || reportado_por)` (ou admin) vê,
+  **e é aí que o valor fica visível** — o card de "veículos designados a você" (não-`full`) nunca lista
+  ocorrências nem valor. Aprovação: `frotasOcorAprovar` → `app_frota_ocorrencia_aprovar(p_id,
+  p_aprovado,p_motivo)`.
+- **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend`.
+
+### 6.3 QSMS — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
+- Tela só pra `funcao='qsms'`/admin (RPCs recusam com `raise exception 'sem permissao'` pra quem não é
+  — testado, ver §6.4). `qsmsAptos` = `app_qsms_condutores_aptos()` (condutores `apto` **sem**
+  treinamento `agendado` em aberto). Seleciona vários (`qsmsSelCondutores`) → **Agendar treinamento**
+  (`qsmsRenderAgendar` → `app_qsms_treinamento_agendar(p_data,p_horario,p_local,p_instrutor,
+  p_condutor_ids[])`, cria `frota_treinamento` + 1 linha por condutor em `frota_treinamento_condutor`).
+- **Baixa:** `qsmsRenderBaixa` lista os participantes do treinamento selecionado (`qsmsTreinoSel`),
+  QSMS marca presença + anexa foto da lista → `app_qsms_treinamento_baixar(p_treinamento_id,
+  p_lista_presenca,p_presentes[])`. Isso **atualiza `frota_condutor.status='ativo'`** pra quem está em
+  `p_presentes` — é essa `UPDATE` que dispara a notificação de "condutor ativo" (via trigger, não é
+  a própria RPC que notifica — ver §6.4). Quem faltou continua `apto` (pode ser reagendado).
+- **Estado:** `qsmsSub, qsmsSelCondutores, qsmsTreinoSel, qsmsAptos, qsmsTreinos`.
+
+### 6.4 Notificação/aprovação — reaproveita Suprimentos (não é hierarquia própria)
+Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o mecanismo do invariante
+§0.9. Todo disparo é por **trigger**, nunca inline nas RPCs `app_*` (que só gravam):
+- `"10 - Frotas".trg_frota_condutor()` (`AFTER INSERT/UPDATE` em `frota_condutor`): cadastro novo/reenvio
+  → grupo `sup_aprovadores_de(condutor)`; `apto` → pessoal ao condutor + grupo `qsms`/admin; `reprovado`
+  → pessoal; `ativo` → pessoal ao condutor + grupo `sup_aprovadores_de(condutor)`.
+- `"10 - Frotas".trg_frota_ocorrencia()` (`frota_ocorrencia`): INSERT → grupo
+  `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` + pessoal a esse mesmo alvo
+  (se não foi ele quem reportou); UPDATE de status → pessoal ao alvo.
+- `"10 - Frotas".trg_frota_emprestimo()` (`frota_emprestimo`, só INSERT): pessoal a `para_condutor_id`.
+- `"10 - Frotas".trg_frota_treinamento_condutor()` (`frota_treinamento_condutor`, só INSERT): pessoal
+  ao condutor agendado (data/local/instrutor).
+- **Quem aprova o quê:** definido por `perfil.aprovador_uuid`/`aprovador2_uuid` de **cada pessoa**
+  (tela de Suprimentos ⚙️ Configurações — não existe tela própria em Frotas). Sem aprovador configurado
+  → cai pra todo `aprovador`/`admin` ativo (`sup_aprovadores_de`, fallback).
+- **Cuidado ao mexer:** qualquer RPC nova de escrita em Frotas **não deve chamar `sup_notificar`
+  diretamente** — crie/edite o trigger da tabela correspondente. Testado via rollback E2E
+  (`set_config('request.jwt.claims',...)` trocando de ator no meio da transação) que a exclusão por
+  `p_exceto` funciona corretamente mesmo quando o ator é um dos aprovadores do alvo.
+
+### Tabelas (`"10 - Frotas"`)
+`frota_veiculo` (locação, uso exclusivo/equipe), `frota_condutor` (PK = `perfil.id`, status/CNH),
+`frota_equipe` + `frota_equipe_membro`, `frota_checklist_situacao`, `frota_checklist_abastecimento`,
+`frota_emprestimo`, `frota_ocorrencia`, `frota_treinamento` + `frota_treinamento_condutor`.
+
+### Cuidados
+- **Sem veículos cadastrados ainda em produção** — quem tem `funcao='frotas'` precisa cadastrar os
+  reais antes das telas de condutor mostrarem algo.
+- **Ninguém com `funcao='qsms'` em produção no momento** — card `#cardQsms` só aparece pra admin até
+  alguém ser designado (`sup_admin_set_funcao` em Suprimentos ⚙️ Configurações, mesma RPC de sempre).
+- Foto de CNH vai pro bucket público `fotos-campo` (mesmo de fotos de campo) — não há bucket
+  privado dedicado a documento de identificação.
+
+## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin
   sobe). RPCs `biblioteca_listar`, `biblioteca_admin_listar`, `biblioteca_salvar`, `biblioteca_excluir`.
 
-## 7. Avisos / Notificações + Web Push — `// NOTIFICAÇÕES` (~L4212) e `// WEB PUSH` (~L491)
+## 8. Avisos / Notificações + Web Push — `// NOTIFICAÇÕES` (~L4212) e `// WEB PUSH` (~L491)
 - **Inbox+badge:** `"9 - suprimentos".sup_notificacao`; RPCs `app_notif_contador`/`app_notif_listar`/
   `app_notif_marcar_lidas`; `ntfBadge`/`ntfInit`; `link` é um "act" → `supGoAct(act)` abre a tela.
 - **Disparo:** `sup_notificar(destinos[],tipo,titulo,texto,link,exceto)`. Pessoais **sem** `exceto`;
@@ -265,7 +384,7 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
   `x-push-secret`); trigger em `sup_notificacao` → `pg_net` → `push-send`. **iOS só com PWA instalado.**
   Chave **pública** VAPID no `index.html` (`VAPID_PUBLIC`); privada **nunca** no front. SW v60+.
 
-## 8. Auth — `// auth` (~L4172)
+## 9. Auth — `// auth` (~L4172)
 - `sb.auth.getSession()` / `onAuthStateChange` → `mostrar(session)`: mostra o app, `iniciarGPS()`,
   `ntfBadge()`, `pushAutoSync()`, carrega `ME` (`app_me`) e **dispara `homeGate()`**. Logout limpa `ME`.
 - **Cuidado:** a `home` é exibida aqui sem `irPara` e `ME` é assíncrono → gates de botão precisam ser
@@ -273,7 +392,7 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
 
 ---
 
-## 9. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
+## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
 **Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`.
@@ -288,6 +407,14 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
 `app_abertura_servico_minhas`, `app_captacao_fila`, `app_captacao_matricula`
 (registro via `app_abertura_servico_registrar`, `app_captacao_registrar`).
 **Suprimentos:** prefixo `sup_*` (ver §5).
+**Condutor/Frotas/QSMS (ver §6):** `app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh`,
+`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`, `app_frota_equipes_listar/equipe_salvar`,
+`app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
+`app_frota_emprestimo_criar/devolver`, `app_frota_meus_emprestimos`,
+`app_frota_ocorrencia_reportar/pendentes/aprovar`,
+`app_qsms_condutores_aptos`, `app_qsms_treinamento_agendar/baixar`, `app_qsms_treinamentos_listar`,
+`app_perfil_por_email` (helper genérico: busca `perfil` por e-mail, usado por Frotas e por qualquer
+módulo que precise resolver destinatário por e-mail).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
