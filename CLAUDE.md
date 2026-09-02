@@ -193,12 +193,20 @@ pwa/
 **Suprimentos** (`suprimentos`) — ver §8.
 
 **Frotas / Condutor / QSMS** (`frotas`/`condutor`/`qsms`, schema `10 - Frotas`) — condutor se
-auto-cadastra (CNH) → gestor aprova → **apto** (10 dias p/ treinamento) → QSMS agenda e dá baixa →
-**ativo**; alerta de CNH vencendo em 30 dias. **Frotas** (`funcao='frotas'`/admin) cadastra veículos
-(locação, uso exclusivo/equipe) e aprova ocorrências (manutenção/sinistro/multa/lavagem — valor só
-visível a quem aprova). Empréstimo de veículo entre condutores, com devolução confirmada por quem
-recebeu. Aprovação/notificação **reaproveita** o mecanismo de Suprimentos (não é hierarquia própria)
-— ver docs/MODULOS.md §6 (detalhe completo) e §0.9/§6.4 (o mecanismo em si).
+auto-cadastra (CNH) → gestor aprova → **apto** (10 dias p/ treinamento) → QSMS agenda e dá baixa
+(foto da lista de presença obrigatória) → **ativo**; alerta de CNH vencendo em 30 dias. Só pode ser
+vinculado a veículo/equipe/empréstimo quem está `apto`/`ativo` (validado no backend; reeditar um
+vínculo já existente não reaplica a checagem — "grandfathering"). **Frotas** (`funcao='frotas'`/admin)
+cadastra veículos (tipo/combustível/motorização/centro de custo, consórcio obrigatório, aluguel com
+histórico de reajuste, valor de devolução) e aprova ocorrências/manutenções (valor só visível a quem
+aprova). Empréstimo de veículo entre condutores — durante o empréstimo, abastecimento/ocorrência/
+lavagem somem de quem emprestou e aparecem pra quem recebeu; retomada é só solicitação (quem está com
+o carro confirma a devolução). Manutenção tem fluxo próprio (orçamento → aprovação → conclusão,
+tabela `frota_manutencao`, separada de ocorrência). Painel de acompanhamento (Frotas) com histórico
+completo de movimentações/abastecimentos/lavagens/ocorrências/manutenções e custos agregados por
+veículo — "tempo real" é só "atualizado ao abrir a tela", sem websocket. Aprovação/notificação
+**reaproveita** o mecanismo de Suprimentos (não é hierarquia própria) — ver docs/MODULOS.md §6
+(detalhe completo) e §0.9/§6.4 (o mecanismo em si).
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 

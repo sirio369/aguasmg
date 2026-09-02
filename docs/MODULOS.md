@@ -399,18 +399,31 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   (`app_frota_manutencao_concluir(p_id,p_data_liberacao,p_fotos_conclusao[])` recusa qualquer outro
   status) — ação fica na tela **Painel › Manutenções** (botão "Marcar como concluída" só aparece pra
   `status==='aprovado'`), não no card do veículo, porque normalmente é feita bem depois da aprovação.
-- **Painel** (`frotasRenderPainel` → 5 listas: `frotasRenderPainelLista('movimentacoes'|
-  'abastecimentos'|'lavagens'|'ocorrencias'|'manutencoes')`, `frotas`/admin): histórico **completo**
-  de toda a frota (não filtrado por veículo/condutor — é o que falta nas outras telas, que só mostram
-  "meu" ou "pendente"). RPCs `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`,
-  `app_frota_lavagens_listar`, `app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar` (as 2
-  últimas diferem das RPCs `_pendentes` homônimas: trazem **todo** status, não só `pendente`, e não
-  são filtradas por `sup_aprovadores_de` — visão gerencial da Frotas, não fila de aprovação pessoal).
-  **"Tempo real" aqui significa só "sempre atualizado quando abre a tela"** — sem Supabase
-  Realtime/websocket (decisão de produto confirmada com a Geovana: nenhum módulo do app usa isso
-  hoje, não valia o risco/esforço só pra este painel). Cadastros de condutor/veículo e status de
-  aprovação **não têm telas próprias no Painel** — já existem em §6.2 (lista de veículos) e
-  "Condutores" logo acima. **Falta só o painel de custos** (última fase, depende de tudo isso).
+- **Painel** (`frotasRenderPainel` → 6 listas: `frotasRenderPainelLista('movimentacoes'|
+  'abastecimentos'|'lavagens'|'ocorrencias'|'manutencoes'|'custos')`, `frotas`/admin): histórico
+  **completo** de toda a frota (não filtrado por veículo/condutor — é o que falta nas outras telas,
+  que só mostram "meu" ou "pendente"). RPCs `app_frota_movimentacoes_listar`,
+  `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`, `app_frota_ocorrencias_listar`,
+  `app_frota_manutencoes_listar` (as 2 últimas diferem das RPCs `_pendentes` homônimas: trazem
+  **todo** status, não só `pendente`, e não são filtradas por `sup_aprovadores_de` — visão gerencial
+  da Frotas, não fila de aprovação pessoal). **"Tempo real" aqui significa só "sempre atualizado
+  quando abre a tela"** — sem Supabase Realtime/websocket (decisão de produto confirmada com a
+  Geovana: nenhum módulo do app usa isso hoje, não valia o risco/esforço só pra este painel).
+  Cadastros de condutor/veículo e status de aprovação **não têm telas próprias no Painel** — já
+  existem em §6.2 (lista de veículos) e "Condutores" logo acima.
+- **Custos por veículo** (última das 6 fases pedidas): `app_frota_custos_por_veiculo()` soma, por
+  veículo, `frota_veiculo_aluguel_historico` (aluguel), `frota_checklist_abastecimento`
+  (abastecimento), `frota_lavagem` (lavagem), `frota_manutencao` **só status `aprovado`/`concluido`**
+  (orçamento reprovado ou ainda pendente não é custo real) e `frota_ocorrencia` tipo `multa` **só
+  status `aprovado`** (mesmo raciocínio), + `valor_devolucao` do próprio veículo. **Aluguel é o único
+  cálculo não-trivial**: cada linha do histórico vira um "período" (do próprio `vigente_desde` até o
+  `vigente_desde` da próxima linha menos 1 dia — via `lead()` — ou até `data_fim_real`/hoje se for a
+  última), e o custo de cada período é `valor * dias/30.44` (mês médio), somado no fim. `aluguel_mensal_atual`
+  é simplesmente a linha de `vigente_desde` mais recente — **cuidado ao testar com dados sintéticos**:
+  um "reajuste" com `vigente_desde` **anterior** à data em que o veículo foi cadastrado (o seed inicial
+  do aluguel usa `current_date`, não `data_inicio` do contrato) inverte a ordem cronológica esperada e
+  o valor "mais recente" pode não ser o que se imagina — não é bug da RPC, é o dado ficando
+  inconsistente com a realidade. `custo_total` é a soma de tudo. Read-only, sem RPC de escrita nova.
 - **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend,
   frotasManutPend, frotasCondutores, frotasPainelCache`.
 
@@ -518,7 +531,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`,
 `app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
 `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
-`app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar` (painel gerencial, §6.2),
+`app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar`, `app_frota_custos_por_veiculo`
+(painel gerencial, §6.2),
 `app_frota_equipes_listar/equipe_salvar`,
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
 `app_frota_emprestimo_criar/devolver/solicitar_devolucao`, `app_frota_meus_emprestimos`,
