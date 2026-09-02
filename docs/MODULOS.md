@@ -351,13 +351,23 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   `app_frota_equipes_listar`; tabelas `frota_equipe`/`frota_equipe_membro`). **Não confundir com** a
   seção "Equipes" de Suprimentos ⚙️ Configurações (`sup_admin_equipe_*`) — aquilo é código morto (RPC
   não existe no banco); esta aqui, de Frotas, é real e funcional.
-- **Ocorrências** (manutenção/sinistro/multa/lavagem): `frotasRenderOcorrencia` → 
-  `app_frota_ocorrencia_reportar(p_veiculo_id,p_tipo,p_descricao,p_valor,p_data_ocorrencia,p_fotos[])`
-  (tabela `frota_ocorrencia`). Fila de aprovação `frotasOcorPend` = `app_frota_ocorrencia_pendentes()`
+- **Ocorrências** (manutenção/sinistro/multa/lavagem): `frotasRenderOcorrencia` (Frotas) e
+  `condRenderOcorrencia` (condutor, §6.1) → mesma RPC
+  `app_frota_ocorrencia_reportar(p_veiculo_id,p_tipo,p_descricao,p_valor,p_data_ocorrencia,p_fotos[],
+  p_condutor_no_momento_id,p_motivo_infracao)` (tabela `frota_ocorrencia`; os 2 últimos params são
+  `default null`, só preenchidos pra `tipo='multa'` — condutores/PRs antigos que não mandam esses 2
+  params continuam funcionando). Fila de aprovação `frotasOcorPend` = `app_frota_ocorrencia_pendentes()`
   — só quem está em `sup_aprovadores_de(condutor_exclusivo_do_veiculo || reportado_por)` (ou admin) vê,
   **e é aí que o valor fica visível** — o card de "veículos designados a você" (não-`full`) nunca lista
   ocorrências nem valor. Aprovação: `frotasOcorAprovar` → `app_frota_ocorrencia_aprovar(p_id,
-  p_aprovado,p_motivo)`.
+  p_aprovado,p_motivo)`. **Multa** é `tipo='multa'` na mesma tabela, não uma entidade separada:
+  `frotasRenderOcorrencia` mostra 2 campos extras só quando `tipo==='multa'`
+  (`#ocfMultaWrap`/`toggleMulta`) — e-mail do **condutor no momento da infração** (resolvido via
+  `app_perfil_por_email`, guardado em `condutor_no_momento_id` — pode ser diferente do
+  `condutor_exclusivo_id` do veículo, ex.: infração durante um empréstimo) e motivo/tipo da infração
+  (`motivo_infracao`). Passa pelo mesmo fluxo pendente→aprovado/reprovado de qualquer ocorrência —
+  "encaminhar ao gestor para ciência" (pedido da Geovana) é a própria aprovação/reprovação existente,
+  não um mecanismo novo.
 - **Condutores** (`frotasRenderCondutores` → `app_frota_condutores_listar()`, `frotas`/admin):
   listagem read-only de **todos** os condutores (qualquer status), nome/e-mail/CNH/prazo de
   treinamento/motivo de reprovação. Aprovar continua sendo só na tela **Condutor** (`condPendentes`,
@@ -377,22 +387,32 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   exclusivo **nasce vazio mesmo em edição** (não tem como pré-preencher e-mail a partir do nome que a
   RPC retorna); deixar em branco **mantém** o condutor já vinculado (frontend reusa
   `vExistente.condutor_exclusivo_id`), só troca se alguém digitar um e-mail novo.
-- **Painel** (`frotasRenderPainel` → 4 listas: `frotasRenderPainelLista('movimentacoes'|'abastecimentos'|
-  'lavagens'|'ocorrencias')`, `frotas`/admin): histórico **completo** de toda a frota (não filtrado por
-  veículo/condutor — é justamente o que falta nas outras telas, que só mostram "meu" ou "pendente").
-  RPCs `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`,
-  `app_frota_lavagens_listar`, `app_frota_ocorrencias_listar` (esta última difere de
-  `app_frota_ocorrencia_pendentes`: traz **todo** status, não só `pendente`, e não é filtrada por
-  `sup_aprovadores_de` — é visão gerencial da Frotas, não fila de aprovação pessoal). **"Tempo real"
-  aqui significa só "sempre atualizado quando abre a tela"** — sem Supabase Realtime/websocket
-  (decisão de produto confirmada com a Geovana: nenhum módulo do app usa isso hoje, não valia o
-  risco/esforço só pra este painel). Cadastros de condutor/veículo e status de aprovação **não têm
-  telas próprias no Painel** — já existem em §6.2 (lista de veículos) e "Condutores" logo acima; o
-  Painel só cobre o que ainda não tinha visão nenhuma (movimentações/abastecimentos/lavagens/
-  ocorrências completas). Manutenções/multas/custos (também pedidos no painel) ainda não existem —
-  entram nas próximas fases.
+- **Manutenção** (tabela própria `frota_manutencao`, **não** é um `tipo` de `frota_ocorrencia` — ciclo
+  de vida diferente demais pra caber no `pendente/aprovado/reprovado` simples de ocorrência):
+  `frotasRenderManutencao` (botão "🔧 Manutenção" no card do veículo, Frotas registra
+  serviço/orçamento/foto do problema) → `app_frota_manutencao_registrar(p_veiculo_id,
+  p_servico_solicitado,p_orcamento_valor,p_fotos_antes[])`, status inicial `pendente`. Aprovação do
+  orçamento (**antes** do serviço ser feito): `frotasManutPend` = `app_frota_manutencao_pendentes()`
+  (mesmo gate `sup_aprovadores_de(condutor_exclusivo||reportado_por)` de ocorrência) →
+  `frotasManutAprovar` → `app_frota_manutencao_aprovar(p_id,p_aprovado,p_motivo)`, status vira
+  `aprovado`/`reprovado`. **Só dá pra concluir uma manutenção `aprovado`**
+  (`app_frota_manutencao_concluir(p_id,p_data_liberacao,p_fotos_conclusao[])` recusa qualquer outro
+  status) — ação fica na tela **Painel › Manutenções** (botão "Marcar como concluída" só aparece pra
+  `status==='aprovado'`), não no card do veículo, porque normalmente é feita bem depois da aprovação.
+- **Painel** (`frotasRenderPainel` → 5 listas: `frotasRenderPainelLista('movimentacoes'|
+  'abastecimentos'|'lavagens'|'ocorrencias'|'manutencoes')`, `frotas`/admin): histórico **completo**
+  de toda a frota (não filtrado por veículo/condutor — é o que falta nas outras telas, que só mostram
+  "meu" ou "pendente"). RPCs `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`,
+  `app_frota_lavagens_listar`, `app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar` (as 2
+  últimas diferem das RPCs `_pendentes` homônimas: trazem **todo** status, não só `pendente`, e não
+  são filtradas por `sup_aprovadores_de` — visão gerencial da Frotas, não fila de aprovação pessoal).
+  **"Tempo real" aqui significa só "sempre atualizado quando abre a tela"** — sem Supabase
+  Realtime/websocket (decisão de produto confirmada com a Geovana: nenhum módulo do app usa isso
+  hoje, não valia o risco/esforço só pra este painel). Cadastros de condutor/veículo e status de
+  aprovação **não têm telas próprias no Painel** — já existem em §6.2 (lista de veículos) e
+  "Condutores" logo acima. **Falta só o painel de custos** (última fase, depende de tudo isso).
 - **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend,
-  frotasCondutores, frotasPainelCache`.
+  frotasManutPend, frotasCondutores, frotasPainelCache`.
 
 ### 6.3 QSMS — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
 - Tela só pra `funcao='qsms'`/admin (RPCs recusam com `raise exception 'sem permissao'` pra quem não é
@@ -416,9 +436,14 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 - `"10 - Frotas".trg_frota_condutor()` (`AFTER INSERT/UPDATE` em `frota_condutor`): cadastro novo/reenvio
   → grupo `sup_aprovadores_de(condutor)`; `apto` → pessoal ao condutor + grupo `qsms`/admin; `reprovado`
   → pessoal; `ativo` → pessoal ao condutor + grupo `sup_aprovadores_de(condutor)`.
-- `"10 - Frotas".trg_frota_ocorrencia()` (`frota_ocorrencia`): INSERT → grupo
-  `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` + pessoal a esse mesmo alvo
-  (se não foi ele quem reportou); UPDATE de status → pessoal ao alvo.
+- `"10 - Frotas".trg_frota_ocorrencia()` (`frota_ocorrencia`, cobre multa também — mesma tabela):
+  INSERT → grupo `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` + pessoal a
+  esse mesmo alvo (se não foi ele quem reportou); UPDATE de status → pessoal ao alvo.
+- `"10 - Frotas".trg_frota_manutencao()` (`frota_manutencao`, INSERT/UPDATE): INSERT → grupo
+  `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` (aprovação de orçamento,
+  `p_exceto`=ator); UPDATE de status pra `aprovado`/`reprovado` → **pessoal a `reportado_por`** (quem
+  registrou a manutenção — normalmente Frotas, não o condutor do veículo; por isso o alvo da
+  notificação de decisão é diferente do alvo usado pra achar o aprovador).
 - `"10 - Frotas".trg_frota_emprestimo()` (`frota_emprestimo`, INSERT/UPDATE): INSERT → pessoal a
   `para_condutor_id` (veículo emprestado); UPDATE com `devolucao_solicitada_em` saindo de `null` →
   pessoal a `para_condutor_id` de novo (titular pediu a devolução, §6.1).
@@ -437,7 +462,9 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `frota_veiculo_aluguel_historico` (1 linha por reajuste, nunca `UPDATE` — histórico do aluguel),
 `frota_condutor` (PK = `perfil.id`, status/CNH), `frota_equipe` + `frota_equipe_membro`,
 `frota_checklist_situacao`, `frota_checklist_abastecimento`, `frota_lavagem`,
-`frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1), `frota_ocorrencia`,
+`frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1),
+`frota_ocorrencia` (+ `condutor_no_momento_id`/`motivo_infracao`, multa — §6.2), `frota_manutencao`
+(tabela própria, ciclo `pendente→aprovado/reprovado→concluido`, não é ocorrência — §6.2),
 `frota_treinamento` + `frota_treinamento_condutor`.
 
 ### Cuidados
@@ -491,12 +518,13 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`,
 `app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
 `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
-`app_frota_ocorrencias_listar` (painel gerencial, §6.2),
+`app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar` (painel gerencial, §6.2),
 `app_frota_equipes_listar/equipe_salvar`,
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
 `app_frota_emprestimo_criar/devolver/solicitar_devolucao`, `app_frota_meus_emprestimos`,
 `app_frota_lavagem_salvar`,
 `app_frota_ocorrencia_reportar/pendentes/aprovar`,
+`app_frota_manutencao_registrar/pendentes/aprovar/concluir`,
 `app_qsms_condutores_aptos`, `app_qsms_treinamento_agendar/baixar`, `app_qsms_treinamentos_listar`,
 `app_perfil_por_email` (helper genérico: busca `perfil` por e-mail, usado por Frotas e por qualquer
 módulo que precise resolver destinatário por e-mail).
