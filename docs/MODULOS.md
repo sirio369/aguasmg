@@ -284,10 +284,14 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   `sup_aprovadores_de(condutor.id)` (ou admin) vê a lista. Botão liga a `condAprovar` →
   `app_condutor_aprovar(p_condutor_id, p_aprovado, p_motivo)`.
 - **Meu veículo / situação / abastecimento / empréstimo:** `condVeiculos` = `app_frota_veiculos_listar()`
-  (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,status`, filtrado a exclusivo-meu ou
-  da minha equipe). Sub-telas `condRenderSituacao`/`condRenderAbastecimento` salvam via
-  `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar` (tabelas `frota_checklist_situacao` /
-  `frota_checklist_abastecimento`; ambas levam `p_consorcio` **ZA1004/ZA0200** e foto opcional).
+  (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,status,consorcio`, filtrado a
+  exclusivo-meu ou da minha equipe). Sub-telas `condRenderSituacao`/`condRenderAbastecimento` salvam
+  via `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar` (tabelas `frota_checklist_situacao` /
+  `frota_checklist_abastecimento`; foto opcional). **`p_consorcio` não é mais escolhido na tela** —
+  vem direto de `v.consorcio` (o veículo, obrigatoriamente vinculado a um consórcio desde o cadastro
+  em Frotas, §6.2). **Combustível do abastecimento é filtrado pelo `tipo_combustivel` do veículo**
+  (`combustiveisPermitidos(v)`: `flex`→gasolina/etanol, `gasolina`→só gasolina, `diesel`→diesel/diesel
+  S10, `outros`/sem cadastro→todas as opções de `COMBUSTIVEIS`).
   **Offline-first** (igual ao resto da coleta de campo, §1): `condSalvarSituacao`/`condSalvarAbastecimento`
   montam um `item` e chamam `enviarOuEnfileirar` — sem sinal, a ação entra na fila IndexedDB e sincroniza
   depois. `p_fotos` de situação é **array** (`text[]`); como o helper genérico `enviar()` só resolve
@@ -307,10 +311,23 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   for aprovador, ou os próprios veículos se for condutor comum); `frotasRenderHome` decide o conteúdo
   completo (`const full = ME.funcao==='frotas'||ME.is_admin`) — CRUD de veículo/equipe só aparece pra
   `full`. **O backend também gateia** (`app_frota_veiculos_listar` já filtra por função — ver §6.4).
-- **Veículo** (`frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` → `app_frota_veiculo_salvar`, 16 params
-  incl. dados de locação `fornecedor/contrato_numero/data_inicio/data_fim_prevista` e uso
-  `uso_tipo ∈ {equipe,exclusivo}` com `equipe_id` **xor** `condutor_exclusivo_id`). Devolução à
-  locadora: `app_frota_veiculo_devolver(p_id, p_data_fim_real)` (botão só aparece se `!data_fim_real`).
+- **Veículo** (`frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` → `app_frota_veiculo_salvar`, 21 params
+  incl. dados de locação `fornecedor/contrato_numero/data_inicio/data_fim_prevista`, uso
+  `uso_tipo ∈ {equipe,exclusivo}` com `equipe_id` **xor** `condutor_exclusivo_id`, e os campos de
+  cadastro: `tipo` (`select` fixo — `TIPOS_VEICULO`: picape/utilitario/hatch/sedan/suv/caminhao/moto),
+  `centro_custo` (texto livre), `tipo_combustivel` (`select` fixo — `COMBUSTIVEIS_VEICULO`:
+  flex/gasolina/diesel/outros — **vocabulário diferente** do `COMBUSTIVEIS` usado no abastecimento,
+  ver §6.1), `motorizacao` (texto livre, ex. "1.6"), `consorcio` (**obrigatório**, `ZA1004`/`ZA0200` —
+  validado na RPC mesmo pra edição; os 2 veículos cadastrados antes desta trave em produção precisam
+  ser reabertos e salvos uma vez pra ganhar consórcio). `CHECK` de `tipo`/`tipo_combustivel`/`consorcio`
+  também no banco (`frota_veiculo_*_check`).
+  **Aluguel tem histórico, não é um campo só:** `p_valor_aluguel` da RPC só é usado **na criação**
+  (semeia a 1ª linha); reajuste é sempre via `app_frota_veiculo_aluguel_reajustar(p_veiculo_id,p_valor,
+  p_vigente_desde)` (nova linha em `frota_veiculo_aluguel_historico`, nunca `UPDATE`). Tela mostra o
+  valor atual (`app_frota_veiculos_listar` traz `valor_aluguel_atual`, subquery do último
+  `vigente_desde`) + botões "Reajustar" e "Ver histórico" (`app_frota_veiculo_aluguel_historico`).
+  Devolução à locadora: `app_frota_veiculo_devolver(p_id, p_data_fim_real, p_valor_devolucao)` (botão
+  só aparece se `!data_fim_real`; `prompt()` pede o valor, mesmo padrão de `condAprovar`).
 - **Equipe** (`frotasRenderEquipes`/`feqCarregar` → `app_frota_equipe_salvar(p_id,p_nome,p_membros[])`,
   `app_frota_equipes_listar`; tabelas `frota_equipe`/`frota_equipe_membro`). **Não confundir com** a
   seção "Equipes" de Suprimentos ⚙️ Configurações (`sup_admin_equipe_*`) — aquilo é código morto (RPC
@@ -358,13 +375,17 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
   `p_exceto` funciona corretamente mesmo quando o ator é um dos aprovadores do alvo.
 
 ### Tabelas (`"10 - Frotas"`)
-`frota_veiculo` (locação, uso exclusivo/equipe), `frota_condutor` (PK = `perfil.id`, status/CNH),
-`frota_equipe` + `frota_equipe_membro`, `frota_checklist_situacao`, `frota_checklist_abastecimento`,
-`frota_emprestimo`, `frota_ocorrencia`, `frota_treinamento` + `frota_treinamento_condutor`.
+`frota_veiculo` (locação, uso exclusivo/equipe, cadastro/combustível/consórcio — §6.2),
+`frota_veiculo_aluguel_historico` (1 linha por reajuste, nunca `UPDATE` — histórico do aluguel),
+`frota_condutor` (PK = `perfil.id`, status/CNH), `frota_equipe` + `frota_equipe_membro`,
+`frota_checklist_situacao`, `frota_checklist_abastecimento`, `frota_emprestimo`, `frota_ocorrencia`,
+`frota_treinamento` + `frota_treinamento_condutor`.
 
 ### Cuidados
-- **Sem veículos cadastrados ainda em produção** — quem tem `funcao='frotas'` precisa cadastrar os
-  reais antes das telas de condutor mostrarem algo.
+- **`consorcio` de `frota_veiculo` é `NULL`-ável no banco** (não dá pra travar `NOT NULL` — 2
+  veículos reais já cadastrados antes dessa trave ficaram sem valor) mas **obrigatório na RPC**
+  `app_frota_veiculo_salvar` pra qualquer criação/edição a partir de agora. Um veículo antigo com
+  `consorcio is null` só se resolve quando alguém abrir e salvar ele de novo.
 - **Ninguém com `funcao='qsms'` em produção no momento** — card `#cardQsms` só aparece pra admin até
   alguém ser designado (`sup_admin_set_funcao` em Suprimentos ⚙️ Configurações, mesma RPC de sempre).
 - Foto de CNH vai pro bucket público `fotos-campo` (mesmo de fotos de campo) — não há bucket
@@ -408,7 +429,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 (registro via `app_abertura_servico_registrar`, `app_captacao_registrar`).
 **Suprimentos:** prefixo `sup_*` (ver §5).
 **Condutor/Frotas/QSMS (ver §6):** `app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh`,
-`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`, `app_frota_equipes_listar/equipe_salvar`,
+`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`,
+`app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_equipes_listar/equipe_salvar`,
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
 `app_frota_emprestimo_criar/devolver`, `app_frota_meus_emprestimos`,
 `app_frota_ocorrencia_reportar/pendentes/aprovar`,
