@@ -67,7 +67,9 @@
   `fields[param] = path`; depois chama `sb.rpc(item.rpc, fields)`.
   - **Regra de ouro das fotos:** a **chave** de `item.fotos` tem que ser **exatamente o nome do
     parâmetro** da RPC (ex.: `p_foto_hd`). Blobs falsy são pulados (foto opcional = ok).
-  - `item = {id, tipo, rpc, pasta, fotos:{p_x:Blob}, fields:{...}}`.
+  - `item = {id, tipo, rpc, pasta, fotos:{p_x:Blob}, fields:{...}}`. Se algum `p_x` é **array**
+    (`text[]`) em vez de path escalar, acrescente `fotosArray:['p_x', ...]` — `enviar()` envolve o path
+    resultante em `[path]` só para esses params (ver Frotas §6.1, primeiro uso).
 - `sincronizar()`: erros com `code` SQLSTATE (5 chars) = rejeição de negócio → descarta o item;
   erro de rede → mantém e tenta depois.
 - `comprimir(file)` (~L598): reduz p/ ~1600px/JPEG 0.7 antes do upload.
@@ -286,6 +288,12 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   da minha equipe). Sub-telas `condRenderSituacao`/`condRenderAbastecimento` salvam via
   `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar` (tabelas `frota_checklist_situacao` /
   `frota_checklist_abastecimento`; ambas levam `p_consorcio` **ZA1004/ZA0200** e foto opcional).
+  **Offline-first** (igual ao resto da coleta de campo, §1): `condSalvarSituacao`/`condSalvarAbastecimento`
+  montam um `item` e chamam `enviarOuEnfileirar` — sem sinal, a ação entra na fila IndexedDB e sincroniza
+  depois. `p_fotos` de situação é **array** (`text[]`); como o helper genérico `enviar()` só resolve
+  path escalar, o `item` leva `fotosArray:['p_fotos']` (lista de params cujo path deve virar `[path]`
+  após o upload) — **convenção nova em `enviar()`, reaproveitável por outro módulo com foto array**.
+  `p_foto_cupom` do abastecimento é escalar, sem precisar de `fotosArray`.
 - **Empréstimo:** `condRenderEmprestimo`/`condSalvarEmprestimo` — condutor busca o destinatário por
   e-mail (`app_perfil_por_email`) e chama `app_frota_emprestimo_criar(p_veiculo_id,
   p_para_condutor_id, p_data_inicio, p_data_fim_prevista)`. **Não valida se o destino é condutor

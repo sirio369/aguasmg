@@ -558,7 +558,7 @@ async function enviar(item){
       const path=(item.pasta||'pressao')+'/'+item.id+'_'+param+'.jpg';
       const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:'image/jpeg',upsert:true});
       if(error) throw error;
-      fields[param]=path;
+      fields[param]=(item.fotosArray&&item.fotosArray.includes(param))?[path]:path;
     }
   }
   const {error}=await sb.rpc(item.rpc||'app_registrar_pressao', fields);
@@ -4343,8 +4343,10 @@ function condRenderCadastro(){
 async function condSalvarCnh(){
   const num=$('#condfNum').value.trim(), cat=$('#condfCat').value, val=$('#condfVal').value;
   if(!num||!val) return toast('Preencha número e validade da CNH');
+  let foto=null;
+  try{ foto=await uploadFoto2('condfFoto','cnh'); }
+  catch(e){ return toast('Não foi possível enviar a foto da CNH — tente novamente'); }
   try{
-    let foto=null; try{ foto=await uploadFoto2('condfFoto','cnh'); }catch(e){}
     const existia = condData && condData.existe && condData.status!=='pendente' && condData.status!=='reprovado';
     const rpc = existia ? 'app_condutor_atualizar_cnh' : 'app_condutor_solicitar';
     const {error}=await sb.rpc(rpc,{p_cnh_numero:num,p_cnh_categoria:cat,p_cnh_validade:val,p_cnh_foto:foto});
@@ -4369,21 +4371,20 @@ function condRenderSituacao(){
   $('#sitfSalvar').addEventListener('click',condSalvarSituacao);
 }
 async function condSalvarSituacao(){
-  try{
-    let foto=null; try{ foto=await uploadFoto2('sitfFoto1','frota'); }catch(e){}
-    const fotos=foto?[foto]:null;
-    const chk=id=>$('#sitf_'+id).checked;
-    const temPend=['pneus_ok','freios_ok','oleo_ok','luzes_ok','extintor_ok','triangulo_macaco_estepe_ok'].some(id=>!chk(id));
-    const {error}=await sb.rpc('app_frota_situacao_salvar',{
+  const chk=id=>$('#sitf_'+id).checked;
+  const temPend=['pneus_ok','freios_ok','oleo_ok','luzes_ok','extintor_ok','triangulo_macaco_estepe_ok'].some(id=>!chk(id));
+  const uid=crypto.randomUUID();
+  const item={id:uid,tipo:'frota_situacao',rpc:'app_frota_situacao_salvar',pasta:'frota',
+    fotos:{p_fotos:FOTO2_BLOBS['sitfFoto1']||null}, fotosArray:['p_fotos'],
+    fields:{
       p_veiculo_id:+condVeiculoSel, p_km:$('#sitfKm').value?+$('#sitfKm').value:null, p_status:temPend?'com_pendencia':'ok',
       p_pneus_ok:chk('pneus_ok'), p_freios_ok:chk('freios_ok'), p_oleo_ok:chk('oleo_ok'), p_luzes_ok:chk('luzes_ok'),
       p_extintor_ok:chk('extintor_ok'), p_triangulo_macaco_estepe_ok:chk('triangulo_macaco_estepe_ok'),
-      p_avarias:$('#sitfAvarias').value||null, p_observacoes:null, p_fotos:fotos,
+      p_avarias:$('#sitfAvarias').value||null, p_observacoes:null, p_fotos:null,
       p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null, p_consorcio:$('#sitfCons').value||null
-    });
-    if(error) throw error;
-    toast('✓ Situação registrada'); condSub='home'; condRender();
-  }catch(e){ toast('Erro: '+(e.message||e)); }
+    }};
+  enviarOuEnfileirar(item,'✓ Situação registrada');
+  condSub='home'; condRender();
 }
 function condRenderAbastecimento(){
   const v=condVeiculos.find(x=>String(x.id)===String(condVeiculoSel))||{};
@@ -4405,17 +4406,17 @@ async function condSalvarAbastecimento(){
   const litros=parseFloat(($('#abafLitros').value||'').replace(',','.'));
   const valor=parseFloat(($('#abafValor').value||'').replace(',','.'));
   if(isNaN(litros)||isNaN(valor)) return toast('Informe litros e valor');
-  try{
-    let foto=null; try{ foto=await uploadFoto2('abafFoto','frota'); }catch(e){}
-    const {error}=await sb.rpc('app_frota_abastecimento_salvar',{
+  const uid=crypto.randomUUID();
+  const item={id:uid,tipo:'frota_abastecimento',rpc:'app_frota_abastecimento_salvar',pasta:'frota',
+    fotos:{p_foto_cupom:FOTO2_BLOBS['abafFoto']||null},
+    fields:{
       p_veiculo_id:+condVeiculoSel, p_km:$('#abafKm').value?+$('#abafKm').value:null, p_tipo_combustivel:$('#abafTipo').value,
       p_litros:litros, p_valor_litro: litros?Math.round((valor/litros)*1000)/1000:null, p_valor_total:valor,
-      p_posto:$('#abafPosto').value||null, p_foto_cupom:foto, p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null,
+      p_posto:$('#abafPosto').value||null, p_foto_cupom:null, p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null,
       p_observacoes:null, p_consorcio:$('#abafCons').value||null
-    });
-    if(error) throw error;
-    toast('✓ Abastecimento registrado'); condSub='home'; condRender();
-  }catch(e){ toast('Erro: '+(e.message||e)); }
+    }};
+  enviarOuEnfileirar(item,'✓ Abastecimento registrado');
+  condSub='home'; condRender();
 }
 function condRenderEmprestimo(){
   const v=condVeiculos.find(x=>String(x.id)===String(condVeiculoSel))||{};
@@ -4450,7 +4451,6 @@ async function frotasRender(){
     const [ve,op]=await Promise.all([sb.rpc('app_frota_veiculos_listar'), sb.rpc('app_frota_ocorrencia_pendentes')]);
     frotasVeiculos=ve.data||[]; frotasOcorPend=op.data||[];
   }catch(e){ $('#frotasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
-  const gestor=frotasSub==='home' && frotasOcorPend.length;
   if(frotasSub==='veiculo_edit') return frotasRenderVeiculoEdit();
   if(frotasSub==='equipes') return frotasRenderEquipes();
   if(frotasSub==='ocorrencia') return frotasRenderOcorrencia();
@@ -4507,7 +4507,7 @@ function frotasRenderVeiculoEdit(){
   const usoSel=$('#fvfUso');
   function toggleUso(){ $('#fvfUsoEquipeWrap').classList.toggle('hidden',usoSel.value!=='equipe'); $('#fvfUsoExclWrap').classList.toggle('hidden',usoSel.value!=='exclusivo'); }
   usoSel.addEventListener('change',toggleUso); toggleUso();
-  if(!frotasEquipes.length){ sb.rpc('app_frota_equipes_listar').then(({data})=>{ frotasEquipes=data||[]; const sel=$('#fvfEquipe'); if(sel) sel.innerHTML=frotasEquipes.map(e=>`<option value="${e.id}">${e.nome}</option>`).join(''); }).catch(()=>{}); }
+  if(!frotasEquipes.length){ sb.rpc('app_frota_equipes_listar').then(({data})=>{ frotasEquipes=data||[]; const sel=$('#fvfEquipe'); if(sel) sel.innerHTML=frotasEquipes.map(e=>`<option value="${e.id}"${v.equipe_id==e.id?' selected':''}>${e.nome}</option>`).join(''); }).catch(()=>{}); }
   $('#fvfSalvar').addEventListener('click',frotasSalvarVeiculo);
 }
 async function frotasSalvarVeiculo(){
@@ -4563,8 +4563,10 @@ function frotasRenderOcorrencia(){
   $('#frotasView').innerHTML=h; wireFotoPick($('#frotasView'));
   $('#frVoltar').addEventListener('click',()=>{frotasSub='home';frotasRender();});
   $('#ocfSalvar').addEventListener('click',async()=>{
+    let foto=null;
+    try{ foto=await uploadFoto2('ocfFoto','frota'); }
+    catch(e){ toast('Não foi possível enviar a foto — ocorrência será registrada sem foto'); }
     try{
-      let foto=null; try{ foto=await uploadFoto2('ocfFoto','frota'); }catch(e){}
       const valor=$('#ocfValor').value?parseFloat($('#ocfValor').value.replace(',','.')):null;
       const {error}=await sb.rpc('app_frota_ocorrencia_reportar',{p_veiculo_id:+frotasVeiculoSel,p_tipo:$('#ocfTipo').value,p_descricao:$('#ocfDesc').value||null,p_valor:valor,p_data_ocorrencia:$('#ocfData').value||null,p_fotos:foto?[foto]:null});
       if(error) throw error;
@@ -4626,8 +4628,10 @@ function qsmsRenderBaixa(){
   $('#qsmsView').innerHTML=h; wireFotoPick($('#qsmsView'));
   $('#qsmsVoltar').addEventListener('click',()=>{qsmsSub='home';qsmsRender();});
   $('#qbxSalvar').addEventListener('click',async()=>{
+    let lista=null;
+    try{ lista=await uploadFoto2('qbxLista','frota'); }
+    catch(e){ toast('Não foi possível enviar a lista de presença — baixa será confirmada sem a foto'); }
     try{
-      let lista=null; try{ lista=await uploadFoto2('qbxLista','frota'); }catch(e){}
       const presentes=Array.from(document.querySelectorAll('.qbxChk:checked')).map(c=>c.value);
       const {error}=await sb.rpc('app_qsms_treinamento_baixar',{p_treinamento_id:+qsmsTreinoSel,p_lista_presenca:lista,p_presentes:presentes});
       if(error) throw error;
