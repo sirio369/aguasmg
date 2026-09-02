@@ -339,7 +339,26 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   **e é aí que o valor fica visível** — o card de "veículos designados a você" (não-`full`) nunca lista
   ocorrências nem valor. Aprovação: `frotasOcorAprovar` → `app_frota_ocorrencia_aprovar(p_id,
   p_aprovado,p_motivo)`.
-- **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend`.
+- **Condutores** (`frotasRenderCondutores` → `app_frota_condutores_listar()`, `frotas`/admin):
+  listagem read-only de **todos** os condutores (qualquer status), nome/e-mail/CNH/prazo de
+  treinamento/motivo de reprovação. Aprovar continua sendo só na tela **Condutor** (`condPendentes`,
+  §6.1) — esta lista aqui é só visibilidade, não duplica a ação de aprovar.
+- **Gate de condutor apto/ativo em toda vinculação a veículo:** `app_perfil_por_email` agora também
+  retorna `condutor_status` — usado no frontend (`frotasSalvarVeiculo` p/ condutor exclusivo,
+  `feqCarregar` p/ membro de equipe, `condSalvarEmprestimo` p/ destinatário do empréstimo) pra barrar
+  quem não está `apto`/`ativo` **antes** de chamar a RPC. **A validação de verdade é no backend**
+  (`app_frota_veiculo_salvar`, `app_frota_equipe_salvar`, `app_frota_emprestimo_criar`) — o frontend é
+  só UX. **Regra do "grandfathering":** a validação só dispara quando o vínculo está **mudando**
+  (condutor exclusivo novo/diferente do que já estava salvo; membro **novo** entrando na equipe).
+  Reeditar um veículo/equipe **sem trocar** quem já estava vinculado passa direto, mesmo que essa
+  pessoa tenha perdido o status depois — senão qualquer edição de um cadastro antigo travaria por causa
+  de um vínculo que já existia antes da regra (foi exatamente o caso dos 2 veículos legados sem
+  `consorcio`, ver §6.2 acima — teriam ficado impossíveis de corrigir se a checagem fosse incondicional).
+  **Cuidado:** `frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` — o campo de e-mail do condutor
+  exclusivo **nasce vazio mesmo em edição** (não tem como pré-preencher e-mail a partir do nome que a
+  RPC retorna); deixar em branco **mantém** o condutor já vinculado (frontend reusa
+  `vExistente.condutor_exclusivo_id`), só troca se alguém digitar um e-mail novo.
+- **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend, frotasCondutores`.
 
 ### 6.3 QSMS — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
 - Tela só pra `funcao='qsms'`/admin (RPCs recusam com `raise exception 'sem permissao'` pra quem não é
@@ -349,9 +368,12 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   p_condutor_ids[])`, cria `frota_treinamento` + 1 linha por condutor em `frota_treinamento_condutor`).
 - **Baixa:** `qsmsRenderBaixa` lista os participantes do treinamento selecionado (`qsmsTreinoSel`),
   QSMS marca presença + anexa foto da lista → `app_qsms_treinamento_baixar(p_treinamento_id,
-  p_lista_presenca,p_presentes[])`. Isso **atualiza `frota_condutor.status='ativo'`** pra quem está em
-  `p_presentes` — é essa `UPDATE` que dispara a notificação de "condutor ativo" (via trigger, não é
-  a própria RPC que notifica — ver §6.4). Quem faltou continua `apto` (pode ser reagendado).
+  p_lista_presenca,p_presentes[])`. **Foto da lista de presença é obrigatória** (bloqueada no
+  frontend antes do upload **e** validada na RPC — `p_lista_presenca is null` levanta exceção); ao
+  contrário da foto de ocorrência/CNH, aqui não existe caminho "salvar sem foto". Isso **atualiza
+  `frota_condutor.status='ativo'`** pra quem está em `p_presentes` — é essa `UPDATE` que dispara a
+  notificação de "condutor ativo" (via trigger, não é a própria RPC que notifica — ver §6.4). Quem
+  faltou continua `apto` (pode ser reagendado).
 - **Estado:** `qsmsSub, qsmsSelCondutores, qsmsTreinoSel, qsmsAptos, qsmsTreinos`.
 
 ### 6.4 Notificação/aprovação — reaproveita Suprimentos (não é hierarquia própria)
@@ -430,7 +452,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 **Suprimentos:** prefixo `sup_*` (ver §5).
 **Condutor/Frotas/QSMS (ver §6):** `app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh`,
 `app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver`,
-`app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_equipes_listar/equipe_salvar`,
+`app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
+`app_frota_equipes_listar/equipe_salvar`,
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
 `app_frota_emprestimo_criar/devolver`, `app_frota_meus_emprestimos`,
 `app_frota_ocorrencia_reportar/pendentes/aprovar`,
