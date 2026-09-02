@@ -4288,6 +4288,8 @@ async function condRender(){
   if(condSub==='situacao') return condRenderSituacao();
   if(condSub==='abastecimento') return condRenderAbastecimento();
   if(condSub==='emprestimo') return condRenderEmprestimo();
+  if(condSub==='ocorrencia') return condRenderOcorrencia();
+  if(condSub==='lavagem') return condRenderLavagem();
   condRenderHome();
 }
 function condRenderHome(){
@@ -4310,10 +4312,10 @@ function condRenderHome(){
   }
   h+='<div class="sec" style="margin-top:16px">🚗 Meu veículo</div>';
   if(!condVeiculos.length) h+='<p class="sub">Nenhum veículo designado a você.</p>';
-  else h+=condVeiculos.map(v=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${v.placa}</b> — ${v.modelo||''}<div class="sub" style="margin-top:2px">Km atual: ${v.km_atual||0}</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost" data-condsit="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">🧰 Situação</button><button class="btn ghost" data-condaba="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">⛽ Abastecimento</button><button class="btn ghost" data-condemp="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">🤝 Emprestar</button></div></div>`).join('');
+  else h+=condVeiculos.map(v=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${v.placa}</b> — ${v.modelo||''}<div class="sub" style="margin-top:2px">Km atual: ${v.km_atual||0}${v.ultima_lavagem_em?(' · Última lavagem: '+fmtData(v.ultima_lavagem_em)):''}</div>${v.lavagem_atrasada?'<div class="banner warn" style="margin-top:6px">🧼 Sem lavagem há mais de 30 dias.</div>':''}<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost" data-condsit="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">🧰 Situação</button><button class="btn ghost" data-condaba="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">⛽ Abastecimento</button><button class="btn ghost" data-condoco="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">⚠️ Ocorrência</button><button class="btn ghost" data-condlav="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">🧼 Lavagem</button><button class="btn ghost" data-condemp="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">🤝 Emprestar</button></div></div>`).join('');
   if(condEmprestimos.length){
     h+='<div class="sec" style="margin-top:16px">🤝 Empréstimos</div>';
-    h+=condEmprestimos.map(e=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${e.placa}</b><div class="sub" style="margin-top:2px">${e.sou_recebedor?('Emprestado por '+(e.de_nome||'')):('Emprestado para '+(e.para_nome||''))} · ${fmtData(e.data_inicio)} a ${fmtData(e.data_fim_prevista)} · ${e.status}</div>${(e.sou_recebedor&&e.status==='ativo')?`<button class="btn ghost" data-conddev="${e.id}" style="margin-top:8px;padding:8px;font-size:13px">Devolver veículo</button>`:''}</div>`).join('');
+    h+=condEmprestimos.map(e=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${e.placa}</b><div class="sub" style="margin-top:2px">${e.sou_recebedor?('Emprestado por '+(e.de_nome||'')):('Emprestado para '+(e.para_nome||''))} · ${fmtData(e.data_inicio)} a ${fmtData(e.data_fim_prevista)} · ${e.status}</div>${(e.sou_recebedor&&e.status==='ativo')?`<button class="btn ghost" data-conddev="${e.id}" style="margin-top:8px;padding:8px;font-size:13px">Devolver veículo</button>`:''}${(!e.sou_recebedor&&e.status==='ativo'&&!e.devolucao_solicitada_em)?`<button class="btn ghost" data-condsolic="${e.id}" style="margin-top:8px;padding:8px;font-size:13px">Solicitar devolução</button>`:''}${(!e.sou_recebedor&&e.devolucao_solicitada_em)?`<div class="sub" style="margin-top:6px">Devolução solicitada em ${fmtData(e.devolucao_solicitada_em)} — aguardando confirmação</div>`:''}</div>`).join('');
   }
   $('#condView').innerHTML=h;
   const ic=$('#condIrCadastro'); if(ic) ic.addEventListener('click',()=>{condSub='cadastro';condRender();});
@@ -4323,7 +4325,10 @@ function condRenderHome(){
   $('#condView').querySelectorAll('[data-condsit]').forEach(b=>b.addEventListener('click',()=>{condSub='situacao';condVeiculoSel=b.dataset.condsit;condRender();}));
   $('#condView').querySelectorAll('[data-condaba]').forEach(b=>b.addEventListener('click',()=>{condSub='abastecimento';condVeiculoSel=b.dataset.condaba;condRender();}));
   $('#condView').querySelectorAll('[data-condemp]').forEach(b=>b.addEventListener('click',()=>{condSub='emprestimo';condVeiculoSel=b.dataset.condemp;condRender();}));
+  $('#condView').querySelectorAll('[data-condoco]').forEach(b=>b.addEventListener('click',()=>{condSub='ocorrencia';condVeiculoSel=b.dataset.condoco;condRender();}));
+  $('#condView').querySelectorAll('[data-condlav]').forEach(b=>b.addEventListener('click',()=>{condSub='lavagem';condVeiculoSel=b.dataset.condlav;condRender();}));
   $('#condView').querySelectorAll('[data-conddev]').forEach(b=>b.addEventListener('click',async()=>{ try{ const {error}=await sb.rpc('app_frota_emprestimo_devolver',{p_id:+b.dataset.conddev}); if(error)throw error; toast('✓ Veículo devolvido'); condRender(); }catch(e){ toast('Erro: '+(e.message||e)); } }));
+  $('#condView').querySelectorAll('[data-condsolic]').forEach(b=>b.addEventListener('click',async()=>{ if(!confirm('Pedir a devolução deste veículo?')) return; try{ const {error}=await sb.rpc('app_frota_emprestimo_solicitar_devolucao',{p_id:+b.dataset.condsolic}); if(error)throw error; toast('✓ Devolução solicitada'); condRender(); }catch(e){ toast('Erro: '+(e.message||e)); } }));
 }
 async function condAprovar(id,aprovado,motivo){
   try{ const {error}=await sb.rpc('app_condutor_aprovar',{p_condutor_id:id,p_aprovado:aprovado,p_motivo:motivo||null}); if(error)throw error; toast(aprovado?'✓ Condutor aprovado':'Condutor reprovado'); condRender(); }
@@ -4452,6 +4457,51 @@ async function condSalvarEmprestimo(){
     toast('✓ Veículo emprestado'); condSub='home'; condRender();
   }catch(e){ toast('Erro: '+(e.message||e)); }
 }
+function condRenderOcorrencia(){
+  const v=condVeiculos.find(x=>String(x.id)===String(condVeiculoSel))||{};
+  const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">⚠️ Ocorrência — ${v.placa||''}</div>
+  <label>Tipo *</label><select id="cocfTipo"><option value="manutencao">Manutenção</option><option value="sinistro">Sinistro</option><option value="multa">Multa</option><option value="lavagem">Lavagem</option></select>
+  <label>Descrição</label><textarea id="cocfDesc" rows="2"></textarea>
+  <div style="display:flex;gap:8px"><div style="flex:1"><label>Valor (R$)</label><input id="cocfValor" inputmode="decimal"/></div><div style="flex:1"><label>Data</label><input id="cocfData" type="date" value="${new Date().toISOString().slice(0,10)}"/></div></div>
+  ${fotoPickHtml('cocfFoto','Foto (opcional)')}
+  <button class="btn" id="cocfSalvar" style="margin-top:14px">Registrar ocorrência</button>`;
+  $('#condView').innerHTML=h; wireFotoPick($('#condView'));
+  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
+  $('#cocfSalvar').addEventListener('click',async()=>{
+    let foto=null;
+    try{ foto=await uploadFoto2('cocfFoto','frota'); }
+    catch(e){ toast('Não foi possível enviar a foto — ocorrência será registrada sem foto'); }
+    try{
+      const valor=$('#cocfValor').value?parseFloat($('#cocfValor').value.replace(',','.')):null;
+      const {error}=await sb.rpc('app_frota_ocorrencia_reportar',{p_veiculo_id:+condVeiculoSel,p_tipo:$('#cocfTipo').value,p_descricao:$('#cocfDesc').value||null,p_valor:valor,p_data_ocorrencia:$('#cocfData').value||null,p_fotos:foto?[foto]:null});
+      if(error) throw error;
+      toast('✓ Ocorrência registrada'); condSub='home'; condRender();
+    }catch(e){ toast('Erro: '+(e.message||e)); }
+  });
+}
+function condRenderLavagem(){
+  const v=condVeiculos.find(x=>String(x.id)===String(condVeiculoSel))||{};
+  const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">🧼 Lavagem — ${v.placa||''}</div>
+  <label>Data</label><input id="lavfData" type="date" value="${new Date().toISOString().slice(0,10)}"/>
+  <label>Valor (R$)</label><input id="lavfValor" inputmode="decimal"/>
+  ${fotoPickHtml('lavfFoto','Foto (opcional)')}
+  <button class="btn" id="lavfSalvar" style="margin-top:14px">Registrar lavagem</button>`;
+  $('#condView').innerHTML=h; wireFotoPick($('#condView'));
+  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
+  $('#lavfSalvar').addEventListener('click',async()=>{
+    let foto=null;
+    try{ foto=await uploadFoto2('lavfFoto','frota'); }
+    catch(e){ toast('Não foi possível enviar a foto — lavagem será registrada sem foto'); }
+    try{
+      const valor=$('#lavfValor').value?parseFloat($('#lavfValor').value.replace(',','.')):null;
+      const {error}=await sb.rpc('app_frota_lavagem_salvar',{p_veiculo_id:+condVeiculoSel,p_data:$('#lavfData').value||null,p_valor:valor,p_foto:foto,p_gps_lat:gps?gps.lat:null,p_gps_lon:gps?gps.lon:null,p_consorcio:v.consorcio||null});
+      if(error) throw error;
+      toast('✓ Lavagem registrada'); condSub='home'; condRender();
+    }catch(e){ toast('Erro: '+(e.message||e)); }
+  });
+}
 
 let frotasVeiculos=[], frotasEquipes=[], frotasOcorPend=[], frotasSub='home', frotasVeiculoSel=null;
 async function frotasInit(){ frotasSub='home'; await frotasRender(); }
@@ -4480,7 +4530,7 @@ function frotasRenderHome(){
     else h+=frotasVeiculos.map(v=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${v.placa}</b> — ${v.modelo||''}</div>`).join('');
   } else {
     h+=`<div class="sec" style="margin-top:16px">🚗 Veículos <button id="frVeicNovo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">➕ Novo</button></div>`;
-    h+= frotasVeiculos.length ? frotasVeiculos.map(v=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${v.placa}</b><span class="sub">${v.status||''}</span></div><div class="sub" style="margin-top:2px">${v.modelo||''} ${v.ano||''} · Km ${v.km_atual||0}</div><div class="sub" style="margin-top:2px">${(TIPOS_VEICULO.find(t=>t[0]===v.tipo)||[,v.tipo])[1]||'—'} · ${(COMBUSTIVEIS_VEICULO.find(c=>c[0]===v.tipo_combustivel)||[,v.tipo_combustivel])[1]||'—'}${v.motorizacao?(' '+v.motorizacao):''} · ${v.consorcio||'sem consórcio'}${v.centro_custo?(' · CC '+v.centro_custo):''}</div><div class="sub" style="margin-top:2px">${v.uso_tipo==='equipe'?('Equipe: '+(v.equipe_nome||'—')):(v.uso_tipo==='exclusivo'?('Exclusivo: '+(v.condutor_exclusivo_nome||'—')):'—')}</div><div class="sub" style="margin-top:2px">Locação: ${v.fornecedor||'—'} · ${fmtData(v.data_inicio)} a ${fmtData(v.data_fim_prevista)}${v.data_fim_real?(' (devolvido '+fmtData(v.data_fim_real)+(v.valor_devolucao!=null?(' · '+fmtDinheiro(v.valor_devolucao)):'')+')'):''}${v.valor_aluguel_atual!=null?(' · aluguel '+fmtDinheiro(v.valor_aluguel_atual)+'/mês'):''}</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost" data-fredit="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">✏️ Editar</button><button class="btn ghost" data-froco="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">⚠️ Ocorrência</button>${(!v.data_fim_real)?`<button data-frdev="${v.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:8px;font-size:13px;border-radius:10px;border:1px solid var(--line)">Devolver à locadora</button>`:''}</div></div>`).join('') : '<p class="sub">Nenhum veículo cadastrado.</p>';
+    h+= frotasVeiculos.length ? frotasVeiculos.map(v=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${v.placa}</b><span class="sub">${v.status||''}</span></div><div class="sub" style="margin-top:2px">${v.modelo||''} ${v.ano||''} · Km ${v.km_atual||0}</div><div class="sub" style="margin-top:2px">${(TIPOS_VEICULO.find(t=>t[0]===v.tipo)||[,v.tipo])[1]||'—'} · ${(COMBUSTIVEIS_VEICULO.find(c=>c[0]===v.tipo_combustivel)||[,v.tipo_combustivel])[1]||'—'}${v.motorizacao?(' '+v.motorizacao):''} · ${v.consorcio||'sem consórcio'}${v.centro_custo?(' · CC '+v.centro_custo):''}</div><div class="sub" style="margin-top:2px">${v.uso_tipo==='equipe'?('Equipe: '+(v.equipe_nome||'—')):(v.uso_tipo==='exclusivo'?('Exclusivo: '+(v.condutor_exclusivo_nome||'—')):'—')}${v.emprestado_para?(' · 🤝 emprestado a '+v.emprestado_para):''}${v.ultima_lavagem_em?(' · lavagem '+fmtData(v.ultima_lavagem_em)):' · nunca lavado'}</div><div class="sub" style="margin-top:2px">Locação: ${v.fornecedor||'—'} · ${fmtData(v.data_inicio)} a ${fmtData(v.data_fim_prevista)}${v.data_fim_real?(' (devolvido '+fmtData(v.data_fim_real)+(v.valor_devolucao!=null?(' · '+fmtDinheiro(v.valor_devolucao)):'')+')'):''}${v.valor_aluguel_atual!=null?(' · aluguel '+fmtDinheiro(v.valor_aluguel_atual)+'/mês'):''}</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost" data-fredit="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">✏️ Editar</button><button class="btn ghost" data-froco="${v.id}" style="margin:0;flex:1;padding:8px;font-size:13px">⚠️ Ocorrência</button>${(!v.data_fim_real)?`<button data-frdev="${v.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:8px;font-size:13px;border-radius:10px;border:1px solid var(--line)">Devolver à locadora</button>`:''}</div></div>`).join('') : '<p class="sub">Nenhum veículo cadastrado.</p>';
     h+=`<div class="sec" style="margin-top:16px">👥 Equipes <button id="frEquipesGo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">Gerir</button></div><p class="sub">Cadastre equipes para vincular vários condutores a um mesmo veículo.</p>`;
     h+=`<div class="sec" style="margin-top:16px">🪪 Condutores <button id="frCondutoresGo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">Ver todos</button></div><p class="sub">Cadastros, status de aprovação e CNH de todos os condutores.</p>`;
   }

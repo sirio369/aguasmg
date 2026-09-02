@@ -283,27 +283,46 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
 - **Aprovação (gestor):** `condPendentes` vem de `app_condutor_pendentes()` — só quem está em
   `sup_aprovadores_de(condutor.id)` (ou admin) vê a lista. Botão liga a `condAprovar` →
   `app_condutor_aprovar(p_condutor_id, p_aprovado, p_motivo)`.
-- **Meu veículo / situação / abastecimento / empréstimo:** `condVeiculos` = `app_frota_veiculos_listar()`
-  (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,status,consorcio`, filtrado a
-  exclusivo-meu ou da minha equipe). Sub-telas `condRenderSituacao`/`condRenderAbastecimento` salvam
-  via `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar` (tabelas `frota_checklist_situacao` /
-  `frota_checklist_abastecimento`; foto opcional). **`p_consorcio` não é mais escolhido na tela** —
-  vem direto de `v.consorcio` (o veículo, obrigatoriamente vinculado a um consórcio desde o cadastro
-  em Frotas, §6.2). **Combustível do abastecimento é filtrado pelo `tipo_combustivel` do veículo**
-  (`combustiveisPermitidos(v)`: `flex`→gasolina/etanol, `gasolina`→só gasolina, `diesel`→diesel/diesel
-  S10, `outros`/sem cadastro→todas as opções de `COMBUSTIVEIS`).
-  **Offline-first** (igual ao resto da coleta de campo, §1): `condSalvarSituacao`/`condSalvarAbastecimento`
-  montam um `item` e chamam `enviarOuEnfileirar` — sem sinal, a ação entra na fila IndexedDB e sincroniza
-  depois. `p_fotos` de situação é **array** (`text[]`); como o helper genérico `enviar()` só resolve
-  path escalar, o `item` leva `fotosArray:['p_fotos']` (lista de params cujo path deve virar `[path]`
-  após o upload) — **convenção nova em `enviar()`, reaproveitável por outro módulo com foto array**.
-  `p_foto_cupom` do abastecimento é escalar, sem precisar de `fotosArray`.
+- **Meu veículo / situação / abastecimento / ocorrência / lavagem / empréstimo:** `condVeiculos` =
+  `app_frota_veiculos_listar()` (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,
+  status,consorcio,ultima_lavagem_em,lavagem_atrasada`). Sub-telas `condRenderSituacao`/
+  `condRenderAbastecimento`/`condRenderOcorrencia`/`condRenderLavagem` salvam via
+  `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar`/`app_frota_ocorrencia_reportar`/
+  `app_frota_lavagem_salvar` (tabelas `frota_checklist_situacao`/`frota_checklist_abastecimento`/
+  `frota_ocorrencia`/`frota_lavagem`; foto opcional em todas). **`p_consorcio` não é escolhido na
+  tela** — vem direto de `v.consorcio` (o veículo, obrigatoriamente vinculado a um consórcio desde o
+  cadastro em Frotas, §6.2). **Combustível do abastecimento é filtrado pelo `tipo_combustivel` do
+  veículo** (`combustiveisPermitidos(v)`: `flex`→gasolina/etanol, `gasolina`→só gasolina,
+  `diesel`→diesel/diesel S10, `outros`/sem cadastro→todas as opções de `COMBUSTIVEIS`).
+  **Offline-first** (igual ao resto da coleta de campo, §1) só em situação/abastecimento —
+  `condSalvarSituacao`/`condSalvarAbastecimento` montam um `item` e chamam `enviarOuEnfileirar`; `p_fotos`
+  de situação é **array** (`text[]`), por isso o `item` leva `fotosArray:['p_fotos']` (convenção nova
+  em `enviar()`, ver §1). **Ocorrência e lavagem são online-only** (chamam a RPC direto, sem fila) —
+  ação de exceção/manutenção pontual, não tão crítica offline quanto o checklist do dia a dia.
+  **Alerta de lavagem atrasada** (`v.lavagem_atrasada`, banner no card do veículo): calculado **na
+  leitura**, sem job/cron — `ultima_lavagem_em` (ou a data de início do vínculo, se nunca lavou) ≤
+  hoje − 30 dias. Mesmo padrão de `cnh_vencendo` em `app_condutor_meu`.
+  **Quem pode agir num veículo agora** é decidido por `"10 - Frotas".condutor_tem_veiculo(uid,
+  veiculo_id)` (função SQL nova, reaproveitada em `app_frota_veiculos_listar` — filtro da lista
+  enxuta —, `app_frota_abastecimento_salvar`, `app_frota_ocorrencia_reportar` e
+  `app_frota_lavagem_salvar`): **titular** (exclusivo/equipe) **enquanto não há empréstimo ativo**, OU
+  **quem está com o empréstimo ativo no momento** (`para_condutor_id`). Durante um empréstimo, o
+  veículo **some** da lista enxuta de quem emprestou e **aparece** na de quem recebeu — é assim que
+  abastecimento/ocorrência/lavagem "deixam de ficar disponíveis pro condutor anterior" (não é um flag,
+  é o próprio filtro de listagem). Situação continua **sem** essa checagem (não fazia parte do pedido;
+  se precisar, é achatar o mesmo padrão). `app_frota_ocorrencia_reportar` também aceita
+  `funcao in ('frotas','admin')` **sem** precisar estar com o veículo (Frotas reporta em qualquer um).
 - **Empréstimo:** `condRenderEmprestimo`/`condSalvarEmprestimo` — condutor busca o destinatário por
-  e-mail (`app_perfil_por_email`) e chama `app_frota_emprestimo_criar(p_veiculo_id,
-  p_para_condutor_id, p_data_inicio, p_data_fim_prevista)`. **Não valida se o destino é condutor
-  cadastrado** — qualquer `perfil` serve. Lista "Meus empréstimos" (`app_frota_meus_emprestimos`,
-  campo `sou_recebedor`) mostra "Devolver veículo" só pra quem recebeu e está `ativo`; devolução via
-  `app_frota_emprestimo_devolver(p_id)`.
+  e-mail (`app_perfil_por_email`, que devolve `condutor_status`) e chama
+  `app_frota_emprestimo_criar(p_veiculo_id, p_para_condutor_id, p_data_inicio, p_data_fim_prevista)`
+  — recusa se o destinatário não estiver `apto`/`ativo` (§6.4/gate de condutor). Lista "Meus
+  empréstimos" (`app_frota_meus_emprestimos`, campo `sou_recebedor`) mostra "Devolver veículo" só pra
+  quem recebeu e está `ativo` (`app_frota_emprestimo_devolver(p_id)`, confirma a devolução). **Retomada
+  (titular quer o veículo de volta):** o titular só **solicita** —
+  `app_frota_emprestimo_solicitar_devolucao(p_id)` marca `devolucao_solicitada_em` (idempotente, só
+  quem é `de_condutor_id` do empréstimo) e dispara notificação pessoal pra quem está com o carro; **a
+  devolução em si continua sendo confirmada por quem está com o veículo** — o titular não pode forçar.
+  Decisão de produto explícita (não inverter sem confirmar de novo).
 - **Estado:** `condSub, condVeiculoSel, condData, condPendentes, condVeiculos, condEmprestimos`.
 
 ### 6.2 Frotas — `// condutor/frotas/qsms` (~L4446) · tela `frotas`
@@ -385,7 +404,9 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 - `"10 - Frotas".trg_frota_ocorrencia()` (`frota_ocorrencia`): INSERT → grupo
   `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` + pessoal a esse mesmo alvo
   (se não foi ele quem reportou); UPDATE de status → pessoal ao alvo.
-- `"10 - Frotas".trg_frota_emprestimo()` (`frota_emprestimo`, só INSERT): pessoal a `para_condutor_id`.
+- `"10 - Frotas".trg_frota_emprestimo()` (`frota_emprestimo`, INSERT/UPDATE): INSERT → pessoal a
+  `para_condutor_id` (veículo emprestado); UPDATE com `devolucao_solicitada_em` saindo de `null` →
+  pessoal a `para_condutor_id` de novo (titular pediu a devolução, §6.1).
 - `"10 - Frotas".trg_frota_treinamento_condutor()` (`frota_treinamento_condutor`, só INSERT): pessoal
   ao condutor agendado (data/local/instrutor).
 - **Quem aprova o quê:** definido por `perfil.aprovador_uuid`/`aprovador2_uuid` de **cada pessoa**
@@ -400,7 +421,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `frota_veiculo` (locação, uso exclusivo/equipe, cadastro/combustível/consórcio — §6.2),
 `frota_veiculo_aluguel_historico` (1 linha por reajuste, nunca `UPDATE` — histórico do aluguel),
 `frota_condutor` (PK = `perfil.id`, status/CNH), `frota_equipe` + `frota_equipe_membro`,
-`frota_checklist_situacao`, `frota_checklist_abastecimento`, `frota_emprestimo`, `frota_ocorrencia`,
+`frota_checklist_situacao`, `frota_checklist_abastecimento`, `frota_lavagem`,
+`frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1), `frota_ocorrencia`,
 `frota_treinamento` + `frota_treinamento_condutor`.
 
 ### Cuidados
@@ -455,7 +477,8 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
 `app_frota_equipes_listar/equipe_salvar`,
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
-`app_frota_emprestimo_criar/devolver`, `app_frota_meus_emprestimos`,
+`app_frota_emprestimo_criar/devolver/solicitar_devolucao`, `app_frota_meus_emprestimos`,
+`app_frota_lavagem_salvar`,
 `app_frota_ocorrencia_reportar/pendentes/aprovar`,
 `app_qsms_condutores_aptos`, `app_qsms_treinamento_agendar/baixar`, `app_qsms_treinamentos_listar`,
 `app_perfil_por_email` (helper genérico: busca `perfil` por e-mail, usado por Frotas e por qualquer
