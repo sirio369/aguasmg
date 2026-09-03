@@ -169,8 +169,23 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 **Auxiliar de Programação**, §4.)
 
 ### 3.1 Captação de clientes — `// MÓDULO CAPTAÇÃO` (~L2266) · tela `captacao`
-- Questionário schema-driven (~70 perguntas, condicionais). Salva via `app_captacao_registrar`
-  (fila, pasta `captacao`; fotos termo/fachada/doc/comprovante). View achatada `vw_captacao`.
+- Questionário schema-driven no array **`CAP_Q`** (`{s:'seção'}` ou `{c:código,l:rótulo,t:tipo,if:cond}`;
+  tipos `txt`/`num`/`sn`/`date`/`time`/`sel:Op1|Op2`). Respostas viram jsonb **keyed pelo `c`** via
+  `capCollect`. Salva via `app_captacao_registrar` (fila, pasta `captacao`; fotos
+  termo/fachada/doc/comprovante). **Obrigatórios** (em `capValidar`): GPS + `_80` (nome) + `906` (CPF/CNPJ).
+- **Reformulado (mais enxuto):** removidos hidrômetro (numeração/capacidade/ano/marca/sequencial/dígitos/
+  lacrado/leitura/lacres), imóvel localizado, imóvel esq/dir, localização do padrão, situação/classificação
+  de água e esgoto (e seus motivos condicionais), ligação tamponada, esgota na rede/PL/coletivo. Categoria
+  virou **dois selects** `CAT_AGUA`/`CAT_ESG` (Res|Pub|Ind|Com); Ramo de atividade consolidado num só (`569`);
+  "Há suspeita de irregularidades?" (`998`) substituído por `CONX_AGUA` (Cliente conectado água?) e
+  `CONX_ESG` (Cliente conectado esgoto?). Economias (`115`–`122`) mantidas.
+- ⚠️ **`vw_captacao`** (view achatada p/ BI, no schema `"8 - obras & servicos"`) extrai códigos
+  específicos do jsonb → **ajustar a view faz parte de qualquer mudança no `CAP_Q`** (senão os códigos
+  removidos ficam como colunas mortas e os novos não aparecem). Nesta reformulação a view foi recriada
+  (migração `vw_captacao_ajuste_perguntas`): removidas as colunas dos campos excluídos, `569` vira a
+  coluna única `ramo_atividade`, e adicionadas `categoria_agua`/`categoria_esgoto` (de `CAT_AGUA`/`CAT_ESG`)
+  e `cliente_conectado_agua`/`cliente_conectado_esgoto` (de `CONX_AGUA`/`CONX_ESG`). Como remove/renomeia
+  colunas, é **DROP+CREATE** (não `create or replace`) + re-`grant select` a `gis_editor`/`gis_visualizacao`.
 
 ### 3.2 Solicitação de serviços (campo) — `// ABERTURA DE SERVIÇOS` (~L1394) · tela `abertura_servicos`
 - Entrevistador pede abertura de OS (tipo, matrícula, HD, foto do HD, GPS). RPC
