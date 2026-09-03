@@ -346,12 +346,14 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   incl. dados de locação `fornecedor/contrato_numero/data_inicio/data_fim_prevista`, uso
   `uso_tipo ∈ {equipe,exclusivo}` com `equipe_id` **xor** `condutor_exclusivo_id`, e os campos de
   cadastro: `tipo` (`select` fixo — `TIPOS_VEICULO`: picape/utilitario/hatch/sedan/suv/caminhao/moto),
-  `centro_custo` (texto livre), `tipo_combustivel` (`select` fixo — `COMBUSTIVEIS_VEICULO`:
-  flex/gasolina/diesel/outros — **vocabulário diferente** do `COMBUSTIVEIS` usado no abastecimento,
-  ver §6.1), `motorizacao` (texto livre, ex. "1.6"), `consorcio` (**obrigatório**, `ZA1004`/`ZA0200` —
-  validado na RPC mesmo pra edição; os 2 veículos cadastrados antes desta trave em produção precisam
-  ser reabertos e salvos uma vez pra ganhar consórcio). `CHECK` de `tipo`/`tipo_combustivel`/`consorcio`
-  também no banco (`frota_veiculo_*_check`).
+  `centro_custo` (`select` fixo — `CENTROS_CUSTO`, lista de ~16 códigos/descrições do plano de contas
+  da empresa, ex. "1.1.10 PRODUÇÃO"; **texto livre no banco** — a RPC não valida contra essa lista,
+  só o frontend restringe as opções), `tipo_combustivel` (`select` fixo — `COMBUSTIVEIS_VEICULO`:
+  flex/gasolina/diesel — **vocabulário diferente** do `COMBUSTIVEIS` usado no abastecimento, ver §6.1;
+  o `CHECK` do banco (`frota_veiculo_tipo_combustivel_check`) ainda aceita `outros` também, mas o
+  frontend não oferece mais essa opção), `motorizacao` (texto livre, ex. "1.6"), `consorcio`
+  (**obrigatório**, `ZA1004`/`ZA0200` — validado na RPC mesmo pra edição). `CHECK` de
+  `tipo`/`tipo_combustivel`/`consorcio` também no banco (`frota_veiculo_*_check`).
   **Aluguel tem histórico, não é um campo só:** `p_valor_aluguel` da RPC só é usado **na criação**
   (semeia a 1ª linha); reajuste é sempre via `app_frota_veiculo_aluguel_reajustar(p_veiculo_id,p_valor,
   p_vigente_desde)` (nova linha em `frota_veiculo_aluguel_historico`, nunca `UPDATE`). Tela mostra o
@@ -396,21 +398,22 @@ treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mun
   listagem read-only de **todos** os condutores (qualquer status), nome/e-mail/CNH/prazo de
   treinamento/motivo de reprovação. Aprovar continua sendo só na tela **Condutor** (`condPendentes`,
   §6.1) — esta lista aqui é só visibilidade, não duplica a ação de aprovar.
-- **Gate de condutor apto/ativo em toda vinculação a veículo:** `app_perfil_por_email` agora também
-  retorna `condutor_status` — usado no frontend (`frotasSalvarVeiculo` p/ condutor exclusivo,
-  `feqCarregar` p/ membro de equipe, `condSalvarEmprestimo` p/ destinatário do empréstimo) pra barrar
-  quem não está `apto`/`ativo` **antes** de chamar a RPC. **A validação de verdade é no backend**
+- **Gate de condutor apto/ativo em toda vinculação a veículo:** condutor exclusivo do veículo é um
+  `<select>` (`#fvfCondSel`), populado via `app_frota_condutores_listar()` filtrado no frontend a
+  `status ∈ {apto,ativo}` — **nada de digitar e-mail**, só escolhe quem já existe e já está liberado
+  (mesma RPC de "Condutores" acima, reaproveitada aqui). Membro de equipe (`feqCarregar`) e
+  destinatário de empréstimo (`condSalvarEmprestimo`) continuam por e-mail (`app_perfil_por_email`,
+  que retorna `condutor_status` pra barrar quem não está `apto`/`ativo` antes de chamar a RPC) — só o
+  condutor exclusivo do veículo virou seleção fechada. **A validação de verdade é sempre no backend**
   (`app_frota_veiculo_salvar`, `app_frota_equipe_salvar`, `app_frota_emprestimo_criar`) — o frontend é
   só UX. **Regra do "grandfathering":** a validação só dispara quando o vínculo está **mudando**
   (condutor exclusivo novo/diferente do que já estava salvo; membro **novo** entrando na equipe).
   Reeditar um veículo/equipe **sem trocar** quem já estava vinculado passa direto, mesmo que essa
-  pessoa tenha perdido o status depois — senão qualquer edição de um cadastro antigo travaria por causa
-  de um vínculo que já existia antes da regra (foi exatamente o caso dos 2 veículos legados sem
-  `consorcio`, ver §6.2 acima — teriam ficado impossíveis de corrigir se a checagem fosse incondicional).
-  **Cuidado:** `frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` — o campo de e-mail do condutor
-  exclusivo **nasce vazio mesmo em edição** (não tem como pré-preencher e-mail a partir do nome que a
-  RPC retorna); deixar em branco **mantém** o condutor já vinculado (frontend reusa
-  `vExistente.condutor_exclusivo_id`), só troca se alguém digitar um e-mail novo.
+  pessoa tenha perdido o status depois — senão qualquer edição de um cadastro antigo travaria por
+  causa de um vínculo que já existia antes da regra. **É por isso que o `<select>` do condutor
+  exclusivo sempre inclui a opção atual mesmo se ela não estiver mais `apto`/`ativo`** (rotulada "não
+  apto/ativo — mantém se não trocar") — sem isso, reabrir e salvar um veículo com titular grandfathered
+  apagaria o vínculo silenciosamente (a lista filtrada não teria a opção pra reselecionar).
 - **Manutenção** (tabela própria `frota_manutencao`, **não** é um `tipo` de `frota_ocorrencia` — ciclo
   de vida diferente demais pra caber no `pendente/aprovado/reprovado` simples de ocorrência):
   `frotasRenderManutencao` (botão "🔧 Manutenção" no card do veículo, Frotas registra
@@ -506,14 +509,17 @@ por envio/atualização de CNH — §6.1), `frota_equipe` + `frota_equipe_membro
 `frota_treinamento` + `frota_treinamento_condutor`.
 
 ### Cuidados
-- **`consorcio` de `frota_veiculo` é `NULL`-ável no banco** (não dá pra travar `NOT NULL` — 2
-  veículos reais já cadastrados antes dessa trave ficaram sem valor) mas **obrigatório na RPC**
+- **`consorcio` de `frota_veiculo` é `NULL`-ável no banco** (não dá pra travar `NOT NULL` — se algum
+  veículo antigo ficar sem valor, o `CHECK`/RPC não trava retroativamente) mas **obrigatório na RPC**
   `app_frota_veiculo_salvar` pra qualquer criação/edição a partir de agora. Um veículo antigo com
   `consorcio is null` só se resolve quando alguém abrir e salvar ele de novo.
 - **Ninguém com `funcao='qsms'` em produção no momento** — card `#cardQsms` só aparece pra admin até
   alguém ser designado (`sup_admin_set_funcao` em Suprimentos ⚙️ Configurações, mesma RPC de sempre).
 - Foto de CNH vai pro bucket público `fotos-campo` (mesmo de fotos de campo) — não há bucket
   privado dedicado a documento de identificação.
+- **Todas as 14 tabelas do schema `"10 - Frotas"` foram zeradas em 2026-09-03** (dados de teste da
+  fase de desenvolvimento, a pedido da Geovana) — nenhum veículo/condutor/equipe cadastrado em
+  produção no momento. Normal encontrar tudo vazio ao testar depois do merge.
 
 ## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin
