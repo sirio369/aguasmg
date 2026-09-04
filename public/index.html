@@ -915,6 +915,7 @@ function abrirDetalhe(id){
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
   $('#lgDet').appendChild(rb);
+  if(p.situacao==='concluido'){ const cb=document.createElement('button'); cb.className='btn ghost'; cb.style.marginTop='8px'; cb.textContent='⬇️ Exportar CSV (dados do logger)'; cb.addEventListener('click',()=>lgExportarCsv(p)); $('#lgDet').appendChild(cb); }
   const eb=document.getElementById('lgEdit');
   if(eb){ const podeEd=!!(ME&&ME.pode_aprovar&&!p.novo); eb.classList.toggle('hidden',!podeEd); eb.onclick=podeEd?(()=>editarLogger(p)):null; }
   irPara('logger_det');
@@ -1220,6 +1221,25 @@ async function lgCarregarPressao(p, elId, cb){
   try{ const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
     box.innerHTML=lgPressaoBox(data); if(cb) cb(data);
   }catch(e){ box.innerHTML='<div class="banner bad">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
+}
+async function lgExportarCsv(p){
+  if(!navigator.onLine) return toast('Conecte-se para exportar');
+  try{
+    const {data,error}=await sb.rpc('app_logger_pressao_export',{p_logger_id:p.id}); if(error) throw error;
+    const rows=data||[];
+    if(!rows.length) return toast('Sem dados de pressão para exportar');
+    const num=v=>v==null?'':String(v).replace('.',',');
+    const esc=v=>{ if(v==null) return ''; const s=String(v); return /[;\n"]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; };
+    const head=['Codigo','Numero','Consorcio','Zona','Data/hora','Pressao_kPa','Pressao_mca','Temperatura_C','Bateria_V'];
+    const linhas=[head.join(';')];
+    rows.forEach(r=>linhas.push([esc(r.codigo),esc(r.numero_logger),esc(r.consorcio),esc(r.zona),esc(r.data_hora),num(r.pressao_kpa),num(r.pressao_mca),num(r.temperature),num(r.battery)].join(';')));
+    const csv='﻿'+linhas.join('\r\n');
+    const nome='logger_'+String(p.label||('id'+p.id)).replace(/[^\w\-]+/g,'_')+'.csv';
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=nome; document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1500);
+    toast(rows.length+' linhas exportadas ('+nome+')');
+  }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
 }
 function relPressaoHtml(d){
   const cards='<div class="relCards">'+relCard('Mínima',d.min_mca,d.min_kpa)+relCard('Média',d.media_mca,d.media_kpa)+relCard('Mediana',d.mediana_mca,d.mediana_kpa)+relCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
