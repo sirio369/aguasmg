@@ -123,6 +123,14 @@
   não veio).
 - **Estado:** `loggersData`, `lgFiltro`, `lgCons`, `detPonto`, `detFotos`, `lgEnviando`, `lgView`,
   `lgMap`, `lgMarkers`. `LG_SIT` (labels/cores por situação), `LG_CONS` (ZA1004/ZA0200).
+- **Pressão / ancoragem (mig `logger_pressao_ts_real_ancoragem`):** o relógio do logger é **irreal**
+  (arranca na configuração de bancada; só o horário/intervalo relativo vale). Regra: `ts_real = ts +
+  (data_instalacao − 1ª leitura com pressão>0)`, coluna **`ts_real`** em `"6 - analises".logger_pressao`
+  (mantém `ts` bruto p/ auditoria). Janela válida = **[data_instalacao, data_remocao]** → descarta o
+  trecho zerado de bancada (início) e o pós-remoção (fim). `logger_pressao_reanchor(p_logger_id)`
+  recalcula (idempotente) e é chamado **ao fim da importação** (`importarDadosLogger`). `logger_pressao_stats`
+  e a view **`vw_logger_pressao`** (BI) já usam `ts_real` + janela → datas reais no relatório/gráfico.
+  `volume`/`intervalo_volume_d` do logger **não** dependem disso (vêm das leituras de HD + datas).
 - **PDF:** `emitirRelatorio(p)` / `relDocHtml(p)` (`// Relatório do ponto` ~L1039) — seções
   Localização (mapa sugerido×instalado), Instalação, Remoção, Finalização, Pressão (SVG de
   `logger_pressao_stats`) + bloco **OS COPASA** sempre visível.
