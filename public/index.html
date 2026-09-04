@@ -217,6 +217,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <button id="lgNovo" class="btn ghost" style="margin-bottom:10px">➕ Inserir logger</button>
     <div id="lgFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
+    <div id="lgSub" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgLista"></div>
     <div id="lgMapa" style="display:none;height:62vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
   </main>
@@ -801,7 +802,8 @@ document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',(
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 
 // ---------- MÓDULO LOGGERS ----------
-let loggersData=[], lgFiltro='todos', lgCons='todos', detFotos={}, detPonto=null, lgEnviando=false;
+let loggersData=[], lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
+function contarSub(kind){ return loggersData.filter(p=>p.situacao==='concluido'&&lgMatchC(p)&&(kind==='com'?!!p.tem_pressao:!p.tem_pressao)).length; }
 const LG_CONS=[{v:'todos',l:'Ambos'},{v:'ZA1004',l:'Contagem'},{v:'ZA0200',l:'Betim'}];
 function lgMatchC(p){ return lgCons==='todos'||p.consorcio===lgCons; }
 const LG_SIT={
@@ -830,20 +832,31 @@ async function carregarLoggers(){
 function renderFiltros(){
   const ordem=['todos','pendente','instalado','removido','concluido'];
   $('#lgFiltros').innerHTML=ordem.map(s=>`<button class="lgf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===lgFiltro?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${LG_SIT[s].lbl} ${contar(s)}</button>`).join('');
-  $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;renderFiltros();renderConsFiltros();atualizarVista();}));
+  $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;lgSub='todos';renderFiltros();renderConsFiltros();renderSubFiltros();atualizarVista();}));
+  renderSubFiltros();
+}
+function renderSubFiltros(){
+  const el=$('#lgSub'); if(!el) return;
+  if(lgFiltro!=='concluido'){ el.innerHTML=''; return; }
+  const opts=[['todos','Todos'],['com','✅ Com dados de pressão'],['sem','⚠️ Sem dados']];
+  el.innerHTML=opts.map(o=>{ const n=o[0]==='todos'?contar('concluido'):contarSub(o[0]); const bad=o[0]==='sem'&&n>0;
+    return `<button class="lgsf" data-sf="${o[0]}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o[0]===lgSub?('background:'+(bad?'var(--bad)':'var(--acc)')+';color:#fff;'):('background:var(--card);border:1px solid '+(bad?'var(--bad)':'var(--line)')+';'+(bad?'color:var(--bad);':''))}">${o[1]} ${n}</button>`;}).join('');
+  el.querySelectorAll('.lgsf').forEach(b=>b.addEventListener('click',()=>{lgSub=b.dataset.sf;renderSubFiltros();atualizarVista();}));
 }
 function renderConsFiltros(){
   const c=$('#lgCons'); if(!c) return;
   c.innerHTML=LG_CONS.map(o=>`<button class="lgc" data-c="${o.v}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o.v===lgCons?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${o.l} ${contarCons(o.v)}</button>`).join('');
   c.querySelectorAll('.lgc').forEach(b=>b.addEventListener('click',()=>{lgCons=b.dataset.c;renderFiltros();renderConsFiltros();atualizarVista();}));
 }
+function lgMatchSub(p){ return !(lgFiltro==='concluido'&&lgSub!=='todos') || (lgSub==='com'?!!p.tem_pressao:!p.tem_pressao); }
 function renderLoggers(){
-  let arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p));
+  let arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p));
   if(gps) arr=arr.slice().sort((a,b)=>((distKm(a.lat,a.lon)??9e9)-(distKm(b.lat,b.lon)??9e9)));
   if(!arr.length){$('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhum ponto nesse filtro.</p>';return;}
   $('#lgLista').innerHTML=arr.map(p=>{
     const s=LG_SIT[p.situacao]||{lbl:p.situacao,bg:'--line',fg:'--mut'};
-    const sub=[p.avulso?'⚡ avulso':'',p.zona,distTxt(distKm(p.lat,p.lon)),p.dias_instalado!=null?('há '+p.dias_instalado+' d'):'',p._pendente?'⏳ na fila':''].filter(Boolean).join(' · ');
+    const semDados=p.situacao==='concluido'&&!p.tem_pressao;
+    const sub=[p.avulso?'⚡ avulso':'',p.zona,distTxt(distKm(p.lat,p.lon)),p.dias_instalado!=null?('há '+p.dias_instalado+' d'):'',semDados?'⚠️ sem dados de pressão':'',p._pendente?'⏳ na fila':''].filter(Boolean).join(' · ');
     return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${p.label||('#'+p.id)}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span><button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button></div>`;
   }).join('');
   $('#lgLista').querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>abrirDetalhe(+el.dataset.open)));
@@ -873,7 +886,7 @@ function renderMapa(){
   setTimeout(()=>lgMap.invalidateSize(),0);
   lgMarkers.clearLayers();
   const cor={pendente:'#e0a300',instalado:'#0e639c',remocao_autorizada:'#b3261e',removido:'#8a5a00',concluido:'#1a7f4b'};
-  const arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&p.lat&&p.lon);
+  const arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{
     const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:cor[p.situacao]||'#888',fillOpacity:1});
@@ -898,6 +911,7 @@ function abrirDetalhe(id){
   else if(p.situacao==='removido') h=formFinalizar(p);
   else h=resumo(p);
   $('#lgDet').innerHTML=h; ligarDetalhe(p);
+  if(p.situacao==='concluido') lgCarregarPressao(p,'lgResumoPressao');
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
   $('#lgDet').appendChild(rb);
@@ -998,10 +1012,8 @@ async function importarDadosLogger(p,file,msgSel,onOk){
       if(error) throw error;
       ins+=(data&&data.inseridos)||0;
     }
-    // ancora a série na data de instalação (relógio do logger é irreal) e descarta bancada/pós-remoção
-    try{ const ra=await sb.rpc('logger_pressao_reanchor',{p_logger_id:p.id}); if(ra.error) throw ra.error; }
-    catch(e){ console.warn('reanchor falhou (dado importado, pode reancorar depois):',e); }
-    set('✓ '+rows.length+' leitura(s) processada(s) ('+ins+' nova(s)). Pode concluir.');
+    // a ancoragem (ts_real) é feita no servidor, dentro do logger_pressao_importar
+    set('✓ '+rows.length+' leitura(s) processada(s) ('+ins+' nova(s)). Confira os dados abaixo.');
     toast('✓ Dados do logger importados');
     if(onOk) onOk(ins);
   }catch(e){ set('Erro: '+(e.message||e)); toast('⚠ '+(e.message||e)); }
@@ -1050,15 +1062,18 @@ function formRemover(p){
 function formFinalizar(p){
   return `<h1>Finalizar · ${p.label||('#'+p.id)}</h1>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:12px;color:var(--mut);line-height:1.6;margin-bottom:12px"><b style="color:var(--ink)">Removido — dados pendentes</b><br>Logger ${p.numero_logger||'—'} · volume ${p.volume??'—'} m³<br>Removido por ${p.usuario_remocao||'—'}</div>
-  <p class="sub">Anexe o arquivo do logger (.json). Os dados são lidos e salvos no banco (pressão em kPa e mca) e passam a alimentar o relatório.</p>
+  <p class="sub">Anexe o arquivo do logger (.json). Os dados de pressão aparecem abaixo (gráfico + indicadores). <b>Confira antes de concluir</b> — o botão só libera após os dados carregarem.</p>
   <label class="pickb" style="display:inline-flex;cursor:pointer">📎 Anexar arquivo do logger (.json)<input id="fzFile" type="file" accept=".json,application/json" style="display:none"></label>
   <div id="fzMsg" class="sub" style="margin-top:6px"></div>
-  <label>OS SIGOS (opcional)</label><input id="fzOs" autocomplete="off"/>
+  <div id="fzResumo" style="margin-top:8px"></div>
+  <label style="margin-top:10px">OS SIGOS (opcional)</label><input id="fzOs" autocomplete="off"/>
   <button id="lgFinalizar" class="btn" disabled>Concluir</button>`;
 }
 function resumo(p){
   return `<h1>${p.label||('#'+p.id)} · concluído</h1>
-  <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;line-height:1.9">Logger ${p.numero_logger||'—'} · HD ${p.numero_hd||'—'}<br>Leitura ${p.leitura_hd_instalacao} → ${p.leitura_hd_remocao} · <b>volume ${p.volume} m³</b><br>Intervalo ${p.intervalo_volume_d?Number(p.intervalo_volume_d).toFixed(1):'—'} dias<br>Instalado por ${p.usuario_instalacao||'—'}<br>Removido por ${p.usuario_remocao||'—'}<br>${p.os_sigos?('OS SIGOS '+p.os_sigos+'<br>'):''}${p.link_dados_sharepoint?('<a href="'+p.link_dados_sharepoint+'" target="_blank">Abrir dados (SharePoint)</a>'):''}</div>`;
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;line-height:1.9">Logger ${p.numero_logger||'—'} · HD ${p.numero_hd||'—'}<br>Leitura ${p.leitura_hd_instalacao} → ${p.leitura_hd_remocao} · <b>volume ${p.volume} m³</b><br>Intervalo ${p.intervalo_volume_d?Number(p.intervalo_volume_d).toFixed(1):'—'} dias<br>Instalado por ${p.usuario_instalacao||'—'}<br>Removido por ${p.usuario_remocao||'—'}<br>${p.os_sigos?('OS SIGOS '+p.os_sigos+'<br>'):''}${p.link_dados_sharepoint?('<a href="'+p.link_dados_sharepoint+'" target="_blank">Abrir dados (SharePoint)</a>'):''}</div>
+  <div class="sec" style="margin-top:14px">📈 Pressão</div>
+  <div id="lgResumoPressao"></div>`;
 }
 // ---------- Relatório do ponto (PDF via impressão) ----------
 const REL_CONS={ZA1004:'Consórcio Águas Integradas · Contagem/MG', ZA0200:'Consórcio Eficiência Hídrica · Betim/MG'};
@@ -1181,6 +1196,30 @@ async function relInjectPressao(p){
     if(!data||!data.n){ box.innerHTML='<div class="relPend">Nenhum dado de pressão importado para este ponto.</div>'; return; }
     box.innerHTML=relPressaoHtml(data);
   }catch(e){ box.innerHTML='<div class="relPend">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
+}
+function lgCard(t,mca,kpa){ return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 6px;text-align:center;background:var(--card)"><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em">'+t+'</div><div style="font-size:18px;font-weight:700;color:var(--acc);line-height:1.2">'+relNum(mca,2)+' <span style="font-size:11px;font-weight:600;color:var(--mut)">mca</span></div><div style="font-size:11px;color:var(--mut)">'+relNum(kpa,1)+' kPa</div></div>'; }
+function lgPressaoBox(d){
+  if(!d) return '<div class="banner warn">Sem dados de pressão.</div>';
+  let h='';
+  if(d.n>0){
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px">'+lgCard('Mínima',d.min_mca,d.min_kpa)+lgCard('Média',d.media_mca,d.media_kpa)+lgCard('Mediana',d.mediana_mca,d.mediana_kpa)+lgCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
+    h+='<div style="margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;overflow-x:auto">'+relPressaoSVG(d.serie||[])+'</div>';
+    h+='<div class="sub" style="font-size:11px;margin-top:6px">'+d.n+' amostra(s) com pressão · '+relFmtData(d.primeiro)+' → '+relFmtData(d.ultimo)+'</div>';
+  } else {
+    h+='<div class="banner bad" style="margin-top:8px">⚠️ Este logger não registrou pressão (0 leituras > 0). Verifique o sensor/instalação.</div>';
+  }
+  const sem=(d.pulsos_com_pressao||0)===0;
+  h+='<div style="margin-top:8px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.6;'+(sem?'background:var(--bad-bg);color:var(--bad)':'background:var(--card);border:1px solid var(--line);color:var(--mut)')+'">'
+    +'📟 Pulsos: <b>'+(d.pulsos_total??'—')+'</b> · com pressão: <b>'+(d.pulsos_com_pressao??'—')+'</b> · sem pressão: <b>'+(d.pulsos_sem_pressao??'—')+'</b><br>⏱️ Intervalo entre pulsos: ~<b>'+(d.intervalo_min??'—')+' min</b> (esperado 15 min)</div>';
+  return h;
+}
+async function lgCarregarPressao(p, elId, cb){
+  const box=document.getElementById(elId); if(!box) return;
+  box.innerHTML='<p class="sub">Carregando dados de pressão…</p>';
+  if(!navigator.onLine){ box.innerHTML='<div class="banner warn">Conecte-se para ver os dados de pressão.</div>'; return; }
+  try{ const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
+    box.innerHTML=lgPressaoBox(data); if(cb) cb(data);
+  }catch(e){ box.innerHTML='<div class="banner bad">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
 }
 function relPressaoHtml(d){
   const cards='<div class="relCards">'+relCard('Mínima',d.min_mca,d.min_kpa)+relCard('Média',d.media_mca,d.media_kpa)+relCard('Mediana',d.mediana_mca,d.mediana_kpa)+relCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
@@ -1311,10 +1350,11 @@ function ligarDetalhe(p){
   const sv=document.getElementById('lgSalvar'); if(sv) sv.addEventListener('click',submeterLogger);
   const fz=document.getElementById('lgFinalizar');
   if(fz){
+    const habilita=(d)=>{ fz.disabled=!(d&&d.pulsos_total>0); };   // só libera Concluir após ver os dados
     const file=document.getElementById('fzFile');
-    if(file) file.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f,'#fzMsg',()=>{ fz.disabled=false; }); });
+    if(file) file.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f,'#fzMsg',()=>{ lgCarregarPressao(p,'fzResumo',habilita); }); });
     fz.addEventListener('click',finalizarLogger);
-    (async()=>{ if(!navigator.onLine) return; try{ const {data}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(data&&data.n){ const m=document.getElementById('fzMsg'); if(m) m.textContent=data.n+' amostra(s) de pressão já importada(s).'; fz.disabled=false; } }catch(e){} })();
+    lgCarregarPressao(p,'fzResumo',habilita);   // ao abrir: mostra o que já existe e habilita se houver dados
   }
   lgOnGps();
 }

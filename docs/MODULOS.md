@@ -123,14 +123,25 @@
   não veio).
 - **Estado:** `loggersData`, `lgFiltro`, `lgCons`, `detPonto`, `detFotos`, `lgEnviando`, `lgView`,
   `lgMap`, `lgMarkers`. `LG_SIT` (labels/cores por situação), `LG_CONS` (ZA1004/ZA0200).
-- **Pressão / ancoragem (mig `logger_pressao_ts_real_ancoragem`):** o relógio do logger é **irreal**
-  (arranca na configuração de bancada; só o horário/intervalo relativo vale). Regra: `ts_real = ts +
-  (data_instalacao − 1ª leitura com pressão>0)`, coluna **`ts_real`** em `"6 - analises".logger_pressao`
-  (mantém `ts` bruto p/ auditoria). Janela válida = **[data_instalacao, data_remocao]** → descarta o
-  trecho zerado de bancada (início) e o pós-remoção (fim). `logger_pressao_reanchor(p_logger_id)`
-  recalcula (idempotente) e é chamado **ao fim da importação** (`importarDadosLogger`). `logger_pressao_stats`
-  e a view **`vw_logger_pressao`** (BI) já usam `ts_real` + janela → datas reais no relatório/gráfico.
-  `volume`/`intervalo_volume_d` do logger **não** dependem disso (vêm das leituras de HD + datas).
+- **Pressão / ancoragem:** o relógio do logger é **irreal** (arranca na configuração de bancada; só o
+  horário/intervalo relativo vale). Regra: `ts_real = ts + (data_instalacao − 1ª leitura com pressão>0)`,
+  coluna **`ts_real`** em `"6 - analises".logger_pressao` (mantém `ts` bruto p/ auditoria). Janela válida
+  = **[data_instalacao, data_remocao]** → descarta o zerado de bancada (início) e o pós-remoção (fim).
+  A ancoragem roda **no servidor**, dentro do `logger_pressao_importar` (idempotente; há também
+  `logger_pressao_reanchor(id)` para reprocessar). `logger_pressao_stats` e a view **`vw_logger_pressao`**
+  (BI, tem coluna `codigo`=label ex. J-4285) usam `ts_real` + janela. `volume`/`intervalo_volume_d`
+  **não** dependem disso (vêm das leituras de HD + datas).
+- **Pressão no corpo do app (não só no PDF):** `logger_pressao_stats` devolve, além dos agregados
+  (mín/média/mediana/máx mca+kpa, série), os **contadores de pulso** (`pulsos_total`, `pulsos_com_pressao`,
+  `pulsos_sem_pressao`, `intervalo_min` — esperado 15). `lgPressaoBox(stats)`/`lgCarregarPressao(p,elId,cb)`
+  renderizam cards + gráfico (`relPressaoSVG`) + nota de pulsos, com estilo inline (não dependem do REL_CSS).
+  Usado: (1) na **finalização** (`fzResumo`) — o botão **Concluir só habilita** quando os dados carregam
+  (`pulsos_total>0`); (2) no **logger concluído** (`resumo` → `lgResumoPressao`). Logger sem pressão
+  (`pulsos_com_pressao=0`) mostra alerta ⚠️.
+- **Filtro "concluído" segrega dados:** `app_loggers_listar` devolve `tem_pressao` (bool); o sub-filtro
+  `#lgSub` (`lgSub`/`renderSubFiltros`/`lgMatchSub`) aparece só no filtro **concluído** com
+  **✅ Com dados de pressão** / **⚠️ Sem dados** (+contagens) — torna visível a quantidade de loggers
+  com problema. A lista marca "⚠️ sem dados de pressão" nesses.
 - **PDF:** `emitirRelatorio(p)` / `relDocHtml(p)` (`// Relatório do ponto` ~L1039) — seções
   Localização (mapa sugerido×instalado), Instalação, Remoção, Finalização, Pressão (SVG de
   `logger_pressao_stats`) + bloco **OS COPASA** sempre visível.
