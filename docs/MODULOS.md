@@ -643,6 +643,17 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   Parque, Fiscalização, Recuperação, Leitura, Grandes; Pesquisa, Campanhas, Loggers, Modelo, Energia,
   Equipes) · 5 Gestão & decisão (Simulador, ELL, Contrato, Indicadores) · 6 Configuração (Parâmetros,
   Governança).
+- **Voltar ao app:** botão fixo `🏠 Voltar ao AcquaHub` no topo da sidebar (fora da `<nav>`, sem
+  `data-s` — não entra na lógica de `go()`/`.navi.on`), `onclick="location.href='index.html'"`.
+- **Mini-mapas por submódulo:** `miniChoropleth(svgId,legId,tipId,valueFn,label,height)` reaproveita
+  `proj`/`pathd`/`centroid`/`scope` do mapa principal — um SVG pequeno por tela, colorido por um valor
+  numérico à escolha, com legenda (mín/máx ou "sem dado/plano" quando todo o escopo dá o mesmo valor) e
+  clique no setor → `go('ficha')`. Hoje plugado em 6 telas, todas com **dado real já existente** (nada
+  fabricado): `rede` (OS/km — `d.osKm`), `pressao_vrp` (redução FAVAD — `VRPMAP`), `auditoria`
+  (irregularidades totais — `AUDITMAP`), `ramais` (reincidência agregada por DMC — `RAMBYDMC`, derivado
+  de `RAMCAND`), `nrw_os` (OS de vazamento — `d.os`), `nrw_vrp_gestao` (VRPs exist.+proj. — `d.vrpE+d.vrpP`).
+  Serve de base pronta para as RPCs `app_nrw_*`: quando o dado virar persistente, só trocar o `valueFn`
+  pelo valor vindo do banco — o desenho/legenda/tooltip/clique não mudam.
 - **Cuidados:**
   - **`sw.js`:** `perdas.html` está em `ASSETS` e o handler `fetch` trata HTML **por página** (chave
     `./perdas.html` própria — não sobrescreve o cache do `index.html`). Mexeu em `perdas.html`? Suba o
