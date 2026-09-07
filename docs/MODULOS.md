@@ -637,12 +637,14 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   auditoria cadastral, reincidência de ramais — extraídos de `"6 - analises".dmc`/`dmc_resumo` e
   `"7 - projetos"`). Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
   **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"6 - analises"`/`"7 - projetos"`.
-- **Estrutura (38 itens de navegação em 6 fases):** 1 Visão (Painel, DMCs, Ficha) · 2 Dados & diagnóstico
+- **Estrutura (32 itens de navegação em 6 fases):** 1 Visão (Painel, DMCs, Ficha) · 2 Dados & diagnóstico
   (Medições, Consumo, Balanço, MNF, Eventos) · 3 Ação (Plano por DMC, Componentes IWA, HD, Fraude,
   Auditoria, Rede, Ramais, Pressão) · 4 Execução (OS, Renovação, VRPs, Reservatórios, Setorização;
-  Parque, Fiscalização, Recuperação, Leitura, Grandes; Pesquisa, Campanhas, Loggers, Modelo, Energia,
-  Equipes) · 5 Gestão & decisão (Simulador, ELL, Contrato, Indicadores) · 6 Configuração (Parâmetros,
-  Governança).
+  Parque, Fiscalização, Recuperação, Leitura, Grandes) · 5 Gestão & decisão (Simulador, ELL, Contrato,
+  Indicadores) · 6 Configuração (Parâmetros, Governança).
+  (removido o subgrupo "Execução — campo & suporte": Pesquisa ativa, Campanhas & step test, Frota de
+  loggers, Modelo hidráulico, Balanço energético, Programação de equipes — esses temas já são cobertos
+  pelos módulos de campo do próprio AcquaHub, fora do cockpit.)
 - **Cuidados:**
   - **`sw.js`:** `perdas.html` está em `ASSETS` e o handler `fetch` trata HTML **por página** (chave
     `./perdas.html` própria — não sobrescreve o cache do `index.html`). Mexeu em `perdas.html`? Suba o
