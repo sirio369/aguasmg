@@ -210,6 +210,11 @@ veículo — "tempo real" é só "atualizado ao abrir a tela", sem websocket. Ap
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 
+**Perdas / NRW** (`public/perdas.html` — **página separada**, não é tela `<main>`) — cockpit de
+acompanhamento de perdas por DMC. Card `#cardPerdas` no hub, gated em `homeGate()` **só para o Sander**
+(`ME.email`); opaco (`.mod soon`) + 🔒 para os demais. A página tem guarda própria pela sessão Supabase.
+Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
+
 ## 7. Notificações e Web Push
 
 - **Inbox + badge:** tabela `"9 - suprimentos".sup_notificacao` (destino_uuid, tipo, titulo, texto,
