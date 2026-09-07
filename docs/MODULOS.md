@@ -613,3 +613,41 @@ módulo que precise resolver destinatário por e-mail).
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
 > join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1;` (via MCP).
+
+---
+
+## 11. Perdas / NRW — cockpit em **página dedicada** `public/perdas.html`
+
+Cockpit de acompanhamento de perdas (NRW) por DMC. **Não é uma tela `<main>` do `index.html`** — é
+uma **página HTML separada** (`public/perdas.html`, autocontida: CSS/JS próprios, SVG nativo, sem
+Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card do hub que faz
+`location.href='perdas.html'`.
+
+- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na seção 🧰 Suporte do `#home`. Nasce
+  `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera **só** para
+  `ME.email === 'sander.sirio@aguasmg.com.br'` (tira `soon`/🔒 e liga `onclick`); os demais ficam
+  opacos e o clique dá `toast('Acesso restrito')`. Segue o padrão de gate da §1 (nasce restrito,
+  revela no `homeGate` quando `ME` resolve).
+- **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
+  supabase-js (mesma `SB_URL`/anon key do app), lê `auth.getSession()` e, se o e-mail ≠ Sander (ou sem
+  sessão), mantém o overlay `#nrwGate` (🔒). Funciona offline (a sessão vem do `localStorage` do mesmo
+  domínio). É gate de **UX/2ª camada**; o enforcement real virá com **RLS** quando os dados saírem de
+  snapshot para RPC.
+- **Dados:** hoje é **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
+  auditoria cadastral, reincidência de ramais — extraídos de `"6 - analises".dmc`/`dmc_resumo` e
+  `"7 - projetos"`). Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
+  **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"6 - analises"`/`"7 - projetos"`.
+- **Estrutura (38 itens de navegação em 6 fases):** 1 Visão (Painel, DMCs, Ficha) · 2 Dados & diagnóstico
+  (Medições, Consumo, Balanço, MNF, Eventos) · 3 Ação (Plano por DMC, Componentes IWA, HD, Fraude,
+  Auditoria, Rede, Ramais, Pressão) · 4 Execução (OS, Renovação, VRPs, Reservatórios, Setorização;
+  Parque, Fiscalização, Recuperação, Leitura, Grandes; Pesquisa, Campanhas, Loggers, Modelo, Energia,
+  Equipes) · 5 Gestão & decisão (Simulador, ELL, Contrato, Indicadores) · 6 Configuração (Parâmetros,
+  Governança).
+- **Cuidados:**
+  - **`sw.js`:** `perdas.html` está em `ASSETS` e o handler `fetch` trata HTML **por página** (chave
+    `./perdas.html` própria — não sobrescreve o cache do `index.html`). Mexeu em `perdas.html`? Suba o
+    `coleta-vN` como em qualquer asset.
+  - Gate do card ≠ segurança real: qualquer um com a URL abre a página; o overlay + (futuramente) a RLS
+    é que restringem. Não colocar segredo no `perdas.html`.
+  - Editar o cockpit: o fonte "de trabalho" é o mesmo arquivo; só cuidar do `<head>` próprio
+    (doctype+charset) e do overlay `#nrwGate` + guarda no fim ao regerar a partir do mockup.

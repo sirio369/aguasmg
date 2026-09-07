@@ -1,0 +1,1687 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cockpit de Perdas — AcquaHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eaf1f3; --surface:#ffffff; --surface-2:#f4f8f9; --panel:#fbfdfd;
+  --ink:#0f2129; --ink-2:#2c414b; --muted:#5c717b; --line:#d6e3e7; --line-2:#e6eef0;
+  --accent:#0e7c86; --accent-rgb:14,124,134; --accent-2:#0a5a62; --on-accent:#ffffff;
+  --good:#2f8b6c; --good-bg:#e2f1ea; --warn:#b9821a; --warn-bg:#f6ecd6; --crit:#bd4438; --crit-bg:#f7e2df;
+  --shadow:0 1px 2px rgba(16,33,41,.06),0 6px 18px rgba(16,33,41,.06);
+  --r:12px; --r-sm:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1418; --surface:#12242b; --surface-2:#0f1e24; --panel:#152a31;
+  --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41; --line-2:#1c313800;
+  --accent:#37b1bc; --accent-rgb:55,177,188; --accent-2:#5cc7d0; --on-accent:#04222;
+  --good:#4bb389; --good-bg:#123329; --warn:#d6a03f; --warn-bg:#33280f; --crit:#df6a5d; --crit-bg:#37201d;
+  --line-2:#1c3138; --on-accent:#062028;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --bg:#0b1418; --surface:#12242b; --surface-2:#0f1e24; --panel:#152a31;
+  --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41; --line-2:#1c3138; --panel:#152a31;
+  --accent:#37b1bc; --accent-rgb:55,177,188; --accent-2:#5cc7d0; --on-accent:#062028;
+  --good:#4bb389; --good-bg:#123329; --warn:#d6a03f; --warn-bg:#33280f; --crit:#df6a5d; --crit-bg:#37201d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.45}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* shell */
+.app{display:grid;grid-template-columns:224px 1fr;min-height:100vh}
+aside{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line-2)}
+.brand .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:var(--on-accent);font-weight:700;font-size:15px}
+.brand b{font-size:15px;letter-spacing:.2px}
+.brand span{display:block;font-size:11px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+nav{padding:10px 10px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.navlab{font-size:10.5px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);padding:12px 10px 5px}
+.navi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-sm);color:var(--ink-2);border:0;background:none;font-size:13.5px;width:100%;text-align:left}
+.navi:hover{background:var(--surface-2)}
+.navi.on{background:rgba(var(--accent-rgb),.12);color:var(--accent);font-weight:600}
+.navi .ic{width:18px;text-align:center;font-size:15px}
+.navfoot{margin-top:auto;padding:12px;border-top:1px solid var(--line-2);font-size:11px;color:var(--muted)}
+
+main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.top h2{font-size:16px}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:2px}
+.seg button{border:0;background:none;color:var(--ink-2);font-size:12.5px;padding:5px 11px;border-radius:7px;font-weight:500}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow);font-weight:600}
+.sel{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:6px 9px;font-size:12.5px;font-family:inherit}
+.sel:disabled{opacity:.4;cursor:not-allowed}
+.focusbar{display:flex;align-items:center;gap:8px;background:rgba(var(--accent-rgb),.12);border:1px solid var(--accent);border-radius:var(--r-sm);padding:8px 12px;font-size:13px;margin-bottom:4px}
+.focusbar .fx{margin-left:auto;border:0;background:none;color:var(--accent);font-weight:600;font-size:12px;cursor:pointer}
+tr.rowfocus>td{background:rgba(var(--accent-rgb),.14)}
+tr.rowfocus>td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.spacer{flex:1}
+.ribbon{display:flex;align-items:center;gap:9px;background:var(--warn-bg);color:var(--ink);border-bottom:1px solid var(--line);padding:8px 22px;font-size:12.5px}
+.ribbon .tag{background:var(--warn);color:#1c1403;font-weight:600;font-size:10.5px;letter-spacing:.5px;padding:2px 7px;border-radius:5px;text-transform:uppercase}
+:root[data-theme="dark"] .ribbon .tag,:root:not([data-theme="light"]) .ribbon .tag{color:#1c1403}
+
+.wrap{padding:22px;display:flex;flex-direction:column;gap:18px;max-width:1360px}
+.screen{display:none}.screen.on{display:flex;flex-direction:column;gap:18px}
+
+/* kpi tiles */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.kpi .lab{font-size:11px;color:var(--muted);letter-spacing:.3px;text-transform:uppercase}
+.kpi .val{font-size:25px;font-weight:600;line-height:1.05;letter-spacing:-.5px}
+.kpi .val small{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0}
+.kpi .sub{font-size:11.5px;color:var(--muted)}
+.kpi.wait{background:var(--surface-2);border-style:dashed}
+.kpi.wait .val{color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:20px;letter-spacing:.2px}
+.chip.wait{background:var(--warn-bg);color:var(--warn)}
+.chip.ok{background:var(--good-bg);color:var(--good)}
+.chip.real{background:rgba(var(--accent-rgb),.12);color:var(--accent)}
+
+/* panels */
+.grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.phead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line-2)}
+.phead h3{font-size:13.5px}
+.phead .hint{font-size:11.5px;color:var(--muted)}
+.pbody{padding:14px 16px}
+
+/* map */
+.mapwrap{position:relative}
+.map{width:100%;height:440px;display:block;background:var(--surface-2)}
+.dmc-shape{cursor:pointer;transition:opacity .12s,stroke-width .12s}
+.dmc-shape:hover{stroke:var(--accent-2);stroke-width:2.4}
+.dmc-shape.sel{stroke:var(--ink);stroke-width:2.6}
+.dmc-lab{font:600 12px "IBM Plex Mono",monospace;fill:var(--ink);pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.legend{position:absolute;left:14px;bottom:14px;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:11px;display:flex;flex-direction:column;gap:6px;max-width:210px}
+.legend .row{display:flex;align-items:center;gap:7px}
+.ramp{height:9px;flex:1;border-radius:5px;background:linear-gradient(90deg,rgba(var(--accent-rgb),.16),rgba(var(--accent-rgb),.9))}
+.mtip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:11.5px;padding:6px 9px;border-radius:7px;opacity:0;transform:translate(-50%,-120%);white-space:nowrap;z-index:3;box-shadow:var(--shadow)}
+.mtip b{color:var(--surface)}
+.maptoggle{display:flex;gap:6px;flex-wrap:wrap}
+.maptoggle button{border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);font-size:11.5px;padding:4px 9px;border-radius:7px}
+.maptoggle button.on{background:var(--accent);color:var(--on-accent);border-color:transparent;font-weight:600}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+.tag-za{font:600 10px "IBM Plex Mono",monospace;padding:1px 6px;border-radius:5px}
+.za0200{background:#e7edf7;color:#33507e}.za1004{background:#f6ece0;color:#8a5a1e}
+:root[data-theme="dark"] .za0200,:root:not([data-theme="light"]) .za0200{background:#1b2740;color:#9db6e6}
+:root[data-theme="dark"] .za1004,:root:not([data-theme="light"]) .za1004{background:#33260f;color:#e0b783}
+.seal{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.s-red{background:var(--crit)}.s-amb{background:var(--warn)}.s-grn{background:var(--good)}
+.bar-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.minibar{width:64px;height:7px;border-radius:4px;background:var(--line);overflow:hidden}
+.minibar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+
+/* ficha */
+.fhead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.fmap{width:150px;height:150px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);flex:none}
+.ftitle{flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px}
+.ftitle .code{font-size:26px;font-weight:700;letter-spacing:-.5px;display:flex;align-items:center;gap:12px}
+.metagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.metagrid .m{background:var(--surface);padding:11px 13px;display:flex;flex-direction:column;gap:3px}
+.metagrid .m .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.metagrid .m .v{font-size:18px;font-weight:600}
+.metagrid .m .v small{font-size:11px;color:var(--muted);font-weight:500}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:6px}
+.stbar{display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.stbar i{display:block;height:100%}
+.leg{display:flex;gap:14px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.leg span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.waitbox{border:1px dashed var(--line);border-radius:var(--r-sm);background:var(--surface-2);padding:18px;text-align:center;color:var(--muted);font-size:12.5px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.iwa{display:flex;flex-direction:column;gap:8px;font-size:12.5px}
+.iwa .r{display:flex;align-items:center;gap:10px}
+.iwa .r .nm{flex:1}
+.iwa .r .amt{font-family:"IBM Plex Mono",monospace}
+.iwa .track{height:20px;border-radius:5px;background:var(--line);overflow:hidden;flex:none;width:150px}
+.iwa .track i{display:block;height:100%}
+.hatch{background:repeating-linear-gradient(45deg,var(--line),var(--line) 5px,transparent 5px,transparent 10px)}
+.ind{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.ind .i{border:1px solid var(--line);border-radius:var(--r-sm);padding:11px;background:var(--surface)}
+.ind .i .k{font-size:11px;color:var(--muted)}
+.ind .i .v{font-size:19px;font-weight:600;margin-top:3px}
+.ind .i .f{font-size:10px;color:var(--muted);font-family:"IBM Plex Mono",monospace;margin-top:2px}
+.actions{display:flex;gap:9px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:var(--r-sm);padding:9px 13px;font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.btn.pri:hover{background:var(--accent-2);color:var(--on-accent)}
+.back{border:0;background:none;color:var(--accent);font-size:13px;font-weight:600;padding:0;margin-bottom:2px}
+
+/* import rows */
+.imp{display:flex;flex-direction:column;gap:10px}
+.improw{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 14px;background:var(--surface)}
+.improw .ic{width:34px;height:34px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-size:17px;flex:none}
+.improw .g{flex:1;min-width:0}
+.improw .g b{font-size:13px}.improw .g p{margin:2px 0 0;font-size:11.5px;color:var(--muted)}
+.emptyrow{border:1px dashed var(--line);border-radius:var(--r-sm);padding:16px;text-align:center;color:var(--muted);font-size:12.5px;background:var(--surface-2)}
+.formrow{display:grid;grid-template-columns:1fr 90px;gap:10px;align-items:center;font-size:12.5px;padding:8px 0;border-bottom:1px solid var(--line-2)}
+.formrow input{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:6px 9px;color:var(--ink);font-family:"IBM Plex Mono",monospace;text-align:right}
+.note{font-size:12px;color:var(--muted)}
+
+.consol{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.zacard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:13px;box-shadow:var(--shadow)}
+.zacard .zh{display:flex;align-items:center;gap:10px}
+.zacard .zh b{font-size:15px}
+.zacard .zh .n{font-size:11.5px;color:var(--muted)}
+.zacard .rowm{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 10px}
+.zacard .rowm .m .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.zacard .rowm .m .v{font-size:17px;font-weight:600;margin-top:2px}
+.zacard .rowm .m .v small{font-size:10.5px;color:var(--muted);font-weight:500}
+.metaband{display:flex;align-items:center;gap:13px;border-top:1px dashed var(--line);padding-top:13px}
+.gauge{--p:0;position:relative;width:56px;height:56px;border-radius:50%;flex:none;background:conic-gradient(var(--warn) calc(var(--p)*1%),var(--line) 0)}
+.gauge::after{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--surface)}
+.gauge b{position:absolute;inset:0;display:grid;place-items:center;font-size:14px;color:var(--muted);z-index:1}
+.metaband .mt{flex:1}.metaband .mt b{font-size:13px}.metaband .mt p{margin:2px 0 0;font-size:11.5px;color:var(--muted)}
+.navi.soon{color:var(--muted);opacity:.6;cursor:default}
+.navi.soon:hover{background:none}
+.sheet .srow{display:flex;justify-content:space-between;gap:12px;padding:8px 6px;border-bottom:1px solid var(--line-2);font-size:13px}
+.sheet .srow.h{font-weight:600;background:var(--surface-2)}
+.sheet .lvl2{padding-left:22px}.sheet .lvl3{padding-left:42px;color:var(--ink-2)}
+.sheet .srow .v{font-family:"IBM Plex Mono",monospace}
+.sheet .srow .v.wait{color:var(--muted)}
+.slider{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.slider label{display:flex;justify-content:space-between;font-size:12.5px}
+.slider label b{font-family:"IBM Plex Mono",monospace;color:var(--accent)}
+.slider input[type=range]{width:100%;accent-color:var(--accent)}
+.simout{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.simout .o{border:1px solid var(--line);border-radius:var(--r-sm);padding:13px;background:var(--surface-2)}
+.simout .o .k{font-size:11px;color:var(--muted)}.simout .o .v{font-size:21px;font-weight:600;margin-top:3px}
+.ellchart{width:100%;height:180px;display:block}
+/* combate às perdas */
+.losstree{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;font-size:12px;margin-bottom:4px}
+.losstree .node{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 13px}
+.losstree .node b{display:block;font-size:13px}.losstree .node span{color:var(--muted);font-size:11px}
+.losstree .op{display:grid;place-items:center;color:var(--muted);font-weight:700;font-size:16px}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+.compc{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:15px;display:flex;flex-direction:column;gap:9px}
+.compc h4{margin:0;font-size:14px}
+.compc .desc{font-size:12px;color:var(--muted);flex:1}
+.compc .tool{display:flex;gap:8px;align-items:flex-start;font-size:12px;background:var(--surface-2);border-radius:8px;padding:8px 10px}
+.compc .tool .ar{color:var(--accent);font-weight:700}
+.compc .foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip.ap{background:#efe4f5;color:#7c3f97}.chip.re{background:rgba(var(--accent-rgb),.14);color:var(--accent)}
+:root[data-theme="dark"] .chip.ap,:root:not([data-theme="light"]) .chip.ap{background:#2c1b38;color:#c79fe0}
+.crit-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.crit-list li{display:flex;gap:9px;align-items:flex-start;font-size:12.5px}
+.crit-list .w{font:600 10px "IBM Plex Mono",monospace;padding:2px 6px;border-radius:5px;flex:none;margin-top:1px}
+.prio{font:700 10px "IBM Plex Mono",monospace;padding:2px 7px;border-radius:5px;letter-spacing:.3px}
+.p-hi{background:var(--crit-bg);color:var(--crit)}.p-md{background:var(--warn-bg);color:var(--warn)}.p-lo{background:var(--good-bg);color:var(--good)}
+.exlabel{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line);border-radius:6px;padding:3px 8px}
+.scorebar{width:90px;height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:inline-block;vertical-align:middle}
+.scorebar i{display:block;height:100%;border-radius:4px}
+@media(max-width:920px){
+  .app{grid-template-columns:1fr}
+  aside{position:fixed;left:-240px;transition:.2s;z-index:20}aside.open{left:0}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid2,.cols{grid-template-columns:1fr}
+  .menubtn{display:inline-grid!important}
+}
+.menubtn{display:none;place-items:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
+</style>
+
+</head>
+<body>
+<div id="nrwGate" style="position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:#0b1418;color:#e7eff2;font-family:system-ui,-apple-system,sans-serif;padding:24px;text-align:center">
+  <div style="max-width:440px">
+    <div style="font-size:42px">🔒</div>
+    <h1 style="font-size:20px;margin:12px 0 6px;font-weight:600">Cockpit de Perdas</h1>
+    <p id="gm" style="color:#8ba0a8;font-size:14px;line-height:1.55;margin:0">Verificando acesso…</p>
+    <a href="index.html" style="display:inline-block;margin-top:16px;color:#37b1bc;font-size:13px;text-decoration:none">← Voltar ao AcquaHub</a>
+  </div>
+</div>
+<div class="app">
+  <aside id="side">
+    <div class="brand"><div class="dot">A</div><div><b>AcquaHub</b><span>Perdas · NRW</span></div></div>
+    <nav id="nav">
+      <div class="navlab">1 · Visão</div>
+      <button class="navi on" data-s="painel"><span class="ic">◧</span>Painel de Perdas</button>
+      <button class="navi" data-s="dmcs"><span class="ic">◵</span>DMCs (mapa)</button>
+      <button class="navi" data-s="ficha"><span class="ic">▤</span>Ficha do DMC</button>
+      <div class="navlab">2 · Dados & diagnóstico</div>
+      <button class="navi" data-s="medicoes"><span class="ic">〜</span>Medições / Entrada</button>
+      <button class="navi" data-s="consumo"><span class="ic">₪</span>Consumo / Faturamento</button>
+      <button class="navi" data-s="nrw_balanco"><span class="ic">∑</span>Balanço hídrico</button>
+      <button class="navi" data-s="nrw_mnf"><span class="ic">☾</span>Vazão mínima noturna</button>
+      <button class="navi" data-s="nrw_eventos"><span class="ic">◉</span>Eventos & alertas</button>
+      <div class="navlab">3 · Ação / combate</div>
+      <button class="navi" data-s="nrw_plano"><span class="ic">◎</span>Plano de ação por DMC</button>
+      <button class="navi" data-s="componentes"><span class="ic">◈</span>Componentes IWA</button>
+      <button class="navi" data-s="troca_hd"><span class="ic">⧗</span>Substituição de HD</button>
+      <button class="navi" data-s="fraude"><span class="ic">⚠</span>Indicativo de fraude</button>
+      <button class="navi" data-s="auditoria"><span class="ic">▦</span>Auditoria cadastral</button>
+      <button class="navi" data-s="rede"><span class="ic">⛓</span>Substituição de rede</button>
+      <button class="navi" data-s="ramais"><span class="ic">⑃</span>Substituição de ramais</button>
+      <button class="navi" data-s="pressao_vrp"><span class="ic">◔</span>Gestão de pressão</button>
+      <div class="navlab">4 · Execução — ativos</div>
+      <button class="navi" data-s="nrw_os"><span class="ic">🛠</span>Gestão de OS / reparos</button>
+      <button class="navi" data-s="nrw_renovacao"><span class="ic">📐</span>Renovação de rede</button>
+      <button class="navi" data-s="nrw_vrp_gestao"><span class="ic">🎛</span>Gestão de VRPs</button>
+      <button class="navi" data-s="nrw_reservatorios"><span class="ic">🛢</span>Reservatórios</button>
+      <button class="navi" data-s="nrw_setorizacao"><span class="ic">⬡</span>Integridade de setorização</button>
+      <div class="navlab">4 · Execução — comercial</div>
+      <button class="navi" data-s="nrw_parque"><span class="ic">⏱</span>Parque de hidrômetros</button>
+      <button class="navi" data-s="nrw_fiscalizacao"><span class="ic">🔎</span>Fiscalização de fraudes</button>
+      <button class="navi" data-s="nrw_recuperacao"><span class="ic">💧</span>Recuperação de faturamento</button>
+      <button class="navi" data-s="nrw_leitura"><span class="ic">📖</span>Gestão de leitura</button>
+      <button class="navi" data-s="nrw_grandes"><span class="ic">🏭</span>Grandes consumidores</button>
+      <div class="navlab">4 · Execução — campo & suporte</div>
+      <button class="navi" data-s="nrw_pesquisa"><span class="ic">🎧</span>Pesquisa ativa</button>
+      <button class="navi" data-s="nrw_campanhas"><span class="ic">🗺</span>Campanhas & step test</button>
+      <button class="navi" data-s="nrw_loggers"><span class="ic">📟</span>Frota de loggers</button>
+      <button class="navi" data-s="nrw_modelo"><span class="ic">🧮</span>Modelo hidráulico</button>
+      <button class="navi" data-s="nrw_energia"><span class="ic">⚡</span>Balanço energético</button>
+      <button class="navi" data-s="nrw_equipes"><span class="ic">🧑‍🔧</span>Programação de equipes</button>
+      <div class="navlab">5 · Gestão & decisão</div>
+      <button class="navi" data-s="nrw_simulador"><span class="ic">⇄</span>Simulador de cenários</button>
+      <button class="navi" data-s="nrw_ell"><span class="ic">₵</span>Nível econômico & ROI</button>
+      <button class="navi" data-s="nrw_contrato"><span class="ic">✓</span>Performance contratual</button>
+      <button class="navi" data-s="nrw_indicadores"><span class="ic">≣</span>Indicadores & benchmarking</button>
+      <div class="navlab">6 · Configuração</div>
+      <button class="navi" data-s="config"><span class="ic">⚙</span>Parâmetros & Metas</button>
+      <button class="navi" data-s="nrw_governanca"><span class="ic">🔏</span>Governança do dado</button>
+      <div class="navfoot">15 DMCs · 2 consórcios<br>Betim ZA0200 · Contagem ZA1004</div>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="top">
+      <button class="menubtn" id="menubtn" aria-label="menu">☰</button>
+      <h2 id="scr-title">Painel de Perdas</h2>
+      <div class="spacer"></div>
+      <div class="seg" id="zaseg" role="group" aria-label="consórcio">
+        <button data-za="all" class="on">Ambos</button>
+        <button data-za="ZA0200">Betim</button>
+        <button data-za="ZA1004">Contagem</button>
+      </div>
+      <select class="sel" id="mes" aria-label="competência">
+        <option>set/2026</option><option>ago/2026</option><option>jul/2026</option>
+      </select>
+    </div>
+    <div class="ribbon">
+      <span class="tag">Prévia</span>
+      <span>Dados físicos do cadastro são <b>reais</b>. Indicadores de perdas (IPD, %NRW, ILI, MNF) ficam <b>aguardando</b> a vazão de entrada (Qin) e o faturamento — mostrados como “—”.</span>
+    </div>
+
+    <div class="wrap">
+      <!-- PAINEL -->
+      <section class="screen on" id="s-painel">
+        <div class="phead" style="border:0;padding:0 2px 0"><h3 style="font-size:13.5px">Consolidado por consórcio</h3><span class="hint">soma dos DMCs — resultado único por ZA (nível da meta contratual)</span></div>
+        <div class="consol" id="consol"></div>
+        <div class="kpis" id="kpis"></div>
+        <div class="grid2">
+          <div class="panel mapwrap">
+            <div class="phead">
+              <h3>Distribuição por DMC</h3>
+              <div class="spacer"></div>
+              <div class="maptoggle" id="ind-toggle"></div>
+            </div>
+            <div class="mapwrap">
+              <svg class="map" id="map" preserveAspectRatio="xMidYMid meet" role="img" aria-label="mapa de DMCs"></svg>
+              <div class="legend" id="legend"></div>
+              <div class="mtip" id="mtip"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="phead"><h3>Ranking de DMCs</h3><div class="spacer"></div><span class="hint" id="rank-hint"></span></div>
+            <div style="overflow-x:auto"><table id="ranktbl"><thead><tr>
+              <th data-k="code">DMC</th><th data-k="ativas">Ativas</th><th data-k="rede">Rede km</th>
+              <th data-k="osKm">OS/km ▾</th><th data-k="dens">Lig/km</th><th data-k="seal">Balanço</th>
+            </tr></thead><tbody id="rankbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><h3>Alertas operacionais</h3><span class="hint">acionados quando a telemetria de vazão entrar</span></div>
+          <div class="pbody"><div class="waitbox">
+            <span style="font-size:20px">🔔</span>
+            Sem alertas — a detecção de <b>degrau de vazão mínima noturna (MNF)</b>, VRP fora do setpoint e alta de vazamentos liga assim que houver série de entrada por DMC.
+          </div></div>
+        </div>
+      </section>
+
+      <!-- DMCS map full -->
+      <section class="screen" id="s-dmcs">
+        <div class="panel mapwrap">
+          <div class="phead"><h3>Setores (DMC) — mapa</h3><div class="spacer"></div>
+            <div class="maptoggle" id="ind-toggle2"></div></div>
+          <div class="mapwrap">
+            <svg class="map" id="map2" style="height:560px" preserveAspectRatio="xMidYMid meet" role="img" aria-label="mapa de DMCs"></svg>
+            <div class="legend" id="legend2"></div>
+            <div class="mtip" id="mtip2"></div>
+          </div>
+        </div>
+        <p class="note">Clique em um setor para abrir a ficha. Camadas de rede, ligações, VRPs e vazamentos entram sobre este mesmo mapa na versão integrada ao app.</p>
+      </section>
+
+      <!-- FICHA -->
+      <section class="screen" id="s-ficha"></section>
+
+      <!-- BALANÇO HÍDRICO -->
+      <section class="screen" id="s-nrw_balanco">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Balanço hídrico (IWA)</h3>
+          <p class="note" style="margin:4px 0 0">A folha padrão IWA por DMC/ZA e competência. Fecha quando entrar a <b>vazão de entrada (Qin)</b>; hoje o lado do consumo usa o proxy do cadastro.</p></div>
+          <span class="chip wait" style="font-size:12px">parcial · aguardando Qin</span>
+        </div></div>
+        <div class="panel"><div class="phead"><h3 id="balTit">Folha do balanço — escopo</h3><span class="hint">m³/mês</span></div>
+          <div class="pbody"><div class="sheet" id="sheet"></div></div>
+        </div>
+      </section>
+
+      <!-- MNF -->
+      <section class="screen" id="s-nrw_mnf">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Vazão mínima noturna (MNF)</h3>
+          <p class="note" style="margin:4px 0 0">O motor de dimensionamento da <b>perda real</b>: entre 02–04h o consumo legítimo é mínimo, então quase toda a vazão é vazamento. Precisa de série sub-horária de entrada por DMC.</p></div>
+          <span class="chip re" style="font-size:12px">Perda real · MNF</span>
+        </div></div>
+        <div class="grid2">
+          <div class="panel"><div class="phead"><h3>Perfil de vazão 24h</h3><span class="exlabel">⚠ curva ilustrativa até a série real entrar</span></div>
+            <div class="pbody"><svg viewBox="0 0 600 240" style="width:100%;height:220px" role="img" aria-label="perfil de vazão">
+              <defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(var(--accent-rgb),.35)"/><stop offset="1" stop-color="rgba(var(--accent-rgb),0)"/></linearGradient></defs>
+              <rect x="150" y="20" width="80" height="200" fill="rgba(var(--accent-rgb),.08)"/>
+              <text x="190" y="34" text-anchor="middle" font-size="10" fill="var(--muted)">janela 02–04h</text>
+              <path d="M40 70 L110 60 L150 150 L190 168 L230 150 L300 70 L380 55 L470 60 L560 72 L560 220 L40 220 Z" fill="url(#ar)"/>
+              <path d="M40 70 L110 60 L150 150 L190 168 L230 150 L300 70 L380 55 L470 60 L560 72" fill="none" stroke="var(--accent)" stroke-width="2"/>
+              <line x1="40" y1="168" x2="560" y2="168" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="5 4"/>
+              <text x="46" y="162" font-size="10" fill="var(--crit)">MNF</text>
+              <circle cx="190" cy="168" r="4" fill="var(--crit)"/>
+              <text x="40" y="235" font-size="10" fill="var(--muted)">0h</text><text x="290" y="235" font-size="10" fill="var(--muted)">12h</text><text x="545" y="235" font-size="10" fill="var(--muted)">24h</text>
+            </svg></div>
+          </div>
+          <div class="panel"><div class="phead"><h3>Cálculo</h3></div><div class="pbody ind">
+            <div class="i"><div class="k">MNF</div><div class="v" style="color:var(--muted)">—</div><div class="f">vazão mín. 02–04h</div></div>
+            <div class="i"><div class="k">Consumo noturno legítimo</div><div class="v" style="color:var(--muted)">—</div><div class="f">LNC (config)</div></div>
+            <div class="i"><div class="k">Vazão de vazamento</div><div class="v" style="color:var(--muted)">—</div><div class="f">NNF = MNF − LNC</div></div>
+            <div class="i"><div class="k">Perda diária</div><div class="v" style="color:var(--muted)">—</div><div class="f">NNF × fator noite-dia</div></div>
+            <div class="i" style="grid-column:1/-1"><div class="k">Detecção de degrau</div><div class="v" style="font-size:13px;color:var(--muted)">sem série — liga quando a vazão de entrada chegar; um salto no MNF = novo vazamento.</div></div>
+          </div></div>
+        </div>
+      </section>
+
+      <!-- EVENTOS & ALERTAS -->
+      <section class="screen" id="s-nrw_eventos">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Eventos & alertas</h3>
+          <p class="note" style="margin:4px 0 0">Detecção automática sobre a telemetria: novo rebentamento (degrau de MNF), desvio de pressão, VRP fora do setpoint, medidor com falha — vira fila priorizada e dispara notificação.</p></div>
+          <span class="chip wait" style="font-size:12px">aguardando telemetria</span>
+        </div></div>
+        <div class="panel"><div class="phead"><h3>Fila de eventos — prévia do formato</h3><span class="exlabel">⚠ exemplos até a telemetria entrar</span></div>
+          <div style="overflow-x:auto"><table><thead><tr><th>Tipo</th><th>DMC</th><th>Detecção</th><th>Severidade</th><th>Status</th></tr></thead><tbody>
+            <tr><td>Degrau de MNF (novo vazamento)</td><td>DMC-06 CTG</td><td class="mono">+4,2 L/s</td><td><span class="prio p-hi">ALTA</span></td><td>aberto</td></tr>
+            <tr><td>VRP fora do setpoint</td><td>DMC-01 BET</td><td class="mono">+11 mca</td><td><span class="prio p-md">MÉDIA</span></td><td>aberto</td></tr>
+            <tr><td>Macromedidor sem comunicação</td><td>DMC-05 BET</td><td class="mono">6 h</td><td><span class="prio p-md">MÉDIA</span></td><td>investigar</td></tr>
+          </tbody></table></div>
+          <div class="pbody"><div class="actions"><button class="btn pri">Configurar regras de alerta</button><button class="btn">Notificações (push)</button></div></div>
+        </div>
+      </section>
+
+      <!-- PLANO DE AÇÃO POR DMC -->
+      <section class="screen" id="s-nrw_plano">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Plano de ação por DMC</h3>
+          <p class="note" style="margin:4px 0 0">Para cada setor, <b>qual alavanca atacar primeiro</b> — cruzando os sinais reais que já temos (OS/km, redução de pressão FADAV das VRPs, irregularidades cadastrais). Sequenciamento do combate.</p></div>
+          <span class="chip real" style="font-size:12px">real (sinais atuais)</span>
+        </div></div>
+        <div class="panel"><div class="phead"><h3>Alavanca prioritária por DMC</h3><span class="hint">ordenado por oportunidade</span></div>
+          <div style="overflow-x:auto"><table id="planotbl"><thead><tr><th>DMC</th><th>Alavanca prioritária</th><th>Sinal</th><th>Ação sugerida</th></tr></thead><tbody id="planobody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- SIMULADOR -->
+      <section class="screen" id="s-nrw_simulador">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Simulador de cenários</h3>
+          <p class="note" style="margin:4px 0 0">What-if: quanto cada alavanca recupera. <b>Estimativa ilustrativa</b> (fecha com o balanço real por DMC); mostra o efeito relativo de pressão, troca de HD e renovação.</p></div>
+          <span class="chip wait" style="font-size:12px">estimativa ilustrativa</span>
+        </div></div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Alavancas</h3></div><div class="pbody">
+            <div class="slider"><label>Redução de pressão <b id="lp">15%</b></label><input type="range" id="sp" min="0" max="40" value="15"></div>
+            <div class="slider"><label>Hidrômetros trocados <b id="lh">1.500</b></label><input type="range" id="sh" min="0" max="8000" step="100" value="1500"></div>
+            <div class="slider"><label>Rede renovada <b id="lk">10 km</b></label><input type="range" id="sk" min="0" max="60" value="10"></div>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Efeito estimado</h3></div><div class="pbody">
+            <div class="simout">
+              <div class="o"><div class="k">Perda real de fundo</div><div class="v" id="op" style="color:var(--good)">−13%</div></div>
+              <div class="o"><div class="k">Volume recuperado</div><div class="v" id="ov">900<small class="note"> m³/mês</small></div></div>
+              <div class="o"><div class="k">Rebentamentos evitados</div><div class="v" id="or">4<small class="note"> /ano</small></div></div>
+            </div>
+            <p class="note" style="margin-top:12px" id="orr"></p>
+          </div></div>
+        </div>
+      </section>
+
+      <!-- ELL & ROI -->
+      <section class="screen" id="s-nrw_ell">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Nível econômico de perdas & ROI</h3>
+          <p class="note" style="margin:4px 0 0">Existe um ponto ótimo: reduzir perda custa, água perdida custa — o mínimo da soma é o <b>nível econômico de perdas</b>. Prioriza por R$, não só por volume.</p></div>
+          <span class="chip wait" style="font-size:12px">precisa custo da água</span>
+        </div></div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Curva do nível econômico</h3><span class="exlabel">⚠ ilustrativa</span></div>
+            <div class="pbody"><svg class="ellchart" viewBox="0 0 560 200" role="img" aria-label="curva ELL">
+              <line x1="40" y1="170" x2="540" y2="170" stroke="var(--line)"/><line x1="40" y1="20" x2="40" y2="170" stroke="var(--line)"/>
+              <path d="M60 40 C160 120 220 160 300 165 C380 160 460 130 520 60" fill="none" stroke="var(--accent)" stroke-width="2"/>
+              <path d="M60 165 C160 150 240 120 320 90 C400 60 470 40 520 30" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 4"/>
+              <line x1="300" y1="20" x2="300" y2="170" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="3 3"/>
+              <circle cx="300" cy="90" r="4" fill="var(--good)"/><text x="306" y="86" font-size="10" fill="var(--good)">ELL</text>
+              <text x="520" y="185" font-size="10" fill="var(--muted)" text-anchor="end">menos perda →</text>
+              <text x="46" y="16" font-size="10" fill="var(--accent)">custo total</text>
+              <text x="470" y="52" font-size="10" fill="var(--warn)">custo de reduzir</text>
+            </svg></div>
+          </div>
+          <div class="panel"><div class="phead"><h3>ROI por intervenção</h3><span class="exlabel">⚠ valores de referência</span></div>
+            <div style="overflow-x:auto"><table><thead><tr><th>Intervenção</th><th>Custo</th><th>Recuperação/ano</th><th>Payback</th></tr></thead><tbody>
+              <tr><td>Redução de pressão (VRP)</td><td class="mono">baixo</td><td class="mono">alta</td><td><span class="prio p-lo">rápido</span></td></tr>
+              <tr><td>Substituição de ramais</td><td class="mono">médio</td><td class="mono">média</td><td><span class="prio p-md">médio</span></td></tr>
+              <tr><td>Troca de hidrômetros</td><td class="mono">médio</td><td class="mono">média</td><td><span class="prio p-md">médio</span></td></tr>
+              <tr><td>Renovação de rede</td><td class="mono">alto</td><td class="mono">alta</td><td><span class="prio p-hi">longo</span></td></tr>
+            </tbody></table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PERFORMANCE CONTRATUAL -->
+      <section class="screen" id="s-nrw_contrato">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Performance contratual</h3>
+          <p class="note" style="margin:4px 0 0">O contrato é <b>por performance</b>: acompanhar o índice de perdas vs. a meta é o que comprova o resultado e sustenta o pagamento. Ancorado no baseline por ZA.</p></div>
+          <span class="chip wait" style="font-size:12px">aguardando baseline</span>
+        </div></div>
+        <div class="consol" id="contratoCards"></div>
+        <div class="panel"><div class="phead"><h3>Curva meta × realizado</h3><span class="exlabel">⚠ preenche a partir do 1º balanço</span></div>
+          <div class="pbody"><div class="waitbox"><span style="font-size:20px">📉</span>A trajetória do índice (baseline → meta ao longo dos 60 meses) e o volume recuperado aparecem aqui quando o balanço mensal começar.</div></div>
+        </div>
+      </section>
+
+      <!-- INDICADORES & BENCHMARKING -->
+      <section class="screen" id="s-nrw_indicadores">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Indicadores & benchmarking</h3>
+          <p class="note" style="margin:4px 0 0">Indicadores regulatórios (SNIS/ARSAE) e comparação entre DMCs. Os físicos já são reais; os de perda entram com o balanço.</p></div>
+          <span class="chip real" style="font-size:12px">físicos reais</span>
+        </div></div>
+        <div class="ind" style="margin:0">
+          <div class="i"><div class="k">IPD · IN049</div><div class="v" style="color:var(--muted)">—</div><div class="f">perdas na distribuição</div></div>
+          <div class="i"><div class="k">IPL · IN051</div><div class="v" style="color:var(--muted)">—</div><div class="f">L/lig·dia</div></div>
+          <div class="i"><div class="k">IN013</div><div class="v" style="color:var(--muted)">—</div><div class="f">perdas de faturamento</div></div>
+          <div class="i"><div class="k">ILI</div><div class="v" style="color:var(--muted)">—</div><div class="f">infrastructure leakage index</div></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Benchmarking entre DMCs</h3><span class="chip real">físicos reais</span></div>
+          <div style="overflow-x:auto"><table id="benchtbl"><thead><tr><th>DMC</th><th>Densidade lig/km</th><th>OS/km</th><th>Rede km</th><th>IPD</th></tr></thead><tbody id="benchbody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- GESTÃO DE OS / REPAROS -->
+      <section class="screen" id="s-nrw_os">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Gestão de OS / reparos</h3>
+          <p class="note" style="margin:4px 0 0">O <b>tempo de reparo</b> (ciência → localização → conserto) é alavanca direta da perda real: quanto mais rápido, menos volume vazado. E a <b>causa raiz</b> diz onde atacar a montante.</p></div>
+          <span class="chip real" style="font-size:12px">real (histórico de OS)</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">OS de vazamento</span><span class="val">10.203</span><span class="sub"><span class="chip real">real</span> Betim 2.203 · Contagem 8.000</span></div>
+          <div class="kpi"><span class="lab">Causa dominante</span><span class="val" style="font-size:20px">PRESSÃO</span><span class="sub"><span class="chip real">real</span> 6.061 OS — vai p/ gestão de pressão</span></div>
+          <div class="kpi"><span class="lab">Tempo de atendimento</span><span class="val" style="font-size:18px">disponível</span><span class="sub"><span class="chip real">real</span> registrado em todas as OS</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Causa raiz das OS de vazamento</h3><span class="chip real">real</span></div><div class="pbody" id="osCausa"></div></div>
+          <div class="panel"><div class="phead"><h3>OS por DMC</h3><span class="hint">backlog / priorização de reparo</span></div>
+            <div style="overflow-x:auto;max-height:340px"><table><thead><tr><th>DMC</th><th>OS de vazamento</th></tr></thead><tbody id="osDmc"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="pbody"><div class="actions"><button class="btn pri">Definir SLA de reparo</button><button class="btn">Backlog aberto</button></div></div></div>
+      </section>
+
+      <!-- RENOVAÇÃO DE REDE -->
+      <section class="screen" id="s-nrw_renovacao">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Renovação de rede (plano plurianual)</h3>
+          <p class="note" style="margin:4px 0 0">Programa de CAPEX: substituir os trechos que mais vazam e o material crítico ao longo do contrato. Prioriza <b>cimento-amianto</b> e alta densidade de rompimento.</p></div>
+          <span class="chip re" style="font-size:12px">Perda real · renovação</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Rede total</span><span class="val">1.415<small> km</small></span><span class="sub"><span class="chip real">real</span> traçado georreferenciado</span></div>
+          <div class="kpi"><span class="lab">Cimento-amianto</span><span class="val">35<small> km</small></span><span class="sub"><span class="chip real">real</span> material crítico — prioridade</span></div>
+          <div class="kpi"><span class="lab">Ano de assentamento</span><span class="val">21<small>%</small></span><span class="sub"><span class="chip wait">parcial</span> conhecido no cadastro</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Composição da rede por material</h3><span class="chip real">real</span></div><div class="pbody" id="matBars"></div></div>
+          <div class="panel"><div class="phead"><h3>Programa plurianual</h3><span class="exlabel">⚠ metas ilustrativas</span></div>
+            <div class="pbody"><div id="planoAnos"></div>
+              <p class="note" style="margin-top:10px">Sequência: cimento-amianto → DMCs com maior OS/km → FoFo antigo. Ritmo ajustado ao CAPEX do contrato. Esta é a camada de <b>plano</b>; o ranking de prioridade está em <b>Substituição de rede</b>.</p>
+              <div class="actions" style="margin-top:8px"><button class="btn" onclick="go('rede')">← Ver ranking por OS/km</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GESTÃO DE VRPs -->
+      <section class="screen" id="s-nrw_vrp_gestao">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Gestão de VRPs</h3>
+          <p class="note" style="margin:4px 0 0">O ativo em si: inventário, instalação e monitoramento das válvulas redutoras. (A análise do efeito na perda fica em <b>Gestão de pressão</b>.)</p></div>
+          <span class="chip real" style="font-size:12px">real (inventário)</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">VRPs existentes</span><span class="val">140</span><span class="sub"><span class="chip real">real</span> no cadastro</span></div>
+          <div class="kpi"><span class="lab">VRPs projetadas</span><span class="val">80</span><span class="sub"><span class="chip real">real</span> a instalar</span></div>
+          <div class="kpi"><span class="lab">Parque total previsto</span><span class="val">220</span><span class="sub"><span class="chip real">real</span> existentes + projetadas</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Inventário por DMC</h3><span class="hint">monitoramento saída × setpoint entra com a telemetria</span></div>
+          <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>Existentes</th><th>Projetadas</th><th>Setpoint alvo</th><th>Status</th></tr></thead><tbody id="vrpInv"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- RESERVATÓRIOS -->
+      <section class="screen" id="s-nrw_reservatorios">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Reservatórios & unidades</h3>
+          <p class="note" style="margin:4px 0 0">Perda real também sai de <b>extravasamento</b> e vazamento em reservatórios. O balanço do reservatório (entrada × saída × variação de nível) fecha esse ponto.</p></div>
+          <span class="chip real" style="font-size:12px">real (cadastro)</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Reservatórios</span><span class="val">16</span><span class="sub"><span class="chip real">real</span> Betim 9 · Contagem 7</span></div>
+          <div class="kpi"><span class="lab">Boosters + elevatórias</span><span class="val">14</span><span class="sub"><span class="chip real">real</span> recalque</span></div>
+          <div class="kpi"><span class="lab">Pontos de macromedição</span><span class="val">37</span><span class="sub"><span class="chip real">real</span> incl. 8 de entrada de DMC</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Unidades por tipo</h3><span class="chip real">real</span></div>
+            <div style="overflow-x:auto"><table><thead><tr><th>Tipo</th><th>Betim</th><th>Contagem</th></tr></thead><tbody>
+              <tr><td>Reservatórios</td><td class="mono">9</td><td class="mono">7</td></tr>
+              <tr><td>Boosters</td><td class="mono">7</td><td class="mono">3</td></tr>
+              <tr><td>Elevatórias</td><td class="mono">3</td><td class="mono">1</td></tr>
+              <tr><td>Bombas</td><td class="mono">0</td><td class="mono">3</td></tr>
+              <tr><td>Poços</td><td class="mono">0</td><td class="mono">5</td></tr>
+              <tr><td>Macromedição</td><td class="mono">14</td><td class="mono">15</td></tr>
+              <tr><td>Macromedição de DMC</td><td class="mono">0</td><td class="mono">8</td></tr>
+            </tbody></table></div>
+          </div>
+          <div class="panel"><div class="phead"><h3>Balanço do reservatório</h3><span class="chip wait">aguardando nível/telemetria</span></div>
+            <div class="pbody"><div class="waitbox"><span style="font-size:20px">🛢</span>Entrada × saída × variação de nível por reservatório — detecta <b>extravasamento</b> e vazamento estrutural. Liga com a telemetria de nível e a macromedição da unidade.</div>
+              <ul class="crit-list" style="margin-top:12px">
+                <li><span class="w p-md">nível</span> Monitorar nível 24h (evitar extravasamento noturno).</li>
+                <li><span class="w p-lo">inspeção</span> Inspeção estrutural periódica (juntas, laje, descarga de fundo).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INTEGRIDADE DE SETORIZAÇÃO -->
+      <section class="screen" id="s-nrw_setorizacao">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Integridade de setorização (DMC)</h3>
+          <p class="note" style="margin:4px 0 0">O balanço só é confiável se o DMC for <b>estanque</b>: medidor de entrada funcionando e válvulas de fronteira fechadas. Uma válvula aberta indevida "vaza" água entre setores e destrói o número.</p></div>
+          <span class="chip real" style="font-size:12px">real (cadastro)</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">DMCs</span><span class="val">15</span><span class="sub"><span class="chip real">real</span> limite definitivo carregado</span></div>
+          <div class="kpi"><span class="lab">Medidores de entrada (DMC)</span><span class="val">8</span><span class="sub"><span class="chip real">real</span> Contagem · Betim a instalar</span></div>
+          <div class="kpi"><span class="lab">Caixas de manobra</span><span class="val">448</span><span class="sub"><span class="chip real">real</span> válvulas de fronteira/manobra</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Integridade por DMC</h3><span class="hint">estanqueidade valida no step test</span></div>
+          <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>Medidor de entrada</th><th>VRPs (fronteira/controle)</th><th>Estanqueidade</th></tr></thead><tbody id="setBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- PARQUE DE HIDRÔMETROS -->
+      <section class="screen" id="s-nrw_parque">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Parque de hidrômetros</h3>
+          <p class="note" style="margin:4px 0 0">O ciclo de vida do medidor: instalação → aferição → troca por idade/classe. Parque velho = <b>submedição</b> (perda aparente). Alimenta a <b>Substituição de HD</b>.</p></div>
+          <span class="chip ap" style="font-size:12px">Perda aparente · medição</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Parque (ligações ativas)</span><span class="val">132.032</span><span class="sub"><span class="chip real">real</span> Betim 57.232 · Contagem 74.800</span></div>
+          <div class="kpi wait"><span class="lab">Idade média do medidor</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> export (IDADE_MEDIDOR)</span></div>
+          <div class="kpi wait"><span class="lab">Vencidos (classe/idade)</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> candidatos à troca</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Parque por DMC</h3><span class="hint">idade/classe entram com o export de matrículas</span></div>
+          <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>Parque (ativas)</th><th>Idade média</th><th>A aferir/trocar</th></tr></thead><tbody id="pqBody"></tbody></table></div>
+          <div class="pbody"><div class="actions"><button class="btn pri">Plano de aferição</button><button class="btn" onclick="go('troca_hd')">Ir p/ Substituição de HD</button></div></div>
+        </div>
+      </section>
+
+      <!-- FISCALIZAÇÃO -->
+      <section class="screen" id="s-nrw_fiscalizacao">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Fiscalização de fraudes</h3>
+          <p class="note" style="margin:4px 0 0">O fluxo operacional que recupera o <b>consumo não-autorizado</b>: da seleção do suspeito até a regularização e a recuperação de receita. O score fica no <b>Indicativo de fraude</b>.</p></div>
+          <span class="chip ap" style="font-size:12px">Perda aparente · não-autorizado</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Universo suspeito</span><span class="val">1.039</span><span class="sub"><span class="chip real">real</span> irregularidades cadastrais</span></div>
+          <div class="kpi wait"><span class="lab">Autos de infração</span><span class="val">—</span><span class="sub"><span class="chip wait">workflow</span> após vistoria</span></div>
+          <div class="kpi wait"><span class="lab">Receita recuperada</span><span class="val">—</span><span class="sub"><span class="chip wait">workflow</span> pós-regularização</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Fluxo (funil)</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">1</span> <b>Seleção</b> — suspeitos priorizados pelo score (Indicativo de fraude).</li>
+              <li><span class="w p-md">2</span> <b>Vistoria em campo</b> — confirma irregularidade (foto, medição).</li>
+              <li><span class="w p-md">3</span> <b>Auto de infração</b> — registra e notifica.</li>
+              <li><span class="w p-lo">4</span> <b>Regularização</b> — normaliza ligação/medidor.</li>
+              <li><span class="w p-lo">5</span> <b>Recuperação</b> — retroativo + volume recuperado ao faturamento.</li>
+            </ul>
+            <div class="actions" style="margin-top:12px"><button class="btn" onclick="go('fraude')">Ver suspeitos (score)</button></div>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Universo por DMC</h3><span class="chip real">real</span></div>
+            <div style="overflow-x:auto;max-height:340px"><table><thead><tr><th>DMC</th><th>Suspeitos</th><th>Vistoriados</th><th>Recuperado</th></tr></thead><tbody id="fiBody"></tbody></table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RECUPERAÇÃO DE FATURAMENTO -->
+      <section class="screen" id="s-nrw_recuperacao">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Recuperação de faturamento</h3>
+          <p class="note" style="margin:4px 0 0">Reduz a perda aparente “por baixo”: <b>ligar os factíveis</b> e <b>regularizar as inativas</b> traz volume que já é consumido para dentro do faturamento.</p></div>
+          <span class="chip ap" style="font-size:12px">Perda aparente · faturamento</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Factíveis a ligar</span><span class="val">10.090</span><span class="sub"><span class="chip real">real</span> ligação viável, ainda não ativa</span></div>
+          <div class="kpi"><span class="lab">Inativas a regularizar</span><span class="val">14.297</span><span class="sub"><span class="chip real">real</span> incl. 646 consumindo</span></div>
+          <div class="kpi wait"><span class="lab">Receita potencial</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> tarifa × volume</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Oportunidade por DMC</h3><span class="chip real">real</span></div>
+          <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>Factíveis</th><th>Inativas</th><th>Ação</th></tr></thead><tbody id="reBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- GESTÃO DE LEITURA -->
+      <section class="screen" id="s-nrw_leitura">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Gestão de leitura</h3>
+          <p class="note" style="margin:4px 0 0">Leitura de má qualidade vira perda aparente: <b>estimativas</b> mascaram consumo e <b>leitura impedida</b> esconde fraude. Aqui se acompanha rota, leiturista e ocorrências.</p></div>
+          <span class="chip ap" style="font-size:12px">Perda aparente · leitura</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Ativas com consumo 0</span><span class="val">355</span><span class="sub"><span class="chip real">real</span> possível leitura falha</span></div>
+          <div class="kpi wait"><span class="lab">Leitura estimada</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> ocorrência de leitura</span></div>
+          <div class="kpi wait"><span class="lab">Leitura impedida</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> amostra 13 meses</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Qualidade de leitura por DMC</h3><span class="hint">estimada/impedida entram com o export</span></div>
+          <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>Ativas c/ consumo 0</th><th>Estimadas</th><th>Impedidas</th></tr></thead><tbody id="leBody"></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- GRANDES CONSUMIDORES -->
+      <section class="screen" id="s-nrw_grandes">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Grandes consumidores</h3>
+          <p class="note" style="margin:4px 0 0">Poucos consumidores concentram muito volume — um erro de medição neles pesa desproporcionalmente. Merecem <b>macromedição individual</b> e acompanhamento próprio.</p></div>
+          <span class="chip ap" style="font-size:12px">Perda aparente · grandes usuários</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi wait"><span class="lab">Grandes consumidores</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> faturamento por matrícula</span></div>
+          <div class="kpi wait"><span class="lab">% do volume no topo</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> curva de Pareto</span></div>
+          <div class="kpi wait"><span class="lab">Com macromedição</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> cobertura</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Consumo por DMC (proxy do cadastro)</h3><span class="chip wait">proxy · até o faturamento por matrícula</span></div>
+          <div style="overflow-x:auto;max-height:360px"><table><thead><tr><th>DMC</th><th>Consumo (m³/mês)</th><th>m³/lig·mês</th></tr></thead><tbody id="grBody"></tbody></table></div>
+          <div class="pbody note">Com o export de faturamento, esta tela lista as <b>matrículas</b> de maior volume (curva de Pareto), sinaliza quedas suspeitas e marca quem precisa de macromedição.</div>
+        </div>
+      </section>
+
+      <!-- PESQUISA ATIVA -->
+      <section class="screen" id="s-nrw_pesquisa">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Pesquisa ativa de vazamentos</h3>
+          <p class="note" style="margin:4px 0 0">Varredura acústica dos setores para achar os <b>rebentamentos não-reportados</b> — a parcela do MNF que não aflora. O MNF prioriza quais DMCs varrer.</p></div>
+          <span class="chip ok" style="font-size:12px">já no app de campo</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Km pesquisado</span><span class="val">—</span><span class="sub"><span class="chip ok">campo</span> registrado no AcquaHub</span></div>
+          <div class="kpi"><span class="lab">Ocorrências</span><span class="val">—</span><span class="sub"><span class="chip ok">campo</span> alimentam OS</span></div>
+          <div class="kpi"><span class="lab">Vaz./km</span><span class="val">—</span><span class="sub"><span class="chip ok">campo</span> produtividade</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Como conecta ao NRW</h3></div><div class="pbody">
+          <ul class="crit-list">
+            <li><span class="w p-hi">MNF</span> O nível de vazamento por DMC (MNF) diz <b>onde varrer primeiro</b> e a intensidade.</li>
+            <li><span class="w p-md">campo</span> Trechos pesquisados (linha) = cobertura; ocorrências (ponto) = vazamentos localizados → viram OS.</li>
+            <li><span class="w p-lo">ALC</span> Política de pesquisa ativa (frequência de varredura) define o tempo até achar o não-reportado.</li>
+          </ul>
+          <div class="actions" style="margin-top:12px"><button class="btn">Abrir no app de campo</button><button class="btn" onclick="go('nrw_mnf')">Ver MNF por DMC</button></div>
+        </div></div>
+      </section>
+
+      <!-- CAMPANHAS & STEP TEST -->
+      <section class="screen" id="s-nrw_campanhas">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Campanhas & step test</h3>
+          <p class="note" style="margin:4px 0 0">Planejamento das campanhas de campo e os <b>testes de estanqueidade/step test</b> que validam a integridade do DMC e localizam vazamento por subtrechos.</p></div>
+          <span class="chip ok" style="font-size:12px">parcial no campo</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Pontos de estanqueidade</span><span class="val">124</span><span class="sub"><span class="chip real">real</span> 56 Betim · 68 Contagem</span></div>
+          <div class="kpi wait"><span class="lab">Campanhas planejadas</span><span class="val">—</span><span class="sub"><span class="chip wait">planejamento</span> por DMC</span></div>
+          <div class="kpi wait"><span class="lab">Setores validados</span><span class="val">—</span><span class="sub"><span class="chip wait">step test</span> estanqueidade OK</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Métodos</h3></div><div class="pbody">
+          <ul class="crit-list">
+            <li><span class="w p-hi">step</span> <b>Step test</b> — fecha válvulas por subtrecho à noite e observa a queda de vazão → localiza o vazamento no subsetor.</li>
+            <li><span class="w p-md">estanq.</span> <b>Teste de estanqueidade</b> — confirma que o DMC não troca água indevida com vizinhos (124 pontos já cadastrados no app).</li>
+            <li><span class="w p-lo">plano</span> Agenda de campanhas por DMC, priorizada pelo MNF e pela idade da última varredura.</li>
+          </ul>
+        </div></div>
+      </section>
+
+      <!-- FROTA DE LOGGERS -->
+      <section class="screen" id="s-nrw_loggers">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Frota de loggers</h3>
+          <p class="note" style="margin:4px 0 0">Os equipamentos que geram o dado de pressão e vazão: instalação, ciclo, bateria e comunicação. Sem logger saudável, não há MNF nem AZP confiável.</p></div>
+          <span class="chip ok" style="font-size:12px">já no app de campo</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi"><span class="lab">Pontos planejados</span><span class="val">160</span><span class="sub"><span class="chip real">real</span> 80 Betim · 80 Contagem</span></div>
+          <div class="kpi wait"><span class="lab">Instalados</span><span class="val">—</span><span class="sub"><span class="chip ok">campo</span> ciclo no AcquaHub</span></div>
+          <div class="kpi wait"><span class="lab">Concluídos</span><span class="val">—</span><span class="sub"><span class="chip ok">campo</span> dados baixados</span></div>
+          <div class="kpi wait"><span class="lab">Alertas (bateria/comm)</span><span class="val">—</span><span class="sub"><span class="chip wait">telemetria</span> saúde da frota</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Ciclo do ponto</h3></div><div class="pbody">
+          <div class="iwa"><div class="r"><span class="nm">pendente → instalado → removido → concluído (dados importados)</span></div></div>
+          <p class="note" style="margin-top:8px">O módulo de loggers do AcquaHub já controla esse ciclo, com foto, GPS e importação do arquivo do aparelho (pressão). Estender para <b>vazão</b> habilita o MNF por DMC.</p>
+        </div></div>
+      </section>
+
+      <!-- MODELO HIDRÁULICO -->
+      <section class="screen" id="s-nrw_modelo">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Modelo hidráulico</h3>
+          <p class="note" style="margin:4px 0 0">O gêmeo digital da rede: define setores, dimensiona VRPs e, calibrado, ajuda a localizar vazamento e simular pressão. Os DMCs e os setpoints já vieram dele.</p></div>
+          <span class="chip ok" style="font-size:12px">em calibração</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">DMCs modelados</span><span class="val">15</span><span class="sub"><span class="chip real">real</span> limite do modelo</span></div>
+          <div class="kpi"><span class="lab">VRPs dimensionadas</span><span class="val">80</span><span class="sub"><span class="chip real">real</span> setpoints do WaterGEMS</span></div>
+          <div class="kpi wait"><span class="lab">Calibração</span><span class="val" style="font-size:16px">em campo</span><span class="sub"><span class="chip wait">em curso</span> pressão/vazão medidas</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Uso no NRW</h3></div><div class="pbody">
+          <ul class="crit-list">
+            <li><span class="w p-hi">setor</span> Setorização e fronteiras (os 15 DMCs saíram do modelo).</li>
+            <li><span class="w p-md">pressão</span> Dimensionamento das VRPs e das zonas de pressão (setpoints já no cockpit).</li>
+            <li><span class="w p-lo">calibra</span> Calibração com a coleta de campo (pressão/vazão) → localização de vazamento e cenários mais fiéis.</li>
+          </ul>
+        </div></div>
+      </section>
+
+      <!-- BALANÇO ENERGÉTICO -->
+      <section class="screen" id="s-nrw_energia">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Balanço energético</h3>
+          <p class="note" style="margin:4px 0 0">Água perdida foi <b>bombeada</b> — cada m³ que vaza custa energia. Reduzir pressão e perda real corta a conta de energia junto.</p></div>
+          <span class="chip re" style="font-size:12px">perda real · energia</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi"><span class="lab">Unidades de recalque</span><span class="val">14</span><span class="sub"><span class="chip real">real</span> 10 boosters · 4 elevatórias</span></div>
+          <div class="kpi"><span class="lab">Bombas</span><span class="val">3</span><span class="sub"><span class="chip real">real</span> Contagem</span></div>
+          <div class="kpi"><span class="lab">Poços</span><span class="val">5</span><span class="sub"><span class="chip real">real</span> Contagem</span></div>
+          <div class="kpi wait"><span class="lab">kWh / m³</span><span class="val">—</span><span class="sub"><span class="chip wait">aguardando</span> conta de energia</span></div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Auditoria energética</h3></div><div class="pbody"><div class="waitbox"><span style="font-size:20px">⚡</span>Consumo de energia por unidade × volume elevado → <b>kWh/m³</b> por setor. Cruzado com a perda real, mostra a economia de energia embutida em cada m³ recuperado. Liga com a conta de energia (aguardando).</div></div></div>
+      </section>
+
+      <!-- PROGRAMAÇÃO DE EQUIPES -->
+      <section class="screen" id="s-nrw_equipes">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Programação de equipes</h3>
+          <p class="note" style="margin:4px 0 0">Transforma o <b>plano de ação por DMC</b> em agenda: troca de HD, pesquisa, fiscalização, reparo e instalação de VRP viram tarefas para as equipes de campo.</p></div>
+          <span class="chip ok" style="font-size:12px">já no app (Auxiliar de Programação)</span>
+        </div></div>
+        <div class="panel"><div class="phead"><h3>Fila de ações → equipes</h3></div><div class="pbody">
+          <ul class="crit-list">
+            <li><span class="w p-hi">origem</span> As ações saem das ferramentas de combate (Substituição de HD, Fiscalização, Pesquisa, Renovação, VRP).</li>
+            <li><span class="w p-md">agenda</span> Programação por equipe/dia com georreferência (o AcquaHub já faz isso na retaguarda).</li>
+            <li><span class="w p-lo">retorno</span> A execução volta como OS/ocorrência e realimenta o balanço e os indicadores.</li>
+          </ul>
+          <div class="actions" style="margin-top:12px"><button class="btn" onclick="go('nrw_plano')">Ver plano de ação por DMC</button></div>
+        </div></div>
+      </section>
+
+      <!-- GOVERNANÇA DO DADO -->
+      <section class="screen" id="s-nrw_governanca">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Governança do dado</h3>
+          <p class="note" style="margin:4px 0 0">O número de perda só vale com <b>rastreabilidade e selo de confiança</b>. Aqui ficam a cobertura, as divergências e a qualidade das fontes.</p></div>
+          <span class="chip real" style="font-size:12px">real</span>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Cobertura matrícula → DMC</span><span class="val">98,5<small>%</small></span><span class="sub"><span class="chip real">real</span> Betim 97,2% · Contagem 99,6%</span></div>
+          <div class="kpi"><span class="lab">Fora de todo DMC</span><span class="val">1.970</span><span class="sub"><span class="chip real">real</span> franja dos concave hulls</span></div>
+          <div class="kpi"><span class="lab">Rede com ano conhecido</span><span class="val">21<small>%</small></span><span class="sub"><span class="chip wait">lacuna</span> dt_execucao</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Selo de confiança por fonte</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="seal s-grn"></span>&nbsp; <b>Cadastro físico</b> — rede, ligações, DMC, VRP: carregado e validado.</li>
+              <li><span class="seal s-grn"></span>&nbsp; <b>Histórico de OS</b> — causa, tempo, reincidência por matrícula.</li>
+              <li><span class="seal s-amb"></span>&nbsp; <b>Consumo</b> — proxy do cadastro (aguardando faturamento real).</li>
+              <li><span class="seal s-red"></span>&nbsp; <b>Vazão de entrada (Qin) & MNF</b> — sem telemetria ainda.</li>
+            </ul>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Divergências rastreadas</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-md">VRP</span> 1 VRP projetada com ZONE do arquivo ≠ DMC espacial (VRP-61 Betim) — mantido o espacial, sinalizado.</li>
+              <li><span class="w p-lo">sliver</span> 1 polígono degenerado de Betim (~0 ha) removido na carga.</li>
+              <li><span class="w p-lo">geo</span> ~1.970 ligações na franja, fora de qualquer DMC — a reavaliar quando a setorização firmar.</li>
+            </ul>
+          </div></div>
+        </div>
+      </section>
+
+      <!-- COMPONENTES IWA -->
+      <section class="screen" id="s-componentes">
+        <div class="losstree">
+          <div class="node"><b>Perdas de água</b><span>Qin − consumo autorizado</span></div>
+          <div class="op">=</div>
+          <div class="node" style="border-color:#b58fce"><b>Aparentes</b><span>comerciais</span></div>
+          <div class="op">+</div>
+          <div class="node" style="border-color:var(--accent)"><b>Reais</b><span>físicas</span></div>
+        </div>
+        <p class="note" style="margin:0 2px">Cada componente tem uma <b>ferramenta de combate</b>, um <b>dado que a alimenta</b> e um status. É o mapa de ação para reduzir perdas — aparentes e reais.</p>
+        <div class="board" id="board-ap"></div>
+        <div class="board" id="board-re"></div>
+      </section>
+
+      <!-- SUBSTITUIÇÃO DE HD -->
+      <section class="screen" id="s-troca_hd">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px">
+            <h3 style="font-size:15px">Substituição de hidrômetros</h3>
+            <p class="note" style="margin:4px 0 0">Ataca a <b>submedição</b> (perda aparente): hidrômetro velho/desgastado registra menos do que passa. Trocar o parque prioritário recupera volume faturado.</p>
+          </div>
+          <div class="chip re" style="font-size:12px">Perda aparente · submedição</div>
+        </div></div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Critério de priorização</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">idade</span> Hidrômetro acima da vida útil (classe/idade do medidor — campo <b>IDADE_MEDIDOR</b> do export).</li>
+              <li><span class="w p-hi">submed.</span> Média 12 meses baixa vs. perfil de consumo/economias (<b>MEDIA_12MESES</b>).</li>
+              <li><span class="w p-md">queda</span> Queda persistente de consumo sem justificativa.</li>
+              <li><span class="w p-md">campo</span> Indício de campo: mostrador embaçado, travado, submedindo no teste.</li>
+            </ul>
+            <p class="note" style="margin-top:12px">O parque de hidrômetros (idade/média) vem do <b>export de matrículas</b> da COPASA — ainda não carregado. Abaixo, o parque atual por DMC (ligações ativas, real) e o formato da lista de troca.</p>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Parque por DMC</h3><span class="hint">ativas = real · candidatos = aguardando idade</span></div>
+            <div style="overflow-x:auto;max-height:340px"><table><thead><tr><th>DMC</th><th>Parque (ativas)</th><th>Idade média</th><th>Candidatos p/ troca</th></tr></thead><tbody id="hdbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Lista de troca — prévia do formato</h3><span class="exlabel">⚠ linhas de exemplo até o parque ser importado</span></div>
+          <div style="overflow-x:auto"><table><thead><tr><th>Matrícula</th><th>DMC</th><th>Idade</th><th>Média 12m (m³)</th><th>Motivo</th><th>Prioridade</th></tr></thead><tbody id="hdex"></tbody></table></div>
+          <div class="pbody"><div class="actions"><button class="btn pri">Gerar campanha de troca</button><button class="btn">Exportar lista (OS)</button></div></div>
+        </div>
+      </section>
+
+      <!-- INDICATIVO DE FRAUDE -->
+      <section class="screen" id="s-fraude">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px">
+            <h3 style="font-size:15px">Indicativo de fraude</h3>
+            <p class="note" style="margin:4px 0 0">Ataca o <b>consumo não-autorizado</b> (perda aparente): ligações clandestinas, by-pass, religação irregular. Gera fila priorizada para <b>fiscalização</b>.</p>
+          </div>
+          <div class="chip ap" style="font-size:12px">Perda aparente · não-autorizado</div>
+        </div></div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Sinais de suspeição</h3><span class="hint">score ponderado</span></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">alto</span> Consumo zero/baixo <b>com portão fechado</b> recorrente (uso sem registro).</li>
+              <li><span class="w p-hi">alto</span> <b>Leitura impedida pelo cliente</b> repetida (bloqueio de aferição).</li>
+              <li><span class="w p-md">médio</span> <b>Factível consumindo</b> ou <b>inativa com consumo</b> (ligação irregular).</li>
+              <li><span class="w p-md">médio</span> Queda abrupta de consumo sem obra/vacância.</li>
+              <li><span class="w p-lo">baixo</span> Consumo incompatível com nº de economias/atividade.</li>
+            </ul>
+            <div style="margin-top:12px;font-size:11.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px">
+              <b style="color:var(--ink)">Score</b> = Σ pesos dos sinais presentes, normalizado 0–100 —
+              <span class="prio p-hi">alto ×3</span> <span class="prio p-md">médio ×2</span> <span class="prio p-lo">baixo ×1</span>.
+              Sinais reforçados (portão fechado <b>+</b> consumo zero) somam. Corte de fiscalização configurável.
+            </div>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Universo a fiscalizar por DMC</h3><span class="hint">inativas + factíveis = real</span></div>
+            <div style="overflow-x:auto;max-height:340px"><table><thead><tr><th>DMC</th><th>Inativas</th><th>Factíveis</th><th>Leitura imped.</th><th>Portão fech.</th></tr></thead><tbody id="frbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Suspeitos priorizados — prévia do formato</h3><span class="exlabel">⚠ exemplos até os sinais (portão/leitura/consumo) serem importados</span></div>
+          <div style="overflow-x:auto"><table><thead><tr><th>Matrícula</th><th>DMC</th><th>Sinais</th><th>Score</th><th>Ação</th></tr></thead><tbody id="frex"></tbody></table></div>
+          <div class="pbody"><div class="actions"><button class="btn pri">Gerar ordens de fiscalização</button><button class="btn">Exportar suspeitos</button></div></div>
+        </div>
+      </section>
+
+      <!-- SUBSTITUIÇÃO DE REDE -->
+      <section class="screen" id="s-rede">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px">
+            <h3 style="font-size:15px">Substituição de rede</h3>
+            <p class="note" style="margin:4px 0 0">Ataca as <b>perdas reais</b>: trechos com muito rompimento drenam volume continuamente. Renovar os piores reduz vazamento de fundo e rebentamentos. <b>Ranking já real</b>, por OS de vazamento por km.</p>
+          </div>
+          <div class="chip re" style="font-size:12px">Perda real · renovação</div>
+        </div></div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Critério de priorização</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">rompim.</span> Densidade de rompimentos — <b>OS de vazamento / km</b> (histórico real).</li>
+              <li><span class="w p-md">material</span> Material crítico (cimento-amianto, FoFo antigo, PVC frágil) — do cadastro da rede.</li>
+              <li><span class="w p-md">idade</span> Idade/ano de assentamento do trecho.</li>
+              <li><span class="w p-lo">pressão</span> Pressão elevada (acelera falha) — cruzar com gestão de VRP.</li>
+            </ul>
+            <p class="note" style="margin-top:12px">O ranking por DMC ao lado usa dado <b>real</b>. O detalhamento por <b>trecho</b> (material/idade) é o próximo nível, a partir do cadastro da rede.</p>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Prioridade de renovação por DMC</h3><span class="chip re">real</span></div>
+            <div style="overflow-x:auto;max-height:360px"><table><thead><tr><th>DMC</th><th>Rede km</th><th>OS vazam.</th><th>OS/km</th><th>Prioridade</th></tr></thead><tbody id="rdbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="phead"><h3>Trechos prioritários — prévia do formato</h3><span class="exlabel">⚠ exemplo até cruzar material/idade do cadastro da rede</span></div>
+          <div style="overflow-x:auto"><table><thead><tr><th>Trecho</th><th>DMC</th><th>Material</th><th>Ano</th><th>Rompimentos</th><th>DN</th><th>Prioridade</th></tr></thead><tbody>
+            <tr><td class="mono">TR-14882</td><td>DMC-03 CTG</td><td>Cimento-amianto</td><td class="mono">1986</td><td class="mono">9</td><td class="mono">100</td><td><span class="prio p-hi">ALTA</span></td></tr>
+            <tr><td class="mono">TR-09517</td><td>DMC-06 CTG</td><td>FoFo antigo</td><td class="mono">1991</td><td class="mono">7</td><td class="mono">150</td><td><span class="prio p-hi">ALTA</span></td></tr>
+            <tr><td class="mono">TR-22140</td><td>DMC-05 CTG</td><td>PVC PBA</td><td class="mono">1999</td><td class="mono">4</td><td class="mono">75</td><td><span class="prio p-md">MÉDIA</span></td></tr>
+          </tbody></table></div>
+          <div class="pbody note">Refino real: <b>material</b>, <b>DN</b> e <b>ano</b> (dt_execucao) já estão no cadastro da rede (<span class="mono">2 - infra_agua.rede</span>); os rompimentos por trecho saem do cruzamento espacial das OS de vazamento.</div>
+        </div>
+        <div class="panel"><div class="pbody"><div class="actions"><button class="btn pri">Priorizar trechos (cadastro da rede)</button><button class="btn" onclick="go('nrw_renovacao')">Programa de renovação →</button></div>
+          <p class="note" style="margin:10px 0 0">Esta tela é o <b>“onde”</b> (ranking por rompimento). O <b>“quando/quanto”</b> (plano plurianual + material) fica em <b>Renovação de rede</b>.</p></div></div>
+      </section>
+
+      <!-- SUBSTITUIÇÃO DE RAMAIS -->
+      <section class="screen" id="s-ramais">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px">
+            <h3 style="font-size:15px">Substituição de ramais</h3>
+            <p class="note" style="margin:4px 0 0">Ataca a <b>perda real no ramal</b> (da rede até o hidrômetro). Matrícula com <b>vazamentos reincidentes</b> tem o ramal comprometido — trocar resolve a fonte, não só o sintoma. <b>Reincidência já é real</b>, do histórico de OS.</p>
+          </div>
+          <div class="chip re" style="font-size:12px">Perda real · ramal</div>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Matrículas ≥ 3 vazamentos</span><span class="val">296</span><span class="sub"><span class="chip real">real</span> candidatas diretas à troca</span></div>
+          <div class="kpi"><span class="lab">Matrículas ≥ 2 vazamentos</span><span class="val">1.239</span><span class="sub"><span class="chip real">real</span> universo de avaliação</span></div>
+          <div class="kpi"><span class="lab">OS sem matrícula</span><span class="val">1.184</span><span class="sub"><span class="chip real">real</span> vão p/ substituição de rede</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Critério de priorização</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">reincid.</span> Nº de <b>OS de vazamento na matrícula</b> (ramal) — histórico real.</li>
+              <li><span class="w p-md">material</span> Material do ramal (PEAD/PVC antigo, ferro galvanizado).</li>
+              <li><span class="w p-md">idade</span> Idade do ramal / última intervenção.</li>
+              <li><span class="w p-lo">pressão</span> Pressão elevada no ponto (cruzar com VRP).</li>
+            </ul>
+            <p class="note" style="margin-top:12px">A reincidência já ordena a fila (real). Material e idade do ramal refinam quando o cadastro de ramais for cruzado.</p>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Matrículas sugeridas para troca</h3><span class="chip re">reincidência real</span></div>
+            <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>Matrícula</th><th>DMC</th><th>Vazamentos</th><th>Prioridade</th></tr></thead><tbody id="rmbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="pbody"><div class="actions"><button class="btn pri">Gerar OS de troca de ramal</button><button class="btn">Exportar lista</button></div></div></div>
+      </section>
+
+      <!-- GESTÃO DE PRESSÃO -->
+      <section class="screen" id="s-pressao_vrp">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px">
+            <h3 style="font-size:15px">Gestão de pressão (VRP)</h3>
+            <p class="note" style="margin:4px 0 0">Reduzir pressão é a alavanca mais rápida contra a <b>perda real de fundo</b>: vazamento ∝ P^N1. Os setpoints das <b>80 VRPs projetadas</b> (WaterGEMS) já indicam a redução planejada por setor.</p>
+          </div>
+          <div class="chip re" style="font-size:12px">Perda real · pressão</div>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">VRPs projetadas</span><span class="val">80</span><span class="sub"><span class="chip real">real</span> a instalar nos setores</span></div>
+          <div class="kpi"><span class="lab">Redução média de pressão</span><span class="val">31<small> mca</small></span><span class="sub"><span class="chip real">real</span> entrada → alvo</span></div>
+          <div class="kpi"><span class="lab">Redução de vazamento</span><span class="val">~56<small>%</small></span><span class="sub"><span class="chip real">real</span> potencial FAVAD (N1=1)</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Como funciona</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">FAVAD</span> Vazamento varia com a pressão: <b>Q ∝ P^N1</b> (N1≈1 mistura fundo + rebentamento).</li>
+              <li><span class="w p-md">setpoint</span> Cada VRP baixa a pressão de <b>entrada</b> para a <b>saída-alvo</b> — redução ≈ 1 − (P_alvo/P_entrada).</li>
+              <li><span class="w p-md">AZP</span> Monitorar o ponto médio do setor (loggers de pressão já coletados).</li>
+              <li><span class="w p-lo">N1</span> Refinar com teste de step de pressão em campo.</li>
+            </ul>
+            <p class="note" style="margin-top:12px">A “Redução de vazamento” usa N1=1 sobre os setpoints projetados — teto indicativo; fecha com o N1 medido e o MNF por setor.</p>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Redução por DMC (setpoints projetados)</h3><span class="chip re">real</span></div>
+            <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>VRP</th><th>P entrada</th><th>P alvo</th><th>Δ mca</th><th>Red. vazam.</th></tr></thead><tbody id="pvbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="pbody"><div class="actions"><button class="btn pri">Priorizar instalação de VRP</button><button class="btn">Simular N1 / MNF</button></div></div></div>
+      </section>
+
+      <!-- AUDITORIA CADASTRAL -->
+      <section class="screen" id="s-auditoria">
+        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:240px">
+            <h3 style="font-size:15px">Auditoria cadastral</h3>
+            <p class="note" style="margin:4px 0 0">Ataca os <b>erros de dados/cadastro</b> (perda aparente): divergências entre o que a rede entrega e o que o comercial registra. Os sinais abaixo são <b>reais</b>, do cruzamento cadastro × consumo.</p>
+          </div>
+          <div class="chip ap" style="font-size:12px">Perda aparente · dados</div>
+        </div></div>
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><span class="lab">Inativas consumindo</span><span class="val">646</span><span class="sub"><span class="chip real">real</span> marcada inativa, mas com consumo</span></div>
+          <div class="kpi"><span class="lab">Ativas com consumo 0</span><span class="val">355</span><span class="sub"><span class="chip real">real</span> leitura / vacância / fraude</span></div>
+          <div class="kpi"><span class="lab">Factíveis consumindo</span><span class="val">38</span><span class="sub"><span class="chip real">real</span> ligação irregular provável</span></div>
+        </div>
+        <div class="cols">
+          <div class="panel"><div class="phead"><h3>Sinais & ação</h3></div><div class="pbody">
+            <ul class="crit-list">
+              <li><span class="w p-hi">inativa+</span> <b>Inativa consumindo</b> → religação não registrada / erro de situação. Ação: regularizar cadastro (recupera faturamento).</li>
+              <li><span class="w p-md">ativa 0</span> <b>Ativa com consumo zero</b> → leitura falha, imóvel vago ou fraude. Ação: verificar em campo.</li>
+              <li><span class="w p-md">factível+</span> <b>Factível consumindo</b> → ligação irregular. Ação: vistoriar / regularizar.</li>
+              <li><span class="w p-lo">sem HD</span> Matrícula sem hidrômetro / leitura estimada recorrente <span class="note">(vem do export de faturamento — aguardando)</span>.</li>
+            </ul>
+            <p class="note" style="margin-top:12px">O “sem hidrômetro” e a “leitura estimada” entram quando o export de matrículas for cruzado; os três primeiros já são reais.</p>
+          </div></div>
+          <div class="panel"><div class="phead"><h3>Achados por DMC</h3><span class="chip re">real</span></div>
+            <div style="overflow-x:auto;max-height:380px"><table><thead><tr><th>DMC</th><th>Inativa consum.</th><th>Ativa cons. 0</th><th>Factível consum.</th></tr></thead><tbody id="aubody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel"><div class="pbody"><div class="actions"><button class="btn pri">Gerar lista de regularização</button><button class="btn">Exportar achados</button></div></div></div>
+      </section>
+
+      <!-- MEDIÇÕES -->
+      <section class="screen" id="s-medicoes">
+        <div class="panel">
+          <div class="phead"><h3>Vazão de entrada por DMC</h3><span class="hint">nenhuma série carregada</span></div>
+          <div class="pbody">
+            <div class="waitbox" style="padding:34px">
+              <span style="font-size:24px">〜</span>
+              <b style="color:var(--ink)">Aguardando telemetria de entrada</b>
+              O gráfico de vazão + pressão e o cálculo da <b>vazão mínima noturna (MNF)</b> aparecem aqui por DMC assim que a primeira série chegar.
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><h3>Importar medições</h3><span class="hint">agnóstico de fonte</span></div>
+          <div class="pbody imp">
+            <div class="improw"><div class="ic">📄</div><div class="g"><b>CSV do SCADA</b><p>timestamp, vazão (L/s ou m³/h). Ideal a 15 min.</p></div><button class="btn">Selecionar arquivo</button></div>
+            <div class="improw"><div class="ic">📟</div><div class="g"><b>Arquivo de logger (.json)</b><p>reaproveita o pipeline dos loggers de pressão, estendido para vazão.</p></div><button class="btn">Selecionar arquivo</button></div>
+            <div class="improw"><div class="ic">✍️</div><div class="g"><b>Leitura de campo</b><p>totalizador do macromedidor + data/hora — lançamento manual.</p></div><button class="btn pri">Lançar leitura</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONSUMO -->
+      <section class="screen" id="s-consumo">
+        <div class="panel">
+          <div class="phead"><h3>Consumo autorizado por DMC</h3><span class="chip wait">provisório (cadastro)</span></div>
+          <div class="pbody">
+            <p class="note" style="margin-top:0">Enquanto o export de faturamento não é importado, o consumo vem do <b>consumo médio do cadastro</b> por matrícula (proxy). Valores por DMC, m³/mês:</p>
+            <div style="overflow-x:auto"><table><thead><tr><th>DMC</th><th>Ligações ativas</th><th>Consumo proxy (m³/mês)</th><th>m³/lig·mês</th></tr></thead><tbody id="consbody"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><h3>Importar faturamento</h3><span class="hint">export do sistema comercial COPASA</span></div>
+          <div class="pbody imp">
+            <div class="improw"><div class="ic">📊</div><div class="g"><b>CSV / Excel por matrícula</b><p>volume medido + ciclo → agrega matrícula → DMC (via cadastro georreferenciado).</p></div><button class="btn pri">Selecionar arquivo</button></div>
+            <div class="emptyrow">Nenhum ciclo importado ainda. Ao importar, substitui o proxy e habilita o balanço real.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIG -->
+      <section class="screen" id="s-config">
+        <div class="cols">
+          <div class="panel">
+            <div class="phead"><h3>Premissas (parâmetros NRW)</h3><span class="hint">versionado por ZA/DMC</span></div>
+            <div class="pbody">
+              <div class="formrow"><span>Submedição de hidrômetro (f_sub)</span><input value="4,0%"></div>
+              <div class="formrow"><span>Consumo não-autorizado</span><input value="2,0%"></div>
+              <div class="formrow"><span>Erros de dados/cadastro</span><input value="1,0%"></div>
+              <div class="formrow"><span>Expoente pressão-vazamento (N1)</span><input value="1,00"></div>
+              <div class="formrow"><span>Fator noite-dia (NDF)</span><input value="24"></div>
+              <div class="formrow" style="border:0"><span>Consumo noturno legítimo (L/h·lig)</span><input value="1,7"></div>
+              <div class="actions" style="margin-top:14px"><button class="btn pri">Salvar versão</button><button class="btn">Histórico</button></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="phead"><h3>Linha de base & meta contratual</h3></div>
+            <div class="pbody">
+              <div class="metagrid" style="grid-template-columns:1fr 1fr">
+                <div class="m"><span class="k">Meta ZA0200 (Betim)</span><span class="v">−24,2<small>%</small></span></div>
+                <div class="m"><span class="k">Meta ZA1004 (Contagem)</span><span class="v">−24,5<small>%</small></span></div>
+                <div class="m"><span class="k">Índice-âncora</span><span class="v" style="font-size:15px">a confirmar<br><small>IPD? IPL?</small></span></div>
+                <div class="m"><span class="k">Baseline registrado</span><span class="v" style="font-size:15px;color:var(--warn)">pendente</span></div>
+              </div>
+              <div class="waitbox" style="margin-top:14px">
+                <span style="font-size:20px">📉</span>
+                A linha de base por DMC é registrada aqui após o primeiro balanço fechado. O acompanhamento mostra a curva <b>indicador × baseline × meta</b> ao longo dos meses.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const DMC=[
+ {za:"ZA0200",n:"01",code:"DMC-01",ativas:1822,inat:236,fact:125,mat:2190,rede:69.9,dens:31.3,vrpP:7,vrpE:16,os:181,pop:2698,cons:22325,area:801.67,gj:'{"type":"Polygon","coordinates":[[[582935,7792448],[582465,7792178],[582460,7792099],[582344,7792069],[581969,7792376],[581703,7792386],[581443,7792734],[581265,7793627],[581095,7793786],[580603,7793284],[580743,7792934],[580468,7792843],[580242,7792975],[579978,7792942],[579685,7792616],[579542,7792621],[579473,7793486],[579610,7793844],[579600,7794157],[579911,7793964],[580397,7795139],[580161,7795211],[578946,7794703],[578682,7794988],[579119,7795973],[579146,7796596],[579575,7796895],[579617,7797218],[579900,7797632],[580710,7797695],[581008,7797221],[581111,7797477],[581259,7797479],[581419,7797294],[581446,7797083],[581202,7796663],[581211,7796475],[580922,7796039],[580722,7795923],[580315,7795953],[580610,7795264],[581319,7795505],[581555,7795404],[581389,7795131],[580742,7794948],[580544,7794800],[580496,7794300],[581009,7794510],[581665,7794380],[581610,7794017],[581383,7793905],[581516,7793473],[582143,7792898],[582441,7792807],[582185,7792791],[581864,7792512],[582370,7792099],[582425,7792208],[582935,7792448]]]}'},
+ {za:"ZA0200",n:"02",code:"DMC-02",ativas:15350,inat:1840,fact:998,mat:18188,rede:170.9,dens:106.5,vrpP:10,vrpE:13,os:542,pop:48411,cons:190181,area:854.84,gj:'{"type":"Polygon","coordinates":[[[585383,7796788],[585620,7796640],[585766,7797020],[585663,7797177],[585706,7797282],[586335,7797266],[585928,7797041],[585731,7796547],[585962,7796000],[585753,7795824],[586060,7795528],[585898,7795312],[585614,7795179],[585931,7794888],[585692,7794381],[585868,7794247],[585866,7794094],[585707,7793978],[585304,7794378],[585023,7794508],[584782,7794125],[584344,7793876],[584092,7793245],[583860,7793377],[583846,7793536],[584006,7793736],[584006,7793851],[583780,7793958],[583890,7794078],[583880,7794443],[583779,7794033],[583418,7794009],[583461,7794217],[583347,7793942],[583171,7793909],[582863,7794166],[582593,7795224],[581932,7795585],[582070,7795882],[582567,7795852],[582820,7796203],[583093,7795788],[582924,7796144],[583119,7796552],[583504,7796269],[583731,7796324],[583958,7796211],[584173,7795951],[584329,7795989],[584737,7796483],[584978,7796458],[584984,7796788],[584638,7797052],[584724,7797722],[584842,7797942],[585023,7797865],[585279,7797538],[585401,7797262],[585383,7796788]]]}'},
+ {za:"ZA0200",n:"03",code:"DMC-03",ativas:2730,inat:374,fact:241,mat:3345,rede:23.1,dens:145.1,vrpP:0,vrpE:7,os:153,pop:8659,cons:32673,area:161.82,gj:'{"type":"Polygon","coordinates":[[[587478,7791814],[587854,7791445],[587954,7791007],[587896,7790531],[587601,7790249],[587047,7791132],[586579,7791431],[586973,7791720],[586611,7791744],[586481,7791838],[586409,7792152],[587216,7792398],[587456,7792177],[587478,7791814]]]}'},
+ {za:"ZA0200",n:"04",code:"DMC-04",ativas:739,inat:145,fact:97,mat:985,rede:59.0,dens:16.7,vrpP:1,vrpE:27,os:31,pop:2385,cons:23400,area:842.62,gj:'{"type":"Polygon","coordinates":[[[582141,7790706],[581083,7790743],[580389,7790298],[580107,7789845],[580387,7789569],[579663,7789038],[580249,7788392],[580664,7788200],[580928,7788422],[580900,7788641],[581151,7788803],[581683,7788475],[581606,7788158],[581031,7788194],[581048,7788054],[581351,7787890],[581634,7787320],[581839,7787320],[581387,7786779],[581220,7786798],[581085,7786395],[580723,7786229],[580569,7785971],[580256,7786171],[580469,7786122],[580517,7786208],[580418,7786282],[580641,7786242],[580544,7786467],[580775,7786578],[580807,7787277],[580523,7788035],[579646,7787919],[579244,7787556],[578758,7787989],[577355,7788537],[577232,7789115],[577930,7789576],[579141,7789407],[579480,7789666],[579569,7790187],[579512,7790402],[579824,7790993],[580260,7791251],[580758,7791377],[580978,7792040],[581219,7791788],[581391,7791348],[582043,7791402],[582141,7790706]]]}'},
+ {za:"ZA0200",n:"05",code:"DMC-05",ativas:17063,inat:1823,fact:1415,mat:20301,rede:181.0,dens:112.2,vrpP:7,vrpE:39,os:892,pop:51997,cons:215321,area:936.79,gj:'{"type":"MultiPolygon","coordinates":[[[[584706,7791817],[584885,7791980],[585270,7791920],[585529,7792046],[585575,7791902],[585735,7791835],[586135,7792023],[586611,7791744],[586973,7791720],[586579,7791431],[587047,7791132],[587601,7790249],[587433,7790192],[587132,7790294],[586766,7790127],[586535,7790196],[586375,7790693],[586122,7790897],[585155,7790865],[585222,7790664],[585021,7790498],[584907,7790729],[584805,7790686],[584753,7790876],[584583,7790852],[584564,7790952],[584747,7790986],[584828,7791129],[584669,7791223],[584466,7791173],[584277,7790697],[583679,7790805],[583560,7790935],[583576,7791308],[583756,7791407],[583698,7791268],[583914,7791310],[584235,7791739],[584412,7791791],[584452,7791559],[584653,7791560],[584716,7791768],[584633,7791801],[584626,7792074],[584556,7791998],[584513,7792180],[584545,7792380],[584683,7792434],[584706,7791817]]],[[[587019,7795527],[587224,7795629],[587308,7795547],[587323,7795227],[587026,7795105],[586939,7794967],[587420,7794882],[587514,7794595],[587137,7793327],[585815,7792624],[585397,7792848],[585009,7792927],[584742,7792514],[584968,7792940],[584924,7793288],[584465,7793744],[584420,7793922],[584782,7794125],[585023,7794508],[585735,7793993],[585866,7794094],[585868,7794247],[585692,7794381],[585931,7794888],[585614,7795179],[585898,7795312],[586295,7795718],[586498,7795617],[586897,7795920],[587097,7795713],[586932,7795640],[587019,7795527]]]]}'},
+ {za:"ZA0200",n:"06",code:"DMC-06",ativas:10162,inat:1172,fact:889,mat:12223,rede:167.9,dens:72.8,vrpP:14,vrpE:2,os:366,pop:25619,cons:170772,area:866.10,gj:'{"type":"MultiPolygon","coordinates":[[[[584753,7790876],[584805,7790686],[584907,7790729],[585021,7790498],[585180,7790595],[585557,7790392],[585642,7790130],[585403,7789772],[584831,7789831],[584314,7789526],[584133,7789590],[583502,7790264],[582650,7790668],[582267,7790585],[582181,7790911],[582230,7791371],[582400,7791668],[582623,7791788],[583235,7791750],[583428,7791881],[583237,7791856],[582679,7792102],[582381,7792076],[582935,7792448],[582425,7792208],[582370,7792099],[581864,7792512],[582185,7792791],[582441,7792807],[581981,7793024],[582050,7793145],[582375,7793196],[582836,7793144],[582807,7793355],[583171,7793909],[583347,7793942],[583461,7794217],[583418,7794009],[583779,7794033],[583880,7794443],[583890,7794078],[583727,7793802],[583860,7793377],[584092,7793245],[584186,7793438],[584425,7793388],[584664,7793126],[584487,7792842],[584670,7792529],[584570,7792285],[584023,7792141],[584569,7792283],[584556,7791998],[584626,7792074],[584633,7791801],[584716,7791768],[584653,7791560],[584452,7791559],[584412,7791791],[584235,7791739],[583908,7791309],[583698,7791268],[583756,7791407],[583632,7791366],[583547,7791230],[583560,7790935],[583679,7790805],[584277,7790697],[584466,7791173],[584669,7791223],[584828,7791129],[584747,7790986],[584564,7790952],[584583,7790852],[584753,7790876]],[[583840,7792092],[583828,7792089],[583780,7792041],[583840,7792092]]],[[[584819,7792681],[585441,7792442],[585524,7792285],[585915,7792236],[585897,7792059],[585806,7791948],[585565,7791933],[585529,7792046],[585270,7791920],[584885,7791980],[584706,7791817],[584634,7792217],[584819,7792681]]],[[[581761,7792384],[581969,7792376],[582337,7792074],[582203,7792069],[581761,7792384]]]]}'},
+ {za:"ZA1004",n:"01",code:"DMC-01",ativas:3332,inat:341,fact:280,mat:3953,rede:50.2,dens:78.7,vrpP:5,vrpE:3,os:371,pop:11335,cons:72820,area:346.42,gj:'{"type":"Polygon","coordinates":[[[596475,7795136],[596636,7794780],[597084,7794421],[598073,7794636],[598068,7794419],[597938,7794421],[597969,7794293],[597731,7793908],[598065,7793898],[598109,7793272],[597932,7792806],[598032,7792347],[597925,7792588],[597658,7792834],[597212,7792582],[596735,7791903],[596405,7791796],[596193,7791994],[596189,7792539],[596424,7792757],[596514,7793333],[596836,7793708],[596740,7794056],[596265,7794506],[596475,7795136]]]}'},
+ {za:"ZA1004",n:"02",code:"DMC-02",ativas:10871,inat:1453,fact:976,mat:13300,rede:114.4,dens:116.3,vrpP:5,vrpE:2,os:1268,pop:41377,cons:166172,area:530.26,gj:'{"type":"Polygon","coordinates":[[[597731,7793908],[597969,7794293],[597938,7794421],[598068,7794419],[598072,7794702],[598380,7794677],[598559,7794150],[598800,7794053],[599240,7794102],[598970,7792825],[599549,7792331],[600013,7792493],[599990,7792642],[600424,7792474],[601055,7792727],[601262,7792546],[600540,7791596],[599769,7791451],[598792,7791073],[597899,7791809],[598051,7792424],[597932,7792806],[598110,7793268],[598065,7793898],[597731,7793908]]]}'},
+ {za:"ZA1004",n:"03",code:"DMC-03",ativas:3579,inat:821,fact:563,mat:4968,rede:41.7,dens:119.2,vrpP:5,vrpE:7,os:759,pop:13215,cons:55752,area:439.07,gj:'{"type":"Polygon","coordinates":[[[596760,7797870],[597436,7797461],[598157,7797344],[598936,7797606],[599120,7798434],[598876,7799168],[599369,7799253],[600072,7798443],[600318,7797925],[599947,7796892],[600249,7796771],[600497,7796385],[600299,7796242],[600034,7796374],[599483,7796908],[599099,7797028],[598957,7797382],[598632,7797231],[598263,7796620],[597453,7796257],[597462,7796089],[597233,7796502],[596848,7796769],[596770,7796925],[596760,7797870]]]}'},
+ {za:"ZA1004",n:"04",code:"DMC-04",ativas:2235,inat:604,fact:343,mat:3183,rede:32.8,dens:97.2,vrpP:3,vrpE:1,os:300,pop:8085,cons:46943,area:332.31,gj:'{"type":"Polygon","coordinates":[[[597453,7796257],[598263,7796620],[598632,7797231],[598957,7797382],[598964,7797232],[599316,7796703],[598734,7796373],[598167,7796468],[598502,7796298],[598320,7795452],[598545,7795145],[598380,7794677],[598072,7794702],[598071,7794636],[597084,7794421],[596636,7794780],[596722,7795461],[597329,7795954],[597574,7795981],[597453,7796257]]]}'},
+ {za:"ZA1004",n:"05",code:"DMC-05",ativas:7562,inat:949,fact:766,mat:9277,rede:85.6,dens:108.4,vrpP:6,vrpE:2,os:963,pop:24234,cons:119296,area:313.68,gj:'{"type":"Polygon","coordinates":[[[599311,7794188],[599520,7794281],[600537,7793720],[600549,7793851],[600965,7793801],[601544,7794033],[601730,7793951],[601481,7793419],[601299,7793485],[601060,7793294],[600984,7792975],[601055,7792727],[600424,7792474],[599990,7792642],[600013,7792493],[599549,7792331],[598970,7792825],[599311,7794188]]]}'},
+ {za:"ZA1004",n:"06",code:"DMC-06",ativas:11381,inat:1485,fact:1059,mat:13925,rede:118.0,dens:118.0,vrpP:6,vrpE:6,os:1520,pop:34619,cons:157676,area:390.21,gj:'{"type":"Polygon","coordinates":[[[600115,7796334],[600299,7796242],[600708,7796689],[600920,7796677],[600987,7796534],[601212,7796613],[601302,7796376],[601405,7796409],[601524,7796300],[601430,7796118],[601560,7796291],[601618,7796148],[601984,7796034],[602077,7795627],[601987,7795357],[601826,7795241],[601772,7794757],[601868,7794596],[601367,7793906],[600965,7793801],[600549,7793851],[600537,7793720],[600462,7793730],[600252,7793944],[599520,7794281],[599697,7794292],[599688,7794478],[599789,7794582],[599913,7794291],[600231,7794216],[600302,7794322],[600517,7794126],[600946,7794149],[601007,7794250],[600996,7794474],[600285,7794654],[600234,7794882],[600530,7795062],[600609,7795278],[600498,7795328],[600311,7795235],[600353,7795293],[600149,7795460],[600300,7795849],[599956,7796283],[600115,7796334]]]}'},
+ {za:"ZA1004",n:"07",code:"DMC-07",ativas:6020,inat:1322,fact:1068,mat:8410,rede:100.9,dens:83.4,vrpP:8,vrpE:11,os:1056,pop:20470,cons:161828,area:648.59,gj:'{"type":"Polygon","coordinates":[[[600984,7792979],[601060,7793294],[601299,7793485],[601468,7793410],[601730,7793951],[601911,7793898],[602226,7794319],[602653,7794127],[603526,7794229],[604146,7793264],[604058,7793189],[603552,7793199],[603119,7792950],[603475,7791722],[603297,7790948],[602908,7790859],[601713,7790906],[602159,7791293],[602234,7791994],[601614,7791988],[601136,7791777],[600966,7791855],[600785,7792000],[601262,7792546],[601055,7792727],[600984,7792979]]]}'},
+ {za:"ZA1004",n:"08",code:"DMC-08",ativas:12136,inat:1427,fact:997,mat:14560,rede:124.1,dens:117.3,vrpP:2,vrpE:3,os:1338,pop:43444,cons:221691,area:405.68,gj:'{"type":"Polygon","coordinates":[[[598320,7795452],[598502,7796298],[598167,7796468],[598751,7796368],[599046,7796139],[599617,7796214],[599798,7796351],[599931,7796310],[600300,7795849],[600149,7795460],[600353,7795293],[600316,7795240],[600498,7795328],[600609,7795278],[600530,7795062],[600234,7794882],[600285,7794654],[600996,7794474],[600966,7794163],[600517,7794126],[600295,7794294],[600231,7794216],[599913,7794291],[599789,7794582],[599688,7794478],[599697,7794292],[599432,7794279],[599240,7794102],[598800,7794053],[598559,7794150],[598380,7794677],[598545,7795145],[598320,7795452]]]}'},
+ {za:"ZA1004",n:"09",code:"DMC-09",ativas:2646,inat:305,fact:273,mat:3224,rede:26.0,dens:124.0,vrpP:0,vrpE:1,os:328,pop:7432,cons:34957,area:108.66,gj:'{"type":"Polygon","coordinates":[[[600708,7796689],[600645,7797011],[600994,7796885],[601814,7797208],[602262,7796862],[602443,7796590],[602220,7796410],[601946,7795948],[601984,7796034],[601618,7796148],[601627,7796280],[601430,7796118],[601524,7796300],[601405,7796409],[601302,7796376],[601212,7796613],[600987,7796534],[600920,7796677],[600708,7796689]]]}'}
+];
+DMC.forEach(d=>{d.geom=JSON.parse(d.gj);d.osKm=d.os/d.rede;d.consLig=d.cons/d.ativas;});
+
+const fmt=n=>Math.round(n).toLocaleString('pt-BR');
+const fmt1=n=>n.toLocaleString('pt-BR',{maximumFractionDigits:1});
+const $=s=>document.querySelector(s);
+let za="all", ind="osKm", sel=DMC.find(d=>d.code==="DMC-06"&&d.za==="ZA1004"), focusDmc=null;
+
+const IND={
+ osKm:{lab:"OS de vazamento / km (proxy)",fmt:d=>fmt1(d.osKm),real:true},
+ ativas:{lab:"Ligações ativas",fmt:d=>fmt(d.ativas),real:true},
+ dens:{lab:"Densidade (lig/km)",fmt:d=>fmt1(d.dens),real:true},
+ ipd:{lab:"Perdas IPD (%)",fmt:d=>"—",real:false}
+};
+const scope=()=>DMC.filter(d=>za==="all"||d.za===za);
+
+/* ---------- geometry ---------- */
+function rings(g){return g.type==="Polygon"?[g.coordinates]:g.coordinates;}
+function proj(feats,W,H,pad){
+ let xs=[],ys=[];feats.forEach(f=>rings(f.geom).forEach(poly=>poly.forEach(r=>r.forEach(p=>{xs.push(p[0]);ys.push(p[1]);}))));
+ const minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+ const w=maxx-minx||1,h=maxy-miny||1,s=Math.min((W-2*pad)/w,(H-2*pad)/h);
+ const ox=pad+(W-2*pad-w*s)/2, oy=pad+(H-2*pad-h*s)/2;
+ return {p:(x,y)=>[ox+(x-minx)*s, H-(oy+(y-miny)*s)]};
+}
+function pathd(g,pr){let d="";rings(g).forEach(poly=>poly.forEach(r=>{r.forEach((pt,i)=>{const[x,y]=pr.p(pt[0],pt[1]);d+=(i?"L":"M")+x.toFixed(1)+" "+y.toFixed(1);});d+="Z";}));return d;}
+function centroid(g,pr){const r=rings(g)[0][0];let sx=0,sy=0;r.forEach(p=>{sx+=p[0];sy+=p[1];});const[x,y]=pr.p(sx/r.length,sy/r.length);return[x,y];}
+
+function drawMap(svgId,legId,tipId){
+ const svg=document.getElementById(svgId),feats=scope();
+ const H=svgId==="map2"?560:440, W=1000; svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+ const pr=proj(feats,W,H,34);
+ const meta=IND[ind]; const vals=feats.map(f=>f[ind]).filter(v=>typeof v==="number");
+ const mn=Math.min(...vals),mx=Math.max(...vals);
+ const rgb=getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim();
+ const surf=getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+ let h='<defs><pattern id="hx" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="'+surf+'" stroke-width="4"/></pattern></defs>';
+ feats.forEach(f=>{
+  let fill;
+  if(!meta.real){fill="url(#hx)";}
+  else{const a=0.16+0.74*((f[ind]-mn)/((mx-mn)||1));fill=`rgba(${rgb},${a.toFixed(3)})`;}
+  const isSel=sel&&f.code===sel.code&&f.za===sel.za;
+  h+=`<path class="dmc-shape${isSel?' sel':''}" d="${pathd(f.geom,pr)}" fill="${fill}" stroke="${isSel?'':'rgba(120,140,150,.55)'}" stroke-width="${isSel?2.6:1}" fill-rule="evenodd" data-code="${f.code}" data-za="${f.za}"/>`;
+ });
+ feats.forEach(f=>{const[x,y]=centroid(f.geom,pr);h+=`<text class="dmc-lab" x="${x.toFixed(0)}" y="${y.toFixed(0)}" text-anchor="middle" dominant-baseline="central">${f.n}</text>`;});
+ svg.innerHTML=h;
+ // legend
+ const leg=document.getElementById(legId);
+ leg.innerHTML=`<div style="font-weight:600">${meta.lab}</div>`+
+   (meta.real?`<div class="row"><span>${fmt1(mn)}</span><div class="ramp"></div><span>${fmt1(mx)}</span></div>`
+             :`<div class="row"><span style="width:20px;height:9px;background:url(#hx);border:1px solid var(--line);display:inline-block"></span> aguardando dados</div>`);
+ // interactions
+ const tip=document.getElementById(tipId);
+ svg.querySelectorAll('.dmc-shape').forEach(el=>{
+  const f=DMC.find(d=>d.code===el.dataset.code&&d.za===el.dataset.za);
+  el.addEventListener('mousemove',e=>{const r=svg.getBoundingClientRect();tip.style.left=(e.clientX-r.left)+'px';tip.style.top=(e.clientY-r.top)+'px';tip.style.opacity=1;tip.innerHTML=`<b>${f.code}</b> · ${f.za==="ZA0200"?"Betim":"Contagem"}<br>${meta.lab}: <b>${meta.fmt(f)}</b>`;});
+  el.addEventListener('mouseleave',()=>tip.style.opacity=0);
+  el.addEventListener('click',()=>{sel=f;go('ficha');});
+ });
+}
+
+/* ---------- painel ---------- */
+function kpis(){
+ const s=scope();
+ const nDMC=s.length, at=s.reduce((a,d)=>a+d.ativas,0), rk=s.reduce((a,d)=>a+d.rede,0),
+   pop=s.reduce((a,d)=>a+d.pop,0), os=s.reduce((a,d)=>a+d.os,0), con=s.reduce((a,d)=>a+d.cons,0);
+ const cards=[
+  {l:"Perdas (IPD)",v:'—',s:"aguardando Qin",c:'wait',wait:true},
+  {l:"OS de vazamento",v:fmt(os),s:"histórico acumulado",c:'real'},
+  {l:"DMCs no escopo",v:nDMC,s:za==="all"?"Betim + Contagem":(za==="ZA0200"?"Betim":"Contagem"),c:'real'},
+  {l:"Ligações ativas",v:fmt(at),s:"cadastro comercial",c:'real'},
+  {l:"Rede de distribuição",v:fmt1(rk)+'<small> km</small>',s:"traçado georreferenciado",c:'real'},
+  {l:"População atendida",v:fmt(pop),s:"setores IBGE 2022",c:'real'}
+ ];
+ $('#kpis').innerHTML=cards.map(c=>`<div class="kpi${c.wait?' wait':''}"><span class="lab">${c.l}</span><span class="val">${c.v}</span><span class="sub"><span class="chip ${c.c}">${c.c==='wait'?'aguardando':'real'}</span> ${c.s}</span></div>`).join('');
+}
+const ZAINFO={ZA0200:{nome:"Betim",sub:"Eficiência Hídrica",meta:24.2},ZA1004:{nome:"Contagem",sub:"Águas Integradas",meta:24.5}};
+function consolidado(){
+ const zas=za==="all"?["ZA0200","ZA1004"]:[za];
+ $('#consol').innerHTML=zas.map(z=>{
+  const s=DMC.filter(d=>d.za===z),sum=k=>s.reduce((a,d)=>a+d[k],0),i=ZAINFO[z];
+  return `<div class="zacard">
+    <div class="zh"><span class="tag-za ${z==='ZA0200'?'za0200':'za1004'}">${z}</span>
+      <div><b>${i.nome}</b> <span class="n">· ${i.sub}</span><div class="n">${s.length} DMCs consolidados</div></div></div>
+    <div class="rowm">
+      <div class="m"><div class="k">Ligações ativas</div><div class="v">${fmt(sum('ativas'))}</div></div>
+      <div class="m"><div class="k">Rede</div><div class="v">${fmt(sum('rede'))}<small> km</small></div></div>
+      <div class="m"><div class="k">População</div><div class="v">${fmt(sum('pop'))}</div></div>
+      <div class="m"><div class="k">OS vazam.</div><div class="v">${fmt(sum('os'))}</div></div>
+      <div class="m"><div class="k">Matrículas</div><div class="v">${fmt(sum('mat'))}</div></div>
+      <div class="m"><div class="k">VRP proj.</div><div class="v">${sum('vrpP')}</div></div>
+      <div class="m"><div class="k">Consumo proxy</div><div class="v">${fmt(sum('cons')/1000)}<small>k m³/mês</small></div></div>
+      <div class="m"><div class="k">Perdas IPD</div><div class="v" style="color:var(--muted)">—</div></div>
+    </div>
+    <div class="metaband">
+      <div class="gauge" style="--p:${i.meta}"><b>—</b></div>
+      <div class="mt"><b>Meta de redução: −${i.meta.toLocaleString('pt-BR')}%</b>
+        <p>IPD atual aguardando o fechamento do balanço (Qin + faturamento). O consolidado do consórcio é a soma dos ${s.length} DMCs.</p></div>
+    </div></div>`;
+ }).join('');
+}
+let sortK="osKm",sortDir=-1;
+function rank(){
+ const s=scope().slice().sort((a,b)=>{const av=a[sortK==="code"?"code":sortK],bv=b[sortK]??a[sortK];
+   if(sortK==="code")return (a.za+a.n).localeCompare(b.za+b.n)*sortDir;
+   return (a[sortK]-b[sortK])*sortDir;});
+ const mxOs=Math.max(...s.map(d=>d.osKm));
+ $('#rankbody').innerHTML=s.map(d=>`<tr data-code="${d.code}" data-za="${d.za}">
+   <td><b>${d.code}</b> <span class="tag-za ${d.za==='ZA0200'?'za0200':'za1004'}">${d.za==='ZA0200'?'BET':'CTG'}</span></td>
+   <td class="mono">${fmt(d.ativas)}</td><td class="mono">${fmt1(d.rede)}</td>
+   <td><div class="bar-cell"><span class="mono">${fmt1(d.osKm)}</span><span class="minibar"><i style="width:${(d.osKm/mxOs*100).toFixed(0)}%"></i></span></div></td>
+   <td class="mono">${fmt1(d.dens)}</td>
+   <td title="balanço aguardando vazão de entrada"><span class="seal s-red"></span></td></tr>`).join('');
+ $('#rank-hint').textContent=s.length+" setores · pior no topo";
+ $('#rankbody').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>{sel=DMC.find(d=>d.code===tr.dataset.code&&d.za===tr.dataset.za);go('ficha');});
+}
+document.querySelectorAll('#ranktbl th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k==="seal")return;if(sortK===k)sortDir*=-1;else{sortK=k;sortDir=k==="code"?1:-1;}rank();});
+
+function indToggles(){
+ ['#ind-toggle','#ind-toggle2'].forEach(sel2=>{
+  $(sel2).innerHTML=Object.entries(IND).map(([k,v])=>`<button data-ind="${k}" class="${k===ind?'on':''}">${v.lab.replace(' / ',' /​')}</button>`).join('');
+  $(sel2).querySelectorAll('button').forEach(b=>b.onclick=()=>{ind=b.dataset.ind;renderMaps();});
+ });
+}
+function renderMaps(){indToggles();drawMap('map','legend','mtip');if($('#s-dmcs').classList.contains('on'))drawMap('map2','legend2','mtip2');}
+
+/* ---------- ficha ---------- */
+function ficha(){
+ const d=sel; const v=VRPMAP[d.za+'|'+d.code]; const nome=d.za==="ZA0200"?"Betim · Eficiência Hídrica":"Contagem · Águas Integradas";
+ const pr=proj([d],150,150,12);
+ const mini=`<svg viewBox="0 0 150 150" class="fmap"><path d="${pathd(d.geom,pr)}" fill="rgba(var(--accent-rgb),.5)" stroke="var(--accent-2)" stroke-width="1.5" fill-rule="evenodd"/></svg>`;
+ const tot=d.ativas+d.inat+d.fact;
+ const seg=(v,c)=>`<i style="width:${(v/tot*100).toFixed(1)}%;background:${c}"></i>`;
+ $('#s-ficha').innerHTML=`
+  <button class="back" onclick="go('dmcs')">‹ voltar ao mapa</button>
+  <div class="panel"><div class="pbody">
+    <div class="fhead">${mini}
+      <div class="ftitle">
+        <div class="code">${d.code}<span class="tag-za ${d.za==='ZA0200'?'za0200':'za1004'}" style="font-size:12px">${d.za}</span></div>
+        <div class="note">${nome} · ${fmt1(d.area)} ha</div>
+        <div><span class="chip real">✓ cadastro físico completo</span> <span class="chip wait">balanço aguardando Qin</span></div>
+        <div class="actions" style="margin-top:4px">
+          <button class="btn pri">📄 Relatório do DMC</button>
+          <button class="btn" onclick="go('nrw_pesquisa')">🎧 Programar pesquisa</button>
+          <button class="btn" onclick="go('nrw_loggers')">📟 Instalar logger</button>
+          <button class="btn" onclick="go('nrw_os',sel)">🛠 Abrir OS</button>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="metagrid">
+    <div class="m"><span class="k">Ligações ativas</span><span class="v">${fmt(d.ativas)}</span></div>
+    <div class="m"><span class="k">Matrículas</span><span class="v">${fmt(d.mat)}</span></div>
+    <div class="m"><span class="k">Rede</span><span class="v">${fmt1(d.rede)}<small> km</small></span></div>
+    <div class="m"><span class="k">Densidade</span><span class="v">${fmt1(d.dens)}<small> lig/km</small></span></div>
+    <div class="m"><span class="k">População</span><span class="v">${fmt(d.pop)}</span></div>
+    <div class="m"><span class="k">VRP projetadas</span><span class="v">${d.vrpP}<small> / ${d.vrpE} exist.</small></span></div>
+    <div class="m"><span class="k">OS vazamento</span><span class="v">${fmt(d.os)}</span></div>
+    <div class="m"><span class="k">Consumo proxy</span><span class="v">${fmt(d.cons/1000)}<small>k m³/mês</small></span></div>
+  </div>
+
+  <div class="cols">
+    <div class="panel"><div class="phead"><h3>Balanço hídrico (IWA)</h3><span class="chip wait">parcial</span></div>
+      <div class="pbody iwa">
+        <div class="r"><span class="nm">Volume de entrada (Qin)</span><span class="track hatch"></span><span class="amt" style="color:var(--muted)">informar</span></div>
+        <div class="r"><span class="nm">Consumo autorizado <span class="note">(proxy)</span></span><span class="track"><i style="width:100%;background:var(--accent)"></i></span><span class="amt">${fmt(d.cons/1000)}k</span></div>
+        <div class="r"><span class="nm">Perdas aparentes</span><span class="track hatch"></span><span class="amt" style="color:var(--muted)">—</span></div>
+        <div class="r"><span class="nm">Perdas reais</span><span class="track hatch"></span><span class="amt" style="color:var(--muted)">—</span></div>
+        <p class="note" style="margin:4px 0 0">Perdas = Qin − consumo autorizado. Entra o número quando a vazão de entrada do setor for medida (SCADA / logger / campo).</p>
+      </div>
+    </div>
+    <div class="panel"><div class="phead"><h3>Composição das ligações</h3></div>
+      <div class="pbody stack">
+        <div class="stbar">${seg(d.ativas,'var(--accent)')}${seg(d.inat,'var(--muted)')}${seg(d.fact,'var(--warn)')}</div>
+        <div class="leg">
+          <span><i class="sw" style="background:var(--accent)"></i>Ativas ${fmt(d.ativas)}</span>
+          <span><i class="sw" style="background:var(--muted)"></i>Inativas ${fmt(d.inat)}</span>
+          <span><i class="sw" style="background:var(--warn)"></i>Factíveis ${fmt(d.fact)}</span>
+        </div>
+        <div class="actions" style="margin-top:12px"><button class="btn">Ver ${fmt(d.mat)} matrículas</button><button class="btn">VRPs do setor (${d.vrpP+d.vrpE})</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="panel"><div class="phead"><h3>Pressão do setor</h3>${v?'<span class="chip real">setpoints reais</span>':'<span class="chip wait">sem VRP projetada</span>'}</div>
+      <div class="pbody">
+        ${v?`<div class="ind"><div class="i"><div class="k">P entrada</div><div class="v">${fmt1(v.from)}<small> mca</small></div></div>
+          <div class="i"><div class="k">P alvo</div><div class="v">${fmt1(v.to)}<small> mca</small></div></div>
+          <div class="i"><div class="k">Redução (FAVAD)</div><div class="v" style="color:var(--good)">${fmt1(v.favad)}<small>%</small></div></div>
+          <div class="i"><div class="k">VRPs</div><div class="v">${d.vrpP}<small> proj · ${d.vrpE} exist.</small></div></div></div>
+          <div class="actions" style="margin-top:10px"><button class="btn" onclick="go('pressao_vrp',sel)">Gestão de pressão →</button></div>`
+        :'<div class="waitbox">Sem VRP projetada neste setor. A pressão média (AZP) entra dos loggers de campo.</div>'}
+      </div>
+    </div>
+    <div class="panel"><div class="phead"><h3>Vazão mínima noturna</h3><span class="chip wait">aguardando série</span></div>
+      <div class="pbody"><div class="waitbox"><span style="font-size:20px">☾</span>O MNF deste setor entra quando houver série de vazão de entrada (02–04h) — é o que dimensiona a perda real do DMC.
+        <button class="btn" onclick="go('nrw_mnf')" style="margin-top:8px">Ver método (MNF)</button></div></div>
+    </div>
+  </div>
+  <div class="panel"><div class="phead"><h3>Subdivisão das perdas</h3><span class="chip wait">aguardando balanço</span></div>
+    <div class="pbody">
+      <div class="stbar"><i class="hatch" style="width:55%"></i><i class="hatch" style="width:45%;filter:brightness(.88)"></i></div>
+      <div class="leg" style="margin-top:8px"><span><i class="sw hatch"></i>Reais — rede, ramais, pressão, reservatório</span><span><i class="sw hatch" style="filter:brightness(.88)"></i>Aparentes — submedição, fraude, erros</span></div>
+      <p class="note" style="margin-top:10px">A partição real × aparente (BABE) preenche quando o balanço fechar. As alavancas de cada parcela estão em <b>Componentes IWA</b>.</p>
+      <div class="actions" style="margin-top:8px"><button class="btn" onclick="go('componentes')">Componentes IWA →</button></div>
+    </div>
+  </div>
+  <div class="panel"><div class="phead"><h3>Indicadores</h3><span class="hint">calculados no fechamento do balanço</span></div>
+    <div class="pbody ind">
+      <div class="i"><div class="k">IPD</div><div class="v" style="color:var(--muted)">—</div><div class="f">(VD−VC)/VD</div></div>
+      <div class="i"><div class="k">IPL</div><div class="v" style="color:var(--muted)">—</div><div class="f">L/lig·dia</div></div>
+      <div class="i"><div class="k">Perdas reais</div><div class="v" style="color:var(--muted)">—</div><div class="f">m³/lig·dia</div></div>
+      <div class="i"><div class="k">ILI</div><div class="v" style="color:var(--muted)">—</div><div class="f">CARL/UARL</div></div>
+      <div class="i"><div class="k">%NRW</div><div class="v" style="color:var(--muted)">—</div><div class="f">NRW/Qin</div></div>
+      <div class="i"><div class="k">MNF</div><div class="v" style="color:var(--muted)">—</div><div class="f">vazão mín. noturna</div></div>
+    </div>
+  </div>`;
+}
+
+/* ---------- consumo table ---------- */
+function consumo(){
+ $('#consbody').innerHTML=scope().map(d=>`<tr><td><b>${d.code}</b> <span class="tag-za ${d.za==='ZA0200'?'za0200':'za1004'}">${d.za==='ZA0200'?'BET':'CTG'}</span></td>
+   <td class="mono">${fmt(d.ativas)}</td><td class="mono">${fmt(d.cons)}</td><td class="mono">${fmt1(d.cons/d.ativas)}</td></tr>`).join('');
+}
+
+/* ---------- combate às perdas ---------- */
+function componentes(){
+ const AP=[
+  {n:"Submedição de hidrômetro",d:"Água consumida que o hidrômetro sub-registra (idade, desgaste, subdimensionamento).",tool:"Substituição de HD",dado:"Parque de hidrômetros (idade, média 12m)",st:["wait","aguardando parque"],go:"troca_hd"},
+  {n:"Consumo não-autorizado",d:"Fraudes, ligações clandestinas, by-pass, religação irregular.",tool:"Indicativo de fraude → fiscalização",dado:"Portão fechado, leitura impedida, consumo",st:["wait","sinais parciais"],go:"fraude"},
+  {n:"Erros de dados/cadastro",d:"Leitura estimada, matrícula sem hidrômetro, inativa consumindo, erro de rota.",tool:"Auditoria cadastral (comercial × técnico)",dado:"Cadastro × consumo (+ export de faturamento)",st:["ok","sinais reais"],go:"auditoria"},
+ ];
+ const RE=[
+  {n:"Vazamentos na rede",d:"Perdas de fundo + rebentamentos reportados e não-reportados na distribuição.",tool:"Pesquisa + gestão de pressão + substituição de rede",dado:"MNF, OS, pressão, material/idade",st:["ok","OS histórico"],go:"rede"},
+  {n:"Gestão de pressão",d:"Reduzir a pressão corta a perda de fundo (FAVAD, Q∝P^N1) — a alavanca mais rápida das perdas reais.",tool:"Redução de pressão via VRP",dado:"Setpoints das VRPs, AZP (loggers)",st:["ok","setpoints reais"],go:"pressao_vrp"},
+  {n:"Vazamentos em ramais",d:"Vazamento no ramal até o hidrômetro. Matrículas com vazamento reincidente = ramal comprometido.",tool:"Substituição de ramais (reincidência de OS)",dado:"OS de vazamento por matrícula, material do ramal",st:["ok","reincidência real"],go:"ramais"},
+  {n:"Reservatórios",d:"Vazamento e extravasamento em reservatórios.",tool:"Inspeção / balanço do reservatório",dado:"Nível + macromedição da unidade",st:["wait","a inspecionar"],go:null},
+ ];
+ const card=(c,tipo)=>`<div class="compc">
+   <div class="foot"><span class="chip ${tipo}">${tipo==='ap'?'Aparente':'Real'}</span><span class="chip ${c.st[0]}">${c.st[1]}</span></div>
+   <h4>${c.n}</h4><div class="desc">${c.d}</div>
+   <div class="tool"><span class="ar">↳</span><div><b>Como atacar:</b> ${c.tool}<br><span class="note">Dado: ${c.dado}</span></div></div>
+   ${c.go?`<button class="btn pri" style="align-self:flex-start" onclick="go('${c.go}')">Abrir ferramenta</button>`:`<button class="btn" style="align-self:flex-start" disabled>Em breve</button>`}
+ </div>`;
+ $('#board-ap').innerHTML=`<div style="grid-column:1/-1;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#7c3f97;font-weight:600">Perdas aparentes (comerciais)</div>`+AP.map(c=>card(c,'ap')).join('');
+ $('#board-re').innerHTML=`<div style="grid-column:1/-1;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-top:6px">Perdas reais (físicas)</div>`+RE.map(c=>card(c,'re')).join('');
+}
+function tagza(d){return `<span class="tag-za ${d.za==='ZA0200'?'za0200':'za1004'}">${d.za==='ZA0200'?'BET':'CTG'}</span>`;}
+function prio(k){return `<span class="prio p-${k}">${k==='hi'?'ALTA':k==='md'?'MÉDIA':'BAIXA'}</span>`;}
+function trocaHd(){
+ $('#hdbody').innerHTML=scope().map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(d.ativas)}</td><td class="mono" style="color:var(--muted)">—</td><td class="mono" style="color:var(--muted)">—</td></tr>`).join('');
+ const ex=[["●●● 41827","DMC-06 CTG","11 anos","6,2","idade + submedição","hi"],["●●● 20915","DMC-02 CTG","9 anos","4,8","queda de consumo","md"],["●●● 73044","DMC-05 BET","13 anos","7,1","idade","hi"]];
+ $('#hdex').innerHTML=ex.map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td class="mono">${r[2]}</td><td class="mono">${r[3]}</td><td>${r[4]}</td><td>${prio(r[5])}</td></tr>`).join('');
+}
+function fraude(){
+ $('#frbody').innerHTML=scope().map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(d.inat)}</td><td class="mono">${fmt(d.fact)}</td><td class="mono" style="color:var(--muted)">—</td><td class="mono" style="color:var(--muted)">—</td></tr>`).join('');
+ const ex=[["●●● 55210","DMC-08 CTG","portão fechado + consumo 0","hi",92],["●●● 18763","DMC-02 BET","leitura impedida ×5","hi",84],["●●● 92004","DMC-05 BET","factível consumindo","md",61]];
+ $('#frex').innerHTML=ex.map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><b class="mono">${r[4]}</b> <span class="prio p-${r[3]}">${r[3]==='hi'?'ALTO':'MÉDIO'}</span></td><td><button class="btn" style="padding:4px 9px">Fiscalizar</button></td></tr>`).join('');
+}
+function redeRank(){
+ const s=scope().slice().sort((a,b)=>b.osKm-a.osKm), mx=Math.max(...s.map(d=>d.osKm));
+ $('#rdbody').innerHTML=s.map(d=>{const sc=d.osKm/mx*100,cls=sc>66?'crit':sc>33?'warn':'good';
+  return `<tr data-code="${d.code}" data-za="${d.za}"><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt1(d.rede)}</td><td class="mono">${fmt(d.os)}</td><td class="mono">${fmt1(d.osKm)}</td><td><span class="scorebar"><i style="width:${sc.toFixed(0)}%;background:var(--${cls})"></i></span> <span class="mono" style="font-size:11px">${sc.toFixed(0)}</span></td></tr>`;}).join('');
+ $('#rdbody').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>{sel=DMC.find(d=>d.code===tr.dataset.code&&d.za===tr.dataset.za);go('ficha');});
+}
+
+const RAMCAND=[
+ {mat:"18759955",dmc:"DMC-03",za:"ZA1004",n:13},{mat:"107120861",dmc:"DMC-03",za:"ZA1004",n:10},
+ {mat:"14471647",dmc:"DMC-03",za:"ZA1004",n:10},{mat:"117933821",dmc:"DMC-03",za:"ZA1004",n:8},
+ {mat:"25793942",dmc:"DMC-07",za:"ZA1004",n:8},{mat:"129142476",dmc:"DMC-05",za:"ZA1004",n:7},
+ {mat:"116789905",dmc:"DMC-03",za:"ZA1004",n:6},{mat:"120055911",dmc:"DMC-02",za:"ZA1004",n:6},
+ {mat:"120806843",dmc:"DMC-02",za:"ZA1004",n:6},{mat:"132264030",dmc:"DMC-03",za:"ZA1004",n:6},
+ {mat:"17205913",dmc:"DMC-02",za:"ZA1004",n:6},{mat:"2253291",dmc:"DMC-07",za:"ZA1004",n:6}
+];
+function ramaisTool(){
+ const s=za==="all"?RAMCAND:RAMCAND.filter(r=>r.za===za), mx=13;
+ if(!s.length){$('#rmbody').innerHTML=`<tr><td colspan="4" class="note" style="padding:16px;text-align:center">Sem reincidência alta nesta ZA na amostra atual — o histórico de OS de Betim é menor. Ver o universo (≥2 vazamentos) nos indicadores acima.</td></tr>`;return;}
+ $('#rmbody').innerHTML=s.map(r=>{const k=r.n>=10?'hi':r.n>=5?'md':'lo';
+  return `<tr><td class="mono">${r.mat}</td><td>${r.dmc} <span class="tag-za za1004">CTG</span></td>
+   <td><div class="bar-cell"><span class="mono">${r.n}</span><span class="minibar"><i style="width:${(r.n/mx*100).toFixed(0)}%"></i></span></div></td>
+   <td>${prio(k)}</td></tr>`;}).join('');
+}
+
+const VRPMAP={
+ "ZA0200|DMC-01":{n:7,from:92,to:38.6,delta:53.4,favad:52.7},"ZA0200|DMC-02":{n:10,from:46.7,to:22.5,delta:24.2,favad:52.1},
+ "ZA0200|DMC-03":{n:1,from:49,to:30,delta:19,favad:38.8},"ZA0200|DMC-04":{n:1,from:80,to:35,delta:45,favad:56.3},
+ "ZA0200|DMC-05":{n:7,from:42,to:20,delta:22,favad:51.0},"ZA0200|DMC-06":{n:14,from:52.6,to:23.6,delta:29,favad:54.4},
+ "ZA1004|DMC-01":{n:5,from:50.4,to:15,delta:35.4,favad:69.3},"ZA1004|DMC-02":{n:5,from:50,to:18,delta:32,favad:62.8},
+ "ZA1004|DMC-03":{n:5,from:47.2,to:16,delta:31.2,favad:63.5},"ZA1004|DMC-04":{n:3,from:47,to:13.3,delta:33.7,favad:71.4},
+ "ZA1004|DMC-05":{n:6,from:45.2,to:20,delta:25.2,favad:53.8},"ZA1004|DMC-06":{n:6,from:56.8,to:35.8,delta:21,favad:36.5},
+ "ZA1004|DMC-07":{n:8,from:48.4,to:18.1,delta:30.3,favad:58.0},"ZA1004|DMC-08":{n:2,from:44.5,to:17.5,delta:27,favad:60.2}
+};
+const AUDITMAP={
+ "ZA0200|DMC-01":{i:5,z:15,f:0},"ZA0200|DMC-02":{i:122,z:58,f:13},"ZA0200|DMC-03":{i:18,z:17,f:2},
+ "ZA0200|DMC-04":{i:5,z:4,f:0},"ZA0200|DMC-05":{i:106,z:69,f:15},"ZA0200|DMC-06":{i:54,z:43,f:6},
+ "ZA1004|DMC-01":{i:10,z:6,f:0},"ZA1004|DMC-02":{i:50,z:12,f:1},"ZA1004|DMC-03":{i:30,z:18,f:0},
+ "ZA1004|DMC-04":{i:18,z:21,f:0},"ZA1004|DMC-05":{i:53,z:22,f:1},"ZA1004|DMC-06":{i:51,z:18,f:0},
+ "ZA1004|DMC-07":{i:46,z:21,f:0},"ZA1004|DMC-08":{i:62,z:25,f:0},"ZA1004|DMC-09":{i:16,z:6,f:0}
+};
+function pressaoVrp(){
+ const sPv=scope().slice().sort((a,b)=>{const va=VRPMAP[a.za+'|'+a.code],vb=VRPMAP[b.za+'|'+b.code];return (vb?vb.favad:-1)-(va?va.favad:-1);});
+ $('#pvbody').innerHTML=sPv.map(d=>{const v=VRPMAP[d.za+'|'+d.code];
+  if(!v)return `<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono" style="color:var(--muted)">0</td><td colspan="4" class="note">sem VRP projetada neste setor</td></tr>`;
+  return `<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${v.n}</td><td class="mono">${fmt1(v.from)}</td><td class="mono">${fmt1(v.to)}</td><td class="mono">${fmt1(v.delta)}</td>
+   <td><div class="bar-cell"><span class="mono">${fmt1(v.favad)}%</span><span class="minibar"><i style="width:${v.favad.toFixed(0)}%"></i></span></div></td></tr>`;}).join('');
+}
+function auditoria(){
+ const sAu=scope().slice().sort((a,b)=>{const x=AUDITMAP[a.za+'|'+a.code]||{i:0,z:0,f:0},y=AUDITMAP[b.za+'|'+b.code]||{i:0,z:0,f:0};return (y.i+y.z+y.f)-(x.i+x.z+x.f);});
+ $('#aubody').innerHTML=sAu.map(d=>{const a=AUDITMAP[d.za+'|'+d.code]||{i:0,z:0,f:0};
+  return `<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(a.i)}</td><td class="mono">${fmt(a.z)}</td><td class="mono">${fmt(a.f)}</td></tr>`;}).join('');
+}
+
+/* ---------- análise & decisão ---------- */
+function balancoSheet(){
+ const cons=scope().reduce((a,d)=>a+d.cons,0), consK=fmt(cons);
+ const row=(cls,lab,val,w)=>`<div class="srow ${cls}"><span>${lab}</span><span class="v ${w?'wait':''}">${val}</span></div>`;
+ $('#sheet').innerHTML=
+  row('h','Volume de entrada no sistema (Qin)','—',1)+
+  row('lvl2','Consumo autorizado','—',1)+
+  row('lvl3','Faturado micromedido (proxy do cadastro)',consK,0)+
+  row('lvl3','Faturado não-medido / estimado','—',1)+
+  row('lvl3','Não-faturado (usos operacionais)','—',1)+
+  row('lvl2 h','Perdas de água (Qin − consumo autorizado)','—',1)+
+  row('lvl3','Aparentes — submedição, fraude, erros','—',1)+
+  row('lvl3','Reais — rede, ramais, reservatório','—',1)+
+  row('h','Água faturada (proxy)',consK,0)+
+  row('h','NRW — água não faturada','—',1);
+ $('#balTit').textContent='Folha do balanço — '+(za==='all'?'Betim + Contagem':(za==='ZA0200'?'Betim':'Contagem'));
+}
+function planoAcao(){
+ const mxOs=Math.max(...DMC.map(d=>d.osKm)), audMax=Math.max(...Object.values(AUDITMAP).map(a=>a.i+a.z));
+ const rows=scope().map(d=>{
+   const v=VRPMAP[d.za+'|'+d.code], a=AUDITMAP[d.za+'|'+d.code]||{i:0,z:0,f:0};
+   const cand=[
+     {lever:'Gestão de pressão (VRP)',score:v?v.favad:0,sinal:v?fmt1(v.favad)+'% FAVAD':'sem VRP',acao:'Instalar VRP / ajustar setpoint'},
+     {lever:'Rede: pesquisa + renovação',score:d.osKm/mxOs*100,sinal:fmt1(d.osKm)+' OS/km',acao:'Pesquisa ativa + renovar trechos críticos'},
+     {lever:'Auditoria / fiscalização',score:(a.i+a.z)/audMax*100,sinal:fmt(a.i+a.z)+' irregular.',acao:'Regularizar cadastro + fiscalizar'}
+   ].sort((x,y)=>y.score-x.score);
+   return {d,top:cand[0]};
+ }).sort((x,y)=>y.top.score-x.top.score);
+ $('#planobody').innerHTML=rows.map(r=>`<tr data-code="${r.d.code}" data-za="${r.d.za}"><td><b>${r.d.code}</b> ${tagza(r.d)}</td><td><b>${r.top.lever}</b></td><td class="mono">${r.top.sinal}</td><td class="note">${r.top.acao}</td></tr>`).join('');
+ $('#planobody').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>{sel=DMC.find(d=>d.code===tr.dataset.code&&d.za===tr.dataset.za);go('ficha');});
+}
+function simular(){
+ const p=+$('#sp').value,h=+$('#sh').value,k=+$('#sk').value;
+ $('#lp').textContent=p+'%';$('#lh').textContent=fmt(h);$('#lk').textContent=k+' km';
+ const redReais=Math.round(p*0.9), volHd=Math.round(h*15*0.04), romp=Math.round(k*0.4);
+ $('#op').textContent='−'+redReais+'%';
+ $('#ov').innerHTML=fmt(volHd)+'<small class="note"> m³/mês</small>';
+ $('#or').innerHTML=romp+'<small class="note"> /ano</small>';
+ $('#orr').textContent='≈ '+fmt(volHd)+' m³/mês recuperados na micromedição (troca de HD), −'+redReais+'% de perda de fundo por pressão, e ~'+romp+' rebentamentos/ano evitados pela renovação. Fecha com o balanço real por DMC.';
+}
+function contratoCards(){
+ const zas=za==='all'?['ZA0200','ZA1004']:[za];
+ $('#contratoCards').innerHTML=zas.map(z=>{const i=ZAINFO[z],s=DMC.filter(d=>d.za===z);
+  return `<div class="zacard"><div class="zh"><span class="tag-za ${z==='ZA0200'?'za0200':'za1004'}">${z}</span><div><b>${i.nome}</b> <span class="n">· ${i.sub}</span></div></div>
+   <div class="rowm"><div class="m"><div class="k">Meta redução</div><div class="v">−${i.meta.toLocaleString('pt-BR')}<small>%</small></div></div>
+    <div class="m"><div class="k">Baseline</div><div class="v" style="color:var(--warn);font-size:15px">pendente</div></div>
+    <div class="m"><div class="k">Realizado</div><div class="v" style="color:var(--muted)">—</div></div>
+    <div class="m"><div class="k">Prazo</div><div class="v">60<small> meses</small></div></div></div>
+   <div class="metaband"><div class="gauge" style="--p:${i.meta}"><b>—</b></div><div class="mt"><b>${s.length} DMCs</b><p>medição do índice por competência — habilita o faturamento por performance.</p></div></div></div>`;}).join('');
+}
+function benchmarking(){
+ $('#benchbody').innerHTML=scope().slice().sort((a,b)=>b.dens-a.dens).map(d=>`<tr data-code="${d.code}" data-za="${d.za}"><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt1(d.dens)}</td><td class="mono">${fmt1(d.osKm)}</td><td class="mono">${fmt1(d.rede)}</td><td class="mono" style="color:var(--muted)">—</td></tr>`).join('');
+ $('#benchbody').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>{sel=DMC.find(d=>d.code===tr.dataset.code&&d.za===tr.dataset.za);go('ficha');});
+}
+['sp','sh','sk'].forEach(id=>document.getElementById(id).addEventListener('input',simular));
+
+/* ---------- ativos & intervenções (onda 3) ---------- */
+function barRow(lab,val,max,unit,color){const w=(val/max*100).toFixed(0);
+ return `<div style="display:flex;align-items:center;gap:10px;margin:8px 0;font-size:12.5px"><span style="width:135px">${lab}</span><span class="minibar" style="flex:1;height:14px"><i style="width:${w}%;background:${color||'var(--accent)'}"></i></span><span class="mono" style="width:76px;text-align:right">${fmt(val)}${unit||''}</span></div>`;}
+function osReparos(){
+ const causas=[["PRESSÃO",6061],["Não classificado",2808],["Dano de terceiros",792],["Não se aplica",255],["Estado da rede",216]];
+ $('#osCausa').innerHTML=causas.map(c=>barRow(c[0],c[1],6061,'',c[0]==="PRESSÃO"?'var(--crit)':'var(--accent)')).join('');
+ const s=scope().slice().sort((a,b)=>b.os-a.os), mxo=Math.max(...DMC.map(d=>d.os));
+ $('#osDmc').innerHTML=s.map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td><div class="bar-cell"><span class="mono">${fmt(d.os)}</span><span class="minibar"><i style="width:${(d.os/mxo*100).toFixed(0)}%"></i></span></div></td></tr>`).join('');
+}
+function renovacao(){
+ const mats=[["PVC",1069],["Ferro fundido",264],["Cimento-amianto",35],["PEAD",11],["Polietileno",10],["PVC-PA",6]];
+ $('#matBars').innerHTML=mats.map(m=>barRow(m[0],m[1],1069,' km',m[0]==="Cimento-amianto"?'var(--crit)':'var(--accent)')).join('');
+ const anos=[["Ano 1",12],["Ano 2",18],["Ano 3",16],["Ano 4",14],["Ano 5",10]];
+ $('#planoAnos').innerHTML=anos.map(a=>barRow(a[0],a[1],18,' km','var(--accent)')).join('');
+}
+function vrpGestao(){
+ $('#vrpInv').innerHTML=scope().map(d=>{const v=VRPMAP[d.za+'|'+d.code];
+  return `<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${d.vrpE}</td><td class="mono">${d.vrpP}</td><td class="mono">${v?fmt1(v.to)+' mca':'—'}</td><td>${d.vrpP>0?'<span class="prio p-md">a instalar</span>':'<span class="prio p-lo">só existentes</span>'}</td></tr>`;}).join('');
+}
+function setorizacao(){
+ $('#setBody').innerHTML=scope().map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td>${d.za==='ZA1004'?'<span class="prio p-lo">macro DMC</span>':'<span class="prio p-md">a instalar</span>'}</td><td class="mono">${d.vrpE+d.vrpP}</td><td class="note">step test pendente</td></tr>`).join('');
+}
+
+/* ---------- comercial (onda 4) ---------- */
+function parqueTool(){
+ $('#pqBody').innerHTML=scope().map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(d.ativas)}</td><td class="mono" style="color:var(--muted)">—</td><td class="mono" style="color:var(--muted)">—</td></tr>`).join('');
+}
+function fiscalizacaoTool(){
+ const s=scope().map(d=>{const a=AUDITMAP[d.za+'|'+d.code]||{i:0,z:0,f:0};return {d,u:a.i+a.z+a.f};}).sort((x,y)=>y.u-x.u);
+ $('#fiBody').innerHTML=s.map(r=>`<tr><td><b>${r.d.code}</b> ${tagza(r.d)}</td><td class="mono">${fmt(r.u)}</td><td class="mono" style="color:var(--muted)">—</td><td class="mono" style="color:var(--muted)">—</td></tr>`).join('');
+}
+function recuperacaoTool(){
+ const s=scope().slice().sort((a,b)=>b.fact-a.fact);
+ $('#reBody').innerHTML=s.map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(d.fact)}</td><td class="mono">${fmt(d.inat)}</td><td class="note">${d.fact>500?'ligar factíveis + regularizar':'regularizar inativas'}</td></tr>`).join('');
+}
+function leituraTool(){
+ const sLe=scope().slice().sort((a,b)=>{const x=AUDITMAP[a.za+'|'+a.code]||{z:0},y=AUDITMAP[b.za+'|'+b.code]||{z:0};return y.z-x.z;});
+ $('#leBody').innerHTML=sLe.map(d=>{const a=AUDITMAP[d.za+'|'+d.code]||{z:0};return `<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(a.z)}</td><td class="mono" style="color:var(--muted)">—</td><td class="mono" style="color:var(--muted)">—</td></tr>`;}).join('');
+}
+function grandesTool(){
+ const s=scope().slice().sort((a,b)=>b.cons-a.cons);
+ $('#grBody').innerHTML=s.map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(d.cons)}</td><td class="mono">${fmt1(d.cons/d.ativas)}</td></tr>`).join('');
+}
+
+/* ---------- nav ---------- */
+const TITLES={painel:"Painel de Perdas",dmcs:"DMCs (mapa)",ficha:"Ficha do DMC",nrw_balanco:"Balanço hídrico",nrw_mnf:"Vazão mínima noturna",nrw_eventos:"Eventos & alertas",nrw_plano:"Plano de ação por DMC",nrw_simulador:"Simulador de cenários",nrw_ell:"Nível econômico & ROI",nrw_contrato:"Performance contratual",nrw_indicadores:"Indicadores & benchmarking",nrw_os:"Gestão de OS / reparos",nrw_renovacao:"Renovação de rede",nrw_vrp_gestao:"Gestão de VRPs",nrw_reservatorios:"Reservatórios",nrw_setorizacao:"Integridade de setorização",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_leitura:"Gestão de leitura",nrw_grandes:"Grandes consumidores",nrw_pesquisa:"Pesquisa ativa",nrw_campanhas:"Campanhas & step test",nrw_loggers:"Frota de loggers",nrw_modelo:"Modelo hidráulico",nrw_energia:"Balanço energético",nrw_equipes:"Programação de equipes",nrw_governanca:"Governança do dado",componentes:"Componentes IWA",troca_hd:"Substituição de HD",fraude:"Indicativo de fraude",rede:"Substituição de rede",ramais:"Substituição de ramais",pressao_vrp:"Gestão de pressão",auditoria:"Auditoria cadastral",medicoes:"Medições / Entrada",consumo:"Consumo / Faturamento",config:"Parâmetros & Metas"};
+const COMPET=new Set(['painel','nrw_balanco','nrw_mnf','nrw_eventos','nrw_contrato','nrw_indicadores','consumo']);
+function applyFocus(s){
+ const scr=document.getElementById('s-'+s); if(!scr) return;
+ const old=scr.querySelector('.focusbar'); if(old) old.remove();
+ scr.querySelectorAll('tr.rowfocus').forEach(r=>r.classList.remove('rowfocus'));
+ if(!focusDmc) return;
+ const tag=focusDmc.za==='ZA0200'?'Betim':'Contagem', codeTag=focusDmc.za==='ZA0200'?'BET':'CTG';
+ const bar=document.createElement('div');
+ bar.className='focusbar';
+ bar.innerHTML=`🎯 Focado em <b style="margin:0 2px">${focusDmc.code}</b> · ${tag}<button class="fx">ver todos ✕</button>`;
+ bar.querySelector('.fx').onclick=()=>{focusDmc=null;go(s);};
+ scr.insertBefore(bar,scr.firstChild);
+ let first=null;
+ scr.querySelectorAll('tbody tr').forEach(tr=>{
+  if(tr.textContent.includes(focusDmc.code)&&tr.textContent.includes(codeTag)){tr.classList.add('rowfocus'); if(!first)first=tr;}
+ });
+ if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function go(s,dmc){
+ if(dmc!==undefined){focusDmc=dmc||null; if(dmc){za=dmc.za; document.querySelectorAll('#zaseg button').forEach(x=>x.classList.toggle('on',x.dataset.za===za));}}
+ else focusDmc=null;
+ document.querySelectorAll('.screen').forEach(el=>el.classList.remove('on'));
+ $('#s-'+s).classList.add('on');
+ document.querySelectorAll('.navi').forEach(n=>n.classList.toggle('on',n.dataset.s===s));
+ $('#scr-title').textContent=TITLES[s];
+ $('#mes').disabled=!COMPET.has(s);
+ $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
+ $('#side').classList.remove('open');
+ if(s==='painel'){kpis();consolidado();rank();renderMaps();}
+ if(s==='dmcs')renderMaps();
+ if(s==='ficha')ficha();
+ if(s==='nrw_balanco')balancoSheet();
+ if(s==='nrw_plano')planoAcao();
+ if(s==='nrw_simulador')simular();
+ if(s==='nrw_contrato')contratoCards();
+ if(s==='nrw_indicadores')benchmarking();
+ if(s==='nrw_os')osReparos();
+ if(s==='nrw_renovacao')renovacao();
+ if(s==='nrw_vrp_gestao')vrpGestao();
+ if(s==='nrw_setorizacao')setorizacao();
+ if(s==='nrw_parque')parqueTool();
+ if(s==='nrw_fiscalizacao')fiscalizacaoTool();
+ if(s==='nrw_recuperacao')recuperacaoTool();
+ if(s==='nrw_leitura')leituraTool();
+ if(s==='nrw_grandes')grandesTool();
+ if(s==='componentes')componentes();
+ if(s==='troca_hd')trocaHd();
+ if(s==='fraude')fraude();
+ if(s==='rede')redeRank();
+ if(s==='ramais')ramaisTool();
+ if(s==='pressao_vrp')pressaoVrp();
+ if(s==='auditoria')auditoria();
+ if(s==='consumo')consumo();
+ applyFocus(s);
+}
+document.querySelectorAll('.navi[data-s]').forEach(n=>n.onclick=()=>go(n.dataset.s));
+document.querySelectorAll('#zaseg button').forEach(b=>b.onclick=()=>{
+ za=b.dataset.za;document.querySelectorAll('#zaseg button').forEach(x=>x.classList.toggle('on',x===b));
+ const cur=document.querySelector('.navi.on').dataset.s;
+ if(sel&&za!=="all"&&sel.za!==za)sel=scope()[0];
+ go(cur);
+});
+$('#menubtn').onclick=()=>$('#side').classList.toggle('open');
+
+kpis();consolidado();rank();renderMaps();
+</script>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const sbg = createClient('https://lwttadkctfznidzvmury.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3dHRhZGtjdGZ6bmlkenZtdXJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MzQ4NjksImV4cCI6MjEwMTUxMDg2OX0._M5FOmACjrYeRgQ6hXrvmxFp3Et8Jrt-fElYohiiVZc');
+const OK = 'sander.sirio@aguasmg.com.br';
+const g = document.getElementById('nrwGate'), gm = document.getElementById('gm');
+try{
+  const { data } = await sbg.auth.getSession();
+  const em = ((data.session && data.session.user && data.session.user.email) || '').toLowerCase();
+  if (em === OK) g.remove();
+  else if (em) gm.textContent = 'Acesso restrito — ' + em + ' não tem permissão para o Cockpit de Perdas.';
+  else gm.textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.';
+}catch(e){ gm.textContent = 'Não foi possível verificar o acesso. Faça login no AcquaHub.'; }
+</script>
+</body>
+</html>
