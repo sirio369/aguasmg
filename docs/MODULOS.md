@@ -179,6 +179,11 @@
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
+- **Popup genérico:** `onEachFeature` do `cadAtualizar` não tem template por camada — só faz
+  `Object.keys(properties).join('<br>')`. Ou seja, **pra aparecer no popup basta a RPC incluir a
+  coluna no `jsonb_build_object` das `properties`**; nada a mexer no frontend. Ex.: `cd_no_agua` das
+  unidades operacionais (reservatório/booster+bomba/elevatória/poço/macromedição) foi adicionado só na
+  RPC (a coluna já existia em `"2 - infra_agua".unidades_operacionais`, só não estava no `SELECT`).
 - Marcador **"Você"** (GPS): `cadOnGps()` cria/atualiza `cadVoce` (não é apagado nos redraws de
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
