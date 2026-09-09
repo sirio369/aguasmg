@@ -1750,7 +1750,7 @@ function vrpRenderLista(){
     const s=VRP_SIT[p.situacao]||{lbl:p.situacao,bg:'--line',fg:'--mut'};
     const cUf=p.consorcio==='ZA1004'?'Contagem':(p.consorcio==='ZA0200'?'Betim':'');
     const sub=[cUf,p.diametro?('DN '+p.diametro):'',distTxt(distKm(p.lat,p.lon))].filter(Boolean).join(' · ');
-    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${vEsc(p.label)||('#'+p.id)}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span>${p.lat?`<button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button>`:''}</div>`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${vEsc(p.label)||('#'+p.id)}${p.cd_no_agua?` <span style="font-weight:400;color:var(--mut)">· nó ${vEsc(p.cd_no_agua)}</span>`:''}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span>${p.lat?`<button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button>`:''}</div>`;
   }).join('');
   $('#vrpLista').querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>vrpAbrir(+el.dataset.open)));
   $('#vrpLista').querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();window.open('https://www.google.com/maps/dir/?api=1&destination='+el.dataset.nav,'_blank');}));
@@ -1764,7 +1764,7 @@ function vrpRenderMapa(){
   const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&vrpMatchJ(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{ const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:VRP_COR[p.situacao]||'#888',fillOpacity:1});
-    m.on('click',()=>vrpAbrir(p.id)); m.bindTooltip((p.label||('#'+p.id))+' · '+((VRP_SIT[p.situacao]||{}).lbl||''));
+    m.on('click',()=>vrpAbrir(p.id)); m.bindTooltip((p.label||('#'+p.id))+(p.cd_no_agua?(' · nó '+p.cd_no_agua):'')+' · '+((VRP_SIT[p.situacao]||{}).lbl||''));
     vrpMarkers.addLayer(m); pts.push([p.lat,p.lon]); });
   if(gps){ vrpMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
   if(pts.length) vrpMap.fitBounds(pts,{padding:[28,28],maxZoom:16}); else vrpMap.setView([-19.93,-44.05],12);

@@ -171,6 +171,9 @@
   conjunto fixo de 57 códigos; `vrpMatchJ`).
 - **Estado:** `vrpData, vrpFiltro, vrpCons, vrpView, vrpMap, vrpMarkers, vrpAtual, vrpAns, vrpFotos,
   vrpUltima, vrpEnviando, vrpBuscaTermo, vrpJoao`.
+- **`cd_no_agua` visível para o usuário** (não só na busca): na lista (`vrpRenderLista`) aparece ao
+  lado do nome da VRP; no mapa (`vrpRenderMapa`) entra no `bindTooltip` (hover). Já vem de
+  `app_vrp_listar` — não precisou mudar RPC.
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
 - Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
