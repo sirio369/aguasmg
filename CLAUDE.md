@@ -111,7 +111,7 @@ pwa/
   `admin`, `campo`, `aprovador`, `almoxarife`, `frotas`, `qsms`. O app carrega o próprio perfil via RPC
   `app_me` (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`).
 - **Aprovação/notificação é única pro app inteiro** (não crie hierarquia paralela por módulo):
-  `perfil.aprovador_uuid`/`aprovador2_uuid` (config. em Suprimentos ⚙️) + `sup_aprovadores_de(uid)`
+  `perfil.aprovador_uuid`/`aprovador2_uuid` (config. no ⚙️ Usuários — na home ou em Suprimentos) + `sup_aprovadores_de(uid)`
   + `sup_notificar(...)` disparado por **trigger** na tabela de negócio (nunca inline na RPC). Ver
   docs/MODULOS.md §0.9 e §6.4 (segundo módulo a reaproveitar isso, depois de Suprimentos).
 - **Geometria:** PostGIS, **SRID 31983** (UTM, metros). Distâncias em metros direto com `ST_Distance`
@@ -272,6 +272,11 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 
 Home dividida em três áreas: **Insumos**, **Equipamentos**, **EPI / Uniforme** (+ **Baixas/Conferência**
 para o almoxarife). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
+
+- **Configurações (admin)** — `supAbrirConfig(from)`, roda dentro de `<main id="suprimentos">`. Duas
+  portas: ⚙️ **na home** (`#homeCfg`, `homeGate()` → `ME.is_admin`) abre **👤 Usuários** (acesso, cargo,
+  aprovadores, consórcio) com **filtros** no topo (acesso / cargo / consórcio / 1º aprovador); ⚙️ **dentro
+  de EPI / Uniforme** (`#supCfg`) abre **🦺 Cargos e cesta de EPI**. Detalhe em `docs/MODULOS.md §5.5`.
 
 - **Insumos** — fluxo: solicitar → aprovar → **segregar** (almoxarife, existe/parcial/falta, gera
   código) → **retirar** (código). Tabelas `sup_solicitacao`/`_item`, `sup_material` (catálogo),

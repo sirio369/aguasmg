@@ -312,10 +312,21 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
   `sup_epi_baixa_fila`/`_solicitar`/`_cancelar`, `sup_epi_minhas_baixas`.
 
 ### 5.5 Configurações (admin) — `// tela: Configurações` (~L3824)
-- Cadastro de usuários: acesso (`sup_admin_set_funcao`), cargo (`sup_admin_set_cargo`), **2 aprovadores
-  diretos** (`sup_admin_set_aprovadores(uuid,uuid,uuid)`), **consórcio** (`sup_admin_set_consorcio`);
-  equipes (`sup_admin_equipe_*`, `sup_admin_membro_*`); cestas por cargo (`sup_cesta_*`,
-  `sup_cargos_*`). Notificações de aprovação vão só aos aprovadores diretos (`sup_aprovadores_de`).
+- **Duas entradas, uma tela** (`supAbrirConfig(from)`, `from` = `'home'` | `'epi'`; roda dentro do
+  `<main id="suprimentos">` reusando `#supView`):
+  - ⚙️ **na home** (`#homeCfg`, ao lado do `<h1>`, `hidden` até `homeGate()` liberar p/ `ME.is_admin`) →
+    seção **👤 Usuários**. Clique seta `supCfgPending=true; supCfgFrom='home'` e `irPara('suprimentos')`;
+    `supInit()` vê o flag e abre a config em vez da home de Suprimentos. Voltar → `home`.
+  - ⚙️ **dentro de EPI / Uniforme** (`#supCfg` da barra, revelado em `supArea('epi')` p/ `ME.is_admin`) →
+    seção **🦺 Cargos e cesta de EPI**. Voltar → `supArea('epi')`.
+- **Usuários:** acesso (`sup_admin_set_funcao`), cargo (`sup_admin_set_cargo`), **2 aprovadores
+  diretos** (`sup_admin_set_aprovadores(uuid,uuid,uuid)`), **consórcio** (`sup_admin_set_consorcio`).
+  Filtros no topo (`#cfgUFiltros`, estado `cfgUF={fu,cu,co,ap}`, `supCfgFiltrosRender`): **acesso**,
+  **cargo**, **consórcio** e **1º aprovador** — filtragem client-side em `supCfgUsers` (os handlers de
+  edição continuam achando o usuário por id em `cfgUsers`, então salvar sob filtro funciona).
+- **Cargos e cesta de EPI:** cestas por cargo (`sup_cesta_*`, `sup_cargos_*`).
+- Equipes (`sup_admin_equipe_*`, `sup_admin_membro_*`) seguem como **código morto** (ver §4 abaixo).
+- Notificações de aprovação vão só aos aprovadores diretos (`sup_aprovadores_de`).
 
 ---
 

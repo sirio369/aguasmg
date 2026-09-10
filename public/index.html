@@ -119,7 +119,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </header>
 
   <main id="home">
-    <h1>Coleta de campo</h1>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <h1>Coleta de campo</h1>
+      <button id="homeCfg" class="hidden" title="Configurações de usuários" style="all:unset;cursor:pointer;font-size:24px;line-height:1;padding:4px 2px;margin-top:4px">⚙️</button>
+    </div>
     <div class="sec">🛠️ Execução</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="pressao"><div class="ic">🌡️</div><div class="nm">Mapeamento de pressão</div></button>
@@ -864,9 +867,10 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const cq=document.getElementById('cardQsms'); if(cq) cq.classList.toggle('hidden', !(ME&&(ME.funcao==='qsms'||ME.is_admin))); const cp=document.getElementById('cardPerdas'); if(cp){ const okP=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cp.classList.toggle('soon',!okP); cp.querySelector('.nm').textContent=okP?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okP?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const cq=document.getElementById('cardQsms'); if(cq) cq.classList.toggle('hidden', !(ME&&(ME.funcao==='qsms'||ME.is_admin))); const cp=document.getElementById('cardPerdas'); if(cp){ const okP=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cp.classList.toggle('soon',!okP); cp.querySelector('.nm').textContent=okP?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okP?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
+if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
 
 // ---------- MÓDULO LOGGERS ----------
 let loggersData=[], lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
@@ -2933,6 +2937,7 @@ async function supEnviar(item,msgOk,onOk){
 async function supInit(){
   await supGetMe();
   if(!supCat.length){ try{ const c=await sb.rpc('sup_materiais_listar',{}); supCat=c.data||[]; }catch(e){} }
+  if(supCfgPending){ supCfgPending=false; supAbrirConfig('home'); return; }
   supHome();
 }
 const SUP_ACTS={
@@ -2998,7 +3003,7 @@ function supHome(){
   supCurrent='home';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
   const tt=$('#supTitle'); if(tt) tt.textContent='';
-  const cfg=$('#supCfg'); if(cfg) cfg.classList.toggle('hidden', !(ME&&ME.is_admin));
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   const almox=!!(ME&&(ME.is_almoxarife||ME.is_admin));
   $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma área</p>'+
     '<div class="grid" style="margin-top:10px">'+
@@ -3014,7 +3019,7 @@ function supArea(cat){
   supAreaId=cat; supCurrent='area';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
   const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI / Uniforme':'Insumos');
-  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
+  const cfg=$('#supCfg'); if(cfg){ cfg.classList.toggle('hidden', !(cat==='epi'&&ME&&ME.is_admin)); cfg.title='Cargos e cesta de EPI'; }
   const blocks = cat==='equip'?supBlocksEquip():(cat==='epi'?supBlocksEpi():supBlocks());
   $('#supView').innerHTML='<p class="sub" style="margin-top:2px">Escolha uma etapa</p>'+
     blocks.map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
@@ -4384,17 +4389,27 @@ function epiComprovanteHtml(e){
 }
 
 // --- tela: Configurações (admin) ---
-let cfgUsers=[], cfgEquipes=[], cfgCargos=[], cfgEpiCat=[], cfgCargoOpts=[];
+let cfgUsers=[], cfgEquipes=[], cfgCargos=[], cfgEpiCat=[], cfgCargoOpts=[], supCfgPending=false, supCfgFrom='epi';
+let cfgUF={fu:'',cu:'',co:'',ap:''};
 const CFG_FUN={campo:'Campo',aprovador:'Aprovador',almoxarife:'Almoxarife',admin:'Admin'};
-function supAbrirConfig(){
+function supAbrirConfig(from){
+  supCfgFrom = from || 'epi';
   supCurrent='config';
-  const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
-  const tt=$('#supTitle'); if(tt) tt.textContent='Configurações';
+  const bk=$('#supBack'); if(bk) bk.textContent = supCfgFrom==='home'?'‹ Início':'‹ EPI / Uniforme';
+  const tt=$('#supTitle'); if(tt) tt.textContent = supCfgFrom==='home'?'Usuários':'Cargos e cesta de EPI';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   supVConfig();
 }
 async function supVConfig(){
+  if(supCfgFrom==='epi'){
+    $('#supView').innerHTML=`
+      <div class="sec">🦺 Cargos e cesta de EPI</div>
+      <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
+      <div id="cfgCargos"></div>`;
+    supCfgCargos();
+    return;
+  }
   try{
     const [u,cg]=await Promise.all([sb.rpc('sup_admin_usuarios'),sb.rpc('sup_cargos_ativos')]);
     if(u.error) throw u.error;
@@ -4406,12 +4421,23 @@ function supCfgRender(){
   $('#supView').innerHTML=`
     <div class="sec">👤 Usuários</div>
     <p class="sub" style="margin-top:2px"><b>Acesso</b> = o que a pessoa pode fazer no app (Campo, Aprovador, Almoxarife, Admin) — vale nos 3 módulos. <b>Cargo</b> = a ocupação, usada para a cesta de EPI. <b>Aprovador 1/2</b> = quem recebe as notificações de aprovação dos pedidos dessa pessoa (se vazio, vão para todos os aprovadores/admins). <b>Consórcio</b> = a que consórcio ela pertence.</p>
-    <div id="cfgUsers"></div>
-    <div class="sec" style="margin-top:26px">🦺 Cargos e cesta de EPI</div>
-    <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
-    <div id="cfgCargos"></div>`;
+    <div id="cfgUFiltros" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px"></div>
+    <div id="cfgUsers"></div>`;
+  supCfgFiltrosRender();
   supCfgUsers();
-  supCfgCargos();
+}
+function supCfgFiltrosRender(){
+  const c=$('#cfgUFiltros'); if(!c) return;
+  const box='flex:1 1 44%;min-width:130px', cargos=cfgCargoOpts||[];
+  c.innerHTML=`
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">Acesso</div><select id="cfuFu" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${cfgUF.fu===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div>
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">Cargo</div><select id="cfuCu" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${cargos.map(cg=>`<option value="${cg.id}"${cfgUF.cu===String(cg.id)?' selected':''}>${cg.nome}</option>`).join('')}</select></div>
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">Consórcio</div><select id="cfuCo" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option><option value="ZA1004"${cfgUF.co==='ZA1004'?' selected':''}>Contagem</option><option value="ZA0200"${cfgUF.co==='ZA0200'?' selected':''}>Betim</option></select></div>
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">1º Aprovador</div><select id="cfuAp" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${cfgUsers.map(u=>`<option value="${u.id}"${cfgUF.ap===String(u.id)?' selected':''}>${u.nome||u.email}</option>`).join('')}</select></div>`;
+  $('#cfuFu').addEventListener('change',e=>{ cfgUF.fu=e.target.value; supCfgUsers(); });
+  $('#cfuCu').addEventListener('change',e=>{ cfgUF.cu=e.target.value; supCfgUsers(); });
+  $('#cfuCo').addEventListener('change',e=>{ cfgUF.co=e.target.value; supCfgUsers(); });
+  $('#cfuAp').addEventListener('change',e=>{ cfgUF.ap=e.target.value; supCfgUsers(); });
 }
 async function supCfgCargos(){
   const c=$('#cfgCargos'); if(!c) return;
@@ -4455,7 +4481,13 @@ function supCfgUsers(){
   if(!cfgUsers.length){ c.innerHTML='<p class="sub">Nenhum usuário.</p>'; return; }
   const apOpts=(u,sel)=>'<option value="">—</option>'+cfgUsers.filter(x=>x.id!==u.id).map(x=>`<option value="${x.id}"${String(sel||'')===String(x.id)?' selected':''}>${x.nome||x.email}</option>`).join('');
   const coOpts=(u)=>[['','—'],['ZA1004','Contagem'],['ZA0200','Betim']].map(([v,l])=>`<option value="${v}"${(u.consorcio||'')===v?' selected':''}>${l}</option>`).join('');
-  c.innerHTML=cfgUsers.map(u=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+  const lista=cfgUsers.filter(u=>
+    (!cfgUF.fu||u.funcao===cfgUF.fu)&&
+    (!cfgUF.cu||String(u.cargo_id||'')===cfgUF.cu)&&
+    (!cfgUF.co||(u.consorcio||'')===cfgUF.co)&&
+    (!cfgUF.ap||String(u.aprovador_uuid||'')===cfgUF.ap));
+  if(!lista.length){ c.innerHTML='<p class="sub" style="padding:10px 0">Nenhum usuário com esses filtros. <button class="btn ghost" id="cfuLimpar" style="width:auto;margin:0;padding:4px 10px;font-size:12px">Limpar filtros</button></p>'; const lb=$('#cfuLimpar'); if(lb) lb.addEventListener('click',()=>{ cfgUF={fu:'',cu:'',co:'',ap:''}; supCfgFiltrosRender(); supCfgUsers(); }); return; }
+  c.innerHTML=lista.map(u=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
     <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div>
     <div class="sub" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px">${u.email||''}</div>
     <div style="display:flex;gap:6px">
@@ -4551,9 +4583,12 @@ async function supCfgRemMembro(eqId,uid){
   const e=cfgEquipes.find(x=>String(x.id)===String(eqId)); if(e) e.membros=Math.max(0,(e.membros||0)-1);
   supCfgEquipes(); supCfgMembros(); toast('✓ Removido');
 }
-if($('#supCfg')) $('#supCfg').addEventListener('click',supAbrirConfig);
+if($('#supCfg')) $('#supCfg').addEventListener('click',()=>supAbrirConfig('epi'));
 
-if($('#supBack')) $('#supBack').addEventListener('click',()=>{ if(supCurrent==='home'||!supCurrent) irPara('home'); else if(supCurrent==='area') supHome(); else supArea(supAreaId); });
+if($('#supBack')) $('#supBack').addEventListener('click',()=>{
+  if(supCurrent==='config'){ if(supCfgFrom==='home') irPara('home'); else supArea('epi'); return; }
+  if(supCurrent==='home'||!supCurrent) irPara('home'); else if(supCurrent==='area') supHome(); else supArea(supAreaId);
+});
 
 // ---------- MÓDULO BIBLIOTECA ----------
 const BIB_CATS=['Procedimentos (POPs)','Termo de Referência','Normas Técnicas','Formulários e Modelos','Segurança (NR)','Contrato','Outros'];
