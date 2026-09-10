@@ -3855,7 +3855,11 @@ function epiCartRender(){
 async function supVEpiPedidos(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('sup_epi_minhas_solicitacoes'); if(error)throw error;
-    const arr=data||[]; if(!arr.length){ $('#supView').innerHTML='<p class="sub">Você ainda não solicitou EPIs.</p>'; return; }
+    const bruto=data||[]; if(!bruto.length){ $('#supView').innerHTML='<p class="sub">Você ainda não solicitou EPIs.</p>'; return; }
+    // esconde o que ficou em falta — o colaborador não deve ficar esperando o que não sai
+    const arr=bruto.filter(s=>s.status!=='em_falta')
+                   .map(s=>Object.assign({},s,{itens:(s.itens||[]).filter(i=>i.situacao!=='falta')}));
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhum pedido de EPI em andamento.</p>'; return; }
     $('#supView').innerHTML=arr.map(s=>{
       const st=EPI_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
       const seg=(s.status==='segregada'||s.status==='em_falta'||s.status==='entregue');
@@ -3983,11 +3987,14 @@ function epiCapturaHtml(id){ return `
   <div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="epiFoto" data-cap="${id}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="epiFoto" data-cap="${id}"/></label></div>
   <img class="epiFotoPrev-${id} hidden" style="max-width:100%;border-radius:8px;margin-top:8px"/>
   <label style="margin-top:10px">Assinatura do colaborador *</label>
-  <div class="sigwrap" style="border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden"><canvas class="epiSig" data-cap="${id}" width="600" height="180" style="width:100%;height:180px;touch-action:none;display:block"></canvas></div>
-  <button type="button" class="btn ghost epiSigClear" data-cap="${id}" style="margin-top:6px">Limpar assinatura</button>`;
+  <div class="sigwrap" style="border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden"><canvas class="epiSig" data-cap="${id}" width="900" height="270" style="width:100%;height:180px;touch-action:none;display:block"></canvas></div>
+  <div style="display:flex;gap:6px;margin-top:6px">
+    <button type="button" class="btn ghost epiSigClear" data-cap="${id}" style="margin:0;flex:1">Limpar</button>
+    <button type="button" class="btn ghost epiSigFSbtn" data-cap="${id}" style="margin:0;width:auto;padding:0 16px">⤢ Ampliar p/ assinar</button>
+  </div>`;
 }
 function epiSigInit(cv){
-  const ctx=cv.getContext('2d'); ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.strokeStyle='#111';
+  const ctx=cv.getContext('2d'); ctx.lineWidth=Math.max(2.5,Math.round(cv.width/300)); ctx.lineCap='round'; ctx.strokeStyle='#111';
   let drawing=false, drawn=false;
   const pos=ev=>{ const r=cv.getBoundingClientRect(); const t=ev.touches?ev.touches[0]:ev; return {x:(t.clientX-r.left)*(cv.width/r.width), y:(t.clientY-r.top)*(cv.height/r.height)}; };
   const start=ev=>{ ev.preventDefault(); drawing=true; const p=pos(ev); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
@@ -3996,6 +4003,47 @@ function epiSigInit(cv){
   cv.addEventListener('mousedown',start); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
   cv.addEventListener('touchstart',start,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',end);
   cv._clear=()=>{ ctx.clearRect(0,0,cv.width,cv.height); drawn=false; }; cv._drawn=()=>drawn;
+}
+// --- assinatura em tela cheia (gira o celular p/ assinar por extenso) ---
+function epiSigResize(cv,w,h,snap){
+  const apply=()=>{ cv.width=w; cv.height=h; const c=cv.getContext('2d'); c.fillStyle='#fff'; c.fillRect(0,0,w,h);
+    c.lineWidth=Math.max(2.5,Math.round(w/300)); c.lineCap='round'; c.strokeStyle='#111'; };
+  if(!snap){ apply(); return; }
+  const img=new Image(); img.onload=()=>{ apply(); cv.getContext('2d').drawImage(img,0,0,w,h); }; img.src=snap;
+}
+function epiSigFS(cv){
+  let fs=document.getElementById('epiSigFS');
+  if(!fs){
+    fs=document.createElement('div'); fs.id='epiSigFS';
+    fs.style.cssText='position:fixed;inset:0;z-index:9999;background:#fff;display:none;flex-direction:column';
+    fs.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);gap:8px">'
+      +'<span style="font-size:13px;color:var(--mut)">✍️ Assine — gire o celular na horizontal</span>'
+      +'<div style="display:flex;gap:6px"><button type="button" id="epiSigFSclear" class="btn ghost" style="width:auto;margin:0;padding:6px 12px;font-size:13px">Limpar</button>'
+      +'<button type="button" id="epiSigFSok" class="btn" style="width:auto;margin:0;padding:6px 16px">✓ Concluir</button></div></div>'
+      +'<div id="epiSigFSbody" style="flex:1;padding:10px;min-height:0"></div>';
+    document.body.appendChild(fs);
+    fs.querySelector('#epiSigFSok').addEventListener('click',epiSigFSclose);
+    fs.querySelector('#epiSigFSclear').addEventListener('click',()=>{ const c=fs._wrap&&fs._wrap.querySelector('.epiSig'); if(c&&c._clear) c._clear(); });
+  }
+  const wrap=cv.closest('.sigwrap'); if(!wrap) return;
+  fs._wrap=wrap; fs._parent=wrap.parentNode; fs._home=wrap.nextSibling;
+  const snap=cv._drawn&&cv._drawn()?cv.toDataURL():null;
+  wrap.style.height='100%'; cv.style.height='100%';
+  fs.querySelector('#epiSigFSbody').appendChild(wrap);
+  fs.style.display='flex';
+  try{ (fs.requestFullscreen&&fs.requestFullscreen()||Promise.reject()).then(()=>{ try{ screen.orientation.lock('landscape'); }catch(e){} }).catch(()=>{}); }catch(e){}
+  requestAnimationFrame(()=>{ const r=wrap.getBoundingClientRect(); epiSigResize(cv,Math.max(300,Math.round(r.width)),Math.max(150,Math.round(r.height)),snap); });
+}
+function epiSigFSclose(){
+  const fs=document.getElementById('epiSigFS'); if(!fs||!fs._wrap) return;
+  const wrap=fs._wrap, cv=wrap.querySelector('.epiSig');
+  const snap=cv&&cv._drawn&&cv._drawn()?cv.toDataURL():null;
+  wrap.style.height=''; if(cv) cv.style.height='180px';
+  if(fs._home&&fs._home.parentNode===fs._parent) fs._parent.insertBefore(wrap,fs._home); else fs._parent.appendChild(wrap);
+  fs.style.display='none'; fs._wrap=null;
+  try{ screen.orientation.unlock(); }catch(e){}
+  try{ document.fullscreenElement&&document.exitFullscreen&&document.exitFullscreen().catch(()=>{}); }catch(e){}
+  if(cv) requestAnimationFrame(()=>epiSigResize(cv,900,270,snap));
 }
 function epiCanvasBlob(cv){ return new Promise(r=>cv.toBlob(r,'image/png')); }
 async function epiUpload(blob,sufixo){ const path='epi/'+crypto.randomUUID()+'_'+sufixo; const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:blob.type||'image/png',upsert:true}); if(error) throw error; return path; }
@@ -4007,6 +4055,7 @@ function epiCapturaWire(){
   }));
   $('#supView').querySelectorAll('.epiSig').forEach(cv=>{ if(!cv._init){ epiSigInit(cv); cv._init=true; } });
   $('#supView').querySelectorAll('.epiSigClear').forEach(b=>b.addEventListener('click',()=>{ const cv=$('#supView').querySelector('.epiSig[data-cap="'+b.dataset.cap+'"]'); if(cv&&cv._clear) cv._clear(); }));
+  $('#supView').querySelectorAll('.epiSigFSbtn').forEach(b=>b.addEventListener('click',()=>{ const cv=$('#supView').querySelector('.epiSig[data-cap="'+b.dataset.cap+'"]'); if(cv) epiSigFS(cv); }));
 }
 async function epiConfirmar(id,rpc,params,okMsg,after){
   if(!navigator.onLine) return toast('Entrega precisa de conexão (foto e assinatura)');
@@ -4029,8 +4078,11 @@ function epiFotoBlock(cap,label){ return `
 }
 function epiSigBlock(cap,label){ return `
   <label style="margin-top:10px">${label||'Assinatura do colaborador *'}</label>
-  <div class="sigwrap" style="border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden"><canvas class="epiSig" data-cap="${cap}" width="600" height="180" style="width:100%;height:180px;touch-action:none;display:block"></canvas></div>
-  <button type="button" class="btn ghost epiSigClear" data-cap="${cap}" style="margin-top:6px">Limpar assinatura</button>`;
+  <div class="sigwrap" style="border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden"><canvas class="epiSig" data-cap="${cap}" width="900" height="270" style="width:100%;height:180px;touch-action:none;display:block"></canvas></div>
+  <div style="display:flex;gap:6px;margin-top:6px">
+    <button type="button" class="btn ghost epiSigClear" data-cap="${cap}" style="margin:0;flex:1">Limpar</button>
+    <button type="button" class="btn ghost epiSigFSbtn" data-cap="${cap}" style="margin:0;width:auto;padding:0 16px">⤢ Ampliar p/ assinar</button>
+  </div>`;
 }
 
 // --- Separar EPI (almox): segrega o pedido aprovado e gera o código de retirada ---
