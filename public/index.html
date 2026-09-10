@@ -2248,18 +2248,28 @@ function pqInit(){
   setTimeout(function(){pqMap.invalidateSize();pqDesenhar();pqOnGps();},60);
   pqSync(); pqCarregarProg();
 }
-async function pqCarregarProg(){
+let pqProgFit=false;   // enquadra os trechos programados só na 1ª carga da sessão
+async function pqCarregarProg(fit){
   if(!pqMap||!pqProgLayer) return;
   try{
     const {data}=await sb.rpc('app_pp_minhas');
     pqProgLayer.clearLayers();
     const fs=(data&&data.features)||[];
-    fs.forEach(f=>L.geoJSON(f,{style:{color:'#7c3aed',weight:5,opacity:.8}})
-      .bindTooltip('🔎 programado · '+(f.properties.comprimento||0)+' m').addTo(pqProgLayer));
+    const gj=L.geoJSON({type:'FeatureCollection',features:fs},{style:{color:'#7c3aed',weight:5,opacity:.8},
+      onEachFeature:(f,l)=>l.bindTooltip('🔎 programado · '+(f.properties.comprimento||0)+' m')});
+    if(fs.length) gj.addTo(pqProgLayer);
     const b=document.getElementById('pqProgInfo');
     if(b){
       if(fs.length){ b.style.display='block'; b.textContent='🔎 '+(data.n_pendentes||fs.length)+' trecho(s) programado(s) p/ você · '+Number(data.km_pendente||0).toFixed(2)+' km — pesquise e eles somem daqui'; }
       else b.style.display='none';
+    }
+    // 1ª carga: se não estou perto de nenhum trecho, mostro onde é a programação
+    if(fs.length && (fit||!pqProgFit) && !pqAtual && !pqPend){
+      pqProgFit=true;
+      try{
+        const bb=gj.getBounds();
+        if(!gps || !bb.contains([gps.lat,gps.lon])) pqMap.fitBounds(bb,{padding:[40,40],maxZoom:16});
+      }catch(e){}
     }
   }catch(e){}
 }
