@@ -33,6 +33,11 @@
    notificação **pessoal** (ao próprio interessado) nunca leva `p_exceto`; notificação de **grupo**
    sempre leva `p_exceto = auth.uid()` (ator). **Módulo novo que precisa de aprovação/notificação →
    reaproveite isso, não crie hierarquia paralela.** Ver §5.5 (origem) e §6.4 (segundo uso, Frotas).
+10. **Schema = audiência (reorg 2026-09).** Schemas **geo-facing** (`1`–`5`, `7`, `8`) o time de GIS
+    conecta o QGIS. Schemas **app-only** (`9`, `10`, `11 - perdas_nrw`, `12 - retaguarda`) **nunca**
+    recebem `GRANT USAGE` a papéis `gis_*` — acesso só via RPC `SECURITY DEFINER`. Dado com PII (CPF,
+    fotos de documento) ou config/cálculo interno **não** vai pra schema geo. Tabela nova = escolha
+    explícita do lado no PR. `"6 - analises"` foi aposentado (`logger_pressao`→`8`, `dmc`→`7`, NRW→`11`).
 
 ---
 
@@ -91,7 +96,7 @@
 
 ---
 
-## 2. Coleta de campo (schema `"8 - obras & servicos"`)
+## 2. Coleta de campo (schema `"8 - coleta_campo"`)
 
 ### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
@@ -103,7 +108,7 @@
 ### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
   → concluido`. **Não existe mais** promoção automática após 7 dias.
-- **Tabela base:** `"8 - obras & servicos".instalacao_logger_calibracao`. **View:** `vw_loggers`
+- **Tabela base:** `"8 - coleta_campo".instalacao_logger_calibracao`. **View:** `vw_loggers`
   calcula `situacao_atual` a partir das datas (`data_instalacao`, `data_remocao`, `data_finalizacao`)
   e `dias_instalado`. **Não crie coluna `situacao`** — mexa no CASE da view.
 - **RPCs:** `app_loggers_listar()` (retorna a lista já achatada), `app_logger_criar` (avulso, já
@@ -125,7 +130,7 @@
   `lgMap`, `lgMarkers`. `LG_SIT` (labels/cores por situação), `LG_CONS` (ZA1004/ZA0200).
 - **Pressão / ancoragem:** o relógio do logger é **irreal** (arranca na configuração de bancada; só o
   horário/intervalo relativo vale). Regra: `ts_real = ts + (data_instalacao − 1ª leitura com pressão>0)`,
-  coluna **`ts_real`** em `"6 - analises".logger_pressao` (mantém `ts` bruto p/ auditoria). Janela válida
+  coluna **`ts_real`** em `"8 - coleta_campo".logger_pressao` (mantém `ts` bruto p/ auditoria). Janela válida
   = **[data_instalacao, data_remocao]** → descarta o zerado de bancada (início) e o pós-remoção (fim).
   A ancoragem roda **no servidor**, dentro do `logger_pressao_importar` (idempotente; há também
   `logger_pressao_reanchor(id)` para reprocessar). `logger_pressao_stats` e a view **`vw_logger_pressao`**
@@ -154,8 +159,10 @@
 ### 2.3 Pesquisa — `// MÓDULO PESQUISA` (~L2067) · telas `pesquisa` / `ocorrencia` / `produtividade`
 - Trechos retos (GPS início→fim) + **ocorrências** + produtividade.
 - **Ocorrência** (`ocRegistrar`): `app_ocorrencia_registrar` (fila, pasta `ocorrencia`), tabela
-  `"8 - obras & servicos".ocorrencia` (campos `tipo`, `local_ref`, `observacao`, `foto`, `lat/lon`,
-  `consorcio`, `usuario` texto, `pesquisa_id`, `origem`). Foto obrigatória.
+  `"8 - coleta_campo".ocorrencia` (campos `tipo`, `local_ref`, `observacao`, `foto`, `lat/lon`,
+  `consorcio`, `usuario` texto, `pesquisa_id`, `origem`). Foto obrigatória. É **dado geo**
+  (movida de `"12 - retaguarda"` em 2026-09): visível no QGIS via `0 - vitrine_gis.vw_gis_ocorrencia`
+  (curada — sem `foto`/`usuario`/gps cru).
 - **Importante:** as ocorrências alimentam a **fila de Abertura de serviços** (§Auxiliar de
   Programação) via `app_ocorrencia_fila`/`app_ocorrencia_os` (colunas `os_numero/os_criada_em/os_por`).
 - **Produtividade** (`// MÓDULO PRODUTIVIDADE` ~L2200): RPCs `app_pesquisa_filtros`,
@@ -209,21 +216,23 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   virou **dois selects** `CAT_AGUA`/`CAT_ESG` (Res|Pub|Ind|Com); Ramo de atividade consolidado num só (`569`);
   "Há suspeita de irregularidades?" (`998`) substituído por `CONX_AGUA` (Cliente conectado água?) e
   `CONX_ESG` (Cliente conectado esgoto?). Economias (`115`–`122`) mantidas.
-- ⚠️ **`vw_captacao`** (view achatada p/ BI, no schema `"8 - obras & servicos"`) extrai códigos
+- **Tabela base:** `"12 - retaguarda".captacao_cliente` (schema *app-only*, contém PII: CPF, fotos de
+  documento — **nunca** exposto a GIS; movido de `"8 - coleta_campo"` na reorg de 2026-09).
+- ⚠️ **`vw_captacao`** (view achatada p/ BI, agora em `"12 - retaguarda"`) extrai códigos
   específicos do jsonb → **ajustar a view faz parte de qualquer mudança no `CAP_Q`** (senão os códigos
-  removidos ficam como colunas mortas e os novos não aparecem). Nesta reformulação a view foi recriada
-  (migração `vw_captacao_ajuste_perguntas`): removidas as colunas dos campos excluídos, `569` vira a
-  coluna única `ramo_atividade`, e adicionadas `categoria_agua`/`categoria_esgoto` (de `CAT_AGUA`/`CAT_ESG`)
-  e `cliente_conectado_agua`/`cliente_conectado_esgoto` (de `CONX_AGUA`/`CONX_ESG`). Como remove/renomeia
-  colunas, é **DROP+CREATE** (não `create or replace`) + re-`grant select` a `gis_editor`/`gis_visualizacao`.
+  removidos ficam como colunas mortas e os novos não aparecem). Recriada na migração
+  `vw_captacao_ajuste_perguntas` (`569` → `ramo_atividade`; `+categoria_agua/_esgoto` de `CAT_AGUA`/`CAT_ESG`;
+  `+cliente_conectado_agua/_esgoto` de `CONX_AGUA`/`CONX_ESG`). Como remove/renomeia colunas, é
+  **DROP+CREATE**. Não conceder a `gis_*` (schema 12 não tem `USAGE` pra GIS).
 
 ### 3.2 Solicitação de serviços (campo) — `// ABERTURA DE SERVIÇOS` (~L1394) · tela `abertura_servicos`
 - Entrevistador pede abertura de OS (tipo, matrícula, HD, foto do HD, GPS). RPC
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
-  `app_abertura_servico_minhas`. Tabela `"8 - obras & servicos".abertura_servico`.
+  `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
+  `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
 
 ### 3.3 Roteiro de leitura (Suporte) — `// SUPORTE › ROTEIRO DE LEITURA` (~L1926) · tela `roteiro`
-- Mapa por **percurso/trecho** sobre `"8 - obras & servicos".vw_roteiro_leitura` (pontos, 133k) e
+- Mapa por **percurso/trecho** sobre `"8 - coleta_campo".vw_roteiro_leitura` (pontos, 133k) e
   `vw_roteiro_leitura_linha` (linhas). Carrega **1 percurso por vez** (nunca os 133k).
 - **RPCs:** `app_roteiro_percursos()` (585, p/ dropdown), `app_roteiro_pontos(p_percurso,p_trecho)`
   (GeoJSON 4326, com `tipo`/`marco`/`trecho`), `app_roteiro_linhas(p_percurso,p_trecho)` (sem
@@ -642,9 +651,12 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   domínio). É gate de **UX/2ª camada**; o enforcement real virá com **RLS** quando os dados saírem de
   snapshot para RPC.
 - **Dados:** hoje é **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
-  auditoria cadastral, reincidência de ramais — extraídos de `"6 - analises".dmc`/`dmc_resumo` e
-  `"7 - projetos"`). Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
-  **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"6 - analises"`/`"7 - projetos"`.
+  auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`/`dmc_resumo`).
+  Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
+  **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"7 - setorizacao"` (geometria/
+  cadastro DMC) e `"11 - perdas_nrw"` (`parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc`).
+  Reorg de 2026-09: `dmc` foi de `"6 - analises"` (aposentado) → `"7 - setorizacao"`; as tabelas de
+  cálculo/config → `"11 - perdas_nrw"` (*app-only*, sem `USAGE` pra GIS).
 - **Estrutura (32 itens de navegação em 6 fases):** 1 Visão (Painel, DMCs, Ficha) · 2 Dados & diagnóstico
   (Medições, Consumo, Balanço, MNF, Eventos) · 3 Ação (Plano por DMC, Componentes IWA, HD, Fraude,
   Auditoria, Rede, Ramais, Pressão) · 4 Execução (OS, Renovação, VRPs, Reservatórios, Setorização;

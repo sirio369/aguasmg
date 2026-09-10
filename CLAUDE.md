@@ -130,16 +130,47 @@ pwa/
   ```
 
 ### Esquemas (cadastro técnico + operação)
+
+**Regra de separação (2026-09):** schema define a **audiência**, não só o assunto.
+- **Geo-facing** (o time de GIS conecta o QGIS aqui): `1`–`5`, `7`, `8`, e camadas via view.
+- **App-only** (invisível ao GIS — sem `USAGE` pra papéis `gis_*`, acesso só via RPC `SECURITY DEFINER`):
+  `9`, `10`, `11`, `12`. Tabela nova = decisão explícita no PR de qual lado ela cai.
+
 | Schema | Conteúdo |
 |---|---|
 | `1 - suporte_geografico` | limites, apoio |
 | `2 - infra_agua` | rede, nós de água (`nos_agua`), unidades operacionais, **`vrps`** |
 | `3 - comercial` | ligações |
-| `4 - redes_terceiros`, `5 - info_copasa`, `6 - analises` | apoio/cadastro |
-| `8 - obras & servicos` | coleta de campo (pressão, loggers, pesquisa, captação, abertura de serviços) |
-| `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) |
-| `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências |
+| `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
+| `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
+| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
+| `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
+| `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
+| `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
+| `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
+
+> `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
+
+**Papéis GIS (2026-09, consolidado 4 → 2):**
+- **`gis_visualizacao`** = *leitura*: `SELECT` em todo o acervo geo (schemas `1`–`5`, `7`, `8`) + `INSERT/UPDATE/DELETE` em `public.layer_styles` (salvar estilo QGIS). Sem escrita em dado geo.
+- **`gis_editor`** = *edição*: **herda `gis_visualizacao`** + escreve **só** onde se edita geometria à mão: `7 - setorizacao.dmc_projetado`, `7 - setorizacao.vrp_projetada`, `8 - coleta_campo.instalacao_logger_calibracao`. `dmc`/`dmc_resumo`/`dmc_ligacao` são **só leitura** (saída de recálculo).
+- `gis_projetos` / `gis_obras_servicos`: aposentados — viraram membros de `gis_editor` (aliases finos até as conexões QGIS serem repontadas; então `DROP ROLE`).
+- Nenhum papel `gis_*` tem `USAGE` em `9`/`10`/`11`/`12`. Auditoria (deve retornar 0 linhas, ignorando `pg_catalog`/`information_schema`/`net` herdados de `PUBLIC`):
+  ```sql
+  select r.rolname, n.nspname
+  from pg_namespace n
+  cross join (values ('gis_visualizacao'),('gis_editor')) r(rolname)
+  where has_schema_privilege(r.rolname, n.oid, 'USAGE')
+    and n.nspname not in ('1 - suporte_geografico','2 - infra_agua','3 - comercial','4 - redes_terceiros',
+                          '5 - info_copasa','7 - setorizacao','8 - coleta_campo','public',
+                          'pg_catalog','information_schema','net');
+  ```
+
+**Vitrine GIS — `0 - vitrine_gis` (2026-09):** schema de *apresentação* read-only pro QGIS. 13 views `vw_gis_*` sobre schemas `7`/`8` (+ join com `2` na `vw_gis_vrp`), só `geom` + colunas estáveis — sem PII, sem `foto_*`/`gps_*` cru, sem `respostas`/`fotos` jsonb, sem internos de cálculo. Views **definer** (rodam como `postgres`) → sobrevivem à revogação de USAGE em 7/8.
+- `GRANT USAGE + SELECT` só pra `gis_visualizacao` (editor herda). Nenhuma view pode referenciar `9`–`12` (checar com `pg_depend`) — se um dado app-only precisar ir pro mapa, **move a tabela pro schema geo** primeiro (ex.: `ocorrencia` `12`→`8` em 2026-09) e só então cria a view curada.
+- `vw_gis_dmc_projetada` = `dmc_projetado.geom` + KPIs firmes do `dmc_resumo` (1:1 por `dmc_id`); provisórios (`economias`, `consumo_medio_total`, contagens de VRP/OS) ficam de fora até estabilizar.
+- **Passo pendente** (após o time repontar o projeto QGIS pra vitrine): `REVOKE USAGE ON SCHEMA "7 - setorizacao","8 - coleta_campo" FROM "gis_visualizacao"` — aí o leitor puro passa a ver só `1`–`5` + `0 - vitrine_gis`. O `gis_editor` mantém 7/8 (edição de geometria precisa da tabela real).
 
 ## 5. Convenções do frontend (`index.html`)
 
@@ -161,7 +192,7 @@ pwa/
 > "cuidados") em **[`docs/MODULOS.md`](docs/MODULOS.md)**. **Leia a seção do módulo que você vai
 > editar antes de mexer** — este mapa aqui é só o panorama.
 
-**Coleta de campo** (schema `8 - obras & servicos`):
+**Coleta de campo** (schema `8 - coleta_campo`):
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
 - **Loggers temporários** (`loggers`/`logger_det`) — ciclo: **pendente → instalado → dados pendentes
   (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após
@@ -173,8 +204,8 @@ pwa/
   `p_foto_extra`; `_editar` recebe paths de foto + OS via `p_campos`).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
-  `"8 - obras & servicos".ocorrencia`) alimentam a fila de **Abertura de serviços** (ver Auxiliar de
-  Programação), onde recebem nº de OS.
+  `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
+  alimentam a fila de **Abertura de serviços** (ver Auxiliar de Programação), onde recebem nº de OS.
 - **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
   **Solicitação de serviços** de campo (`abertura_servicos`) e, na subdivisão **🛟 Suporte**,
   **Roteiro de leitura** (`roteiro`) — mapa por percurso/trecho sobre `vw_roteiro_leitura`(_linha),
