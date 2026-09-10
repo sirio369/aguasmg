@@ -152,6 +152,21 @@ pwa/
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
 
+**Papéis GIS (2026-09, consolidado 4 → 2):**
+- **`gis_visualizacao`** = *leitura*: `SELECT` em todo o acervo geo (schemas `1`–`5`, `7`, `8`) + `INSERT/UPDATE/DELETE` em `public.layer_styles` (salvar estilo QGIS). Sem escrita em dado geo.
+- **`gis_editor`** = *edição*: **herda `gis_visualizacao`** + escreve **só** onde se edita geometria à mão: `7 - setorizacao.dmc_projetado`, `7 - setorizacao.vrp_projetada`, `8 - coleta_campo.instalacao_logger_calibracao`. `dmc`/`dmc_resumo`/`dmc_ligacao` são **só leitura** (saída de recálculo).
+- `gis_projetos` / `gis_obras_servicos`: aposentados — viraram membros de `gis_editor` (aliases finos até as conexões QGIS serem repontadas; então `DROP ROLE`).
+- Nenhum papel `gis_*` tem `USAGE` em `9`/`10`/`11`/`12`. Auditoria (deve retornar 0 linhas, ignorando `pg_catalog`/`information_schema`/`net` herdados de `PUBLIC`):
+  ```sql
+  select r.rolname, n.nspname
+  from pg_namespace n
+  cross join (values ('gis_visualizacao'),('gis_editor')) r(rolname)
+  where has_schema_privilege(r.rolname, n.oid, 'USAGE')
+    and n.nspname not in ('1 - suporte_geografico','2 - infra_agua','3 - comercial','4 - redes_terceiros',
+                          '5 - info_copasa','7 - setorizacao','8 - coleta_campo','public',
+                          'pg_catalog','information_schema','net');
+  ```
+
 ## 5. Convenções do frontend (`index.html`)
 
 - **Um arquivo grande**; funções agrupadas por módulo, com comentários `// ---------- NOME ----------`.
