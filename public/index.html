@@ -280,6 +280,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <h1>Pesquisa</h1>
     <p class="sub">Registre trechos <b>retos</b>. Finalize a cada mudança de direção (esquina, curva) e inicie um novo.</p>
     <div id="pqGps" class="banner warn">Obtendo GPS…</div>
+    <div id="pqProgInfo" style="display:none;background:#f2ecff;border:1px solid #c9b8f5;color:#4b2e83;border-radius:10px;padding:8px 11px;font-size:13px;margin-bottom:8px"></div>
     <div id="pqMapa" style="height:42vh;min-height:250px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px"></div>
     <div id="pqInfo" style="display:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;margin-bottom:10px"></div>
     <div class="seg" style="gap:10px">
@@ -346,6 +347,17 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="prodTudo" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Tudo</button>
     </div>
     <div id="prodCards" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px"></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" id="prodCruzar"/> 🔗 Cruzar com a programação da pesquisa
+    </label>
+    <div id="prodCruzPanel" class="hidden" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px">
+      <div id="prodCruzKpi" style="color:var(--mut);margin-bottom:8px"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="prodFP" checked/> <i style="width:14px;height:4px;background:#7c3aed;border-radius:2px;display:inline-block"></i> pendente (cadastro)</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="prodFE" checked/> <i style="width:14px;height:4px;background:#15803d;border-radius:2px;display:inline-block"></i> pesquisado (cadastro)</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="prodFR" checked/> <i style="width:14px;height:4px;background:#d81b60;border-radius:2px;display:inline-block"></i> reporte de campo</label>
+      </div>
+    </div>
     <div id="prodMapa" style="height:42vh;min-height:250px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
@@ -1495,6 +1507,8 @@ if($('#prodAte')) $('#prodAte').addEventListener('change',prodAtualizar);
 if($('#prodHoje')) $('#prodHoje').addEventListener('click',()=>{document.getElementById('prodDe').value=prodHojeStr();document.getElementById('prodAte').value=prodHojeStr();prodAtualizar();});
 if($('#prodMes')) $('#prodMes').addEventListener('click',()=>{document.getElementById('prodDe').value=prodMesIniStr();document.getElementById('prodAte').value=prodHojeStr();prodAtualizar();});
 if($('#prodTudo')) $('#prodTudo').addEventListener('click',()=>{document.getElementById('prodDe').value='';document.getElementById('prodAte').value='';prodAtualizar();});
+if($('#prodCruzar')) $('#prodCruzar').addEventListener('change',prodCruzToggle);
+['prodFP','prodFE','prodFR'].forEach(id=>{ if($('#'+id)) $('#'+id).addEventListener('change',prodCruzAtualizar); });
 if($('#ocBack')) $('#ocBack').addEventListener('click',()=>irPara('pesquisa'));
 // wiring captação
 ['cap_matricula','cap_endereco','cap_categoria','cap_economias','cap_ocupacao','cap_nome','cap_mae','cap_cpf','cap_rg','cap_nasc','cap_email','cap_tel'].forEach(id=>{
@@ -2208,7 +2222,7 @@ if($('#rlMatGo')) $('#rlMatGo').addEventListener('click',rlBuscarMat);
 if($('#rlMat')) $('#rlMat').addEventListener('keydown',function(e){if(e.key==='Enter')rlBuscarMat();});
 
 // ---------- MÓDULO PESQUISA (trechos retos + ocorrência) ----------
-let pqMap=null, pqLayer=null, pqYou=null;
+let pqMap=null, pqLayer=null, pqProgLayer=null, pqYou=null;
 let pqAtual=null;    // trecho em andamento {lat,lon,ts,acc}
 let pqPend=null;     // finalizado aguardando confirmação {ini,fim,dist,dur}
 let pqTrajetos=[];   // confirmados nesta sessão
@@ -2221,11 +2235,27 @@ function pqInit(){
     cont.innerHTML='';
     pqMap=L.map('pqMapa');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(pqMap);
+    pqProgLayer=L.layerGroup().addTo(pqMap);   // trechos programados p/ este geofonista
     pqLayer=L.layerGroup().addTo(pqMap);
     pqMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?17:12);
   }
   setTimeout(function(){pqMap.invalidateSize();pqDesenhar();pqOnGps();},60);
-  pqSync();
+  pqSync(); pqCarregarProg();
+}
+async function pqCarregarProg(){
+  if(!pqMap||!pqProgLayer) return;
+  try{
+    const {data}=await sb.rpc('app_pp_minhas');
+    pqProgLayer.clearLayers();
+    const fs=(data&&data.features)||[];
+    fs.forEach(f=>L.geoJSON(f,{style:{color:'#7c3aed',weight:5,opacity:.8}})
+      .bindTooltip('🔎 programado · '+(f.properties.comprimento||0)+' m').addTo(pqProgLayer));
+    const b=document.getElementById('pqProgInfo');
+    if(b){
+      if(fs.length){ b.style.display='block'; b.textContent='🔎 '+(data.n_pendentes||fs.length)+' trecho(s) programado(s) p/ você · '+Number(data.km_pendente||0).toFixed(2)+' km — pesquise e eles somem daqui'; }
+      else b.style.display='none';
+    }
+  }catch(e){}
 }
 function pqHav(a,b){const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180,h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
 function pqFmtDur(ms){const s=Math.round(ms/1000);if(s<60)return s+' s';const m=Math.floor(s/60),r=s%60;return m+' min '+(r<10?'0':'')+r+' s';}
@@ -2273,6 +2303,7 @@ function pqConfirmar(){
   }};
   pqTrajetos.push(t); pqPend=null; pqDesenhar(); pqSync();
   enviarOuEnfileirar(item,'✓ Trecho salvo ('+Math.round(t.dist)+' m)');
+  setTimeout(pqCarregarProg,1800);   // o cruzamento no servidor pode ter marcado programados como executados
 }
 function pqDescartar(){ pqPend=null; pqDesenhar(); pqSync(); }
 function pqDesenhar(){
@@ -2378,6 +2409,36 @@ async function prodAtualizar(){
     if(error)throw error;
     prodCards(data); prodDesenhar(data);
   }catch(e){toast('Erro na produtividade: '+(e.message||e));}
+  prodCruzAtualizar();
+}
+let prodPend=null, prodExec=null;
+function prodCruzToggle(){
+  const on=document.getElementById('prodCruzar').checked;
+  document.getElementById('prodCruzPanel').classList.toggle('hidden',!on);
+  if(on) prodCruzAtualizar();
+  else {
+    [prodPend,prodExec].forEach(l=>{ if(l&&prodMap) prodMap.removeLayer(l); }); prodPend=prodExec=null;
+    if(prodTr&&prodMap&&!prodMap.hasLayer(prodTr)) prodTr.addTo(prodMap);
+  }
+}
+async function prodCruzAtualizar(){
+  if(!document.getElementById('prodCruzar') || !document.getElementById('prodCruzar').checked || !prodMap) return;
+  const su=document.getElementById('prodUser'); const u=(su&&su.value!=='__todos')?su.value:null;
+  const de=(document.getElementById('prodDe').value||null), ate=(document.getElementById('prodAte').value||null);
+  try{
+    const {data,error}=await sb.rpc('app_pp_mapa',{p_usuario:u,p_data_ini:de,p_data_fim:ate});
+    if(error)throw error;
+    const fp=document.getElementById('prodFP').checked, fe=document.getElementById('prodFE').checked, fr=document.getElementById('prodFR').checked;
+    if(prodPend){prodMap.removeLayer(prodPend);prodPend=null;}
+    if(prodExec){prodMap.removeLayer(prodExec);prodExec=null;}
+    const cp=(data.cadastro_pendente&&data.cadastro_pendente.features)||[];
+    const ce=(data.cadastro_executado&&data.cadastro_executado.features)||[];
+    if(fp&&cp.length) prodPend=L.geoJSON(data.cadastro_pendente,{style:{color:'#7c3aed',weight:5,opacity:.8}}).bindTooltip('pendente (cadastro)').addTo(prodMap);
+    if(fe&&ce.length) prodExec=L.geoJSON(data.cadastro_executado,{style:{color:'#15803d',weight:5,opacity:.8}}).bindTooltip('pesquisado (cadastro)').addTo(prodMap);
+    if(prodTr){ if(fr){ if(!prodMap.hasLayer(prodTr)) prodTr.addTo(prodMap); } else prodMap.removeLayer(prodTr); }
+    const k=data.kpis||{};
+    document.getElementById('prodCruzKpi').innerHTML='📏 <b>'+Number(k.km_programado||0).toFixed(2)+'</b> km programado · ✅ <b>'+Number(k.km_executado||0).toFixed(2)+'</b> km · '+Number(k.pct_cobertura||0).toFixed(0)+'% · <b>'+(k.n_pendentes||0)+'</b> trecho(s) pendente(s)';
+  }catch(e){ toast('Erro no cruzamento: '+(e.message||e)); }
 }
 function prodCards(d){
   const cards=[
