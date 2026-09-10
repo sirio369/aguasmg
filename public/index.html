@@ -412,6 +412,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="ppModoVoltar" class="bk" style="margin-left:auto;padding:2px 6px">‹ Ver toda a rede</button>
     </div>
     <div id="ppMapa" style="height:52vh;min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:12px;color:var(--mut)">
+      <span><i style="display:inline-block;width:14px;height:3px;background:#475569;vertical-align:middle;border-radius:2px"></i> livre</span>
+      <span><i style="display:inline-block;width:14px;height:3px;background:#7c3aed;vertical-align:middle;border-radius:2px"></i> programado</span>
+      <span><i style="display:inline-block;width:14px;height:3px;background:#15803d;vertical-align:middle;border-radius:2px"></i> pesquisado</span>
+      <span><i style="display:inline-block;width:14px;height:3px;background:#dc2626;vertical-align:middle;border-radius:2px"></i> sem pesquisa recente</span>
+      <span><i style="display:inline-block;width:14px;height:3px;background:#f97316;vertical-align:middle;border-radius:2px"></i> selecionado</span>
+    </div>
     <div id="ppSelInfo" class="banner" style="display:none;margin-top:10px"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
       <select id="ppColab" style="flex:1;min-width:150px"><option value="">Geofonista…</option></select>
@@ -2403,7 +2410,8 @@ let ppFeatById=new Map();            // rede_id -> layer leaflet
 let ppStatusById=new Map();          // rede_id -> pp_status
 let ppFiltroColab=null;              // null=modo rede | uuid=modo geofonista
 let ppResumoData=[];
-const PP_COL={livre:'#9aa4b2',pendente:'#2f7ed8',executado:'#1a7f4b',sel:'#ff6d00',vencido:'#c0392b'};
+const PP_COL={livre:'#475569',pendente:'#7c3aed',executado:'#15803d',sel:'#f97316',vencido:'#dc2626'};
+const PP_W={livre:3.5,pendente:5,executado:4.5,vencido:5,sel:7};
 
 function ppInit(){
   const cont=document.getElementById('ppMapa');
@@ -2411,7 +2419,7 @@ function ppInit(){
   if(!ppMap){
     cont.innerHTML='';
     ppMap=L.map('ppMapa').setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?16:13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(ppMap);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.55,attribution:'© OpenStreetMap'}).addTo(ppMap);
     ppRedeLayer=L.layerGroup().addTo(ppMap);
     ppDrawnLayer=L.featureGroup().addTo(ppMap);
     if(L.Draw){
@@ -2455,9 +2463,9 @@ function ppRender(feats,tooltipExtra){
   (feats||[]).forEach(f=>{
     const p=f.properties, id=p.id, st=p.pp_status||null, sel=ppSel.has(id);
     ppStatusById.set(id,st);
-    let col = sel?PP_COL.sel : (st?PP_COL[st] : PP_COL.livre);
-    if(!sel && !st && venceEm && (!p.ultima_pesquisa || p.ultima_pesquisa.slice(0,10) < venceEm)) col=PP_COL.vencido;
-    const ln=L.geoJSON(f,{style:{color:col,weight:sel?6:3,opacity:.9}});
+    let key = sel?'sel' : (st||'livre');
+    if(!sel && !st && venceEm && (!p.ultima_pesquisa || p.ultima_pesquisa.slice(0,10) < venceEm)) key='vencido';
+    const ln=L.geoJSON(f,{style:{color:PP_COL[key],weight:PP_W[key]||3.5,opacity:1}});
     ln.eachLayer(l=>{
       l.on('click',()=>ppToggle(id));
       const up=p.ultima_pesquisa?('últ. pesq. '+p.ultima_pesquisa.slice(0,10)):'sem pesquisa';
@@ -2488,8 +2496,8 @@ async function ppCarregarColabView(){
 }
 function ppEstiloId(id){
   const ln=ppFeatById.get(id); if(!ln) return;
-  const st=ppStatusById.get(id), sel=ppSel.has(id);
-  ln.setStyle({color:sel?PP_COL.sel:(st?PP_COL[st]:PP_COL.livre),weight:sel?6:3});
+  const st=ppStatusById.get(id), key=ppSel.has(id)?'sel':(st||'livre');
+  ln.setStyle({color:PP_COL[key],weight:PP_W[key]||3.5});
 }
 function ppToggle(id){ ppSel.has(id)?ppSel.delete(id):ppSel.add(id); ppEstiloId(id); ppSelInfo(); }
 function ppLimparSel(){ ppSel.clear(); ppRecarregar(); }
