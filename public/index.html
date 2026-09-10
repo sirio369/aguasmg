@@ -2256,7 +2256,21 @@ async function pqCarregarProg(fit){
     pqProgLayer.clearLayers();
     const fs=(data&&data.features)||[];
     const gj=L.geoJSON({type:'FeatureCollection',features:fs},{style:{color:'#7c3aed',weight:5,opacity:.8},
-      onEachFeature:(f,l)=>l.bindTooltip('🔎 programado · '+(f.properties.comprimento||0)+' m')});
+      onEachFeature:(f,l)=>{
+        let c=null; try{ c=l.getBounds().getCenter(); }catch(e){}
+        l.bindPopup(()=>{
+          const d=document.createElement('div'); d.style.minWidth='150px';
+          d.innerHTML='<div style="font-size:13px;margin-bottom:6px">🔎 <b>Trecho programado</b> · '+(f.properties.comprimento||0)+' m</div>';
+          if(c){
+            const btn=document.createElement('button');
+            btn.textContent='🧭 Navegar até aqui';
+            btn.style.cssText='all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;background:var(--acc);color:var(--acc-ink);padding:8px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+            btn.onclick=()=>pqNavegar(c.lat,c.lng);
+            d.appendChild(btn);
+          }
+          return d;
+        });
+      }});
     if(fs.length) gj.addTo(pqProgLayer);
     const b=document.getElementById('pqProgInfo');
     if(b){
@@ -2272,6 +2286,9 @@ async function pqCarregarProg(fit){
       }catch(e){}
     }
   }catch(e){}
+}
+function pqNavegar(lat,lon){
+  window.open('https://www.google.com/maps/dir/?api=1&destination='+lat+','+lon+'&travelmode=walking','_blank','noopener');
 }
 function pqHav(a,b){const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180,h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
 function pqFmtDur(ms){const s=Math.round(ms/1000);if(s<60)return s+' s';const m=Math.floor(s/60),r=s%60;return m+' min '+(r<10?'0':'')+r+' s';}
