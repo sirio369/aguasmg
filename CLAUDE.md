@@ -167,6 +167,11 @@ pwa/
                           'pg_catalog','information_schema','net');
   ```
 
+**Vitrine GIS — `0 - vitrine_gis` (2026-09):** schema de *apresentação* read-only pro QGIS. 12 views `vw_gis_*` sobre schemas `7`/`8` (+ join com `2` na `vw_gis_vrp`), só `geom` + colunas estáveis — sem PII, sem `foto_*`/`gps_*` cru, sem `respostas`/`fotos` jsonb, sem internos de cálculo. Views **definer** (rodam como `postgres`) → sobrevivem à revogação de USAGE em 7/8.
+- `GRANT USAGE + SELECT` só pra `gis_visualizacao` (editor herda). Nenhuma view pode referenciar `9`–`12` (checar com `pg_depend`).
+- `vw_gis_dmc_projetada` = `dmc_projetado.geom` + KPIs firmes do `dmc_resumo` (1:1 por `dmc_id`); provisórios (`economias`, `consumo_medio_total`, contagens de VRP/OS) ficam de fora até estabilizar.
+- **Passo pendente** (após o time repontar o projeto QGIS pra vitrine): `REVOKE USAGE ON SCHEMA "7 - setorizacao","8 - coleta_campo" FROM "gis_visualizacao"` — aí o leitor puro passa a ver só `1`–`5` + `0 - vitrine_gis`. O `gis_editor` mantém 7/8 (edição de geometria precisa da tabela real).
+
 ## 5. Convenções do frontend (`index.html`)
 
 - **Um arquivo grande**; funções agrupadas por módulo, com comentários `// ---------- NOME ----------`.
