@@ -397,7 +397,17 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="programacao_pesquisa" class="hidden">
     <div class="bar"><button class="bk" id="ppBack">‹ Auxiliar de Programação</button></div>
     <h1>Programação de pesquisa</h1>
-    <p class="sub">Desenhe um polígono sobre a rede (ou toque nos trechos) e vincule a um geofonista.</p>
+    <details style="margin:2px 0 10px;font-size:13px">
+      <summary style="cursor:pointer;color:var(--acc)">ℹ️ Como usar</summary>
+      <ol style="margin:8px 0 0;padding-left:20px;color:var(--mut);line-height:1.6">
+        <li>Use a ferramenta de <b>polígono/retângulo</b> (canto sup. dir. do mapa) para selecionar vários trechos de uma vez — ou <b>toque</b> em trechos avulsos.</li>
+        <li>Escolha o <b>geofonista</b> e toque em <b>Vincular</b>. Para tirar, selecione e toque em <b>Desvincular</b>.</li>
+        <li><b>✕ Limpar seleção</b> (no mapa) zera a seleção atual.</li>
+        <li>Na lista <b>Programação por geofonista</b>, toque num nome para ver só a rota dele; <b>‹ Ver toda a rede</b> volta.</li>
+        <li><b>Sem pesquisa desde ‹data›</b>: mostra só trechos não pesquisados desde a data (candidatos a reprogramar).</li>
+        <li>Conforme o campo lança os traçados, os trechos viram <b>pesquisado</b> e saem da lista de pendências.</li>
+      </ol>
+    </details>
     <div style="display:flex;gap:6px;margin:0 0 8px">
       <select id="ppCons" style="flex:1"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
       <button id="ppCarregarRede" class="btn" style="margin:0;width:auto;padding:12px 14px">↻ Rede</button>
@@ -2403,7 +2413,8 @@ let ppFeatById=new Map();            // rede_id -> layer leaflet
 let ppStatusById=new Map();          // rede_id -> pp_status
 let ppFiltroColab=null;              // null=modo rede | uuid=modo geofonista
 let ppResumoData=[];
-const PP_COL={livre:'#9aa4b2',pendente:'#2f7ed8',executado:'#1a7f4b',sel:'#ff6d00',vencido:'#c0392b'};
+const PP_COL={livre:'#475569',pendente:'#7c3aed',executado:'#15803d',sel:'#f97316',vencido:'#dc2626'};
+const PP_W={livre:3.5,pendente:5,executado:4.5,vencido:5,sel:7};
 
 function ppInit(){
   const cont=document.getElementById('ppMapa');
@@ -2411,7 +2422,7 @@ function ppInit(){
   if(!ppMap){
     cont.innerHTML='';
     ppMap=L.map('ppMapa').setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?16:13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(ppMap);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.55,attribution:'© OpenStreetMap'}).addTo(ppMap);
     ppRedeLayer=L.layerGroup().addTo(ppMap);
     ppDrawnLayer=L.featureGroup().addTo(ppMap);
     if(L.Draw){
@@ -2436,6 +2447,18 @@ function ppInit(){
       return d;
     }});
     ppClearCtl=new C(); ppMap.addControl(ppClearCtl);
+    // legenda das cores da rede
+    const Lg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+      const d=L.DomUtil.create('div','pp-legend');
+      d.style.cssText='background:rgba(255,255,255,.92);border:1px solid #ccc;border-radius:8px;padding:7px 9px;font:12px/1.5 system-ui,sans-serif;color:#333;box-shadow:0 1px 4px rgba(0,0,0,.2)';
+      const row=(c,t)=>'<div style="display:flex;align-items:center;gap:6px"><i style="width:16px;height:4px;background:'+c+';border-radius:2px;flex:none"></i>'+t+'</div>';
+      d.innerHTML='<b style="display:block;margin-bottom:3px">Rede</b>'
+        +row(PP_COL.livre,'livre')+row(PP_COL.pendente,'programado')+row(PP_COL.executado,'pesquisado')
+        +row(PP_COL.vencido,'sem pesquisa recente')+row(PP_COL.sel,'selecionado');
+      L.DomEvent.disableClickPropagation(d);
+      return d;
+    }});
+    ppMap.addControl(new Lg());
   }
   setTimeout(()=>ppMap.invalidateSize(),60);
   ppCarregarColabs(); ppRecarregar(); ppResumo();
@@ -2455,9 +2478,9 @@ function ppRender(feats,tooltipExtra){
   (feats||[]).forEach(f=>{
     const p=f.properties, id=p.id, st=p.pp_status||null, sel=ppSel.has(id);
     ppStatusById.set(id,st);
-    let col = sel?PP_COL.sel : (st?PP_COL[st] : PP_COL.livre);
-    if(!sel && !st && venceEm && (!p.ultima_pesquisa || p.ultima_pesquisa.slice(0,10) < venceEm)) col=PP_COL.vencido;
-    const ln=L.geoJSON(f,{style:{color:col,weight:sel?6:3,opacity:.9}});
+    let key = sel?'sel' : (st||'livre');
+    if(!sel && !st && venceEm && (!p.ultima_pesquisa || p.ultima_pesquisa.slice(0,10) < venceEm)) key='vencido';
+    const ln=L.geoJSON(f,{style:{color:PP_COL[key],weight:PP_W[key]||3.5,opacity:1}});
     ln.eachLayer(l=>{
       l.on('click',()=>ppToggle(id));
       const up=p.ultima_pesquisa?('últ. pesq. '+p.ultima_pesquisa.slice(0,10)):'sem pesquisa';
@@ -2488,8 +2511,8 @@ async function ppCarregarColabView(){
 }
 function ppEstiloId(id){
   const ln=ppFeatById.get(id); if(!ln) return;
-  const st=ppStatusById.get(id), sel=ppSel.has(id);
-  ln.setStyle({color:sel?PP_COL.sel:(st?PP_COL[st]:PP_COL.livre),weight:sel?6:3});
+  const st=ppStatusById.get(id), key=ppSel.has(id)?'sel':(st||'livre');
+  ln.setStyle({color:PP_COL[key],weight:PP_W[key]||3.5});
 }
 function ppToggle(id){ ppSel.has(id)?ppSel.delete(id):ppSel.add(id); ppEstiloId(id); ppSelInfo(); }
 function ppLimparSel(){ ppSel.clear(); ppRecarregar(); }
