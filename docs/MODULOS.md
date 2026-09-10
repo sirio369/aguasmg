@@ -330,13 +330,36 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
 
 ---
 
-## 6. Frotas / Condutor / QSMS — schema `"10 - Frotas"` · telas `condutor` / `frotas` / `qsms`
+## 6. Frota — schema `"10 - Frotas"` · tela-hub `frota` (+ telas internas `condutor` / `frotas` / `qsms`)
 
-Três telas, três públicos, um fluxo só: colaborador vira **condutor** (auto-cadastro de CNH →
-aprovação do gestor → treinamento de direção defensiva → ativo), **Frotas** (`funcao='frotas'`/admin)
-cadastra veículos e aprova ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos
-treinamentos. Cards na home (🧰 Suporte): 🚗 Frotas, 🪪 Condutor (todo mundo vê), 🦺 QSMS
-(`#cardQsms`, nasce `hidden`, revelado por `homeGate()` — mesmo padrão do §1/§4).
+Um público entra por **um só card** na home (🧰 Suporte › **🚗 Frota**, `data-go="frota"`). Fluxo
+único: colaborador vira **condutor** (auto-cadastro de CNH → aprovação do gestor → treinamento de
+direção defensiva → ativo), **Frotas** (`funcao='frotas'`/admin) cadastra veículos e aprova
+ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos treinamentos.
+
+### 6.0 Hub `frota` — `// ----- HUB da Frota` (~L4856)
+- Estilo Suprimentos/Insumos: `frotaInit` → `frotaHome` renderiza **seções → botões**; `frotaBlocks()`
+  monta as seções e o gate de cada uma (seção sem acesso **não aparece**, diferente do `supArea` que
+  mostra bloqueada):
+  - **👤 Colaborador** (`on:true`, todo usuário): Minha CNH · Situação do veículo · Abastecimento ·
+    Registrar ocorrência · Lavagem · Emprestar / meus empréstimos.
+  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): Aprovar condutores · Aprovar ocorrências ·
+    Aprovar manutenções.
+  - **🏢 Equipe administrativa** (`funcao='frotas'||is_admin`): Veículos · Equipes · Condutores ·
+    Painel e custos.
+  - **🦺 QSMS** (`funcao='qsms'||is_admin`): Treinamentos (agendar / baixa).
+- **`frotaOpen(id)` é um roteador** — não duplica render. Seta um alvo e chama `irPara`:
+  - ações de Colaborador → `condTarget={sub,act}` + `irPara('condutor')`; `condInit` consome o alvo
+    depois do load (`condGoTarget`). Ação que depende de veículo: 0 veículos → `toast`; 1 → auto-seleciona;
+    2+ → `condRenderPick(sub)` (lista de placas). "Minha CNH" cai na home do condutor (ou no cadastro se
+    ainda não existe). "Aprovar condutores" cai na home (a fila já fica no topo).
+  - Gestor/Admin → `frotasTarget` (`'home'|'equipes'|'condutores'|'painel'`) + `irPara('frotas')`;
+    `frotasInit` consome. Aprovações de ocorrência/manutenção ficam no topo da home de `frotas`.
+  - QSMS → `irPara('qsms')`.
+- As telas internas `condutor`/`frotas`/`qsms` **não têm mais card na home**; a barra delas volta pro
+  hub (`#condBar`/`#frotasBar`/`#qsmsBar` → `irPara('frota')`). Os `‹ Voltar` **internos** das
+  sub-telas continuam indo pra home da própria tela (2 níveis de volta). Deep-links de notificação
+  (`supGoAct`, §7) continuam apontando direto pra `condutor`/`frotas`/`qsms` — seguem funcionando.
 
 ### 6.1 Condutor — `// condutor/frotas/qsms` (~L4275) · tela `condutor`
 - **Ciclo de status** (`frota_condutor.status`): `pendente` → (gestor aprova) → `apto` (banner com

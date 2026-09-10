@@ -224,7 +224,11 @@ pwa/
 
 **Suprimentos** (`suprimentos`) — ver §8.
 
-**Frotas / Condutor / QSMS** (`frotas`/`condutor`/`qsms`, schema `10 - Frotas`) — condutor se
+**Frota** (card único `frota` na home; telas internas `condutor`/`frotas`/`qsms`, schema `10 - Frotas`)
+— o card abre um **hub estilo Suprimentos** (`frotaInit`/`frotaHome`/`frotaBlocks`) com 4 seções
+gateadas: **👤 Colaborador**, **🖊️ Gestor**, **🏢 Equipe administrativa**, **🦺 QSMS**. `frotaOpen(id)`
+é só roteador: seta `condTarget`/`frotasTarget` e faz `irPara('condutor'|'frotas'|'qsms')` — o render
+de cada fluxo continua onde estava. Detalhe em `docs/MODULOS.md §6.0`. Fluxo: condutor se
 auto-cadastra (CNH) → gestor aprova → **apto** (10 dias p/ treinamento) → QSMS agenda e dá baixa
 (foto da lista de presença obrigatória) → **ativo**; alerta de CNH vencendo em 30 dias. Só pode ser
 vinculado a veículo/equipe/empréstimo quem está `apto`/`ativo` (validado no backend; reeditar um
