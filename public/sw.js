@@ -1,4 +1,4 @@
-const CACHE = 'coleta-v99';
+const CACHE = 'coleta-v100';
 const ASSETS = ['./', './index.html', './perdas.html', './manifest.webmanifest', './icon.png', './logo.png'];
 
 self.addEventListener('install', e => {
