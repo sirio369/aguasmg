@@ -2313,6 +2313,15 @@ function pqInit(){
     pqProgLayer=L.layerGroup().addTo(pqMap);   // trechos programados p/ este geofonista
     pqLayer=L.layerGroup().addTo(pqMap);
     pqMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?17:12);
+    const Loc=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+      const b=L.DomUtil.create('button','pqLoc');
+      b.type='button'; b.title='Centralizar na minha posição'; b.textContent='📍';
+      b.style.cssText='width:38px;height:38px;font-size:18px;line-height:38px;text-align:center;background:#fff;border:1px solid #bbb;border-radius:8px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)';
+      L.DomEvent.disableClickPropagation(b);
+      b.onclick=function(){ if(gps){ pqMap.setView([gps.lat,gps.lon], Math.max(pqMap.getZoom(),17)); } else toast('Sem sinal de GPS'); };
+      return b;
+    }});
+    pqMap.addControl(new Loc());
   }
   setTimeout(function(){pqMap.invalidateSize();pqDesenhar();pqOnGps();},60);
   pqSync(); pqCarregarProg();
