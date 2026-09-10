@@ -142,7 +142,7 @@ pwa/
 | `2 - infra_agua` | rede, nós de água (`nos_agua`), unidades operacionais, **`vrps`** |
 | `3 - comercial` | ligações |
 | `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
-| `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
+| `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo`. **`cod_dmc_za`** (coluna gerada = `consorcio` + `codigo_dmc`, ex. `ZA0200-DMC-06`) é a **chave global** — `codigo_dmc`/`numero_dmc` se repetem entre as duas ZAs (ZA0200 tem DMC-01..06, ZA1004 tem DMC-01..09) |
 | `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
 | `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
@@ -169,7 +169,8 @@ pwa/
 
 **Vitrine GIS — `0 - vitrine_gis` (2026-09):** schema de *apresentação* read-only pro QGIS. 13 views `vw_gis_*` sobre schemas `7`/`8` (+ join com `2` na `vw_gis_vrp`), só `geom` + colunas estáveis — sem PII, sem `foto_*`/`gps_*` cru, sem `respostas`/`fotos` jsonb, sem internos de cálculo. Views **definer** (rodam como `postgres`) → sobrevivem à revogação de USAGE em 7/8.
 - `GRANT USAGE + SELECT` só pra `gis_visualizacao` (editor herda). Nenhuma view pode referenciar `9`–`12` (checar com `pg_depend`) — se um dado app-only precisar ir pro mapa, **move a tabela pro schema geo** primeiro (ex.: `ocorrencia` `12`→`8` em 2026-09) e só então cria a view curada.
-- `vw_gis_dmc_projetada` = `dmc_projetado.geom` + KPIs firmes do `dmc_resumo` (1:1 por `dmc_id`); provisórios (`economias`, `consumo_medio_total`, contagens de VRP/OS) ficam de fora até estabilizar.
+- `vw_gis_dmc_projetada` = `dmc_projetado.geom` + KPIs firmes do `dmc_resumo` (1:1 por `dmc_id`); provisórios (`economias`, `consumo_medio_total`, contagens de VRP/OS) ficam de fora até estabilizar. `cod_dmc_za` exposto em `vw_gis_dmc` / `vw_gis_dmc_projetada` / `vw_gis_vrp_projetada` — usar como rótulo/chave no QGIS.
+- **Reconciliação DMC (2026-09):** `ZA0200-DMC-06` estava partida em 2 polígonos de staging (REG0000784 + REG1496117) → fundidos num só (861 ha); `dmc_ligacao`/`dmc_resumo`/`vrp_projetada` repontados; `vrp_projetada.dmc_divergente` zerou. `ZA1004-DMC-06` (outra ZA) é separada e não foi tocada.
 - **Trava aplicada (2026-09):** `gis_visualizacao` **não tem mais** USAGE em `7 - setorizacao` / `8 - coleta_campo` — o leitor puro enxerga só `1`–`5` + `0 - vitrine_gis`. O `gis_editor` mantém USAGE em 7/8 + `SELECT`+escrita nas 3 tabelas de edição de geometria (`dmc_projetado`, `vrp_projetada`, `instalacao_logger_calibracao`); o resto de 7/8 ele também lê pela vitrine.
 - **Repontar o projeto QGIS** ("Águas MG"): camadas de leitura → `0 - vitrine_gis.vw_gis_*`; as 3 de escrita seguem na tabela crua (conectar como `gis_editor`).
 
