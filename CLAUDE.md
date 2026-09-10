@@ -142,8 +142,8 @@ pwa/
 | `2 - infra_agua` | rede, nós de água (`nos_agua`), unidades operacionais, **`vrps`** |
 | `3 - comercial` | ligações |
 | `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
-| `7 - projetos` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
-| `8 - obras & servicos` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
+| `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
+| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
 | `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
@@ -172,7 +172,7 @@ pwa/
 > "cuidados") em **[`docs/MODULOS.md`](docs/MODULOS.md)**. **Leia a seção do módulo que você vai
 > editar antes de mexer** — este mapa aqui é só o panorama.
 
-**Coleta de campo** (schema `8 - obras & servicos`):
+**Coleta de campo** (schema `8 - coleta_campo`):
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
 - **Loggers temporários** (`loggers`/`logger_det`) — ciclo: **pendente → instalado → dados pendentes
   (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após

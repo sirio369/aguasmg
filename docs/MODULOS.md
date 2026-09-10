@@ -96,7 +96,7 @@
 
 ---
 
-## 2. Coleta de campo (schema `"8 - obras & servicos"`)
+## 2. Coleta de campo (schema `"8 - coleta_campo"`)
 
 ### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
@@ -108,7 +108,7 @@
 ### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
   → concluido`. **Não existe mais** promoção automática após 7 dias.
-- **Tabela base:** `"8 - obras & servicos".instalacao_logger_calibracao`. **View:** `vw_loggers`
+- **Tabela base:** `"8 - coleta_campo".instalacao_logger_calibracao`. **View:** `vw_loggers`
   calcula `situacao_atual` a partir das datas (`data_instalacao`, `data_remocao`, `data_finalizacao`)
   e `dias_instalado`. **Não crie coluna `situacao`** — mexa no CASE da view.
 - **RPCs:** `app_loggers_listar()` (retorna a lista já achatada), `app_logger_criar` (avulso, já
@@ -130,7 +130,7 @@
   `lgMap`, `lgMarkers`. `LG_SIT` (labels/cores por situação), `LG_CONS` (ZA1004/ZA0200).
 - **Pressão / ancoragem:** o relógio do logger é **irreal** (arranca na configuração de bancada; só o
   horário/intervalo relativo vale). Regra: `ts_real = ts + (data_instalacao − 1ª leitura com pressão>0)`,
-  coluna **`ts_real`** em `"8 - obras & servicos".logger_pressao` (mantém `ts` bruto p/ auditoria). Janela válida
+  coluna **`ts_real`** em `"8 - coleta_campo".logger_pressao` (mantém `ts` bruto p/ auditoria). Janela válida
   = **[data_instalacao, data_remocao]** → descarta o zerado de bancada (início) e o pós-remoção (fim).
   A ancoragem roda **no servidor**, dentro do `logger_pressao_importar` (idempotente; há também
   `logger_pressao_reanchor(id)` para reprocessar). `logger_pressao_stats` e a view **`vw_logger_pressao`**
@@ -215,7 +215,7 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   "Há suspeita de irregularidades?" (`998`) substituído por `CONX_AGUA` (Cliente conectado água?) e
   `CONX_ESG` (Cliente conectado esgoto?). Economias (`115`–`122`) mantidas.
 - **Tabela base:** `"12 - retaguarda".captacao_cliente` (schema *app-only*, contém PII: CPF, fotos de
-  documento — **nunca** exposto a GIS; movido de `"8 - obras & servicos"` na reorg de 2026-09).
+  documento — **nunca** exposto a GIS; movido de `"8 - coleta_campo"` na reorg de 2026-09).
 - ⚠️ **`vw_captacao`** (view achatada p/ BI, agora em `"12 - retaguarda"`) extrai códigos
   específicos do jsonb → **ajustar a view faz parte de qualquer mudança no `CAP_Q`** (senão os códigos
   removidos ficam como colunas mortas e os novos não aparecem). Recriada na migração
@@ -227,10 +227,10 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 - Entrevistador pede abertura de OS (tipo, matrícula, HD, foto do HD, GPS). RPC
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
   `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
-  `"8 - obras & servicos"` na reorg de 2026-09; *app-only*, não exposta a GIS).
+  `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
 
 ### 3.3 Roteiro de leitura (Suporte) — `// SUPORTE › ROTEIRO DE LEITURA` (~L1926) · tela `roteiro`
-- Mapa por **percurso/trecho** sobre `"8 - obras & servicos".vw_roteiro_leitura` (pontos, 133k) e
+- Mapa por **percurso/trecho** sobre `"8 - coleta_campo".vw_roteiro_leitura` (pontos, 133k) e
   `vw_roteiro_leitura_linha` (linhas). Carrega **1 percurso por vez** (nunca os 133k).
 - **RPCs:** `app_roteiro_percursos()` (585, p/ dropdown), `app_roteiro_pontos(p_percurso,p_trecho)`
   (GeoJSON 4326, com `tipo`/`marco`/`trecho`), `app_roteiro_linhas(p_percurso,p_trecho)` (sem
@@ -649,11 +649,11 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   domínio). É gate de **UX/2ª camada**; o enforcement real virá com **RLS** quando os dados saírem de
   snapshot para RPC.
 - **Dados:** hoje é **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
-  auditoria cadastral, reincidência de ramais — extraídos de `"7 - projetos".dmc`/`dmc_resumo`).
+  auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`/`dmc_resumo`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
-  **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"7 - projetos"` (geometria/
+  **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"7 - setorizacao"` (geometria/
   cadastro DMC) e `"11 - perdas_nrw"` (`parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc`).
-  Reorg de 2026-09: `dmc` foi de `"6 - analises"` (aposentado) → `"7 - projetos"`; as tabelas de
+  Reorg de 2026-09: `dmc` foi de `"6 - analises"` (aposentado) → `"7 - setorizacao"`; as tabelas de
   cálculo/config → `"11 - perdas_nrw"` (*app-only*, sem `USAGE` pra GIS).
 - **Estrutura (32 itens de navegação em 6 fases):** 1 Visão (Painel, DMCs, Ficha) · 2 Dados & diagnóstico
   (Medições, Consumo, Balanço, MNF, Eventos) · 3 Ação (Plano por DMC, Componentes IWA, HD, Fraude,
