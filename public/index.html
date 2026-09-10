@@ -139,9 +139,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
-      <button class="mod" data-go="frotas"><div class="ic">🚗</div><div class="nm">Frotas</div></button>
-      <button class="mod" data-go="condutor"><div class="ic">🪪</div><div class="nm">Condutor</div></button>
-      <button class="mod hidden" id="cardQsms" data-go="qsms"><div class="ic">🦺</div><div class="nm">QSMS</div></button>
+      <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
     </div>
   </main>
 
@@ -539,18 +537,23 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="bibView"></div>
   </main>
 
+  <main id="frota" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Frota</b></div>
+    <div id="frotaView"></div>
+  </main>
+
   <main id="condutor" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Condutor</b></div>
+    <div class="bar"><button class="bk" id="condBar">‹ Frota</button><b style="font-size:16px">Condutor</b></div>
     <div id="condView"></div>
   </main>
 
   <main id="frotas" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Frotas</b></div>
+    <div class="bar"><button class="bk" id="frotasBar">‹ Frota</button><b style="font-size:16px">Frotas</b></div>
     <div id="frotasView"></div>
   </main>
 
   <main id="qsms" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">QSMS</b></div>
+    <div class="bar"><button class="bk" id="qsmsBar">‹ Frota</button><b style="font-size:16px">QSMS</b></div>
     <div id="qsmsView"></div>
   </main>
 
@@ -837,7 +840,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','matriculas','roteiro','notificacoes','condutor','frotas','qsms'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','matriculas','roteiro','notificacoes','frota','condutor','frotas','qsms'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -854,6 +857,7 @@ function irPara(id){
   if(id==='suprimentos') supInit();
   if(id==='pr_prod') prProdInit();
   if(id==='biblioteca') bibInit();
+  if(id==='frota') frotaInit();
   if(id==='condutor') condInit();
   if(id==='frotas') frotasInit();
   if(id==='qsms') qsmsInit();
@@ -867,10 +871,11 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const cq=document.getElementById('cardQsms'); if(cq) cq.classList.toggle('hidden', !(ME&&(ME.funcao==='qsms'||ME.is_admin))); const cp=document.getElementById('cardPerdas'); if(cp){ const okP=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cp.classList.toggle('soon',!okP); cp.querySelector('.nm').textContent=okP?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okP?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const cp=document.getElementById('cardPerdas'); if(cp){ const okP=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cp.classList.toggle('soon',!okP); cp.querySelector('.nm').textContent=okP?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okP?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
+['condBar','frotasBar','qsmsBar'].forEach(bid=>{ const b=$('#'+bid); if(b) b.addEventListener('click',()=>irPara('frota')); });
 
 // ---------- MÓDULO LOGGERS ----------
 let loggersData=[], lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
@@ -4854,8 +4859,79 @@ const FOTO2_BLOBS={};
 function wireFotoPick(root){ root.querySelectorAll('.fFoto2').forEach(fi=>fi.addEventListener('change',async e=>{ const f=e.target.files[0]||null; const alvo=fi.dataset.alvo; const img=$('#'+alvo+'_prev'); if(f){ FOTO2_BLOBS[alvo]=await comprimirGeral(f); img.src=URL_obj(FOTO2_BLOBS[alvo]); img.classList.remove('hidden'); } else { FOTO2_BLOBS[alvo]=null; img.classList.add('hidden'); } })); }
 async function uploadFoto2(alvo,pasta){ const b=FOTO2_BLOBS[alvo]; if(!b) return null; const path=pasta+'/'+crypto.randomUUID()+'.jpg'; const {error}=await sb.storage.from('fotos-campo').upload(path,b,{contentType:'image/jpeg',upsert:true}); if(error) throw error; return path; }
 
-let condSub='home', condData=null, condPendentes=[], condVeiculos=[], condEmprestimos=[];
-async function condInit(){ condSub='home'; await condRender(); }
+// ----- HUB da Frota (estilo Suprimentos: seções -> botões -> abre o fluxo que já existe) -----
+let frotaCur='home';
+function frotaBlocks(){
+  const gestor=!!(ME&&(ME.pode_aprovar||ME.is_admin));
+  const adm=!!(ME&&(ME.funcao==='frotas'||ME.is_admin));
+  const qs=!!(ME&&(ME.funcao==='qsms'||ME.is_admin));
+  return [
+    {t:'Colaborador',ic:'👤',on:true,acts:[
+      {id:'cnh',ic:'🪪',lbl:'Minha CNH'},
+      {id:'situacao',ic:'🧰',lbl:'Situação do veículo'},
+      {id:'abastecimento',ic:'⛽',lbl:'Abastecimento'},
+      {id:'ocorrencia',ic:'⚠️',lbl:'Registrar ocorrência'},
+      {id:'lavagem',ic:'🧼',lbl:'Lavagem'},
+      {id:'emprestimo',ic:'🤝',lbl:'Emprestar / meus empréstimos'}]},
+    {t:'Gestor',ic:'🖊️',on:gestor,papel:'Aprovador',acts:[
+      {id:'ap_condutor',ic:'🪪',lbl:'Aprovar condutores'},
+      {id:'ap_ocorrencia',ic:'⚠️',lbl:'Aprovar ocorrências'},
+      {id:'ap_manutencao',ic:'🔧',lbl:'Aprovar manutenções'}]},
+    {t:'Equipe administrativa',ic:'🏢',on:adm,papel:'Frotas / Admin',acts:[
+      {id:'veiculos',ic:'🚗',lbl:'Veículos'},
+      {id:'equipes',ic:'👥',lbl:'Equipes'},
+      {id:'condutores',ic:'🪪',lbl:'Condutores'},
+      {id:'painel',ic:'📊',lbl:'Painel e custos'}]},
+    {t:'QSMS',ic:'🦺',on:qs,papel:'QSMS / Admin',acts:[
+      {id:'qsms',ic:'🦺',lbl:'Treinamentos (agendar / baixa)'}]}
+  ];
+}
+async function frotaInit(){
+  frotaCur='home';
+  if(!ME){ try{ const {data}=await sb.rpc('app_me'); if(data) ME=data; }catch(e){} }
+  frotaHome();
+}
+function frotaHome(){
+  frotaCur='home';
+  const blocks=frotaBlocks();
+  $('#frotaView').innerHTML='<h1 style="margin-bottom:2px">Frota</h1><p class="sub">Escolha uma ação</p>'+
+    blocks.filter(b=>b.on).map(b=>`<div class="sec" style="margin-top:16px">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
+      b.acts.map(a=>`<button class="mod" data-fract="${a.id}"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`).join('')+
+    '</div>').join('');
+  $('#frotaView').querySelectorAll('[data-fract]').forEach(el=>el.addEventListener('click',()=>frotaOpen(el.dataset.fract)));
+}
+function frotaOpen(id){
+  const CONDACTS={cnh:'home',situacao:'situacao',abastecimento:'abastecimento',ocorrencia:'ocorrencia',lavagem:'lavagem',emprestimo:'emprestimo',ap_condutor:'home'};
+  if(id in CONDACTS){ condTarget={sub:CONDACTS[id],act:id}; irPara('condutor'); return; }
+  if(id==='ap_ocorrencia'||id==='ap_manutencao'||id==='veiculos'){ frotasTarget='home'; irPara('frotas'); return; }
+  if(id==='equipes'||id==='condutores'||id==='painel'){ frotasTarget=id; irPara('frotas'); return; }
+  if(id==='qsms'){ irPara('qsms'); return; }
+}
+
+let condSub='home', condData=null, condPendentes=[], condVeiculos=[], condEmprestimos=[], condTarget=null, frotasTarget=null;
+async function condInit(){
+  const tgt=condTarget; condTarget=null;
+  condSub='home';
+  await condRender();
+  if(tgt) condGoTarget(tgt);
+}
+function condGoTarget(tgt){
+  const act=tgt.act;
+  if(act==='ap_condutor'){ if(!condPendentes.length) toast('Nenhum condutor aguardando aprovação'); condSub='home'; return; }  // a fila já fica no topo da home
+  if(act==='cnh'){ condSub = condData && condData.existe ? 'home' : 'cadastro'; if(condSub==='cadastro') condRender(); return; }
+  // ações que dependem de um veículo
+  if(!condVeiculos.length){ toast('Nenhum veículo designado a você'); return; }
+  if(condVeiculos.length===1){ condVeiculoSel=String(condVeiculos[0].id); condSub=tgt.sub; condRender(); return; }
+  condRenderPick(tgt.sub);
+}
+function condRenderPick(sub){
+  const LBL={situacao:'Situação',abastecimento:'Abastecimento',ocorrencia:'Ocorrência',lavagem:'Lavagem',emprestimo:'Emprestar'};
+  let h='<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🚗 Escolha o veículo — '+(LBL[sub]||sub)+'</div>';
+  h+=condVeiculos.map(v=>`<button class="btn ghost" data-cpick="${v.id}" style="margin-top:8px;display:block;text-align:left;width:100%"><b>${v.placa}</b> — ${v.modelo||''}</button>`).join('');
+  $('#condView').innerHTML=h;
+  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#condView').querySelectorAll('[data-cpick]').forEach(b=>b.addEventListener('click',()=>{ condVeiculoSel=b.dataset.cpick; condSub=sub; condRender(); }));
+}
 async function condRender(){
   $('#condView').innerHTML='<p class="sub">Carregando…</p>';
   try{
@@ -5100,7 +5176,7 @@ async function condRenderCnhHistorico(){
 }
 
 let frotasVeiculos=[], frotasEquipes=[], frotasOcorPend=[], frotasManutPend=[], frotasSub='home', frotasVeiculoSel=null;
-async function frotasInit(){ frotasSub='home'; await frotasRender(); }
+async function frotasInit(){ frotasSub = (frotasTarget && ['equipes','condutores','painel'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
 async function frotasRender(){
   $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
   try{
@@ -5134,7 +5210,7 @@ function frotasRenderHome(){
   }
   if(!full){
     h+='<div class="sec" style="margin-top:16px">🚗 Veículos designados a você</div>';
-    if(!frotasVeiculos.length) h+='<p class="sub">Nenhum veículo designado. Vá em <b>Condutor</b> para registrar situação/abastecimento.</p>';
+    if(!frotasVeiculos.length) h+='<p class="sub">Nenhum veículo designado. Use <b>Frota › Colaborador</b> para registrar situação/abastecimento.</p>';
     else h+=frotasVeiculos.map(v=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${v.placa}</b> — ${v.modelo||''}</div>`).join('');
   } else {
     h+=`<div class="sec" style="margin-top:16px">🚗 Veículos <button id="frVeicNovo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">➕ Novo</button></div>`;
