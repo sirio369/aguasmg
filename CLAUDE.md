@@ -143,11 +143,11 @@ pwa/
 | `3 - comercial` | ligações |
 | `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
 | `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
-| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
+| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
 | `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
-| `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico`, `ocorrencia` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
+| `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -167,8 +167,8 @@ pwa/
                           'pg_catalog','information_schema','net');
   ```
 
-**Vitrine GIS — `0 - vitrine_gis` (2026-09):** schema de *apresentação* read-only pro QGIS. 12 views `vw_gis_*` sobre schemas `7`/`8` (+ join com `2` na `vw_gis_vrp`), só `geom` + colunas estáveis — sem PII, sem `foto_*`/`gps_*` cru, sem `respostas`/`fotos` jsonb, sem internos de cálculo. Views **definer** (rodam como `postgres`) → sobrevivem à revogação de USAGE em 7/8.
-- `GRANT USAGE + SELECT` só pra `gis_visualizacao` (editor herda). Nenhuma view pode referenciar `9`–`12` (checar com `pg_depend`).
+**Vitrine GIS — `0 - vitrine_gis` (2026-09):** schema de *apresentação* read-only pro QGIS. 13 views `vw_gis_*` sobre schemas `7`/`8` (+ join com `2` na `vw_gis_vrp`), só `geom` + colunas estáveis — sem PII, sem `foto_*`/`gps_*` cru, sem `respostas`/`fotos` jsonb, sem internos de cálculo. Views **definer** (rodam como `postgres`) → sobrevivem à revogação de USAGE em 7/8.
+- `GRANT USAGE + SELECT` só pra `gis_visualizacao` (editor herda). Nenhuma view pode referenciar `9`–`12` (checar com `pg_depend`) — se um dado app-only precisar ir pro mapa, **move a tabela pro schema geo** primeiro (ex.: `ocorrencia` `12`→`8` em 2026-09) e só então cria a view curada.
 - `vw_gis_dmc_projetada` = `dmc_projetado.geom` + KPIs firmes do `dmc_resumo` (1:1 por `dmc_id`); provisórios (`economias`, `consumo_medio_total`, contagens de VRP/OS) ficam de fora até estabilizar.
 - **Passo pendente** (após o time repontar o projeto QGIS pra vitrine): `REVOKE USAGE ON SCHEMA "7 - setorizacao","8 - coleta_campo" FROM "gis_visualizacao"` — aí o leitor puro passa a ver só `1`–`5` + `0 - vitrine_gis`. O `gis_editor` mantém 7/8 (edição de geometria precisa da tabela real).
 
@@ -204,8 +204,8 @@ pwa/
   `p_foto_extra`; `_editar` recebe paths de foto + OS via `p_campos`).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
-  `"12 - retaguarda".ocorrencia`) alimentam a fila de **Abertura de serviços** (ver Auxiliar de
-  Programação), onde recebem nº de OS.
+  `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
+  alimentam a fila de **Abertura de serviços** (ver Auxiliar de Programação), onde recebem nº de OS.
 - **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
   **Solicitação de serviços** de campo (`abertura_servicos`) e, na subdivisão **🛟 Suporte**,
   **Roteiro de leitura** (`roteiro`) — mapa por percurso/trecho sobre `vw_roteiro_leitura`(_linha),

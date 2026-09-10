@@ -159,8 +159,10 @@
 ### 2.3 Pesquisa — `// MÓDULO PESQUISA` (~L2067) · telas `pesquisa` / `ocorrencia` / `produtividade`
 - Trechos retos (GPS início→fim) + **ocorrências** + produtividade.
 - **Ocorrência** (`ocRegistrar`): `app_ocorrencia_registrar` (fila, pasta `ocorrencia`), tabela
-  `"12 - retaguarda".ocorrencia` (campos `tipo`, `local_ref`, `observacao`, `foto`, `lat/lon`,
-  `consorcio`, `usuario` texto, `pesquisa_id`, `origem`). Foto obrigatória.
+  `"8 - coleta_campo".ocorrencia` (campos `tipo`, `local_ref`, `observacao`, `foto`, `lat/lon`,
+  `consorcio`, `usuario` texto, `pesquisa_id`, `origem`). Foto obrigatória. É **dado geo**
+  (movida de `"12 - retaguarda"` em 2026-09): visível no QGIS via `0 - vitrine_gis.vw_gis_ocorrencia`
+  (curada — sem `foto`/`usuario`/gps cru).
 - **Importante:** as ocorrências alimentam a **fila de Abertura de serviços** (§Auxiliar de
   Programação) via `app_ocorrencia_fila`/`app_ocorrencia_os` (colunas `os_numero/os_criada_em/os_por`).
 - **Produtividade** (`// MÓDULO PRODUTIVIDADE` ~L2200): RPCs `app_pesquisa_filtros`,
