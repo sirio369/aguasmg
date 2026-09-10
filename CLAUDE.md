@@ -130,16 +130,27 @@ pwa/
   ```
 
 ### Esquemas (cadastro técnico + operação)
+
+**Regra de separação (2026-09):** schema define a **audiência**, não só o assunto.
+- **Geo-facing** (o time de GIS conecta o QGIS aqui): `1`–`5`, `7`, `8`, e camadas via view.
+- **App-only** (invisível ao GIS — sem `USAGE` pra papéis `gis_*`, acesso só via RPC `SECURITY DEFINER`):
+  `9`, `10`, `11`, `12`. Tabela nova = decisão explícita no PR de qual lado ela cai.
+
 | Schema | Conteúdo |
 |---|---|
 | `1 - suporte_geografico` | limites, apoio |
 | `2 - infra_agua` | rede, nós de água (`nos_agua`), unidades operacionais, **`vrps`** |
 | `3 - comercial` | ligações |
-| `4 - redes_terceiros`, `5 - info_copasa`, `6 - analises` | apoio/cadastro |
-| `8 - obras & servicos` | coleta de campo (pressão, loggers, pesquisa, captação, abertura de serviços) |
-| `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) |
-| `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências |
+| `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
+| `7 - projetos` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
+| `8 - obras & servicos` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
+| `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
+| `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
+| `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
+| `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico`, `ocorrencia` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
+
+> `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
 
 ## 5. Convenções do frontend (`index.html`)
 
@@ -173,7 +184,7 @@ pwa/
   `p_foto_extra`; `_editar` recebe paths de foto + OS via `p_campos`).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
-  `"8 - obras & servicos".ocorrencia`) alimentam a fila de **Abertura de serviços** (ver Auxiliar de
+  `"12 - retaguarda".ocorrencia`) alimentam a fila de **Abertura de serviços** (ver Auxiliar de
   Programação), onde recebem nº de OS.
 - **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
   **Solicitação de serviços** de campo (`abertura_servicos`) e, na subdivisão **🛟 Suporte**,
