@@ -14,10 +14,13 @@ drop function if exists "8 - coleta_campo".pp_recompute(bigint[]);
 
 -- 2. RPCs
 drop function if exists public.app_rede_bbox(double precision,double precision,double precision,double precision,text,boolean);
+drop function if exists public.app_rede_bbox(double precision,double precision,double precision,double precision,text,boolean,date);
 drop function if exists public.app_pp_rede_no_poligono(text,text);
 drop function if exists public.app_pp_atribuir(bigint[],uuid,boolean);
 drop function if exists public.app_pp_desatribuir(bigint[]);
 drop function if exists public.app_pp_resumo();
+drop function if exists public.app_pp_por_colaborador(uuid);
+drop function if exists public.app_pp_colaboradores();
 drop function if exists public.app_pp_minhas();
 drop function if exists public.app_pp_mapa(uuid,text,date,date);
 drop function if exists public.app_pp_recruzar(numeric,numeric);

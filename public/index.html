@@ -402,6 +402,15 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <select id="ppCons" style="flex:1"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
       <button id="ppCarregarRede" class="btn" style="margin:0;width:auto;padding:12px 14px">↻ Rede</button>
     </div>
+    <div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:13px;color:var(--mut)">
+      <label for="ppSemDesde" style="white-space:nowrap">Sem pesquisa desde</label>
+      <input type="date" id="ppSemDesde" style="flex:1;min-width:0"/>
+      <button id="ppSemLimpar" class="bk" style="padding:6px 8px" title="limpar">✕</button>
+    </div>
+    <div id="ppModo" class="hidden" style="display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px 10px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:13px">
+      <span id="ppModoLbl"></span>
+      <button id="ppModoVoltar" class="bk" style="margin-left:auto;padding:2px 6px">‹ Ver toda a rede</button>
+    </div>
     <div id="ppMapa" style="height:52vh;min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
     <div id="ppSelInfo" class="banner" style="display:none;margin-top:10px"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -2388,11 +2397,13 @@ function prodDesenhar(d){
 }
 
 // ---------- MÓDULO PROGRAMAÇÃO DE PESQUISA ----------
-let ppMap=null, ppRedeLayer=null, ppDrawnLayer=null, ppDrawCtl=null;
+let ppMap=null, ppRedeLayer=null, ppDrawnLayer=null, ppDrawCtl=null, ppClearCtl=null;
 let ppSel=new Set();                 // rede_id selecionados
 let ppFeatById=new Map();            // rede_id -> layer leaflet
-let ppStatusById=new Map();          // rede_id -> pp_status (null|'pendente'|'executado')
-const PP_COL={livre:'#9aa4b2',pendente:'#2f7ed8',executado:'#1a7f4b',sel:'#ff6d00'};
+let ppStatusById=new Map();          // rede_id -> pp_status
+let ppFiltroColab=null;              // null=modo rede | uuid=modo geofonista
+let ppResumoData=[];
+const PP_COL={livre:'#9aa4b2',pendente:'#2f7ed8',executado:'#1a7f4b',sel:'#ff6d00',vencido:'#c0392b'};
 
 function ppInit(){
   const cont=document.getElementById('ppMapa');
@@ -2415,9 +2426,19 @@ function ppInit(){
       ppMap.addControl(ppDrawCtl);
       ppMap.on(L.Draw.Event.CREATED,e=>{ ppDrawnLayer.addLayer(e.layer); ppSelecionarPorGeom(e.layer.toGeoJSON().geometry); });
     }
+    // botão "limpar seleção" no mapa
+    const C=L.Control.extend({options:{position:'bottomleft'},onAdd:function(){
+      const d=L.DomUtil.create('button','pp-clear');
+      d.type='button'; d.textContent='✕ Limpar seleção';
+      d.style.cssText='display:none;background:#fff;color:#b3261e;border:1px solid #b3261e;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)';
+      L.DomEvent.disableClickPropagation(d);
+      d.onclick=ppLimparSel;
+      return d;
+    }});
+    ppClearCtl=new C(); ppMap.addControl(ppClearCtl);
   }
   setTimeout(()=>ppMap.invalidateSize(),60);
-  ppCarregarColabs(); ppCarregarRede(); ppResumo();
+  ppCarregarColabs(); ppRecarregar(); ppResumo();
 }
 async function ppCarregarColabs(){
   try{
@@ -2426,26 +2447,44 @@ async function ppCarregarColabs(){
     s.innerHTML='<option value="">Geofonista…</option>'+((data||[]).map(c=>'<option value="'+c.id+'">'+(c.nome||c.id)+'</option>').join(''));
   }catch(e){}
 }
+// despacha entre modo rede (bbox) e modo geofonista (drill-down)
+function ppRecarregar(){ return ppFiltroColab ? ppCarregarColabView() : ppCarregarRede(); }
+function ppRender(feats,tooltipExtra){
+  ppRedeLayer.clearLayers(); ppFeatById.clear(); ppStatusById.clear();
+  const hoje=new Date(), venceEm=document.getElementById('ppSemDesde').value;
+  (feats||[]).forEach(f=>{
+    const p=f.properties, id=p.id, st=p.pp_status||null, sel=ppSel.has(id);
+    ppStatusById.set(id,st);
+    let col = sel?PP_COL.sel : (st?PP_COL[st] : PP_COL.livre);
+    if(!sel && !st && venceEm && (!p.ultima_pesquisa || p.ultima_pesquisa.slice(0,10) < venceEm)) col=PP_COL.vencido;
+    const ln=L.geoJSON(f,{style:{color:col,weight:sel?6:3,opacity:.9}});
+    ln.eachLayer(l=>{
+      l.on('click',()=>ppToggle(id));
+      const up=p.ultima_pesquisa?('últ. pesq. '+p.ultima_pesquisa.slice(0,10)):'sem pesquisa';
+      l.bindTooltip((p.programado_para?('👤 '+p.programado_para+' · '):'')+(p.comprimento||0)+' m'+(tooltipExtra?(' · '+tooltipExtra(p)):' · '+up));
+    });
+    ln.addTo(ppRedeLayer); ppFeatById.set(id,ln);
+  });
+  ppSelInfo();
+}
 async function ppCarregarRede(){
   if(!ppMap) return;
   const b=ppMap.getBounds(), cons=document.getElementById('ppCons').value||null;
+  const desde=document.getElementById('ppSemDesde').value||null;
   try{
-    const {data,error}=await sb.rpc('app_rede_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:cons,p_so_operacional:true});
+    const {data,error}=await sb.rpc('app_rede_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:cons,p_so_operacional:true,p_nao_pesquisado_desde:desde});
     if(error)throw error;
-    ppRedeLayer.clearLayers(); ppFeatById.clear(); ppStatusById.clear();
-    (data.features||[]).forEach(f=>{
-      const id=f.properties.id, st=f.properties.pp_status||null;
-      ppStatusById.set(id,st);
-      const sel=ppSel.has(id);
-      const ln=L.geoJSON(f,{style:{color:sel?PP_COL.sel:(st?PP_COL[st]:PP_COL.livre),weight:sel?6:3,opacity:.9}});
-      ln.eachLayer(l=>{
-        l.on('click',()=>ppToggle(id));
-        l.bindTooltip((f.properties.programado_para?('👤 '+f.properties.programado_para+' · '):'')+(f.properties.comprimento||0)+' m');
-      });
-      ln.addTo(ppRedeLayer); ppFeatById.set(id,ln);
-    });
-    ppSelInfo();
+    ppRender(data.features);
   }catch(e){ toast('Erro ao carregar rede: '+(e.message||e)); }
+}
+async function ppCarregarColabView(){
+  try{
+    const {data,error}=await sb.rpc('app_pp_por_colaborador',{p_colaborador:ppFiltroColab});
+    if(error)throw error;
+    ppRender(data.features,p=>((p.pp_status==='executado'&&p.executado_em)?('exec. '+String(p.executado_em).slice(0,10)):p.pp_status));
+    const fs=(data.features||[]);
+    if(fs.length){ try{ ppMap.fitBounds(L.geoJSON(data).getBounds(),{padding:[30,30],maxZoom:17}); }catch(e){} }
+  }catch(e){ toast(e.message||e); }
 }
 function ppEstiloId(id){
   const ln=ppFeatById.get(id); if(!ln) return;
@@ -2453,19 +2492,21 @@ function ppEstiloId(id){
   ln.setStyle({color:sel?PP_COL.sel:(st?PP_COL[st]:PP_COL.livre),weight:sel?6:3});
 }
 function ppToggle(id){ ppSel.has(id)?ppSel.delete(id):ppSel.add(id); ppEstiloId(id); ppSelInfo(); }
+function ppLimparSel(){ ppSel.clear(); ppRecarregar(); }
 async function ppSelecionarPorGeom(geom){
   const cons=document.getElementById('ppCons').value||null;
   try{
     const {data,error}=await sb.rpc('app_pp_rede_no_poligono',{p_polygon_geojson:JSON.stringify(geom),p_consorcio:cons});
     if(error)throw error;
     (data.features||[]).forEach(f=>ppSel.add(f.properties.id));
-    ppCarregarRede();
+    ppRecarregar();
   }catch(e){ toast(e.message||e); }
   setTimeout(()=>ppDrawnLayer.clearLayers(),400);
 }
 function ppSelInfo(){
   const el=document.getElementById('ppSelInfo'), n=ppSel.size;
   const bA=document.getElementById('ppAtribuir'), bD=document.getElementById('ppDesatribuir');
+  const cb=document.querySelector('.pp-clear'); if(cb) cb.style.display=n?'block':'none';
   if(!n){ el.style.display='none'; bA.disabled=true; bD.disabled=true; return; }
   let km=0, ja=0;
   ppSel.forEach(id=>{ const ln=ppFeatById.get(id); if(ln) ln.eachLayer(l=>{ const p=l.feature.properties; km+=(p.comprimento||0)/1000; if(p.programado_para) ja++; }); });
@@ -2480,7 +2521,7 @@ async function ppVincular(){
     const {data,error}=await sb.rpc('app_pp_atribuir',{p_rede_ids:[...ppSel],p_colaborador:colab,p_sobrescrever:true});
     if(error)throw error;
     toast('✓ '+data.atribuidos+' trecho(s) vinculado(s)');
-    ppSel.clear(); ppCarregarRede(); ppResumo();
+    ppSel.clear(); ppRecarregar(); ppResumo();
   }catch(e){ toast(e.message||e); }
 }
 async function ppDesvincular(){
@@ -2489,24 +2530,47 @@ async function ppDesvincular(){
     const {data,error}=await sb.rpc('app_pp_desatribuir',{p_rede_ids:[...ppSel]});
     if(error)throw error;
     toast('✓ '+data.removidos+' trecho(s) desvinculado(s)');
-    ppSel.clear(); ppCarregarRede(); ppResumo();
+    ppSel.clear(); ppRecarregar(); ppResumo();
   }catch(e){ toast(e.message||e); }
+}
+function ppEntrarColab(uuid){ ppFiltroColab=uuid; ppSel.clear(); ppAtualizarModo(); ppRenderResumo(); ppCarregarColabView(); }
+function ppSairColab(){ ppFiltroColab=null; ppSel.clear(); ppAtualizarModo(); ppRenderResumo(); ppCarregarRede(); }
+function ppAtualizarModo(){
+  const bar=document.getElementById('ppModo');
+  if(ppFiltroColab){
+    const r=ppResumoData.find(x=>x.colaborador_uuid===ppFiltroColab);
+    document.getElementById('ppModoLbl').innerHTML='📍 Mostrando a programação de <b>'+((r&&r.nome)||'—')+'</b>';
+    bar.classList.remove('hidden');
+  } else bar.classList.add('hidden');
 }
 async function ppResumo(){
   try{
     const {data,error}=await sb.rpc('app_pp_resumo'); if(error)throw error;
-    const el=document.getElementById('ppResumo');
-    if(!data||!data.length){ el.innerHTML='<p class="sub">Nada programado ainda.</p>'; return; }
-    el.innerHTML=data.map(r=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:8px">'
-      +'<div style="display:flex;gap:8px;align-items:center"><b>'+(r.nome||'—')+'</b><span class="sub" style="margin-left:auto">'+r.n_pendentes+' pendente(s)</span></div>'
-      +'<div style="display:flex;gap:14px;margin-top:6px;font-size:13px;color:var(--mut)"><span>📏 '+Number(r.km_programado||0).toFixed(2)+' km</span><span>✅ '+Number(r.km_executado||0).toFixed(2)+' km</span><span>'+Number(r.pct||0).toFixed(0)+'%</span></div>'
-      +'<div style="height:6px;background:var(--line);border-radius:4px;margin-top:6px;overflow:hidden"><i style="display:block;height:100%;width:'+Math.min(100,Number(r.pct||0))+'%;background:var(--ok)"></i></div></div>').join('');
-  }catch(e){}
+    ppResumoData=data||[];
+  }catch(e){ ppResumoData=[]; }
+  ppRenderResumo(); ppAtualizarModo();
+}
+function ppRenderResumo(){
+  const el=document.getElementById('ppResumo');
+  if(!ppResumoData.length){ el.innerHTML='<p class="sub">Nada programado ainda.</p>'; return; }
+  el.innerHTML=ppResumoData.map(r=>{
+    const on=r.colaborador_uuid===ppFiltroColab;
+    return '<button type="button" class="pp-grow" data-colab="'+r.colaborador_uuid+'" style="display:block;width:100%;text-align:left;background:'+(on?'var(--acc)':'var(--card)')+';color:'+(on?'var(--acc-ink)':'var(--ink)')+';border:1px solid '+(on?'var(--acc)':'var(--line)')+';border-radius:12px;padding:12px 13px;margin-bottom:8px;font:inherit;cursor:pointer">'
+      +'<div style="display:flex;gap:8px;align-items:center"><b>'+(r.nome||'—')+'</b><span style="margin-left:auto;font-size:12px;opacity:.85">'+r.n_pendentes+' pendente(s) '+(on?'✓':'›')+'</span></div>'
+      +'<div style="display:flex;gap:14px;margin-top:6px;font-size:13px;opacity:.85"><span>📏 '+Number(r.km_programado||0).toFixed(2)+' km</span><span>✅ '+Number(r.km_executado||0).toFixed(2)+' km</span><span>'+Number(r.pct||0).toFixed(0)+'%</span></div>'
+      +'<div style="height:6px;background:'+(on?'rgba(255,255,255,.3)':'var(--line)')+';border-radius:4px;margin-top:6px;overflow:hidden"><i style="display:block;height:100%;width:'+Math.min(100,Number(r.pct||0))+'%;background:'+(on?'#fff':'var(--ok)')+'"></i></div></button>';
+  }).join('');
+  el.querySelectorAll('[data-colab]').forEach(b=>b.addEventListener('click',()=>{
+    const u=b.dataset.colab; (u===ppFiltroColab)?ppSairColab():ppEntrarColab(u);
+  }));
 }
 if($('#ppBack')) $('#ppBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
 if($('#ppColab')) $('#ppColab').addEventListener('change',ppSelInfo);
-if($('#ppCarregarRede')) $('#ppCarregarRede').addEventListener('click',ppCarregarRede);
-if($('#ppCons')) $('#ppCons').addEventListener('change',ppCarregarRede);
+if($('#ppCarregarRede')) $('#ppCarregarRede').addEventListener('click',ppRecarregar);
+if($('#ppCons')) $('#ppCons').addEventListener('change',ppRecarregar);
+if($('#ppSemDesde')) $('#ppSemDesde').addEventListener('change',ppRecarregar);
+if($('#ppSemLimpar')) $('#ppSemLimpar').addEventListener('click',()=>{ const d=$('#ppSemDesde'); if(d){ d.value=''; ppRecarregar(); } });
+if($('#ppModoVoltar')) $('#ppModoVoltar').addEventListener('click',ppSairColab);
 if($('#ppAtribuir')) $('#ppAtribuir').addEventListener('click',ppVincular);
 if($('#ppDesatribuir')) $('#ppDesatribuir').addEventListener('click',ppDesvincular);
 
