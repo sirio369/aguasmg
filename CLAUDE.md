@@ -155,7 +155,7 @@ pwa/
 **Papéis GIS (2026-09, consolidado 4 → 2):**
 - **`gis_visualizacao`** = *leitura*: `SELECT` em todo o acervo geo (schemas `1`–`5`, `7`, `8`) + `INSERT/UPDATE/DELETE` em `public.layer_styles` (salvar estilo QGIS). Sem escrita em dado geo.
 - **`gis_editor`** = *edição*: **herda `gis_visualizacao`** + escreve **só** onde se edita geometria à mão: `7 - setorizacao.dmc_projetado`, `7 - setorizacao.vrp_projetada`, `8 - coleta_campo.instalacao_logger_calibracao`. `dmc`/`dmc_resumo`/`dmc_ligacao` são **só leitura** (saída de recálculo).
-- `gis_projetos` / `gis_obras_servicos`: aposentados — viraram membros de `gis_editor` (aliases finos até as conexões QGIS serem repontadas; então `DROP ROLE`).
+- `gis_projetos` / `gis_obras_servicos`: **dropados** (2026-09) — absorvidos pelo modelo de 2 papéis.
 - Nenhum papel `gis_*` tem `USAGE` em `9`/`10`/`11`/`12`. Auditoria (deve retornar 0 linhas, ignorando `pg_catalog`/`information_schema`/`net` herdados de `PUBLIC`):
   ```sql
   select r.rolname, n.nspname
@@ -170,7 +170,8 @@ pwa/
 **Vitrine GIS — `0 - vitrine_gis` (2026-09):** schema de *apresentação* read-only pro QGIS. 13 views `vw_gis_*` sobre schemas `7`/`8` (+ join com `2` na `vw_gis_vrp`), só `geom` + colunas estáveis — sem PII, sem `foto_*`/`gps_*` cru, sem `respostas`/`fotos` jsonb, sem internos de cálculo. Views **definer** (rodam como `postgres`) → sobrevivem à revogação de USAGE em 7/8.
 - `GRANT USAGE + SELECT` só pra `gis_visualizacao` (editor herda). Nenhuma view pode referenciar `9`–`12` (checar com `pg_depend`) — se um dado app-only precisar ir pro mapa, **move a tabela pro schema geo** primeiro (ex.: `ocorrencia` `12`→`8` em 2026-09) e só então cria a view curada.
 - `vw_gis_dmc_projetada` = `dmc_projetado.geom` + KPIs firmes do `dmc_resumo` (1:1 por `dmc_id`); provisórios (`economias`, `consumo_medio_total`, contagens de VRP/OS) ficam de fora até estabilizar.
-- **Passo pendente** (após o time repontar o projeto QGIS pra vitrine): `REVOKE USAGE ON SCHEMA "7 - setorizacao","8 - coleta_campo" FROM "gis_visualizacao"` — aí o leitor puro passa a ver só `1`–`5` + `0 - vitrine_gis`. O `gis_editor` mantém 7/8 (edição de geometria precisa da tabela real).
+- **Trava aplicada (2026-09):** `gis_visualizacao` **não tem mais** USAGE em `7 - setorizacao` / `8 - coleta_campo` — o leitor puro enxerga só `1`–`5` + `0 - vitrine_gis`. O `gis_editor` mantém USAGE em 7/8 + `SELECT`+escrita nas 3 tabelas de edição de geometria (`dmc_projetado`, `vrp_projetada`, `instalacao_logger_calibracao`); o resto de 7/8 ele também lê pela vitrine.
+- **Repontar o projeto QGIS** ("Águas MG"): camadas de leitura → `0 - vitrine_gis.vw_gis_*`; as 3 de escrita seguem na tabela crua (conectar como `gis_editor`).
 
 ## 5. Convenções do frontend (`index.html`)
 
