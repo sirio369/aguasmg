@@ -8,6 +8,8 @@
 <link rel="icon" href="./icon.png"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <title>AcquaHub</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--ink:#15181d;--mut:#5b6472;--line:#dfe3e9;--acc:#0e639c;--acc-ink:#fff;--ok:#1a7f4b;--ok-bg:#e5f4ec;--warn:#8a5a00;--warn-bg:#fdf1d8;--bad:#b3261e;--bad-bg:#fbe7e6;}
@@ -388,7 +390,27 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="matriculas"><div class="ic">🆕</div><div class="nm">Criação de matrículas</div></button>
       <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
+      <button class="mod" data-go="programacao_pesquisa"><div class="ic">🔎</div><div class="nm">Programação de pesquisa</div></button>
     </div>
+  </main>
+
+  <main id="programacao_pesquisa" class="hidden">
+    <div class="bar"><button class="bk" id="ppBack">‹ Auxiliar de Programação</button></div>
+    <h1>Programação de pesquisa</h1>
+    <p class="sub">Desenhe um polígono sobre a rede (ou toque nos trechos) e vincule a um geofonista.</p>
+    <div style="display:flex;gap:6px;margin:0 0 8px">
+      <select id="ppCons" style="flex:1"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
+      <button id="ppCarregarRede" class="btn" style="margin:0;width:auto;padding:12px 14px">↻ Rede</button>
+    </div>
+    <div id="ppMapa" style="height:52vh;min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+    <div id="ppSelInfo" class="banner" style="display:none;margin-top:10px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <select id="ppColab" style="flex:1;min-width:150px"><option value="">Geofonista…</option></select>
+      <button id="ppAtribuir" class="btn" style="margin:0;width:auto;padding:12px 16px" disabled>Vincular</button>
+      <button id="ppDesatribuir" class="btn" style="margin:0;width:auto;padding:12px 14px;background:var(--bad);color:#fff" disabled>Desvincular</button>
+    </div>
+    <div class="sec" style="margin-top:22px">Programação por geofonista</div>
+    <div id="ppResumo" style="margin-top:8px"></div>
   </main>
 
   <main id="abertura_servicos" class="hidden">
@@ -769,7 +791,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','matriculas','roteiro','notificacoes','condutor','frotas','qsms'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','matriculas','roteiro','notificacoes','condutor','frotas','qsms'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -792,6 +814,7 @@ function irPara(id){
   if(id==='abertura_servicos') asInit();
   if(id==='entrevistadores') entInit();
   if(id==='programacao_servicos') pgInit();
+  if(id==='programacao_pesquisa') ppInit();
   if(id==='matriculas') mtInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
@@ -2363,6 +2386,129 @@ function prodDesenhar(d){
   }
   if(bs.length){ let bb=bs[0]; for(let i=1;i<bs.length;i++) bb=bb.extend(bs[i]); prodMap.fitBounds(bb,{padding:[30,30],maxZoom:17}); }
 }
+
+// ---------- MÓDULO PROGRAMAÇÃO DE PESQUISA ----------
+let ppMap=null, ppRedeLayer=null, ppDrawnLayer=null, ppDrawCtl=null;
+let ppSel=new Set();                 // rede_id selecionados
+let ppFeatById=new Map();            // rede_id -> layer leaflet
+let ppStatusById=new Map();          // rede_id -> pp_status (null|'pendente'|'executado')
+const PP_COL={livre:'#9aa4b2',pendente:'#2f7ed8',executado:'#1a7f4b',sel:'#ff6d00'};
+
+function ppInit(){
+  const cont=document.getElementById('ppMapa');
+  if(!window.L){ cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>'; return; }
+  if(!ppMap){
+    cont.innerHTML='';
+    ppMap=L.map('ppMapa').setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?16:13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(ppMap);
+    ppRedeLayer=L.layerGroup().addTo(ppMap);
+    ppDrawnLayer=L.featureGroup().addTo(ppMap);
+    if(L.Draw){
+      try{ L.Draw.Polyline.prototype._onTouch=L.Util.falseFn; }catch(e){}
+      ppDrawCtl=new L.Control.Draw({
+        position:'topright',
+        draw:{polygon:{shapeOptions:{color:'#ff6d00',weight:2,fillOpacity:.08}},
+              rectangle:{shapeOptions:{color:'#ff6d00',weight:2,fillOpacity:.08}},
+              polyline:false,circle:false,marker:false,circlemarker:false},
+        edit:{featureGroup:ppDrawnLayer,edit:false,remove:false}
+      });
+      ppMap.addControl(ppDrawCtl);
+      ppMap.on(L.Draw.Event.CREATED,e=>{ ppDrawnLayer.addLayer(e.layer); ppSelecionarPorGeom(e.layer.toGeoJSON().geometry); });
+    }
+  }
+  setTimeout(()=>ppMap.invalidateSize(),60);
+  ppCarregarColabs(); ppCarregarRede(); ppResumo();
+}
+async function ppCarregarColabs(){
+  try{
+    const {data}=await sb.rpc('app_pp_colaboradores');
+    const s=document.getElementById('ppColab');
+    s.innerHTML='<option value="">Geofonista…</option>'+((data||[]).map(c=>'<option value="'+c.id+'">'+(c.nome||c.id)+'</option>').join(''));
+  }catch(e){}
+}
+async function ppCarregarRede(){
+  if(!ppMap) return;
+  const b=ppMap.getBounds(), cons=document.getElementById('ppCons').value||null;
+  try{
+    const {data,error}=await sb.rpc('app_rede_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:cons,p_so_operacional:true});
+    if(error)throw error;
+    ppRedeLayer.clearLayers(); ppFeatById.clear(); ppStatusById.clear();
+    (data.features||[]).forEach(f=>{
+      const id=f.properties.id, st=f.properties.pp_status||null;
+      ppStatusById.set(id,st);
+      const sel=ppSel.has(id);
+      const ln=L.geoJSON(f,{style:{color:sel?PP_COL.sel:(st?PP_COL[st]:PP_COL.livre),weight:sel?6:3,opacity:.9}});
+      ln.eachLayer(l=>{
+        l.on('click',()=>ppToggle(id));
+        l.bindTooltip((f.properties.programado_para?('👤 '+f.properties.programado_para+' · '):'')+(f.properties.comprimento||0)+' m');
+      });
+      ln.addTo(ppRedeLayer); ppFeatById.set(id,ln);
+    });
+    ppSelInfo();
+  }catch(e){ toast('Erro ao carregar rede: '+(e.message||e)); }
+}
+function ppEstiloId(id){
+  const ln=ppFeatById.get(id); if(!ln) return;
+  const st=ppStatusById.get(id), sel=ppSel.has(id);
+  ln.setStyle({color:sel?PP_COL.sel:(st?PP_COL[st]:PP_COL.livre),weight:sel?6:3});
+}
+function ppToggle(id){ ppSel.has(id)?ppSel.delete(id):ppSel.add(id); ppEstiloId(id); ppSelInfo(); }
+async function ppSelecionarPorGeom(geom){
+  const cons=document.getElementById('ppCons').value||null;
+  try{
+    const {data,error}=await sb.rpc('app_pp_rede_no_poligono',{p_polygon_geojson:JSON.stringify(geom),p_consorcio:cons});
+    if(error)throw error;
+    (data.features||[]).forEach(f=>ppSel.add(f.properties.id));
+    ppCarregarRede();
+  }catch(e){ toast(e.message||e); }
+  setTimeout(()=>ppDrawnLayer.clearLayers(),400);
+}
+function ppSelInfo(){
+  const el=document.getElementById('ppSelInfo'), n=ppSel.size;
+  const bA=document.getElementById('ppAtribuir'), bD=document.getElementById('ppDesatribuir');
+  if(!n){ el.style.display='none'; bA.disabled=true; bD.disabled=true; return; }
+  let km=0, ja=0;
+  ppSel.forEach(id=>{ const ln=ppFeatById.get(id); if(ln) ln.eachLayer(l=>{ const p=l.feature.properties; km+=(p.comprimento||0)/1000; if(p.programado_para) ja++; }); });
+  el.style.display='block'; el.className='banner';
+  el.innerHTML='<b>'+n+'</b> trecho(s) · '+km.toFixed(2)+' km'+(ja?(' · '+ja+' já vinculado(s)'):'');
+  bA.disabled=!document.getElementById('ppColab').value; bD.disabled=false;
+}
+async function ppVincular(){
+  const colab=document.getElementById('ppColab').value;
+  if(!colab||!ppSel.size) return;
+  try{
+    const {data,error}=await sb.rpc('app_pp_atribuir',{p_rede_ids:[...ppSel],p_colaborador:colab,p_sobrescrever:true});
+    if(error)throw error;
+    toast('✓ '+data.atribuidos+' trecho(s) vinculado(s)');
+    ppSel.clear(); ppCarregarRede(); ppResumo();
+  }catch(e){ toast(e.message||e); }
+}
+async function ppDesvincular(){
+  if(!ppSel.size) return;
+  try{
+    const {data,error}=await sb.rpc('app_pp_desatribuir',{p_rede_ids:[...ppSel]});
+    if(error)throw error;
+    toast('✓ '+data.removidos+' trecho(s) desvinculado(s)');
+    ppSel.clear(); ppCarregarRede(); ppResumo();
+  }catch(e){ toast(e.message||e); }
+}
+async function ppResumo(){
+  try{
+    const {data,error}=await sb.rpc('app_pp_resumo'); if(error)throw error;
+    const el=document.getElementById('ppResumo');
+    if(!data||!data.length){ el.innerHTML='<p class="sub">Nada programado ainda.</p>'; return; }
+    el.innerHTML=data.map(r=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:8px">'
+      +'<div style="display:flex;gap:8px;align-items:center"><b>'+(r.nome||'—')+'</b><span class="sub" style="margin-left:auto">'+r.n_pendentes+' pendente(s)</span></div>'
+      +'<div style="display:flex;gap:14px;margin-top:6px;font-size:13px;color:var(--mut)"><span>📏 '+Number(r.km_programado||0).toFixed(2)+' km</span><span>✅ '+Number(r.km_executado||0).toFixed(2)+' km</span><span>'+Number(r.pct||0).toFixed(0)+'%</span></div>'
+      +'<div style="height:6px;background:var(--line);border-radius:4px;margin-top:6px;overflow:hidden"><i style="display:block;height:100%;width:'+Math.min(100,Number(r.pct||0))+'%;background:var(--ok)"></i></div></div>').join('');
+  }catch(e){}
+}
+if($('#ppBack')) $('#ppBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
+if($('#ppColab')) $('#ppColab').addEventListener('change',ppSelInfo);
+if($('#ppCarregarRede')) $('#ppCarregarRede').addEventListener('click',ppCarregarRede);
+if($('#ppCons')) $('#ppCons').addEventListener('change',ppCarregarRede);
+if($('#ppAtribuir')) $('#ppAtribuir').addEventListener('click',ppVincular);
+if($('#ppDesatribuir')) $('#ppDesatribuir').addEventListener('click',ppDesvincular);
 
 // ---------- MÓDULO CAPTAÇÃO DE CLIENTES (mockup) ----------
 let captFotos={};
