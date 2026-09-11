@@ -1,7 +1,16 @@
 -- ============================================================
 -- PONTO DE RETORNO — Fase A "Programação de pesquisa de vazamento"
 -- Baseline: 2026-09-10 16:13 UTC. pesquisa_trecho estava VAZIA.
--- Rodar tudo isto reverte 100% ao estado anterior.
+-- Rodar tudo isto reverte 100% ao estado anterior — INCLUINDO apagar dados reais
+-- de pesquisa/programação lançados depois (Fases B/C/D/E). Só use isto pra
+-- descontinuar o módulo inteiro, não como "desfazer a última mudança".
+--
+-- ⚠️ Desatualizado a partir da Fase E (2026-09-11, segmentação de rede p/
+-- Programação de Pesquisa): não dropa "rede_pp_segmento"/"rede_pp_segmento_fonte"
+-- nem o trigger em "2 - infra_agua".rede, e as funções abaixo usam o schema
+-- pré-Fase E (rede_id em vez de segmento_id). Pra reverter só a Fase E mantendo
+-- os dados reais, use docs/rollback_fase_e_segmentacao_pp.sql — este arquivo aqui
+-- fica só como registro de como zerar o módulo inteiro desde o início.
 -- Aplicar via mcp supabase apply_migration (name: rollback_fase_a_pp) ou psql.
 -- ============================================================
 

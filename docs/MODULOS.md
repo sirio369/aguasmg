@@ -27,7 +27,7 @@
 8. **Geometria PostGIS = SRID 31983** (UTM, metros). Para o mapa/lat-lon, `ST_Transform(...,4326)`.
    Distância em metros direto com `ST_Distance` (não converta para `geography`).
 9. **Aprovação/notificação: um único mecanismo para o app inteiro.** `perfil.aprovador_uuid` /
-   `aprovador2_uuid` (configurados em Suprimentos ⚙️ Configurações) + `"9 - suprimentos".sup_aprovadores_de(uid)`
+   `aprovador2_uuid` (configurados no ⚙️ Usuários — home ou Suprimentos, §5.5) + `"9 - suprimentos".sup_aprovadores_de(uid)`
    (fallback: todo `aprovador`/`admin` ativo) + `"9 - suprimentos".sup_notificar(...)` **disparado por
    trigger** `AFTER INSERT/UPDATE` na tabela de negócio — nunca inline na RPC. Regra de ouro:
    notificação **pessoal** (ao próprio interessado) nunca leva `p_exceto`; notificação de **grupo**
@@ -38,6 +38,11 @@
     recebem `GRANT USAGE` a papéis `gis_*` — acesso só via RPC `SECURITY DEFINER`. Dado com PII (CPF,
     fotos de documento) ou config/cálculo interno **não** vai pra schema geo. Tabela nova = escolha
     explícita do lado no PR. `"6 - analises"` foi aposentado (`logger_pressao`→`8`, `dmc`→`7`, NRW→`11`).
+    **Exceção pontual:** uma tabela *pode* morar num schema geo (ex.: `8`) e ainda assim ser app-only —
+    não é o schema que decide sozinho, é ter **RLS habilitada sem policy pra `gis_*`** (ex.:
+    `programacao_pesquisa`, `pp_config`, `rede_pp_segmento`/`_fonte`, §4.3): artefato interno do app que
+    convive no mesmo schema da rede por conveniência de FK/trigger, mas não é cadastro curado — quem
+    precisa ver isso no QGIS usa a vitrine (`vw_gis_programacao_pesquisa`), nunca a tabela crua.
 
 ---
 
@@ -268,6 +273,148 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 - Ambas gated a `aprovador/admin` **no backend** (a RPC retorna `[]` p/ quem não é).
 - **Estado:** `pgFiltro`. Funções: `pgInit` (carrega as duas listas), `pgCarregar`/`pgSalvarOs`,
   `pgCarregarOc`/`pgSalvarOcOs`.
+
+### 4.3 Programação de pesquisa de vazamento — `// MÓDULO PROGRAMAÇÃO DE PESQUISA` (~L2438) · tela `programacao_pesquisa` (dentro de Auxiliar de Programação)
+
+Time interno (aprovador/admin) desenha polígonos de seleção no mapa (estilo QGIS/leaflet-draw) sobre
+a rede cadastral e vincula os trechos selecionados a um colaborador de campo. O geofonista vê "sua"
+programação na tela **Pesquisa** e ela some conforme ele registra trechos reais; **Produtividade**
+cruza cadastro-programado × cadastro-executado × reporte de campo. Rollback point completo (nuke total,
+inclui apagar dados reais — não usar como "desfazer última mudança") em
+`docs/rollback_fase_a_programacao_pesquisa.sql`; rollback incremental só da Fase E (segmentação, abaixo)
+em `docs/rollback_fase_e_segmentacao_pp.sql`.
+
+#### 4.3.1 Segmentação de rede (Fase E, 2026-09-11) — a unidade de trabalho NÃO é a rede cadastral
+
+O cadastro (`"2 - infra_agua".rede`) tem trechos digitalizados de qualquer tamanho — do típico ramal de
+poucos metros a **linhas de até 4 km** (17.350 redes; 8.812 com mais de 40 m; mediana das longas ~289 m).
+Cruzar "% do trecho coberto pelo trace GPS" contra uma rede de 400 m é ruim pra dois lados: o geofonista
+pode ter andado metade da rua e o sistema mostra **tudo pendente** (a agregação não passa do corte), e um
+trace real (curva de rua, deslocamento de calçada) tem mais chance de sair do buffer de tolerância ao
+longo de um trecho longo.
+
+**Fix:** toda rede é recortada em pedaços de até `pp_config.seg_max_len_m` (padrão **40 m**) — a
+Programação de Pesquisa passou a rodar inteiramente sobre esses pedaços, não mais sobre `rede` direto.
+"Andei a rua toda" agora fecha pedaço por pedaço conforme o trace avança, em vez de precisar cobrir 50–60%
+de uma linha de centenas de metros de uma vez.
+
+- **Tabela `"8 - coleta_campo".rede_pp_segmento`** — `id` (PK), `rede_id` (FK `rede`, **on delete
+  cascade**), `seq` (ordem dentro da rede, 0-based), `geom` (`LineString`, pedaço de `rede.geom`),
+  `comprimento_m` (generated, `st_length(geom)`), `no_agua_ini`/`no_agua_fim` — só preenchidos no
+  **primeiro**/**último** pedaço de cada rede (as pontas reais da rede na topologia; pedaços internos não
+  têm nó real). **~46.260 linhas** (backfill de toda `rede`, não só o que está programado hoje).
+- **Tabela `"8 - coleta_campo".rede_pp_segmento_fonte`** — 1 linha por `rede_id` já segmentada:
+  `geom_hash` (`md5(st_asewkb(rede.geom))` no momento do corte) + `n_segmentos` + `atualizado_em`. É o
+  controle de mudança (ver 4.3.2).
+- **Ambas as tabelas** têm RLS habilitada **sem policies** (mesmo padrão de `programacao_pesquisa`/
+  `pp_config`) — só acessíveis via função `SECURITY DEFINER` (dono); **não são expostas** a
+  `gis_visualizacao`/`gis_editor` nem à vitrine GIS (são artefato interno de matching, não cadastro
+  curado — a geometria "de verdade" já está em `rede`/`vitrine_gis`).
+- **`pp_config.seg_max_len_m`** (default 40) — muda o tamanho do corte; mudar exige rodar
+  `"8 - coleta_campo".pp_segmentar_todas(p_forcar:=true)` pra recortar tudo de novo (ver 4.3.2).
+
+#### 4.3.2 Resiliente a reimportação da base de rede — "mantido e rearranjado"
+
+Requisito explícito: se a base de `rede` for trocada (reimport do cadastro COPASA), o trabalho de
+recorte **deve se manter** para redes que não mudaram e **se rearranjar sozinho** para as que mudaram —
+sem intervenção manual.
+
+- **`"8 - coleta_campo".pp_segmentar_um(p_rede_id, p_forcar default false)`** — a função central,
+  **idempotente por hash de geometria**: compara `md5(st_asewkb(rede.geom))` contra o que está gravado em
+  `rede_pp_segmento_fonte`; se bate (e `p_forcar=false`), **não faz nada** — preserva os pedaços, suas
+  atribuições (`programacao_pesquisa`) e progresso (`coberto_m`/`status`) intactos. Se mudou (ou a rede é
+  nova), **apaga** os pedaços antigos daquela rede (o `on delete cascade` de `programacao_pesquisa
+  .segmento_id → rede_pp_segmento.id` **derruba junto** qualquer atribuição/progresso amarrado aos
+  pedaços antigos — a programação daquela rede específica precisa ser refeita) e recorta de novo com
+  `st_linesubstring` em frações iguais (`st_dump`/`st_geometryn` primeiro, pro caso — hoje inexistente —
+  de `rede.geom` ter mais de uma parte).
+- **Trigger `trg_rede_pp_segmentar`** (`AFTER INSERT OR UPDATE OF geom ON "2 - infra_agua".rede FOR EACH
+  ROW`) chama `pp_segmentar_um(new.id)` automaticamente — reimportação (bulk insert/update) ou edição
+  manual pelo `gis_editor` disparam o recorte sozinhas, linha a linha, sem esperar um job.
+  **`DELETE` não precisa de trigger:** o `on delete cascade` de `rede_pp_segmento.rede_id → rede.id`
+  já limpa os pedaços (e cascade novamente sobre `programacao_pesquisa`) quando uma rede é removida.
+- **`"8 - coleta_campo".pp_segmentar_todas(p_forcar default false)`** — varre `rede` inteira chamando
+  `pp_segmentar_um` pra cada uma; usado no backfill inicial e pra re-sync manual/forçado (ex.: mudou
+  `seg_max_len_m`). Testado: mudar a geometria de 1 rede troca só os `id`s dela (novos, sequenciais) e
+  não toca em nenhuma outra; deletar uma rede limpa `rede_pp_segmento`+`_fonte` dela via cascade,
+  isolado.
+- Nenhuma dessas 3 funções está em `public` (não são RPC do PostgREST) — só chamadas via trigger ou
+  manutenção direta (MCP/psql). Se algum dia precisar de um botão de "ressincronizar" no app, criar um
+  wrapper `public.app_pp_*` fino com gate de admin, igual `app_pp_recruzar` faz pro cruzamento.
+
+#### 4.3.3 Programador — tela `programacao_pesquisa`
+
+- Mapa leaflet-draw (polígono/retângulo) sobre `rede_pp_segmento` (via `app_rede_bbox`, candidatos por
+  bbox, **até 10.000** features — subiu de 4.000 porque a mesma área agora tem ~2,7× mais feições curtas
+  em vez de menos feições longas) ou seleção livre por polígono (`app_pp_rede_no_poligono`, **até 8.000**,
+  idem). Camada de seleção dedicada (`ppSelLayer`) sempre visível por cima, independente de filtro de
+  colaborador/data — ver "cuidado" abaixo.
+- Vincula (`app_pp_atribuir(p_rede_ids bigint[], p_colaborador, p_sobrescrever)`) / desvincula
+  (`app_pp_desatribuir(p_rede_ids bigint[])`) — **`p_rede_ids` continua com esse nome** (zero mudança no
+  frontend), mas **os valores agora são `rede_pp_segmento.id`**, não mais `rede.id`. Desvincular
+  **deleta** a linha (sem histórico — decisão de produto: reprogramar é comum, "desprogramar" não deixa
+  rastro).
+- Lista de colaboradores clicável (`app_pp_colaboradores`, inclui o próprio usuário logado) filtra o mapa
+  pra "só a programação dele" (`app_pp_por_colaborador`). Botão "✕ Limpar seleção", filtro "não pesquisado
+  desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`), legenda clicável (filtro de status por cor).
+- **Resumo** (`app_pp_resumo`) — km programado/executado/% por colaborador (agrega em subquery — `jsonb_agg`
+  direto sobre `count(*)` aninhado dá erro de agregado aninhado).
+- **Cuidado (histórico, ainda vale):** nunca re-renderize a camada de seleção a partir de uma camada
+  base filtrada (por colaborador/data) — se os trechos recém-selecionados não estiverem nessa camada
+  filtrada, a seleção "some" visualmente. A seleção vive em `ppSelFeat`/`ppSelLayer`, desenhada direto,
+  nunca via re-fetch.
+
+#### 4.3.4 Cruzamento previsto × realizado — `pp_cruzar_trecho()` (trigger) + `pp_recompute()`
+
+- **Trigger `trg_pp_cruzar`** em `INSERT` de `"8 - coleta_campo".pesquisa_trecho` → `pp_cruzar_trecho()`
+  acha os `segmento_id` de `rede_pp_segmento` a até `tol_m + 60` do trecho novo e chama
+  `pp_recompute(v_ids)` só pra eles (não recalcula a tabela inteira a cada trecho registrado).
+- **`pp_recompute(p_segmento_ids bigint[] default null)`** (null = recalcula tudo — usado por
+  `app_pp_recruzar` ao mudar config, e pelo backfill/migração da Fase E):
+  1. Zera `coberto_m`/`status='pendente'` dos segmentos alvo.
+  2. Pra cada `(segmento, trecho)` a até `tol_m` um do outro: `st_dump(st_linemerge(st_intersection(
+     st_buffer(trecho, tol_m), segmento.geom)))` — dumpa em pedacinhos, filtra só os **paralelos**
+     (diferença de azimute entre o pedacinho e o trecho ≤ `max_ang_deg`, módulo π via
+     `a - pi()*floor(a/pi())` — `mod()` não aceita `double precision`), soma o comprimento
+     (`st_union` pra não contar sobreposição de 2+ trechos) → `coberto_m`.
+  3. Flip pra `executado`: `coberto_m/comprimento_m >= cov_pct` (padrão **0,5**) — ou **`min_len_m`**
+     (padrão 12 m: pedaço **menor** que isso precisa **0,90** de cobertura direta, não `cov_pct`, porque
+     em comprimentos bem curtos qualquer imprecisão de buffer derruba a razão).
+  4. **Herança por vizinho topológico** (só entre pedaços **na ponta real** de redes diferentes,
+     via `no_agua_ini`/`no_agua_fim` — pedaços internos não têm nó real, então não entram aqui): coto
+     `< min_len_m` sem cobertura direta, mas com vizinho já `executado` compartilhando nó, também vira
+     `executado`. Loop de até 5 passadas (propagação em cadeia).
+- **Calibração** (Fase D, 2026-09-10, e ajuste de Fase E após dados reais 2026-09-11): comparar o *trecho
+  inteiro* (start→end) contra o *segmento inteiro* falha em segmento comprido/curvo — por isso o dump é
+  por **sub-parte** da interseção, não do segmento cru. `app_pp_recruzar(p_tol_m, p_cov_pct,
+  p_max_ang_deg, p_min_len_m)` (admin, atualiza `pp_config` + chama `pp_recompute(null)`) é a única forma
+  suportada de retunar — **não edite `pp_config` direto por fora dela** fora de manutenção excepcional
+  (o `NULL` de cada parâmetro preserva o valor atual). **Valores vigentes (2026-09-11, com dados reais de
+  campo):** `tol_m=12, cov_pct=0.5, max_ang_deg=35, min_len_m=12, seg_max_len_m=40`. Diagnóstico que levou
+  a esses valores: pedaços "da mesma rua" que ficavam abaixo do corte por pouco (`ratio` 0,30–0,58 com
+  `tol_m=8/cov_pct=0,6`) sobem de forma saudável até uns 12–15 m de tolerância; pedaços de rua/ramal
+  **diferente** continuam em `ratio` ≈0 mesmo em `tol_m=20` (o filtro de azimute segura) — não tem
+  "vazamento" pra rua errada ao afrouxar dentro dessa faixa. Pedaços muito compridos que só foram
+  parcialmente andados **plateauam abaixo do corte mesmo em tolerância larga** — isso é o sistema
+  reportando a verdade (ainda falta andar), não um bug; a segmentação (4.3.1) já reduz bastante esse
+  efeito ao encurtar o denominador da razão.
+- **Tabela `pp_config`** (1 linha, `id=1`): `tol_m`, `cov_pct`, `max_ang_deg`, `min_len_m`,
+  `seg_max_len_m`, `atualizado_em`. **RLS habilitada sem policies** (corrigido em 2026-09-11 — estava
+  com RLS **desligada**, exposta a leitura/escrita direta por `anon`/`authenticated`; nenhum client-side
+  do app lê essa tabela direto, só via `app_pp_recruzar`/`pp_recompute`, então a trava não quebra nada).
+
+#### 4.3.5 Tela Pesquisa (geofonista) e Produtividade (análise)
+
+- **Pesquisa** (`pqInit`/`pqCarregarProg`) — camada roxa da programação do próprio usuário
+  (`app_pp_minhas`, enquadra o mapa nela na 1ª carga); popup "🧭 Navegar até aqui" (Google Maps); botão
+  📍 recentraliza na posição GPS. Após confirmar um trecho, re-consulta com atraso (o cruzamento no
+  servidor pode ter virado programado→executado, some do mapa).
+- **Produtividade** — toggle **"🔗 Cruzar com a programação da pesquisa"** (`app_pp_mapa(p_colaborador,
+  p_consorcio, p_data_ini, p_data_fim, p_usuario)`) — 3 camadas com legenda-filtro clicável (🟣 pendente
+  cadastro · 🟢 executado cadastro · 🔴 reporte de campo) + KPIs (km programado/executado/% cobertura/nº
+  pendentes). Respeita os filtros de pessoa/data já existentes na tela.
+- **RPCs** `app_pp_minhas`/`app_pp_mapa`: propriedade `segmento_id` no GeoJSON (renomeada de `rede_id`
+  na Fase E — nenhum código do frontend lia esse campo por nome, só exibia via popup genérico).
 
 ---
 
