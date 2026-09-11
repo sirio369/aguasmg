@@ -171,7 +171,10 @@
   previsto e medido nos dois lugares onde a caixa de pressão aparece.
 - **Exportar CSV** (logger concluído): botão `lgExportarCsv(p)` → RPC `app_logger_pressao_export(id)`
   (espelha `vw_logger_pressao`, janela válida, `ts_real` local) → CSV `;`-separado, decimais com vírgula,
-  BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`.
+  BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`. **Pressão em 4 colunas (2026-09), pra
+  deixar o multiplicador auditável linha a linha:** `Pressao_Inicial_kPa` (bruto, nunca muda) →
+  `Multiplicador` → `Pressao_Final_kPa` (=inicial×multiplicador, nova coluna `pressao_final_kpa` na
+  view) → `Pressao_Final_mca` (=final_kPa/9,80665 — mesmo valor que já aparecia nos cards/PDF).
 - **Filtro "concluído" segrega dados:** `app_loggers_listar` devolve `tem_pressao` (bool); o sub-filtro
   `#lgSub` (`lgSub`/`renderSubFiltros`/`lgMatchSub`) aparece só no filtro **concluído** com
   **✅ Com dados de pressão** / **⚠️ Sem dados** (+contagens) — torna visível a quantidade de loggers
