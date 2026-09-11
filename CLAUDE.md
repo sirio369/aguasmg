@@ -143,7 +143,7 @@ pwa/
 | `3 - comercial` | ligações |
 | `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
 | `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
-| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`) + views |
+| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`), **programação de pesquisa** (`programacao_pesquisa`, `rede_pp_segmento`/`_fonte`, `pp_config` — app-only mesmo estando neste schema geo, sem policy pra `gis_*`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
 | `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
@@ -207,6 +207,16 @@ pwa/
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
   `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
   alimentam a fila de **Abertura de serviços** (ver Auxiliar de Programação), onde recebem nº de OS.
+- **Programação de pesquisa de vazamento** (`programacao_pesquisa`, dentro de Auxiliar de Programação;
+  só aprovador/admin) — o programador desenha polígonos no mapa (`app_pp_rede_no_poligono`) e vincula
+  as redes selecionadas a um colaborador (`app_pp_atribuir`/`app_pp_desatribuir`, tabela
+  `"8 - coleta_campo".programacao_pesquisa`). O geofonista vê sua programação na tela **Pesquisa**
+  (camada roxa, `app_pp_minhas`) e ela some conforme ele registra trechos reais; **Produtividade** cruza
+  cadastro-programado × cadastro-executado × reporte de campo (`app_pp_mapa`). O cruzamento roda em
+  **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
+  cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
+  cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
+  segmentação resiliente a reimportação da base de rede, em `docs/MODULOS.md §4.3`.
 - **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
   **Solicitação de serviços** de campo (`abertura_servicos`) e, na subdivisão **🛟 Suporte**,
   **Roteiro de leitura** (`roteiro`) — mapa por percurso/trecho sobre `vw_roteiro_leitura`(_linha),
