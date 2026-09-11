@@ -2921,6 +2921,7 @@ function capReset(){
 
 // ---------- MÓDULO SUPRIMENTOS ----------
 let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', supCartS=[], supCartC=[], supConEstoque=[], eqUsuarios=[], eqTipos=[], eqPainelData=[], epiCat=[], epiCartS=[], epiFotoBlob={}, epiPainelData={}, epiEntregas=[];
+let ferCat=[], ferCartS=[], ferEstoqueAtual=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -2966,7 +2967,13 @@ const SUP_ACTS={
   epi_segregar:{ic:'🏷️',lbl:'Separar EPI',fn:()=>supVEpiSegregar()},
   epi_entregar:{ic:'📤',lbl:'Entregar EPI (retirada)',fn:()=>supVEpiEntregar()},
   epi_baixa:{ic:'🔁',lbl:'Devolver / Trocar EPI',fn:()=>supVEpiBaixa()},
-  epi_painel:{ic:'📋',lbl:'EPIs por colaborador',fn:()=>supVEpiPainel()}
+  epi_painel:{ic:'📋',lbl:'EPIs por colaborador',fn:()=>supVEpiPainel()},
+  ferramenta_solicitar:{ic:'🧰',lbl:'Solicitar ferramenta',fn:()=>supVFerramentaSolicitar()},
+  ferramenta_pedidos:{ic:'📋',lbl:'Minhas ferramentas',fn:()=>supVFerramentaPedidos()},
+  ferramenta_aprovar:{ic:'🖊️',lbl:'Aprovar solicitações',fn:()=>supVFerramentaAprovar()},
+  ferramenta_painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel('sup_ferramenta_painel_multi')},
+  ferramenta_almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVFerramentaAlmox()},
+  ferramenta_recebimento:{ic:'📥',lbl:'Recebimento (devolução)',fn:()=>supVFerramentaRecebimento()}
 };
 function supBlocks(){
   const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
@@ -3006,6 +3013,18 @@ function supBlocksEpi(){
       {id:'epi_baixa',on:almox,papel:'Almoxarife'}]}
   ];
 }
+function supBlocksFerramenta(){
+  const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
+  return [
+    {t:'Campo',ic:'🧑‍🔧',acts:[{id:'ferramenta_solicitar',on:true},{id:'ferramenta_pedidos',on:true}]},
+    {t:'Gestão',ic:'📊',acts:[
+      {id:'ferramenta_aprovar',on:podeAp,papel:'Encarregado'},
+      {id:'ferramenta_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
+    {t:'Almoxarifado',ic:'📦',acts:[
+      {id:'ferramenta_almox',on:almox,papel:'Almoxarife'},
+      {id:'ferramenta_recebimento',on:almox,papel:'Almoxarife'}]}
+  ];
+}
 function supHome(){
   supCurrent='home';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
@@ -3018,6 +3037,7 @@ function supHome(){
       '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
       '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
       '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI / Uniforme</div></button>'+
+      '<button class="mod" data-suparea="ferramenta"><div class="ic">🔧</div><div class="nm">Ferramentas</div></button>'+
     '</div>'+
     (almox?('<div class="sec" style="margin-top:20px">📋 Conferência</div>'+
       '<div class="grid" style="margin-top:10px">'+
@@ -3029,9 +3049,9 @@ function supHome(){
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Almoxarifado';
-  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI / Uniforme':'Insumos');
+  const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI / Uniforme':(cat==='ferramenta'?'Ferramentas':'Insumos'));
   const cfg=$('#supCfg'); if(cfg){ cfg.classList.toggle('hidden', !(cat==='epi'&&ME&&ME.is_admin)); cfg.title='Cargos e cesta de EPI'; }
-  const blocks = cat==='equip'?supBlocksEquip():(cat==='epi'?supBlocksEpi():supBlocks());
+  const blocks = cat==='equip'?supBlocksEquip():(cat==='epi'?supBlocksEpi():(cat==='ferramenta'?supBlocksFerramenta():supBlocks()));
   $('#supView').innerHTML='<p class="sub" style="margin-top:2px">Escolha uma etapa</p>'+
     blocks.map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
       b.acts.map(a=>{
@@ -3060,7 +3080,7 @@ async function supEquipAviso(){
 function supOpen(id){
   const A=SUP_ACTS[id]; if(!A) return;
   supCurrent=id;
-  const bk=$('#supBack'); if(bk) bk.textContent = supAreaId==='equip'?'‹ Equipamentos':(supAreaId==='epi'?'‹ EPI':'‹ Insumos');
+  const bk=$('#supBack'); if(bk) bk.textContent = supAreaId==='equip'?'‹ Equipamentos':(supAreaId==='epi'?'‹ EPI':(supAreaId==='ferramenta'?'‹ Ferramentas':'‹ Insumos'));
   const tt=$('#supTitle'); if(tt) tt.textContent=A.lbl;
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   $('#supView').innerHTML=''; A.fn();
@@ -3081,6 +3101,26 @@ function supEstTable(cont,arr){
   c.innerHTML='<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
     '<div style="display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:7px 11px;background:var(--card);font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em"><span>Item</span><span style="text-align:right">Saldo</span><span style="text-align:right">Mín</span></div>'+
     arr.map(x=>`<div style="display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:9px 11px;border-top:1px solid var(--line);font-size:14px;align-items:center${x.abaixo_min?';background:var(--bad-bg)':''}"><span>${x.material}${x.abaixo_min?' ⚠️':''} <span class="sub" style="font-size:11px">${x.unidade}</span></span><b style="text-align:right${x.abaixo_min?';color:var(--bad)':''}">${supNum(x.saldo)}</b><span style="text-align:right;color:var(--mut)">${supNum(x.minimo)}</span></div>`).join('')+'</div>';
+}
+// estoque agregado do painel, mas clicável: expande "quem tem" usando o detalhamento por colaborador já carregado
+function supEstTableDrill(cont,agg,porArr){
+  const c=$('#'+cont);
+  if(!agg.length){ c.innerHTML='<p class="sub">Estoque vazio.</p>'; return; }
+  c.innerHTML='<p class="sub" style="margin:0 0 6px;font-size:11.5px">Toque num item pra ver quem está com ele</p><div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+    '<div style="display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:7px 11px;background:var(--card);font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em"><span>Item</span><span style="text-align:right">Saldo</span><span style="text-align:right">Mín</span></div>'+
+    agg.map((x,ix)=>`<div class="pnAggRow" data-ix="${ix}" style="cursor:pointer;display:grid;grid-template-columns:1fr 62px 56px;gap:6px;padding:9px 11px;border-top:1px solid var(--line);font-size:14px;align-items:center${x.abaixo_min?';background:var(--bad-bg)':''}"><span>${x.material}${x.abaixo_min?' ⚠️':''} <span class="sub" style="font-size:11px">${x.unidade}</span></span><b style="text-align:right${x.abaixo_min?';color:var(--bad)':''}">${supNum(x.saldo)}</b><span style="text-align:right;color:var(--mut)">${supNum(x.minimo||0)}</span></div><div class="pnAggDet hidden" data-det="${ix}" style="padding:0 11px 10px;background:var(--card)"></div>`).join('')+'</div>';
+  c.querySelectorAll('.pnAggRow').forEach(row=>row.addEventListener('click',()=>{
+    const ix=row.dataset.ix, det=c.querySelector('.pnAggDet[data-det="'+ix+'"]');
+    const abrindo=det.classList.contains('hidden');
+    c.querySelectorAll('.pnAggDet').forEach(d=>{d.classList.add('hidden');d.innerHTML='';});
+    if(!abrindo) return;
+    const nome=agg[+ix].material;
+    const quem=(porArr||[]).map(p=>({nome:p.nome,it:(p.estoque||[]).find(e=>e.material===nome)})).filter(p=>p.it&&+p.it.saldo>0);
+    det.innerHTML = quem.length
+      ? '<div class="sub" style="padding-top:8px;margin-bottom:2px;font-size:11px;text-transform:uppercase;letter-spacing:.03em">Quem tem</div>'+quem.map(p=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:13px;border-top:1px solid var(--line)"><span>${p.nome}</span><b style="white-space:nowrap">${supNum(p.it.saldo)} ${p.it.unidade||''}</b></div>`).join('')
+      : '<p class="sub" style="padding-top:8px">Ninguém com saldo no momento.</p>';
+    det.classList.remove('hidden');
+  }));
 }
 
 // --- busca de material (texto livre → dropdown filtrado) ---
@@ -3334,7 +3374,8 @@ function supAlmoxWire(){
 }
 
 // --- tela: Painel das equipes (multi-seleção: estoque agregado + por equipe + movimentações) ---
-async function supVPainel(){
+async function supVPainel(rpcNome){
+  rpcNome = rpcNome || 'sup_painel_multi';
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   let us=[];
   try{ const u=await sb.rpc('sup_usuarios_listar'); us=u.data||[]; }catch(e){}
@@ -3376,13 +3417,13 @@ async function supVPainel(){
     if(!sel.size){ $('#supPOut').innerHTML='<p class="sub">Selecione ao menos uma equipe acima.</p>'; return; }
     $('#supPOut').innerHTML='<p class="sub">Carregando…</p>';
     try{
-      const {data,error}=await sb.rpc('sup_painel_multi',{p_colaboradores:[...sel],p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
+      const {data,error}=await sb.rpc(rpcNome,{p_colaboradores:[...sel],p_data_ini:$('#supPDe').value||null,p_data_fim:$('#supPAte').value||null}); if(error)throw error;
       const agg=(data&&data.agregado)||[], por=(data&&data.por_equipe)||[], mv=(data&&data.movimentos)||[];
       let h='<div class="sec">📦 Estoque agregado <span class="sub" style="font-weight:400">('+por.length+' equipe'+(por.length!==1?'s':'')+')</span></div><div id="pnAgg"></div>';
       h+='<div class="sec" style="margin-top:20px">🚐 Estoque por equipe</div><div id="pnPor"></div>';
       h+='<div class="sec" style="margin-top:20px">🔄 Movimentações</div><div id="pnMov"></div>';
       $('#supPOut').innerHTML=h;
-      supEstTable('pnAgg',agg);
+      supEstTableDrill('pnAgg',agg,por);
       $('#pnPor').innerHTML=por.map((e,ix)=>`<div style="margin-bottom:12px"><div style="font-weight:700;font-size:13px;margin-bottom:4px">${e.nome}</div><div id="pnPor${ix}"></div></div>`).join('');
       por.forEach((e,ix)=>supEstTable('pnPor'+ix, e.estoque||[]));
       $('#pnMov').innerHTML = mv.length? mv.map(m=>{ const neg=m.quantidade<0;
@@ -3445,6 +3486,166 @@ async function supVBaixas(){
   };
   ['bxDe','bxAte','bxTipo','bxStatus','bxCons'].forEach(id=>$('#'+id).addEventListener('change',load));
   load();
+}
+
+// ===== FERRAMENTAS =====
+// Mesmo fluxo de Insumos (solicitar->aprovar->segregar->entregar, reaproveita sup_aprovar/sup_segregar/
+// sup_entregar/supAlmoxCard/supAlmoxWire) + devolução com código (nova, dupla confirmação: colaborador
+// solicita, almoxarife recebe). Catálogo/estoque/filas são RPCs próprias (sup_ferramenta_*), filtradas
+// a sup_material.ferramenta=true — nunca aparecem em Insumos, e vice-versa.
+function ferMatById(id){ return ferCat.find(m=>String(m.id)===String(id)); }
+function ferMatFiltrar(termo){
+  const t=_matNorm(termo).trim(); if(!t) return [];
+  const toks=t.split(/\s+/), out=[];
+  for(const m of ferCat){
+    if(!m._s) m._s=_matNorm(m.descricao+' '+(m.sinonimo||'')+' '+(m.categoria||''));
+    if(toks.every(tk=>m._s.includes(tk))){ out.push(m); if(out.length>=200) break; }
+  }
+  return out;
+}
+function ferMatBuscaFill(){
+  const termo=$('#ferSBusca')?$('#ferSBusca').value:''; const sel=$('#ferSMat'), hint=$('#ferSHint');
+  if(!sel) return;
+  const res=ferMatFiltrar(termo);
+  if(!termo.trim()){ sel.innerHTML='<option value="">Digite acima para buscar…</option>'; if(hint) hint.textContent=ferCat.length+' ferramentas no catálogo'; return; }
+  sel.innerHTML = res.length? res.map(m=>`<option value="${m.id}">${m.descricao} (${m.unidade})</option>`).join('') : '<option value="">Nenhuma ferramenta encontrada</option>';
+  if(hint) hint.textContent = res.length? (res.length>=200?'Mostrando as 200 primeiras — refine a busca':res.length+' encontrada(s)') : 'Nada encontrado para "'+termo+'"';
+}
+async function ferCatLoad(){ if(!ferCat.length){ try{ const {data}=await sb.rpc('sup_ferramenta_catalogo',{}); ferCat=data||[]; }catch(e){} } }
+
+// --- tela: Solicitar ferramenta ---
+async function supVFerramentaSolicitar(){
+  ferCartS=[];
+  $('#supView').innerHTML=`
+    <label>Buscar ferramenta</label>
+    <input id="ferSBusca" autocomplete="off" placeholder="Ex.: trena, alicate, martelo, cone…"/>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <select id="ferSMat" style="flex:1;min-width:0"><option value="">Digite acima para buscar…</option></select>
+      <input id="ferSQt" inputmode="decimal" placeholder="Qtd" style="width:74px;text-align:center"/>
+      <button id="ferSAdd" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:0 15px;border-radius:10px;font-size:20px;display:flex;align-items:center">＋</button>
+    </div>
+    <div class="sub" id="ferSHint" style="margin-top:4px;font-size:11px"></div>
+    <div id="ferSCart" style="margin-top:10px"></div>
+    <label>Observação</label><textarea id="ferSObs" rows="2"></textarea>
+    <button id="ferSSend" class="btn" disabled>Enviar solicitação</button>`;
+  supCartRender('ferSCart',ferCartS,'ferSSend');
+  await ferCatLoad(); ferMatBuscaFill();
+  $('#ferSBusca').addEventListener('input',ferMatBuscaFill);
+  $('#ferSAdd').addEventListener('click',()=>{
+    const id=$('#ferSMat').value, q=parseFloat(($('#ferSQt').value||'').replace(',','.'));
+    if(!id||isNaN(q)||q<=0) return toast('Escolha a ferramenta e a quantidade');
+    const m=ferMatById(id), ex=ferCartS.find(x=>String(x.material_id)===String(id));
+    if(ex) ex.quantidade+=q; else ferCartS.push({material_id:+id,descricao:m.descricao,unidade:m.unidade,quantidade:q});
+    $('#ferSQt').value=''; supCartRender('ferSCart',ferCartS,'ferSSend');
+  });
+  $('#ferSSend').addEventListener('click',async()=>{
+    if(!ferCartS.length) return;
+    $('#ferSSend').disabled=true;
+    const item={id:crypto.randomUUID(),tipo:'sup_ferramenta_solicitar',rpc:'sup_ferramenta_solicitar',fields:{
+      p_itens:ferCartS.map(x=>({material_id:x.material_id,quantidade:x.quantidade})), p_obs:$('#ferSObs').value||null}};
+    const ok=await supEnviar(item,'✓ Solicitação enviada',()=>{ferCartS=[];supOpen('ferramenta_pedidos');});
+    if(!ok) $('#ferSSend').disabled=false;
+  });
+}
+
+// --- tela: Minhas ferramentas (o que tenho + devolver + histórico) ---
+async function supVFerramentaPedidos(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  let estoque=[], solics=[], devs=[];
+  try{
+    const [e,s,d]=await Promise.all([sb.rpc('sup_ferramenta_meu_estoque'),sb.rpc('sup_ferramenta_minhas_solicitacoes',{}),sb.rpc('sup_ferramenta_minhas_devolucoes',{})]);
+    if(e.error) throw e.error; estoque=e.data||[]; solics=s.data||[]; devs=d.data||[];
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<div class="sec">🔧 Comigo agora</div>';
+  h += estoque.length
+    ? '<p class="sub" style="margin:2px 0 8px">Marque o que está devolvendo ao almoxarifado.</p><div id="ferDevCart"></div><button id="ferDevSend" class="btn" style="margin-top:10px" disabled>Solicitar devolução</button>'
+    : '<p class="sub">Nenhuma ferramenta com você no momento.</p>';
+  const pend=devs.filter(d=>d.status==='solicitada');
+  if(pend.length){
+    h+='<div class="sec" style="margin-top:20px">📥 Devolução aguardando o almoxarifado</div>';
+    h+=pend.map(d=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div class="sub">${(d.itens||[]).map(i=>i.material+' ('+supNum(i.quantidade)+' '+i.unidade+')').join(', ')}</div><div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de devolução: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${d.codigo}</b></div><button class="btn ghost ferDevCanc" data-id="${d.id}" style="margin-top:8px;padding:8px;font-size:13px">Cancelar pedido</button></div>`).join('');
+  }
+  h+='<div class="sec" style="margin-top:20px">📋 Minhas solicitações</div>';
+  h += solics.length ? solics.map(s=>{
+    const st=SUP_ST[s.status]||{l:s.status,bg:'--line',fg:'--mut'};
+    const cod=(s.status==='segregada'&&s.codigo_retirada)?`<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:19px;letter-spacing:3px;color:var(--acc)">${s.codigo_retirada}</b></div>`:'';
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>#${s.id}</b><div class="sub" style="margin:2px 0 0">${s.itens} item(s) · ${supData(s.criado_em)}</div></div><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>${cod}</div>`;
+  }).join('') : '<p class="sub">Você ainda não solicitou ferramenta.</p>';
+  $('#supView').innerHTML=h;
+  if(estoque.length){
+    const cart=estoque.map(x=>({...x,sel:false,qtd:x.saldo}));
+    const renderDevCart=()=>{
+      $('#ferDevCart').innerHTML=cart.map((x,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="ferDevCk" data-i="${i}" ${x.sel?'checked':''} style="width:auto"/><div style="flex:1;font-size:14px">${x.material}</div><input class="ferDevQt" data-i="${i}" inputmode="decimal" value="${supNum(x.qtd)}" ${x.sel?'':'disabled'} style="width:58px;text-align:center;font-size:13px"/><span class="sub" style="font-size:12px">${x.unidade} <span style="color:var(--mut)">(tenho ${supNum(x.saldo)})</span></span></div>`).join('');
+      $('#ferDevCart').querySelectorAll('.ferDevCk').forEach(c=>c.addEventListener('change',()=>{ cart[+c.dataset.i].sel=c.checked; renderDevCart(); }));
+      $('#ferDevCart').querySelectorAll('.ferDevQt').forEach(inp=>inp.addEventListener('input',()=>{ cart[+inp.dataset.i].qtd=parseFloat((inp.value||'0').replace(',','.'))||0; }));
+      const algum=cart.some(x=>x.sel); const btn=$('#ferDevSend'); if(btn) btn.disabled=!algum;
+    };
+    renderDevCart();
+    $('#ferDevSend').addEventListener('click',async()=>{
+      const itens=cart.filter(x=>x.sel&&x.qtd>0).map(x=>({material_id:x.material_id,quantidade:Math.min(x.qtd,x.saldo)}));
+      if(!itens.length) return toast('Marque ao menos uma ferramenta');
+      $('#ferDevSend').disabled=true;
+      try{
+        const {data,error}=await sb.rpc('sup_ferramenta_devolucao_solicitar',{p_itens:itens,p_obs:null}); if(error)throw error;
+        toast('✓ Devolução solicitada — código '+data.codigo); supVFerramentaPedidos();
+      }catch(e){ toast('⚠ '+(e.message||e)); $('#ferDevSend').disabled=false; }
+    });
+  }
+  $('#supView').querySelectorAll('.ferDevCanc').forEach(b=>b.addEventListener('click',()=>supAcao('sup_ferramenta_devolucao_cancelar',{p_devolucao_id:+b.dataset.id},'Pedido cancelado',supVFerramentaPedidos)));
+}
+
+// --- tela: Aprovar solicitações de ferramenta ---
+async function supVFerramentaAprovar(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_ferramenta_fila_aprovacao'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação de ferramenta aguardando aprovação.</p>'; return; }
+    $('#supView').innerHTML='<div class="sec">🔧 Solicitações de ferramenta</div><p class="sub" style="margin:2px 0 10px">Você pode ajustar a quantidade ou cancelar itens (✕). O que for aprovado segue para a separação do almoxarife.</p>'+arr.map(s=>{
+      const itens=(s.itens||[]).map(i=>`<div class="inApItem" data-material="${i.material_id}" data-qs="${i.qt_solicitada}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.material}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt_solicitada)} ${i.unidade||''}</div></div><input class="inApQt" inputmode="decimal" value="${supNum(i.qt_solicitada)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="inApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
+      return `<div class="inApCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:4px 0 6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
+    }).join('');
+    $('#supView').querySelectorAll('.inApX').forEach(b=>b.addEventListener('click',()=>{ const it=b.closest('.inApItem'); const q=it.querySelector('.inApQt'); const canc=it.classList.toggle('inCanc'); if(canc){ q.value='0'; q.disabled=true; it.style.opacity=.5; b.textContent='↩'; } else { q.value=supNum(+it.dataset.qs); q.disabled=false; it.style.opacity=1; b.textContent='✕'; } }));
+    $('#supView').querySelectorAll('[data-ap]').forEach(b=>b.addEventListener('click',()=>{
+      const card=b.closest('.inApCard'); const itens=[];
+      card.querySelectorAll('.inApItem').forEach(it=>{ const q=parseFloat((it.querySelector('.inApQt').value||'0').replace(',','.'))||0; itens.push({material_id:+it.dataset.material,qtd:q}); });
+      if(!itens.some(i=>i.qtd>0)) return toast('Aprove ao menos 1 item, ou rejeite a solicitação');
+      supAcao('sup_aprovar',{p_solicitacao_id:+b.dataset.ap,p_ajustes:itens},'Aprovada',supVFerramentaAprovar);
+    }));
+    $('#supView').querySelectorAll('[data-rj]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_rejeitar',{p_solicitacao_id:+b.dataset.rj},'Rejeitada',supVFerramentaAprovar)));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- tela: Almoxarife — separação e entrega de ferramenta (reaproveita supAlmoxCard/supAlmoxWire) ---
+async function supVFerramentaAlmox(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_ferramenta_fila_almoxarife'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nada na fila de separação de ferramentas.</p>'; return; }
+    $('#supView').innerHTML=arr.map(supAlmoxCard).join('');
+    supAlmoxWire();
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- tela: Recebimento — almoxarife confirma devolução por código ---
+async function supVFerramentaRecebimento(){
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_ferramenta_devolucao_fila_recebimento'); if(error)throw error;
+    const arr=data||[];
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma devolução aguardando recebimento.</p>'; return; }
+    $('#supView').innerHTML='<div class="sec">📥 Devoluções a receber</div><p class="sub" style="margin:2px 0 10px">Peça o código de 4 dígitos pro colaborador e confirme o recebimento físico da ferramenta.</p>'+arr.map(d=>{
+      const itens=(d.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0"><span>${i.material}</span><b>${supNum(i.quantidade)} ${i.unidade}</b></div>`).join('');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${d.id}</b><span class="sub" style="margin-left:auto">${d.colaborador||''}</span></div><div style="margin:6px 0">${itens}</div>${d.obs?('<div class="sub">Obs: '+d.obs+'</div>'):''}<div style="display:flex;gap:6px;margin-top:8px"><input class="ferRecCod" data-id="${d.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-rec="${d.id}" style="margin:0;width:auto;padding:12px 16px">Confirmar</button></div></div>`;
+    }).join('');
+    $('#supView').querySelectorAll('[data-rec]').forEach(b=>b.addEventListener('click',()=>{
+      const inp=$('#supView').querySelector('.ferRecCod[data-id="'+b.dataset.rec+'"]');
+      const cod=((inp||{}).value||'').trim();
+      if(cod.length!==4) return toast('Digite o código de 4 dígitos');
+      supAcao('sup_ferramenta_devolucao_confirmar',{p_devolucao_id:+b.dataset.rec,p_codigo:cod},'Devolução confirmada',supVFerramentaRecebimento);
+    }));
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
 // ===== EQUIPAMENTOS =====

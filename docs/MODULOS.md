@@ -27,12 +27,12 @@
 8. **Geometria PostGIS = SRID 31983** (UTM, metros). Para o mapa/lat-lon, `ST_Transform(...,4326)`.
    Distância em metros direto com `ST_Distance` (não converta para `geography`).
 9. **Aprovação/notificação: um único mecanismo para o app inteiro.** `perfil.aprovador_uuid` /
-   `aprovador2_uuid` (configurados no ⚙️ Usuários — home ou Suprimentos, §5.5) + `"9 - suprimentos".sup_aprovadores_de(uid)`
+   `aprovador2_uuid` (configurados no ⚙️ Usuários — home ou Suprimentos, §5.6) + `"9 - suprimentos".sup_aprovadores_de(uid)`
    (fallback: todo `aprovador`/`admin` ativo) + `"9 - suprimentos".sup_notificar(...)` **disparado por
    trigger** `AFTER INSERT/UPDATE` na tabela de negócio — nunca inline na RPC. Regra de ouro:
    notificação **pessoal** (ao próprio interessado) nunca leva `p_exceto`; notificação de **grupo**
    sempre leva `p_exceto = auth.uid()` (ator). **Módulo novo que precisa de aprovação/notificação →
-   reaproveite isso, não crie hierarquia paralela.** Ver §5.5 (origem) e §6.4 (segundo uso, Frotas).
+   reaproveite isso, não crie hierarquia paralela.** Ver §5.6 (origem) e §6.4 (segundo uso, Frotas).
 10. **Schema = audiência (reorg 2026-09).** Schemas **geo-facing** (`1`–`5`, `7`, `8`) o time de GIS
     conecta o QGIS. Schemas **app-only** (`9`, `10`, `11 - perdas_nrw`, `12 - retaguarda`) **nunca**
     recebem `GRANT USAGE` a papéis `gis_*` — acesso só via RPC `SECURITY DEFINER`. Dado com PII (CPF,
@@ -435,20 +435,34 @@ sem intervenção manual.
 `"9 - suprimentos"` continuam com o nome antigo, não vale a pena renomear isso).
 
 Home própria (`supHome`) com duas seções: **📦 Áreas** (**Insumos**, **Equipamentos**,
-**EPI/Uniforme** — sempre visíveis) e, separada, **📋 Conferência** (**Baixas/Conferência**, só
-`is_almoxarife`/admin — visualmente apartada das 3 áreas porque não é "mais uma área", é a etapa de
-conferência que consolida as outras). `SUP_ACTS` mapeia act→função; `supBlocks*` montam os menus por
-papel (`ME`). Navegação interna por `supArea`/`supHome`/`supGoAct`; back inteligente em `#supBack`.
-Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`, `sup_pode_aprovar(uuid)`.
+**EPI/Uniforme**, **Ferramentas** — sempre visíveis) e, separada, **📋 Conferência**
+(**Baixas/Conferência**, só `is_almoxarife`/admin — visualmente apartada das 4 áreas porque não é
+"mais uma área", é a etapa de conferência que consolida as outras). `SUP_ACTS` mapeia act→função;
+`supBlocks*` montam os menus por papel (`ME`). Navegação interna por `supArea`/`supHome`/`supGoAct`;
+back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`,
+`sup_pode_aprovar(uuid)`.
 
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
   existe/parcial/falta, gera código) → retirar (código) → consumir na OS**.
-- RPCs: `sup_materiais_listar` (catálogo, **exclui** categoria EPI/EPC), `sup_minhas_solicitacoes`,
-  `sup_fila_aprovacao`, `sup_fila_almoxarife`, `sup_segregar`, `sup_meu_estoque`,
-  `sup_meus_equipamentos`(equip), `sup_painel_multi` (Painel das equipes: multi-seleção → estoque
-  agregado + por equipe + movimentações). Tabelas `sup_solicitacao`/`_item`, `sup_material`,
-  `sup_movimento`; **`sup_saldo` é VIEW** (derivada de `sup_movimento` — não dá DELETE).
+- RPCs: `sup_materiais_listar` (catálogo, **exclui** categoria EPI/EPC **e itens `ferramenta`**),
+  `sup_minhas_solicitacoes`, `sup_fila_aprovacao`, `sup_fila_almoxarife`, `sup_segregar`,
+  `sup_meu_estoque`, `sup_meus_equipamentos`(equip), `sup_painel_multi` (Painel das equipes:
+  multi-seleção → estoque agregado + por equipe + movimentações). Tabelas `sup_solicitacao`/`_item`,
+  `sup_material`, `sup_movimento`; **`sup_saldo` é VIEW** (derivada de `sup_movimento` — não dá DELETE).
+- **Painel das equipes com drill-down (2026-09):** na tabela de estoque agregado, tocar num item
+  abre/fecha (um de cada vez) um painel "Quem tem" logo abaixo, listando colaborador+saldo — cruza o
+  `agregado` clicado contra o `por_equipe[].estoque` que a própria RPC já retorna (sem round-trip
+  extra). Implementado em `supEstTableDrill(cont,agg,porArr)`, chamado por `supVPainel` no lugar do
+  antigo `supEstTable` — **compartilhado com o Painel de Ferramentas** (§5.4), não existe em EPI.
+- **Materiais `ferramenta=true` não aparecem aqui** (ver §5.4) — `sup_material` ganhou a coluna
+  `ferramenta boolean` (2026-09): 274 itens reclassificados (trena, alicate, cone, escada, talha,
+  cadeira/banqueta etc. — cadeira de rodas e fita zebrada ficaram de fora, são insumo/EPC normal).
+  `sup_consumir` **bloqueia** consumo de item `ferramenta` com erro explícito ("ferramenta não se
+  consome, use a devolução ao almoxarifado"). Outros 38 itens (blindado, biodigestor, EE compacta,
+  pórtico, detector de gás, cilindro de calibração, compressores, geradores, marteletes etc.) foram
+  **desativados** (`ativo=false`) do catálogo de Insumos para virar `sup_equipamento` cadastrado à mão
+  (não migrados automaticamente).
 
 ### 5.2 Equipamentos
 - Rastreio por pessoa via **termo de responsabilidade** (fica **vermelho até aceitar, verde depois**,
@@ -481,12 +495,53 @@ Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`, `sup_pode_ap
   EPI:** `sup_pode_aprovar` continua intocado pra Insumos/Equipamentos (Encarregado normal), não vira
   cargo-based ali.
 
-### 5.4 Baixas / Conferência (almoxarife)
+### 5.4 Ferramentas (2026-09) — `// ===== FERRAMENTAS =====`
+- **4ª área da home, estrutura própria** (Campo/Gestão/Almoxarifado — igual Insumos, não é uma aba
+  dentro de Insumos): item reusável (trena, alicate, cone, escada, cadeira/banqueta, talha, cinto de
+  segurança etc., ver §5.1) que se **empresta e devolve**, nunca se consome. `supBlocksFerramenta()`
+  monta os 3 blocos; ids `ferramenta_*` em `SUP_ACTS`; estado `ferCat`/`ferCartS`.
+  - **Campo:** `ferramenta_solicitar` (`supVFerramentaSolicitar`, catálogo `sup_ferramenta_catalogo` +
+    `sup_ferramenta_solicitar`) e `ferramenta_pedidos` (`supVFerramentaPedidos` — 3 blocos na mesma
+    tela: **estoque atual** com o colaborador via `sup_ferramenta_meu_estoque` + checkbox/qtd por item
+    e botão **"Solicitar devolução"**; **devoluções em andamento** com o código de 4 dígitos
+    (`sup_ferramenta_minhas_devolucoes`) e opção de cancelar; **histórico de solicitações**
+    (`sup_ferramenta_minhas_solicitacoes`), com código de retirada quando `segregada`).
+  - **Gestão:** `ferramenta_aprovar` (`supVFerramentaAprovar`, fila `sup_ferramenta_fila_aprovacao` +
+    RPCs **compartilhadas** `sup_aprovar`/`sup_rejeitar` — mesma UI de ajuste de qtd/cancelamento de
+    Insumos) e `ferramenta_painel` (reaproveita `supVPainel('sup_ferramenta_painel_multi')` — mesma
+    função parametrizada do Painel de Insumos, incluindo o drill-down "quem tem" do §5.1).
+  - **Almoxarifado:** `ferramenta_almox` (`supVFerramentaAlmox`, fila `sup_ferramenta_fila_almoxarife`
+    + `supAlmoxCard`/`supAlmoxWire` **reaproveitados como estão** — chamam `sup_segregar`/`sup_entregar`,
+    que são agnósticas de material) e **`ferramenta_recebimento`** (`supVFerramentaRecebimento`, tela
+    nova sem equivalente em Insumos: lista `sup_ferramenta_devolucao_fila_recebimento`, almoxarife
+    digita o **código de 4 dígitos que o colaborador informa de viva voz** e confirma via
+    `sup_ferramenta_devolucao_confirmar` — o código nunca é mostrado nessa tela, só na tela do
+    colaborador, pra servir de prova de handoff físico).
+- **Dois códigos, dois fluxos simétricos:** retirada usa `codigo_retirada` (padrão já existente de
+  Insumos/EPI); devolução usa um `codigo` novo gerado por `sup_ferramenta_devolucao_solicitar` — em
+  ambos os casos quem *recebe* fisicamente é quem digita o código pra confirmar (almoxarife entrega
+  pedindo o código de retirada; almoxarife recebe pedindo o código de devolução).
+- Tabelas novas: `sup_ferramenta_devolucao` (status `solicitada`/`confirmada`/`cancelada`, `codigo`,
+  `colaborador_uuid`, `recebido_por`) e `sup_ferramenta_devolucao_item` (`material_id`, `quantidade`).
+  Confirmar devolução grava um `sup_movimento` tipo **`devolucao`** negativo (zera o saldo do
+  colaborador) — esse valor do enum existia desde sempre mas estava sem uso até este módulo.
+- Notificações (`sup_trg_ferramenta_devolucao`, trigger AFTER INSERT/UPDATE em
+  `sup_ferramenta_devolucao`): solicitar devolução avisa `almoxarife`+`admin`
+  (`link='ferramenta_recebimento'`); confirmar avisa o colaborador (`link='ferramenta_pedidos'`).
+- RPCs novas (todas `SECURITY DEFINER`, grants revisados — funções novas nascem com EXECUTE liberado
+  pra `PUBLIC` por padrão do Postgres, teve que revogar+regrant `authenticated` explicitamente):
+  `sup_ferramenta_catalogo`, `sup_ferramenta_solicitar`, `sup_ferramenta_minhas_solicitacoes`,
+  `sup_ferramenta_meu_estoque`, `sup_ferramenta_devolucao_solicitar`, `sup_ferramenta_minhas_devolucoes`,
+  `sup_ferramenta_devolucao_cancelar`, `sup_ferramenta_fila_aprovacao`, `sup_ferramenta_fila_almoxarife`,
+  `sup_ferramenta_painel_multi`, `sup_ferramenta_devolucao_fila_recebimento`,
+  `sup_ferramenta_devolucao_confirmar`.
+
+### 5.5 Baixas / Conferência (almoxarife)
 - Consolida entregas por período p/ baixa no **SIENGE**, **por consórcio** (do perfil de quem retirou).
   RPCs: `sup_baixas_relatorio` (5 args, com `p_consorcio`), `sup_baixas_marcar`,
   `sup_epi_baixa_fila`/`_solicitar`/`_cancelar`, `sup_epi_minhas_baixas`.
 
-### 5.5 Configurações (admin) — `// tela: Configurações` (~L3824)
+### 5.6 Configurações (admin) — `// tela: Configurações` (~L3824)
 - **Duas entradas, uma tela** (`supAbrirConfig(from)`, `from` = `'home'` | `'epi'`; roda dentro do
   `<main id="suprimentos">` reusando `#supView`):
   - ⚙️ **na home** (`#homeCfg`, ao lado do `<h1>`, `hidden` até `homeGate()` liberar p/ `ME.is_admin`) →
