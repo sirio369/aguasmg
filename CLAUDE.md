@@ -208,6 +208,9 @@ pwa/
   no kPa cru. Coluna `multiplicador_pressao`, RPC `app_logger_set_multiplicador`; entra dentro de
   `logger_pressao_stats` e da view `vw_logger_pressao`, então cards, gráfico, PDF, CSV e qualquer BI
   que leia a view saem todos já corrigidos, sem passo extra. Detalhe em `docs/MODULOS.md §2.2`.
+  **Card "Modelo (previsto)"** (2026-09): logo acima do grid Mínima/Média/Mediana/Máxima, com
+  `p.pressao_modelo` (já existia, sem RPC nova) — comparação rápida modelo × medido, no logger
+  concluído e no preview de finalização.
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
   `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
