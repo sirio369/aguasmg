@@ -282,10 +282,12 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
   - **Chave pública VAPID** está no `index.html` (const `VAPID_PUBLIC`). A **privada e o segredo**
     ficam só em `push_config` — não printe.
 
-## 8. Suprimentos / Almoxarifado (schema `9 - suprimentos`)
+## 8. Almoxarifado (schema `9 - suprimentos`)
 
-Home dividida em três áreas: **Insumos**, **Equipamentos**, **EPI / Uniforme** (+ **Baixas/Conferência**
-para o almoxarife). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
+**Exibido como "Almoxarifado"** (só o rótulo — screen id `suprimentos`, funções `sup_*` e o schema
+seguem com o nome antigo). Home em duas seções: **📦 Áreas** — **Insumos**, **Equipamentos**,
+**EPI / Uniforme** — e, separada, **📋 Conferência** — **Baixas/Conferência** (só almoxarife/admin).
+Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
 
 - **Configurações (admin)** — `supAbrirConfig(from)`, roda dentro de `<main id="suprimentos">`. Duas
   portas: ⚙️ **na home** (`#homeCfg`, `homeGate()` → `ME.is_admin`) abre **👤 Usuários** (acesso, cargo,
@@ -307,6 +309,9 @@ para o almoxarife). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→fu
   EPIs + assinatura). Status: solicitada/aprovada/**segregada**/entregue/rejeitada. Devolução/troca por
   código, com fotos. **Tamanho** por escala: `letra` (P/M/G/GG/EXG) ou `numero` (33–48, calçados/botas).
   Tabelas `sup_epi*`. RPCs `sup_epi_*` (`_solicitar`/`_aprovar`/`_segregar`/`_entregar`/`_fila_*`/`_baixa_*`).
+  **Gestão de EPI (Aprovar EPI + EPIs por colaborador)** liberada também por **cargo** (não só
+  `funcao`): `"9 - suprimentos".sup_epi_gestor(uid)` — aprovador/admin **ou** cargo em
+  {Técnico de Segurança do Trabalho, Técnico de Qualidade, Coordenador de QSMSS}. Ver `docs/MODULOS.md §5.3`.
 - **Baixas / Conferência** — consolida entregas por período para conferência/baixa no SIENGE.
 
 ## 9. Regras de ouro ao alterar o app

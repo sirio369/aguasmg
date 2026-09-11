@@ -135,7 +135,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec" style="margin-top:20px">🧰 Suporte</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="cadastro"><div class="ic">🗺️</div><div class="nm">Cadastro técnico</div></button>
-      <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Suprimentos</div></button>
+      <button class="mod" data-go="suprimentos"><div class="ic">📦</div><div class="nm">Almoxarifado</div></button>
       <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
@@ -2992,12 +2992,14 @@ function supBlocksEquip(){
   ];
 }
 function supBlocksEpi(){
-  const almox=!!(ME&&ME.is_almoxarife), podeAp=!!(ME&&ME.pode_aprovar), gestao=podeAp||almox;
+  // epi_gestor: aprovador/admin OU cargo de Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
+  // (liberado só nas telas de EPI — calculado no backend em "9 - suprimentos".sup_epi_gestor, refletido aqui)
+  const almox=!!(ME&&ME.is_almoxarife), podeAp=!!(ME&&(ME.pode_aprovar||ME.epi_gestor)), gestao=podeAp||almox;
   return [
     {t:'Campo',ic:'🧑‍🔧',acts:[{id:'epi_solicitar',on:true},{id:'epi_pedidos',on:true},{id:'epi_meus',on:true}]},
     {t:'Gestão',ic:'📊',acts:[
-      {id:'epi_aprovar',on:podeAp,papel:'Encarregado'},
-      {id:'epi_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
+      {id:'epi_aprovar',on:podeAp,papel:'Encarregado / QSMS'},
+      {id:'epi_painel',on:gestao,papel:'Encarregado / Almoxarife / QSMS'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
       {id:'epi_segregar',on:almox,papel:'Almoxarife'},
       {id:'epi_entregar',on:almox,papel:'Almoxarife'},
@@ -3010,19 +3012,23 @@ function supHome(){
   const tt=$('#supTitle'); if(tt) tt.textContent='';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   const almox=!!(ME&&(ME.is_almoxarife||ME.is_admin));
-  $('#supView').innerHTML='<h1 style="margin-bottom:2px">Suprimentos</h1><p class="sub">Escolha uma área</p>'+
+  $('#supView').innerHTML='<h1 style="margin-bottom:2px">Almoxarifado</h1><p class="sub">Escolha uma área</p>'+
+    '<div class="sec" style="margin-top:14px">📦 Áreas</div>'+
     '<div class="grid" style="margin-top:10px">'+
       '<button class="mod" data-suparea="insumos"><div class="ic">📦</div><div class="nm">Insumos</div></button>'+
       '<button class="mod" data-suparea="equip"><div class="ic">🧰</div><div class="nm">Equipamentos</div></button>'+
       '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI / Uniforme</div></button>'+
-      (almox?'<button class="mod" data-supbaixas="1"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div></button>':'')+
-    '</div>';
+    '</div>'+
+    (almox?('<div class="sec" style="margin-top:20px">📋 Conferência</div>'+
+      '<div class="grid" style="margin-top:10px">'+
+        '<button class="mod" data-supbaixas="1"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div></button>'+
+      '</div>'):'');
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
   $('#supView').querySelectorAll('[data-supbaixas]').forEach(el=>el.addEventListener('click',()=>supVBaixas()));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
-  const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  const bk=$('#supBack'); if(bk) bk.textContent='‹ Almoxarifado';
   const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI / Uniforme':'Insumos');
   const cfg=$('#supCfg'); if(cfg){ cfg.classList.toggle('hidden', !(cat==='epi'&&ME&&ME.is_admin)); cfg.title='Cargos e cesta de EPI'; }
   const blocks = cat==='equip'?supBlocksEquip():(cat==='epi'?supBlocksEpi():supBlocks());
@@ -3389,7 +3395,7 @@ async function supVPainel(){
 
 // --- Baixas / Conferência (almoxarife): consolidado de entregas por período ---
 async function supVBaixas(){
-  supCurrent='area'; const bk=$('#supBack'); if(bk) bk.textContent='‹ Suprimentos';
+  supCurrent='area'; const bk=$('#supBack'); if(bk) bk.textContent='‹ Almoxarifado';
   const tt=$('#supTitle'); if(tt) tt.textContent='Baixas / Conferência';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -3522,7 +3528,7 @@ function eqTermoHtml(d, canAccept){
   const cls=aceito?'ok':'pend';
   const statusLbl=d.status==='pendente'?'Aguardando aceite':(aceito?'Aceito':(d.status||''));
   let h='<style>'+TERMO_CSS+'</style><div class="termoWrap '+cls+'">';
-  h+='<div class="relTop"><div><h1>Termo de Responsabilidade de Equipamento</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge">'+statusLbl+'</div></div>';
+  h+='<div class="relTop"><div><h1>Termo de Responsabilidade de Equipamento</h1><div class="sub">AcquaHub · Almoxarifado</div></div><div class="relBadge">'+statusLbl+'</div></div>';
   h+='<div class="termoAviso">'+(aceito?('✅ Termo aceito pelo colaborador em '+relFmtData(d.aceito_em)):'⚠ Termo AINDA NÃO aceito pelo colaborador')+'</div>';
   h+='<div class="relBody">';
   h+='<div class="relGrid">'+relField('Equipamento',d.equipamento)+relField('Tipo',d.tipo||'—')+relField('Nº de série / patrimônio',d.num_serie||'—')+relField('Nº do termo','#'+d.id)+'</div>';
@@ -4340,7 +4346,7 @@ function epiFichaHtml(d){
       +'<td style="'+td+'">'+saida+'</td>'
       +'</tr>';
   }).join('') : '<tr><td colspan="9" style="'+td+';text-align:center;color:#777">Nenhuma entrega registrada.</td></tr>';
-  let h='<div class="relTop"><div><h1>Ficha de Controle de Entrega de EPI e Uniforme</h1><div class="sub">AcquaHub · Suprimentos · referência NR-6</div></div></div><div class="relBody">';
+  let h='<div class="relTop"><div><h1>Ficha de Controle de Entrega de EPI e Uniforme</h1><div class="sub">AcquaHub · Almoxarifado · referência NR-6</div></div></div><div class="relBody">';
   h+='<div class="relGrid">'+relField('Colaborador',d.colaborador)+relField('Cargo / Função',d.cargo)+relField('Emitida em',relFmtData(new Date().toISOString()))+relField('Itens no histórico',String(itens.length))+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span> Histórico de entregas</div>';
   h+='<div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><thead><tr>'
@@ -4368,7 +4374,7 @@ function epiComprovanteHtml(e){
   const titulo=isDev?'Comprovante de Devolução de EPI':'Comprovante de Entrega de EPI';
   const dev=e.devolvido;
   const fig=(path,cap,white)=>'<figure style="margin:0;text-align:center"><img src="'+fotoURL(path)+'" style="width:100%;border:1px solid #ccc;border-radius:6px'+(white?';background:#fff':'')+'" onerror="this.style.display=\'none\'"/><figcaption style="font-size:11px;color:#666;margin-top:3px">'+cap+'</figcaption></figure>';
-  let h='<div class="relTop"><div><h1>'+titulo+'</h1><div class="sub">AcquaHub · Suprimentos</div></div><div class="relBadge" style="color:'+clr+'">'+tp+'</div></div><div class="relBody">';
+  let h='<div class="relTop"><div><h1>'+titulo+'</h1><div class="sub">AcquaHub · Almoxarifado</div></div><div class="relBadge" style="color:'+clr+'">'+tp+'</div></div><div class="relBody">';
   h+='<div class="relGrid">'+relField('Colaborador',nome)+relField('Data',relFmtData(e.entregue_em))+relField('Responsável',e.entregue_por)+relField('Nº do registro','#'+e.id)+'</div>';
   if(isDev){
     h+='<div class="relSec"><span class="relNum">1</span> EPI devolvido</div><div class="relGrid">'+(dev?relField(dev.epi+(dev.tamanho?(' · Tam '+dev.tamanho):'')+(dev.ca?(' · CA '+dev.ca):''),'×'+relNum(dev.qt,0)):'<div class="sub">—</div>')+'</div>';
