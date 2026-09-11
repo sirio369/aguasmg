@@ -119,7 +119,7 @@
 - **RPCs:** `app_loggers_listar()` (retorna a lista já achatada), `app_logger_criar` (avulso, já
   instalado), `app_logger_instalar`, `app_logger_remover`, `app_logger_finalizar` (anexa .json +
   OS SIGOS), `app_logger_editar(p_id, p_campos jsonb, p_foto_* ...)`, `logger_pressao_importar`,
-  `logger_pressao_stats`.
+  `logger_pressao_stats`, `app_logger_set_multiplicador`.
 - **Fotos:** instalação = HD, leitura, numeração, cavalete, fachada + **extra** (opcional);
   remoção = HD + cavalete. Params: `p_foto_hd`, `p_foto_leitura_hd`, `p_foto_numeracao_hd`,
   `p_foto_cavalete`, `p_foto_fachada`, `p_foto_extra`. Colunas: `foto_hd_instalacao`,
@@ -148,6 +148,20 @@
   Usado: (1) na **finalização** (`fzResumo`) — o botão **Concluir só habilita** quando os dados carregam
   (`pulsos_total>0`); (2) no **logger concluído** (`resumo` → `lgResumoPressao`). Logger sem pressão
   (`pulsos_com_pressao=0`) mostra alerta ⚠️.
+- **Multiplicador de pressão (2026-09, só no logger concluído):** card **antes do card "Mínima"**
+  (`lgMultCardHtml`), input + botão pequeno **💾 Salvar** — editável só para quem já vê o lápis
+  (`ME.pode_aprovar`; demais colaboradores veem o valor aplicado, somente leitura). Padrão **1**.
+  Coluna `instalacao_logger_calibracao.multiplicador_pressao` (numeric, `check > 0`), gravada por
+  `app_logger_set_multiplicador(p_id, p_multiplicador)` (mesmo gate do lápis: `sup_funcao in
+  ('admin','aprovador')`). **O multiplicador entra dentro do próprio cálculo kPa→mca — nunca mexe no
+  kPa bruto:** `mca = round(kpa * multiplicador / 9.80665, 4)`. Aplicado em **todo lugar que deriva
+  mca a partir do kPa cru**, então salvar atualiza tudo junto, sem passo manual extra:
+  `logger_pressao_stats` (cards + gráfico do app + PDF, e devolve o valor atual em `multiplicador`)
+  e a view **`vw_logger_pressao`** (CSV `app_logger_pressao_export` e qualquer BI que leia a view —
+  ela também expõe a coluna crua `multiplicador_pressao` p/ auditoria). `vw_loggers`/`app_loggers_listar`
+  também repassam `multiplicador_pressao`. Salvar recarrega `lgCarregarPressao(...,true)` na hora —
+  cards, gráfico e o próprio card do multiplicador atualizam juntos; o PDF mostra o valor aplicado
+  como campo (`relPressaoHtml`) toda vez que é emitido, então relatórios futuros já saem corrigidos.
 - **Exportar CSV** (logger concluído): botão `lgExportarCsv(p)` → RPC `app_logger_pressao_export(id)`
   (espelha `vw_logger_pressao`, janela válida, `ts_real` local) → CSV `;`-separado, decimais com vírgula,
   BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`.
@@ -540,6 +554,9 @@ back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `
 - Consolida entregas por período p/ baixa no **SIENGE**, **por consórcio** (do perfil de quem retirou).
   RPCs: `sup_baixas_relatorio` (5 args, com `p_consorcio`), `sup_baixas_marcar`,
   `sup_epi_baixa_fila`/`_solicitar`/`_cancelar`, `sup_epi_minhas_baixas`.
+- **Nunca inclui item `ferramenta`** (fix 2026-09 — tinha ficado de fora do rollout do §5.4): ferramenta
+  se empresta/devolve, não é custo consumido, então não faz sentido baixar no SIENGE junto com insumo.
+  `sup_baixas_relatorio`'s CTE `ins` filtra `and not m.ferramenta`.
 
 ### 5.6 Configurações (admin) — `// tela: Configurações` (~L3824)
 - **Duas entradas, uma tela** (`supAbrirConfig(from)`, `from` = `'home'` | `'epi'`; roda dentro do
