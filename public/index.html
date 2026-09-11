@@ -4431,14 +4431,18 @@ function supCfgRender(){
   supCfgFiltrosRender();
   supCfgUsers();
 }
+const CFG_VAZIO_OPT=(sel)=>`<option value="__VAZIO__"${sel==='__VAZIO__'?' selected':''}>— Não preenchido —</option>`;
 function supCfgFiltrosRender(){
   const c=$('#cfgUFiltros'); if(!c) return;
   const box='flex:1 1 44%;min-width:130px', cargos=cfgCargoOpts||[];
+  // "1º Aprovador" só lista quem HOJE está de fato como aprovador de alguém (não a lista inteira de usuários)
+  const aprovAtuaisIds=new Set(cfgUsers.map(u=>u.aprovador_uuid).filter(Boolean).map(String));
+  const aprovOpts=cfgUsers.filter(u=>aprovAtuaisIds.has(String(u.id)));
   c.innerHTML=`
-    <div style="${box}"><div class="sub" style="${CFG_LBL}">Acesso</div><select id="cfuFu" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${cfgUF.fu===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div>
-    <div style="${box}"><div class="sub" style="${CFG_LBL}">Cargo</div><select id="cfuCu" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${cargos.map(cg=>`<option value="${cg.id}"${cfgUF.cu===String(cg.id)?' selected':''}>${cg.nome}</option>`).join('')}</select></div>
-    <div style="${box}"><div class="sub" style="${CFG_LBL}">Consórcio</div><select id="cfuCo" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option><option value="ZA1004"${cfgUF.co==='ZA1004'?' selected':''}>Contagem</option><option value="ZA0200"${cfgUF.co==='ZA0200'?' selected':''}>Betim</option></select></div>
-    <div style="${box}"><div class="sub" style="${CFG_LBL}">1º Aprovador</div><select id="cfuAp" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${cfgUsers.map(u=>`<option value="${u.id}"${cfgUF.ap===String(u.id)?' selected':''}>${u.nome||u.email}</option>`).join('')}</select></div>`;
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">Acesso</div><select id="cfuFu" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${CFG_VAZIO_OPT(cfgUF.fu)}${Object.keys(CFG_FUN).map(k=>`<option value="${k}"${cfgUF.fu===k?' selected':''}>${CFG_FUN[k]}</option>`).join('')}</select></div>
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">Cargo</div><select id="cfuCu" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${CFG_VAZIO_OPT(cfgUF.cu)}${cargos.map(cg=>`<option value="${cg.id}"${cfgUF.cu===String(cg.id)?' selected':''}>${cg.nome}</option>`).join('')}</select></div>
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">Consórcio</div><select id="cfuCo" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${CFG_VAZIO_OPT(cfgUF.co)}<option value="ZA1004"${cfgUF.co==='ZA1004'?' selected':''}>Contagem</option><option value="ZA0200"${cfgUF.co==='ZA0200'?' selected':''}>Betim</option></select></div>
+    <div style="${box}"><div class="sub" style="${CFG_LBL}">1º Aprovador</div><select id="cfuAp" style="width:100%;font-size:13px;padding:7px 8px"><option value="">Todos</option>${CFG_VAZIO_OPT(cfgUF.ap)}${aprovOpts.map(u=>`<option value="${u.id}"${cfgUF.ap===String(u.id)?' selected':''}>${u.nome||u.email}</option>`).join('')}</select></div>`;
   $('#cfuFu').addEventListener('change',e=>{ cfgUF.fu=e.target.value; supCfgUsers(); });
   $('#cfuCu').addEventListener('change',e=>{ cfgUF.cu=e.target.value; supCfgUsers(); });
   $('#cfuCo').addEventListener('change',e=>{ cfgUF.co=e.target.value; supCfgUsers(); });
@@ -4486,11 +4490,12 @@ function supCfgUsers(){
   if(!cfgUsers.length){ c.innerHTML='<p class="sub">Nenhum usuário.</p>'; return; }
   const apOpts=(u,sel)=>'<option value="">—</option>'+cfgUsers.filter(x=>x.id!==u.id).map(x=>`<option value="${x.id}"${String(sel||'')===String(x.id)?' selected':''}>${x.nome||x.email}</option>`).join('');
   const coOpts=(u)=>[['','—'],['ZA1004','Contagem'],['ZA0200','Betim']].map(([v,l])=>`<option value="${v}"${(u.consorcio||'')===v?' selected':''}>${l}</option>`).join('');
+  const cfgMatch=(val,filtro)=>{ if(!filtro) return true; if(filtro==='__VAZIO__') return val==null||val===''; return String(val==null?'':val)===filtro; };
   const lista=cfgUsers.filter(u=>
-    (!cfgUF.fu||u.funcao===cfgUF.fu)&&
-    (!cfgUF.cu||String(u.cargo_id||'')===cfgUF.cu)&&
-    (!cfgUF.co||(u.consorcio||'')===cfgUF.co)&&
-    (!cfgUF.ap||String(u.aprovador_uuid||'')===cfgUF.ap));
+    cfgMatch(u.funcao,cfgUF.fu)&&
+    cfgMatch(u.cargo_id,cfgUF.cu)&&
+    cfgMatch(u.consorcio,cfgUF.co)&&
+    cfgMatch(u.aprovador_uuid,cfgUF.ap));
   if(!lista.length){ c.innerHTML='<p class="sub" style="padding:10px 0">Nenhum usuário com esses filtros. <button class="btn ghost" id="cfuLimpar" style="width:auto;margin:0;padding:4px 10px;font-size:12px">Limpar filtros</button></p>'; const lb=$('#cfuLimpar'); if(lb) lb.addEventListener('click',()=>{ cfgUF={fu:'',cu:'',co:'',ap:''}; supCfgFiltrosRender(); supCfgUsers(); }); return; }
   c.innerHTML=lista.map(u=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
     <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.nome||u.email}</div>
