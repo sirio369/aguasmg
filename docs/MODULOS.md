@@ -390,7 +390,9 @@ sem intervenção manual.
   p_max_ang_deg, p_min_len_m)` (admin, atualiza `pp_config` + chama `pp_recompute(null)`) é a única forma
   suportada de retunar — **não edite `pp_config` direto por fora dela** fora de manutenção excepcional
   (o `NULL` de cada parâmetro preserva o valor atual). **Valores vigentes (2026-09-11, com dados reais de
-  campo):** `tol_m=12, cov_pct=0.5, max_ang_deg=35, min_len_m=12, seg_max_len_m=40`. Diagnóstico que levou
+  campo; `tol_m` subiu de 12→15 no mesmo dia após revisão visual na Produtividade — pedaço pendente
+  correndo paralelo a um executado, mesma rua):** `tol_m=15, cov_pct=0.5, max_ang_deg=35, min_len_m=12,
+  seg_max_len_m=40`. Diagnóstico que levou
   a esses valores: pedaços "da mesma rua" que ficavam abaixo do corte por pouco (`ratio` 0,30–0,58 com
   `tol_m=8/cov_pct=0,6`) sobem de forma saudável até uns 12–15 m de tolerância; pedaços de rua/ramal
   **diferente** continuam em `ratio` ≈0 mesmo em `tol_m=20` (o filtro de azimute segura) — não tem
