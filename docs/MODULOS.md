@@ -162,9 +162,19 @@
   também repassam `multiplicador_pressao`. Salvar recarrega `lgCarregarPressao(...,true)` na hora —
   cards, gráfico e o próprio card do multiplicador atualizam juntos; o PDF mostra o valor aplicado
   como campo (`relPressaoHtml`) toda vez que é emitido, então relatórios futuros já saem corrigidos.
+- **Card "📐 Modelo (previsto)" (2026-09):** card extra logo acima do grid Mínima/Média/Mediana/Máxima
+  (`lgCardModelo`, borda tracejada p/ não confundir com dado medido), com o valor de projeto/simulação
+  (`instalacao_logger_calibracao.pressao`, já vinha em `p.pressao_modelo` via `app_loggers_listar` —
+  não precisou de RPC/coluna nova). Só aparece quando o ponto tem valor de modelo **e** há amostra de
+  pressão (`d.n>0`). Em `lgPressaoBox(d, pressaoModelo)`, usado tanto no **logger concluído**
+  (`lgResumoPressao`) quanto no **preview de finalização** (`fzResumo`) — comparação lado a lado entre
+  previsto e medido nos dois lugares onde a caixa de pressão aparece.
 - **Exportar CSV** (logger concluído): botão `lgExportarCsv(p)` → RPC `app_logger_pressao_export(id)`
   (espelha `vw_logger_pressao`, janela válida, `ts_real` local) → CSV `;`-separado, decimais com vírgula,
-  BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`.
+  BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`. **Pressão em 4 colunas (2026-09), pra
+  deixar o multiplicador auditável linha a linha:** `Pressao_Inicial_kPa` (bruto, nunca muda) →
+  `Multiplicador` → `Pressao_Final_kPa` (=inicial×multiplicador, nova coluna `pressao_final_kpa` na
+  view) → `Pressao_Final_mca` (=final_kPa/9,80665 — mesmo valor que já aparecia nos cards/PDF).
 - **Filtro "concluído" segrega dados:** `app_loggers_listar` devolve `tem_pressao` (bool); o sub-filtro
   `#lgSub` (`lgSub`/`renderSubFiltros`/`lgMatchSub`) aparece só no filtro **concluído** com
   **✅ Com dados de pressão** / **⚠️ Sem dados** (+contagens) — torna visível a quantidade de loggers

@@ -1275,6 +1275,9 @@ async function relInjectPressao(p){
   }catch(e){ box.innerHTML='<div class="relPend">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
 }
 function lgCard(t,mca,kpa){ return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 6px;text-align:center;background:var(--card)"><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em">'+t+'</div><div style="font-size:18px;font-weight:700;color:var(--acc);line-height:1.2">'+relNum(mca,2)+' <span style="font-size:11px;font-weight:600;color:var(--mut)">mca</span></div><div style="font-size:11px;color:var(--mut)">'+relNum(kpa,1)+' kPa</div></div>'; }
+// Pressão do modelo: valor de projeto/simulação (instalacao_logger_calibracao.pressao, mca puro, sem
+// kPa correspondente) — mostrado à parte, com borda tracejada, pra não ser confundido com dado medido.
+function lgCardModelo(mca){ return '<div style="border:1px dashed var(--acc);border-radius:10px;padding:9px 6px;text-align:center;background:var(--card)"><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em">📐 Modelo (previsto)</div><div style="font-size:18px;font-weight:700;color:var(--ink);line-height:1.2">'+relNum(mca,2)+' <span style="font-size:11px;font-weight:600;color:var(--mut)">mca</span></div></div>'; }
 // Multiplicador de pressão: fator aplicado sobre kPa junto com a conversão p/ mca (correção de
 // calibração/instalação). Vive em instalacao_logger_calibracao.multiplicador_pressao (padrão 1),
 // já vem calculado no retorno de logger_pressao_stats (campo `multiplicador`) — todo o resto
@@ -1307,10 +1310,11 @@ function lgMultWire(p,elId){
     }catch(e){ toast('⚠ '+(e.message||e)); btn.disabled=false; btn.textContent=old; }
   });
 }
-function lgPressaoBox(d){
+function lgPressaoBox(d, pressaoModelo){
   if(!d) return '<div class="banner warn">Sem dados de pressão.</div>';
   let h='';
   if(d.n>0){
+    if(pressaoModelo!=null) h+='<div style="margin-top:8px">'+lgCardModelo(pressaoModelo)+'</div>';
     h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px">'+lgCard('Mínima',d.min_mca,d.min_kpa)+lgCard('Média',d.media_mca,d.media_kpa)+lgCard('Mediana',d.mediana_mca,d.mediana_kpa)+lgCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
     h+='<div style="margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;overflow-x:auto">'+relPressaoSVG(d.serie||[])+'</div>';
     h+='<div class="sub" style="font-size:11px;margin-top:6px">'+d.n+' amostra(s) com pressão · '+relFmtData(d.primeiro)+' → '+relFmtData(d.ultimo)+'</div>';
@@ -1328,7 +1332,7 @@ async function lgCarregarPressao(p, elId, cb, comMult){
   if(!navigator.onLine){ box.innerHTML='<div class="banner warn">Conecte-se para ver os dados de pressão.</div>'; return; }
   try{ const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
     const podeEd=!!(ME&&ME.pode_aprovar);
-    box.innerHTML=(comMult?lgMultCardHtml(data,podeEd):'')+lgPressaoBox(data);
+    box.innerHTML=(comMult?lgMultCardHtml(data,podeEd):'')+lgPressaoBox(data,p.pressao_modelo);
     if(cb) cb(data);
     if(comMult&&podeEd) lgMultWire(p,elId);
   }catch(e){ box.innerHTML='<div class="banner bad">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
@@ -1341,9 +1345,9 @@ async function lgExportarCsv(p){
     if(!rows.length) return toast('Sem dados de pressão para exportar');
     const num=v=>v==null?'':String(v).replace('.',',');
     const esc=v=>{ if(v==null) return ''; const s=String(v); return /[;\n"]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; };
-    const head=['Codigo','Numero','Consorcio','Zona','Data/hora','Pressao_kPa','Pressao_mca','Temperatura_C','Bateria_V'];
+    const head=['Codigo','Numero','Consorcio','Zona','Data/hora','Pressao_Inicial_kPa','Multiplicador','Pressao_Final_kPa','Pressao_Final_mca','Temperatura_C','Bateria_V'];
     const linhas=[head.join(';')];
-    rows.forEach(r=>linhas.push([esc(r.codigo),esc(r.numero_logger),esc(r.consorcio),esc(r.zona),esc(r.data_hora),num(r.pressao_kpa),num(r.pressao_mca),num(r.temperature),num(r.battery)].join(';')));
+    rows.forEach(r=>linhas.push([esc(r.codigo),esc(r.numero_logger),esc(r.consorcio),esc(r.zona),esc(r.data_hora),num(r.pressao_kpa),num(r.multiplicador_pressao),num(r.pressao_final_kpa),num(r.pressao_mca),num(r.temperature),num(r.battery)].join(';')));
     const csv='﻿'+linhas.join('\r\n');
     const nome='logger_'+String(p.label||('id'+p.id)).replace(/[^\w\-]+/g,'_')+'.csv';
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
