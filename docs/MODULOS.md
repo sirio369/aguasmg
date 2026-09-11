@@ -428,12 +428,18 @@ sem intervenção manual.
 
 ---
 
-## 5. Suprimentos / Almoxarifado — `// MÓDULO SUPRIMENTOS` (~L2403) · tela `suprimentos` (schema `"9 - suprimentos"`)
+## 5. Almoxarifado — `// MÓDULO SUPRIMENTOS` (~L2403) · tela `suprimentos` (schema `"9 - suprimentos"`)
 
-Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Baixas/Conferência**.
-`SUP_ACTS` mapeia act→função; `supBlocks*` montam os menus por papel (`ME`). Navegação interna por
-`supArea`/`supHome`/`supGoAct`; back inteligente em `#supBack`. Helpers de papel no banco:
-`sup_funcao(uuid)`, `sup_e_almox(uuid)`, `sup_pode_aprovar(uuid)`.
+**Nome exibido é "Almoxarifado"** (card da home, título, back-button, cabeçalhos de PDF) — mudou de
+"Suprimentos" em 2026-09 (só o rótulo; screen id `suprimentos`, funções `sup_*` e o schema
+`"9 - suprimentos"` continuam com o nome antigo, não vale a pena renomear isso).
+
+Home própria (`supHome`) com duas seções: **📦 Áreas** (**Insumos**, **Equipamentos**,
+**EPI/Uniforme** — sempre visíveis) e, separada, **📋 Conferência** (**Baixas/Conferência**, só
+`is_almoxarife`/admin — visualmente apartada das 3 áreas porque não é "mais uma área", é a etapa de
+conferência que consolida as outras). `SUP_ACTS` mapeia act→função; `supBlocks*` montam os menus por
+papel (`ME`). Navegação interna por `supArea`/`supHome`/`supGoAct`; back inteligente em `#supBack`.
+Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`, `sup_pode_aprovar(uuid)`.
 
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
@@ -462,6 +468,18 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
   `sup_epi_troca_fila_aprovacao`, `sup_epi_fila_segregar`, `sup_epi_segregar`, `sup_epi_fila_entrega`,
   `sup_epi_meus`, `sup_epi_devolver`, `sup_epi_substituir`, `sup_epi_gestao_colaborador(es)`,
   `sup_epi_ficha` (ficha consolidada). Fotos via `epiUpload` (pasta `epi`).
+- **Gestão de EPI liberada também por CARGO (2026-09), não só por acesso (`funcao`).** Os cards
+  **Aprovar EPI** (`epi_aprovar`) e **EPIs por colaborador** (`epi_painel`) são liberados pra
+  aprovador/admin **ou** para quem tem o `perfil.cargo_id` de **Técnico de Segurança do Trabalho**,
+  **Técnico de Qualidade** ou **Coordenador de QSMSS** — mesmo com `funcao='campo'`. Função
+  `"9 - suprimentos".sup_epi_gestor(uid)` (`sup_pode_aprovar(uid) OR cargo em (...)`, casado por
+  **nome** do cargo, não por id — resiliente a recriação de `sup_cargo`) é o gate único, usado por
+  `app_me()` (campo `epi_gestor`, refletido em `supBlocksEpi()` no front) e por **todas** as RPCs de
+  gestão de EPI (`sup_epi_fila_aprovacao`, `sup_epi_aprovar`, `sup_epi_rejeitar`,
+  `sup_epi_troca_fila_aprovacao`, `sup_epi_troca_aprovar`, `sup_epi_troca_rejeitar`,
+  `sup_epi_gestao_colaborador(es)`) — trocou o antigo `sup_pode_aprovar(uid)` só nelas. **Escopo é só
+  EPI:** `sup_pode_aprovar` continua intocado pra Insumos/Equipamentos (Encarregado normal), não vira
+  cargo-based ali.
 
 ### 5.4 Baixas / Conferência (almoxarife)
 - Consolida entregas por período p/ baixa no **SIENGE**, **por consórcio** (do perfil de quem retirou).
