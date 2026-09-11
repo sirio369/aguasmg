@@ -349,6 +349,14 @@ sem intervenção manual.
   em vez de menos feições longas) ou seleção livre por polígono (`app_pp_rede_no_poligono`, **até 8.000**,
   idem). Camada de seleção dedicada (`ppSelLayer`) sempre visível por cima, independente de filtro de
   colaborador/data — ver "cuidado" abaixo.
+- **Bug corrigido (2026-09-11, mesmo dia da Fase E):** o `limit` de ambas as RPCs vinha **depois** de um
+  `jsonb_agg(...)` sem `group by` — nesse formato o SELECT já colapsa pra 1 linha (o agregado), então
+  `limit N` só limitava o nº de linhas de *saída* (sempre 1), **não** a quantidade de feições dentro do
+  array. Passou despercebido antes da Fase E porque uma área típica tinha poucas centenas/milhares de
+  redes inteiras; com a segmentação (~2,7× mais feições pela mesma área), um zoom "de bairro" chegou a
+  devolver **12.622 feições numa chamada só** — o mapa do programador travava/não carregava. Fix: `limit`
+  movido pra dentro de uma subconsulta, **antes** do agregado (testado: mesma área agora retorna
+  exatamente 10.000, não mais ilimitado).
 - Vincula (`app_pp_atribuir(p_rede_ids bigint[], p_colaborador, p_sobrescrever)`) / desvincula
   (`app_pp_desatribuir(p_rede_ids bigint[])`) — **`p_rede_ids` continua com esse nome** (zero mudança no
   frontend), mas **os valores agora são `rede_pp_segmento.id`**, não mais `rede.id`. Desvincular
