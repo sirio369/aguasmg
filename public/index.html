@@ -987,7 +987,7 @@ function abrirDetalhe(id){
   else if(p.situacao==='removido') h=formFinalizar(p);
   else h=resumo(p);
   $('#lgDet').innerHTML=h; ligarDetalhe(p);
-  if(p.situacao==='concluido') lgCarregarPressao(p,'lgResumoPressao');
+  if(p.situacao==='concluido') lgCarregarPressao(p,'lgResumoPressao',null,true);
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
   $('#lgDet').appendChild(rb);
@@ -1275,6 +1275,38 @@ async function relInjectPressao(p){
   }catch(e){ box.innerHTML='<div class="relPend">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
 }
 function lgCard(t,mca,kpa){ return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 6px;text-align:center;background:var(--card)"><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em">'+t+'</div><div style="font-size:18px;font-weight:700;color:var(--acc);line-height:1.2">'+relNum(mca,2)+' <span style="font-size:11px;font-weight:600;color:var(--mut)">mca</span></div><div style="font-size:11px;color:var(--mut)">'+relNum(kpa,1)+' kPa</div></div>'; }
+// Multiplicador de pressão: fator aplicado sobre kPa junto com a conversão p/ mca (correção de
+// calibração/instalação). Vive em instalacao_logger_calibracao.multiplicador_pressao (padrão 1),
+// já vem calculado no retorno de logger_pressao_stats (campo `multiplicador`) — todo o resto
+// (cards, gráfico, PDF, CSV/view) deriva do mesmo cálculo, então salvar aqui atualiza tudo junto.
+function lgMultCardHtml(d,podeEd){
+  const v=(d&&d.multiplicador!=null)?Number(d.multiplicador):1;
+  const vTxt=(Math.round(v*10000)/10000).toString().replace('.',',');
+  if(!podeEd) return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:12px;color:var(--mut)">Multiplicador de pressão aplicado</div><b style="font-size:15px;color:var(--acc)">×'+vTxt+'</b></div>';
+  return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);margin-bottom:6px">'
+    +'<div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">Multiplicador de pressão</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<input id="lgMultVal" inputmode="decimal" value="'+vTxt+'" style="width:70px;text-align:center;font-size:15px;font-weight:700"/>'
+    +'<span class="sub" style="font-size:11px;flex:1">multiplica todas as pressões (kPa→mca) deste logger</span>'
+    +'<button id="lgMultSalvar" style="all:unset;cursor:pointer;background:var(--acc);color:var(--acc-ink);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;white-space:nowrap">💾 Salvar</button>'
+    +'</div></div>';
+}
+function lgMultWire(p,elId){
+  const inp=document.getElementById('lgMultVal'), btn=document.getElementById('lgMultSalvar');
+  if(!inp||!btn) return;
+  btn.addEventListener('click',async()=>{
+    const v=parseFloat((inp.value||'').replace(',','.'));
+    if(isNaN(v)||v<=0) return toast('Multiplicador deve ser maior que zero');
+    if(!navigator.onLine) return toast('Conecte-se para salvar o multiplicador');
+    btn.disabled=true; const old=btn.textContent; btn.textContent='…';
+    try{
+      const {error}=await sb.rpc('app_logger_set_multiplicador',{p_id:p.id,p_multiplicador:v});
+      if(error) throw error;
+      toast('✓ Multiplicador salvo — recalculando');
+      await lgCarregarPressao(p,elId,null,true);
+    }catch(e){ toast('⚠ '+(e.message||e)); btn.disabled=false; btn.textContent=old; }
+  });
+}
 function lgPressaoBox(d){
   if(!d) return '<div class="banner warn">Sem dados de pressão.</div>';
   let h='';
@@ -1290,12 +1322,15 @@ function lgPressaoBox(d){
     +'📟 Pulsos: <b>'+(d.pulsos_total??'—')+'</b> · com pressão: <b>'+(d.pulsos_com_pressao??'—')+'</b> · sem pressão: <b>'+(d.pulsos_sem_pressao??'—')+'</b><br>⏱️ Intervalo entre pulsos: ~<b>'+(d.intervalo_min??'—')+' min</b> (esperado 15 min)</div>';
   return h;
 }
-async function lgCarregarPressao(p, elId, cb){
+async function lgCarregarPressao(p, elId, cb, comMult){
   const box=document.getElementById(elId); if(!box) return;
   box.innerHTML='<p class="sub">Carregando dados de pressão…</p>';
   if(!navigator.onLine){ box.innerHTML='<div class="banner warn">Conecte-se para ver os dados de pressão.</div>'; return; }
   try{ const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
-    box.innerHTML=lgPressaoBox(data); if(cb) cb(data);
+    const podeEd=!!(ME&&ME.pode_aprovar);
+    box.innerHTML=(comMult?lgMultCardHtml(data,podeEd):'')+lgPressaoBox(data);
+    if(cb) cb(data);
+    if(comMult&&podeEd) lgMultWire(p,elId);
   }catch(e){ box.innerHTML='<div class="banner bad">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
 }
 async function lgExportarCsv(p){
@@ -1318,9 +1353,12 @@ async function lgExportarCsv(p){
   }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
 }
 function relPressaoHtml(d){
+  const mult=(d.multiplicador!=null)?Number(d.multiplicador):1;
+  const multTxt=(Math.round(mult*10000)/10000).toString().replace('.',',');
+  const multRow='<div class="relGrid" style="margin-bottom:2px">'+relWide('Multiplicador de pressão aplicado','×'+multTxt)+'</div>';
   const cards='<div class="relCards">'+relCard('Mínima',d.min_mca,d.min_kpa)+relCard('Média',d.media_mca,d.media_kpa)+relCard('Mediana',d.mediana_mca,d.mediana_kpa)+relCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
   const info='<div class="sub" style="font-size:11px;margin-top:7px;color:#666">'+d.n+' amostra(s) de pressão (> 0) · '+relFmtData(d.primeiro)+' → '+relFmtData(d.ultimo)+'</div>';
-  return cards+relPressaoSVG(d.serie||[])+info;
+  return multRow+cards+relPressaoSVG(d.serie||[])+info;
 }
 function relPressaoSVG(s){
   if(!s.length) return '';

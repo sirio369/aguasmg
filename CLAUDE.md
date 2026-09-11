@@ -203,6 +203,11 @@ pwa/
   consórcio** (ZA1004/ZA0200). No **lápis** (aprovador/admin) dá pra editar/anexar todas as fotos e 3
   campos de **OS COPASA** (instalação/remoção/social). RPCs `app_logger_*` (`_criar`/`_instalar` têm
   `p_foto_extra`; `_editar` recebe paths de foto + OS via `p_campos`).
+  **Multiplicador de pressão** (2026-09, só no logger concluído, antes do card "Mínima"): fator
+  (padrão 1, editável só por quem já vê o lápis) aplicado **junto com** a conversão kPa→mca — nunca
+  no kPa cru. Coluna `multiplicador_pressao`, RPC `app_logger_set_multiplicador`; entra dentro de
+  `logger_pressao_stats` e da view `vw_logger_pressao`, então cards, gráfico, PDF, CSV e qualquer BI
+  que leia a view saem todos já corrigidos, sem passo extra. Detalhe em `docs/MODULOS.md §2.2`.
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
   `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
@@ -328,7 +333,8 @@ almoxarife/admin). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→fun
   **Gestão de EPI (Aprovar EPI + EPIs por colaborador)** liberada também por **cargo** (não só
   `funcao`): `"9 - suprimentos".sup_epi_gestor(uid)` — aprovador/admin **ou** cargo em
   {Técnico de Segurança do Trabalho, Técnico de Qualidade, Coordenador de QSMSS}. Ver `docs/MODULOS.md §5.3`.
-- **Baixas / Conferência** — consolida entregas por período para conferência/baixa no SIENGE.
+- **Baixas / Conferência** — consolida entregas por período para conferência/baixa no SIENGE. **Nunca
+  inclui item `ferramenta`** (fix 2026-09 — ferramenta empresta/devolve, não é custo consumido).
 
 ## 9. Regras de ouro ao alterar o app
 
