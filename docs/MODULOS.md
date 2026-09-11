@@ -323,7 +323,11 @@ Home própria com áreas **Insumos**, **Equipamentos**, **EPI/Uniforme** e **Bai
   diretos** (`sup_admin_set_aprovadores(uuid,uuid,uuid)`), **consórcio** (`sup_admin_set_consorcio`).
   Filtros no topo (`#cfgUFiltros`, estado `cfgUF={fu,cu,co,ap}`, `supCfgFiltrosRender`): **acesso**,
   **cargo**, **consórcio** e **1º aprovador** — filtragem client-side em `supCfgUsers` (os handlers de
-  edição continuam achando o usuário por id em `cfgUsers`, então salvar sob filtro funciona).
+  edição continuam achando o usuário por id em `cfgUsers`, então salvar sob filtro funciona). Cada um
+  dos 4 tem uma opção **"— Não preenchido —"** (sentinela `'__VAZIO__'`, `cfgMatch(val,filtro)` trata
+  `null`/`''`) pra achar quem está com o campo em branco (ex.: sem cargo, sem consórcio). O select de
+  **1º Aprovador** só lista quem **hoje** está de fato como `aprovador_uuid` de alguém (calculado a
+  cada render de `cfgUsers`) — não a lista inteira de usuários.
 - **Cargos e cesta de EPI:** cestas por cargo (`sup_cesta_*`, `sup_cargos_*`).
 - Equipes (`sup_admin_equipe_*`, `sup_admin_membro_*`) seguem como **código morto** (ver §4 abaixo).
 - Notificações de aprovação vão só aos aprovadores diretos (`sup_aprovadores_de`).
