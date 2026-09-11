@@ -206,13 +206,15 @@ pwa/
   **Multiplicador de pressão** (2026-09, só no logger concluído, antes do card "Mínima"): fator
   (padrão 1, editável só por quem já vê o lápis) aplicado **junto com** a conversão kPa→mca — nunca
   no kPa cru. Coluna `multiplicador_pressao`, RPC `app_logger_set_multiplicador`; entra dentro de
-  `logger_pressao_stats` e da view `vw_logger_pressao`, então cards, gráfico, PDF, CSV e qualquer BI
-  que leia a view saem todos já corrigidos, sem passo extra. **CSV (2026-09)** mostra as 4 etapas do
-  cálculo por linha: `Pressao_Inicial_kPa → Multiplicador → Pressao_Final_kPa → Pressao_Final_mca`
-  (nova coluna `pressao_final_kpa` na view). Detalhe em `docs/MODULOS.md §2.2`.
+  `logger_pressao_stats` e da view `vw_logger_pressao`, então cards, gráfico, CSV e qualquer BI que
+  leia a view saem todos já corrigidos, sem passo extra — **não aparece no PDF** (removido 2026-09,
+  é detalhe operacional do app/CSV). **CSV (2026-09)** mostra as 4 etapas do cálculo por linha:
+  `Pressao_Inicial_kPa → Multiplicador → Pressao_Final_kPa → Pressao_Final_mca` (nova coluna
+  `pressao_final_kpa` na view). Detalhe em `docs/MODULOS.md §2.2`.
   **Card "Modelo (previsto)"** (2026-09): logo acima do grid Mínima/Média/Mediana/Máxima, com
   `p.pressao_modelo` (já existia, sem RPC nova) — comparação rápida modelo × medido, no logger
-  concluído e no preview de finalização.
+  concluído e no preview de finalização. **No PDF mora no tópico 5 · Pressão** (saiu do tópico
+  1 · Localização, onde ficava sem nada pra comparar do lado).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
   As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
   `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)

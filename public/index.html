@@ -1224,7 +1224,7 @@ function relDocHtml(p){
   h+='<div class="relGrid" style="margin-top:10px">'+relField('OS COPASA instalação',p.os_copasa_instalacao)+relField('OS COPASA remoção',p.os_copasa_remocao)+relField('OS COPASA social',p.os_copasa_social)+'</div>';
   // 1 · Localização (sugerido × instalado + mapa)
   h+='<div class="relSec"><span class="relNum">1</span> Localização</div>';
-  h+='<div class="relGrid">'+relField('Coordenada sugerida',sug)+relField('Coordenada instalada',gpsReal)+relField('Pressão de modelo',p.pressao_modelo!=null?(p.pressao_modelo+' mca'):'—')+relField('Distância sugerido → instalado',dist)+'</div>';
+  h+='<div class="relGrid">'+relField('Coordenada sugerida',sug)+relField('Coordenada instalada',gpsReal)+relField('Distância sugerido → instalado',dist)+'</div>';
   h+='<div id="relMapa" class="relMapWrap"><div class="relMapPh">Preparando mapa…</div></div>';
   h+='<div class="relLeg"><span><span class="relDot" style="background:#1d6fe0"></span>Ponto sugerido</span><span><span class="relDot" style="background:#e11d1d"></span>Ponto instalado (GPS real)</span></div>';
   // 2 · Instalação
@@ -1271,7 +1271,7 @@ async function relInjectPressao(p){
   try{
     const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
     if(!data||!data.n){ box.innerHTML='<div class="relPend">Nenhum dado de pressão importado para este ponto.</div>'; return; }
-    box.innerHTML=relPressaoHtml(data);
+    box.innerHTML=relPressaoHtml(data,p.pressao_modelo);
   }catch(e){ box.innerHTML='<div class="relPend">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
 }
 function lgCard(t,mca,kpa){ return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 6px;text-align:center;background:var(--card)"><div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em">'+t+'</div><div style="font-size:18px;font-weight:700;color:var(--acc);line-height:1.2">'+relNum(mca,2)+' <span style="font-size:11px;font-weight:600;color:var(--mut)">mca</span></div><div style="font-size:11px;color:var(--mut)">'+relNum(kpa,1)+' kPa</div></div>'; }
@@ -1356,13 +1356,11 @@ async function lgExportarCsv(p){
     toast(rows.length+' linhas exportadas ('+nome+')');
   }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
 }
-function relPressaoHtml(d){
-  const mult=(d.multiplicador!=null)?Number(d.multiplicador):1;
-  const multTxt=(Math.round(mult*10000)/10000).toString().replace('.',',');
-  const multRow='<div class="relGrid" style="margin-bottom:2px">'+relWide('Multiplicador de pressão aplicado','×'+multTxt)+'</div>';
+function relPressaoHtml(d,pressaoModelo){
+  const modeloRow=(pressaoModelo!=null)?('<div class="relGrid" style="margin-bottom:2px">'+relWide('Pressão do modelo',relNum(Number(pressaoModelo),2)+' mca')+'</div>'):'';
   const cards='<div class="relCards">'+relCard('Mínima',d.min_mca,d.min_kpa)+relCard('Média',d.media_mca,d.media_kpa)+relCard('Mediana',d.mediana_mca,d.mediana_kpa)+relCard('Máxima',d.max_mca,d.max_kpa)+'</div>';
   const info='<div class="sub" style="font-size:11px;margin-top:7px;color:#666">'+d.n+' amostra(s) de pressão (> 0) · '+relFmtData(d.primeiro)+' → '+relFmtData(d.ultimo)+'</div>';
-  return multRow+cards+relPressaoSVG(d.serie||[])+info;
+  return modeloRow+cards+relPressaoSVG(d.serie||[])+info;
 }
 function relPressaoSVG(s){
   if(!s.length) return '';
