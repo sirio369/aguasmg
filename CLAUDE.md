@@ -286,18 +286,34 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 
 **Exibido como "Almoxarifado"** (só o rótulo — screen id `suprimentos`, funções `sup_*` e o schema
 seguem com o nome antigo). Home em duas seções: **📦 Áreas** — **Insumos**, **Equipamentos**,
-**EPI / Uniforme** — e, separada, **📋 Conferência** — **Baixas/Conferência** (só almoxarife/admin).
-Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
+**EPI / Uniforme**, **Ferramentas** — e, separada, **📋 Conferência** — **Baixas/Conferência** (só
+almoxarife/admin). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
 
 - **Configurações (admin)** — `supAbrirConfig(from)`, roda dentro de `<main id="suprimentos">`. Duas
   portas: ⚙️ **na home** (`#homeCfg`, `homeGate()` → `ME.is_admin`) abre **👤 Usuários** (acesso, cargo,
   aprovadores, consórcio) com **filtros** no topo (acesso / cargo / consórcio / 1º aprovador); ⚙️ **dentro
-  de EPI / Uniforme** (`#supCfg`) abre **🦺 Cargos e cesta de EPI**. Detalhe em `docs/MODULOS.md §5.5`.
+  de EPI / Uniforme** (`#supCfg`) abre **🦺 Cargos e cesta de EPI**. Detalhe em `docs/MODULOS.md §5.6`.
 
 - **Insumos** — fluxo: solicitar → aprovar → **segregar** (almoxarife, existe/parcial/falta, gera
   código) → **retirar** (código). Tabelas `sup_solicitacao`/`_item`, `sup_material` (catálogo),
   `sup_saldo`/`sup_movimento` (kardex por equipe). RPCs `sup_solicitar`/`sup_aprovar`/`sup_segregar`/
-  `sup_entregar`/`sup_consumir`. Catálogo via `sup_materiais_listar` (exclui categoria `EPI / EPC`).
+  `sup_entregar`/`sup_consumir`. Catálogo via `sup_materiais_listar` (exclui categoria `EPI / EPC` e
+  itens `ferramenta=true`, ver abaixo). Painel das equipes tem **drill-down**: tocar um item do
+  estoque agregado mostra quem tem (`supEstTableDrill`), sem round-trip extra.
+- **Ferramentas** (2026-09) — item reusável (trena, alicate, cone, escada, talha etc.) que se
+  **empresta e devolve**, nunca se consome — `sup_material.ferramenta=true` fica fora do catálogo de
+  Insumos e `sup_consumir` bloqueia consumo desses itens. **4ª área própria** (Campo/Gestão/Almox igual
+  Insumos): Campo = **Solicitar ferramenta** + **Minhas ferramentas** (estoque atual com botão
+  "Solicitar devolução" embutido + histórico); Gestão = **Aprovar solicitações** (reaproveita
+  `sup_aprovar`/`sup_rejeitar`) + **Painel das equipes** (mesma função parametrizada e drill-down de
+  Insumos); Almoxarifado = **Separação e entrega** (reaproveita `supAlmoxCard`/`sup_segregar`/
+  `sup_entregar`) + **Recebimento** (tela nova: almoxarife confirma devolução digitando o código de
+  4 dígitos que o colaborador informa, nunca mostrado nessa tela). Dois códigos simétricos: retirada
+  (`codigo_retirada`, padrão já existente) e devolução (`codigo` novo, tabela `sup_ferramenta_devolucao`
+  + `_item`; confirmar grava `sup_movimento` tipo **`devolucao`** negativo — enum que existia sem uso
+  até agora). RPCs `sup_ferramenta_*` (catálogo/solicitar/meu_estoque/fila_aprovacao/fila_almoxarife/
+  painel_multi/devolucao_*). Notifica por trigger (`sup_trg_ferramenta_devolucao`). Detalhe em
+  `docs/MODULOS.md §5.4`.
 - **Equipamentos** — rastreio por pessoa via **termo de responsabilidade**. Emitir → **aceitar dentro
   do próprio termo** (documento fica **vermelho até aceitar, verde depois**) → usar → devolver por
   código (com defeito → abre manutenção corretiva). Preventiva por tipo (dias). Tela "Equipamentos por
