@@ -59,6 +59,12 @@
   `entInit()` (subdivisões do Entrevistadores). **Cuidado:** a `home` aparece no boot **sem** passar
   por `irPara`, e `ME` carrega assíncrono — por isso o gate também é chamado quando `app_me` resolve
   (ver §Auth). Botão gated novo → siga esse padrão (nasce `hidden`, revela no gate).
+- **Botões da home menores (2026-09):** override `#home .grid`/`#home .mod`/`#home .mod .ic`/
+  `#home .mod .nm` (gap 6px, padding 8px 6px, ícone 19px, rótulo 10,5px) — **só na home**, não mexe em
+  `.mod`/`.grid` globais (Frota, área de Almoxarifado etc. continuam do tamanho normal). Motivo: com
+  12 cards em grid 2 colunas, o tamanho antigo não cabia numa tela sem rolar (medido 375×667: ~264px
+  de sobra). Testado com harness fora do app (mede `getBoundingClientRect` real, sem o `min-height:100%`
+  do `.wrap` mascarar a medida) — estes valores dão ~36px de folga no mesmo 375×667.
 
 ### Perfil / papéis — objeto `ME`
 - Carregado por `sb.rpc('app_me')` → `ME = {id,nome,email,cargo,funcao,is_admin,is_almoxarife,pode_aprovar,equipes[]}`.

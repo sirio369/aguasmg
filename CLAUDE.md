@@ -184,6 +184,9 @@ pwa/
   (ex.: gerar código, aceitar termo) são feitas **online** e avisam se offline.
 - **Estilo:** usa variáveis CSS (`var(--acc)`, `var(--card)`, `var(--line)`, `var(--bad)`,
   `var(--ok-bg)`, `var(--warn-bg)`, ...). Reaproveite-as em vez de cores fixas.
+  `.mod`/`.grid` (cards de módulo) são **globais**, reaproveitados em vários hubs (home, Frota,
+  Almoxarifado...) — se só uma tela precisa de ajuste de tamanho, use um override escopado
+  (`#idDaTela .mod{...}`), como em `#home` (2026-09, botões menores pra caber sem rolar).
 - **Relatórios/PDF** (termo de equipamento, comprovantes, ficha de logger): overlay `#relatorio`
   com `REL_CSS`, impressão via `window.print()`.
 
