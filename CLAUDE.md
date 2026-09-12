@@ -145,7 +145,7 @@ pwa/
 | `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
 | `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`), **programação de pesquisa** (`programacao_pesquisa`, `rede_pp_segmento`/`_fonte`, `pp_config` — app-only mesmo estando neste schema geo, sem policy pra `gis_*`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
-| `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, empréstimos, ocorrências — *app-only* (treinamento QSMS dormente desde 2026-09) |
+| `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos, empréstimos, lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes e Ocorrência **removidos por completo** em 2026-09) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
@@ -249,31 +249,40 @@ pwa/
 
 **Suprimentos** (`suprimentos`) — ver §8.
 
-**Frota** (card único `frota` na home; telas internas `condutor`/`frotas` — `qsms` dormente desde
-2026-09, ver abaixo — schema `10 - Frotas`) — o card abre um **hub estilo Suprimentos**
-(`frotaInit`/`frotaHome`/`frotaBlocks`) com 3 seções gateadas: **👤 Colaborador**, **🖊️ Gestor**,
-**🏢 Equipe administrativa**. `frotaOpen(id)` é só roteador: seta `condTarget`/`frotasTarget` e faz
-`irPara('condutor'|'frotas')` — o render de cada fluxo continua onde estava. Detalhe em
-`docs/MODULOS.md §6.0`. **Fluxo (reformulado 2026-09):** o **gestor de frota cadastra a CNH** do
-colaborador (tela Frotas › Condutores, lista *todos* os colaboradores + busca/filtro + tick "isento" —
-`app_frota_usuarios_completo`/`app_frota_condutor_cadastrar`/`app_frota_isentar`) → colaborador é
-avisado e **assina eletronicamente o termo de responsabilidade de condução** (PDF via overlay
-`#relatorio` igual logger/equipamento, assinatura em canvas igual EPI — `frotaTermoVer`/
-`app_frota_termo_assinar`) → **ativo**; alerta de CNH vencendo em 30 dias. **Não existe mais
-autocadastro nem aprovação separada, nem etapa de treinamento** (QSMS ficou dormente — tela/RPCs/
-tabelas preservados, só sem botão de entrada; será reconstruído depois com escopo próprio). Só pode
-ser vinculado a veículo/equipe/empréstimo quem está `ativo` (validado no backend; reeditar um
-vínculo já existente não reaplica a checagem — "grandfathering"). **Frotas** (`funcao='frotas'`/admin)
-cadastra veículos (tipo/combustível/motorização/centro de custo, consórcio obrigatório, aluguel com
-histórico de reajuste, valor de devolução) e aprova ocorrências/manutenções (valor só visível a quem
-aprova). Empréstimo de veículo entre condutores — durante o empréstimo, abastecimento/ocorrência/
-lavagem somem de quem emprestou e aparecem pra quem recebeu; retomada é só solicitação (quem está com
-o carro confirma a devolução). Manutenção tem fluxo próprio (orçamento → aprovação → conclusão,
-tabela `frota_manutencao`, separada de ocorrência). Painel de acompanhamento (Frotas) com histórico
-completo de movimentações/abastecimentos/lavagens/ocorrências/manutenções e custos agregados por
-veículo — "tempo real" é só "atualizado ao abrir a tela", sem websocket. Aprovação/notificação
-**reaproveita** o mecanismo de Suprimentos (não é hierarquia própria) — ver docs/MODULOS.md §6
-(detalhe completo) e §0.9/§6.4 (o mecanismo em si).
+**Frota** (card único `frota` na home; telas internas `condutor`/`frotas` — schema `10 - Frotas`) —
+o card abre um **hub estilo Suprimentos** (`frotaInit`/`frotaHome`/`frotaBlocks`) com 3 seções
+gateadas: **👤 Colaborador**, **🖊️ Gestor**, **🏢 Equipe administrativa**. `frotaOpen(id)` é só
+roteador: seta `condTarget`/`frotasTarget` e faz `irPara('condutor'|'frotas')`. Detalhe em
+`docs/MODULOS.md §6.0`. **Reformulação grande em 2026-09** — QSMS/treinamento de direção defensiva,
+Equipes, Ocorrência genérica (multa/sinistro/lavagem-como-tipo) e aluguel-com-histórico-de-reajuste
+foram **removidos por completo** (não ficaram dormentes: RPCs e, onde não havia dado real, tabelas
+também apagadas — ver `docs/MODULOS.md §6.3`/"Tabelas"). Fluxo atual: o **gestor de frota cadastra a
+CNH** do colaborador (tela Frotas › Condutores, lista *todos* os colaboradores + busca/filtro + tick
+"isento" — `app_frota_usuarios_completo`/`app_frota_condutor_cadastrar`/`app_frota_isentar`) →
+colaborador **assina eletronicamente o termo de responsabilidade de condução** (PDF via overlay
+`#relatorio`, assinatura em canvas igual EPI — `frotaTermoVer`/`app_frota_termo_assinar`) → **ativo**
+→ **Frotas vincula o colaborador a um veículo** (`app_frota_veiculo_vincular`/`_desvincular`, tabela
+`frota_veiculo_vinculo` — vários vínculos abertos por veículo ao mesmo tempo são permitidos; substitui
+o antigo modelo de equipe/condutor-exclusivo). Só quem está `ativo` pode ser vinculado/receber
+empréstimo. **Veículo, radicalmente simplificado:** `app_frota_veiculo_salvar` (18 params) cadastra só
+identificação/combustível/motorização + **`tipo`** (lista fechada de 9 categorias reais de obra —
+administrativo, basculante toco, retroescavadeira, pipa, vácuo, pick-up especial/simples, van,
+carroceria¾/VUC) + **`centro_custo`** (`select` de 33 pares código-Nível-4/descrição-Nível-3) +
+`consorcio` (obrigatório) + `contrato_numero` (vincula a um contrato de locação já existente — **sem
+aluguel/histórico de reajuste próprio**). **Colaborador**, no seu módulo: CNH, **checklist diário**
+(lembrete automático 7:30 da manhã pra quem tem vínculo ativo + CNH ativa, `pg_cron` +
+`frota_checklist_lembrete_diario`), abastecimento, **registrar problema** (substitui "ocorrência" —
+tipo mecânico + descrição + **foto obrigatória**, sem valor, sempre vira uma manutenção pendente),
+**solicitar lavagem**, empréstimo/devolução. **Lavagem** tem ciclo próprio: colaborador solicita →
+Frotas agenda (data/horário/local, notifica) → colaborador confirma execução
+(`frota_lavagem`, status `solicitada→agendada→realizada`). **Manutenção** também: colaborador
+solicita (sem valor) → gestor aprova/reprova → Frotas agenda **com o custo** → conclui
+(`frota_manutencao`, status `pendente→aprovado/reprovado→agendado→concluido`). **Histórico**
+(por veículo ou por colaborador, com filtro de período) junta vínculos/empréstimos/checklists/
+manutenções numa timeline só — é a tela de investigação de sinistro. **Painel e custos** tem 5
+submódulos (movimentações/abastecimentos/lavagens/manutenções/custos), os 4 primeiros com filtro de
+veículo/colaborador/data. Aprovação/notificação **reaproveita** o mecanismo de Suprimentos (não é
+hierarquia própria) — ver docs/MODULOS.md §6 (detalhe completo) e §0.9/§6.4 (o mecanismo em si).
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 

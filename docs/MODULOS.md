@@ -69,8 +69,10 @@
 ### Perfil / papéis — objeto `ME`
 - Carregado por `sb.rpc('app_me')` → `ME = {id,nome,email,cargo,funcao,is_admin,is_almoxarife,pode_aprovar,equipes[]}`.
 - `funcao ∈ {admin, campo, aprovador, almoxarife, frotas, qsms}`. `pode_aprovar` = aprovador **ou**
-  admin. `is_almoxarife` = almoxarife **ou** admin. `frotas` libera o CRUD completo de veículos/equipes
-  em **Frotas** (§6); `qsms` libera a tela **QSMS** (agendar/dar baixa em treinamento, §6.3).
+  admin. `is_almoxarife` = almoxarife **ou** admin. `frotas` libera o CRUD completo de veículos e a
+  seção "Equipe administrativa" em **Frotas** (§6). `qsms` **não libera mais nada** (2026-09 — a tela
+  que abria foi removida por completo, §6.3); o valor continua existindo só por compatibilidade de
+  quem já tinha esse acesso configurado.
 - `supGetMe()` (~L2412) carrega sob demanda e faz fallback `campo` se falhar. No login (§Auth) o `ME`
   é carregado globalmente e dispara os gates.
 - **Cuidado:** `ME` pode ser `null` no início. Sempre teste `!!(ME&&ME.pode_aprovar)`.
@@ -600,46 +602,47 @@ back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `
 
 ---
 
-## 6. Frota — schema `"10 - Frotas"` · tela-hub `frota` (+ telas internas `condutor` / `frotas` / `qsms`)
+## 6. Frota — schema `"10 - Frotas"` · tela-hub `frota` (+ telas internas `condutor` / `frotas`)
 
 Um público entra por **um só card** na home (🧰 Suporte › **🚗 Frota**, `data-go="frota"`). Fluxo
-**(reformulado 2026-09)**: **Frotas** (`funcao='frotas'`/admin) cadastra a CNH do colaborador →
-colaborador é avisado e **assina o termo de responsabilidade de condução** (assinatura eletrônica,
-igual EPI) → ativo. Frotas também cadastra veículos e aprova ocorrências/manutenções. **Não há mais
-etapa de treinamento de direção defensiva** — a role `qsms` e as telas de treinamento ficam
-**dormentes** (código/tabelas preservados, desconectados do fluxo principal); será reconstruído em
-outro momento com escopo próprio (ver §6.3).
+**(reformulado 2026-09, 2ª rodada)**: **Frotas** (`funcao='frotas'`/admin) cadastra a CNH do
+colaborador → colaborador é avisado e **assina o termo de responsabilidade de condução** (assinatura
+eletrônica, igual EPI) → ativo → Frotas **vincula** o colaborador a um veículo. Colaborador faz
+**checklist diário** (com botão de reportar problema embutido), abastece e **solicita** lavagem;
+Frotas **agenda** a lavagem (data/horário/local) e o colaborador confirma a execução depois. Problema
+reportado vira **solicitação de manutenção**: colaborador solicita → gestor aprova → Frotas agenda
+(data + custo) → Frotas conclui. **Equipes, ocorrência genérica (multa/sinistro/lavagem-como-tipo),
+aluguel com histórico de reajuste e a etapa de treinamento de direção defensiva (QSMS) foram
+removidos por completo** (não ficaram dormentes — RPCs e, onde não havia dado real, as tabelas também
+foram apagadas; ver §6.2–§6.4 e "Tabelas" abaixo).
 
 ### 6.0 Hub `frota` — `// ----- HUB da Frota` (~L4856)
 - Estilo Suprimentos/Insumos: `frotaInit` → `frotaHome` renderiza **seções → botões**; `frotaBlocks()`
   monta as seções e o gate de cada uma (seção sem acesso **não aparece**, diferente do `supArea` que
   mostra bloqueada):
-  - **👤 Colaborador** (`on:true`, todo usuário): Minha CNH · Situação do veículo · Abastecimento ·
-    Registrar ocorrência · Lavagem · Emprestar / meus empréstimos.
-  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): Aprovar ocorrências · Aprovar manutenções.
-    **"Aprovar condutores" foi removido (2026-09)** — não existe mais aprovação separada, o cadastro
-    de CNH pelo gestor de frota já é o ato de vetting (ver §6.1).
-  - **🏢 Equipe administrativa** (`funcao='frotas'||is_admin`): Veículos · Equipes · Condutores ·
-    Painel e custos. **"Condutores" foi reformulado (2026-09)** — agora é a lista completa de
-    *todos* os colaboradores (não só quem já tem CNH), com cadastro de CNH e tick de isento
-    (ver §6.1).
-  - ~~🦺 QSMS~~ **removido do hub (2026-09)** — tela/RPCs/tabelas continuam existindo (dormentes),
-    só não têm mais botão de entrada (ver §6.3).
+  - **👤 Colaborador** (`on:true`, todo usuário): Minha CNH · Checklist diário · Abastecimento ·
+    Registrar problema (manutenção) · Solicitar lavagem · Emprestar / meus empréstimos.
+  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): Aprovar manutenções (única aprovação que resta —
+    "Aprovar condutores" e "Aprovar ocorrências" foram removidos, ver §6.1/§6.2).
+  - **🏢 Equipe administrativa** (`funcao='frotas'||is_admin`): Veículos · Condutores · Lavagens a
+    agendar · Manutenções a agendar · Histórico (veículo/colaborador) · Painel e custos.
+    **"Equipes" foi removida** (ver §6.2). "Condutores" é a lista completa de *todos* os
+    colaboradores (não só quem já tem CNH), com cadastro de CNH e tick de isento (ver §6.1).
 - **`frotaOpen(id)` é um roteador** — não duplica render. Seta um alvo e chama `irPara`:
   - ações de Colaborador → `condTarget={sub,act}` + `irPara('condutor')`; `condInit` consome o alvo
     depois do load (`condGoTarget`). Ação que depende de veículo: 0 veículos → `toast`; 1 → auto-seleciona;
     2+ → `condRenderPick(sub)` (lista de placas). "Minha CNH" sempre cai na home do condutor
     (`condRenderHome` já trata os dois casos: sem cadastro, ou com termo pendente/ativo).
-  - Gestor/Admin → `frotasTarget` (`'home'|'equipes'|'condutores'|'painel'`) + `irPara('frotas')`;
-    `frotasInit` consome. Aprovações de ocorrência/manutenção ficam no topo da home de `frotas`.
+  - Gestor/Admin → `frotasTarget` (`'condutores'|'painel'|'lavagem_fila'|'manutencao_fila'|
+    'historico'`) + `irPara('frotas')`; `frotasInit` consome. Aprovação de manutenção fica no topo
+    da home de `frotas`.
 - As telas internas `condutor`/`frotas` **não têm mais card na home**; a barra delas volta pro
   hub (`#condBar`/`#frotasBar` → `irPara('frota')`). Os `‹ Voltar` **internos** das
   sub-telas continuam indo pra home da própria tela (2 níveis de volta). Deep-links de notificação
-  (`supGoAct`, §7) continuam apontando direto pra `condutor`/`frotas` — seguem funcionando; o link
-  `qsms_treinamento` de notificações antigas ainda abre a tela `qsms` (dormente, só não tem mais
-  entrada pelo hub).
+  (`supGoAct`, §7) apontam pra `condutor`/`frotas` com o `frotasTarget`/`condSub` certo já setado
+  (ex.: `frota_lavagem_agendar` → `frotasTarget='lavagem_fila'`).
 
-### 6.1 Condutor — `// condutor/frotas/qsms` (~L4275) · tela `condutor`
+### 6.1 Condutor — `// condutor/frotas` (~L4275) · tela `condutor`
 - **Ciclo de status (reformulado 2026-09)** (`frota_condutor.status`): o **gestor de frota cadastra
   a CNH** (não é mais autocadastro) → `termo_pendente` → colaborador **assina o termo de
   responsabilidade** → `ativo`. Os status `pendente`/`apto`/`reprovado` continuam **válidos no
@@ -693,103 +696,133 @@ outro momento com escopo próprio (ver §6.3).
   `cnh_dias_para_vencer` (`cnh_validade - current_date`, pode ser negativo se já venceu). Exibido
   como banner (com a contagem de dias) em `condRenderHome` quando `status==='ativo'`, e como
   texto ao lado da validade sempre que a CNH existe.
-- **Meu veículo / situação / abastecimento / ocorrência / lavagem / empréstimo:** `condVeiculos` =
+- **Checklist diário, abastecimento, problema (manutenção), lavagem, empréstimo:** `condVeiculos` =
   `app_frota_veiculos_listar()` (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,
-  status,consorcio,ultima_lavagem_em,lavagem_atrasada`). Sub-telas `condRenderSituacao`/
-  `condRenderAbastecimento`/`condRenderOcorrencia`/`condRenderLavagem` salvam via
-  `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar`/`app_frota_ocorrencia_reportar`/
-  `app_frota_lavagem_salvar` (tabelas `frota_checklist_situacao`/`frota_checklist_abastecimento`/
-  `frota_ocorrencia`/`frota_lavagem`; foto opcional em todas). **`p_consorcio` não é escolhido na
-  tela** — vem direto de `v.consorcio` (o veículo, obrigatoriamente vinculado a um consórcio desde o
-  cadastro em Frotas, §6.2). **Combustível do abastecimento é filtrado pelo `tipo_combustivel` do
-  veículo** (`combustiveisPermitidos(v)`: `flex`→gasolina/etanol, `gasolina`→só gasolina,
-  `diesel`→diesel/diesel S10, `outros`/sem cadastro→todas as opções de `COMBUSTIVEIS`).
-  **Offline-first** (igual ao resto da coleta de campo, §1) só em situação/abastecimento —
-  `condSalvarSituacao`/`condSalvarAbastecimento` montam um `item` e chamam `enviarOuEnfileirar`; `p_fotos`
-  de situação é **array** (`text[]`), por isso o `item` leva `fotosArray:['p_fotos']` (convenção nova
-  em `enviar()`, ver §1). **Ocorrência e lavagem são online-only** (chamam a RPC direto, sem fila) —
-  ação de exceção/manutenção pontual, não tão crítica offline quanto o checklist do dia a dia.
-  **Alerta de lavagem atrasada** (`v.lavagem_atrasada`, banner no card do veículo): calculado **na
-  leitura**, sem job/cron — `ultima_lavagem_em` (ou a data de início do vínculo, se nunca lavou) ≤
-  hoje − 30 dias. Mesmo padrão de `cnh_vencendo` em `app_condutor_meu`.
-  **Quem pode agir num veículo agora** é decidido por `"10 - Frotas".condutor_tem_veiculo(uid,
-  veiculo_id)` (função SQL nova, reaproveitada em `app_frota_veiculos_listar` — filtro da lista
-  enxuta —, `app_frota_abastecimento_salvar`, `app_frota_ocorrencia_reportar` e
-  `app_frota_lavagem_salvar`): **titular** (exclusivo/equipe) **enquanto não há empréstimo ativo**, OU
-  **quem está com o empréstimo ativo no momento** (`para_condutor_id`). Durante um empréstimo, o
-  veículo **some** da lista enxuta de quem emprestou e **aparece** na de quem recebeu — é assim que
-  abastecimento/ocorrência/lavagem "deixam de ficar disponíveis pro condutor anterior" (não é um flag,
-  é o próprio filtro de listagem). Situação continua **sem** essa checagem (não fazia parte do pedido;
-  se precisar, é achatar o mesmo padrão). `app_frota_ocorrencia_reportar` também aceita
-  `funcao in ('frotas','admin')` **sem** precisar estar com o veículo (Frotas reporta em qualquer um).
+  status,consorcio,ultima_lavagem_em,lavagem_atrasada`).
+  - **Checklist** (`condRenderSituacao`/`condSalvarSituacao` → `app_frota_situacao_salvar`, tabela
+    `frota_checklist_situacao`) ganhou um botão **"🔧 Encontrou um problema? Registrar"** que leva
+    direto pra `condSub='ocorrencia'` (o formulário de manutenção, ver abaixo) — checklist e
+    problema são passos separados, mas o segundo é um atalho de dentro do primeiro.
+  - **Registrar problema** (`condRenderOcorrencia`, **reformulado 2026-09** — não existe mais
+    "ocorrência" genérica): tipo do problema (`TIPO_PROBLEMA`: pneu furado/freio/motor/elétrica/
+    suspensão/bateria/ar-condicionado/vidro-retrovisor/outro — **multa, sinistro e lavagem foram
+    removidos da lista**, lavagem virou fluxo próprio abaixo), detalhamento + **foto obrigatória**
+    (antes era opcional), **sem campo de valor** (o custo só entra depois, quando Frotas agenda —
+    ver §6.2) → `app_frota_manutencao_solicitar(p_veiculo_id,p_tipo_problema,p_servico_solicitado,
+    p_fotos_antes[])`, grava direto em `frota_manutencao` com `status='pendente'`. **Não existe mais
+    a tabela/RPC de "ocorrência"** — o antigo `app_frota_ocorrencia_reportar` e a tabela
+    `frota_ocorrencia` foram **apagados** (estavam sempre vazios, nenhum dado real a preservar).
+  - **Lavagem** (`condRenderLavagem`, **reformulado 2026-09**): colaborador só **solicita**
+    (`app_frota_lavagem_solicitar(p_veiculo_id)`, sem formulário — nenhum dado a preencher ainda).
+    Frotas agenda (data/horário/local, ver §6.2) e notifica; aí o colaborador vê em "🧼 Minhas
+    lavagens" (`app_frota_minhas_lavagens`) um botão **"Registrar execução"**
+    (`condRenderLavagemRealizar` → `app_frota_lavagem_realizar(p_id,p_valor,p_foto)`, valor/foto
+    opcionais) que fecha o ciclo. Tabela `frota_lavagem` ganhou `status`
+    (`solicitada→agendada→realizada|cancelada`) + `solicitado_em/agendado_por/data_agendada/
+    horario_agendado/local_agendado/realizado_em` — as colunas antigas `data`/`valor`/`foto`
+    passaram a significar "da execução", só preenchidas no fim do ciclo.
+  - **`p_consorcio` não é escolhido na tela** — vem direto de `v.consorcio` (o veículo,
+    obrigatoriamente vinculado a um consórcio desde o cadastro em Frotas, §6.2). **Combustível do
+    abastecimento é filtrado pelo `tipo_combustivel` do veículo** (`combustiveisPermitidos(v)`:
+    `flex`→gasolina/etanol, `gasolina`→só gasolina, `diesel`→diesel/diesel S10, `outros`/sem
+    cadastro→todas as opções de `COMBUSTIVEIS`).
+  - **Offline-first** (igual ao resto da coleta de campo, §1) só em checklist/abastecimento —
+    `condSalvarSituacao`/`condSalvarAbastecimento` montam um `item` e chamam `enviarOuEnfileirar`;
+    `p_fotos` do checklist é **array** (`text[]`), por isso o `item` leva `fotosArray:['p_fotos']`
+    (convenção nova em `enviar()`, ver §1). **Problema/manutenção e lavagem são online-only**
+    (chamam a RPC direto, sem fila).
+  - **Alerta de lavagem atrasada** (`v.lavagem_atrasada`, banner no card do veículo): calculado **na
+    leitura**, sem job/cron — última lavagem `realizada` (ou a data de início do vínculo, se nunca
+    lavou) ≤ hoje − 30 dias. Mesmo padrão de `cnh_vencendo` em `app_condutor_meu`.
+  - **Quem pode agir num veículo agora** é decidido por `"10 - Frotas".condutor_tem_veiculo(uid,
+    veiculo_id)` (reaproveitada em `app_frota_veiculos_listar` — filtro da lista enxuta —,
+    `app_frota_abastecimento_salvar`, `app_frota_manutencao_solicitar` e
+    `app_frota_lavagem_solicitar`): **tem um vínculo aberto** (`frota_veiculo_vinculo`,
+    `desvinculado_em is null` — substitui exclusivo/equipe, ver §6.2) **enquanto não há empréstimo
+    ativo**, OU **quem está com o empréstimo ativo no momento** (`para_condutor_id`). Durante um
+    empréstimo, o veículo **some** da lista enxuta de quem emprestou e **aparece** na de quem
+    recebeu (não é um flag, é o próprio filtro de listagem). Checklist continua **sem** essa
+    checagem. `app_frota_manutencao_solicitar`/`app_frota_lavagem_solicitar` também aceitam
+    `funcao in ('frotas','admin')` **sem** precisar de vínculo (Frotas solicita em qualquer um).
 - **Empréstimo:** `condRenderEmprestimo`/`condSalvarEmprestimo` — condutor busca o destinatário por
   e-mail (`app_perfil_por_email`, que devolve `condutor_status`) e chama
   `app_frota_emprestimo_criar(p_veiculo_id, p_para_condutor_id, p_data_inicio, p_data_fim_prevista)`
-  — recusa se o destinatário não estiver `apto`/`ativo` (§6.4/gate de condutor). Lista "Meus
-  empréstimos" (`app_frota_meus_emprestimos`, campo `sou_recebedor`) mostra "Devolver veículo" só pra
-  quem recebeu e está `ativo` (`app_frota_emprestimo_devolver(p_id)`, confirma a devolução). **Retomada
-  (titular quer o veículo de volta):** o titular só **solicita** —
-  `app_frota_emprestimo_solicitar_devolucao(p_id)` marca `devolucao_solicitada_em` (idempotente, só
-  quem é `de_condutor_id` do empréstimo) e dispara notificação pessoal pra quem está com o carro; **a
-  devolução em si continua sendo confirmada por quem está com o veículo** — o titular não pode forçar.
-  Decisão de produto explícita (não inverter sem confirmar de novo).
-- **Estado:** `condSub, condVeiculoSel, condData, condVeiculos, condEmprestimos`.
+  — recusa se o destinatário não estiver `ativo` (2026-09: `apto` não conta mais, já que não existe
+  mais essa etapa intermediária). Lista "Meus empréstimos" (`app_frota_meus_emprestimos`, campo
+  `sou_recebedor`) mostra "Devolver veículo" só pra quem recebeu e está `ativo`
+  (`app_frota_emprestimo_devolver(p_id)`, confirma a devolução). **Retomada (titular quer o veículo
+  de volta):** o titular só **solicita** — `app_frota_emprestimo_solicitar_devolucao(p_id)` marca
+  `devolucao_solicitada_em` (idempotente, só quem é `de_condutor_id` do empréstimo) e dispara
+  notificação pessoal pra quem está com o carro; **a devolução em si continua sendo confirmada por
+  quem está com o veículo** — o titular não pode forçar. Decisão de produto explícita (não inverter
+  sem confirmar de novo).
+- **Estado:** `condSub, condVeiculoSel, condLavagemSel, condData, condVeiculos, condEmprestimos,
+  condMinhasLavagens`.
 
-### 6.2 Frotas — `// condutor/frotas/qsms` (~L4446) · tela `frotas`
-- **Gate de tela vs. gate de conteúdo:** todo mundo entra na tela (pra ver ocorrências pendentes se
+### 6.2 Frotas — `// condutor/frotas` (~L4446) · tela `frotas`
+- **Gate de tela vs. gate de conteúdo:** todo mundo entra na tela (pra ver manutenções pendentes se
   for aprovador, ou os próprios veículos se for condutor comum); `frotasRenderHome` decide o conteúdo
-  completo (`const full = ME.funcao==='frotas'||ME.is_admin`) — CRUD de veículo/equipe só aparece pra
+  completo (`const full = ME.funcao==='frotas'||ME.is_admin`) — CRUD de veículo só aparece pra
   `full`. **O backend também gateia** (`app_frota_veiculos_listar` já filtra por função — ver §6.4).
-- **Veículo** (`frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` → `app_frota_veiculo_salvar`, 23 params
-  incl. dados de locação `fornecedor/contrato_numero/data_inicio/data_fim_prevista`, uso
-  `uso_tipo ∈ {equipe,exclusivo}` com `equipe_id` **xor** `condutor_exclusivo_id`, e os campos de
-  cadastro: `tipo` (`select` fixo — `TIPOS_VEICULO`: picape/utilitario/hatch/sedan/suv/caminhao/moto),
-  `centro_custo` (texto livre), `tipo_combustivel` (`select` fixo — `COMBUSTIVEIS_VEICULO`:
-  flex/gasolina/diesel/outros — **vocabulário diferente** do `COMBUSTIVEIS` usado no abastecimento,
-  ver §6.1), `motorizacao` (texto livre, ex. "1.6"), `consorcio` (**obrigatório**, `ZA1004`/`ZA0200` —
-  validado na RPC mesmo pra edição; os 2 veículos cadastrados antes desta trave em produção precisam
-  ser reabertos e salvos uma vez pra ganhar consórcio). `CHECK` de `tipo`/`tipo_combustivel`/`consorcio`
-  também no banco (`frota_veiculo_*_check`).
-  **Aluguel tem histórico, não é um campo só:** `p_valor_aluguel` da RPC só é usado **na criação**
-  (semeia a 1ª linha); reajuste é sempre via `app_frota_veiculo_aluguel_reajustar(p_veiculo_id,p_valor,
-  p_vigente_desde)` (nova linha em `frota_veiculo_aluguel_historico`, nunca `UPDATE`). Tela mostra o
-  valor atual (`app_frota_veiculos_listar` traz `valor_aluguel_atual`, subquery do último
-  `vigente_desde`) + botões "Reajustar" e "Ver histórico" (`app_frota_veiculo_aluguel_historico`).
-  Devolução à locadora: `app_frota_veiculo_devolver(p_id, p_data_fim_real, p_valor_devolucao)` (botão
-  só aparece se `!data_fim_real`; `prompt()` pede o valor, mesmo padrão de `condAprovar`).
-  **`p_fotos` (até 3, `fvfFoto1/2/3` + `wireFotoPick`) e `p_km_inicial`** — `fotos` é `coalesce`ado
-  na edição (não envia nada → mantém as fotos atuais; envia → **substitui todas**, não anexa uma a
-  uma). `km_inicial` só é gravado **na criação** (semeia também `km_atual`) — não editável depois, é
-  um retrato do que o veículo tinha ao entrar no sistema; veículos cadastrados antes disso ficam com
-  `km_inicial` nulo, sem como reconstruir retroativamente.
-- **Relatório do veículo** (`frotasRelatorioVeiculo`/`frotasRelatorioHtml` → `app_frota_veiculo_relatorio(p_veiculo_id)`,
-  botão "📄 Relatório" no card): reaproveita o overlay `#relatorio`/`REL_CSS` compartilhado (§1, mesmo
-  padrão de loggers/VRP/comprovantes de Suprimentos) — identificação, locação, km inicial × atual,
-  condutor(es) principal(is) (exclusivo, ou membros da equipe), fotos e o **mesmo cálculo de gastos**
-  de `app_frota_custos_por_veiculo` (§6.2 "Custos", Fase 6) só que filtrado a **um** veículo — RPCs
-  irmãs, lógica duplicada de propósito (SQL não compartilha CTE entre funções sem view/função auxiliar
-  extra) — **se mudar a fórmula de custo numa, muda na outra**.
-- **Equipe** (`frotasRenderEquipes`/`feqCarregar` → `app_frota_equipe_salvar(p_id,p_nome,p_membros[])`,
-  `app_frota_equipes_listar`; tabelas `frota_equipe`/`frota_equipe_membro`). **Não confundir com** a
-  seção "Equipes" de Suprimentos ⚙️ Configurações (`sup_admin_equipe_*`) — aquilo é código morto (RPC
-  não existe no banco); esta aqui, de Frotas, é real e funcional.
-- **Ocorrências** (manutenção/sinistro/multa/lavagem): `frotasRenderOcorrencia` (Frotas) e
-  `condRenderOcorrencia` (condutor, §6.1) → mesma RPC
-  `app_frota_ocorrencia_reportar(p_veiculo_id,p_tipo,p_descricao,p_valor,p_data_ocorrencia,p_fotos[],
-  p_condutor_no_momento_id,p_motivo_infracao)` (tabela `frota_ocorrencia`; os 2 últimos params são
-  `default null`, só preenchidos pra `tipo='multa'` — condutores/PRs antigos que não mandam esses 2
-  params continuam funcionando). Fila de aprovação `frotasOcorPend` = `app_frota_ocorrencia_pendentes()`
-  — só quem está em `sup_aprovadores_de(condutor_exclusivo_do_veiculo || reportado_por)` (ou admin) vê,
-  **e é aí que o valor fica visível** — o card de "veículos designados a você" (não-`full`) nunca lista
-  ocorrências nem valor. Aprovação: `frotasOcorAprovar` → `app_frota_ocorrencia_aprovar(p_id,
-  p_aprovado,p_motivo)`. **Multa** é `tipo='multa'` na mesma tabela, não uma entidade separada:
-  `frotasRenderOcorrencia` mostra 2 campos extras só quando `tipo==='multa'`
-  (`#ocfMultaWrap`/`toggleMulta`) — e-mail do **condutor no momento da infração** (resolvido via
-  `app_perfil_por_email`, guardado em `condutor_no_momento_id` — pode ser diferente do
-  `condutor_exclusivo_id` do veículo, ex.: infração durante um empréstimo) e motivo/tipo da infração
-  (`motivo_infracao`). Passa pelo mesmo fluxo pendente→aprovado/reprovado de qualquer ocorrência —
-  "encaminhar ao gestor para ciência" (pedido da Geovana) é a própria aprovação/reprovação existente,
-  não um mecanismo novo.
+- **Veículo, radicalmente simplificado (2026-09):** `frotasRenderVeiculoEdit`/`frotasSalvarVeiculo`
+  → `app_frota_veiculo_salvar` (18 params — **caiu de 23**: fora `uso_tipo`/`equipe_id`/
+  `condutor_exclusivo_id`/`p_valor_aluguel`). **Foco só em cadastro/lista** — vínculo com pessoa
+  virou tela própria (ver "Vincular/desvincular" abaixo), "Equipes" e "Painel"/"Condutores" saíram
+  do submenu de Veículos.
+  - **`tipo` agora é uma lista fechada de 9 categorias reais de obra** (`TIPOS_VEICULO`, `CHECK`
+    `frota_veiculo_tipo_check` no banco): administrativo, basculante tipo toco c/ cabine
+    suplementar, retroescavadeira 4x4 c/ concha de 45cm, caminhão pipa, caminhão vácuo, utilitário
+    pick-up especial, utilitário pick-up simples, van 10 passageiros, caminhão carroceria 3/4 ou VUC
+    c/ cabine suplementar — **substitui** a lista genérica antiga (picape/hatch/sedã/SUV/...). O
+    único veículo real (`picape`) foi migrado pra `pickup_simples` na troca.
+  - **`centro_custo` virou `select` fechado** (`CENTROS_CUSTO_FROTA`, 33 pares `[código Nível 4,
+    descrição Nível 3]` — ex. `['01.001.007.002','GESTÃO DO PROJETO']`). **A regra é usar o código
+    completo do item "Equipamentos" (Nível 4), mas mostrar a descrição do pai (Nível 3)** — o Nível 4
+    quase sempre se chama só "EQUIPAMENTOS", não identifica nada sozinho. Lista fixa no frontend, sem
+    `CHECK` no banco (mudar a lista de centros de custo não deve exigir migração). O único veículo
+    real teve o `centro_custo` antigo (texto livre "4.2.8", formato incompatível) **zerado** na
+    migração — precisa ser reaberto e salvo de novo com o valor certo do dropdown.
+  - **Aluguel removido, só sobra o campo `contrato_numero`** (já existia) — pra vincular ao contrato
+    de locação existente. **`app_frota_veiculo_aluguel_reajustar`/`_historico` foram apagados** (a
+    tabela `frota_veiculo_aluguel_historico`, com 1 linha real de reajuste, **foi mantida** — só
+    ficou desconectada da UI, não tinha por que apagar dado financeiro real).
+  - `consorcio` continua **obrigatório** (`ZA1004`/`ZA0200`, validado na RPC e no banco).
+  - **`p_fotos` (até 3, `fvfFoto1/2/3` + `wireFotoPick`) e `p_km_inicial`** — sem mudança: `fotos` é
+    `coalesce`ado na edição (substitui todas se enviar algo novo); `km_inicial` só gravado na
+    criação. Devolução à locadora (`app_frota_veiculo_devolver`) sem mudança.
+- **Vincular/desvincular** (`frotasRenderVinculo`, **novo 2026-09** — substitui "Equipe"/"condutor
+  exclusivo"): botão 🔗 no card do veículo. Lista quem está vinculado agora (`v.vinculados`, de
+  `app_frota_veiculos_listar`) com botão **Desvincular** por pessoa
+  (`app_frota_veiculo_desvincular(p_vinculo_id)`) + campo de e-mail pra **Vincular**
+  (`app_frota_veiculo_vincular(p_veiculo_id,p_condutor_id)`, recusa se o colaborador não estiver
+  `ativo`). **Pode ter mais de um vínculo aberto por veículo ao mesmo tempo** (era assim que "equipe"
+  funcionava — a mudança troca a tabela intermediária por linhas diretas em
+  `frota_veiculo_vinculo`, não muda a regra de negócio). O único vínculo real (2 pessoas na antiga
+  equipe "HDD2") foi migrado pra 2 linhas nesta tabela nova, com `vinculado_em` = data de criação do
+  veículo (não tinha como saber a data real do vínculo antigo).
+- **Histórico** (`frotasRenderHistorico`, **novo 2026-09**): busca por **veículo** (dropdown) ou por
+  **colaborador** (e-mail), com filtro de período — `app_frota_historico_veiculo(p_veiculo_id,
+  p_data_ini,p_data_fim)` / `app_frota_historico_condutor(p_condutor_id,p_data_ini,p_data_fim)`.
+  Cada uma junta, numa timeline só ordenada por data: vínculo/desvínculo, empréstimo/devolução,
+  checklist (com status/km/avarias) e manutenção solicitada — é a tela que responde "quem estava com
+  esse veículo em tal data" ou "por quais veículos essa pessoa já passou", útil pra investigar
+  sinistro (ver também "Registro de checklist" abaixo). Atalho direto por veículo: botão 📜 no card
+  (`data-frhist`), já abre com `frHistVeiculoSel` preenchido.
+- **Registro de checklist / linha do tempo pra sinistro:** não é uma tela separada — é o próprio
+  **Histórico** acima, filtrado por veículo: cada checklist (`frota_checklist_situacao`) aparece na
+  timeline com status (`ok`/`com_pendencia`), km e avarias, ao lado de vínculos/empréstimos/
+  manutenções do mesmo período — dá pra reconstruir "quem estava com o carro, em que km, com que
+  problema reportado" num intervalo de datas.
+- **Lavagens a agendar** (`frotasRenderLavagemFila` → `app_frota_lavagem_fila_agendar()`, lista
+  `status='solicitada'`) → **Agendar** (`frotasRenderLavagemAgendar` → `app_frota_lavagem_agendar(
+  p_id,p_data,p_horario,p_local)`, data e local obrigatórios) — dispara notificação pro colaborador
+  (`link='frota_minhas_lavagens'`) com data/horário/local pra ele ir até o ponto de lavagem.
+- **Manutenções a agendar** (`frotasRenderManutencaoFila` → `app_frota_manutencoes_agendar_fila()`,
+  lista `status='aprovado'`) → **Agendar** (`frotasRenderManutencaoAgendar` →
+  `app_frota_manutencao_agendar(p_id,p_data_agendada,p_orcamento_valor)`, data e **custo** obrigatórios
+  — é só **aqui** que o valor entra no fluxo, não no reporte do colaborador) → status vira `agendado`.
+  Concluir (`app_frota_manutencao_concluir`, exige `status='agendado'` — antes exigia `'aprovado'`)
+  fica dentro do Painel › Manutenções, igual antes.
 - **Condutores (reformulado 2026-09)** (`frotasRenderCondutores`/`frotasRenderCondutorCadastro` →
   `app_frota_usuarios_completo()`, `frotas`/admin): lista **todo mundo** (`perfil` LEFT JOIN
   `frota_condutor` LEFT JOIN termo mais recente), não só quem já tem CNH — busca por nome/e-mail +
@@ -797,137 +830,108 @@ outro momento com escopo próprio (ver §6.3).
   cadastrar/atualizar CNH (se ainda não tem) ou ver status + link pro termo (se já tem) — **esta lista
   agora É o ponto de entrada do fluxo**, não só visibilidade (ver §6.1). `app_frota_condutores_listar`
   (a RPC antiga, só condutores já existentes) continua definida no banco mas nada mais chama.
-- **Gate de condutor apto/ativo em toda vinculação a veículo:** `app_perfil_por_email` agora também
-  retorna `condutor_status` — usado no frontend (`frotasSalvarVeiculo` p/ condutor exclusivo,
-  `feqCarregar` p/ membro de equipe, `condSalvarEmprestimo` p/ destinatário do empréstimo) pra barrar
-  quem não está `apto`/`ativo` **antes** de chamar a RPC. **A validação de verdade é no backend**
-  (`app_frota_veiculo_salvar`, `app_frota_equipe_salvar`, `app_frota_emprestimo_criar`) — o frontend é
-  só UX. **Regra do "grandfathering":** a validação só dispara quando o vínculo está **mudando**
-  (condutor exclusivo novo/diferente do que já estava salvo; membro **novo** entrando na equipe).
-  Reeditar um veículo/equipe **sem trocar** quem já estava vinculado passa direto, mesmo que essa
-  pessoa tenha perdido o status depois — senão qualquer edição de um cadastro antigo travaria por causa
-  de um vínculo que já existia antes da regra (foi exatamente o caso dos 2 veículos legados sem
-  `consorcio`, ver §6.2 acima — teriam ficado impossíveis de corrigir se a checagem fosse incondicional).
-  **Cuidado:** `frotasRenderVeiculoEdit`/`frotasSalvarVeiculo` — o campo de e-mail do condutor
-  exclusivo **nasce vazio mesmo em edição** (não tem como pré-preencher e-mail a partir do nome que a
-  RPC retorna); deixar em branco **mantém** o condutor já vinculado (frontend reusa
-  `vExistente.condutor_exclusivo_id`), só troca se alguém digitar um e-mail novo.
-- **Manutenção** (tabela própria `frota_manutencao`, **não** é um `tipo` de `frota_ocorrencia` — ciclo
-  de vida diferente demais pra caber no `pendente/aprovado/reprovado` simples de ocorrência):
-  `frotasRenderManutencao` (botão "🔧 Manutenção" no card do veículo, Frotas registra
-  serviço/orçamento/foto do problema) → `app_frota_manutencao_registrar(p_veiculo_id,
-  p_servico_solicitado,p_orcamento_valor,p_fotos_antes[])`, status inicial `pendente`. Aprovação do
-  orçamento (**antes** do serviço ser feito): `frotasManutPend` = `app_frota_manutencao_pendentes()`
-  (mesmo gate `sup_aprovadores_de(condutor_exclusivo||reportado_por)` de ocorrência) →
-  `frotasManutAprovar` → `app_frota_manutencao_aprovar(p_id,p_aprovado,p_motivo)`, status vira
-  `aprovado`/`reprovado`. **Só dá pra concluir uma manutenção `aprovado`**
-  (`app_frota_manutencao_concluir(p_id,p_data_liberacao,p_fotos_conclusao[])` recusa qualquer outro
-  status) — ação fica na tela **Painel › Manutenções** (botão "Marcar como concluída" só aparece pra
-  `status==='aprovado'`), não no card do veículo, porque normalmente é feita bem depois da aprovação.
-- **Painel** (`frotasRenderPainel` → 6 listas: `frotasRenderPainelLista('movimentacoes'|
-  'abastecimentos'|'lavagens'|'ocorrencias'|'manutencoes'|'custos')`, `frotas`/admin): histórico
-  **completo** de toda a frota (não filtrado por veículo/condutor — é o que falta nas outras telas,
-  que só mostram "meu" ou "pendente"). RPCs `app_frota_movimentacoes_listar`,
-  `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`, `app_frota_ocorrencias_listar`,
-  `app_frota_manutencoes_listar` (as 2 últimas diferem das RPCs `_pendentes` homônimas: trazem
-  **todo** status, não só `pendente`, e não são filtradas por `sup_aprovadores_de` — visão gerencial
-  da Frotas, não fila de aprovação pessoal). **"Tempo real" aqui significa só "sempre atualizado
-  quando abre a tela"** — sem Supabase Realtime/websocket (decisão de produto confirmada com a
-  Geovana: nenhum módulo do app usa isso hoje, não valia o risco/esforço só pra este painel).
-  Cadastros de condutor/veículo e status de aprovação **não têm telas próprias no Painel** — já
-  existem em §6.2 (lista de veículos) e "Condutores" logo acima.
-- **Custos por veículo** (última das 6 fases pedidas): `app_frota_custos_por_veiculo()` soma, por
-  veículo, `frota_veiculo_aluguel_historico` (aluguel), `frota_checklist_abastecimento`
-  (abastecimento), `frota_lavagem` (lavagem), `frota_manutencao` **só status `aprovado`/`concluido`**
-  (orçamento reprovado ou ainda pendente não é custo real) e `frota_ocorrencia` tipo `multa` **só
-  status `aprovado`** (mesmo raciocínio), + `valor_devolucao` do próprio veículo. **Aluguel é o único
-  cálculo não-trivial**: cada linha do histórico vira um "período" (do próprio `vigente_desde` até o
-  `vigente_desde` da próxima linha menos 1 dia — via `lead()` — ou até `data_fim_real`/hoje se for a
-  última), e o custo de cada período é `valor * dias/30.44` (mês médio), somado no fim. `aluguel_mensal_atual`
-  é simplesmente a linha de `vigente_desde` mais recente — **cuidado ao testar com dados sintéticos**:
-  um "reajuste" com `vigente_desde` **anterior** à data em que o veículo foi cadastrado (o seed inicial
-  do aluguel usa `current_date`, não `data_inicio` do contrato) inverte a ordem cronológica esperada e
-  o valor "mais recente" pode não ser o que se imagina — não é bug da RPC, é o dado ficando
-  inconsistente com a realidade. `custo_total` é a soma de tudo. Read-only, sem RPC de escrita nova.
-- **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend,
-  frotasManutPend, frotasCondutores, frotasPainelCache`.
+- **Gate de condutor ativo em toda vinculação a veículo:** `app_perfil_por_email` retorna
+  `condutor_status` — usado no frontend (`frotasRenderVinculo` pra vincular, `condSalvarEmprestimo`
+  pra destinatário do empréstimo) pra barrar quem não está `ativo` **antes** de chamar a RPC (2026-09:
+  `apto` não conta mais como suficiente em lugar nenhum). **A validação de verdade é no backend**
+  (`app_frota_veiculo_vincular`, `app_frota_emprestimo_criar`) — o frontend é só UX.
+- **Painel, com filtros (reformulado 2026-09)** (`frotasRenderPainel` → 5 submódulos:
+  `frotasRenderPainelLista('movimentacoes'|'abastecimentos'|'lavagens'|'manutencoes'|'custos')`,
+  `frotas`/admin — **"ocorrências" saiu da lista**, não existe mais essa entidade). Cada submódulo
+  (exceto custos) ganhou filtro de **veículo** (dropdown), **colaborador** (e-mail → resolvido pra
+  uuid via `app_perfil_por_email`) e **período** (`p_data_ini`/`p_data_fim`) — as 4 RPCs
+  (`app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
+  `app_frota_manutencoes_listar`) ganharam esses 4 parâmetros, todos opcionais (`default null` —
+  chamar sem filtro continua trazendo tudo, mesmo comportamento de antes). `PAINEL_CFG` (const) só
+  descreve `{rpc,titulo,row}` por tipo; `frotasRenderPainelLista` monta o formulário de filtro +
+  chama `carregar()` — reaproveitado pelo botão "Filtrar" e pela carga inicial.
+  **"Tempo real" aqui significa só "sempre atualizado quando busca"** — sem Supabase Realtime.
+- **Custos por veículo** (`app_frota_custos_por_veiculo()`, **sem filtro** — visão agregada por
+  veículo): soma `frota_checklist_abastecimento` (abastecimento), `frota_lavagem` **só
+  `status='realizada'`** (lavagem), `frota_manutencao` **só status `agendado`/`concluido`** (é só
+  nesses dois estágios que `orcamento_valor` está de fato preenchido — antes era
+  `aprovado`/`concluido`, mas `aprovado` nunca tinha valor no fluxo novo) + `valor_devolucao` do
+  próprio veículo. **Aluguel e multas saíram do cálculo** (junto com a remoção de aluguel/ocorrência).
+  `custo_total` é a soma de tudo. Read-only.
+- **Estado:** `frotasSub, frotasVeiculoSel, frotasManutPend, frHistVeiculoSel, frHistCondutorSel,
+  frLavagemSel, frManutSel, frotasCondutores, frCondBusca, frCondFiltro, frCondSel,
+  frotasPainelCache, frPnlFiltro`.
 
-### 6.3 QSMS — **DORMENTE desde 2026-09** — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
-**Removido do fluxo principal a pedido do usuário** ("não deverá haver processo de treinamento de
-direção defensiva... será construído em outro momento") — a etapa de treinamento que existia entre
-`apto` e `ativo` foi substituída pela assinatura do termo de responsabilidade (§6.1). Nada foi
-apagado: tela, RPCs (`app_qsms_condutores_aptos`, `app_qsms_treinamento_agendar`,
-`app_qsms_treinamento_baixar`, `app_qsms_treinamentos_listar`) e tabelas (`frota_treinamento`,
-`frota_treinamento_condutor`, com dados reais de 2026-09 preservados) continuam existindo — só o
-botão de entrada no hub (`frotaBlocks()`) foi removido. `irPara('qsms')` e o link de notificação
-`qsms_treinamento` continuam funcionando (backward-compat de avisos antigos), mas não há mais caminho
-normal pra chegar lá. **Se/quando reconstruir:** decidir se reaproveita `frota_condutor.status='apto'`
-como gate de novo, ou se cria um conceito próprio independente do termo de condução — hoje `apto`
-não é mais produzido por nenhuma RPC ativa, então "quem está apto pra treinar" precisaria ser
-redefinido.
-- Comportamento antigo, pra referência: tela só pra `funcao='qsms'`/admin. `qsmsAptos` =
-  `app_qsms_condutores_aptos()` (condutores `apto` sem treinamento `agendado` em aberto) → **Agendar
-  treinamento** (`app_qsms_treinamento_agendar`, cria `frota_treinamento` + 1 linha por condutor em
-  `frota_treinamento_condutor`) → **Baixa** (`app_qsms_treinamento_baixar`, foto da lista de presença
-  obrigatória, atualizava `frota_condutor.status='ativo'` pra quem estava presente).
-- **Estado:** `qsmsSub, qsmsSelCondutores, qsmsTreinoSel, qsmsAptos, qsmsTreinos`.
+### 6.3 QSMS / treinamento de direção defensiva — **REMOVIDO por completo em 2026-09**
+A pedido explícito do usuário ("não deverá haver processo de treinamento de direção defensiva... será
+construído em outro momento") — a etapa que existia entre `apto` e `ativo` foi substituída pela
+assinatura do termo de responsabilidade (§6.1). **Ao contrário da 1ª rodada da reformulação (que só
+tinha desconectado a tela), esta 2ª rodada apagou de fato**: tela (`<main id="qsms">`), todas as
+funções `qsms*` do frontend, as 4 RPCs `app_qsms_*`, o trigger `trg_frota_treinamento_condutor` e as
+tabelas `frota_treinamento`/`frota_treinamento_condutor` (as 4 linhas de dado real que existiam já
+tinham sido substituídas pelo termo assinado retroativo na 1ª rodada — não sobrava nada a preservar).
+O link de notificação `qsms_treinamento` (de avisos bem antigos) e o próprio `funcao='qsms'` como
+valor de acesso **continuam existindo** no banco (não valia quebrar histórico de notificação por
+causa disso), só não abrem mais nada — `supGoAct` não tem mais um `case` pra esse link.
+**Se/quando reconstruir:** vai precisar recriar tela, RPCs e tabelas do zero; não reaproveita nada
+desta remoção.
 
 ### 6.4 Notificação/aprovação — reaproveita Suprimentos (não é hierarquia própria)
 Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o mecanismo do invariante
 §0.9. Todo disparo é por **trigger**, nunca inline nas RPCs `app_*` (que só gravam):
-- `"10 - Frotas".trg_frota_condutor()` (`AFTER INSERT/UPDATE` em `frota_condutor`, **reformulado
-  2026-09**): `termo_pendente` → pessoal ao condutor ("assine o termo", `link='condutor_termo'`);
-  `reprovado` → pessoal (legado, não produzido por nenhuma RPC ativa); `ativo` → pessoal ao condutor +
-  grupo `frotas`/admin (era grupo `qsms`/`sup_aprovadores_de` antes da reformulação). **Cuidado que
-  já mordeu uma vez:** a condição precisa cobrir **INSERT e UPDATE** — `termo_pendente` é atingido
-  tanto por `INSERT` (1º cadastro, feito pelo gestor) quanto por `UPDATE` (recadastro); um trigger que
-  só olha `TG_OP='UPDATE'` deixa o 1º cadastro **sem notificar ninguém** (pego no teste E2E antes de
-  ir pra produção).
-- `"10 - Frotas".trg_frota_ocorrencia()` (`frota_ocorrencia`, cobre multa também — mesma tabela):
-  INSERT → grupo `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` + pessoal a
-  esse mesmo alvo (se não foi ele quem reportou); UPDATE de status → pessoal ao alvo.
-- `"10 - Frotas".trg_frota_manutencao()` (`frota_manutencao`, INSERT/UPDATE): INSERT → grupo
-  `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` (aprovação de orçamento,
-  `p_exceto`=ator); UPDATE de status pra `aprovado`/`reprovado` → **pessoal a `reportado_por`** (quem
-  registrou a manutenção — normalmente Frotas, não o condutor do veículo; por isso o alvo da
-  notificação de decisão é diferente do alvo usado pra achar o aprovador).
+- `"10 - Frotas".trg_frota_condutor()` (`AFTER INSERT/UPDATE` em `frota_condutor`): `termo_pendente`
+  → pessoal ao condutor ("assine o termo", `link='condutor_termo'`); `reprovado` → pessoal (legado,
+  não produzido por nenhuma RPC ativa); `ativo` → pessoal ao condutor + grupo `frotas`/admin.
+  **Cuidado que já mordeu uma vez:** a condição precisa cobrir **INSERT e UPDATE** — `termo_pendente`
+  é atingido tanto por `INSERT` (1º cadastro, feito pelo gestor) quanto por `UPDATE` (recadastro); um
+  trigger que só olha `TG_OP='UPDATE'` deixa o 1º cadastro **sem notificar ninguém** (pego no teste
+  E2E antes de ir pra produção).
+- `"10 - Frotas".trg_frota_manutencao()` (`frota_manutencao`, INSERT/UPDATE, **reformulado 2026-09**):
+  INSERT → grupo `sup_aprovadores_de(reportado_por)` (não depende mais de condutor exclusivo do
+  veículo — não existe mais); UPDATE de status → pessoal a `reportado_por` em **`aprovado`**,
+  **`reprovado`** (com motivo), **`agendado`** (novo — com a data) e **`concluido`** (novo).
+- `"10 - Frotas".trg_frota_lavagem()` (`frota_lavagem`, INSERT/UPDATE, **novo 2026-09**): INSERT →
+  grupo `frotas`/admin ("lavagem solicitada", `link='frota_lavagem_agendar'`); UPDATE→`agendada` →
+  pessoal ao colaborador que solicitou, com data/horário/local (`link='frota_minhas_lavagens'`).
 - `"10 - Frotas".trg_frota_emprestimo()` (`frota_emprestimo`, INSERT/UPDATE): INSERT → pessoal a
   `para_condutor_id` (veículo emprestado); UPDATE com `devolucao_solicitada_em` saindo de `null` →
   pessoal a `para_condutor_id` de novo (titular pediu a devolução, §6.1).
-- `"10 - Frotas".trg_frota_treinamento_condutor()` (`frota_treinamento_condutor`, só INSERT): pessoal
-  ao condutor agendado (data/local/instrutor).
+- **Removidos (2026-09):** `trg_frota_ocorrencia` (tabela apagada) e `trg_frota_treinamento_condutor`
+  (tabela apagada, §6.3).
 - **Quem aprova o quê:** definido por `perfil.aprovador_uuid`/`aprovador2_uuid` de **cada pessoa**
   (tela de Suprimentos ⚙️ Configurações — não existe tela própria em Frotas). Sem aprovador configurado
   → cai pra todo `aprovador`/`admin` ativo (`sup_aprovadores_de`, fallback).
 - **Cuidado ao mexer:** qualquer RPC nova de escrita em Frotas **não deve chamar `sup_notificar`
   diretamente** — crie/edite o trigger da tabela correspondente. Testado via rollback E2E
-  (`set_config('request.jwt.claims',...)` trocando de ator no meio da transação) que a exclusão por
-  `p_exceto` funciona corretamente mesmo quando o ator é um dos aprovadores do alvo.
+  (`set_config('request.jwt.claims',...)` trocando de ator no meio da transação).
 
 ### Tabelas (`"10 - Frotas"`)
-`frota_veiculo` (locação, uso exclusivo/equipe, cadastro/combustível/consórcio — §6.2),
-`frota_veiculo_aluguel_historico` (1 linha por reajuste, nunca `UPDATE` — histórico do aluguel),
-`frota_condutor` (PK = `perfil.id`, status/CNH), `frota_condutor_cnh_historico` (append-only, 1 linha
-por envio/atualização de CNH, + `atualizado_por` desde 2026-09 — §6.1), `frota_termo` (**nova
-2026-09** — 1 linha por termo emitido, `status` pendente/assinado/cancelado, `assinatura_path`),
-`frota_equipe` + `frota_equipe_membro`, `frota_checklist_situacao`, `frota_checklist_abastecimento`,
-`frota_lavagem`, `frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1),
-`frota_ocorrencia` (+ `condutor_no_momento_id`/`motivo_infracao`, multa — §6.2), `frota_manutencao`
-(tabela própria, ciclo `pendente→aprovado/reprovado→concluido`, não é ocorrência — §6.2),
-`frota_treinamento` + `frota_treinamento_condutor` (dormentes desde 2026-09 — §6.3). `public.perfil`
-ganhou `frota_isento` (2026-09, não é tabela de Frotas mas é usada só por ela).
+`frota_veiculo` (cadastro/combustível/consórcio/contrato — §6.2; **`uso_tipo`/`equipe_id`/
+`condutor_exclusivo_id` ficaram sem uso**, ninguém mais escreve neles, não foram dropados),
+`frota_veiculo_aluguel_historico` (**sem interface própria desde 2026-09** — 1 linha real de reajuste
+preservada, não apagada), `frota_veiculo_vinculo` (**nova 2026-09** — vínculo pessoa↔veículo,
+`vinculado_em`/`desvinculado_em`, pode ter várias linhas abertas por veículo — §6.2),
+`frota_condutor` (PK = `perfil.id`, status/CNH), `frota_condutor_cnh_historico` (append-only, +
+`atualizado_por` desde 2026-09 — §6.1), `frota_termo` (1 linha por termo emitido, `status`
+pendente/assinado/cancelado, `assinatura_path` — §6.1), `frota_checklist_situacao`,
+`frota_checklist_abastecimento`, `frota_lavagem` (**reformulada 2026-09** — ganhou `status`/
+`solicitado_em`/`agendado_por`/`data_agendada`/`horario_agendado`/`local_agendado`/`realizado_em` —
+§6.1/§6.2), `frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1), `frota_manutencao`
+(**reformulada 2026-09** — ganhou `tipo_problema`/`data_agendada`, ciclo agora
+`pendente→aprovado/reprovado→agendado→concluido` — §6.1/§6.2). `public.perfil` ganhou `frota_isento`
+(2026-09, não é tabela de Frotas mas é usada só por ela).
+**Apagadas em 2026-09** (estavam vazias ou já totalmente substituídas, sem dado real a perder):
+`frota_equipe`/`frota_equipe_membro` (substituída por `frota_veiculo_vinculo`), `frota_ocorrencia`
+(substituída por `frota_manutencao` direto), `frota_treinamento`/`frota_treinamento_condutor`
+(substituída pelo termo assinado, §6.3).
 
 ### Cuidados
-- **`consorcio` de `frota_veiculo` é `NULL`-ável no banco** (não dá pra travar `NOT NULL` — 2
-  veículos reais já cadastrados antes dessa trave ficaram sem valor) mas **obrigatório na RPC**
-  `app_frota_veiculo_salvar` pra qualquer criação/edição a partir de agora. Um veículo antigo com
-  `consorcio is null` só se resolve quando alguém abrir e salvar ele de novo.
-- **`funcao='qsms'` não tem mais função nenhuma no app** (2026-09) — a tela que ela liberava está
-  dormente (§6.3). Quem tiver esse acesso configurado não perde nada de errado, só não tem mais
-  nenhum botão extra por causa dele.
-- Foto de CNH vai pro bucket público `fotos-campo` (mesmo de fotos de campo) — não há bucket
-  privado dedicado a documento de identificação. **Assinatura do termo (2026-09) vai pro mesmo
-  bucket**, mesma observação de privacidade.
+- **`consorcio` de `frota_veiculo` é `NULL`-ável no banco** (não dá pra travar `NOT NULL` — o veículo
+  real já cadastrado antes dessa trave ficou sem valor num momento) mas **obrigatório na RPC**
+  `app_frota_veiculo_salvar` pra qualquer criação/edição a partir de agora.
+- **`centro_custo` do único veículo real foi zerado na migração de 2026-09** (formato antigo "4.2.8"
+  incompatível com os códigos novos de 4 níveis) — precisa reabrir e salvar de novo escolhendo do
+  dropdown.
+- **`funcao='qsms'` não abre mais nada no app** (2026-09) — a tela que ela liberava foi removida
+  (§6.3). Quem tiver esse acesso configurado não perde nada de errado, só não tem mais nenhum botão
+  extra por causa dele.
+- Foto de CNH e assinatura do termo vão pro bucket público `fotos-campo` (mesmo de fotos de campo) —
+  não há bucket privado dedicado a documento de identificação.
 
 ## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin
@@ -966,26 +970,32 @@ ganhou `frota_isento` (2026-09, não é tabela de Frotas mas é usada só por el
 `app_abertura_servico_minhas`, `app_captacao_fila`, `app_captacao_matricula`
 (registro via `app_abertura_servico_registrar`, `app_captacao_registrar`).
 **Suprimentos:** prefixo `sup_*` (ver §5).
-**Condutor/Frotas (ver §6):**
+**Condutor/Frotas (ver §6, reformulado 2026-09 — vínculo/checklist/lavagem/manutenção):**
 `app_condutor_meu/atualizar_cnh/cnh_historico`,
 `app_frota_usuarios_completo`, `app_frota_condutor_cadastrar`, `app_frota_isentar`,
-`app_frota_termo_ver/assinar` (2026-09 — termo de responsabilidade, substitui aprovação+treinamento),
-`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver/veiculo_relatorio`,
-`app_frota_veiculo_aluguel_reajustar/aluguel_historico`,
+`app_frota_termo_ver/assinar` (termo de responsabilidade, substitui aprovação+treinamento),
+`app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver/veiculo_relatorio` (veículo simplificado —
+sem uso/equipe/exclusivo/aluguel, `tipo`/`centro_custo` viraram lista fechada, §6.2),
+`app_frota_veiculo_vincular/desvincular` (vínculo pessoa↔veículo, substitui equipe/exclusivo),
+`app_frota_historico_veiculo/historico_condutor` (timeline p/ investigação de sinistro, §6.2),
 `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
-`app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar`, `app_frota_custos_por_veiculo`
-(painel gerencial, §6.2),
-`app_frota_equipes_listar/equipe_salvar`,
+`app_frota_manutencoes_listar` (as 4 com filtro de veículo/condutor/data desde 2026-09),
+`app_frota_custos_por_veiculo` (painel gerencial, §6.2),
 `app_frota_situacao_salvar`, `app_frota_abastecimento_salvar`,
 `app_frota_emprestimo_criar/devolver/solicitar_devolucao`, `app_frota_meus_emprestimos`,
-`app_frota_lavagem_salvar`,
-`app_frota_ocorrencia_reportar/pendentes/aprovar`,
-`app_frota_manutencao_registrar/pendentes/aprovar/concluir`,
+`app_frota_lavagem_solicitar/fila_agendar/agendar/realizar`, `app_frota_minhas_lavagens` (ciclo
+solicitar→agendar→confirmar, §6.1/§6.2),
+`app_frota_manutencao_solicitar/pendentes/aprovar/agendar/concluir`, `app_frota_manutencoes_agendar_fila`
+(ciclo solicitar→aprovar→agendar-com-custo→concluir, substitui "ocorrência" pra qualquer problema
+mecânico, §6.1/§6.2),
 `app_perfil_por_email` (helper genérico: busca `perfil` por e-mail, usado por Frotas e por qualquer
 módulo que precise resolver destinatário por e-mail).
-**Legado, ainda no banco mas sem chamador no frontend (2026-09):** `app_condutor_solicitar/pendentes/
-aprovar`, `app_frota_condutores_listar` (substituídas pelo fluxo acima), `app_qsms_condutores_aptos`,
-`app_qsms_treinamento_agendar/baixar`, `app_qsms_treinamentos_listar` (QSMS dormente, §6.3).
+**Removidas por completo em 2026-09** (não há mais linha no banco): `app_frota_veiculo_aluguel_
+reajustar/aluguel_historico`, `app_frota_equipes_listar/equipe_salvar`, `app_frota_ocorrencia_
+reportar/pendentes/aprovar`, `app_frota_ocorrencias_listar`, `app_qsms_*` (condutores_aptos,
+treinamento_agendar/baixar, treinamentos_listar). **Legado, ainda no banco mas sem chamador no
+frontend:** `app_condutor_solicitar/pendentes/aprovar`, `app_frota_condutores_listar` (substituídas
+pelo fluxo de cadastro-pelo-gestor).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
