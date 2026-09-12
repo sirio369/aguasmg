@@ -3793,6 +3793,66 @@ function eqTermoHtml(d, canAccept){
   h+='</div>';
   return h;
 }
+// --- Termo de responsabilidade de condução (Frota) — mesma casca do termo de equipamento (PDF via
+// #relatorio/REL_CSS/TERMO_CSS), mas assinatura eletrônica (canvas) em vez de clique simples, igual
+// à retirada de EPI (epiSigInit/epiCanvasBlob/epiUpload — funções genéricas, reaproveitadas aqui).
+async function frotaTermoVer(termoId, canSign){
+  let d;
+  try{ const {data,error}=await sb.rpc('app_frota_termo_ver',{p_termo_id:termoId}); if(error)throw error; d=data||{}; }
+  catch(e){ return toast('⚠ '+(e.message||e)); }
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  const paint=()=>{
+    ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+frotaTermoHtml(d, canSign)+'</div>';
+    document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+    document.getElementById('relPrint').onclick=()=>window.print();
+    const cv=ov.querySelector('.frotaSig'); if(cv&&!cv._init){ epiSigInit(cv); cv._init=true; }
+    const cl=document.getElementById('frotaSigClear'); if(cl) cl.addEventListener('click',()=>{ if(cv&&cv._clear) cv._clear(); });
+    const ab=document.getElementById('frotaTermoAssinar');
+    if(ab) ab.addEventListener('click',async()=>{
+      if(!navigator.onLine) return toast('Assinar o termo precisa de conexão');
+      if(!cv||!cv._drawn()) return toast('Colete sua assinatura no quadro acima');
+      ab.disabled=true; ab.textContent='Registrando…';
+      try{
+        const ap=await epiUpload(await epiCanvasBlob(cv),'termo_frota.png');
+        const {error}=await sb.rpc('app_frota_termo_assinar',{p_termo_id:termoId,p_assinatura:ap});
+        if(error) throw error;
+        toast('✓ Termo assinado');
+        try{ const {data}=await sb.rpc('app_frota_termo_ver',{p_termo_id:termoId}); if(data) d=data; }catch(e){}
+        canSign=false; paint(); ov.scrollTop=0;
+        try{ if(typeof condRender==='function') condRender(); }catch(e){}
+      }catch(e){ toast('⚠ '+(e.message||e)); ab.disabled=false; ab.textContent='✅ Assinar o termo'; }
+    });
+  };
+  paint();
+  ov.style.display='block'; ov.scrollTop=0;
+}
+function frotaTermoHtml(d, canSign){
+  const assinado=d.status==='assinado';
+  const cls=assinado?'ok':'pend';
+  const statusLbl=d.status==='pendente'?'Aguardando assinatura':(assinado?'Assinado':(d.status||''));
+  let h='<style>'+TERMO_CSS+'</style><div class="termoWrap '+cls+'">';
+  h+='<div class="relTop"><div><h1>Termo de Responsabilidade de Condução</h1><div class="sub">AcquaHub · Frota</div></div><div class="relBadge">'+statusLbl+'</div></div>';
+  h+='<div class="termoAviso">'+(assinado?('✅ Termo assinado pelo condutor em '+relFmtData(d.assinado_em)):'⚠ Termo AINDA NÃO assinado pelo condutor')+'</div>';
+  h+='<div class="relBody">';
+  h+='<div class="relGrid">'+relField('Condutor',d.condutor)+relField('CNH',d.cnh_numero||'—')+relField('Categoria',d.cnh_categoria||'—')+relField('Validade da CNH',relFmtData(d.cnh_validade))+'</div>';
+  h+='<div class="relGrid">'+relField('Nº do termo','#'+d.id)+relField('Cadastrado por',d.emitido_por||'—')+relField('Emitido em',relFmtData(d.emitido_em))+relField('Assinado em',d.assinado_em?relFmtData(d.assinado_em):'—')+'</div>';
+  if(d.obs) h+='<div class="sub" style="margin-top:8px">Obs: '+d.obs+'</div>';
+  h+='<div class="relSec"><span class="relNum">1</span> Termo</div>';
+  h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro possuir Carteira Nacional de Habilitação (CNH) válida e compatível com a categoria do veículo que vier a conduzir, e comprometo-me a: (a) utilizar os veículos da empresa exclusivamente para as atividades de trabalho; (b) conduzir com atenção às normas de trânsito, zelando pela minha segurança e de terceiros; (c) comunicar imediatamente qualquer sinistro, multa, avaria ou defeito ao gestor de frotas; (d) manter minha CNH válida e informar o gestor de frotas em caso de renovação, suspensão ou cassação; e (e) responder, nos termos da legislação vigente, por infrações de trânsito cometidas sob minha condução. Estou ciente de que este termo permanece vigente enquanto eu estiver credenciado(a) como condutor(a) da empresa.</div>';
+  h+='<div class="sub" style="margin-top:10px;font-size:10px">'+(assinado?('Assinatura eletrônica registrada no app em '+relFmtData(d.assinado_em)+'.'):'Termo ainda não assinado pelo condutor.')+'</div>';
+  if(assinado && d.assinatura_path){
+    h+='<div class="relSec" style="margin-top:14px"><span class="relNum">2</span> Assinatura</div><img src="'+fotoURL(d.assinatura_path)+'" style="max-width:340px;width:100%;border:1px solid #ddd;border-radius:6px;margin-top:8px;background:#fff"/>';
+  } else if(canSign){
+    h+='<div class="relSec" style="margin-top:14px"><span class="relNum">2</span> Assinatura</div>';
+    h+='<div class="sigwrap" style="border:1px solid #ccc;border-radius:10px;background:#fff;overflow:hidden;margin-top:8px"><canvas class="frotaSig" width="900" height="270" style="width:100%;height:180px;touch-action:none;display:block"></canvas></div>';
+    h+='<button type="button" id="frotaSigClear" style="all:unset;cursor:pointer;color:#777;font-size:12px;margin-top:4px;display:inline-block">Limpar assinatura</button>';
+    h+='<div style="margin-top:12px"><button id="frotaTermoAssinar" style="all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;text-align:center;padding:13px;border-radius:10px;background:#0a7d5e;color:#fff;font-weight:700;font-size:15px">✅ Assinar o termo</button><div style="text-align:center;color:#777;font-size:11px;margin-top:6px">Ao assinar, seu aceite eletrônico é registrado e o termo passa a valer.</div></div>';
+  }
+  h+='</div><div class="relFoot"><span>AcquaHub · termo gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  h+='</div>';
+  return h;
+}
 function supEqMeusWire(){
   $('#supView').querySelectorAll('[data-vertermo]').forEach(b=>b.addEventListener('click',()=>eqTermoVer(+b.dataset.vertermo,false)));
   $('#supView').querySelectorAll('[data-aceitartermo]').forEach(b=>b.addEventListener('click',()=>eqTermoVer(+b.dataset.aceitartermo,true)));
@@ -5119,7 +5179,6 @@ let frotaCur='home';
 function frotaBlocks(){
   const gestor=!!(ME&&(ME.pode_aprovar||ME.is_admin));
   const adm=!!(ME&&(ME.funcao==='frotas'||ME.is_admin));
-  const qs=!!(ME&&(ME.funcao==='qsms'||ME.is_admin));
   return [
     {t:'Colaborador',ic:'👤',on:true,acts:[
       {id:'cnh',ic:'🪪',lbl:'Minha CNH'},
@@ -5129,16 +5188,13 @@ function frotaBlocks(){
       {id:'lavagem',ic:'🧼',lbl:'Lavagem'},
       {id:'emprestimo',ic:'🤝',lbl:'Emprestar / meus empréstimos'}]},
     {t:'Gestor',ic:'🖊️',on:gestor,papel:'Aprovador',acts:[
-      {id:'ap_condutor',ic:'🪪',lbl:'Aprovar condutores'},
       {id:'ap_ocorrencia',ic:'⚠️',lbl:'Aprovar ocorrências'},
       {id:'ap_manutencao',ic:'🔧',lbl:'Aprovar manutenções'}]},
     {t:'Equipe administrativa',ic:'🏢',on:adm,papel:'Frotas / Admin',acts:[
       {id:'veiculos',ic:'🚗',lbl:'Veículos'},
       {id:'equipes',ic:'👥',lbl:'Equipes'},
       {id:'condutores',ic:'🪪',lbl:'Condutores'},
-      {id:'painel',ic:'📊',lbl:'Painel e custos'}]},
-    {t:'QSMS',ic:'🦺',on:qs,papel:'QSMS / Admin',acts:[
-      {id:'qsms',ic:'🦺',lbl:'Treinamentos (agendar / baixa)'}]}
+      {id:'painel',ic:'📊',lbl:'Painel e custos'}]}
   ];
 }
 async function frotaInit(){
@@ -5156,14 +5212,13 @@ function frotaHome(){
   $('#frotaView').querySelectorAll('[data-fract]').forEach(el=>el.addEventListener('click',()=>frotaOpen(el.dataset.fract)));
 }
 function frotaOpen(id){
-  const CONDACTS={cnh:'home',situacao:'situacao',abastecimento:'abastecimento',ocorrencia:'ocorrencia',lavagem:'lavagem',emprestimo:'emprestimo',ap_condutor:'home'};
+  const CONDACTS={cnh:'home',situacao:'situacao',abastecimento:'abastecimento',ocorrencia:'ocorrencia',lavagem:'lavagem',emprestimo:'emprestimo'};
   if(id in CONDACTS){ condTarget={sub:CONDACTS[id],act:id}; irPara('condutor'); return; }
   if(id==='ap_ocorrencia'||id==='ap_manutencao'||id==='veiculos'){ frotasTarget='home'; irPara('frotas'); return; }
   if(id==='equipes'||id==='condutores'||id==='painel'){ frotasTarget=id; irPara('frotas'); return; }
-  if(id==='qsms'){ irPara('qsms'); return; }
 }
 
-let condSub='home', condData=null, condPendentes=[], condVeiculos=[], condEmprestimos=[], condTarget=null, frotasTarget=null;
+let condSub='home', condData=null, condVeiculos=[], condEmprestimos=[], condTarget=null, frotasTarget=null;
 async function condInit(){
   const tgt=condTarget; condTarget=null;
   condSub='home';
@@ -5172,8 +5227,7 @@ async function condInit(){
 }
 function condGoTarget(tgt){
   const act=tgt.act;
-  if(act==='ap_condutor'){ if(!condPendentes.length) toast('Nenhum condutor aguardando aprovação'); condSub='home'; return; }  // a fila já fica no topo da home
-  if(act==='cnh'){ condSub = condData && condData.existe ? 'home' : 'cadastro'; if(condSub==='cadastro') condRender(); return; }
+  if(act==='cnh'){ condSub='home'; return; }
   // ações que dependem de um veículo
   if(!condVeiculos.length){ toast('Nenhum veículo designado a você'); return; }
   if(condVeiculos.length===1){ condVeiculoSel=String(condVeiculos[0].id); condSub=tgt.sub; condRender(); return; }
@@ -5190,11 +5244,11 @@ function condRenderPick(sub){
 async function condRender(){
   $('#condView').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const [me,ap,ve,em]=await Promise.all([
-      sb.rpc('app_condutor_meu'), sb.rpc('app_condutor_pendentes'),
+    const [me,ve,em]=await Promise.all([
+      sb.rpc('app_condutor_meu'),
       sb.rpc('app_frota_veiculos_listar'), sb.rpc('app_frota_meus_emprestimos')
     ]);
-    condData=me.data||{existe:false}; condPendentes=ap.data||[]; condVeiculos=ve.data||[]; condEmprestimos=em.data||[];
+    condData=me.data||{existe:false}; condVeiculos=ve.data||[]; condEmprestimos=em.data||[];
   }catch(e){ $('#condView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   if(condSub==='cadastro') return condRenderCadastro();
   if(condSub==='situacao') return condRenderSituacao();
@@ -5207,21 +5261,19 @@ async function condRender(){
 }
 function condRenderHome(){
   let h='';
-  if(condPendentes.length){
-    h+='<div class="sec">🖊️ Aprovações pendentes</div>';
-    h+=condPendentes.map(p=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${p.nome||p.email}</b><div class="sub" style="margin-top:2px">CNH ${p.cnh_numero||'—'} · Cat. ${p.cnh_categoria||'—'} · Validade ${fmtData(p.cnh_validade)}</div>${p.cnh_foto?`<div class="sub" style="margin-top:2px"><a href="${SBASE+p.cnh_foto}" target="_blank" rel="noopener">Ver foto da CNH</a></div>`:''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-condap="${p.id}" style="margin:0;flex:1;padding:9px">Aprovar</button><button data-condrep="${p.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--bad);color:var(--bad)">Reprovar</button></div></div>`).join('');
-  }
-  h+='<div class="sec" style="margin-top:16px">🪪 Minha CNH</div>';
+  h+='<div class="sec">🪪 Minha CNH</div>';
   if(!condData.existe){
-    h+='<div class="banner warn">Você ainda não é um condutor cadastrado.</div><button class="btn" id="condIrCadastro" style="margin-top:10px">Cadastrar meus dados de CNH</button>';
+    h+='<div class="banner warn">Seu cadastro de condutor ainda não foi feito. Fale com o gestor de frotas para iniciar — ele cadastra sua CNH e você recebe um aviso pra assinar o termo de responsabilidade.</div>';
   } else {
     const st=condData.status;
-    if(condData.cnh_vencendo && (st==='apto'||st==='ativo')) h+='<div class="banner warn">⚠️ Sua CNH vence em '+fmtData(condData.cnh_validade)+' ('+(condData.cnh_dias_para_vencer!=null?(condData.cnh_dias_para_vencer+' dia(s)'):'—')+'). Atualize os dados assim que renovar.</div>';
-    if(st==='pendente') h+='<div class="banner warn">Cadastro enviado — aguardando aprovação do seu gestor.</div>';
-    else if(st==='reprovado') h+='<div class="banner bad">Cadastro reprovado.'+(condData.motivo_reprovacao?(' Motivo: '+condData.motivo_reprovacao):'')+'</div><button class="btn" id="condIrCadastro" style="margin-top:10px">Enviar novo cadastro</button>';
-    else if(st==='apto'){ h+='<div class="banner warn">✅ Você está <b>APTO</b>. Realize o treinamento de direção defensiva até <b>'+fmtData(condData.prazo_treinamento)+'</b>.</div>'; if(condData.treinamento) h+='<div class="sub" style="margin-top:6px">Treinamento agendado: '+fmtData(condData.treinamento.data)+(condData.treinamento.horario?(' às '+condData.treinamento.horario):'')+(condData.treinamento.local?(' — '+condData.treinamento.local):'')+(condData.treinamento.instrutor?(' — instrutor '+condData.treinamento.instrutor):'')+'</div>'; }
-    else if(st==='ativo'){ h+='<div class="banner ok">🟢 Você está <b>ATIVO</b> para direção.</div>'; }
-    if(condData.existe && st!=='pendente') h+=`<div style="margin-top:10px" class="sub">CNH ${condData.cnh_numero||'—'} · Cat. ${condData.cnh_categoria||'—'} · Validade ${fmtData(condData.cnh_validade)}${condData.cnh_dias_para_vencer!=null?(' ('+(condData.cnh_dias_para_vencer>=0?(condData.cnh_dias_para_vencer+' dia(s) restantes'):'vencida'))+')':''}</div>${condData.cnh_foto?`<div class="sub" style="margin-top:4px"><a href="${SBASE+condData.cnh_foto}" target="_blank" rel="noopener">Ver foto da CNH</a></div>`:''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" id="condIrAtualizar" style="margin:0;flex:1;padding:8px;font-size:13px">Atualizar CNH</button><button class="btn ghost" id="condIrCnhHist" style="margin:0;flex:1;padding:8px;font-size:13px">Histórico</button></div>`;
+    if(condData.cnh_vencendo && st==='ativo') h+='<div class="banner warn">⚠️ Sua CNH vence em '+fmtData(condData.cnh_validade)+' ('+(condData.cnh_dias_para_vencer!=null?(condData.cnh_dias_para_vencer+' dia(s)'):'—')+'). Atualize os dados assim que renovar.</div>';
+    if(st==='termo_pendente'){
+      h+='<div class="banner warn">✍️ Sua CNH foi cadastrada. Assine o termo de responsabilidade de condução para poder dirigir veículos da empresa.</div>';
+      if(condData.termo&&condData.termo.status==='pendente') h+='<button class="btn" id="condIrTermo" style="margin-top:10px">Ver e assinar o termo</button>';
+    }
+    else if(st==='ativo'){ h+='<div class="banner ok">🟢 Você está <b>ATIVO</b> para direção.</div>'; if(condData.termo) h+='<button class="btn ghost" id="condIrTermoVer" style="margin-top:8px;padding:8px;font-size:13px">Ver termo assinado</button>'; }
+    else if(st==='reprovado') h+='<div class="banner bad">Cadastro reprovado.'+(condData.motivo_reprovacao?(' Motivo: '+condData.motivo_reprovacao):'')+' Fale com o gestor de frotas.</div>';
+    if(st!=='pendente') h+=`<div style="margin-top:10px" class="sub">CNH ${condData.cnh_numero||'—'} · Cat. ${condData.cnh_categoria||'—'} · Validade ${fmtData(condData.cnh_validade)}${condData.cnh_dias_para_vencer!=null?(' ('+(condData.cnh_dias_para_vencer>=0?(condData.cnh_dias_para_vencer+' dia(s) restantes'):'vencida'))+')':''}</div>${condData.cnh_foto?`<div class="sub" style="margin-top:4px"><a href="${SBASE+condData.cnh_foto}" target="_blank" rel="noopener">Ver foto da CNH</a></div>`:''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" id="condIrAtualizar" style="margin:0;flex:1;padding:8px;font-size:13px">Atualizar CNH</button><button class="btn ghost" id="condIrCnhHist" style="margin:0;flex:1;padding:8px;font-size:13px">Histórico</button></div>`;
   }
   h+='<div class="sec" style="margin-top:16px">🚗 Meu veículo</div>';
   if(!condVeiculos.length) h+='<p class="sub">Nenhum veículo designado a você.</p>';
@@ -5234,8 +5286,8 @@ function condRenderHome(){
   const ic=$('#condIrCadastro'); if(ic) ic.addEventListener('click',()=>{condSub='cadastro';condRender();});
   const ia=$('#condIrAtualizar'); if(ia) ia.addEventListener('click',()=>{condSub='cadastro';condRender();});
   const ich=$('#condIrCnhHist'); if(ich) ich.addEventListener('click',()=>{condSub='cnh_historico';condRender();});
-  $('#condView').querySelectorAll('[data-condap]').forEach(b=>b.addEventListener('click',()=>condAprovar(b.dataset.condap,true)));
-  $('#condView').querySelectorAll('[data-condrep]').forEach(b=>b.addEventListener('click',()=>{ const mo=prompt('Motivo da reprovação (opcional):')||null; condAprovar(b.dataset.condrep,false,mo); }));
+  const it=$('#condIrTermo'); if(it) it.addEventListener('click',()=>frotaTermoVer(condData.termo.id,true));
+  const itv=$('#condIrTermoVer'); if(itv) itv.addEventListener('click',()=>frotaTermoVer(condData.termo.id,false));
   $('#condView').querySelectorAll('[data-condsit]').forEach(b=>b.addEventListener('click',()=>{condSub='situacao';condVeiculoSel=b.dataset.condsit;condRender();}));
   $('#condView').querySelectorAll('[data-condaba]').forEach(b=>b.addEventListener('click',()=>{condSub='abastecimento';condVeiculoSel=b.dataset.condaba;condRender();}));
   $('#condView').querySelectorAll('[data-condemp]').forEach(b=>b.addEventListener('click',()=>{condSub='emprestimo';condVeiculoSel=b.dataset.condemp;condRender();}));
@@ -5244,19 +5296,16 @@ function condRenderHome(){
   $('#condView').querySelectorAll('[data-conddev]').forEach(b=>b.addEventListener('click',async()=>{ try{ const {error}=await sb.rpc('app_frota_emprestimo_devolver',{p_id:+b.dataset.conddev}); if(error)throw error; toast('✓ Veículo devolvido'); condRender(); }catch(e){ toast('Erro: '+(e.message||e)); } }));
   $('#condView').querySelectorAll('[data-condsolic]').forEach(b=>b.addEventListener('click',async()=>{ if(!confirm('Pedir a devolução deste veículo?')) return; try{ const {error}=await sb.rpc('app_frota_emprestimo_solicitar_devolucao',{p_id:+b.dataset.condsolic}); if(error)throw error; toast('✓ Devolução solicitada'); condRender(); }catch(e){ toast('Erro: '+(e.message||e)); } }));
 }
-async function condAprovar(id,aprovado,motivo){
-  try{ const {error}=await sb.rpc('app_condutor_aprovar',{p_condutor_id:id,p_aprovado:aprovado,p_motivo:motivo||null}); if(error)throw error; toast(aprovado?'✓ Condutor aprovado':'Condutor reprovado'); condRender(); }
-  catch(e){ toast('Erro: '+(e.message||e)); }
-}
 function condRenderCadastro(){
   const d=condData||{};
   const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
-  <div class="sec">🪪 Dados da CNH</div>
+  <div class="sec">🪪 Atualizar dados da CNH</div>
+  <p class="sub" style="margin-top:2px">Renovou a CNH ou percebeu um dado errado? Atualize aqui — isso reabre o termo de responsabilidade (você vai precisar assinar de novo).</p>
   <label>Número da CNH *</label><input id="condfNum" value="${(d.cnh_numero||'').replace(/"/g,'&quot;')}"/>
   <label>Categoria *</label><select id="condfCat">${CNH_CATS.map(c=>`<option${d.cnh_categoria===c?' selected':''}>${c}</option>`).join('')}</select>
   <label>Validade *</label><input id="condfVal" type="date" value="${d.cnh_validade?String(d.cnh_validade).slice(0,10):''}"/>
   ${fotoPickHtml('condfFoto','Foto da CNH')}
-  <button class="btn" id="condfSalvar" style="margin-top:14px">Enviar cadastro</button>`;
+  <button class="btn" id="condfSalvar" style="margin-top:14px">Salvar</button>`;
   $('#condView').innerHTML=h; wireFotoPick($('#condView'));
   $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
   $('#condfSalvar').addEventListener('click',condSalvarCnh);
@@ -5268,11 +5317,9 @@ async function condSalvarCnh(){
   try{ foto=await uploadFoto2('condfFoto','cnh'); }
   catch(e){ return toast('Não foi possível enviar a foto da CNH — tente novamente'); }
   try{
-    const existia = condData && condData.existe && condData.status!=='pendente' && condData.status!=='reprovado';
-    const rpc = existia ? 'app_condutor_atualizar_cnh' : 'app_condutor_solicitar';
-    const {error}=await sb.rpc(rpc,{p_cnh_numero:num,p_cnh_categoria:cat,p_cnh_validade:val,p_cnh_foto:foto});
+    const {error}=await sb.rpc('app_condutor_atualizar_cnh',{p_cnh_numero:num,p_cnh_categoria:cat,p_cnh_validade:val,p_cnh_foto:foto});
     if(error) throw error;
-    toast('✓ Dados enviados'); condSub='home'; condRender();
+    toast('✓ CNH atualizada — assine o novo termo'); condSub='home'; condRender();
   }catch(e){ toast('Erro: '+(e.message||e)); }
 }
 let condVeiculoSel=null;
@@ -5443,6 +5490,7 @@ async function frotasRender(){
   if(frotasSub==='ocorrencia') return frotasRenderOcorrencia();
   if(frotasSub==='manutencao') return frotasRenderManutencao();
   if(frotasSub==='condutores') return frotasRenderCondutores();
+  if(frotasSub==='condutor_cadastro') return frotasRenderCondutorCadastro();
   if(frotasSub==='painel') return frotasRenderPainel();
   if(frotasSub==='painel_movimentacoes') return frotasRenderPainelLista('movimentacoes');
   if(frotasSub==='painel_abastecimentos') return frotasRenderPainelLista('abastecimentos');
@@ -5489,19 +5537,94 @@ function frotasRenderHome(){
   $('#frotasView').querySelectorAll('[data-froco]').forEach(b=>b.addEventListener('click',()=>{frotasVeiculoSel=b.dataset.froco;frotasSub='ocorrencia';frotasRender();}));
   $('#frotasView').querySelectorAll('[data-frdev]').forEach(b=>b.addEventListener('click',async()=>{ if(!confirm('Confirmar devolução à locadora hoje?')) return; const vt=prompt('Valor de devolução (R$, opcional):'); const valorDev=(vt&&vt.trim())?parseFloat(vt.replace(',','.')):null; try{ const {error}=await sb.rpc('app_frota_veiculo_devolver',{p_id:+b.dataset.frdev,p_data_fim_real:new Date().toISOString().slice(0,10),p_valor_devolucao:isNaN(valorDev)?null:valorDev}); if(error)throw error; toast('✓ Veículo devolvido'); frotasRender(); }catch(e){ toast('Erro: '+(e.message||e)); } }));
 }
-let frotasCondutores=[];
+let frotasCondutores=[], frCondBusca='', frCondFiltro='todos', frCondSel=null;
+const FRCOND_STATUS_LABEL={termo_pendente:{l:'Termo pendente',bg:'--warn-bg',fg:'--warn'},ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},pendente:{l:'Pendente (legado)',bg:'--warn-bg',fg:'--warn'},apto:{l:'Apto (legado)',bg:'--warn-bg',fg:'--warn'},reprovado:{l:'Reprovado',bg:'--bad-bg',fg:'--bad'}};
+function frCondMatch(c){
+  const t=_matNorm(frCondBusca||'').trim();
+  if(t&&!_matNorm((c.nome||'')+' '+(c.email||'')).includes(t)) return false;
+  if(frCondFiltro==='sem_cnh') return !c.tem_condutor&&!c.frota_isento;
+  if(frCondFiltro==='termo_pendente') return c.condutor_status==='termo_pendente';
+  if(frCondFiltro==='ativo') return c.condutor_status==='ativo';
+  if(frCondFiltro==='isento') return !!c.frota_isento;
+  return true;
+}
 async function frotasRenderCondutores(){
   $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const {data,error}=await sb.rpc('app_frota_condutores_listar');
+    const {data,error}=await sb.rpc('app_frota_usuarios_completo');
     if(error) throw error;
     frotasCondutores=data||[];
   }catch(e){ $('#frotasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
-  const STATUS_LABEL={pendente:'Pendente',apto:'Apto (aguardando treinamento)',ativo:'Ativo',reprovado:'Reprovado'};
+  const semCnh=frotasCondutores.filter(c=>!c.tem_condutor&&!c.frota_isento).length;
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🪪 Condutores</div>';
-  h+= frotasCondutores.length ? frotasCondutores.map(c=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${c.nome}</b><span class="sub">${STATUS_LABEL[c.status]||c.status}</span></div><div class="sub" style="margin-top:2px">${c.email||''}</div><div class="sub" style="margin-top:2px">CNH ${c.cnh_numero||'—'} · Cat. ${c.cnh_categoria||'—'} · Validade ${fmtData(c.cnh_validade)}</div>${c.status==='apto'?`<div class="sub" style="margin-top:2px">Prazo treinamento: ${fmtData(c.prazo_treinamento)}</div>`:''}${c.status==='reprovado'&&c.motivo_reprovacao?`<div class="sub" style="margin-top:2px">Motivo: ${c.motivo_reprovacao}</div>`:''}</div>`).join('') : '<p class="sub">Nenhum condutor cadastrado ainda.</p>';
+  h+='<p class="sub" style="margin-top:2px">Toque num colaborador para cadastrar/atualizar a CNH. Marque "Isento" quem nunca vai dirigir veículo da empresa, pra tirar da fila de pendências.</p>';
+  h+='<input id="frCondBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" value="'+(frCondBusca||'').replace(/"/g,'&quot;')+'"/>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px">'+[['todos','Todos'],['sem_cnh','Sem CNH ('+semCnh+')'],['termo_pendente','Termo pendente'],['ativo','Ativo'],['isento','Isento']].map(([v,l])=>`<button type="button" class="frCondChip${frCondFiltro===v?' sel':''}" data-f="${v}" style="all:unset;cursor:pointer;font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);${frCondFiltro===v?'background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':'color:var(--mut)'}">${l}</button>`).join('')+'</div>';
+  const lista=frotasCondutores.filter(frCondMatch);
+  h+='<div id="frCondLista"></div>';
   $('#frotasView').innerHTML=h;
+  const renderLista=()=>{
+    const arr=frotasCondutores.filter(frCondMatch);
+    $('#frCondLista').innerHTML = arr.length ? arr.map(c=>{
+      const semCnhAqui=!c.tem_condutor&&!c.frota_isento;
+      const st=c.frota_isento?{l:'Isento',bg:'--line',fg:'--mut'}:(semCnhAqui?{l:'Sem CNH cadastrada',bg:'--bad-bg',fg:'--bad'}:(FRCOND_STATUS_LABEL[c.condutor_status]||{l:c.condutor_status||'—',bg:'--line',fg:'--mut'}));
+      return `<div class="frCondRow" data-uid="${c.id}" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${c.nome||c.email}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>
+        <div class="sub" style="margin-top:2px">${c.email||''}</div>
+        ${c.tem_condutor?`<div class="sub" style="margin-top:2px">CNH ${c.cnh_numero||'—'} · Cat. ${c.cnh_categoria||'—'} · Validade ${fmtData(c.cnh_validade)}</div>`:''}
+      </div>`;
+    }).join('') : '<p class="sub" style="margin-top:10px">Nenhum colaborador encontrado.</p>';
+    $('#frCondLista').querySelectorAll('.frCondRow').forEach(el=>el.addEventListener('click',()=>{ frCondSel=el.dataset.uid; frotasSub='condutor_cadastro'; frotasRender(); }));
+  };
+  renderLista();
   $('#frVoltar').addEventListener('click',()=>{frotasSub='home';frotasRender();});
+  $('#frCondBusca').addEventListener('input',e=>{ frCondBusca=e.target.value; renderLista(); });
+  $('#frotasView').querySelectorAll('.frCondChip').forEach(b=>b.addEventListener('click',()=>{ frCondFiltro=b.dataset.f; frotasRenderCondutores(); }));
+}
+function frotasRenderCondutorCadastro(){
+  const c=frotasCondutores.find(x=>String(x.id)===String(frCondSel));
+  if(!c){ frotasSub='condutores'; return frotasRenderCondutores(); }
+  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>';
+  h+='<div class="sec">🪪 '+(c.nome||c.email)+'</div><p class="sub" style="margin-top:2px">'+(c.email||'')+'</p>';
+  if(!c.tem_condutor){
+    h+='<label style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px"><input type="checkbox" id="frCondIsento" '+(c.frota_isento?'checked':'')+' style="width:auto"/> <span>Isento — esta pessoa nunca vai dirigir veículo da empresa</span></label>';
+  }
+  if(c.frota_isento && !c.tem_condutor){
+    h+='<p class="sub" style="margin-top:12px">Marcado como isento — some da fila de pendências de CNH. Desmarque acima se ela vier a precisar dirigir.</p>';
+  } else {
+    h+='<div class="sec" style="margin-top:16px">'+(c.tem_condutor?'Atualizar':'Cadastrar')+' CNH</div>';
+    if(c.tem_condutor){
+      const st=FRCOND_STATUS_LABEL[c.condutor_status]||{l:c.condutor_status,bg:'--line',fg:'--mut'};
+      h+='<div class="sub" style="margin:2px 0 10px">Status atual: <b style="color:var('+st.fg+')">'+st.l+'</b>'+(c.termo_id?' · <a href="#" id="frCondVerTermo">ver termo</a>':'')+'</div>';
+    }
+    h+=`<label>Número da CNH *</label><input id="frcNum" value="${(c.cnh_numero||'').replace(/"/g,'&quot;')}"/>
+    <label>Categoria *</label><select id="frcCat">${CNH_CATS.map(cc=>`<option${c.cnh_categoria===cc?' selected':''}>${cc}</option>`).join('')}</select>
+    <label>Validade *</label><input id="frcVal" type="date" value="${c.cnh_validade?String(c.cnh_validade).slice(0,10):''}"/>
+    ${fotoPickHtml('frcFoto','Foto da CNH (opcional)')}
+    <button class="btn" id="frcSalvar" style="margin-top:14px">Salvar${c.tem_condutor?' — reabre o termo p/ nova assinatura':''}</button>`;
+  }
+  $('#frotasView').innerHTML=h; wireFotoPick($('#frotasView'));
+  $('#frVoltar').addEventListener('click',()=>{frotasSub='condutores';frotasRender();});
+  const ck=$('#frCondIsento'); if(ck) ck.addEventListener('change',async()=>{
+    ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_frota_isentar',{p_uid:c.id,p_isento:ck.checked}); if(error) throw error; toast('✓ Salvo'); frotasRenderCondutores(); }
+    catch(e){ toast('Erro: '+(e.message||e)); ck.disabled=false; ck.checked=!ck.checked; }
+  });
+  const vt=$('#frCondVerTermo'); if(vt) vt.addEventListener('click',(ev)=>{ ev.preventDefault(); frotaTermoVer(c.termo_id,false); });
+  const sv=$('#frcSalvar'); if(sv) sv.addEventListener('click',async()=>{
+    const num=$('#frcNum').value.trim(), cat=$('#frcCat').value, val=$('#frcVal').value;
+    if(!num||!val) return toast('Preencha número e validade da CNH');
+    sv.disabled=true;
+    let foto=null;
+    try{ foto=await uploadFoto2('frcFoto','cnh'); }
+    catch(e){ toast('Não foi possível enviar a foto — tente novamente'); sv.disabled=false; return; }
+    try{
+      const {error}=await sb.rpc('app_frota_condutor_cadastrar',{p_uid:c.id,p_cnh_numero:num,p_cnh_categoria:cat,p_cnh_validade:val,p_cnh_foto:foto});
+      if(error) throw error;
+      toast('✓ CNH cadastrada — colaborador foi avisado para assinar o termo');
+      frotasSub='condutores'; frotasRenderCondutores();
+    }catch(e){ toast('Erro: '+(e.message||e)); sv.disabled=false; }
+  });
 }
 function frotasRenderPainel(){
   const h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📊 Painel da frota</div><p class="sub">Histórico completo, sempre atualizado ao abrir.</p>'
@@ -5868,8 +5991,9 @@ async function ntfInit(){
 }
 async function ntfMarcarTodas(){ try{ await sb.rpc('app_notif_marcar_lidas',{}); }catch(e){} toast('✓ Avisos marcados como lidos'); ntfBadge(); ntfInit(); }
 async function supGoAct(act){
-  if(act==='condutor_aprovar'||act==='condutor_status'||act==='frota_emprestimo'){ irPara('condutor'); return; }
+  if(act==='condutor_aprovar'||act==='condutor_status'||act==='condutor_termo'||act==='frota_emprestimo'){ irPara('condutor'); return; }
   if(act==='frota_ocorrencia'||act==='frota_ocorrencia_aprovar'||act==='frota_manutencao'||act==='frota_manutencao_aprovar'){ irPara('frotas'); return; }
+  if(act==='condutores'){ frotasTarget='condutores'; irPara('frotas'); return; }
   if(act==='qsms_treinamento'){ irPara('qsms'); return; }
   try{ await supGetMe(); }catch(e){}
   SCREENS.forEach(s=>{ const el=$('#'+s); if(el) el.classList.toggle('hidden', s!=='suprimentos'); });
