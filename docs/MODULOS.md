@@ -603,9 +603,12 @@ back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `
 ## 6. Frota — schema `"10 - Frotas"` · tela-hub `frota` (+ telas internas `condutor` / `frotas` / `qsms`)
 
 Um público entra por **um só card** na home (🧰 Suporte › **🚗 Frota**, `data-go="frota"`). Fluxo
-único: colaborador vira **condutor** (auto-cadastro de CNH → aprovação do gestor → treinamento de
-direção defensiva → ativo), **Frotas** (`funcao='frotas'`/admin) cadastra veículos e aprova
-ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos treinamentos.
+**(reformulado 2026-09)**: **Frotas** (`funcao='frotas'`/admin) cadastra a CNH do colaborador →
+colaborador é avisado e **assina o termo de responsabilidade de condução** (assinatura eletrônica,
+igual EPI) → ativo. Frotas também cadastra veículos e aprova ocorrências/manutenções. **Não há mais
+etapa de treinamento de direção defensiva** — a role `qsms` e as telas de treinamento ficam
+**dormentes** (código/tabelas preservados, desconectados do fluxo principal); será reconstruído em
+outro momento com escopo próprio (ver §6.3).
 
 ### 6.0 Hub `frota` — `// ----- HUB da Frota` (~L4856)
 - Estilo Suprimentos/Insumos: `frotaInit` → `frotaHome` renderiza **seções → botões**; `frotaBlocks()`
@@ -613,50 +616,83 @@ ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos treinament
   mostra bloqueada):
   - **👤 Colaborador** (`on:true`, todo usuário): Minha CNH · Situação do veículo · Abastecimento ·
     Registrar ocorrência · Lavagem · Emprestar / meus empréstimos.
-  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): Aprovar condutores · Aprovar ocorrências ·
-    Aprovar manutenções.
+  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): Aprovar ocorrências · Aprovar manutenções.
+    **"Aprovar condutores" foi removido (2026-09)** — não existe mais aprovação separada, o cadastro
+    de CNH pelo gestor de frota já é o ato de vetting (ver §6.1).
   - **🏢 Equipe administrativa** (`funcao='frotas'||is_admin`): Veículos · Equipes · Condutores ·
-    Painel e custos.
-  - **🦺 QSMS** (`funcao='qsms'||is_admin`): Treinamentos (agendar / baixa).
+    Painel e custos. **"Condutores" foi reformulado (2026-09)** — agora é a lista completa de
+    *todos* os colaboradores (não só quem já tem CNH), com cadastro de CNH e tick de isento
+    (ver §6.1).
+  - ~~🦺 QSMS~~ **removido do hub (2026-09)** — tela/RPCs/tabelas continuam existindo (dormentes),
+    só não têm mais botão de entrada (ver §6.3).
 - **`frotaOpen(id)` é um roteador** — não duplica render. Seta um alvo e chama `irPara`:
   - ações de Colaborador → `condTarget={sub,act}` + `irPara('condutor')`; `condInit` consome o alvo
     depois do load (`condGoTarget`). Ação que depende de veículo: 0 veículos → `toast`; 1 → auto-seleciona;
-    2+ → `condRenderPick(sub)` (lista de placas). "Minha CNH" cai na home do condutor (ou no cadastro se
-    ainda não existe). "Aprovar condutores" cai na home (a fila já fica no topo).
+    2+ → `condRenderPick(sub)` (lista de placas). "Minha CNH" sempre cai na home do condutor
+    (`condRenderHome` já trata os dois casos: sem cadastro, ou com termo pendente/ativo).
   - Gestor/Admin → `frotasTarget` (`'home'|'equipes'|'condutores'|'painel'`) + `irPara('frotas')`;
     `frotasInit` consome. Aprovações de ocorrência/manutenção ficam no topo da home de `frotas`.
-  - QSMS → `irPara('qsms')`.
-- As telas internas `condutor`/`frotas`/`qsms` **não têm mais card na home**; a barra delas volta pro
-  hub (`#condBar`/`#frotasBar`/`#qsmsBar` → `irPara('frota')`). Os `‹ Voltar` **internos** das
+- As telas internas `condutor`/`frotas` **não têm mais card na home**; a barra delas volta pro
+  hub (`#condBar`/`#frotasBar` → `irPara('frota')`). Os `‹ Voltar` **internos** das
   sub-telas continuam indo pra home da própria tela (2 níveis de volta). Deep-links de notificação
-  (`supGoAct`, §7) continuam apontando direto pra `condutor`/`frotas`/`qsms` — seguem funcionando.
+  (`supGoAct`, §7) continuam apontando direto pra `condutor`/`frotas` — seguem funcionando; o link
+  `qsms_treinamento` de notificações antigas ainda abre a tela `qsms` (dormente, só não tem mais
+  entrada pelo hub).
 
 ### 6.1 Condutor — `// condutor/frotas/qsms` (~L4275) · tela `condutor`
-- **Ciclo de status** (`frota_condutor.status`): `pendente` → (gestor aprova) → `apto` (banner com
-  prazo de **10 dias**, `prazo_treinamento`) → (QSMS agenda + dá baixa no treinamento) → `ativo`.
-  Reprovação → `reprovado` (`motivo_reprovacao`), pode reenviar.
-- **Auto-cadastro:** `condRenderCadastro`/`condSalvarCnh` → `app_condutor_solicitar` (1º envio) ou
-  `app_condutor_atualizar_cnh` (já `apto`/`ativo`, ex.: CNH renovada) — mesma assinatura
-  `(p_cnh_numero, p_cnh_categoria, p_cnh_validade, p_cnh_foto)`. Foto via `uploadFoto2(...,'cnh')`
-  → bucket `fotos-campo` (**mesmo bucket público das fotos de campo** — sem storage dedicado/privado
-  para CNH; se isso virar problema de privacidade, é o primeiro lugar a mexer).
+- **Ciclo de status (reformulado 2026-09)** (`frota_condutor.status`): o **gestor de frota cadastra
+  a CNH** (não é mais autocadastro) → `termo_pendente` → colaborador **assina o termo de
+  responsabilidade** → `ativo`. Os status `pendente`/`apto`/`reprovado` continuam **válidos no
+  `CHECK`** só por compatibilidade com histórico — nenhuma RPC nova os produz. Os 5 condutores reais
+  que existiam antes desta mudança (2 `apto`, 3 `ativo`) foram migrados uma vez pra `termo_pendente`
+  e notificados a assinar — **nenhum condutor jamais tinha assinado nada antes**, o termo é documento
+  novo (decisão registrada aqui: se a intenção era só cobrir daqui pra frente, os 3 que já eram
+  `ativo` precisam ser revertidos manualmente).
+- **Cadastro pelo gestor:** tela **Frotas › Condutores** (`frotasRenderCondutores`, §6.2) lista
+  **todos os colaboradores** (`app_frota_usuarios_completo()`, não só quem já tem CNH) com busca e
+  filtros (Todos/Sem CNH/Termo pendente/Ativo/Isento). Clicar abre `frotasRenderCondutorCadastro` →
+  `app_frota_condutor_cadastrar(p_uid, p_cnh_numero, p_cnh_categoria, p_cnh_validade, p_cnh_foto)`
+  (`funcao in ('frotas','admin')`) — cadastra **ou atualiza** a CNH de qualquer colaborador, sempre
+  deixando `status='termo_pendente'` e emitindo um **termo novo** (cancela qualquer termo pendente
+  anterior primeiro, pra não acumular). **Isento:** tick `perfil.frota_isento` (`app_frota_isentar`,
+  mesmo gate) — marca quem nunca vai dirigir, some da contagem "Sem CNH" sem precisar de linha em
+  `frota_condutor`. Foto continua opcional, via `uploadFoto2(...,'cnh')` → bucket `fotos-campo`
+  (**mesmo bucket público das fotos de campo** — sem storage dedicado/privado para CNH).
+- **Autoatualização (colaborador):** `condRenderCadastro`/`condSalvarCnh` agora só serve pra
+  **atualizar** CNH já cadastrada (ex.: renovou) — `app_condutor_atualizar_cnh`, mesma assinatura de
+  antes. Também reabre o termo (novo `termo_pendente` + termo novo) — qualquer mudança de CNH exige
+  reassinar. **Não existe mais autocadastro inicial** (`app_condutor_solicitar` continua definida no
+  banco, mas nada no frontend chama — o ponto de entrada agora é sempre o gestor).
 - **Histórico da CNH:** as duas RPCs acima **também** inserem uma linha em
   `frota_condutor_cnh_historico` a cada chamada (1ª vez ou atualização) — tabela **append-only**,
-  nunca `UPDATE`, mesmo padrão do histórico de aluguel (§6.2). `app_condutor_cnh_historico()` devolve
-  o histórico do próprio condutor (`condRenderCnhHistorico`, botão "Histórico" ao lado de "Atualizar
-  CNH"). Condutores que já existiam antes desta RPC existir foram **migrados uma vez** (uma linha
-  inicial com os dados atuais de `frota_condutor` no momento da migração) — não há como reconstruir
-  atualizações anteriores a isso.
+  nunca `UPDATE`, mesmo padrão do histórico de aluguel (§6.2). Ganhou a coluna **`atualizado_por`**
+  (2026-09) — antes só o próprio colaborador escrevia aqui, agora pode ser o gestor de frota; sem essa
+  coluna não dava pra saber quem de fato registrou aquela versão. `app_condutor_cnh_historico()`
+  devolve o histórico do próprio condutor (`condRenderCnhHistorico`, botão "Histórico" ao lado de
+  "Atualizar CNH"). Condutores que já existiam antes desta RPC existir foram **migrados uma vez** (uma
+  linha inicial com os dados atuais de `frota_condutor` no momento da migração) — não há como
+  reconstruir atualizações anteriores a isso.
+- **Termo de responsabilidade de condução** (tabela nova `frota_termo`, 1 linha por
+  cadastro/atualização de CNH — nunca `UPDATE` de conteúdo, só de `status`): PDF via o mesmo overlay
+  `#relatorio`/`REL_CSS` dos loggers/equipamento (`frotaTermoVer`/`frotaTermoHtml`), com **assinatura
+  eletrônica em canvas** (não é só clique como o termo de equipamento, §5.2) — reaproveita
+  `epiSigInit`/`epiCanvasBlob`/`epiUpload` da retirada de EPI **como estão**, sem duplicar a lógica de
+  captura. Vermelho/verde igual ao termo de equipamento (`TERMO_CSS`, compartilhado). `condIrTermo`
+  (banner "Minha CNH") abre pra assinar; `condIrTermoVer`/`frCondVerTermo` abrem read-only
+  (`canSign=false`) — condutor já ativo, ou gestor conferindo. `app_frota_termo_ver(p_termo_id)` gate:
+  o próprio condutor, ou `funcao in ('frotas','admin','aprovador')`. `app_frota_termo_assinar(p_termo_id,
+  p_assinatura)`: só o próprio condutor, só termo `pendente` — grava `assinatura_path`, `assinado_em`,
+  e **atualiza `frota_condutor.status='ativo'`** (é essa `UPDATE` que dispara a notificação "está
+  ATIVO", via trigger — mesma mecânica de antes, só a causa mudou de "treinamento confirmado" pra
+  "termo assinado"). Reaproveita a coluna `treinamento_confirmado_em` pra guardar o timestamp da
+  assinatura — nome ficou desatualizado (era específico de treinamento), não valeu a pena renomear
+  só por isso.
 - **Ver a própria CNH:** `condRenderHome` mostra link "Ver foto da CNH" (`SBASE+cnh_foto`) quando
-  `condData.cnh_foto` existe — mesmo padrão do link que o gestor já via na fila de aprovação
-  (`condPendentes`).
+  `condData.cnh_foto` existe.
 - **Alerta de vencimento:** `app_condutor_meu` retorna `cnh_vencendo` (validade ≤ hoje+30) **e**
   `cnh_dias_para_vencer` (`cnh_validade - current_date`, pode ser negativo se já venceu). Exibido
-  como banner (com a contagem de dias) em `condRenderHome` quando `status` é `apto`/`ativo`, e como
+  como banner (com a contagem de dias) em `condRenderHome` quando `status==='ativo'`, e como
   texto ao lado da validade sempre que a CNH existe.
-- **Aprovação (gestor):** `condPendentes` vem de `app_condutor_pendentes()` — só quem está em
-  `sup_aprovadores_de(condutor.id)` (ou admin) vê a lista. Botão liga a `condAprovar` →
-  `app_condutor_aprovar(p_condutor_id, p_aprovado, p_motivo)`.
 - **Meu veículo / situação / abastecimento / ocorrência / lavagem / empréstimo:** `condVeiculos` =
   `app_frota_veiculos_listar()` (retorno enxuto p/ não-`frotas`: `id,placa,modelo,tipo,km_atual,
   status,consorcio,ultima_lavagem_em,lavagem_atrasada`). Sub-telas `condRenderSituacao`/
@@ -697,7 +733,7 @@ ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos treinament
   quem é `de_condutor_id` do empréstimo) e dispara notificação pessoal pra quem está com o carro; **a
   devolução em si continua sendo confirmada por quem está com o veículo** — o titular não pode forçar.
   Decisão de produto explícita (não inverter sem confirmar de novo).
-- **Estado:** `condSub, condVeiculoSel, condData, condPendentes, condVeiculos, condEmprestimos`.
+- **Estado:** `condSub, condVeiculoSel, condData, condVeiculos, condEmprestimos`.
 
 ### 6.2 Frotas — `// condutor/frotas/qsms` (~L4446) · tela `frotas`
 - **Gate de tela vs. gate de conteúdo:** todo mundo entra na tela (pra ver ocorrências pendentes se
@@ -754,10 +790,13 @@ ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos treinament
   (`motivo_infracao`). Passa pelo mesmo fluxo pendente→aprovado/reprovado de qualquer ocorrência —
   "encaminhar ao gestor para ciência" (pedido da Geovana) é a própria aprovação/reprovação existente,
   não um mecanismo novo.
-- **Condutores** (`frotasRenderCondutores` → `app_frota_condutores_listar()`, `frotas`/admin):
-  listagem read-only de **todos** os condutores (qualquer status), nome/e-mail/CNH/prazo de
-  treinamento/motivo de reprovação. Aprovar continua sendo só na tela **Condutor** (`condPendentes`,
-  §6.1) — esta lista aqui é só visibilidade, não duplica a ação de aprovar.
+- **Condutores (reformulado 2026-09)** (`frotasRenderCondutores`/`frotasRenderCondutorCadastro` →
+  `app_frota_usuarios_completo()`, `frotas`/admin): lista **todo mundo** (`perfil` LEFT JOIN
+  `frota_condutor` LEFT JOIN termo mais recente), não só quem já tem CNH — busca por nome/e-mail +
+  filtro (Todos/Sem CNH/Termo pendente/Ativo/Isento). Clicar num colaborador abre a mesma tela pra
+  cadastrar/atualizar CNH (se ainda não tem) ou ver status + link pro termo (se já tem) — **esta lista
+  agora É o ponto de entrada do fluxo**, não só visibilidade (ver §6.1). `app_frota_condutores_listar`
+  (a RPC antiga, só condutores já existentes) continua definida no banco mas nada mais chama.
 - **Gate de condutor apto/ativo em toda vinculação a veículo:** `app_perfil_por_email` agora também
   retorna `condutor_status` — usado no frontend (`frotasSalvarVeiculo` p/ condutor exclusivo,
   `feqCarregar` p/ membro de equipe, `condSalvarEmprestimo` p/ destinatário do empréstimo) pra barrar
@@ -813,28 +852,37 @@ ocorrências, **QSMS** (`funcao='qsms'`/admin) agenda e dá baixa nos treinament
 - **Estado:** `frotasSub, frotasVeiculoSel, frotasVeiculos, frotasEquipes, frotasOcorPend,
   frotasManutPend, frotasCondutores, frotasPainelCache`.
 
-### 6.3 QSMS — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
-- Tela só pra `funcao='qsms'`/admin (RPCs recusam com `raise exception 'sem permissao'` pra quem não é
-  — testado, ver §6.4). `qsmsAptos` = `app_qsms_condutores_aptos()` (condutores `apto` **sem**
-  treinamento `agendado` em aberto). Seleciona vários (`qsmsSelCondutores`) → **Agendar treinamento**
-  (`qsmsRenderAgendar` → `app_qsms_treinamento_agendar(p_data,p_horario,p_local,p_instrutor,
-  p_condutor_ids[])`, cria `frota_treinamento` + 1 linha por condutor em `frota_treinamento_condutor`).
-- **Baixa:** `qsmsRenderBaixa` lista os participantes do treinamento selecionado (`qsmsTreinoSel`),
-  QSMS marca presença + anexa foto da lista → `app_qsms_treinamento_baixar(p_treinamento_id,
-  p_lista_presenca,p_presentes[])`. **Foto da lista de presença é obrigatória** (bloqueada no
-  frontend antes do upload **e** validada na RPC — `p_lista_presenca is null` levanta exceção); ao
-  contrário da foto de ocorrência/CNH, aqui não existe caminho "salvar sem foto". Isso **atualiza
-  `frota_condutor.status='ativo'`** pra quem está em `p_presentes` — é essa `UPDATE` que dispara a
-  notificação de "condutor ativo" (via trigger, não é a própria RPC que notifica — ver §6.4). Quem
-  faltou continua `apto` (pode ser reagendado).
+### 6.3 QSMS — **DORMENTE desde 2026-09** — `// condutor/frotas/qsms` (~L4577) · tela `qsms`
+**Removido do fluxo principal a pedido do usuário** ("não deverá haver processo de treinamento de
+direção defensiva... será construído em outro momento") — a etapa de treinamento que existia entre
+`apto` e `ativo` foi substituída pela assinatura do termo de responsabilidade (§6.1). Nada foi
+apagado: tela, RPCs (`app_qsms_condutores_aptos`, `app_qsms_treinamento_agendar`,
+`app_qsms_treinamento_baixar`, `app_qsms_treinamentos_listar`) e tabelas (`frota_treinamento`,
+`frota_treinamento_condutor`, com dados reais de 2026-09 preservados) continuam existindo — só o
+botão de entrada no hub (`frotaBlocks()`) foi removido. `irPara('qsms')` e o link de notificação
+`qsms_treinamento` continuam funcionando (backward-compat de avisos antigos), mas não há mais caminho
+normal pra chegar lá. **Se/quando reconstruir:** decidir se reaproveita `frota_condutor.status='apto'`
+como gate de novo, ou se cria um conceito próprio independente do termo de condução — hoje `apto`
+não é mais produzido por nenhuma RPC ativa, então "quem está apto pra treinar" precisaria ser
+redefinido.
+- Comportamento antigo, pra referência: tela só pra `funcao='qsms'`/admin. `qsmsAptos` =
+  `app_qsms_condutores_aptos()` (condutores `apto` sem treinamento `agendado` em aberto) → **Agendar
+  treinamento** (`app_qsms_treinamento_agendar`, cria `frota_treinamento` + 1 linha por condutor em
+  `frota_treinamento_condutor`) → **Baixa** (`app_qsms_treinamento_baixar`, foto da lista de presença
+  obrigatória, atualizava `frota_condutor.status='ativo'` pra quem estava presente).
 - **Estado:** `qsmsSub, qsmsSelCondutores, qsmsTreinoSel, qsmsAptos, qsmsTreinos`.
 
 ### 6.4 Notificação/aprovação — reaproveita Suprimentos (não é hierarquia própria)
 Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o mecanismo do invariante
 §0.9. Todo disparo é por **trigger**, nunca inline nas RPCs `app_*` (que só gravam):
-- `"10 - Frotas".trg_frota_condutor()` (`AFTER INSERT/UPDATE` em `frota_condutor`): cadastro novo/reenvio
-  → grupo `sup_aprovadores_de(condutor)`; `apto` → pessoal ao condutor + grupo `qsms`/admin; `reprovado`
-  → pessoal; `ativo` → pessoal ao condutor + grupo `sup_aprovadores_de(condutor)`.
+- `"10 - Frotas".trg_frota_condutor()` (`AFTER INSERT/UPDATE` em `frota_condutor`, **reformulado
+  2026-09**): `termo_pendente` → pessoal ao condutor ("assine o termo", `link='condutor_termo'`);
+  `reprovado` → pessoal (legado, não produzido por nenhuma RPC ativa); `ativo` → pessoal ao condutor +
+  grupo `frotas`/admin (era grupo `qsms`/`sup_aprovadores_de` antes da reformulação). **Cuidado que
+  já mordeu uma vez:** a condição precisa cobrir **INSERT e UPDATE** — `termo_pendente` é atingido
+  tanto por `INSERT` (1º cadastro, feito pelo gestor) quanto por `UPDATE` (recadastro); um trigger que
+  só olha `TG_OP='UPDATE'` deixa o 1º cadastro **sem notificar ninguém** (pego no teste E2E antes de
+  ir pra produção).
 - `"10 - Frotas".trg_frota_ocorrencia()` (`frota_ocorrencia`, cobre multa também — mesma tabela):
   INSERT → grupo `sup_aprovadores_de(condutor_exclusivo_do_veiculo ?? reportado_por)` + pessoal a
   esse mesmo alvo (se não foi ele quem reportou); UPDATE de status → pessoal ao alvo.
@@ -860,22 +908,26 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
 `frota_veiculo` (locação, uso exclusivo/equipe, cadastro/combustível/consórcio — §6.2),
 `frota_veiculo_aluguel_historico` (1 linha por reajuste, nunca `UPDATE` — histórico do aluguel),
 `frota_condutor` (PK = `perfil.id`, status/CNH), `frota_condutor_cnh_historico` (append-only, 1 linha
-por envio/atualização de CNH — §6.1), `frota_equipe` + `frota_equipe_membro`,
-`frota_checklist_situacao`, `frota_checklist_abastecimento`, `frota_lavagem`,
-`frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1),
+por envio/atualização de CNH, + `atualizado_por` desde 2026-09 — §6.1), `frota_termo` (**nova
+2026-09** — 1 linha por termo emitido, `status` pendente/assinado/cancelado, `assinatura_path`),
+`frota_equipe` + `frota_equipe_membro`, `frota_checklist_situacao`, `frota_checklist_abastecimento`,
+`frota_lavagem`, `frota_emprestimo` (+ `devolucao_solicitada_em`, retomada — §6.1),
 `frota_ocorrencia` (+ `condutor_no_momento_id`/`motivo_infracao`, multa — §6.2), `frota_manutencao`
 (tabela própria, ciclo `pendente→aprovado/reprovado→concluido`, não é ocorrência — §6.2),
-`frota_treinamento` + `frota_treinamento_condutor`.
+`frota_treinamento` + `frota_treinamento_condutor` (dormentes desde 2026-09 — §6.3). `public.perfil`
+ganhou `frota_isento` (2026-09, não é tabela de Frotas mas é usada só por ela).
 
 ### Cuidados
 - **`consorcio` de `frota_veiculo` é `NULL`-ável no banco** (não dá pra travar `NOT NULL` — 2
   veículos reais já cadastrados antes dessa trave ficaram sem valor) mas **obrigatório na RPC**
   `app_frota_veiculo_salvar` pra qualquer criação/edição a partir de agora. Um veículo antigo com
   `consorcio is null` só se resolve quando alguém abrir e salvar ele de novo.
-- **Ninguém com `funcao='qsms'` em produção no momento** — card `#cardQsms` só aparece pra admin até
-  alguém ser designado (`sup_admin_set_funcao` em Suprimentos ⚙️ Configurações, mesma RPC de sempre).
+- **`funcao='qsms'` não tem mais função nenhuma no app** (2026-09) — a tela que ela liberava está
+  dormente (§6.3). Quem tiver esse acesso configurado não perde nada de errado, só não tem mais
+  nenhum botão extra por causa dele.
 - Foto de CNH vai pro bucket público `fotos-campo` (mesmo de fotos de campo) — não há bucket
-  privado dedicado a documento de identificação.
+  privado dedicado a documento de identificação. **Assinatura do termo (2026-09) vai pro mesmo
+  bucket**, mesma observação de privacidade.
 
 ## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin
@@ -914,10 +966,12 @@ por envio/atualização de CNH — §6.1), `frota_equipe` + `frota_equipe_membro
 `app_abertura_servico_minhas`, `app_captacao_fila`, `app_captacao_matricula`
 (registro via `app_abertura_servico_registrar`, `app_captacao_registrar`).
 **Suprimentos:** prefixo `sup_*` (ver §5).
-**Condutor/Frotas/QSMS (ver §6):**
-`app_condutor_solicitar/meu/pendentes/aprovar/atualizar_cnh/cnh_historico`,
+**Condutor/Frotas (ver §6):**
+`app_condutor_meu/atualizar_cnh/cnh_historico`,
+`app_frota_usuarios_completo`, `app_frota_condutor_cadastrar`, `app_frota_isentar`,
+`app_frota_termo_ver/assinar` (2026-09 — termo de responsabilidade, substitui aprovação+treinamento),
 `app_frota_veiculos_listar/veiculo_salvar/veiculo_devolver/veiculo_relatorio`,
-`app_frota_veiculo_aluguel_reajustar/aluguel_historico`, `app_frota_condutores_listar`,
+`app_frota_veiculo_aluguel_reajustar/aluguel_historico`,
 `app_frota_movimentacoes_listar`, `app_frota_abastecimentos_listar`, `app_frota_lavagens_listar`,
 `app_frota_ocorrencias_listar`, `app_frota_manutencoes_listar`, `app_frota_custos_por_veiculo`
 (painel gerencial, §6.2),
@@ -927,9 +981,11 @@ por envio/atualização de CNH — §6.1), `frota_equipe` + `frota_equipe_membro
 `app_frota_lavagem_salvar`,
 `app_frota_ocorrencia_reportar/pendentes/aprovar`,
 `app_frota_manutencao_registrar/pendentes/aprovar/concluir`,
-`app_qsms_condutores_aptos`, `app_qsms_treinamento_agendar/baixar`, `app_qsms_treinamentos_listar`,
 `app_perfil_por_email` (helper genérico: busca `perfil` por e-mail, usado por Frotas e por qualquer
 módulo que precise resolver destinatário por e-mail).
+**Legado, ainda no banco mas sem chamador no frontend (2026-09):** `app_condutor_solicitar/pendentes/
+aprovar`, `app_frota_condutores_listar` (substituídas pelo fluxo acima), `app_qsms_condutores_aptos`,
+`app_qsms_treinamento_agendar/baixar`, `app_qsms_treinamentos_listar` (QSMS dormente, §6.3).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p

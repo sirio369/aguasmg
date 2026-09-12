@@ -145,7 +145,7 @@ pwa/
 | `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
 | `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`), **programação de pesquisa** (`programacao_pesquisa`, `rede_pp_segmento`/`_fonte`, `pp_config` — app-only mesmo estando neste schema geo, sem policy pra `gis_*`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
-| `10 - Frotas` | veículos, condutores/CNH, treinamento QSMS, empréstimos, ocorrências — *app-only* |
+| `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, empréstimos, ocorrências — *app-only* (treinamento QSMS dormente desde 2026-09) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
@@ -249,14 +249,20 @@ pwa/
 
 **Suprimentos** (`suprimentos`) — ver §8.
 
-**Frota** (card único `frota` na home; telas internas `condutor`/`frotas`/`qsms`, schema `10 - Frotas`)
-— o card abre um **hub estilo Suprimentos** (`frotaInit`/`frotaHome`/`frotaBlocks`) com 4 seções
-gateadas: **👤 Colaborador**, **🖊️ Gestor**, **🏢 Equipe administrativa**, **🦺 QSMS**. `frotaOpen(id)`
-é só roteador: seta `condTarget`/`frotasTarget` e faz `irPara('condutor'|'frotas'|'qsms')` — o render
-de cada fluxo continua onde estava. Detalhe em `docs/MODULOS.md §6.0`. Fluxo: condutor se
-auto-cadastra (CNH) → gestor aprova → **apto** (10 dias p/ treinamento) → QSMS agenda e dá baixa
-(foto da lista de presença obrigatória) → **ativo**; alerta de CNH vencendo em 30 dias. Só pode ser
-vinculado a veículo/equipe/empréstimo quem está `apto`/`ativo` (validado no backend; reeditar um
+**Frota** (card único `frota` na home; telas internas `condutor`/`frotas` — `qsms` dormente desde
+2026-09, ver abaixo — schema `10 - Frotas`) — o card abre um **hub estilo Suprimentos**
+(`frotaInit`/`frotaHome`/`frotaBlocks`) com 3 seções gateadas: **👤 Colaborador**, **🖊️ Gestor**,
+**🏢 Equipe administrativa**. `frotaOpen(id)` é só roteador: seta `condTarget`/`frotasTarget` e faz
+`irPara('condutor'|'frotas')` — o render de cada fluxo continua onde estava. Detalhe em
+`docs/MODULOS.md §6.0`. **Fluxo (reformulado 2026-09):** o **gestor de frota cadastra a CNH** do
+colaborador (tela Frotas › Condutores, lista *todos* os colaboradores + busca/filtro + tick "isento" —
+`app_frota_usuarios_completo`/`app_frota_condutor_cadastrar`/`app_frota_isentar`) → colaborador é
+avisado e **assina eletronicamente o termo de responsabilidade de condução** (PDF via overlay
+`#relatorio` igual logger/equipamento, assinatura em canvas igual EPI — `frotaTermoVer`/
+`app_frota_termo_assinar`) → **ativo**; alerta de CNH vencendo em 30 dias. **Não existe mais
+autocadastro nem aprovação separada, nem etapa de treinamento** (QSMS ficou dormente — tela/RPCs/
+tabelas preservados, só sem botão de entrada; será reconstruído depois com escopo próprio). Só pode
+ser vinculado a veículo/equipe/empréstimo quem está `ativo` (validado no backend; reeditar um
 vínculo já existente não reaplica a checagem — "grandfathering"). **Frotas** (`funcao='frotas'`/admin)
 cadastra veículos (tipo/combustível/motorização/centro de custo, consórcio obrigatório, aluguel com
 histórico de reajuste, valor de devolução) e aprova ocorrências/manutenções (valor só visível a quem
