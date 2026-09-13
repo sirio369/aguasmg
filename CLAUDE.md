@@ -309,7 +309,16 @@ subtela sempre teve seu próprio "‹ Voltar" contextual (os dois apareciam junt
 duplicavam botões já existentes no hub. **Cuidado de bastidor (5ª rodada):** `CREATE OR REPLACE
 FUNCTION` que só acrescenta parâmetro cria um **overload novo**, não substitui o original — a regra
 (§0.6) já dizia pra usar `drop function`+`create` nesse caso, mas foi esquecida 2x; achados e
-limpos overloads órfãos em 4 RPCs (detalhe em docs/MODULOS.md §6 "Cuidados").
+limpos overloads órfãos em 4 RPCs (detalhe em docs/MODULOS.md §6 "Cuidados"). **Revisão de UI/QA
+(6ª rodada, 2026-09):** rótulos amigáveis centralizados (`labelOf`/`statusBadge`, corrige Histórico e
+Relatório de Manutenções que mostravam valor cru do banco) · `.relBadge` dos relatórios em PDF
+ganhou `color` padrão (estava branco-em-branco no Relatório do Veículo, VRP e termo assinado) ·
+`prompt()`/`confirm()` nativos viraram tela própria em Reprovar manutenção, Devolver à locadora e
+"Marcar como concluída" do admin (não dava pra automatizar em teste de navegador) · checklist e
+abastecimento agora recusam com o veículo em `manutencao` (RPC + botão desabilitado no hub) · novo
+`qa/smoke_test_frota.sql` (6 blocos com rollback garantido, cobre overloads/grants/vínculo/
+manutenção/lavagem/o gate novo) — roda contra produção porque criar branch de teste no Supabase
+exige uma confirmação de custo (`confirm_cost`) fora do alcance das ferramentas desta sessão.
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 

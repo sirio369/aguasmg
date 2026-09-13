@@ -1165,7 +1165,7 @@ const REL_CSS=`
 .relTop{background:#0a7d5e;color:#fff;padding:16px 30px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
 .relTop h1{font-size:18px;margin:0;line-height:1.2}
 .relTop .sub{color:#cdeee2;font-size:12px;margin-top:3px}
-.relBadge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;background:#fff}
+.relBadge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;background:#fff;color:#0a7d5e}
 .relBody{padding:16px 30px 0}
 .relSec{margin-top:18px;padding-bottom:5px;border-bottom:2px solid #0a7d5e;font-weight:700;color:#0a7d5e;font-size:12px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center}
 .relNum{display:inline-flex;width:19px;height:19px;border-radius:50%;background:#0a7d5e;color:#fff;font-size:11px;align-items:center;justify-content:center;margin-right:8px;flex:0 0 auto}
@@ -5196,6 +5196,24 @@ const CENTROS_CUSTO_FROTA=[
   ['05.001.001.002','PAVIMENTAÇÃO']
 ];
 const TIPO_PROBLEMA=[['pneu_furado','Pneu furado'],['freio','Freio'],['motor','Motor'],['eletrica','Elétrica'],['suspensao','Suspensão'],['bateria','Bateria'],['ar_condicionado','Ar-condicionado'],['vidro_retrovisor','Vidro/retrovisor'],['outro','Outro']];
+// Lookup genérico p/ listas [codigo,label] (TIPOS_VEICULO, TIPO_PROBLEMA, COMBUSTIVEIS_VEICULO,
+// CENTROS_CUSTO_FROTA...) — usado em vez de repetir `(LISTA.find(t=>t[0]===v)||[,v])[1]||'—'` em
+// cada tela; mesma semântica de antes (achou→label, não achou→valor cru, vazio→'—').
+function labelOf(list,value){ if(value==null||value==='') return '—'; const f=list.find(t=>t[0]===value); return f?f[1]:value; }
+const MANUT_STATUS_LABEL={
+  pendente:{l:'Aguardando aprovação',bg:'--warn-bg',fg:'--warn'},
+  aprovado:{l:'Aprovada — aguardando agendamento',bg:'--warn-bg',fg:'--warn'},
+  reprovado:{l:'Reprovada',bg:'--bad-bg',fg:'--bad'},
+  agendado:{l:'Agendada',bg:'--warn-bg',fg:'--warn'},
+  concluido:{l:'Concluída',bg:'--ok-bg',fg:'--ok'}
+};
+const LAVAGEM_STATUS_LABEL={
+  solicitada:{l:'Aguardando agendamento',bg:'--warn-bg',fg:'--warn'},
+  agendada:{l:'Agendada',bg:'--warn-bg',fg:'--warn'},
+  realizada:{l:'Realizada',bg:'--ok-bg',fg:'--ok'},
+  cancelada:{l:'Cancelada',bg:'--line',fg:'--mut'}
+};
+function statusBadge(map,status){ const st=map[status]||{l:status||'—',bg:'--line',fg:'--mut'}; return `<span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span>`; }
 function fmtData(d){ if(!d) return '—'; try{ const p=String(d).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }catch(e){ return d; } }
 function fmtDinheiro(v){ if(v==null) return '—'; return 'R$ '+(Math.round(+v*100)/100).toFixed(2).replace('.',','); }
 async function comprimirGeral(file){ return comprimir(file); }
@@ -5214,8 +5232,8 @@ function frotaBlocks(){
     {t:'Colaborador',ic:'👤',on:true,acts:[
       {id:'cnh',ic:'🪪',lbl:'Minha CNH'},
       {id:'veiculos_meu',ic:'🚗',lbl:'Veículos'},
-      {id:'situacao',ic:'✅',lbl:'Checklist diário',precisaVeic:true},
-      {id:'abastecimento',ic:'⛽',lbl:'Abastecimento',precisaVeic:true},
+      {id:'situacao',ic:'✅',lbl:'Checklist diário',precisaVeic:true,bloqueiaManutencao:true},
+      {id:'abastecimento',ic:'⛽',lbl:'Abastecimento',precisaVeic:true,bloqueiaManutencao:true},
       {id:'manutencao',ic:'🔧',lbl:'Manutenção',precisaVeic:true},
       {id:'lavagem',ic:'🧼',lbl:'Lavagem',precisaVeic:true}]},
     {t:'Gestor',ic:'🖊️',on:gestor,papel:'Aprovador',acts:[
@@ -5241,6 +5259,7 @@ function frotaHome(){
     blocks.filter(b=>b.on).map(b=>`<div class="sec" style="margin-top:16px">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
       b.acts.map(a=>{
         if(a.precisaVeic && !frotaMeuVeiculo) return `<button class="mod" disabled style="opacity:.4;cursor:not-allowed" title="Vincule-se a um veículo primeiro em Veículos"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
+        if(a.bloqueiaManutencao && frotaMeuVeiculo && frotaMeuVeiculo.status==='manutencao') return `<button class="mod" disabled style="opacity:.4;cursor:not-allowed" title="Veículo em manutenção no momento"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
         return `<button class="mod" data-fract="${a.id}"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
       }).join('')+
     '</div>').join('');
@@ -5317,7 +5336,7 @@ async function condRenderVeiculos(){
   if(condMeuVeiculo){
     const v=condMeuVeiculo;
     h+=`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">
-      <div style="display:flex;justify-content:space-between;gap:8px"><b>${v.placa}</b><span class="sub">${(TIPOS_VEICULO.find(t=>t[0]===v.tipo)||[,v.tipo])[1]||'—'}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:8px"><b>${v.placa}</b><span class="sub">${labelOf(TIPOS_VEICULO,v.tipo)}</span></div>
       <div class="sub" style="margin-top:2px">${v.modelo||''} · Km atual: ${v.km_atual||0}${v.ultima_lavagem_em?(' · Última lavagem: '+fmtData(v.ultima_lavagem_em)):''}</div>
       ${v.status==='manutencao'?'<div class="banner warn" style="margin-top:6px">🔧 Veículo em manutenção no momento.</div>':''}
       ${v.lavagem_atrasada?'<div class="banner warn" style="margin-top:6px">🧼 Sem lavagem há mais de 30 dias.</div>':''}
@@ -5339,7 +5358,7 @@ async function condRenderVeiculos(){
     try{
       const {data,error}=await sb.rpc('app_frota_veiculos_disponiveis'); if(error) throw error;
       const disp=data||[];
-      box.innerHTML = disp.length ? disp.map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px"><div><b>${v.placa}</b><div class="sub">${v.modelo||''} · ${(TIPOS_VEICULO.find(t=>t[0]===v.tipo)||[,v.tipo])[1]||'—'}</div></div><button class="btn" data-vincme="${v.id}" style="margin:0;width:auto;padding:8px 14px;font-size:13px">Vincular</button></div>`).join('') : '<p class="sub">Nenhum veículo disponível no momento.</p>';
+      box.innerHTML = disp.length ? disp.map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px"><div><b>${v.placa}</b><div class="sub">${v.modelo||''} · ${labelOf(TIPOS_VEICULO,v.tipo)}</div></div><button class="btn" data-vincme="${v.id}" style="margin:0;width:auto;padding:8px 14px;font-size:13px">Vincular</button></div>`).join('') : '<p class="sub">Nenhum veículo disponível no momento.</p>';
       box.querySelectorAll('[data-vincme]').forEach(b=>b.addEventListener('click',async()=>{
         try{ const {error}=await sb.rpc('app_frota_veiculo_vincular_me',{p_veiculo_id:+b.dataset.vincme}); if(error) throw error; toast('✓ Veículo vinculado'); condRender(); }
         catch(e){ toast('Erro: '+(e.message||e)); }
@@ -5474,7 +5493,6 @@ async function condRenderLavagem(){
     condMinhasLavagens=data||[];
   }catch(e){ $('#condView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   const v=condMeuVeiculo||{};
-  const LAV_STL={solicitada:'Aguardando agendamento',agendada:'Agendada',realizada:'Realizada',cancelada:'Cancelada'};
   const temAberta=condMinhasLavagens.some(l=>l.status==='solicitada'||l.status==='agendada');
   let h='<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🧼 Lavagem — '+(v.placa||'')+'</div>';
   h+=temAberta
@@ -5482,8 +5500,7 @@ async function condRenderLavagem(){
     : '<p class="sub" style="margin-top:2px">A equipe administrativa vai aprovar e te avisar a data, horário e local pra você levar o veículo.</p><button class="btn" id="lavfSalvar" style="margin-top:10px">Solicitar lavagem</button>';
   h+='<div class="sec" style="margin-top:16px">Histórico</div>';
   h+= condMinhasLavagens.length ? condMinhasLavagens.map(l=>{
-    const stl=LAV_STL[l.status]||l.status;
-    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${stl}</b><span class="sub">${fmtData(l.solicitado_em)}</span></div>${l.status==='agendada'?`<div class="sub" style="margin-top:2px">${fmtData(l.data_agendada)}${l.horario_agendado?(' às '+String(l.horario_agendado).slice(0,5)):''}${l.local_agendado?(' — '+l.local_agendado):''}</div><button class="btn ghost" data-lavrealizar="${l.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar execução</button>`:''}</div>`;
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px">${statusBadge(LAVAGEM_STATUS_LABEL,l.status)}<span class="sub">${fmtData(l.solicitado_em)}</span></div>${l.status==='agendada'?`<div class="sub" style="margin-top:2px">${fmtData(l.data_agendada)}${l.horario_agendado?(' às '+String(l.horario_agendado).slice(0,5)):''}${l.local_agendado?(' — '+l.local_agendado):''}</div><button class="btn ghost" data-lavrealizar="${l.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar execução</button>`:''}</div>`;
   }).join('') : '<p class="sub" style="margin-top:8px">Nenhuma lavagem ainda.</p>';
   $('#condView').innerHTML=h;
   $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
@@ -5520,7 +5537,6 @@ function condRenderLavagemRealizar(){
     }catch(e){ toast('Erro: '+(e.message||e)); }
   });
 }
-const MANUT_STATUS_LABEL={pendente:'Aguardando aprovação',aprovado:'Aprovada — aguardando agendamento',reprovado:'Reprovada',agendado:'Agendada',concluido:'Concluída'};
 async function condRenderManutencao(){
   $('#condView').innerHTML='<p class="sub">Carregando…</p>';
   try{
@@ -5534,13 +5550,12 @@ async function condRenderManutencao(){
   h+='<button class="btn" id="manfNovo" style="margin-top:10px">🔧 Reportar problema</button>';
   h+='<div class="sec" style="margin-top:16px">Histórico</div>';
   h+= condManutencoes.length ? condManutencoes.map(m=>{
-    const tipoLbl=(TIPO_PROBLEMA.find(t=>t[0]===m.tipo_problema)||[,m.tipo_problema])[1]||'—';
-    const stl=MANUT_STATUS_LABEL[m.status]||m.status;
+    const tipoLbl=labelOf(TIPO_PROBLEMA,m.tipo_problema);
     let extra='';
     if(m.status==='reprovado'&&m.motivo_reprovacao) extra=`<div class="sub" style="margin-top:2px">Motivo: ${m.motivo_reprovacao}</div>`;
     else if(m.status==='agendado') extra=`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button class="btn ghost" data-manutconcluir="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar conclusão</button>`;
     else if(m.status==='concluido') extra=`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>`;
-    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${tipoLbl}</b><span class="sub">${stl}</span></div>${m.servico_solicitado?`<div class="sub" style="margin-top:2px">${m.servico_solicitado}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">Reportado em ${fmtData(m.reportado_em)}</div>${extra}</div>`;
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${tipoLbl}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div>${m.servico_solicitado?`<div class="sub" style="margin-top:2px">${m.servico_solicitado}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">Reportado em ${fmtData(m.reportado_em)}</div>${extra}</div>`;
   }).join('') : '<p class="sub" style="margin-top:8px">Nenhuma manutenção ainda.</p>';
   $('#condView').innerHTML=h;
   $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
@@ -5549,7 +5564,7 @@ async function condRenderManutencao(){
 }
 function condRenderManutencaoConcluir(){
   const m=condManutencoes.find(x=>String(x.id)===String(condManutencaoSel))||{};
-  const tipoLbl=(TIPO_PROBLEMA.find(t=>t[0]===m.tipo_problema)||[,m.tipo_problema])[1]||'—';
+  const tipoLbl=labelOf(TIPO_PROBLEMA,m.tipo_problema);
   const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
   <div class="sec">🔧 Registrar conclusão — ${tipoLbl}</div>
   <p class="sub" style="margin-top:2px">Já foi buscar o veículo no mecânico? Confirme aqui pra liberar de vez.</p>
@@ -5595,7 +5610,10 @@ async function frotasRender(){
   catch(e){ frotasVeiculos=[]; }
   if(frotasSub==='veiculo_edit') return frotasRenderVeiculoEdit();
   if(frotasSub==='veiculo_detalhe') return frotasRenderVeiculoDetalhe();
+  if(frotasSub==='veiculo_devolver') return frotasRenderVeiculoDevolver();
   if(frotasSub==='manutencao_aprovar') return frotasRenderManutencaoAprovar();
+  if(frotasSub==='manutencao_reprovar') return frotasRenderManutencaoReprovar();
+  if(frotasSub==='manutencao_concluir_admin') return frotasRenderManutencaoConcluirAdmin();
   if(frotasSub==='condutores') return frotasRenderCondutores();
   if(frotasSub==='condutor_cadastro') return frotasRenderCondutorCadastro();
   if(frotasSub==='vinculo') return frotasRenderVinculo();
@@ -5634,7 +5652,7 @@ function frotasRenderHome(){
       return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px">${v.placa}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>
         <div class="sub" style="margin-top:3px">${v.modelo||''}${v.ano?(' '+v.ano):''} · Km ${v.km_atual||0}</div>
-        <div class="sub" style="margin-top:3px">${(TIPOS_VEICULO.find(t=>t[0]===v.tipo)||[,v.tipo])[1]||'—'}</div>
+        <div class="sub" style="margin-top:3px">${labelOf(TIPOS_VEICULO,v.tipo)}</div>
         <div class="sub" style="margin-top:3px">${vinc?('👤 '+vinc):'Sem colaborador vinculado'}${v.ultima_lavagem_em?(' · 🧼 '+fmtData(v.ultima_lavagem_em)):' · nunca lavado'}</div>
         <button class="btn ghost" data-frdet="${v.id}" style="margin-top:10px;padding:9px;font-size:13px">Ver detalhes</button>
       </div>`;
@@ -5654,9 +5672,9 @@ function frotasRenderVeiculoDetalhe(){
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1 style="margin:0">${v.placa}</h1><span style="font-size:12px;padding:4px 11px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>
   <p class="sub" style="margin-top:2px">${v.modelo||''}${v.ano?(' '+v.ano):''}</p>`;
   h+='<div class="sec" style="margin-top:14px">Identificação</div>';
-  h+=`<div class="sub">${(TIPOS_VEICULO.find(t=>t[0]===v.tipo)||[,v.tipo])[1]||'—'}</div>`;
-  h+=`<div class="sub" style="margin-top:2px">${(COMBUSTIVEIS_VEICULO.find(c=>c[0]===v.tipo_combustivel)||[,v.tipo_combustivel])[1]||'—'}${v.motorizacao?(' '+v.motorizacao):''} · ${v.consorcio||'sem consórcio'}</div>`;
-  h+=`<div class="sub" style="margin-top:2px">CC ${v.centro_custo?((CENTROS_CUSTO_FROTA.find(c=>c[0]===v.centro_custo)||[,v.centro_custo])[1]):'—'}</div>`;
+  h+=`<div class="sub">${labelOf(TIPOS_VEICULO,v.tipo)}</div>`;
+  h+=`<div class="sub" style="margin-top:2px">${labelOf(COMBUSTIVEIS_VEICULO,v.tipo_combustivel)}${v.motorizacao?(' '+v.motorizacao):''} · ${v.consorcio||'sem consórcio'}</div>`;
+  h+=`<div class="sub" style="margin-top:2px">CC ${labelOf(CENTROS_CUSTO_FROTA,v.centro_custo)}</div>`;
   h+=`<div class="sub" style="margin-top:2px">Km inicial ${v.km_inicial!=null?v.km_inicial:'—'} · Km atual ${v.km_atual||0}</div>`;
   h+='<div class="sec" style="margin-top:14px">Locação</div>';
   h+=`<div class="sub">Fornecedor ${v.fornecedor||'—'} · Contrato ${v.contrato_numero||'—'}</div>`;
@@ -5679,11 +5697,24 @@ function frotasRenderVeiculoDetalhe(){
   $('#frDetHistorico').addEventListener('click',()=>{frHistVeiculoSel=String(v.id);frHistCondutorSel=null;frHistBackTo='veiculo_detalhe';frotasSub='historico';frotasRender();});
   $('#frDetRelatorio').addEventListener('click',()=>frotasRelatorioVeiculo(v.id));
   $('#frDetGerenciarVinc').addEventListener('click',()=>{frotasVeiculoSel=String(v.id);frotasSub='vinculo';frotasRender();});
-  const dev=$('#frDetDevolver'); if(dev) dev.addEventListener('click',async()=>{
-    if(!confirm('Confirmar devolução à locadora hoje?')) return;
-    const vt=prompt('Valor de devolução (R$, opcional):'); const valorDev=(vt&&vt.trim())?parseFloat(vt.replace(',','.')):null;
-    try{ const {error}=await sb.rpc('app_frota_veiculo_devolver',{p_id:+v.id,p_data_fim_real:new Date().toISOString().slice(0,10),p_valor_devolucao:isNaN(valorDev)?null:valorDev}); if(error)throw error; toast('✓ Veículo devolvido'); frotasRender(); }
-    catch(e){ toast('Erro: '+(e.message||e)); }
+  const dev=$('#frDetDevolver'); if(dev) dev.addEventListener('click',()=>{frotasSub='veiculo_devolver';frotasRender();});
+}
+function frotasRenderVeiculoDevolver(){
+  const v=frotasVeiculos.find(x=>String(x.id)===String(frotasVeiculoSel))||{};
+  const h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">Devolver à locadora — ${v.placa||''}</div>
+  <p class="sub" style="margin-top:2px">Confirma a devolução hoje (${fmtData(new Date().toISOString().slice(0,10))})?</p>
+  <label>Valor de devolução (R$, opcional)</label><input id="devValor" inputmode="decimal"/>
+  <button class="btn" id="devConfirmar" style="margin-top:14px">Confirmar devolução</button>`;
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>{frotasSub='veiculo_detalhe';frotasRender();});
+  $('#devConfirmar').addEventListener('click',async()=>{
+    const vt=$('#devValor').value; const valorDev=vt?parseFloat(vt.replace(',','.')):null;
+    try{
+      const {error}=await sb.rpc('app_frota_veiculo_devolver',{p_id:+v.id,p_data_fim_real:new Date().toISOString().slice(0,10),p_valor_devolucao:isNaN(valorDev)?null:valorDev});
+      if(error) throw error;
+      toast('✓ Veículo devolvido'); frotasSub='veiculo_detalhe'; frotasRender();
+    }catch(e){ toast('Erro: '+(e.message||e)); }
   });
 }
 let frotasCondutores=[], frCondBusca='', frCondFiltro='todos', frCondSel=null;
@@ -5855,7 +5886,7 @@ async function frotasRenderHistorico(){
         else if(e.tipo==='emprestimo_recebido') desc='Recebeu '+(d.placa||'')+' de '+(d.de||'')+' ('+(d.status||'')+')';
         else if(e.tipo==='devolucao') desc='Devolução — '+(d.de||'')+' → '+(d.para||'');
         else if(e.tipo==='checklist') desc='Checklist ('+(d.status||'')+') por '+(d.por||'')+(d.km?(' · km '+d.km):'')+(d.avarias?(' · '+d.avarias):'');
-        else if(e.tipo==='manutencao_solicitada') desc='Problema reportado: '+(d.tipo||'')+' — '+(d.servico||'')+' por '+(d.por||'')+' ('+(d.status||'')+')';
+        else if(e.tipo==='manutencao_solicitada') desc='Problema reportado: '+labelOf(TIPO_PROBLEMA,d.tipo)+' — '+(d.servico||'')+' por '+(d.por||'')+' ('+(MANUT_STATUS_LABEL[d.status]||{l:d.status||''}).l+')';
         else desc=e.tipo;
         return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:6px"><div style="display:flex;gap:8px"><span>${HIST_ICON[e.tipo]||'•'}</span><span style="flex:1;font-size:13px">${desc}</span></div><div class="sub" style="margin-top:2px;font-size:11px">${relFmtData(e.ts)}</div></div>`;
       }).join('') : '<p class="sub">Nada encontrado no período.</p>';
@@ -5904,7 +5935,7 @@ async function frotasRenderManutencaoFila(){
   try{ const {data,error}=await sb.rpc('app_frota_manutencoes_agendar_fila'); if(error) throw error; fila=data||[]; }
   catch(e){ $('#frotasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔧 Manutenções a agendar</div>';
-  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${(TIPO_PROBLEMA.find(t=>t[0]===m.tipo_problema)||[,m.tipo_problema])[1]||'—'}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">Aprovada em ${fmtData(m.aprovado_em)} · solicitado por ${m.reportado_por||''}</div><button class="btn ghost" data-managendar="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Agendar</button></div>`).join('') : '<p class="sub">Nenhuma manutenção aprovada aguardando agendamento.</p>';
+  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">Aprovada em ${fmtData(m.aprovado_em)} · solicitado por ${m.reportado_por||''}</div><button class="btn ghost" data-managendar="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Agendar</button></div>`).join('') : '<p class="sub">Nenhuma manutenção aprovada aguardando agendamento.</p>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>{frotasSub='home';frotasRender();});
   $('#frotasView').querySelectorAll('[data-managendar]').forEach(b=>b.addEventListener('click',()=>{frManutSel=b.dataset.managendar;frotasSub='manutencao_agendar';frotasRender();}));
@@ -5940,11 +5971,11 @@ function frotasRenderPainel(){
     frotasSub='painel_'+k; frotasRender();
   }));
 }
-let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''};
+let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''}, frManutCluirSel=null;
 const PAINEL_CFG={
   abastecimentos:{rpc:'app_frota_abastecimentos_listar',titulo:'⛽ Abastecimentos',row:a=>`<b>${a.placa}</b><div class="sub" style="margin-top:2px">${a.condutor_nome||''} · ${fmtData(a.data)} · ${a.litros||0} L · ${fmtDinheiro(a.valor_total)}${a.consorcio?(' · '+a.consorcio):''}</div>`},
-  lavagens:{rpc:'app_frota_lavagens_listar',titulo:'🧼 Lavagens',row:l=>`<b>${l.placa}</b><div class="sub" style="margin-top:2px">${l.condutor_nome||''} · ${({solicitada:'Aguardando agendamento',agendada:'Agendada',realizada:'Realizada',cancelada:'Cancelada'})[l.status]||l.status}${l.data?(' · '+fmtData(l.data)):''}${l.valor!=null?(' · '+fmtDinheiro(l.valor)):''}${l.consorcio?(' · '+l.consorcio):''}</div>`},
-  manutencoes:{rpc:'app_frota_manutencoes_listar',titulo:'🔧 Manutenções',row:m=>`<b>${m.placa}</b><div class="sub" style="margin-top:2px">${(TIPO_PROBLEMA.find(t=>t[0]===m.tipo_problema)||[,m.tipo_problema])[1]||'—'}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">${m.status} · solicitado por ${m.reportado_por_nome||''} em ${fmtData(m.reportado_em)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>${m.aprovado_por_nome?`<div class="sub" style="margin-top:2px">${m.status==='reprovado'?'Reprovado':'Aprovado'} por ${m.aprovado_por_nome}${m.motivo_reprovacao?(' — '+m.motivo_reprovacao):''}</div>`:''}${m.status==='agendado'?`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button data-mancluir="${m.id}" class="btn ghost" style="margin-top:8px;padding:8px;font-size:13px">Marcar como concluída</button>`:''}${m.status==='concluido'?`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}</div>`:''}`},
+  lavagens:{rpc:'app_frota_lavagens_listar',titulo:'🧼 Lavagens',row:l=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${l.placa}</b>${statusBadge(LAVAGEM_STATUS_LABEL,l.status)}</div><div class="sub" style="margin-top:2px">${l.condutor_nome||''}${l.data?(' · '+fmtData(l.data)):''}${l.valor!=null?(' · '+fmtDinheiro(l.valor)):''}${l.consorcio?(' · '+l.consorcio):''}</div>`},
+  manutencoes:{rpc:'app_frota_manutencoes_listar',titulo:'🔧 Manutenções',row:m=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">solicitado por ${m.reportado_por_nome||''} em ${fmtData(m.reportado_em)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>${m.aprovado_por_nome?`<div class="sub" style="margin-top:2px">${m.status==='reprovado'?'Reprovado':'Aprovado'} por ${m.aprovado_por_nome}${m.motivo_reprovacao?(' — '+m.motivo_reprovacao):''}</div>`:''}${m.status==='agendado'?`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button data-mancluir="${m.id}" class="btn ghost" style="margin-top:8px;padding:8px;font-size:13px">Marcar como concluída</button>`:''}${m.status==='concluido'?`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}</div>`:''}`},
   custos:{rpc:'app_frota_custos_por_veiculo',titulo:'💰 Custos por veículo',row:c=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${c.placa}</b><b>${fmtDinheiro(c.custo_total)}</b></div><div class="sub" style="margin-top:2px">${c.modelo||''}</div><div class="sub" style="margin-top:6px">Abastecimento: ${fmtDinheiro(c.abastecimentos_total)} · Lavagem: ${fmtDinheiro(c.lavagens_total)} · Manutenção: ${fmtDinheiro(c.manutencoes_total)}${c.valor_devolucao!=null?(' · Devolução: '+fmtDinheiro(c.valor_devolucao)):''}</div>`}
 };
 async function frotasRenderPainelLista(tipo){
@@ -5974,21 +6005,30 @@ async function frotasRenderPainelLista(tipo){
       frotasPainelCache[tipo]=data||[];
       const lista=frotasPainelCache[tipo];
       $('#pnlLista').innerHTML = lista.length ? lista.map(x=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">${CFG.row(x)}</div>`).join('') : '<p class="sub">Nada encontrado.</p>';
-      $('#pnlLista').querySelectorAll('[data-mancluir]').forEach(b=>b.addEventListener('click',async()=>{
-        const dt=prompt('Data de liberação do veículo (AAAA-MM-DD):', new Date().toISOString().slice(0,10));
-        if(!dt) return;
-        const ct=prompt('Custo final (R$, opcional):');
-        const custo=(ct&&ct.trim())?parseFloat(ct.replace(',','.')):null;
-        try{
-          const {error}=await sb.rpc('app_frota_manutencao_concluir',{p_id:+b.dataset.mancluir,p_data_liberacao:dt,p_fotos_conclusao:null,p_orcamento_valor:isNaN(custo)?null:custo});
-          if(error) throw error;
-          toast('✓ Manutenção concluída'); carregar();
-        }catch(e){ toast('Erro: '+(e.message||e)); }
-      }));
+      $('#pnlLista').querySelectorAll('[data-mancluir]').forEach(b=>b.addEventListener('click',()=>{ frManutCluirSel=b.dataset.mancluir; frotasSub='manutencao_concluir_admin'; frotasRender(); }));
     }catch(e){ $('#pnlLista').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
   };
   const bb=$('#pnlBuscar'); if(bb) bb.addEventListener('click',carregar);
   carregar();
+}
+function frotasRenderManutencaoConcluirAdmin(){
+  const h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">🔧 Marcar como concluída</div>
+  <p class="sub" style="margin-top:2px">Reforço/exceção — normalmente é o próprio colaborador quem dá baixa.</p>
+  <label>Data de liberação *</label><input id="admManData" type="date" value="${new Date().toISOString().slice(0,10)}"/>
+  <label>Custo final (R$)</label><input id="admManCusto" inputmode="decimal"/>
+  <button class="btn" id="admManConfirmar" style="margin-top:14px">Confirmar conclusão</button>`;
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>{frotasSub='painel_manutencoes';frotasRender();});
+  $('#admManConfirmar').addEventListener('click',async()=>{
+    const dt=$('#admManData').value; if(!dt) return toast('Informe a data');
+    const ct=$('#admManCusto').value; const custo=ct?parseFloat(ct.replace(',','.')):null;
+    try{
+      const {error}=await sb.rpc('app_frota_manutencao_concluir',{p_id:+frManutCluirSel,p_data_liberacao:dt,p_fotos_conclusao:null,p_orcamento_valor:isNaN(custo)?null:custo});
+      if(error) throw error;
+      toast('✓ Manutenção concluída'); frotasSub='painel_manutencoes'; frotasRender();
+    }catch(e){ toast('Erro: '+(e.message||e)); }
+  });
 }
 async function frotasManutAprovar(id,aprovado,motivo){
   try{ const {error}=await sb.rpc('app_frota_manutencao_aprovar',{p_id:+id,p_aprovado:aprovado,p_motivo:motivo||null}); if(error)throw error; toast(aprovado?'✓ Orçamento aprovado':'Orçamento reprovado'); frotasRender(); }
@@ -6000,11 +6040,25 @@ async function frotasRenderManutencaoAprovar(){
   try{ const {data,error}=await sb.rpc('app_frota_manutencao_pendentes'); if(error) throw error; fila=data||[]; }
   catch(e){ $('#frotasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔧 Aprovar manutenções</div>';
-  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${(TIPO_PROBLEMA.find(t=>t[0]===m.tipo_problema)||[,m.tipo_problema])[1]||'—'}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div>${(m.fotos_antes&&m.fotos_antes.length)?`<div class="sub" style="margin-top:2px"><a href="${SBASE+m.fotos_antes[0]}" target="_blank" rel="noopener">Ver foto</a></div>`:''}<div class="sub" style="margin-top:2px">Solicitado por ${m.reportado_por||''} em ${fmtData(m.reportado_em)}</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-manap="${m.id}" style="margin:0;flex:1;padding:9px">Aprovar</button><button data-manrep="${m.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--bad);color:var(--bad)">Reprovar</button></div></div>`).join('') : '<p class="sub">Nenhuma manutenção pendente de aprovação.</p>';
+  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div>${(m.fotos_antes&&m.fotos_antes.length)?`<div class="sub" style="margin-top:2px"><a href="${SBASE+m.fotos_antes[0]}" target="_blank" rel="noopener">Ver foto</a></div>`:''}<div class="sub" style="margin-top:2px">Solicitado por ${m.reportado_por||''} em ${fmtData(m.reportado_em)}</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-manap="${m.id}" style="margin:0;flex:1;padding:9px">Aprovar</button><button data-manrep="${m.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--bad);color:var(--bad)">Reprovar</button></div></div>`).join('') : '<p class="sub">Nenhuma manutenção pendente de aprovação.</p>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#frotasView').querySelectorAll('[data-manap]').forEach(b=>b.addEventListener('click',()=>frotasManutAprovar(b.dataset.manap,true)));
-  $('#frotasView').querySelectorAll('[data-manrep]').forEach(b=>b.addEventListener('click',()=>{ const mo=prompt('Motivo da reprovação (opcional):')||null; frotasManutAprovar(b.dataset.manrep,false,mo); }));
+  $('#frotasView').querySelectorAll('[data-manrep]').forEach(b=>b.addEventListener('click',()=>{ frManutRepSel=b.dataset.manrep; frotasSub='manutencao_reprovar'; frotasRender(); }));
+}
+let frManutRepSel=null;
+function frotasRenderManutencaoReprovar(){
+  const h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">🔧 Reprovar manutenção</div>
+  <label>Motivo (opcional)</label><textarea id="manrepMotivo" rows="3" placeholder="Por que está sendo reprovada?"></textarea>
+  <button class="btn" id="manrepConfirmar" style="margin-top:14px;background:var(--bad)">Confirmar reprovação</button>`;
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>{frotasSub='manutencao_aprovar';frotasRender();});
+  $('#manrepConfirmar').addEventListener('click',()=>{
+    const mo=$('#manrepMotivo').value.trim()||null;
+    frotasSub='manutencao_aprovar';
+    frotasManutAprovar(frManutRepSel,false,mo);
+  });
 }
 async function frotasRelatorioVeiculo(veiculoId){
   let r;
@@ -6019,14 +6073,15 @@ async function frotasRelatorioVeiculo(veiculoId){
   document.getElementById('relPrint').onclick=()=>window.print();
 }
 function frotasRelatorioHtml(r){
-  const tipoLbl=(TIPOS_VEICULO.find(t=>t[0]===r.tipo)||[,r.tipo])[1]||'—';
-  const combLbl=(COMBUSTIVEIS_VEICULO.find(c=>c[0]===r.tipo_combustivel)||[,r.tipo_combustivel])[1]||'—';
-  let h='<div class="relTop"><div><h1>Relatório do Veículo — '+(r.placa||'')+'</h1><div class="sub">'+(r.modelo||'')+' · '+(r.consorcio||'—')+'</div></div><div class="relBadge">'+(r.status||'')+'</div></div>';
+  const tipoLbl=labelOf(TIPOS_VEICULO,r.tipo);
+  const combLbl=labelOf(COMBUSTIVEIS_VEICULO,r.tipo_combustivel);
+  const statusLbl=(STATUS_VEICULO_LABEL[r.status]||{l:r.status||'—'}).l;
+  let h='<div class="relTop"><div><h1>Relatório do Veículo — '+(r.placa||'')+'</h1><div class="sub">'+(r.modelo||'')+' · '+(r.consorcio||'—')+'</div></div><div class="relBadge">'+statusLbl+'</div></div>';
   h+='<div class="relBody">';
   h+='<div class="relSec"><span class="relNum">1</span> Identificação</div>';
   h+='<div class="relGrid">'+relField('Placa',r.placa)+relField('Modelo',r.modelo)+relField('Tipo',tipoLbl)+relField('Ano',r.ano)+'</div>';
   h+='<div class="relGrid" style="margin-top:10px">'+relField('Cor',r.cor)+relField('Chassi',r.chassi)+relField('Renavam',r.renavam)+relField('Combustível',combLbl+(r.motorizacao?(' '+r.motorizacao):''))+'</div>';
-  h+='<div class="relGrid" style="margin-top:10px">'+relField('Centro de custo',r.centro_custo?((CENTROS_CUSTO_FROTA.find(c=>c[0]===r.centro_custo)||[,r.centro_custo])[1]+' ('+r.centro_custo+')'):'—')+relField('Consórcio',r.consorcio)+relField('Emitido em',relFmtData(r.gerado_em))+'</div>';
+  h+='<div class="relGrid" style="margin-top:10px">'+relField('Centro de custo',r.centro_custo?(labelOf(CENTROS_CUSTO_FROTA,r.centro_custo)+' ('+r.centro_custo+')'):'—')+relField('Consórcio',r.consorcio)+relField('Emitido em',relFmtData(r.gerado_em))+'</div>';
   h+='<div class="relSec"><span class="relNum">2</span> Locação</div>';
   h+='<div class="relGrid">'+relField('Fornecedor',r.fornecedor)+relField('Contrato',r.contrato_numero)+relField('Início',fmtData(r.data_inicio))+relField('Fim previsto',fmtData(r.data_fim_prevista))+'</div>';
   h+='<div class="relGrid" style="margin-top:10px">'+relField('Devolvido em',r.data_fim_real?fmtData(r.data_fim_real):'—')+relField('Valor de devolução',r.valor_devolucao!=null?fmtDinheiro(r.valor_devolucao):'—')+'</div>';
