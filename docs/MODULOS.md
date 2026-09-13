@@ -634,7 +634,10 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     veículos nem lavagens, ver §6.1) · **Veículos** (vincular/desvincular a si mesmo, self-service,
     §6.1) · Checklist diário · Abastecimento · **Manutenção** · **Lavagem** — **estes últimos 4
     ficam desabilitados** (`disabled`, opacidade reduzida) **enquanto `frotaMeuVeiculo` é `null`**
-    (colaborador sem veículo vinculado não tem o que fazer neles). Os botões de Manutenção/Lavagem
+    (colaborador sem veículo vinculado não tem o que fazer neles). **Checklist diário e Abastecimento
+    também desabilitam (6ª rodada) se `frotaMeuVeiculo.status==='manutencao'`** — flag
+    `bloqueiaManutencao:true` no item; Manutenção e Lavagem continuam liberados nesse caso (ver §6.1
+    "Cuidados" sobre o gate real ficar na RPC, não só aqui). Os botões de Manutenção/Lavagem
     **renomeados na 5ª rodada** (eram "Registrar problema (manutenção)"/"Solicitar lavagem" —
     ficaram genéricos porque agora abrem uma tela de histórico + ação, não só um formulário avulso,
     ver §6.1). **"Emprestar" não existe mais como ação própria.**
@@ -789,10 +792,13 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     `app_frota_manutencao_solicitar` e `app_frota_lavagem_solicitar`) — **simplificada nesta rodada**
     pra checar só **vínculo aberto** (`frota_veiculo_vinculo`, `desvinculado_em is null`); a
     cláusula de empréstimo-ativo foi removida (empréstimo não existe mais como mecanismo separado,
-    ver "Vincular/desvincular" abaixo). Checklist continua **sem** essa checagem no backend (só o
-    frontend já auto-seleciona `condMeuVeiculo`). `app_frota_manutencao_solicitar`/
+    ver "Vincular/desvincular" abaixo). Checklist continua **sem checagem de vínculo** no backend (só
+    o frontend já auto-seleciona `condMeuVeiculo`). `app_frota_manutencao_solicitar`/
     `app_frota_lavagem_solicitar` também aceitam `funcao in ('frotas','admin')` **sem** precisar de
-    vínculo (Frotas solicita em qualquer um).
+    vínculo (Frotas solicita em qualquer um). **Checklist e abastecimento passaram a recusar se
+    `frota_veiculo.status='manutencao'` (6ª rodada)** — o veículo não está fisicamente com o
+    colaborador nesse estado; o hub também desabilita os 2 botões nesse caso (ver §6.0), mas quem
+    garante de verdade é a RPC (deep-link de notificação passa por cima do botão desabilitado).
 - **Vincular/desvincular — self-service, substitui empréstimo (reformulado 2026-09, 3ª rodada):**
   tela **Veículos** do Colaborador (`condRenderVeiculos`, `condSub='veiculos'`). **Um veículo só
   pode ter um vínculo aberto por vez, e uma pessoa só pode estar vinculada a um veículo por vez**
@@ -859,13 +865,16 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   - `consorcio` continua **obrigatório** (`ZA1004`/`ZA0200`, validado na RPC e no banco).
   - **`p_fotos` (até 3, `fvfFoto1/2/3` + `wireFotoPick`) e `p_km_inicial`** — sem mudança: `fotos` é
     `coalesce`ado na edição (substitui todas se enviar algo novo); `km_inicial` só gravado na
-    criação. Devolução à locadora (`app_frota_veiculo_devolver`) sem mudança.
+    criação. **Devolução à locadora virou tela própria** (`frotasRenderVeiculoDevolver`,
+    `frotasSub='veiculo_devolver'`, 6ª rodada — antes era `confirm()`+`prompt()` nativos); RPC
+    `app_frota_veiculo_devolver` sem mudança.
 - **Detalhe do veículo** (`frotasRenderVeiculoDetalhe`, `frotasSub='veiculo_detalhe'`, **novo
   2026-09, 3ª rodada** — abre a partir do botão "Ver detalhes" da lista): identificação/locação/km +
   seção **Vínculo** (mostra quem está vinculado, se alguém, com botão pra gerenciar) + botões
   **Editar** (`veiculo_edit`, mesma tela de sempre), **Histórico** (pré-preenchido com este veículo,
   `frHistBackTo='veiculo_detalhe'` pra o "‹ Voltar" saber pra onde retornar), **Relatório** (mesmo
-  overlay de sempre) e **Devolver à locadora** (se ainda não devolvido). É o único lugar de onde se
+  overlay de sempre) e **Devolver à locadora** (se ainda não devolvido — tela própria desde a 6ª
+  rodada, ver abaixo). É o único lugar de onde se
   chega em "Vincular/desvincular" agora — não tem mais atalho direto no card da lista.
 - **Vincular/desvincular — visão admin** (`frotasRenderVinculo`, alcançável só pelo Detalhe do
   veículo acima): **desde o self-service de §6.1, é principalmente um mecanismo de exceção** (o
@@ -904,8 +913,10 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   própria do **Gestor** — **corrigido 2026-09, 3ª rodada**: o botão do hub e o link de notificação
   `frota_manutencao_aprovar` caíam os dois, por bug, na tela de Veículos, sem fila de aprovação
   nenhuma visível) → `app_frota_manutencao_pendentes()` (já existia, só não tinha tela própria
-  ligada) lista `status='pendente'`, aprovar/reprovar via `app_frota_manutencao_aprovar(p_id,
-  p_aprovado,p_motivo)` (RPC sem mudança).
+  ligada) lista `status='pendente'`, aprovar direto ou **reprovar via tela própria**
+  (`frotasRenderManutencaoReprovar`, `frotasSub='manutencao_reprovar'`, 6ª rodada — antes o motivo
+  vinha de `prompt()` nativo) → `app_frota_manutencao_aprovar(p_id,p_aprovado,p_motivo)` (RPC sem
+  mudança).
 - **Manutenções a agendar** (`frotasRenderManutencaoFila` → `app_frota_manutencoes_agendar_fila()`,
   lista `status='aprovado'`) → **Agendar** (`frotasRenderManutencaoAgendar` →
   `app_frota_manutencao_agendar(p_id,p_data_agendada)`, **só data — sem custo (5ª rodada)**: o
@@ -917,7 +928,8 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   manutenção" já existia em `STATUS_VEICULO_LABEL` só que nunca era escrito por nenhuma RPC).
   **Concluir agora é principalmente o colaborador** (ver §6.1 "dar baixa") — `frotasSub='painel_
   manutencoes'` mantém um botão "Marcar como concluída" como **reforço/exceção pra Frotas**
-  (`data-mancluir`, 2 `prompt()` sequenciais — data e custo — chamando a mesma
+  (`data-mancluir` → tela própria `frotasRenderManutencaoConcluirAdmin`, `frotasSub='manutencao_
+  concluir_admin'`, 6ª rodada — antes eram 2 `prompt()` sequenciais, data e custo — chamando a mesma
   `app_frota_manutencao_concluir` com `p_orcamento_valor`). `app_frota_manutencao_concluir` ganhou
   esse 4º parâmetro (`p_orcamento_valor numeric default null`) e a permissão foi ampliada pra aceitar
   `v_id=reportado_por` **além de** `funcao in ('frotas','admin')`. Ao concluir, restaura
@@ -957,8 +969,11 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   acima; manter `agendado` no filtro não somava nada a mais, só confundia) + `valor_devolucao` do
   próprio veículo. `custo_total` é a soma de tudo. Read-only.
 - **Estado:** `frotasSub, frotasVeiculoSel, frVeicFiltroTipo, frVeicFiltroCond, frHistVeiculoSel,
-  frHistCondutorSel, frHistBackTo, frLavagemSel, frManutSel, frotasCondutores, frCondBusca,
-  frCondFiltro, frCondSel, frotasPainelCache, frPnlFiltro`. **`frotasCondutores` virou compartilhado
+  frHistCondutorSel, frHistBackTo, frLavagemSel, frManutSel, frManutRepSel, frManutCluirSel,
+  frotasCondutores, frCondBusca, frCondFiltro, frCondSel, frotasPainelCache, frPnlFiltro`.
+  **`frManutRepSel`/`frManutCluirSel` são novos (6ª rodada)** — guardam o id da manutenção entre a
+  lista e a tela de Reprovar/Marcar-como-concluída, mesmo papel que `frLavagemSel`/`frManutSel` já
+  faziam pra Agendar. **`frotasCondutores` virou compartilhado
   entre 4 telas (4ª rodada)** — Condutores (busca/cadastro, uso original), Vincular/desvincular,
   Histórico e Relatório (filtro por colaborador) todas chamam `frotasCarregarColaboradores()`
   (wrapper de `app_frota_usuarios_completo`) pra popular a mesma variável antes de montar seu
@@ -1077,6 +1092,54 @@ real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (g
   direção", "nao autenticado" → "não autenticado"). Puramente textual — nenhuma lógica/assinatura
   mudou. **Cuidado ao adicionar mensagem nova:** escrever com acentuação correta desde o início (não
   repetir o problema).
+- **`.relBadge` (badge de status nos relatórios em PDF/overlay, `REL_CSS`) não tinha `color` próprio
+  — herdava branco de `.relTop` e ficava branco-em-branco (2026-09, 6ª rodada):** achado no Relatório
+  do Veículo (§6.2), mas o mesmo `.relBadge` é reaproveitado por Loggers, VRP e pelos termos de
+  responsabilidade — a badge só ficava legível quando algo mais dava um `color` explícito (inline nos
+  reports de Logger/Suprimentos, ou via `.termoWrap.pend .relBadge{color:...}` nos termos, só pro
+  estado "pendente"). Faltava um **default**: qualquer badge sem override específico (Relatório do
+  Veículo, Relatório de Visita · VRP, e o termo no estado "assinado/ok") ficava invisível. Corrigido
+  com `color:#0a7d5e` na regra base de `.relBadge` — os overrides existentes continuam funcionando
+  (maior especificidade/inline sempre vence). **Junto veio outro bug**: o badge do Relatório do
+  Veículo mostrava `r.status` cru ("em_uso") — agora passa por `STATUS_VEICULO_LABEL` como em toda
+  outra tela.
+- **Rótulos amigáveis centralizados (2026-09, 6ª rodada)** — `labelOf(lista, valor)` substitui a
+  repetição de `(LISTA.find(t=>t[0]===v)||[,v])[1]||'—'` em ~10 pontos (`TIPOS_VEICULO`,
+  `TIPO_PROBLEMA`, `COMBUSTIVEIS_VEICULO`, `CENTROS_CUSTO_FROTA`); `statusBadge(mapa, status)` gera
+  o mesmo pill colorido do card de veículo (`background/color: var(--xx-bg)/var(--xx)`) a partir de
+  `MANUT_STATUS_LABEL`/`LAVAGEM_STATUS_LABEL` (agora no formato `{l,bg,fg}`, igual
+  `STATUS_VEICULO_LABEL`/`FRCOND_STATUS_LABEL` — antes eram mapas `status→string`, sem cor). Isso
+  corrigiu dois bugs reais: o Histórico (`frotasRenderHistorico`) e a lista de Manutenções do
+  Relatório mostravam `tipo_problema`/`status` **crus** do banco ("motor", "concluido") porque a
+  descrição ali nunca tinha passado por lookup nenhum — não era só falta de cor, faltava o rótulo.
+  **Cuidado ao adicionar um novo tipo/status em Frota:** se não usar `labelOf`/`statusBadge`, o bug
+  volta a se espalhar.
+- **`prompt()`/`confirm()` nativos trocados por tela própria em 3 fluxos (2026-09, 6ª rodada):**
+  Reprovar manutenção (`frotasRenderManutencaoReprovar`, motivo em textarea),
+  Devolver à locadora (`frotasRenderVeiculoDevolver`, valor em input) e "Marcar como concluída" do
+  admin em Relatório › Manutenções (`frotasRenderManutencaoConcluirAdmin`, data+custo em inputs).
+  Motivo duplo: diálogo nativo destoa do resto do app **e** não dá pra automatizar em teste de
+  navegador (`window.prompt` levanta "not supported" em ambiente de automação — foi assim que a
+  limitação foi descoberta, numa rodada de QA manual). Outros `confirm()` simples de Frota
+  (desvincular veículo/colaborador) **não** foram trocados — só os 3 fluxos que pediam texto/número
+  livre, que são os que a automação não conseguia completar.
+- **Checklist e abastecimento recusados com o veículo em `manutencao` (2026-09, 6ª rodada):**
+  `app_frota_situacao_salvar`/`app_frota_abastecimento_salvar` agora checam
+  `frota_veiculo.status` antes de gravar — se `='manutencao'`, recusa (o veículo não está fisicamente
+  com o colaborador). O hub (`frotaBlocks`/`frotaHome`) também desabilita os 2 botões nesse caso
+  (`bloqueiaManutencao:true` nos itens do array) — front é só UX, quem garante é a RPC. **Lavagem e
+  Manutenção continuam liberados** mesmo com o veículo em manutenção (reportar um 2º problema, ou
+  acompanhar/solicitar lavagem, fazem sentido independente de onde o veículo está fisicamente).
+- **`qa/smoke_test_frota.sql` (novo, 6ª rodada):** 6 blocos `do $$ ... end $$` com rollback garantido
+  (sempre termina em `raise exception 'ROLLBACK_OK...'`), cobrindo overloads órfãos, grants, vínculo/
+  desvínculo (+ status do veículo), ciclo completo de manutenção (com o teste de permissão do
+  reportante × terceiro), o bloqueio de checklist/abastecimento em manutenção, e o ciclo completo de
+  lavagem. Rode depois de qualquer mudança nas RPCs de Frota. **Roda contra produção**, não contra
+  uma branch isolada — tentei criar uma branch de teste no Supabase (`create_branch`), mas a
+  ferramenta exige um `confirm_cost_id` de uma chamada `confirm_cost` que não está disponível nas
+  ferramentas desta sessão (branch tem custo real, exige confirmação própria). É seguro rodar contra
+  produção só porque cada bloco é 100% rollback — não é o ideal a longo prazo; se um dia branch
+  virar viável, apontar o script pra lá em vez de produção.
 
 ## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin
