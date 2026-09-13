@@ -5274,7 +5274,7 @@ function frotaOpen(id){
   if(id==='condutores'||id==='lavagem_fila'||id==='manutencao_fila'){ frotasTarget=id; irPara('frotas'); return; }
 }
 
-let condSub='home', condData=null, condMeuVeiculo=null, condMinhasLavagens=[], condManutencoes=[], condManutencaoSel=null, condTarget=null, frotasTarget=null;
+let condSub='home', condData=null, condMeuVeiculo=null, condMinhasLavagens=[], condManutencoes=[], condManutencaoSel=null, condOcorrenciaBackTo='manutencao', condTarget=null, frotasTarget=null;
 function condSetBar(){ const bar=$('#condBar'); if(bar) bar.classList.toggle('hidden', condSub!=='home'); }
 function frotasSetBar(){ const bar=$('#frotasBar'); if(bar) bar.classList.toggle('hidden', frotasSub!=='home'); }
 async function condInit(){
@@ -5347,7 +5347,7 @@ async function condRenderVeiculos(){
     h+='<div id="condVeicDisp" style="margin-top:8px"><p class="sub">Carregando…</p></div>';
   }
   $('#condView').innerHTML=h;
-  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
+  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
   const bd=$('#condDesvincular'); if(bd) bd.addEventListener('click',async()=>{
     if(!confirm('Desvincular este veículo? Ele ficará disponível para outra pessoa.')) return;
     try{ const {error}=await sb.rpc('app_frota_veiculo_desvincular_me'); if(error) throw error; toast('✓ Veículo desvinculado'); condSub='veiculos'; condRender(); }
@@ -5407,9 +5407,9 @@ function condRenderSituacao(){
   <button class="btn" id="sitfSalvar" style="margin-top:14px">Salvar checklist</button>
   <button class="btn ghost" id="sitfProblema" style="margin-top:8px">🔧 Encontrou um problema? Registrar</button>`;
   $('#condView').innerHTML=h; wireFotoPick($('#condView'));
-  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
+  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
   $('#sitfSalvar').addEventListener('click',condSalvarSituacao);
-  $('#sitfProblema').addEventListener('click',()=>{condSub='ocorrencia';condRender();});
+  $('#sitfProblema').addEventListener('click',()=>{condOcorrenciaBackTo='situacao';condSub='ocorrencia';condRender();});
 }
 async function condSalvarSituacao(){
   const v=condMeuVeiculo;
@@ -5440,7 +5440,7 @@ function condRenderAbastecimento(){
   ${fotoPickHtml('abafFoto','Foto da nota fiscal')}
   <button class="btn" id="abafSalvar" style="margin-top:14px">Salvar abastecimento</button>`;
   $('#condView').innerHTML=h; wireFotoPick($('#condView'));
-  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
+  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
   $('#abafSalvar').addEventListener('click',condSalvarAbastecimento);
 }
 async function condSalvarAbastecimento(){
@@ -5471,7 +5471,7 @@ function condRenderOcorrencia(){
   ${fotoPickHtml('cocfFoto','Foto do problema *')}
   <button class="btn" id="cocfSalvar" style="margin-top:14px">Enviar solicitação de manutenção</button>`;
   $('#condView').innerHTML=h; wireFotoPick($('#condView'));
-  $('#condVoltar').addEventListener('click',()=>{condSub='manutencao';condRender();});
+  $('#condVoltar').addEventListener('click',()=>{condSub=condOcorrenciaBackTo;condRender();});
   $('#cocfSalvar').addEventListener('click',async()=>{
     const v=condMeuVeiculo; if(!v) return toast('Você não tem veículo vinculado');
     if(!FOTO2_BLOBS['cocfFoto']) return toast('A foto do problema é obrigatória');
@@ -5503,7 +5503,7 @@ async function condRenderLavagem(){
     return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px">${statusBadge(LAVAGEM_STATUS_LABEL,l.status)}<span class="sub">${fmtData(l.solicitado_em)}</span></div>${l.status==='agendada'?`<div class="sub" style="margin-top:2px">${fmtData(l.data_agendada)}${l.horario_agendado?(' às '+String(l.horario_agendado).slice(0,5)):''}${l.local_agendado?(' — '+l.local_agendado):''}</div><button class="btn ghost" data-lavrealizar="${l.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar execução</button>`:''}</div>`;
   }).join('') : '<p class="sub" style="margin-top:8px">Nenhuma lavagem ainda.</p>';
   $('#condView').innerHTML=h;
-  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
+  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
   $('#condView').querySelectorAll('[data-lavrealizar]').forEach(b=>b.addEventListener('click',()=>{ condLavagemSel=b.dataset.lavrealizar; condSub='lavagem_realizar'; condRender(); }));
   const bs=$('#lavfSalvar'); if(bs) bs.addEventListener('click',async()=>{
     const v=condMeuVeiculo; if(!v) return toast('Você não tem veículo vinculado');
@@ -5558,8 +5558,8 @@ async function condRenderManutencao(){
     return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${tipoLbl}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div>${m.servico_solicitado?`<div class="sub" style="margin-top:2px">${m.servico_solicitado}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">Reportado em ${fmtData(m.reportado_em)}</div>${extra}</div>`;
   }).join('') : '<p class="sub" style="margin-top:8px">Nenhuma manutenção ainda.</p>';
   $('#condView').innerHTML=h;
-  $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
-  $('#manfNovo').addEventListener('click',()=>{condSub='ocorrencia';condRender();});
+  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#manfNovo').addEventListener('click',()=>{condOcorrenciaBackTo='manutencao';condSub='ocorrencia';condRender();});
   $('#condView').querySelectorAll('[data-manutconcluir]').forEach(b=>b.addEventListener('click',()=>{ condManutencaoSel=b.dataset.manutconcluir; condSub='manutencao_concluir'; condRender(); }));
 }
 function condRenderManutencaoConcluir(){
@@ -5763,7 +5763,7 @@ async function frotasRenderCondutores(){
     $('#frCondLista').querySelectorAll('.frCondRow').forEach(el=>el.addEventListener('click',()=>{ frCondSel=el.dataset.uid; frotasSub='condutor_cadastro'; frotasRender(); }));
   };
   renderLista();
-  $('#frVoltar').addEventListener('click',()=>{frotasSub='home';frotasRender();});
+  $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#frCondBusca').addEventListener('input',e=>{ frCondBusca=e.target.value; renderLista(); });
   $('#frotasView').querySelectorAll('.frCondChip').forEach(b=>b.addEventListener('click',()=>{ frCondFiltro=b.dataset.f; frotasRenderCondutores(); }));
 }
@@ -5904,7 +5904,7 @@ async function frotasRenderLavagemFila(){
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🧼 Lavagens a agendar</div>';
   h+= fila.length ? fila.map(l=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${l.placa}</b><div class="sub" style="margin-top:2px">Solicitado por ${l.condutor||''} em ${fmtData(l.solicitado_em)}</div><button class="btn ghost" data-lavagendar="${l.id}" style="margin-top:8px;padding:8px;font-size:13px">Agendar</button></div>`).join('') : '<p class="sub">Nenhuma lavagem pendente de agendamento.</p>';
   $('#frotasView').innerHTML=h;
-  $('#frVoltar').addEventListener('click',()=>{frotasSub='home';frotasRender();});
+  $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#frotasView').querySelectorAll('[data-lavagendar]').forEach(b=>b.addEventListener('click',()=>{frLavagemSel=b.dataset.lavagendar;frotasSub='lavagem_agendar';frotasRender();}));
 }
 function frotasRenderLavagemAgendar(){
@@ -5937,7 +5937,7 @@ async function frotasRenderManutencaoFila(){
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔧 Manutenções a agendar</div>';
   h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">Aprovada em ${fmtData(m.aprovado_em)} · solicitado por ${m.reportado_por||''}</div><button class="btn ghost" data-managendar="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Agendar</button></div>`).join('') : '<p class="sub">Nenhuma manutenção aprovada aguardando agendamento.</p>';
   $('#frotasView').innerHTML=h;
-  $('#frVoltar').addEventListener('click',()=>{frotasSub='home';frotasRender();});
+  $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#frotasView').querySelectorAll('[data-managendar]').forEach(b=>b.addEventListener('click',()=>{frManutSel=b.dataset.managendar;frotasSub='manutencao_agendar';frotasRender();}));
 }
 function frotasRenderManutencaoAgendar(){
