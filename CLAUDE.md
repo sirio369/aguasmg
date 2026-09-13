@@ -277,26 +277,39 @@ só, em vez de 5 botões no card. **Colaborador**, no seu módulo: CNH (só dado
 veículo nenhum), **Veículos** (self-service acima), **checklist diário** (layout em cartão, lembrete
 automático 7:30 da manhã pra quem tem vínculo ativo + CNH ativa, `pg_cron` +
 `frota_checklist_lembrete_diario`), abastecimento (combustível agora é só Etanol/Diesel/Arla, sem
-campo "posto"), **registrar problema** (substitui "ocorrência" — tipo mecânico + descrição + **foto
-obrigatória**, sem valor, sempre vira uma manutenção pendente), **solicitar lavagem** — estes 4
-últimos ficam **desabilitados no hub** enquanto o colaborador não tiver veículo vinculado. **Lavagem**
-tem ciclo próprio: colaborador solicita → Frotas agenda (data/horário/local, notifica) → colaborador
-confirma execução (`frota_lavagem`, status `solicitada→agendada→realizada`). **Manutenção** também:
-colaborador solicita (sem valor) → **gestor aprova/reprova numa tela própria** (`app_frota_
-manutencao_pendentes`/`_aprovar` — corrigido nesta rodada: o botão do hub caía, por bug, na tela de
-Veículos) → Frotas agenda **com o custo** → conclui (`frota_manutencao`, status
-`pendente→aprovado/reprovado→agendado→concluido`). **Histórico** (por veículo ou por colaborador,
-com filtro de período) junta vínculos/checklists/manutenções (+ empréstimos históricos, se houver)
-numa timeline só — é a tela de investigação de sinistro; virou um item **dentro de** Relatório
-(abaixo) em vez de botão próprio no hub. **Relatório** (renomeado de "Painel e custos", movido de
-Equipe administrativa pra **Gestor**) tem 4 submódulos com filtro de veículo/colaborador/data
-(abastecimentos/lavagens/manutenções/histórico) + custos por veículo sem filtro — "Movimentações
-(empréstimos)" saiu da lista: sem mecanismo de empréstimo, não sobrava o que mostrar. Aprovação/
-notificação **reaproveita** o mecanismo de Suprimentos (não é hierarquia própria) — ver
-docs/MODULOS.md §6 (detalhe completo) e §0.9/§6.4 (o mecanismo em si). **Todo campo "e-mail do
-colaborador" virou dropdown de nome** (Vincular admin, Histórico, Relatório — `app_perfil_por_email`
-não é mais chamada por Frota) e **as mensagens de notificação/erro do módulo (triggers + ~45 RPCs)
-tiveram a acentuação corrigida** (vinham todas sem acento desde que foram escritas).
+campo "posto"), **Manutenção** e **Lavagem** — cada uma é uma tela de **histórico + ação**, não só
+um formulário avulso (**renomeadas na 5ª rodada**, eram "Registrar problema (manutenção)"/"Solicitar
+lavagem", iam direto pro formulário sem mostrar nada do que já existia). Estes 4 últimos ficam
+**desabilitados no hub** enquanto o colaborador não tiver veículo vinculado. Checklist agora começa
+com os itens **desmarcados por padrão** (5ª rodada — antes vinham todos pré-marcados, então "tudo OK"
+era o estado inicial mesmo sem checar nada). **Lavagem** tem ciclo próprio: colaborador solicita
+(bloqueado se já houver uma pendente) → Frotas agenda (data/horário/local, notifica) → colaborador
+confirma execução (`frota_lavagem`, status `solicitada→agendada→realizada`) — toda a lista fica na
+tela de Lavagem, não mais embutida em "Minha CNH" (removida de lá na 5ª rodada). **Manutenção**
+também: colaborador solicita (sem valor) → gestor aprova/reprova → Frotas agenda **só a data** (sem
+custo — 5ª rodada, custo saiu do agendamento) → **o próprio colaborador dá baixa** (novo — antes não
+existia jeito nenhum de concluir fora do papel frotas/admin) quando busca o veículo no mecânico,
+informando aí o **custo final** (`app_frota_manutencao_concluir`, permissão ampliada pra aceitar
+quem reportou, além de frotas/admin; Frotas mantém um atalho de reforço em Relatório › Manutenções).
+Agendar/concluir também fazem `frota_veiculo.status` oscilar por `manutencao` (rótulo que já
+existia, mas nenhuma RPC escrevia até agora) e voltar a `em_uso`/`disponivel` ao concluir. **Histórico**
+(por veículo ou por colaborador, com filtro de período) junta vínculos/checklists/manutenções (+
+empréstimos históricos, se houver) numa timeline só — é a tela de investigação de sinistro; é um item
+**dentro de** Relatório (abaixo). **Relatório** ("Painel e custos" antigo, na categoria **Gestor**)
+tem 4 submódulos com filtro de veículo/colaborador/data (abastecimentos/lavagens/manutenções/
+histórico) + custos por veículo sem filtro (soma manutenção **só `status='concluido'`** agora, não
+mais `agendado` também — nunca tinha valor real nesse estágio). Aprovação/notificação **reaproveita**
+o mecanismo de Suprimentos (não é hierarquia própria) — ver docs/MODULOS.md §6 (detalhe completo) e
+§0.9/§6.4 (o mecanismo em si). **Todo campo "e-mail do colaborador" virou dropdown de nome**
+(Vincular admin, Histórico, Relatório) e **as mensagens de notificação/erro do módulo tiveram a
+acentuação corrigida**. **Navegação (5ª rodada):** cada subtela mostra só **um** botão de voltar — a
+barra fixa do topo (`#condBar`/`#frotasBar`) some fora da tela-raiz de cada módulo, já que toda
+subtela sempre teve seu próprio "‹ Voltar" contextual (os dois apareciam juntos antes). A tela
+**Veículos** perdeu 3 seções-atalho (Condutores/Lavagens a agendar/Manutenções a agendar) que
+duplicavam botões já existentes no hub. **Cuidado de bastidor (5ª rodada):** `CREATE OR REPLACE
+FUNCTION` que só acrescenta parâmetro cria um **overload novo**, não substitui o original — a regra
+(§0.6) já dizia pra usar `drop function`+`create` nesse caso, mas foi esquecida 2x; achados e
+limpos overloads órfãos em 4 RPCs (detalhe em docs/MODULOS.md §6 "Cuidados").
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 
