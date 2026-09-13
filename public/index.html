@@ -5631,6 +5631,12 @@ function frotasRenderVeiculoDetalhe(){
   });
 }
 let frotasCondutores=[], frCondBusca='', frCondFiltro='todos', frCondSel=null;
+async function frotasCarregarColaboradores(){
+  try{ const {data,error}=await sb.rpc('app_frota_usuarios_completo'); if(error) throw error; frotasCondutores=data||[]; }
+  catch(e){ frotasCondutores=[]; }
+  return frotasCondutores;
+}
+function frotasColaboradoresOrdenados(){ return [...frotasCondutores].sort((a,b)=>(a.nome||a.email||'').localeCompare(b.nome||b.email||'')); }
 const FRCOND_STATUS_LABEL={termo_pendente:{l:'Termo pendente',bg:'--warn-bg',fg:'--warn'},ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},pendente:{l:'Pendente (legado)',bg:'--warn-bg',fg:'--warn'},apto:{l:'Apto (legado)',bg:'--warn-bg',fg:'--warn'},reprovado:{l:'Reprovado',bg:'--bad-bg',fg:'--bad'}};
 function frCondMatch(c){
   const t=_matNorm(frCondBusca||'').trim();
@@ -5724,12 +5730,14 @@ function frotasRenderCondutorCadastro(){
 async function frotasRenderVinculo(){
   const v=frotasVeiculos.find(x=>String(x.id)===String(frotasVeiculoSel))||{};
   const temVinc=!!(v.vinculados&&v.vinculados.length);
+  if(!temVinc) await frotasCarregarColaboradores();
+  const ativos=temVinc?[]:frotasColaboradoresOrdenados().filter(c=>c.condutor_status==='ativo');
   let h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔗 Vincular/desvincular — ${v.placa||''}</div>`;
   h+='<p class="sub" style="margin-top:2px">Só colaboradores com termo assinado (status ativo) podem ser vinculados. Um veículo tem no máximo uma pessoa vinculada por vez.</p>';
   h+='<div id="frVincLista">'+(temVinc?v.vinculados.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px"><span>${x.nome}</span><button data-desvinc="${x.vinculo_id}" style="all:unset;cursor:pointer;color:var(--bad);font-size:13px">Desvincular</button></div>`).join('') : '<p class="sub">Nenhum colaborador vinculado.</p>')+'</div>';
   if(!temVinc){
     h+='<div class="sec" style="margin-top:16px">Vincular colaborador</div>';
-    h+='<label>E-mail do colaborador *</label><input id="frVincEmail" placeholder="nome@aguasmg.com.br"/><button class="btn" id="frVincSalvar" style="margin-top:10px">Vincular</button>';
+    h+=`<label>Colaborador *</label><select id="frVincSel"><option value="">Selecione…</option>${ativos.map(c=>`<option value="${c.id}">${c.nome||c.email}</option>`).join('')}</select><button class="btn" id="frVincSalvar" style="margin-top:10px">Vincular</button>`;
   }
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>{frotasSub='veiculo_detalhe';frotasRender();});
@@ -5739,11 +5747,9 @@ async function frotasRenderVinculo(){
     catch(e){ toast('Erro: '+(e.message||e)); }
   }));
   const bs=$('#frVincSalvar'); if(bs) bs.addEventListener('click',async()=>{
-    const email=$('#frVincEmail').value.trim(); if(!email) return toast('Informe o e-mail');
+    const condId=$('#frVincSel').value; if(!condId) return toast('Selecione o colaborador');
     try{
-      const {data:pf}=await sb.rpc('app_perfil_por_email',{p_email:email});
-      if(!pf||!pf.id) return toast('Colaborador não encontrado com esse e-mail');
-      const {error}=await sb.rpc('app_frota_veiculo_vincular',{p_veiculo_id:+frotasVeiculoSel,p_condutor_id:pf.id});
+      const {error}=await sb.rpc('app_frota_veiculo_vincular',{p_veiculo_id:+frotasVeiculoSel,p_condutor_id:condId});
       if(error) throw error;
       toast('✓ Vinculado'); frotasRender();
     }catch(e){ toast('Erro: '+(e.message||e)); }
@@ -5752,12 +5758,14 @@ async function frotasRenderVinculo(){
 
 // --- Histórico (linha do tempo de um veículo ou colaborador) ---
 let frHistVeiculoSel=null, frHistCondutorSel=null, frHistBackTo='painel';
-function frotasRenderHistorico(){
+async function frotasRenderHistorico(){
+  await frotasCarregarColaboradores();
+  const colaboradores=frotasColaboradoresOrdenados();
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📜 Histórico</div>';
   h+='<p class="sub" style="margin-top:2px">Veja toda a linha do tempo de um veículo (vínculos, empréstimos, checklists, manutenções) ou de um colaborador (em quais veículos esteve, quando).</p>';
   h+='<div style="display:flex;gap:8px;margin:10px 0"><select id="frHistTipo" style="flex:1"><option value="veiculo"'+(!frHistCondutorSel?' selected':'')+'>Por veículo</option><option value="condutor"'+(frHistCondutorSel?' selected':'')+'>Por colaborador</option></select></div>';
   h+='<div id="frHistVeicWrap"><label>Veículo</label><select id="frHistVeic"><option value="">—</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${String(v.id)===String(frHistVeiculoSel)?' selected':''}>${v.placa} — ${v.modelo||''}</option>`).join('')+'</select></div>';
-  h+='<div id="frHistCondWrap" class="hidden"><label>E-mail do colaborador</label><input id="frHistCondEmail" placeholder="nome@aguasmg.com.br"/></div>';
+  h+='<div id="frHistCondWrap" class="hidden"><label>Colaborador</label><select id="frHistCondSel"><option value="">Selecione…</option>'+colaboradores.map(c=>`<option value="${c.id}"${String(c.id)===String(frHistCondutorSel)?' selected':''}>${c.nome||c.email}</option>`).join('')+'</select></div>';
   h+='<div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1"><label>De</label><input id="frHistDe" type="date"/></div><div style="flex:1"><label>Até</label><input id="frHistAte" type="date"/></div></div>';
   h+='<button class="btn" id="frHistBuscar" style="margin-top:12px">Buscar</button>';
   h+='<div id="frHistResultado" style="margin-top:16px"></div>';
@@ -5777,10 +5785,9 @@ function frotasRenderHistorico(){
         frHistVeiculoSel=vid;
         const r=await sb.rpc('app_frota_historico_veiculo',{p_veiculo_id:+vid,p_data_ini:de,p_data_fim:ate}); if(r.error) throw r.error; data=r.data;
       } else {
-        const email=$('#frHistCondEmail').value.trim(); if(!email) return toast('Informe o e-mail');
-        const {data:pf}=await sb.rpc('app_perfil_por_email',{p_email:email});
-        if(!pf||!pf.id) return toast('Colaborador não encontrado'); frHistCondutorSel=pf.id;
-        const r=await sb.rpc('app_frota_historico_condutor',{p_condutor_id:pf.id,p_data_ini:de,p_data_fim:ate}); if(r.error) throw r.error; data=r.data;
+        const condId=$('#frHistCondSel').value; if(!condId) return toast('Selecione o colaborador');
+        frHistCondutorSel=condId;
+        const r=await sb.rpc('app_frota_historico_condutor',{p_condutor_id:condId,p_data_ini:de,p_data_fim:ate}); if(r.error) throw r.error; data=r.data;
       }
       const arr=data||[];
       box.innerHTML = arr.length ? arr.map(e=>{
@@ -5877,7 +5884,7 @@ function frotasRenderPainel(){
     frotasSub='painel_'+k; frotasRender();
   }));
 }
-let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorEmail:'',de:'',ate:''};
+let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''};
 const PAINEL_CFG={
   abastecimentos:{rpc:'app_frota_abastecimentos_listar',titulo:'⛽ Abastecimentos',row:a=>`<b>${a.placa}</b><div class="sub" style="margin-top:2px">${a.condutor_nome||''} · ${fmtData(a.data)} · ${a.litros||0} L · ${fmtDinheiro(a.valor_total)}${a.consorcio?(' · '+a.consorcio):''}</div>`},
   lavagens:{rpc:'app_frota_lavagens_listar',titulo:'🧼 Lavagens',row:l=>`<b>${l.placa}</b><div class="sub" style="margin-top:2px">${l.condutor_nome||''} · ${({solicitada:'Aguardando agendamento',agendada:'Agendada',realizada:'Realizada',cancelada:'Cancelada'})[l.status]||l.status}${l.data?(' · '+fmtData(l.data)):''}${l.valor!=null?(' · '+fmtDinheiro(l.valor)):''}${l.consorcio?(' · '+l.consorcio):''}</div>`},
@@ -5887,9 +5894,11 @@ const PAINEL_CFG={
 async function frotasRenderPainelLista(tipo){
   const CFG=PAINEL_CFG[tipo];
   const semFiltro=(tipo==='custos');
+  if(!semFiltro) await frotasCarregarColaboradores();
+  const colaboradores=semFiltro?[]:frotasColaboradoresOrdenados();
   let h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">${CFG.titulo}</div>`;
   if(!semFiltro){
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><select id="pnlVeic" style="flex:1;min-width:140px"><option value="">Todos os veículos</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${frPnlFiltro.veiculo===String(v.id)?' selected':''}>${v.placa}</option>`).join('')+'</select><input id="pnlCond" placeholder="e-mail do colaborador" value="'+(frPnlFiltro.condutorEmail||'').replace(/"/g,'&quot;')+'" style="flex:1;min-width:160px"/></div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><select id="pnlVeic" style="flex:1;min-width:140px"><option value="">Todos os veículos</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${frPnlFiltro.veiculo===String(v.id)?' selected':''}>${v.placa}</option>`).join('')+'</select><select id="pnlCondSel" style="flex:1;min-width:160px"><option value="">Todos os colaboradores</option>'+colaboradores.map(c=>`<option value="${c.id}"${frPnlFiltro.condutorId===String(c.id)?' selected':''}>${c.nome||c.email}</option>`).join('')+'</select></div>';
     h+='<div style="display:flex;gap:8px"><input id="pnlDe" type="date" value="'+(frPnlFiltro.de||'')+'"/><input id="pnlAte" type="date" value="'+(frPnlFiltro.ate||'')+'"/><button id="pnlBuscar" class="btn" style="margin:0;width:auto;padding:0 16px">Filtrar</button></div>';
   }
   h+='<div id="pnlLista" style="margin-top:12px"></div>';
@@ -5900,11 +5909,9 @@ async function frotasRenderPainelLista(tipo){
     try{
       let params={};
       if(!semFiltro){
-        const vid=$('#pnlVeic')?$('#pnlVeic').value:''; const email=$('#pnlCond')?$('#pnlCond').value.trim():'';
-        frPnlFiltro={veiculo:vid,condutorEmail:email,de:$('#pnlDe')?$('#pnlDe').value:'',ate:$('#pnlAte')?$('#pnlAte').value:''};
-        let condId=null;
-        if(email){ const {data:pf}=await sb.rpc('app_perfil_por_email',{p_email:email}); if(pf&&pf.id) condId=pf.id; else return toast('Colaborador não encontrado'); }
-        params={p_veiculo_id:vid?+vid:null,p_condutor_id:condId,p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null};
+        const vid=$('#pnlVeic')?$('#pnlVeic').value:''; const condId=$('#pnlCondSel')?$('#pnlCondSel').value:'';
+        frPnlFiltro={veiculo:vid,condutorId:condId,de:$('#pnlDe')?$('#pnlDe').value:'',ate:$('#pnlAte')?$('#pnlAte').value:''};
+        params={p_veiculo_id:vid?+vid:null,p_condutor_id:condId||null,p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null};
       }
       const {data,error}=await sb.rpc(CFG.rpc,params);
       if(error) throw error;

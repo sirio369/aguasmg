@@ -837,14 +837,18 @@ direção defensiva (QSMS) **já haviam sido removidos por completo** numa rodad
   colaborador normalmente se vincula/desvincula sozinho) — mas continua existindo pra Frotas
   corrigir situações (colaborador esqueceu de se desvincular, precisa reatribuir manualmente etc.).
   Mostra quem está vinculado com botão **Desvincular** (`app_frota_veiculo_desvincular(p_vinculo_id)`)
-  — só aparece o formulário de **Vincular** por e-mail (`app_frota_veiculo_vincular(p_veiculo_id,
-  p_condutor_id)`) quando o veículo **não** tem ninguém vinculado (desde a 3ª rodada, só dá pra ter
-  **um** vínculo aberto por vez, não mais vários — ver §6.1; as duas RPCs também recusam com
-  mensagem clara se o veículo já estiver ocupado ou a pessoa já vinculada em outro lugar, e fazem o
-  mesmo `UPDATE` de `status` que a versão self-service).
+  — só aparece o formulário de **Vincular** (4ª rodada: **dropdown de colaboradores `ativo`**,
+  `frotasCarregarColaboradores()`/`app_frota_usuarios_completo` — não mais campo de e-mail livre;
+  manda o `id` do `<option>` direto como `p_condutor_id`, sem round-trip por `app_perfil_por_email`)
+  quando o veículo **não** tem ninguém vinculado (desde a 3ª rodada, só dá pra ter **um** vínculo
+  aberto por vez, não mais vários — ver §6.1; as duas RPCs também recusam com mensagem clara se o
+  veículo já estiver ocupado ou a pessoa já vinculada em outro lugar, e fazem o mesmo `UPDATE` de
+  `status` que a versão self-service).
 - **Histórico** (`frotasRenderHistorico`, alcançável pelo Detalhe do veículo **ou** de dentro de
   Relatório, ver abaixo — `frHistBackTo` guarda de onde veio pro "‹ Voltar" certo): busca por
-  **veículo** (dropdown) ou por **colaborador** (e-mail), com filtro de período —
+  **veículo** (dropdown) ou por **colaborador** (4ª rodada: **dropdown de todos os colaboradores**,
+  sem filtro de status — histórico pode envolver gente já inativa/reprovada; antes era campo de
+  e-mail livre + `app_perfil_por_email`), com filtro de período —
   `app_frota_historico_veiculo(p_veiculo_id,p_data_ini,p_data_fim)` /
   `app_frota_historico_condutor(p_condutor_id,p_data_ini,p_data_fim)`. Cada uma junta, numa timeline
   só ordenada por data: vínculo/desvínculo, checklist (com status/km/avarias) e manutenção
@@ -893,10 +897,12 @@ direção defensiva (QSMS) **já haviam sido removidos por completo** numa rodad
   **"Movimentações (empréstimos)" foi removida da lista** — não sobrava o que mostrar sem o
   mecanismo de empréstimo ativo (§6.1); `app_frota_movimentacoes_listar` (as duas sobrecargas, a
   antiga sem filtro e a com filtro de pp13) foram **apagadas**. Os 3 submódulos restantes com filtro
-  (abastecimentos/lavagens/manutenções) ganharam filtro de **veículo** (dropdown), **colaborador**
-  (e-mail → resolvido pra uuid via `app_perfil_por_email`) e **período** (`p_data_ini`/`p_data_fim`)
-  numa rodada anterior — sem mudança nesta. `PAINEL_CFG` (const) só descreve `{rpc,titulo,row}` por
-  tipo; `frotasRenderPainelLista` monta o formulário de filtro + chama `carregar()`.
+  (abastecimentos/lavagens/manutenções) ganharam filtro de **veículo** (dropdown) e **período**
+  (`p_data_ini`/`p_data_fim`) numa rodada anterior; o filtro de **colaborador** virou **dropdown de
+  todos os colaboradores** na 4ª rodada (`frotasCarregarColaboradores()`, manda o `id` direto como
+  `p_condutor_id` — antes era campo de e-mail livre + `app_perfil_por_email`). `PAINEL_CFG` (const)
+  só descreve `{rpc,titulo,row}` por tipo; `frotasRenderPainelLista` monta o formulário de filtro +
+  chama `carregar()`.
   **"Tempo real" aqui significa só "sempre atualizado quando busca"** — sem Supabase Realtime.
 - **Custos por veículo** (`app_frota_custos_por_veiculo()`, **sem filtro** — visão agregada por
   veículo, dentro de Relatório): soma `frota_checklist_abastecimento` (abastecimento), `frota_lavagem`
@@ -905,7 +911,12 @@ direção defensiva (QSMS) **já haviam sido removidos por completo** numa rodad
   próprio veículo. `custo_total` é a soma de tudo. Read-only, sem mudança nesta rodada.
 - **Estado:** `frotasSub, frotasVeiculoSel, frVeicFiltroTipo, frVeicFiltroCond, frHistVeiculoSel,
   frHistCondutorSel, frHistBackTo, frLavagemSel, frManutSel, frotasCondutores, frCondBusca,
-  frCondFiltro, frCondSel, frotasPainelCache, frPnlFiltro`.
+  frCondFiltro, frCondSel, frotasPainelCache, frPnlFiltro`. **`frotasCondutores` virou compartilhado
+  entre 4 telas (4ª rodada)** — Condutores (busca/cadastro, uso original), Vincular/desvincular,
+  Histórico e Relatório (filtro por colaborador) todas chamam `frotasCarregarColaboradores()`
+  (wrapper de `app_frota_usuarios_completo`) pra popular a mesma variável antes de montar seu
+  dropdown — `frotasColaboradoresOrdenados()` devolve a lista por ordem de nome (a ordem "sem CNH
+  primeiro" do `app_frota_usuarios_completo` só faz sentido na tela Condutores).
 
 ### 6.3 QSMS / treinamento de direção defensiva — **REMOVIDO por completo em 2026-09**
 A pedido explícito do usuário ("não deverá haver processo de treinamento de direção defensiva... será
@@ -994,6 +1005,13 @@ real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (g
   função (§0, invariante de grants).
 - Foto de CNH e assinatura do termo vão pro bucket público `fotos-campo` (mesmo de fotos de campo) —
   não há bucket privado dedicado a documento de identificação.
+- **Mensagens de notificação/erro sem acentuação corrigidas (2026-09, 4ª rodada):** todo texto das
+  triggers (`trg_frota_condutor`/`trg_frota_lavagem`/`trg_frota_manutencao`) e todo `raise exception`
+  das RPCs `app_frota_*`/`app_condutor_*` (~45 funções) foi reescrito com acentuação correta — texto
+  vinha sem acento desde que foi escrito (ex.: "Voce esta ATIVO para direcao" → "Você está ATIVO para
+  direção", "nao autenticado" → "não autenticado"). Puramente textual — nenhuma lógica/assinatura
+  mudou. **Cuidado ao adicionar mensagem nova:** escrever com acentuação correta desde o início (não
+  repetir o problema).
 
 ## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin
@@ -1053,8 +1071,10 @@ solicitar→agendar→confirmar, §6.1/§6.2),
 `app_frota_manutencao_solicitar/pendentes/aprovar/agendar/concluir`, `app_frota_manutencoes_agendar_fila`
 (ciclo solicitar→aprovar→agendar-com-custo→concluir, substitui "ocorrência" pra qualquer problema
 mecânico, §6.1/§6.2),
-`app_perfil_por_email` (helper genérico: busca `perfil` por e-mail, usado por Frotas e por qualquer
-módulo que precise resolver destinatário por e-mail).
+`app_perfil_por_email` (helper genérico: busca `perfil` por e-mail — **desde a 4ª rodada de 2026-09,
+Frota não chama mais essa RPC em lugar nenhum**, todo campo de "e-mail do colaborador" virou dropdown
+de nome; a função continua no banco pra qualquer outro módulo que precise resolver destinatário por
+e-mail, mas hoje não tem chamador em nenhum lugar do frontend).
 **Removidas por completo** (não há mais linha no banco): `app_frota_veiculo_aluguel_
 reajustar/aluguel_historico`, `app_frota_equipes_listar/equipe_salvar`, `app_frota_ocorrencia_
 reportar/pendentes/aprovar`, `app_frota_ocorrencias_listar`, `app_qsms_*` (condutores_aptos,
