@@ -293,7 +293,10 @@ Equipe administrativa pra **Gestor**) tem 4 submódulos com filtro de veículo/c
 (abastecimentos/lavagens/manutenções/histórico) + custos por veículo sem filtro — "Movimentações
 (empréstimos)" saiu da lista: sem mecanismo de empréstimo, não sobrava o que mostrar. Aprovação/
 notificação **reaproveita** o mecanismo de Suprimentos (não é hierarquia própria) — ver
-docs/MODULOS.md §6 (detalhe completo) e §0.9/§6.4 (o mecanismo em si).
+docs/MODULOS.md §6 (detalhe completo) e §0.9/§6.4 (o mecanismo em si). **Todo campo "e-mail do
+colaborador" virou dropdown de nome** (Vincular admin, Histórico, Relatório — `app_perfil_por_email`
+não é mais chamada por Frota) e **as mensagens de notificação/erro do módulo (triggers + ~45 RPCs)
+tiveram a acentuação corrigida** (vinham todas sem acento desde que foram escritas).
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 
