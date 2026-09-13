@@ -1140,6 +1140,25 @@ real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (g
   ferramentas desta sessão (branch tem custo real, exige confirmação própria). É seguro rodar contra
   produção só porque cada bloco é 100% rollback — não é o ideal a longo prazo; se um dia branch
   virar viável, apontar o script pra lá em vez de produção.
+- **9 botões "‹ Voltar" levando pra tela errada (2026-09, 7ª rodada) — exposto pela própria correção
+  da 5ª rodada:** esconder a barra fixa `#condBar`/`#frotasBar` fora da home (5ª rodada, acima) tirou
+  o "atalho" que mascarava um problema mais antigo: várias subtelas são abertas **direto** a partir do
+  hub (`frotaOpen`→`condGoTarget`/`frotasInit` pulando a home), mas o "‹ Voltar" delas estava
+  hardcoded pra `condSub='home'`/`frotasSub='home'` — uma tela **diferente** de onde o usuário veio
+  (ex.: Checklist diário, aberto direto do hub, voltava pra "Minha CNH" em vez do hub). Com a barra
+  fixa sempre visível isso não incomodava (dava pra voltar ao hub por ela); sem a barra, virou "botão
+  de voltar quebrado". Corrigidos os 9 casos reais (`condRenderVeiculos`/`Situacao`/`Abastecimento`/
+  `Lavagem`/`Manutencao` e `frotasRenderCondutores`/`LavagemFila`/`ManutencaoFila` → `irPara('frota')`
+  direto; ver §6.0 pra essa função). **Caso especial — "Registrar problema" tem 2 entradas**
+  (Checklist › "Encontrou um problema?" **e** Manutenção › "Reportar problema"): não dava pra
+  hardcodar um destino só, então ganhou uma variável de contexto nova, **`condOcorrenciaBackTo`**
+  (`'situacao'`|`'manutencao'`, setada por quem abre a tela), igual ao padrão já existente de
+  `frHistBackTo` pro Histórico (§6.2). **Detalhe deliberado:** só o botão "‹ Voltar" (desistir) respeita
+  `condOcorrenciaBackTo` — depois de **salvar com sucesso** um problema, a tela sempre manda pra
+  Manutenção (pra ver a ocorrência nova na lista), não importa se a entrada foi pelo Checklist.
+  **Cuidado ao adicionar uma nova subtela aberta direto do hub:** o "‹ Voltar" dela deve chamar
+  `irPara('frota')`, nunca `condSub`/`frotasSub='home'` — "home" (Minha CNH / lista de Veículos) só é
+  o destino certo pra telas que só se abrem **de dentro** da home de cada módulo.
 
 ## 7. Biblioteca — `// MÓDULO BIBLIOTECA` (~L3996) · tela `biblioteca`
 - Documentos de referência (PDF) por categoria. Bucket Storage **`biblioteca`** (público; só admin

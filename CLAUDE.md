@@ -319,6 +319,13 @@ abastecimento agora recusam com o veículo em `manutencao` (RPC + botão desabil
 `qa/smoke_test_frota.sql` (6 blocos com rollback garantido, cobre overloads/grants/vínculo/
 manutenção/lavagem/o gate novo) — roda contra produção porque criar branch de teste no Supabase
 exige uma confirmação de custo (`confirm_cost`) fora do alcance das ferramentas desta sessão.
+**Correção de navegação (7ª rodada, 2026-09):** esconder a barra fixa na 5ª rodada expôs 9 botões
+"‹ Voltar" hardcoded pra `condSub`/`frotasSub='home'` em subtelas abertas **direto do hub**
+(Checklist, Veículos, Abastecimento, Manutenção, Lavagem, Condutores, Lavagens/Manutenções a
+agendar) — corrigidos pra `irPara('frota')`. "Registrar problema" (2 pontos de entrada: Checklist e
+Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão de `frHistBackTo`.
+Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
+direto do hub deve ser `irPara('frota')`, nunca `='home'`.
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 
