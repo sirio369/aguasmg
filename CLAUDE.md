@@ -230,7 +230,10 @@ pwa/
   as redes selecionadas a um colaborador (`app_pp_atribuir`/`app_pp_desatribuir`, tabela
   `"8 - coleta_campo".programacao_pesquisa`). O geofonista vê sua programação na tela **Pesquisa**
   (camada roxa, `app_pp_minhas`) e ela some conforme ele registra trechos reais; **Produtividade** cruza
-  cadastro-programado × cadastro-executado × reporte de campo (`app_pp_mapa`). O cruzamento roda em
+  cadastro-programado × cadastro-executado × reporte de campo × **histórico de execuções** (`app_pp_mapa`
+  — a 4ª camada, 2026-09, é um log permanente/insert-only em `pp_execucao`, independente do ciclo de
+  atribuição ao vivo, que pode ser resetado/reprogramado à vontade sem perder o registro histórico de
+  quando cada trecho foi pesquisado). O cruzamento roda em
   **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a

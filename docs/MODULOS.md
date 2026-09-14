@@ -415,8 +415,12 @@ sem intervenção manual.
 - Vincula (`app_pp_atribuir(p_rede_ids bigint[], p_colaborador, p_sobrescrever)`) / desvincula
   (`app_pp_desatribuir(p_rede_ids bigint[])`) — **`p_rede_ids` continua com esse nome** (zero mudança no
   frontend), mas **os valores agora são `rede_pp_segmento.id`**, não mais `rede.id`. Desvincular
-  **deleta** a linha (sem histórico — decisão de produto: reprogramar é comum, "desprogramar" não deixa
-  rastro).
+  **deleta** a linha e reprogramar (`sobrescrever=true`) **reseta** ela pra `pendente` — **sem trava,
+  mesmo se já `executado`** (decisão de produto: reprogramar/re-pesquisar o mesmo trecho é comum e tem
+  que continuar livre — ex.: filtro "não pesquisado desde X"). Isso é **seguro** porque a linha de
+  `programacao_pesquisa` é só o **ciclo de atribuição atual** — o fato permanente "isso foi pesquisado
+  em tal data" mora em outro lugar, ver **4.3.6**. (Uma trava foi tentada e revertida no mesmo dia —
+  bloqueava reprogramar um trecho já executado, o que quebrava a pesquisa repetida legítima.)
 - Lista de colaboradores clicável (`app_pp_colaboradores`, inclui o próprio usuário logado) filtra o mapa
   pra "só a programação dele" (`app_pp_por_colaborador`). Botão "✕ Limpar seleção", filtro "não pesquisado
   desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`), legenda clicável (filtro de status por cor).
@@ -475,11 +479,72 @@ sem intervenção manual.
   📍 recentraliza na posição GPS. Após confirmar um trecho, re-consulta com atraso (o cruzamento no
   servidor pode ter virado programado→executado, some do mapa).
 - **Produtividade** — toggle **"🔗 Cruzar com a programação da pesquisa"** (`app_pp_mapa(p_colaborador,
-  p_consorcio, p_data_ini, p_data_fim, p_usuario)`) — 3 camadas com legenda-filtro clicável (🟣 pendente
-  cadastro · 🟢 executado cadastro · 🔴 reporte de campo) + KPIs (km programado/executado/% cobertura/nº
-  pendentes). Respeita os filtros de pessoa/data já existentes na tela.
+  p_consorcio, p_data_ini, p_data_fim, p_usuario)`) — 4 camadas com legenda-filtro clicável (🟣 pendente
+  cadastro · 🟢 executado cadastro · 🔴 reporte de campo · 🔵 **histórico de execuções**, tracejado,
+  **2026-09-14, novo, desligada por padrão** — ver 4.3.6) + KPIs (km programado/executado/% cobertura/nº
+  pendentes/nº execuções no histórico). Respeita os filtros de pessoa/data já existentes na tela.
 - **RPCs** `app_pp_minhas`/`app_pp_mapa`: propriedade `segmento_id` no GeoJSON (renomeada de `rede_id`
   na Fase E — nenhum código do frontend lia esse campo por nome, só exibia via popup genérico).
+
+#### 4.3.6 Histórico permanente de execuções — `pp_execucao` (2026-09-14, novo)
+
+**Por quê:** `programacao_pesquisa` é o **ciclo de atribuição atual** de um segmento — livremente
+desvinculável/reprogramável (4.3.3), inclusive depois de `executado`. Isso é necessário (pesquisar o
+mesmo trecho de novo é legítimo — filtro "não pesquisado desde X"), mas sozinho tem um problema: a
+**única** cópia do fato "isso já foi pesquisado, em tal data" vivia ali (`rede_pp_segmento` não tem
+coluna de status própria — 4.3.1), então desvincular ou reprogramar um trecho já executado apagava
+esse fato **sem deixar rastro** — o "pesquisado (cadastro)" simplesmente sumia. Uma trava de
+imutabilidade (bloquear desvincular/reprogramar se `status='executado'`) foi tentada e revertida no
+mesmo dia: ela resolvia isso mas também travava o trecho **pra sempre**, impedindo até a re-pesquisa
+legítima.
+
+**Solução:** tabela nova **insert-only** (nunca editada/apagada pelo app — mesmo espírito de
+`pesquisa_trecho`, o "reporte de campo"), que registra **um lançamento permanente** toda vez que um
+segmento vira `executado` de verdade. `programacao_pesquisa` continua podendo ser resetada/apagada à
+vontade — o histórico já está salvo em outro lugar.
+
+- **`"8 - coleta_campo".pp_execucao`** — `segmento_id` (FK `rede_pp_segmento`, `ON DELETE SET NULL` —
+  não trava nem cai junto se a rede for re-segmentada, 4.3.1), `rede_id` (estável, não muda com
+  resegmentação), `geom` (**snapshot** da geometria no momento — não depende do segmento ainda existir),
+  `comprimento_m`/`coberto_m`/`colaborador_uuid`/`programado_por`/`programado_em`/`executado_em`/
+  `primeiro_trecho_id` (cópia do estado de `programacao_pesquisa` no instante do flip), `origem`
+  (`cobertura_direta` | `heranca_vizinho` | `desconhecido`), **`programacao_id`** (FK
+  `programacao_pesquisa.id`, `ON DELETE SET NULL`, **`UNIQUE`** — é a chave de deduplicação, ver
+  abaixo). RLS ligada, **sem policy** — mesmo padrão de `programacao_pesquisa`/`pp_config` (só acessível
+  via função `SECURITY DEFINER`, dona da tabela bypassa RLS por não ter `FORCE ROW LEVEL SECURITY`).
+- **Trigger `trg_pp_log_execucao`** (`AFTER UPDATE OF status ON programacao_pesquisa ... WHEN (NEW.status
+  = 'executado' AND OLD.status <> 'executado')` → `pp_log_execucao()`) — loga automaticamente em
+  **qualquer** transição pendente→executado, não importa o caminho de escrita (hoje só `pp_recompute`
+  escreve `status`, mas o trigger não depende disso).
+  - `pp_recompute` marca a **origem** do flip com `perform set_config('pp.origem_flip', '...', true)`
+    logo antes de cada um dos dois `UPDATE`s que viram status (cobertura direta / herança de vizinho) —
+    o trigger lê `current_setting('pp.origem_flip', true)`. É só sinalização, não muda a lógica de
+    cálculo do `pp_recompute` em nada.
+  - **Pegadinha achada e corrigida no mesmo dia — dedup é por `programacao_id`, não por
+    `segmento_id`/status:** `pp_recompute` **sempre** reseta pra `pendente` e recalcula do zero, mesmo
+    quando só está reconfirmando um trecho que já estava `executado` (ex.: qualquer trecho novo
+    pesquisado a até `tol_m+60` de um segmento já pronto reprocessa ele via `trg_pp_cruzar`) — cada
+    recompute desses geraria uma transição `pendente→executado` **de novo** e o trigger logaria um
+    lançamento duplicado a cada recompute de vizinhança, não um por evento real. Fix: `pp_execucao.
+  programacao_id` é `UNIQUE`, e o insert do trigger usa `ON CONFLICT (programacao_id) DO NOTHING` — como
+  o `id` de uma linha de `programacao_pesquisa` fica estável durante toda a vida daquele ciclo de
+  atribuição (só muda quando desvincula+re-atribui = ciclo novo), isso deduplica corretamente:
+  **N recomputes do mesmo ciclo → 1 lançamento**; **desvincular + atribuir de novo (ciclo novo, `id`
+  novo) → lançamento novo**, mesmo no mesmo `segmento_id`. Testado (rollback E2E): 4 flips seguidos do
+  mesmo ciclo → 1 linha em `pp_execucao`; ciclo novo depois → 2ª linha, `id`s distintos.
+- **`app_pp_mapa`** ganhou a chave `historico_execucoes` (FeatureCollection + `n`) — mesmos filtros
+  `p_colaborador/p_usuario/p_consorcio/p_data_ini/p_data_fim` das outras chaves, junta com `rede`
+  (consórcio/`nu_trecho`) e `perfil` (nome). Frontend: 4º `fchip` ("Histórico de execuções", cor
+  `#0891b2`, **`prodFilt.H` começa `false`** — as outras 3 camadas começam ligadas, essa é opt-in por
+  ser potencialmente densa/sobreposta), renderizado tracejado (`dashArray:'2,6'`) pra não se confundir
+  com a camada sólida "pesquisado (cadastro)"; tooltip mostra colaborador/data/comprimento e "herdado do
+  vizinho" quando `origem='heranca_vizinho'`.
+- **Fora de escopo (deliberado):** `app_pp_resumo`/`app_pp_por_colaborador`/`app_pp_minhas`/KPIs de
+  `app_pp_mapa` continuam lendo o estado **ao vivo** de `programacao_pesquisa` (ciclo atual), não
+  `pp_execucao` — não foram redesenhados pra somar histórico entre ciclos (ex.: km "executado" não vira
+  "km executado somando todas as vezes que cada trecho foi pesquisado"). Se isso for necessário no
+  futuro, é uma decisão de produto separada (como contar produtividade quando o mesmo trecho é
+  pesquisado 2+ vezes), não decidida ainda.
 
 ---
 
