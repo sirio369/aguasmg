@@ -571,7 +571,7 @@ vontade — o histórico já está salvo em outro lugar.
   `app_pp_mapa` leem o estado **ao vivo** de `programacao_pesquisa` (passada corrente). A tela de
   Acompanhamento (Fase 4, ver 4.3.7) é que vai somar/analisar histórico entre passadas via `pp_execucao`.
 
-#### 4.3.7 Motor de passadas e redesenho do módulo (Fase 1 feita 2026-09-14; Fases 2-5 planejadas)
+#### 4.3.7 Motor de passadas e redesenho do módulo (Fases 1-4 feitas 2026-09-14; Fase 5 planejada)
 
 **Contexto:** o TR exige pesquisar **toda a rede 5 vezes** ao longo do contrato. Isso tornou o conceito
 de "passada" (Nª pesquisa de cada trecho) de primeira classe, e motivou um redesenho do módulo separado
@@ -592,15 +592,39 @@ programa + analisa o profundo.
   `n_passada=1`; reprogramar abre passada 2 (não reaproveita o traço antigo, exige novo); ruído de
   recompute na mesma passada não duplica; `sobrescrever=false` não mexe em atribuição existente.
 
-**Fases 2-5 (planejadas, frontend):** (2) Pesquisa do geofonista — sumiço instantâneo do executado (o
-cruzamento roda **síncrono** no `trg_pp_cruzar`, então dá pra tirar o re-fetch com atraso da 4.3.5).
-(3) "Minha produtividade" do geofonista, simplificada — só pendente (atemporal) · executado (com data) ·
-reporte de campo (com data). (4) Tela nova de **Acompanhamento** no Auxiliar de Programação, ao lado de
-Programar — dashboard do time interno com **dois km distintos** (km andado = soma dos `pesquisa_trecho`;
-km de rede pesquisado = soma dos segmentos executados no período via `pp_execucao`), **`vaz/km` sobre o
-km de rede** (não o km andado), progresso das 5 passadas (mapa colorido por `n_passada`), e resumo por
-colaborador; o toggle "Cruzar com a programação" vira **"Cobertura de rede"**. (5) Trava de UX: sem
-programação ativa, "iniciar trajeto" desabilitado.
+**Fase 2 — Pesquisa do geofonista (feita):** sumiço instantâneo do executado — ver 4.3.5.
+**Fase 3 — "Minha produtividade" do geofonista, simplificada (feita):** ver 4.3.5.
+**Fase 4 — tela de Acompanhamento do time interno (feita):** ver **4.3.8** abaixo.
+**Fase 5 (planejada, frontend):** trava de UX — sem programação ativa, "iniciar trajeto" desabilitado
+(o banco já garante pela Fase 1; isso é só clareza na tela do geofonista).
+
+#### 4.3.8 Tela Acompanhamento da pesquisa (Fase 4, 2026-09-14) — `pp_acomp` (Auxiliar de Programação)
+
+Dashboard do **time interno** (aprovador/admin — herda o gate do Auxiliar de Programação), ao lado da
+tela Programar. Módulo JS `pa*` (`paInit`/`paAtualizar`/…), reaproveita `prodHojeStr`/`prodMesIniStr`.
+Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** → **progresso do TR** →
+**mapa** → **resumo por colaborador**.
+- **Dois km distintos (decisão de produto):** `km_andado` = soma dos `pesquisa_trecho` (o quanto a
+  pessoa **andou**, com repetição de rua) · `km_rede_pesquisado` = soma dos segmentos que viraram
+  execução no período via `pp_execucao` (o quanto de **rede** foi coberto). O indicador **`vaz/km` usa o
+  km de rede**, não o km andado (densidade de vazamento por rede inspecionada). Velocidade média = km
+  andado / tempo.
+- **Progresso do TR (as 5 passadas):** barra empilhada mostrando quanto da rede já foi pesquisada 0/1/…/
+  5+ vezes (cinza → teal escuro). É **cumulativo da rede inteira** (por consórcio) — **não** filtra por
+  data/colaborador (o TR é um total, não um recorte de período).
+- **Mapa com 2 modos** (toggle): **"Cobertura de rede"** (camadas programado/pesquisado/reporte/
+  histórico/ocorrências, via `app_pp_mapa`, respeita filtros) e **"Passadas"** (heatmap da rede colorido
+  por `n_passada`, carregado **por viewport** via `app_pp_passadas_bbox` — recarrega no `moveend`; a rede
+  inteira são 46k segmentos, inviável de mandar de uma vez).
+- **Resumo por colaborador:** km programado/pesquisado/%/vazamentos/velocidade por pessoa.
+- **RPCs novas (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio,
+  p_colaborador, p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo`;
+  `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,p_consorcio)` → segmentos no viewport com `n_passada`.
+  `app_pp_mapa` estendido com a camada `ocorrencias` e casamento traço↔usuário por **nome OU email**
+  (mesma pegadinha da 4.3.5). O antigo dropdown "Todos os coletores" de análise que existia na
+  produtividade do geofonista vive agora **aqui** (é a tela de análise do time interno).
+- **Fora de escopo (registrado):** integração de um relatório do **SIGOS/COPASA** pra trazer a execução
+  do vazamento (localizado ou não) — fica pra outro momento (decisão do usuário, 2026-09-14).
 - **Ideia registrada p/ a tela Programar (interno):** filtro por nº de passadas (0 / 1 / 2 / …) sobre os
   segmentos candidatos — pro programador puxar "tudo em 0 passadas" (1ª rodada) ou "tudo em 2" (hora da
   3ª). Precisa `app_rede_bbox`/`app_pp_rede_no_poligono` exporem a contagem de passadas por segmento

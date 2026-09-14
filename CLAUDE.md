@@ -233,7 +233,12 @@ pwa/
   cadastro-programado × cadastro-executado × reporte de campo × **histórico de execuções** (`app_pp_mapa`
   — a 4ª camada, 2026-09, é um log permanente/insert-only em `pp_execucao`, independente do ciclo de
   atribuição ao vivo, que pode ser resetado/reprogramado à vontade sem perder o registro histórico de
-  quando cada trecho foi pesquisado). O cruzamento roda em
+  quando cada trecho foi pesquisado). **Redesenho 2026-09 (Fases 1-4, ver docs/MODULOS.md §4.3.7-4.3.8):**
+  o TR exige **5 passadas** de toda a rede → conceito de "passada" (`pp_execucao.n_passada`), `pp_recompute`
+  só conta traço posterior à programação, e o módulo foi separado por público: geofonista tem Pesquisa +
+  "Minha produtividade" pessoal simplificada (`app_pesquisa_minha`, `auth.uid()`); time interno tem, no
+  Auxiliar de Programação, **Programar** + **Acompanhamento** (tela `pp_acomp`: KPIs com 2 km + vaz/km por
+  km de rede, progresso das 5 passadas, mapa camadas↔passadas, resumo por colaborador). O cruzamento roda em
   **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
@@ -247,7 +252,8 @@ pwa/
   **Criação de matrículas** (`matriculas`, fila de captações `app_captacao_fila`/`_os`) e
   **Abertura de serviços** (`programacao_servicos`), que lança o nº da OS da COPASA para as
   **solicitações** (`app_abertura_fila`/`app_abertura_os`) **e** para as **ocorrências da pesquisa**
-  (`app_ocorrencia_fila`/`app_ocorrencia_os`).
+  (`app_ocorrencia_fila`/`app_ocorrencia_os`); **Programação de pesquisa** (programar+atribuir trechos) e
+  **Acompanhamento da pesquisa** (`pp_acomp`, dashboard de resultados do time interno — ver §4.3.8).
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.

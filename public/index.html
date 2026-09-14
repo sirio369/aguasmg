@@ -419,6 +419,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="matriculas"><div class="ic">🆕</div><div class="nm">Criação de matrículas</div></button>
       <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
       <button class="mod" data-go="programacao_pesquisa"><div class="ic">🔎</div><div class="nm">Programação de pesquisa</div></button>
+      <button class="mod" data-go="pp_acomp"><div class="ic">📊</div><div class="nm">Acompanhamento da pesquisa</div></button>
     </div>
   </main>
 
@@ -458,6 +459,39 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div class="sec" style="margin-top:22px">Programação por geofonista</div>
     <div id="ppResumo" style="margin-top:8px"></div>
+  </main>
+
+  <main id="pp_acomp" class="hidden">
+    <div class="bar"><button class="bk" id="paBack">‹ Auxiliar de Programação</button></div>
+    <h1>Acompanhamento da pesquisa</h1>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <select id="paCons" style="flex:1;min-width:140px"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
+      <select id="paColab" style="flex:1;min-width:140px"><option value="">Todos os coletores</option></select>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <span style="font-size:12px;color:var(--mut)">De</span>
+      <input id="paDe" type="date" style="flex:1;min-width:0;font-size:13px;padding:8px"/>
+      <span style="font-size:12px;color:var(--mut)">até</span>
+      <input id="paAte" type="date" style="flex:1;min-width:0;font-size:13px;padding:8px"/>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="paHoje" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Hoje</button>
+      <button id="paMes" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Este mês</button>
+      <button id="paTudo" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Tudo</button>
+    </div>
+    <div id="paCards" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
+    <div class="sec">Progresso do TR — cada trecho 5×</div>
+    <div id="paBar" style="display:flex;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:8px 0"></div>
+    <div id="paBarLeg" style="display:flex;gap:8px 14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:18px"></div>
+    <div class="sec">Mapa</div>
+    <div style="display:flex;gap:6px;margin:8px 0">
+      <button id="paModoCamadas" type="button" style="all:unset;cursor:pointer;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);text-align:center">Cobertura de rede</button>
+      <button id="paModoPassadas" type="button" style="all:unset;cursor:pointer;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);text-align:center">Passadas</button>
+    </div>
+    <div id="paLegend" style="display:flex;gap:8px 12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:8px"></div>
+    <div id="paMapa" style="height:48vh;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+    <div class="sec" style="margin-top:20px">Resumo por colaborador</div>
+    <div id="paResumo" style="overflow-x:auto;margin-top:8px"></div>
   </main>
 
   <main id="abertura_servicos" class="hidden">
@@ -864,7 +898,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','matriculas','roteiro','notificacoes','frota','condutor','frotas'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -888,6 +922,7 @@ function irPara(id){
   if(id==='entrevistadores') entInit();
   if(id==='programacao_servicos') pgInit();
   if(id==='programacao_pesquisa') ppInit();
+  if(id==='pp_acomp') paInit();
   if(id==='matriculas') mtInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
@@ -2615,6 +2650,138 @@ function prodDesenhar(d){
   if(bs.length){ let bb=bs[0]; for(let i=1;i<bs.length;i++) bb=bb.extend(bs[i]); try{prodMap.fitBounds(bb,{padding:[30,30],maxZoom:17});}catch(e){} }
 }
 
+// ---------- MÓDULO ACOMPANHAMENTO DA PESQUISA (interno — aprovador/admin) ----------
+// Dashboard do time interno: KPIs (2 km + vaz/km por km de rede) · progresso das 5 passadas do TR ·
+// mapa (modo camadas ↔ passadas) · resumo por colaborador. RPCs app_pp_acompanhamento / app_pp_mapa /
+// app_pp_passadas_bbox. Reaproveita prodHojeStr/prodMesIniStr do módulo de produtividade.
+let paMap=null, paMode='camadas', paLayers={}, paHeat=null;
+const PA_PASS_COL=['#B4B2A9','#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#04342C']; // 0..5 passadas
+function paInit(){
+  const cont=document.getElementById('paMapa');
+  if(window.L && !paMap){
+    cont.innerHTML='';
+    paMap=L.map('paMapa');
+    mapAddCamadaBase(paMap);
+    paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
+    paMap.on('moveend',()=>{ if(paMode==='passadas') paCarregarHeat(); });
+  }
+  const de=document.getElementById('paDe'), ate=document.getElementById('paAte');
+  if(de && !de.value) de.value=prodMesIniStr();
+  if(ate && !ate.value) ate.value=prodHojeStr();
+  paStyleModeBtns();
+  setTimeout(()=>{ if(paMap) paMap.invalidateSize(); },60);
+  paCarregarColabs();
+  paAtualizar();
+}
+async function paCarregarColabs(){
+  try{
+    const {data}=await sb.rpc('app_pp_colaboradores');
+    const s=document.getElementById('paColab');
+    s.innerHTML='<option value="">Todos os coletores</option>'+((data||[]).map(c=>'<option value="'+c.id+'">'+((c.nome||c.id)+(c.eu?' (você)':''))+'</option>').join(''));
+  }catch(e){}
+}
+function paFiltros(){
+  return {
+    p_consorcio: document.getElementById('paCons').value||null,
+    p_colaborador: document.getElementById('paColab').value||null,
+    p_data_ini: document.getElementById('paDe').value||null,
+    p_data_fim: document.getElementById('paAte').value||null
+  };
+}
+async function paAtualizar(){
+  try{
+    const {data,error}=await sb.rpc('app_pp_acompanhamento',paFiltros());
+    if(error)throw error;
+    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paResumo(data.resumo||[]);
+  }catch(e){ toast('Erro no acompanhamento: '+(e.message||e)); }
+  paMapaRefresh();
+}
+function paCards(k){
+  const cards=[
+    {lbl:'Km de rede pesquisado',val:Number(k.km_rede_pesquisado||0).toFixed(2)+' km'},
+    {lbl:'Km andado (reporte)',val:Number(k.km_andado||0).toFixed(2)+' km'},
+    {lbl:'Vazamentos',val:String(k.vazamentos||0)},
+    {lbl:'Vaz / km de rede',val:Number(k.vaz_km||0).toFixed(2)},
+    {lbl:'Cobertura da programação',val:Number(k.pct_cobertura||0).toFixed(0)+'%'},
+    {lbl:'Velocidade média',val:Number(k.velocidade_kmh||0).toFixed(1)+' km/h'}
+  ];
+  document.getElementById('paCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px"><div style="font-size:12px;color:var(--mut)">'+c.lbl+'</div><div style="font-size:21px;font-weight:700;margin-top:3px">'+c.val+'</div></div>').join('');
+}
+function paProgresso(arr){
+  const bar=document.getElementById('paBar'), leg=document.getElementById('paBarLeg');
+  const tot=arr.reduce((a,b)=>a+Number(b.km||0),0);
+  if(!tot){ bar.innerHTML=''; leg.innerHTML='<span>Sem rede no filtro.</span>'; return; }
+  bar.innerHTML=arr.map(b=>{
+    const w=(Number(b.km||0)/tot*100); if(w<=0) return '';
+    const lbl=(b.passada>=5?'5+':b.passada)+'× · '+Number(b.km||0).toFixed(0)+' km';
+    return '<div title="'+lbl+'" style="width:'+w+'%;background:'+PA_PASS_COL[b.passada]+'"></div>';
+  }).join('');
+  leg.innerHTML=arr.map(b=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:11px;height:11px;border-radius:3px;background:'+PA_PASS_COL[b.passada]+';display:inline-block"></i>'+(b.passada>=5?'5+':b.passada)+'× · '+Number(b.km||0).toFixed(0)+' km</span>').join('');
+}
+function paResumo(rows){
+  const el=document.getElementById('paResumo');
+  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem programação/execução no filtro.</p>'; return; }
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px">'
+    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;font-weight:400;padding:6px 4px">Colaborador</th><th style="font-weight:400;padding:6px 4px">km prog.</th><th style="font-weight:400;padding:6px 4px">km pesq.</th><th style="font-weight:400;padding:6px 4px">%</th><th style="font-weight:400;padding:6px 4px">vaz.</th><th style="font-weight:400;padding:6px 4px">km/h</th></tr></thead><tbody>'
+    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+(r.nome||'—')+'</td><td style="padding:7px 4px">'+Number(r.km_prog||0).toFixed(1)+'</td><td style="padding:7px 4px">'+Number(r.km_pesq||0).toFixed(1)+'</td><td style="padding:7px 4px">'+Number(r.pct||0).toFixed(0)+'%</td><td style="padding:7px 4px">'+(r.vazamentos||0)+'</td><td style="padding:7px 4px">'+Number(r.velocidade_kmh||0).toFixed(1)+'</td></tr>').join('')
+    +'</tbody></table>';
+}
+function paStyleModeBtns(){
+  [['paModoCamadas','camadas'],['paModoPassadas','passadas']].forEach(([id,m])=>{
+    const b=document.getElementById(id); if(!b) return;
+    const on=paMode===m;
+    b.style.background=on?'var(--acc)':'transparent';
+    b.style.color=on?'var(--acc-ink)':'inherit';
+    b.style.borderColor=on?'var(--acc)':'var(--line)';
+  });
+}
+function paSetMode(m){ paMode=m; paStyleModeBtns(); paMapaRefresh(); }
+function paClearLayers(){
+  Object.values(paLayers).forEach(l=>{ if(l&&paMap) paMap.removeLayer(l); });
+  paLayers={};
+  if(paHeat&&paMap){ paMap.removeLayer(paHeat); paHeat=null; }
+}
+function paLegendCamadas(){
+  document.getElementById('paLegend').innerHTML=[['#7c3aed','Programado'],['#15803d','Pesquisado'],['#d81b60','Reporte'],['#0891b2','Histórico'],['#1565c0','Ocorrência']]
+    .map(([c,l])=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:4px;border-radius:2px;background:'+c+';display:inline-block"></i>'+l+'</span>').join('');
+}
+function paLegendPassadas(){
+  document.getElementById('paLegend').innerHTML=PA_PASS_COL.map((c,i)=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:4px;border-radius:2px;background:'+c+';display:inline-block"></i>'+(i>=5?'5+':i)+'×</span>').join('');
+}
+async function paMapaRefresh(){
+  if(!paMap) return;
+  paClearLayers();
+  if(paMode==='passadas'){ paLegendPassadas(); paCarregarHeat(); return; }
+  paLegendCamadas();
+  const f=paFiltros();
+  try{
+    const {data,error}=await sb.rpc('app_pp_mapa',{p_colaborador:f.p_colaborador,p_consorcio:f.p_consorcio,p_data_ini:f.p_data_ini,p_data_fim:f.p_data_fim});
+    if(error)throw error;
+    const bs=[];
+    const addLinha=(key,geo,style)=>{ const fs=(geo&&geo.features)||[]; if(!fs.length) return; const ly=L.geoJSON(geo,{style:style}).addTo(paMap); paLayers[key]=ly; try{bs.push(ly.getBounds());}catch(e){} };
+    addLinha('prog',data.cadastro_pendente,{color:'#7c3aed',weight:5,opacity:.8});
+    addLinha('exec',data.cadastro_executado,{color:'#15803d',weight:5,opacity:.85});
+    addLinha('hist',data.historico_execucoes,{color:'#0891b2',weight:3,opacity:.7,dashArray:'2 6'});
+    addLinha('rep',data.reportes_campo,{color:'#d81b60',weight:4,opacity:.8});
+    if(data.ocorrencias&&(data.ocorrencias.features||[]).length){
+      paLayers.oc=L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paMap);
+      try{bs.push(paLayers.oc.getBounds());}catch(e){}
+    }
+    if(bs.length){ let bb=bs[0]; for(let i=1;i<bs.length;i++) bb=bb.extend(bs[i]); try{paMap.fitBounds(bb,{padding:[30,30],maxZoom:16});}catch(e){} }
+  }catch(e){ toast('Erro no mapa: '+(e.message||e)); }
+}
+async function paCarregarHeat(){
+  if(!paMap||paMode!=='passadas') return;
+  const b=paMap.getBounds(), cons=document.getElementById('paCons').value||null;
+  try{
+    const {data,error}=await sb.rpc('app_pp_passadas_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:cons});
+    if(error)throw error;
+    if(paHeat){ paMap.removeLayer(paHeat); paHeat=null; }
+    paHeat=L.geoJSON(data,{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.55};},
+      onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip(n+' passada(s)'); }}).addTo(paMap);
+  }catch(e){ toast('Erro no mapa de passadas: '+(e.message||e)); }
+}
+
 // ---------- MÓDULO PROGRAMAÇÃO DE PESQUISA ----------
 let ppMap=null, ppRedeLayer=null, ppSelLayer=null, ppDrawnLayer=null, ppDrawCtl=null, ppClearCtl=null;
 let ppSel=new Set();                 // rede_id selecionados
@@ -2829,6 +2996,16 @@ if($('#ppSemLimpar')) $('#ppSemLimpar').addEventListener('click',()=>{ const d=$
 if($('#ppModoVoltar')) $('#ppModoVoltar').addEventListener('click',ppSairColab);
 if($('#ppAtribuir')) $('#ppAtribuir').addEventListener('click',ppVincular);
 if($('#ppDesatribuir')) $('#ppDesatribuir').addEventListener('click',ppDesvincular);
+if($('#paBack')) $('#paBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
+if($('#paCons')) $('#paCons').addEventListener('change',paAtualizar);
+if($('#paColab')) $('#paColab').addEventListener('change',paAtualizar);
+if($('#paDe')) $('#paDe').addEventListener('change',paAtualizar);
+if($('#paAte')) $('#paAte').addEventListener('change',paAtualizar);
+if($('#paHoje')) $('#paHoje').addEventListener('click',()=>{document.getElementById('paDe').value=prodHojeStr();document.getElementById('paAte').value=prodHojeStr();paAtualizar();});
+if($('#paMes')) $('#paMes').addEventListener('click',()=>{document.getElementById('paDe').value=prodMesIniStr();document.getElementById('paAte').value=prodHojeStr();paAtualizar();});
+if($('#paTudo')) $('#paTudo').addEventListener('click',()=>{document.getElementById('paDe').value='';document.getElementById('paAte').value='';paAtualizar();});
+if($('#paModoCamadas')) $('#paModoCamadas').addEventListener('click',()=>paSetMode('camadas'));
+if($('#paModoPassadas')) $('#paModoPassadas').addEventListener('click',()=>paSetMode('passadas'));
 
 // ---------- MÓDULO CAPTAÇÃO DE CLIENTES (mockup) ----------
 let captFotos={};
