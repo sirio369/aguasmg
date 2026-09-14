@@ -489,13 +489,28 @@ sem intervenção manual.
   dentro do `INSERT` do trecho (`trg_pp_cruzar`→`pp_recompute`), então ao voltar o await o segmento já
   está `executado` e some da camada roxa na hora. **Offline:** fica pra `sincronizar()`, que também
   re-carrega a camada roxa se a tela Pesquisa estiver aberta quando a fila sobe.
-- **Produtividade** — toggle **"🔗 Cruzar com a programação da pesquisa"** (`app_pp_mapa(p_colaborador,
-  p_consorcio, p_data_ini, p_data_fim, p_usuario)`) — 4 camadas com legenda-filtro clicável (🟣 pendente
-  cadastro · 🟢 executado cadastro · 🔴 reporte de campo · 🔵 **histórico de execuções**, tracejado,
-  **2026-09-14, novo, desligada por padrão** — ver 4.3.6) + KPIs (km programado/executado/% cobertura/nº
-  pendentes/nº execuções no histórico). Respeita os filtros de pessoa/data já existentes na tela.
-- **RPCs** `app_pp_minhas`/`app_pp_mapa`: propriedade `segmento_id` no GeoJSON (renomeada de `rede_id`
+- **Minha produtividade (geofonista) — simplificada na Fase 3 (2026-09-14):** era uma tela de análise
+  (dropdown "Todos os coletores", cards de km andado/velocidade/vaz-km, toggle "Cruzar com a
+  programação" com 4 camadas). Virou **consulta pessoal** do geofonista: **sempre o usuário logado**
+  (`auth.uid()`, sem dropdown), 3 camadas fixas — 🟣 **pendente** da programação dele (ATEMPORAL — é a
+  lista de tarefas, o filtro de data **não** a afeta) · 🟢 **pesquisado** no período · 🔴 **reporte de
+  campo** no período — e 3 cards (km pendente · km de rede pesquisado · km andado). A análise profunda
+  (dois km, vaz/km por km de rede, cruzamento, histórico entre passadas, comparação entre coletores)
+  migrou pro **Acompanhamento** do time interno (Fase 4, ver 4.3.7).
+  - **RPC nova `app_pesquisa_minha(p_data_ini, p_data_fim)`** (`SECURITY DEFINER`, baseada em
+    `auth.uid()` — nada de nome/uuid vindo do cliente). Chaves `pendente`/`executado`/`reporte`, cada uma
+    FeatureCollection + `n` + `km`. `pendente` vem de `programacao_pesquisa` (status pendente, sem filtro
+    de data); `executado` de `pp_execucao` (filtrado por `executado_em`); `reporte` de `pesquisa_trecho`.
+  - **Pegadinha do casamento traço↔usuário:** `pesquisa_trecho.usuario` grava
+    `full_name` do JWT **ou** o e-mail como fallback (visto: gravou e-mail, enquanto `perfil.nome` é o
+    nome de exibição). Então o `reporte` casa por **`usuario in (nome, email)`** do próprio `auth.uid()`,
+    não só por nome — senão os traços dele não apareceriam.
+  - **RPCs `app_pesquisa_produtividade`/`app_pesquisa_filtros` ficaram órfãs** do frontend (a tela não
+    as usa mais); deixadas no banco por ora (a Fase 4 terá sua própria RPC de análise).
+- **RPCs `app_pp_minhas`/`app_pp_mapa`:** propriedade `segmento_id` no GeoJSON (renomeada de `rede_id`
   na Fase E — nenhum código do frontend lia esse campo por nome, só exibia via popup genérico).
+  `app_pp_mapa` (com a camada `historico_execucoes`, 4.3.6) passa a servir a tela de **Acompanhamento**
+  (Fase 4), não mais a produtividade do geofonista.
 
 #### 4.3.6 Histórico permanente de execuções — `pp_execucao` (2026-09-14, novo)
 

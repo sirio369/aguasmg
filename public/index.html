@@ -351,7 +351,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="produtividade" class="hidden">
     <div class="bar"><button class="bk" id="prodBack">‹ Pesquisa</button></div>
     <h1>Minha produtividade</h1>
-    <select id="prodUser" style="width:100%;font-size:13px;padding:9px 10px;margin-bottom:8px"></select>
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
       <span style="font-size:12px;color:var(--mut)">De</span>
       <input id="prodDe" type="date" style="flex:1;min-width:0;font-size:13px;padding:8px 8px"/>
@@ -363,16 +362,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="prodMes" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Este mês</button>
       <button id="prodTudo" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Tudo</button>
     </div>
-    <div id="prodCards" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px"></div>
-    <button id="prodCruzar" type="button" class="pchip">🔗 Cruzar com a programação</button>
-    <div id="prodCruzPanel" class="hidden" style="margin-bottom:10px">
-      <div id="prodCruzKpi" style="display:flex;flex-wrap:wrap;gap:6px 8px;margin-bottom:8px"></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        <button type="button" class="fchip" data-f="P" data-c="#7c3aed">Pendente (cadastro)</button>
-        <button type="button" class="fchip" data-f="E" data-c="#15803d">Pesquisado (cadastro)</button>
-        <button type="button" class="fchip" data-f="R" data-c="#d81b60">Reporte de campo</button>
-        <button type="button" class="fchip" data-f="H" data-c="#0891b2">Histórico de execuções</button>
-      </div>
+    <div id="prodCards" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-bottom:10px;font-size:12px;color:var(--mut)">
+      <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:15px;height:4px;border-radius:2px;background:#7c3aed;display:inline-block"></i>Programado (pendente)</span>
+      <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:15px;height:4px;border-radius:2px;background:#15803d;display:inline-block"></i>Pesquisado</span>
+      <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:15px;height:4px;border-radius:2px;background:#d81b60;display:inline-block"></i>Reporte de campo</span>
     </div>
     <div id="prodMapa" style="height:42vh;min-height:250px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
@@ -1591,14 +1585,11 @@ if($('#pqDescartar')) $('#pqDescartar').addEventListener('click',pqDescartar);
 if($('#pqOcorr')) $('#pqOcorr').addEventListener('click',pqOcorrencia);
 if($('#pqProd')) $('#pqProd').addEventListener('click',()=>irPara('produtividade'));
 if($('#prodBack')) $('#prodBack').addEventListener('click',()=>irPara('pesquisa'));
-if($('#prodUser')) $('#prodUser').addEventListener('change',prodAtualizar);
 if($('#prodDe')) $('#prodDe').addEventListener('change',prodAtualizar);
 if($('#prodAte')) $('#prodAte').addEventListener('change',prodAtualizar);
 if($('#prodHoje')) $('#prodHoje').addEventListener('click',()=>{document.getElementById('prodDe').value=prodHojeStr();document.getElementById('prodAte').value=prodHojeStr();prodAtualizar();});
 if($('#prodMes')) $('#prodMes').addEventListener('click',()=>{document.getElementById('prodDe').value=prodMesIniStr();document.getElementById('prodAte').value=prodHojeStr();prodAtualizar();});
 if($('#prodTudo')) $('#prodTudo').addEventListener('click',()=>{document.getElementById('prodDe').value='';document.getElementById('prodAte').value='';prodAtualizar();});
-if($('#prodCruzar')) $('#prodCruzar').addEventListener('click',prodCruzToggle);
-document.querySelectorAll('#prodCruzPanel .fchip').forEach(b=>b.addEventListener('click',()=>prodFchipClick(b)));
 if($('#ocBack')) $('#ocBack').addEventListener('click',()=>irPara('pesquisa'));
 // wiring captação
 ['cap_matricula','cap_endereco','cap_categoria','cap_economias','cap_ocupacao','cap_nome','cap_mae','cap_cpf','cap_rg','cap_nasc','cap_email','cap_tel'].forEach(id=>{
@@ -2565,8 +2556,10 @@ function ocRegistrar(){
   irPara('pesquisa');
 }
 
-// ---------- MÓDULO PRODUTIVIDADE ----------
-let prodMap=null, prodTr=null, prodOc=null;
+// ---------- MÓDULO PRODUTIVIDADE (Minha produtividade — geofonista) ----------
+// Consulta pessoal (auth.uid()) via app_pesquisa_minha: 3 camadas — pendente (ATEMPORAL) ·
+// executado (período) · reporte de campo (período). Análise do time interno fica no Acompanhamento.
+let prodMap=null, prodPendL=null, prodExecL=null, prodRepL=null;
 function prodHojeStr(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
 function prodMesIniStr(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-01';}
 function prodInit(){
@@ -2581,102 +2574,45 @@ function prodInit(){
   if(de && !de.value) de.value=prodMesIniStr();   // padrão: mês corrente
   if(ate && !ate.value) ate.value=prodHojeStr();
   setTimeout(()=>{ if(prodMap) prodMap.invalidateSize(); },60);
-  prodCarregarFiltros().then(prodAtualizar);
-}
-async function prodCarregarFiltros(){
-  try{
-    const {data}=await sb.rpc('app_pesquisa_filtros');
-    const us=(data&&data.usuarios)||[];
-    const sel=document.getElementById('prodUser'); if(!sel) return;
-    const meu=$('#nome').textContent;
-    sel.innerHTML=['<option value="__todos">Todos os coletores</option>'].concat(us.map(u=>'<option value="'+u+'">'+u+'</option>')).join('');
-    sel.value = us.indexOf(meu)>=0 ? meu : '__todos';
-  }catch(e){}
+  prodAtualizar();
 }
 async function prodAtualizar(){
-  const su=document.getElementById('prodUser'); if(!su) return;
-  const u=su.value==='__todos'?null:su.value;
   const de=(document.getElementById('prodDe').value||null);
   const ate=(document.getElementById('prodAte').value||null);
   try{
-    const {data,error}=await sb.rpc('app_pesquisa_produtividade',{p_usuario:u,p_data_ini:de,p_data_fim:ate});
+    const {data,error}=await sb.rpc('app_pesquisa_minha',{p_data_ini:de,p_data_fim:ate});
     if(error)throw error;
     prodCards(data); prodDesenhar(data);
   }catch(e){toast('Erro na produtividade: '+(e.message||e));}
-  prodCruzAtualizar();
-}
-let prodPend=null, prodExec=null, prodHist=null, prodCruzOn=false;
-let prodFilt={P:true,E:true,R:true,H:false};
-function prodCruzToggle(){
-  prodCruzOn=!prodCruzOn;
-  document.getElementById('prodCruzar').classList.toggle('on',prodCruzOn);
-  document.getElementById('prodCruzPanel').classList.toggle('hidden',!prodCruzOn);
-  if(prodCruzOn){ prodPintarFchips(); prodCruzAtualizar(); }
-  else {
-    [prodPend,prodExec,prodHist].forEach(l=>{ if(l&&prodMap) prodMap.removeLayer(l); }); prodPend=prodExec=prodHist=null;
-    if(prodTr&&prodMap&&!prodMap.hasLayer(prodTr)) prodTr.addTo(prodMap);
-  }
-}
-function prodPintarFchips(){
-  document.querySelectorAll('#prodCruzPanel .fchip').forEach(b=>{
-    b.style.setProperty('--c',b.dataset.c);
-    b.classList.toggle('on',!!prodFilt[b.dataset.f]);
-  });
-}
-function prodFchipClick(b){ prodFilt[b.dataset.f]=!prodFilt[b.dataset.f]; prodPintarFchips(); prodCruzAtualizar(); }
-async function prodCruzAtualizar(){
-  if(!prodCruzOn || !prodMap) return;
-  const su=document.getElementById('prodUser'); const u=(su&&su.value!=='__todos')?su.value:null;
-  const de=(document.getElementById('prodDe').value||null), ate=(document.getElementById('prodAte').value||null);
-  try{
-    const {data,error}=await sb.rpc('app_pp_mapa',{p_usuario:u,p_data_ini:de,p_data_fim:ate});
-    if(error)throw error;
-    if(prodPend){prodMap.removeLayer(prodPend);prodPend=null;}
-    if(prodExec){prodMap.removeLayer(prodExec);prodExec=null;}
-    if(prodHist){prodMap.removeLayer(prodHist);prodHist=null;}
-    const cp=(data.cadastro_pendente&&data.cadastro_pendente.features)||[];
-    const ce=(data.cadastro_executado&&data.cadastro_executado.features)||[];
-    const he=(data.historico_execucoes&&data.historico_execucoes.features)||[];
-    if(prodFilt.P&&cp.length) prodPend=L.geoJSON(data.cadastro_pendente,{style:{color:'#7c3aed',weight:5,opacity:.8}}).bindTooltip('pendente (cadastro)').addTo(prodMap);
-    if(prodFilt.E&&ce.length) prodExec=L.geoJSON(data.cadastro_executado,{style:{color:'#15803d',weight:5,opacity:.8}}).bindTooltip('pesquisado (cadastro)').addTo(prodMap);
-    if(prodFilt.H&&he.length) prodHist=L.geoJSON(data.historico_execucoes,{style:{color:'#0891b2',weight:3,opacity:.7,dashArray:'2,6'},
-      onEachFeature:(f,l)=>{ const p=f.properties||{}; l.bindTooltip('🗂️ '+(p.colaborador||'?')+' · '+String(p.executado_em||'').slice(0,10)+' · '+(p.comprimento||0)+' m'+(p.origem==='heranca_vizinho'?' · herdado do vizinho':'')); }
-    }).addTo(prodMap);
-    if(prodTr){ if(prodFilt.R){ if(!prodMap.hasLayer(prodTr)) prodTr.addTo(prodMap); } else prodMap.removeLayer(prodTr); }
-    const k=data.kpis||{};
-    document.getElementById('prodCruzKpi').innerHTML=
-       '<span class="kchip">📏 <b>'+Number(k.km_programado||0).toFixed(2)+'</b> km prog.</span>'
-      +'<span class="kchip">✅ <b>'+Number(k.km_executado||0).toFixed(2)+'</b> km feito</span>'
-      +'<span class="kchip"><b>'+Number(k.pct_cobertura||0).toFixed(0)+'%</b> cobertura</span>'
-      +'<span class="kchip"><b>'+(k.n_pendentes||0)+'</b> pendente(s)</span>'
-      +'<span class="kchip">🗂️ <b>'+(data.historico_execucoes&&data.historico_execucoes.n||0)+'</b> execução(ões) no histórico</span>';
-  }catch(e){ toast('Erro no cruzamento: '+(e.message||e)); }
 }
 function prodCards(d){
+  const pend=d.pendente||{}, exec=d.executado||{}, rep=d.reporte||{};
   const cards=[
-    {ic:'📏',lbl:'Km pesquisado',val:(Number(d.km||0)).toFixed(2)+' km'},
-    {ic:'⚡',lbl:'Velocidade',val:(Number(d.velocidade_kmh||0)).toFixed(1)+' km/h'},
-    {ic:'💧',lbl:'Vazamentos',val:String(d.vazamentos||0)},
-    {ic:'📊',lbl:'Vaz./km',val:(Number(d.vaz_km||0)).toFixed(2)}
+    {ic:'🟣',lbl:'Pendente (programação)',val:Number(pend.km||0).toFixed(2)+' km',sub:(pend.n||0)+' trecho(s) · atemporal'},
+    {ic:'🟢',lbl:'Pesquisado no período',val:Number(exec.km||0).toFixed(2)+' km',sub:(exec.n||0)+' trecho(s) de rede'},
+    {ic:'🔴',lbl:'Andado no período',val:Number(rep.km||0).toFixed(2)+' km',sub:(rep.n||0)+' trajeto(s)'}
   ];
-  document.getElementById('prodCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px"><div style="font-size:12px;color:var(--mut)">'+c.ic+' '+c.lbl+'</div><div style="font-size:23px;font-weight:700;margin-top:4px">'+c.val+'</div></div>').join('');
+  document.getElementById('prodCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px"><div style="font-size:12px;color:var(--mut)">'+c.ic+' '+c.lbl+'</div><div style="font-size:22px;font-weight:700;margin-top:4px">'+c.val+'</div><div style="font-size:11px;color:var(--mut);margin-top:2px">'+c.sub+'</div></div>').join('');
 }
 function prodDesenhar(d){
   if(!prodMap) return;
-  if(prodTr){prodMap.removeLayer(prodTr);prodTr=null;}
-  if(prodOc){prodMap.removeLayer(prodOc);prodOc=null;}
+  [prodPendL,prodExecL,prodRepL].forEach(l=>{ if(l) prodMap.removeLayer(l); });
+  prodPendL=prodExecL=prodRepL=null;
   const bs=[];
-  const ft=(d.trechos&&d.trechos.features)||[];
-  if(ft.length){
-    prodTr=L.geoJSON(d.trechos,{style:{color:'#d81b60',weight:5,opacity:.85}}).addTo(prodMap);
-    bs.push(prodTr.getBounds());
+  if(d.pendente&&(d.pendente.features||[]).length){
+    prodPendL=L.geoJSON(d.pendente,{style:{color:'#7c3aed',weight:5,opacity:.8}}).bindTooltip('programado (pendente)').addTo(prodMap);
+    try{bs.push(prodPendL.getBounds());}catch(e){}
   }
-  const fo=(d.ocorrencias&&d.ocorrencias.features)||[];
-  if(fo.length){
-    prodOc=L.geoJSON(d.ocorrencias,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((f.properties&&f.properties.tipo)||'vazamento')}).addTo(prodMap);
-    bs.push(prodOc.getBounds());
+  if(d.executado&&(d.executado.features||[]).length){
+    prodExecL=L.geoJSON(d.executado,{style:{color:'#15803d',weight:5,opacity:.85},
+      onEachFeature:(f,l)=>{const p=f.properties||{};l.bindTooltip('pesquisado · '+String(p.executado_em||'').slice(0,10)+(p.n_passada?(' · passada '+p.n_passada):''));}}).addTo(prodMap);
+    try{bs.push(prodExecL.getBounds());}catch(e){}
   }
-  if(bs.length){ let bb=bs[0]; for(let i=1;i<bs.length;i++) bb=bb.extend(bs[i]); prodMap.fitBounds(bb,{padding:[30,30],maxZoom:17}); }
+  if(d.reporte&&(d.reporte.features||[]).length){
+    prodRepL=L.geoJSON(d.reporte,{style:{color:'#d81b60',weight:4,opacity:.8}}).bindTooltip('reporte de campo').addTo(prodMap);
+    try{bs.push(prodRepL.getBounds());}catch(e){}
+  }
+  if(bs.length){ let bb=bs[0]; for(let i=1;i<bs.length;i++) bb=bb.extend(bs[i]); try{prodMap.fitBounds(bb,{padding:[30,30],maxZoom:17});}catch(e){} }
 }
 
 // ---------- MÓDULO PROGRAMAÇÃO DE PESQUISA ----------
