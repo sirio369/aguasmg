@@ -664,6 +664,10 @@ async function sincronizar(){
   await atualizarFila();
   const lg=document.getElementById('loggers');
   if(ok&&lg&&!lg.classList.contains('hidden')) carregarLoggers();
+  // trecho de pesquisa sincronizado da fila (offline→online) pode ter marcado programados como
+  // executados no servidor — recarrega a camada roxa se a tela Pesquisa estiver aberta.
+  const pq=document.getElementById('pesquisa');
+  if(ok&&pq&&!pq.classList.contains('hidden')&&typeof pqCarregarProg==='function') pqCarregarProg();
   return {ok,total:itens.length,falhou};
 }
 async function atualizarFila(){
@@ -2487,8 +2491,13 @@ function pqConfirmar(){
     p_dispositivo:navigator.userAgent.slice(0,60)
   }};
   pqTrajetos.push(t); pqPend=null; pqDesenhar(); pqSync();
-  enviarOuEnfileirar(item,'✓ Trecho salvo ('+Math.round(t.dist)+' m)');
-  setTimeout(pqCarregarProg,1800);   // o cruzamento no servidor pode ter marcado programados como executados
+  const online=navigator.onLine;
+  enviarOuEnfileirar(item,'✓ Trecho salvo ('+Math.round(t.dist)+' m)').then(()=>{
+    // online: o cruzamento (trg_pp_cruzar→pp_recompute) roda SÍNCRONO dentro do INSERT do trecho,
+    // então quando o envio resolve o segmento programado já virou executado no servidor —
+    // recarrega e ele some da camada roxa na hora (sem chute de timeout). Offline: fica pra sincronizar().
+    if(online) pqCarregarProg();
+  });
 }
 function pqDescartar(){ pqPend=null; pqDesenhar(); pqSync(); }
 function pqDesenhar(){

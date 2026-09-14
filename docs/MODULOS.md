@@ -483,8 +483,12 @@ sem intervenção manual.
 
 - **Pesquisa** (`pqInit`/`pqCarregarProg`) — camada roxa da programação do próprio usuário
   (`app_pp_minhas`, enquadra o mapa nela na 1ª carga); popup "🧭 Navegar até aqui" (Google Maps); botão
-  📍 recentraliza na posição GPS. Após confirmar um trecho, re-consulta com atraso (o cruzamento no
-  servidor pode ter virado programado→executado, some do mapa).
+  📍 recentraliza na posição GPS. **Sumiço instantâneo do executado (Fase 2, 2026-09-14):** ao confirmar
+  um trecho **online**, o `pqCarregarProg` é re-disparado **quando o envio resolve** (encadeado no
+  `.then` do `enviarOuEnfileirar`), não mais num `setTimeout` chutado — o cruzamento roda **síncrono**
+  dentro do `INSERT` do trecho (`trg_pp_cruzar`→`pp_recompute`), então ao voltar o await o segmento já
+  está `executado` e some da camada roxa na hora. **Offline:** fica pra `sincronizar()`, que também
+  re-carrega a camada roxa se a tela Pesquisa estiver aberta quando a fila sobe.
 - **Produtividade** — toggle **"🔗 Cruzar com a programação da pesquisa"** (`app_pp_mapa(p_colaborador,
   p_consorcio, p_data_ini, p_data_fim, p_usuario)`) — 4 camadas com legenda-filtro clicável (🟣 pendente
   cadastro · 🟢 executado cadastro · 🔴 reporte de campo · 🔵 **histórico de execuções**, tracejado,
