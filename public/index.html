@@ -740,6 +740,28 @@ $('#salvar').addEventListener('click',async()=>{
 });
 function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;document.querySelectorAll('#pressao .fFoto').forEach(i=>i.value='');$('#fotoPrev').classList.add('hidden');validar();}
 
+// ---------- MAPAS — camada base rua/satélite (compartilhado por todos os módulos com mapa) ----------
+function mapAddCamadaBase(map,tileOpts,ctlPos){
+  tileOpts=Object.assign({maxZoom:19},tileOpts||{});
+  const rua=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',Object.assign({attribution:'© OpenStreetMap'},tileOpts)).addTo(map);
+  const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',Object.assign({attribution:'Tiles © Esri'},tileOpts));
+  let emSat=false;
+  const Btn=L.Control.extend({options:{position:ctlPos||'topright'},onAdd:function(){
+    const b=L.DomUtil.create('button','map-sat-toggle');
+    b.type='button'; b.title='Alternar mapa/satélite';
+    b.textContent='🛰️';
+    b.style.cssText='width:34px;height:34px;font-size:16px;line-height:34px;text-align:center;background:#fff;border:1px solid #bbb;border-radius:6px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)';
+    L.DomEvent.disableClickPropagation(b);
+    b.onclick=function(){
+      emSat=!emSat;
+      if(emSat){ map.removeLayer(rua); sat.addTo(map); b.textContent='🗺️'; }
+      else { map.removeLayer(sat); rua.addTo(map); b.textContent='🛰️'; }
+    };
+    return b;
+  }});
+  map.addControl(new Btn());
+}
+
 // ---------- TESTE DE ESTANQUEIDADE (pontos de referência p/ bater pressão) ----------
 let estData=[], estFiltroS='todos', estView='lista', estMap=null, estMarkers=null, prAlvo=null, estLimites=null, estLimLayer=null;
 const EST_SIT={ todos:{lbl:'Todos'}, pendente:{lbl:'Pendente',bg:'--warn-bg',fg:'--warn',cor:'#e0a300'}, medido:{lbl:'Medido',bg:'--ok-bg',fg:'--ok',cor:'#1a7f4b'} };
@@ -801,7 +823,7 @@ function estSetView(v){
 function estMapaRender(){
   const cont=$('#estMapa');
   if(!window.L){cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
-  if(!estMap){ cont.innerHTML=''; estMap=L.map('estMapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(estMap); estMarkers=L.layerGroup().addTo(estMap); }
+  if(!estMap){ cont.innerHTML=''; estMap=L.map('estMapa'); mapAddCamadaBase(estMap); estMarkers=L.layerGroup().addTo(estMap); }
   setTimeout(()=>estMap.invalidateSize(),0);
   if(!estLimLayer) estDesenharLimites();
   estMarkers.clearLayers();
@@ -958,7 +980,7 @@ function renderMapa(){
   if(!lgMap){
     cont.innerHTML='';
     lgMap=L.map('lgMapa');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(lgMap);
+    mapAddCamadaBase(lgMap);
     lgMarkers=L.layerGroup().addTo(lgMap);
   }
   setTimeout(()=>lgMap.invalidateSize(),0);
@@ -1877,7 +1899,7 @@ function vrpRenderLista(){
 function vrpRenderMapa(){
   const cont=$('#vrpMapa');
   if(!window.L){ cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>'; return; }
-  if(!vrpMap){ cont.innerHTML=''; vrpMap=L.map('vrpMapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(vrpMap); vrpMarkers=L.layerGroup().addTo(vrpMap); }
+  if(!vrpMap){ cont.innerHTML=''; vrpMap=L.map('vrpMapa'); mapAddCamadaBase(vrpMap); vrpMarkers=L.layerGroup().addTo(vrpMap); }
   setTimeout(()=>vrpMap.invalidateSize(),0);
   vrpMarkers.clearLayers();
   const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&vrpMatchJ(p)&&p.lat&&p.lon);
@@ -2056,7 +2078,7 @@ function cadInit(){
   if(!cadMap){
     document.getElementById('cadMapa').innerHTML='';
     cadMap=L.map('cadMapa');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(cadMap);
+    mapAddCamadaBase(cadMap);
     cadMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
     cadMap.on('moveend',function(){clearTimeout(cadDeb);cadDeb=setTimeout(cadAtualizar,300);});
     cadFiltrosRender();
@@ -2153,7 +2175,7 @@ async function rlInit(){
   if(!rlMap){
     document.getElementById('rlMapa').innerHTML='';
     rlMap=L.map('rlMapa');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(rlMap);
+    mapAddCamadaBase(rlMap);
     rlMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?13:11);
   }
   setTimeout(function(){rlMap.invalidateSize();},60);
@@ -2360,7 +2382,7 @@ function pqInit(){
   if(!pqMap){
     cont.innerHTML='';
     pqMap=L.map('pqMapa');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(pqMap);
+    mapAddCamadaBase(pqMap);
     pqProgLayer=L.layerGroup().addTo(pqMap);   // trechos programados p/ este geofonista
     pqLayer=L.layerGroup().addTo(pqMap);
     pqMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?17:12);
@@ -2542,7 +2564,7 @@ function prodInit(){
   if(window.L && !prodMap){
     cont.innerHTML='';
     prodMap=L.map('prodMapa');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(prodMap);
+    mapAddCamadaBase(prodMap);
     prodMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
   }
   const de=document.getElementById('prodDe'), ate=document.getElementById('prodAte');
@@ -2660,7 +2682,7 @@ function ppInit(){
   if(!ppMap){
     cont.innerHTML='';
     ppMap=L.map('ppMapa').setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?16:13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.55,attribution:'© OpenStreetMap'}).addTo(ppMap);
+    mapAddCamadaBase(ppMap,{opacity:.55},'topleft');
     ppRedeLayer=L.layerGroup().addTo(ppMap);
     ppSelLayer=L.layerGroup().addTo(ppMap);   // seleção — sempre visível, por cima dos filtros
     ppDrawnLayer=L.featureGroup().addTo(ppMap);
@@ -5021,7 +5043,7 @@ function prProdInit(){
   if(window.L && !prpMap){
     cont.innerHTML='';
     prpMap=L.map('prpMapa');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(prpMap);
+    mapAddCamadaBase(prpMap);
     prpMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
   }
   const de=document.getElementById('prpDe'), ate=document.getElementById('prpAte');

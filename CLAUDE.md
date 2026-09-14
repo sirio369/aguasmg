@@ -189,6 +189,9 @@ pwa/
   (`#idDaTela .mod{...}`), como em `#home` (2026-09, botões menores pra caber sem rolar).
 - **Relatórios/PDF** (termo de equipamento, comprovantes, ficha de logger): overlay `#relatorio`
   com `REL_CSS`, impressão via `window.print()`.
+- **Mapas (Leaflet):** todo mapa novo deve chamar `mapAddCamadaBase(map,tileOpts,ctlPos)` em vez de
+  criar seu próprio `L.tileLayer(...)` — é o que dá o botão pequeno de alternar rua/satélite (Esri
+  World Imagery, grátis) já usado nos 9 mapas do app (2026-09). Detalhe em `docs/MODULOS.md` §1.
 
 ## 6. Mapa de módulos (tela → funções/RPCs principais)
 
