@@ -415,12 +415,17 @@ sem intervenção manual.
 - Vincula (`app_pp_atribuir(p_rede_ids bigint[], p_colaborador, p_sobrescrever)`) / desvincula
   (`app_pp_desatribuir(p_rede_ids bigint[])`) — **`p_rede_ids` continua com esse nome** (zero mudança no
   frontend), mas **os valores agora são `rede_pp_segmento.id`**, não mais `rede.id`. Desvincular
-  **deleta** a linha e reprogramar (`sobrescrever=true`) **reseta** ela pra `pendente` — **sem trava,
-  mesmo se já `executado`** (decisão de produto: reprogramar/re-pesquisar o mesmo trecho é comum e tem
-  que continuar livre — ex.: filtro "não pesquisado desde X"). Isso é **seguro** porque a linha de
-  `programacao_pesquisa` é só o **ciclo de atribuição atual** — o fato permanente "isso foi pesquisado
-  em tal data" mora em outro lugar, ver **4.3.6**. (Uma trava foi tentada e revertida no mesmo dia —
-  bloqueava reprogramar um trecho já executado, o que quebrava a pesquisa repetida legítima.)
+  **deleta** a linha. Reprogramar (`sobrescrever=true`, o que o frontend sempre manda) **apaga+recria**
+  a linha (id novo, `programado_em=agora`) — **sem trava, mesmo se já `executado`**: reprogramar/
+  re-pesquisar o mesmo trecho é comum e tem que continuar livre (o TR exige **5 passadas** de toda a
+  rede ao longo do contrato). Isso é **seguro** porque `programacao_pesquisa` é só a **atribuição atual
+  (a passada corrente)** — o fato permanente "isso foi pesquisado em tal data, na Nª passada" mora no
+  histórico, ver **4.3.6**. **Por que apaga+recria e não `UPDATE` no lugar (Fase 1, 2026-09-14):** cada
+  passada precisa de um `programacao_pesquisa.id` **novo**, senão o dedup do histórico (que é por
+  `programacao_id`, 4.3.6) **bloquearia** o lançamento da 2ª passada. Apagar a linha antiga não perde
+  nada — a passada concluída já está salva em `pp_execucao` (o `on delete set null` do backlink só
+  desliga o vínculo). (Uma trava de imutabilidade foi tentada e revertida antes disso — bloqueava
+  reprogramar trecho já executado, o que quebrava a re-pesquisa legítima.)
 - Lista de colaboradores clicável (`app_pp_colaboradores`, inclui o próprio usuário logado) filtra o mapa
   pra "só a programação dele" (`app_pp_por_colaborador`). Botão "✕ Limpar seleção", filtro "não pesquisado
   desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`), legenda clicável (filtro de status por cor).
@@ -439,7 +444,9 @@ sem intervenção manual.
 - **`pp_recompute(p_segmento_ids bigint[] default null)`** (null = recalcula tudo — usado por
   `app_pp_recruzar` ao mudar config, e pelo backfill/migração da Fase E):
   1. Zera `coberto_m`/`status='pendente'` dos segmentos alvo.
-  2. Pra cada `(segmento, trecho)` a até `tol_m` um do outro: `st_dump(st_linemerge(st_intersection(
+  2. Pra cada `(segmento, trecho)` a até `tol_m` um do outro **e com o trecho posterior à programação
+     do segmento** (`t.inicio_ts >= programado_em at time zone 'America/Sao_Paulo'` — **filtro da Fase 1,
+     2026-09-14**; ver "Por que o filtro de tempo" abaixo): `st_dump(st_linemerge(st_intersection(
      st_buffer(trecho, tol_m), segmento.geom)))` — dumpa em pedacinhos, filtra só os **paralelos**
      (diferença de azimute entre o pedacinho e o trecho ≤ `max_ang_deg`, módulo π via
      `a - pi()*floor(a/pi())` — `mod()` não aceita `double precision`), soma o comprimento
@@ -508,7 +515,9 @@ vontade — o histórico já está salvo em outro lugar.
   resegmentação), `geom` (**snapshot** da geometria no momento — não depende do segmento ainda existir),
   `comprimento_m`/`coberto_m`/`colaborador_uuid`/`programado_por`/`programado_em`/`executado_em`/
   `primeiro_trecho_id` (cópia do estado de `programacao_pesquisa` no instante do flip), `origem`
-  (`cobertura_direta` | `heranca_vizinho` | `desconhecido`), **`programacao_id`** (FK
+  (`cobertura_direta` | `heranca_vizinho` | `desconhecido`), **`n_passada`** (Fase 1 — a Nª vez que
+  **esse segmento** foi pesquisado: `1 + count(*)` de linhas já existentes em `pp_execucao` pro mesmo
+  `segmento_id` no instante do insert; meta do TR = 5), **`programacao_id`** (FK
   `programacao_pesquisa.id`, `ON DELETE SET NULL`, **`UNIQUE`** — é a chave de deduplicação, ver
   abaixo). RLS ligada, **sem policy** — mesmo padrão de `programacao_pesquisa`/`pp_config` (só acessível
   via função `SECURITY DEFINER`, dona da tabela bypassa RLS por não ter `FORCE ROW LEVEL SECURITY`).
@@ -539,12 +548,47 @@ vontade — o histórico já está salvo em outro lugar.
   ser potencialmente densa/sobreposta), renderizado tracejado (`dashArray:'2,6'`) pra não se confundir
   com a camada sólida "pesquisado (cadastro)"; tooltip mostra colaborador/data/comprimento e "herdado do
   vizinho" quando `origem='heranca_vizinho'`.
-- **Fora de escopo (deliberado):** `app_pp_resumo`/`app_pp_por_colaborador`/`app_pp_minhas`/KPIs de
-  `app_pp_mapa` continuam lendo o estado **ao vivo** de `programacao_pesquisa` (ciclo atual), não
-  `pp_execucao` — não foram redesenhados pra somar histórico entre ciclos (ex.: km "executado" não vira
-  "km executado somando todas as vezes que cada trecho foi pesquisado"). Se isso for necessário no
-  futuro, é uma decisão de produto separada (como contar produtividade quando o mesmo trecho é
-  pesquisado 2+ vezes), não decidida ainda.
+- **Ainda lendo estado ao vivo:** `app_pp_resumo`/`app_pp_por_colaborador`/`app_pp_minhas`/KPIs de
+  `app_pp_mapa` leem o estado **ao vivo** de `programacao_pesquisa` (passada corrente). A tela de
+  Acompanhamento (Fase 4, ver 4.3.7) é que vai somar/analisar histórico entre passadas via `pp_execucao`.
+
+#### 4.3.7 Motor de passadas e redesenho do módulo (Fase 1 feita 2026-09-14; Fases 2-5 planejadas)
+
+**Contexto:** o TR exige pesquisar **toda a rede 5 vezes** ao longo do contrato. Isso tornou o conceito
+de "passada" (Nª pesquisa de cada trecho) de primeira classe, e motivou um redesenho do módulo separado
+por **público**: o geofonista (campo) só executa + consulta o simples; o time interno (encarregado)
+programa + analisa o profundo.
+
+**Fase 1 — motor de passadas (backend, feito, em produção):**
+- **Ordem obrigatória "programa → pesquisa".** `pp_recompute` só conta um trecho de campo se ele for
+  **posterior** à programação do segmento (`t.inicio_ts >= programado_em`, 4.3.4). Trecho órfão (sem
+  programação) ou anterior à programação **não** vira execução. Isso é o que garante, no banco, o
+  princípio "sem programação não há execução" — sem precisar de trava agressiva na inserção do trecho.
+- **Cada passada = uma linha nova.** Reprogramar um segmento (`app_pp_atribuir` com `sobrescrever`, 4.3.3)
+  **apaga+recria** a linha → `id` novo, `programado_em=agora`. Com isso, um trecho já executado numa
+  passada **não reacende sozinho** na passada seguinte (o trecho antigo agora é anterior ao novo
+  `programado_em`); a passada N+1 exige **traço novo**. E como o `id` é novo, o dedup do histórico (por
+  `programacao_id`, 4.3.6) deixa passar o lançamento da passada nova. `pp_execucao.n_passada` guarda o nº.
+- **Testado (rollback E2E):** trecho anterior à programação é ignorado; posterior executa e loga
+  `n_passada=1`; reprogramar abre passada 2 (não reaproveita o traço antigo, exige novo); ruído de
+  recompute na mesma passada não duplica; `sobrescrever=false` não mexe em atribuição existente.
+
+**Fases 2-5 (planejadas, frontend):** (2) Pesquisa do geofonista — sumiço instantâneo do executado (o
+cruzamento roda **síncrono** no `trg_pp_cruzar`, então dá pra tirar o re-fetch com atraso da 4.3.5).
+(3) "Minha produtividade" do geofonista, simplificada — só pendente (atemporal) · executado (com data) ·
+reporte de campo (com data). (4) Tela nova de **Acompanhamento** no Auxiliar de Programação, ao lado de
+Programar — dashboard do time interno com **dois km distintos** (km andado = soma dos `pesquisa_trecho`;
+km de rede pesquisado = soma dos segmentos executados no período via `pp_execucao`), **`vaz/km` sobre o
+km de rede** (não o km andado), progresso das 5 passadas (mapa colorido por `n_passada`), e resumo por
+colaborador; o toggle "Cruzar com a programação" vira **"Cobertura de rede"**. (5) Trava de UX: sem
+programação ativa, "iniciar trajeto" desabilitado.
+- **Ideia registrada p/ a tela Programar (interno):** filtro por nº de passadas (0 / 1 / 2 / …) sobre os
+  segmentos candidatos — pro programador puxar "tudo em 0 passadas" (1ª rodada) ou "tudo em 2" (hora da
+  3ª). Precisa `app_rede_bbox`/`app_pp_rede_no_poligono` exporem a contagem de passadas por segmento
+  (join com `pp_execucao`).
+- **Decisões do produto (2026-09-14):** passada contada **por segmento** (não rodada global
+  sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
+  **manual** pelo programador (nada de reabertura automática por prazo, por ora).
 
 ---
 
