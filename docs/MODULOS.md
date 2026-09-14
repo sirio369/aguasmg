@@ -107,6 +107,26 @@
 - Padrão: monta HTML num overlay `#relatorio` e chama `window.print()` (CSS `@media print`).
   Usado por loggers (§Loggers), VRP, comprovantes de suprimentos e relatório de veículo (§6.2).
 
+### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
+- **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
+  Cadastro técnico `cadMap`, Roteiro de leitura `rlMap`, Pesquisa `pqMap`, Produtividade `prodMap`,
+  Programação de pesquisa `ppMap`, Produtividade de pressão `prpMap`) passou a chamar essa função em
+  vez de montar seu próprio `L.tileLayer(...).addTo(map)` — antes só existia OpenStreetMap, sem opção
+  de satélite. A função cria as duas camadas (`rua` = OpenStreetMap, `sat` = Esri World Imagery,
+  `https://server.arcgisonline.com/.../World_Imagery/...`, grátis, sem chave/custo) e adiciona um
+  **botão pequeno** (`L.Control` customizado, mesmo padrão do botão "📍" de `pqMap`) que alterna entre
+  as duas com um toque só (`🛰️`↔`🗺️`) — **decisão deliberada**: cogitou-se usar o `L.control.layers`
+  nativo do Leaflet (painel expansível com nomes), mas um botão de toque único é mais rápido em campo
+  (uma mão, sem abrir painel primeiro).
+- **Assinatura:** `tileOpts` (opcional) repassa opções extras pras DUAS camadas — hoje só usado por
+  `ppMap`, que já dimia o OSM (`opacity:.55`, pro traçado de rede colorido por cima se destacar) e
+  precisa da mesma opacidade no satélite. `ctlPos` (opcional, default `'topright'`) posiciona o botão —
+  só `ppMap` passa `'topleft'`, porque `'topright'` já tem a barra de desenho (`L.Control.Draw`) daquele
+  módulo; **cuidado ao adicionar controle novo num mapa existente:** confira que posição já está
+  ocupada antes de deixar no default.
+- **Mapa novo no futuro → sempre chame esta função**, nunca `L.tileLayer(...).addTo(map)` direto — é
+  assim que o toggle satélite continua valendo pra tudo sem precisar lembrar módulo por módulo.
+
 ---
 
 ## 2. Coleta de campo (schema `"8 - coleta_campo"`)
