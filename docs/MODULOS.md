@@ -571,7 +571,7 @@ vontade — o histórico já está salvo em outro lugar.
   `app_pp_mapa` leem o estado **ao vivo** de `programacao_pesquisa` (passada corrente). A tela de
   Acompanhamento (Fase 4, ver 4.3.7) é que vai somar/analisar histórico entre passadas via `pp_execucao`.
 
-#### 4.3.7 Motor de passadas e redesenho do módulo (Fases 1-4 feitas 2026-09-14; Fase 5 planejada)
+#### 4.3.7 Motor de passadas e redesenho do módulo (Fases 1-5 feitas 2026-09-14)
 
 **Contexto:** o TR exige pesquisar **toda a rede 5 vezes** ao longo do contrato. Isso tornou o conceito
 de "passada" (Nª pesquisa de cada trecho) de primeira classe, e motivou um redesenho do módulo separado
@@ -595,8 +595,12 @@ programa + analisa o profundo.
 **Fase 2 — Pesquisa do geofonista (feita):** sumiço instantâneo do executado — ver 4.3.5.
 **Fase 3 — "Minha produtividade" do geofonista, simplificada (feita):** ver 4.3.5.
 **Fase 4 — tela de Acompanhamento do time interno (feita):** ver **4.3.8** abaixo.
-**Fase 5 (planejada, frontend):** trava de UX — sem programação ativa, "iniciar trajeto" desabilitado
-(o banco já garante pela Fase 1; isso é só clareza na tela do geofonista).
+**Fase 5 — trava de UX no campo (feita):** na tela Pesquisa, "▶ Iniciar trajeto" fica **desabilitado**
+quando o geofonista não tem programação ativa (`app_pp_minhas` retorna 0), com aviso "sem programação
+ativa — a pesquisa só conta dentro da sua programação". Flag `pqTemProg`/`pqAtualizarIniBtn` +
+guarda em `pqIniciar`. **Permissivo offline:** só bloqueia quando sabemos (online, `app_pp_minhas` ok)
+que não há programação — em erro/offline mantém liberado (pode ter programação, só sem sinal agora), pra
+não travar campo sem rede. O banco já garante a regra (Fase 1); isto é a camada de clareza na UX.
 
 #### 4.3.8 Tela Acompanhamento da pesquisa (Fase 4, 2026-09-14) — `pp_acomp` (Auxiliar de Programação)
 

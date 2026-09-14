@@ -2406,6 +2406,7 @@ let pqAtual=null;    // trecho em andamento {lat,lon,ts,acc}
 let pqPend=null;     // finalizado aguardando confirmação {ini,fim,dist,dur}
 let pqTrajetos=[];   // confirmados nesta sessão
 let pqPesquisaId=null; // id da jornada (agrupa os trechos de uma saída)
+let pqTemProg=true;  // Fase 5: false só quando sabemos (online) que não há programação ativa; permissivo offline
 let ocFotoBlob=null;
 function pqInit(){
   const cont=document.getElementById('pqMapa');
@@ -2454,10 +2455,12 @@ async function pqCarregarProg(fit){
         });
       }});
     if(fs.length) gj.addTo(pqProgLayer);
+    pqTemProg = fs.length>0;   // Fase 5: só libera "iniciar trajeto" com programação ativa (a pesquisa só conta dentro dela)
+    pqAtualizarIniBtn();
     const b=document.getElementById('pqProgInfo');
     if(b){
-      if(fs.length){ b.style.display='block'; b.textContent='🔎 '+(data.n_pendentes||fs.length)+' trecho(s) programado(s) p/ você · '+Number(data.km_pendente||0).toFixed(2)+' km — pesquise e eles somem daqui'; }
-      else b.style.display='none';
+      if(fs.length){ b.style.display='block'; b.className=''; b.style.cssText='display:block;background:#f2ecff;border:1px solid #c9b8f5;color:#4b2e83;border-radius:10px;padding:8px 11px;font-size:13px;margin-bottom:8px'; b.textContent='🔎 '+(data.n_pendentes||fs.length)+' trecho(s) programado(s) p/ você · '+Number(data.km_pendente||0).toFixed(2)+' km — pesquise e eles somem daqui'; }
+      else { b.style.display='block'; b.style.cssText='display:block;background:var(--warn-bg,#fff4e5);border:1px solid #e0b877;color:#7a4b00;border-radius:10px;padding:8px 11px;font-size:13px;margin-bottom:8px'; b.textContent='Sem programação ativa. Peça ao encarregado — a pesquisa só conta dentro da sua programação.'; }
     }
     // 1ª carga: se não estou perto de nenhum trecho, mostro onde é a programação
     if(fs.length && (fit||!pqProgFit) && !pqAtual && !pqPend){
@@ -2467,7 +2470,14 @@ async function pqCarregarProg(fit){
         if(!gps || !bb.contains([gps.lat,gps.lon])) pqMap.fitBounds(bb,{padding:[40,40],maxZoom:16});
       }catch(e){}
     }
-  }catch(e){}
+  }catch(e){ pqTemProg=true; pqAtualizarIniBtn(); }   // offline/erro: não bloqueia (pode ter programação, só sem sinal agora)
+}
+function pqAtualizarIniBtn(){
+  const b=document.getElementById('pqIni'); if(!b) return;
+  b.disabled=!pqTemProg;
+  b.style.opacity=pqTemProg?'1':'.45';
+  b.style.cursor=pqTemProg?'pointer':'not-allowed';
+  b.title=pqTemProg?'':'Sem programação ativa';
 }
 function pqNavegar(lat,lon){
   window.open('https://www.google.com/maps/dir/?api=1&destination='+lat+','+lon+'&travelmode=walking','_blank','noopener');
@@ -2484,6 +2494,7 @@ function pqOnGps(){
 }
 function pqIniciar(){
   if(pqAtual||pqPend)return;
+  if(!pqTemProg){ toast('Sem programação ativa — peça ao encarregado. A pesquisa só conta dentro da sua programação.'); return; }
   if(!gps||gps.acc>PRECISAO_MAX){toast('GPS insuficiente');return;}
   if(!pqPesquisaId) pqPesquisaId=crypto.randomUUID();
   // emenda: se estiver a ≤10 m do fim do trecho anterior, começa exatamente nele
