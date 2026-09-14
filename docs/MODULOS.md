@@ -415,12 +415,17 @@ sem intervenção manual.
 - Vincula (`app_pp_atribuir(p_rede_ids bigint[], p_colaborador, p_sobrescrever)`) / desvincula
   (`app_pp_desatribuir(p_rede_ids bigint[])`) — **`p_rede_ids` continua com esse nome** (zero mudança no
   frontend), mas **os valores agora são `rede_pp_segmento.id`**, não mais `rede.id`. Desvincular
-  **deleta** a linha e reprogramar (`sobrescrever=true`) **reseta** ela pra `pendente` — **sem trava,
-  mesmo se já `executado`** (decisão de produto: reprogramar/re-pesquisar o mesmo trecho é comum e tem
-  que continuar livre — ex.: filtro "não pesquisado desde X"). Isso é **seguro** porque a linha de
-  `programacao_pesquisa` é só o **ciclo de atribuição atual** — o fato permanente "isso foi pesquisado
-  em tal data" mora em outro lugar, ver **4.3.6**. (Uma trava foi tentada e revertida no mesmo dia —
-  bloqueava reprogramar um trecho já executado, o que quebrava a pesquisa repetida legítima.)
+  **deleta** a linha. Reprogramar (`sobrescrever=true`, o que o frontend sempre manda) **apaga+recria**
+  a linha (id novo, `programado_em=agora`) — **sem trava, mesmo se já `executado`**: reprogramar/
+  re-pesquisar o mesmo trecho é comum e tem que continuar livre (o TR exige **5 passadas** de toda a
+  rede ao longo do contrato). Isso é **seguro** porque `programacao_pesquisa` é só a **atribuição atual
+  (a passada corrente)** — o fato permanente "isso foi pesquisado em tal data, na Nª passada" mora no
+  histórico, ver **4.3.6**. **Por que apaga+recria e não `UPDATE` no lugar (Fase 1, 2026-09-14):** cada
+  passada precisa de um `programacao_pesquisa.id` **novo**, senão o dedup do histórico (que é por
+  `programacao_id`, 4.3.6) **bloquearia** o lançamento da 2ª passada. Apagar a linha antiga não perde
+  nada — a passada concluída já está salva em `pp_execucao` (o `on delete set null` do backlink só
+  desliga o vínculo). (Uma trava de imutabilidade foi tentada e revertida antes disso — bloqueava
+  reprogramar trecho já executado, o que quebrava a re-pesquisa legítima.)
 - Lista de colaboradores clicável (`app_pp_colaboradores`, inclui o próprio usuário logado) filtra o mapa
   pra "só a programação dele" (`app_pp_por_colaborador`). Botão "✕ Limpar seleção", filtro "não pesquisado
   desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`), legenda clicável (filtro de status por cor).
@@ -439,7 +444,9 @@ sem intervenção manual.
 - **`pp_recompute(p_segmento_ids bigint[] default null)`** (null = recalcula tudo — usado por
   `app_pp_recruzar` ao mudar config, e pelo backfill/migração da Fase E):
   1. Zera `coberto_m`/`status='pendente'` dos segmentos alvo.
-  2. Pra cada `(segmento, trecho)` a até `tol_m` um do outro: `st_dump(st_linemerge(st_intersection(
+  2. Pra cada `(segmento, trecho)` a até `tol_m` um do outro **e com o trecho posterior à programação
+     do segmento** (`t.inicio_ts >= programado_em at time zone 'America/Sao_Paulo'` — **filtro da Fase 1,
+     2026-09-14**; ver "Por que o filtro de tempo" abaixo): `st_dump(st_linemerge(st_intersection(
      st_buffer(trecho, tol_m), segmento.geom)))` — dumpa em pedacinhos, filtra só os **paralelos**
      (diferença de azimute entre o pedacinho e o trecho ≤ `max_ang_deg`, módulo π via
      `a - pi()*floor(a/pi())` — `mod()` não aceita `double precision`), soma o comprimento
@@ -476,15 +483,34 @@ sem intervenção manual.
 
 - **Pesquisa** (`pqInit`/`pqCarregarProg`) — camada roxa da programação do próprio usuário
   (`app_pp_minhas`, enquadra o mapa nela na 1ª carga); popup "🧭 Navegar até aqui" (Google Maps); botão
-  📍 recentraliza na posição GPS. Após confirmar um trecho, re-consulta com atraso (o cruzamento no
-  servidor pode ter virado programado→executado, some do mapa).
-- **Produtividade** — toggle **"🔗 Cruzar com a programação da pesquisa"** (`app_pp_mapa(p_colaborador,
-  p_consorcio, p_data_ini, p_data_fim, p_usuario)`) — 4 camadas com legenda-filtro clicável (🟣 pendente
-  cadastro · 🟢 executado cadastro · 🔴 reporte de campo · 🔵 **histórico de execuções**, tracejado,
-  **2026-09-14, novo, desligada por padrão** — ver 4.3.6) + KPIs (km programado/executado/% cobertura/nº
-  pendentes/nº execuções no histórico). Respeita os filtros de pessoa/data já existentes na tela.
-- **RPCs** `app_pp_minhas`/`app_pp_mapa`: propriedade `segmento_id` no GeoJSON (renomeada de `rede_id`
+  📍 recentraliza na posição GPS. **Sumiço instantâneo do executado (Fase 2, 2026-09-14):** ao confirmar
+  um trecho **online**, o `pqCarregarProg` é re-disparado **quando o envio resolve** (encadeado no
+  `.then` do `enviarOuEnfileirar`), não mais num `setTimeout` chutado — o cruzamento roda **síncrono**
+  dentro do `INSERT` do trecho (`trg_pp_cruzar`→`pp_recompute`), então ao voltar o await o segmento já
+  está `executado` e some da camada roxa na hora. **Offline:** fica pra `sincronizar()`, que também
+  re-carrega a camada roxa se a tela Pesquisa estiver aberta quando a fila sobe.
+- **Minha produtividade (geofonista) — simplificada na Fase 3 (2026-09-14):** era uma tela de análise
+  (dropdown "Todos os coletores", cards de km andado/velocidade/vaz-km, toggle "Cruzar com a
+  programação" com 4 camadas). Virou **consulta pessoal** do geofonista: **sempre o usuário logado**
+  (`auth.uid()`, sem dropdown), 3 camadas fixas — 🟣 **pendente** da programação dele (ATEMPORAL — é a
+  lista de tarefas, o filtro de data **não** a afeta) · 🟢 **pesquisado** no período · 🔴 **reporte de
+  campo** no período — e 3 cards (km pendente · km de rede pesquisado · km andado). A análise profunda
+  (dois km, vaz/km por km de rede, cruzamento, histórico entre passadas, comparação entre coletores)
+  migrou pro **Acompanhamento** do time interno (Fase 4, ver 4.3.7).
+  - **RPC nova `app_pesquisa_minha(p_data_ini, p_data_fim)`** (`SECURITY DEFINER`, baseada em
+    `auth.uid()` — nada de nome/uuid vindo do cliente). Chaves `pendente`/`executado`/`reporte`, cada uma
+    FeatureCollection + `n` + `km`. `pendente` vem de `programacao_pesquisa` (status pendente, sem filtro
+    de data); `executado` de `pp_execucao` (filtrado por `executado_em`); `reporte` de `pesquisa_trecho`.
+  - **Pegadinha do casamento traço↔usuário:** `pesquisa_trecho.usuario` grava
+    `full_name` do JWT **ou** o e-mail como fallback (visto: gravou e-mail, enquanto `perfil.nome` é o
+    nome de exibição). Então o `reporte` casa por **`usuario in (nome, email)`** do próprio `auth.uid()`,
+    não só por nome — senão os traços dele não apareceriam.
+  - **RPCs `app_pesquisa_produtividade`/`app_pesquisa_filtros` ficaram órfãs** do frontend (a tela não
+    as usa mais); deixadas no banco por ora (a Fase 4 terá sua própria RPC de análise).
+- **RPCs `app_pp_minhas`/`app_pp_mapa`:** propriedade `segmento_id` no GeoJSON (renomeada de `rede_id`
   na Fase E — nenhum código do frontend lia esse campo por nome, só exibia via popup genérico).
+  `app_pp_mapa` (com a camada `historico_execucoes`, 4.3.6) passa a servir a tela de **Acompanhamento**
+  (Fase 4), não mais a produtividade do geofonista.
 
 #### 4.3.6 Histórico permanente de execuções — `pp_execucao` (2026-09-14, novo)
 
@@ -508,7 +534,9 @@ vontade — o histórico já está salvo em outro lugar.
   resegmentação), `geom` (**snapshot** da geometria no momento — não depende do segmento ainda existir),
   `comprimento_m`/`coberto_m`/`colaborador_uuid`/`programado_por`/`programado_em`/`executado_em`/
   `primeiro_trecho_id` (cópia do estado de `programacao_pesquisa` no instante do flip), `origem`
-  (`cobertura_direta` | `heranca_vizinho` | `desconhecido`), **`programacao_id`** (FK
+  (`cobertura_direta` | `heranca_vizinho` | `desconhecido`), **`n_passada`** (Fase 1 — a Nª vez que
+  **esse segmento** foi pesquisado: `1 + count(*)` de linhas já existentes em `pp_execucao` pro mesmo
+  `segmento_id` no instante do insert; meta do TR = 5), **`programacao_id`** (FK
   `programacao_pesquisa.id`, `ON DELETE SET NULL`, **`UNIQUE`** — é a chave de deduplicação, ver
   abaixo). RLS ligada, **sem policy** — mesmo padrão de `programacao_pesquisa`/`pp_config` (só acessível
   via função `SECURITY DEFINER`, dona da tabela bypassa RLS por não ter `FORCE ROW LEVEL SECURITY`).
@@ -539,12 +567,75 @@ vontade — o histórico já está salvo em outro lugar.
   ser potencialmente densa/sobreposta), renderizado tracejado (`dashArray:'2,6'`) pra não se confundir
   com a camada sólida "pesquisado (cadastro)"; tooltip mostra colaborador/data/comprimento e "herdado do
   vizinho" quando `origem='heranca_vizinho'`.
-- **Fora de escopo (deliberado):** `app_pp_resumo`/`app_pp_por_colaborador`/`app_pp_minhas`/KPIs de
-  `app_pp_mapa` continuam lendo o estado **ao vivo** de `programacao_pesquisa` (ciclo atual), não
-  `pp_execucao` — não foram redesenhados pra somar histórico entre ciclos (ex.: km "executado" não vira
-  "km executado somando todas as vezes que cada trecho foi pesquisado"). Se isso for necessário no
-  futuro, é uma decisão de produto separada (como contar produtividade quando o mesmo trecho é
-  pesquisado 2+ vezes), não decidida ainda.
+- **Ainda lendo estado ao vivo:** `app_pp_resumo`/`app_pp_por_colaborador`/`app_pp_minhas`/KPIs de
+  `app_pp_mapa` leem o estado **ao vivo** de `programacao_pesquisa` (passada corrente). A tela de
+  Acompanhamento (Fase 4, ver 4.3.7) é que vai somar/analisar histórico entre passadas via `pp_execucao`.
+
+#### 4.3.7 Motor de passadas e redesenho do módulo (Fases 1-5 feitas 2026-09-14)
+
+**Contexto:** o TR exige pesquisar **toda a rede 5 vezes** ao longo do contrato. Isso tornou o conceito
+de "passada" (Nª pesquisa de cada trecho) de primeira classe, e motivou um redesenho do módulo separado
+por **público**: o geofonista (campo) só executa + consulta o simples; o time interno (encarregado)
+programa + analisa o profundo.
+
+**Fase 1 — motor de passadas (backend, feito, em produção):**
+- **Ordem obrigatória "programa → pesquisa".** `pp_recompute` só conta um trecho de campo se ele for
+  **posterior** à programação do segmento (`t.inicio_ts >= programado_em`, 4.3.4). Trecho órfão (sem
+  programação) ou anterior à programação **não** vira execução. Isso é o que garante, no banco, o
+  princípio "sem programação não há execução" — sem precisar de trava agressiva na inserção do trecho.
+- **Cada passada = uma linha nova.** Reprogramar um segmento (`app_pp_atribuir` com `sobrescrever`, 4.3.3)
+  **apaga+recria** a linha → `id` novo, `programado_em=agora`. Com isso, um trecho já executado numa
+  passada **não reacende sozinho** na passada seguinte (o trecho antigo agora é anterior ao novo
+  `programado_em`); a passada N+1 exige **traço novo**. E como o `id` é novo, o dedup do histórico (por
+  `programacao_id`, 4.3.6) deixa passar o lançamento da passada nova. `pp_execucao.n_passada` guarda o nº.
+- **Testado (rollback E2E):** trecho anterior à programação é ignorado; posterior executa e loga
+  `n_passada=1`; reprogramar abre passada 2 (não reaproveita o traço antigo, exige novo); ruído de
+  recompute na mesma passada não duplica; `sobrescrever=false` não mexe em atribuição existente.
+
+**Fase 2 — Pesquisa do geofonista (feita):** sumiço instantâneo do executado — ver 4.3.5.
+**Fase 3 — "Minha produtividade" do geofonista, simplificada (feita):** ver 4.3.5.
+**Fase 4 — tela de Acompanhamento do time interno (feita):** ver **4.3.8** abaixo.
+**Fase 5 — trava de UX no campo (feita):** na tela Pesquisa, "▶ Iniciar trajeto" fica **desabilitado**
+quando o geofonista não tem programação ativa (`app_pp_minhas` retorna 0), com aviso "sem programação
+ativa — a pesquisa só conta dentro da sua programação". Flag `pqTemProg`/`pqAtualizarIniBtn` +
+guarda em `pqIniciar`. **Permissivo offline:** só bloqueia quando sabemos (online, `app_pp_minhas` ok)
+que não há programação — em erro/offline mantém liberado (pode ter programação, só sem sinal agora), pra
+não travar campo sem rede. O banco já garante a regra (Fase 1); isto é a camada de clareza na UX.
+
+#### 4.3.8 Tela Acompanhamento da pesquisa (Fase 4, 2026-09-14) — `pp_acomp` (Auxiliar de Programação)
+
+Dashboard do **time interno** (aprovador/admin — herda o gate do Auxiliar de Programação), ao lado da
+tela Programar. Módulo JS `pa*` (`paInit`/`paAtualizar`/…), reaproveita `prodHojeStr`/`prodMesIniStr`.
+Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** → **progresso do TR** →
+**mapa** → **resumo por colaborador**.
+- **Dois km distintos (decisão de produto):** `km_andado` = soma dos `pesquisa_trecho` (o quanto a
+  pessoa **andou**, com repetição de rua) · `km_rede_pesquisado` = soma dos segmentos que viraram
+  execução no período via `pp_execucao` (o quanto de **rede** foi coberto). O indicador **`vaz/km` usa o
+  km de rede**, não o km andado (densidade de vazamento por rede inspecionada). Velocidade média = km
+  andado / tempo.
+- **Progresso do TR (as 5 passadas):** barra empilhada mostrando quanto da rede já foi pesquisada 0/1/…/
+  5+ vezes (cinza → teal escuro). É **cumulativo da rede inteira** (por consórcio) — **não** filtra por
+  data/colaborador (o TR é um total, não um recorte de período).
+- **Mapa com 2 modos** (toggle): **"Cobertura de rede"** (camadas programado/pesquisado/reporte/
+  histórico/ocorrências, via `app_pp_mapa`, respeita filtros) e **"Passadas"** (heatmap da rede colorido
+  por `n_passada`, carregado **por viewport** via `app_pp_passadas_bbox` — recarrega no `moveend`; a rede
+  inteira são 46k segmentos, inviável de mandar de uma vez).
+- **Resumo por colaborador:** km programado/pesquisado/%/vazamentos/velocidade por pessoa.
+- **RPCs novas (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio,
+  p_colaborador, p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo`;
+  `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,p_consorcio)` → segmentos no viewport com `n_passada`.
+  `app_pp_mapa` estendido com a camada `ocorrencias` e casamento traço↔usuário por **nome OU email**
+  (mesma pegadinha da 4.3.5). O antigo dropdown "Todos os coletores" de análise que existia na
+  produtividade do geofonista vive agora **aqui** (é a tela de análise do time interno).
+- **Fora de escopo (registrado):** integração de um relatório do **SIGOS/COPASA** pra trazer a execução
+  do vazamento (localizado ou não) — fica pra outro momento (decisão do usuário, 2026-09-14).
+- **Ideia registrada p/ a tela Programar (interno):** filtro por nº de passadas (0 / 1 / 2 / …) sobre os
+  segmentos candidatos — pro programador puxar "tudo em 0 passadas" (1ª rodada) ou "tudo em 2" (hora da
+  3ª). Precisa `app_rede_bbox`/`app_pp_rede_no_poligono` exporem a contagem de passadas por segmento
+  (join com `pp_execucao`).
+- **Decisões do produto (2026-09-14):** passada contada **por segmento** (não rodada global
+  sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
+  **manual** pelo programador (nada de reabertura automática por prazo, por ora).
 
 ---
 
