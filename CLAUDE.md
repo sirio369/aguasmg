@@ -405,9 +405,11 @@ almoxarife/admin). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→fun
 - **Equipamentos** — rastreio por pessoa via **termo de responsabilidade**. Emitir → **aceitar dentro
   do próprio termo** (documento fica **vermelho até aceitar, verde depois**) → usar → devolver por
   código (com defeito → abre manutenção corretiva). Preventiva por tipo (dias). Tela "Equipamentos por
-  responsável" mostra movimentações e **destaca quebra/defeito**. Tabelas `sup_equipamento`,
-  `sup_equip_tipo`, `sup_termo`, `sup_manutencao`, `sup_equip_solicitacao`. RPCs `sup_equip_*`,
-  `sup_termo_*`, `sup_equip_historico`.
+  responsável" mostra movimentações e **destaca quebra/defeito**. **Equipamentos cadastrados**
+  (Almoxarifado, 2026-09: inventário do acervo com filtro de tipo/nome-nº-série/situação — Em estoque ×
+  Em uso × Manutenção — agrupado por tipo, só leitura sobre `sup_equip_listar`; ver `docs/MODULOS.md
+  §5.2`). Tabelas `sup_equipamento`, `sup_equip_tipo`, `sup_termo`, `sup_manutencao`,
+  `sup_equip_solicitacao`. RPCs `sup_equip_*`, `sup_termo_*`, `sup_equip_historico`.
 - **EPI / Uniforme** — espelha o fluxo de insumo: solicitar → aprovar (sem código) → **Separar EPI**
   (almoxarife, gera código, avisa o colaborador) → **retirada** (código + foto do colaborador com os
   EPIs + assinatura). Status: solicitada/aprovada/**segregada**/entregue/rejeitada. Devolução/troca por

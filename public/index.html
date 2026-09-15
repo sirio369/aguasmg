@@ -3247,6 +3247,7 @@ const SUP_ACTS={
   painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()},
   eq_meus:{ic:'🧰',lbl:'Meus equipamentos',fn:()=>supVEqMeus()},
   eq_solicitar:{ic:'🙋',lbl:'Solicitar equipamento',fn:()=>supVEqSolicitar()},
+  eq_inventario:{ic:'🗃️',lbl:'Equipamentos cadastrados',fn:()=>supVEqInventario()},
   eq_gerir:{ic:'🏷️',lbl:'Cadastrar equipamentos',fn:()=>supVEqGerir()},
   eq_entregar:{ic:'📤',lbl:'Entregar / devolver',fn:()=>supVEqEntregar()},
   eq_alertas:{ic:'🛠️',lbl:'Manutenção',fn:()=>supVEqAlertas()},
@@ -3283,6 +3284,7 @@ function supBlocksEquip(){
   return [
     {t:'Campo',ic:'🧑‍🔧',acts:[{id:'eq_meus',on:true},{id:'eq_solicitar',on:true}]},
     {t:'Almoxarifado',ic:'📦',acts:[
+      {id:'eq_inventario',on:almox,papel:'Almoxarife'},
       {id:'eq_gerir',on:almox,papel:'Almoxarife'},
       {id:'eq_entregar',on:almox,papel:'Almoxarife'},
       {id:'eq_alertas',on:almox,papel:'Almoxarife'}]},
@@ -4254,6 +4256,63 @@ async function supVEqEntregar(){
     $('#supView').querySelectorAll('[data-solrej]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_equip_rejeitar',{p_solicitacao_id:+b.dataset.solrej},'Solicitação rejeitada',supVEqEntregar)));
     $('#supView').querySelectorAll('[data-cancelemit]').forEach(b=>b.addEventListener('click',()=>supAcao('sup_termo_cancelar',{p_equipamento_id:+b.dataset.cancelemit},'Emissão cancelada',supVEqEntregar)));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+
+// --- Equipamentos cadastrados (almoxarife): inventário do acervo — estoque × em uso × manutenção ---
+let eqInvData=[], eqInvTipo='', eqInvBusca='', eqInvSit='todos';
+function eqInvSituacao(e){ if(e.manutencao_aberta||e.status==='manutencao') return 'manutencao'; if(e.status==='em_uso') return 'uso'; return 'estoque'; }
+async function supVEqInventario(){
+  eqInvTipo=''; eqInvBusca=''; eqInvSit='todos';
+  $('#supView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('sup_equip_listar'); if(error)throw error;
+    eqInvData=data||[];
+    const tipos=[...new Set(eqInvData.map(e=>e.tipo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const temManut=eqInvData.some(e=>eqInvSituacao(e)==='manutencao');
+    const sits=[['todos','Todos'],['estoque','Em estoque'],['uso','Em uso']].concat(temManut?[['manutencao','Manutenção']]:[]);
+    $('#supView').innerHTML=
+      '<div class="sec">🗃️ Equipamentos cadastrados</div>'+
+      '<p class="sub" style="margin:2px 0 10px">Gestão do acervo: o que está em estoque, emprestado e em manutenção.</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px">'+
+        '<input id="eqInvBusca" placeholder="🔎 Nome ou nº de série" style="width:100%"/>'+
+        '<select id="eqInvTipo" style="width:100%"><option value="">Todos os tipos</option>'+tipos.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')+'</select>'+
+        '<div id="eqInvSit" style="display:flex;gap:6px;flex-wrap:wrap"></div>'+
+      '</div>'+
+      '<div id="eqInvResumo" class="sub" style="margin:6px 0"></div>'+
+      '<div id="eqInvLista"></div>';
+    const sitc=$('#eqInvSit');
+    const pintaSit=()=>sitc.querySelectorAll('[data-eqsit]').forEach(x=>{const on=x.dataset.eqsit===eqInvSit;x.style.background=on?'var(--acc)':'';x.style.color=on?'var(--acc-ink)':'';x.style.borderColor=on?'var(--acc)':'';});
+    sitc.innerHTML=sits.map(s=>`<button class="btn ghost" data-eqsit="${s[0]}" style="margin:0;padding:7px 12px;font-size:13px">${s[1]}</button>`).join('');
+    pintaSit();
+    sitc.querySelectorAll('[data-eqsit]').forEach(b=>b.addEventListener('click',()=>{ eqInvSit=b.dataset.eqsit; pintaSit(); eqInvRender(); }));
+    $('#eqInvBusca').addEventListener('input',e=>{ eqInvBusca=e.target.value; eqInvRender(); });
+    $('#eqInvTipo').addEventListener('change',e=>{ eqInvTipo=e.target.value; eqInvRender(); });
+    eqInvRender();
+  }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
+}
+function eqInvRender(){
+  const cont=$('#eqInvLista'); if(!cont) return;
+  const q=eqInvBusca.trim().toLowerCase();
+  const arr=eqInvData.filter(e=>{
+    if(eqInvTipo && (e.tipo||'')!==eqInvTipo) return false;
+    if(eqInvSit!=='todos' && eqInvSituacao(e)!==eqInvSit) return false;
+    if(q){ const hay=((e.nome||'')+' '+(e.num_serie||'')).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  const est=eqInvData.filter(e=>eqInvSituacao(e)==='estoque').length, uso=eqInvData.filter(e=>eqInvSituacao(e)==='uso').length, man=eqInvData.filter(e=>eqInvSituacao(e)==='manutencao').length;
+  const rz=$('#eqInvResumo'); if(rz) rz.innerHTML=`Total <b>${eqInvData.length}</b> · Em estoque <b>${est}</b> · Em uso <b>${uso}</b>${man?(' · Manutenção <b>'+man+'</b>'):''} — exibindo <b>${arr.length}</b>`;
+  if(!arr.length){ cont.innerHTML='<p class="sub" style="margin-top:10px">Nenhum equipamento com esses filtros.</p>'; return; }
+  const grupos={}; arr.forEach(e=>{ const t=e.tipo||'Sem tipo'; (grupos[t]=grupos[t]||[]).push(e); });
+  const tks=Object.keys(grupos).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  cont.innerHTML=tks.map(t=>`<div class="sec" style="margin-top:16px">🧰 ${t} <span class="sub" style="font-weight:400">(${grupos[t].length})</span></div>`+grupos[t].map(eqInvCard).join('')).join('');
+}
+function eqInvCard(e){
+  const sub=e.num_serie?('nº '+e.num_serie):'';
+  const resp=(e.status==='em_uso'&&e.responsavel)?`<div class="sub" style="margin-top:2px">👤 ${e.responsavel}${e.termo_status==='pendente'?' · aceite pendente':''}</div>`:'';
+  const manut=e.manutencao_aberta?`<div style="margin-top:4px;font-size:12px;color:var(--bad)">🔧 ${e.manutencao_desc||'Em manutenção'}</div>`:'';
+  const dev=e.devolucao_solicitada?`<div style="margin-top:4px;font-size:12px;color:var(--warn)">🔁 devolução solicitada</div>`:'';
+  const prev=e.preventiva_vencida?`<div style="margin-top:4px;font-size:12px;color:var(--warn)">🛠️ preventiva vencida</div>`:'';
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+(e.nome||'—')+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+resp+'</div>'+eqStatusChip(e)+'</div>'+manut+dev+prev+'</div>';
 }
 
 // --- Manutenção: corretiva (defeito) + preventiva de todos (almoxarife) ---
