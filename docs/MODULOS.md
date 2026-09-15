@@ -337,6 +337,19 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 - Ambas gated a `aprovador/admin` **no backend** (a RPC retorna `[]` p/ quem não é).
 - **Estado:** `pgFiltro`. Funções: `pgInit` (carrega as duas listas), `pgCarregar`/`pgSalvarOs`,
   `pgCarregarOc`/`pgSalvarOcOs`.
+- **Ocorrências: referência geográfica + Lista/Mapa (2026-09-15).** O card de ocorrência mostra, além
+  do link `📍 Mapa`: o **par de coordenadas** (`lat,lon` já vinham na RPC, só passaram a ser exibidos,
+  selecionáveis) e um **endereço/nº** best-effort via **reverse-geocode Nominatim/OSM** — client-side,
+  `revGeo(lat,lon)` (cache em `_revGeoCache`, serializado + delay 1,1 s pra respeitar o rate-limit do
+  Nominatim; preenche o `<span class="pgOcEnd">` de forma assíncrona via `pgOcFillEnderecos`). Sem CSP
+  e o SW não intercepta cross-origin, então a chamada vai direto à rede; se falhar, o card mostra
+  "endereço indisponível" e segue. O card é gerado por `pgOcCard(s,popup)` — **reusado** na lista e no
+  popup do mapa. **Toggle 📋 Lista / 🗺️ Mapa** (`#pgOcTabs`, estado `pgOcMode`, `pgOcRenderTabs`/
+  `pgOcAplicarView`): o mapa (`#pgOcMapa`, `pgOcCarregarMapa`, `mapAddCamadaBase` + `layerGroup`)
+  plota um `circleMarker` por ocorrência (vermelho=sem OS, verde=com OS) sobre **os mesmos dados
+  filtrados** (`pgOcData`, recarregado a cada troca de filtro pendente/criada/todas); clicar no ponto
+  abre um **popup com o mesmo card** (inclui input+Salvar da OS, fiado no `popupopen`). Salvar fecha o
+  popup e recarrega. `pgInit` chama `pgOcRenderTabs`.
 
 ### 4.3 Programação de pesquisa de vazamento — `// MÓDULO PROGRAMAÇÃO DE PESQUISA` (~L2438) · tela `programacao_pesquisa` (dentro de Auxiliar de Programação)
 

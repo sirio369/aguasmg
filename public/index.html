@@ -525,7 +525,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec">🧾 Solicitações de serviço</div>
     <div id="pgLista" style="margin-top:8px"></div>
     <div class="sec" style="margin-top:22px">⚠️ Ocorrências — pesquisa de vazamentos</div>
+    <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
     <div id="pgOcLista" style="margin-top:8px"></div>
+    <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
   <main id="matriculas" class="hidden">
@@ -1706,7 +1708,7 @@ if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
 // ---------- PROGRAMAÇÃO DE SERVIÇOS (aprovador/admin) ----------
 let pgFiltro='pendente';
 const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Todas']];
-function pgInit(){ pgRenderFiltros(); pgCarregar(); pgCarregarOc(); }
+function pgInit(){ pgRenderFiltros(); pgOcRenderTabs(); pgCarregar(); pgCarregarOc(); }
 function pgRenderFiltros(){
   const c=document.getElementById('pgFiltros'); if(!c) return;
   c.innerHTML=PG_FILTROS.map(f=>`<button class="btn ghost" data-pgf="${f[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${pgFiltro===f[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${f[1]}</button>`).join('');
@@ -1739,31 +1741,97 @@ async function pgSalvarOs(id){
   try{ const {error}=await sb.rpc('app_abertura_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); pgCarregar(); }
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
-async function pgCarregarOc(){
-  const c=document.getElementById('pgOcLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; const arr=data||[];
-    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':''))+'.</p>'; return; }
-    c.innerHTML=arr.map(s=>{
-      const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
-      const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto</a>`:'';
-      const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
-      const info=[s.local?('Local: '+s.local):'',s.consorcio||''].filter(Boolean).join(' · ');
-      const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
-      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
+// --- reverse-geocode (Nominatim/OSM), best-effort + cache + rate-limit ---
+const _revGeoCache={}; let _revGeoLast=Promise.resolve();
+function revGeo(lat,lon){
+  if(lat==null||lon==null) return Promise.resolve(null);
+  const key=(+lat).toFixed(5)+','+(+lon).toFixed(5);
+  if(key in _revGeoCache) return Promise.resolve(_revGeoCache[key]);
+  const p=_revGeoLast.then(async()=>{
+    if(key in _revGeoCache) return _revGeoCache[key];
+    try{
+      const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&accept-language=pt-BR&lat='+lat+'&lon='+lon,{headers:{'Accept':'application/json'}});
+      const j=await r.json(); const a=j.address||{};
+      const rua=a.road||a.pedestrian||a.footway||a.residential||a.path||'';
+      const num=a.house_number||'';
+      const bairro=a.suburb||a.neighbourhood||a.quarter||a.village||'';
+      const cidade=a.city||a.town||a.municipality||a.city_district||'';
+      let txt=[rua+(num?(', '+num):''),bairro,cidade].filter(Boolean).join(' · ');
+      if(!txt) txt=(j.display_name||'').split(',').slice(0,3).join(', ');
+      _revGeoCache[key]=txt||null;
+    }catch(_){ _revGeoCache[key]=null; }
+    return _revGeoCache[key];
+  });
+  _revGeoLast=p.then(()=>new Promise(r=>setTimeout(r,1100)),()=>new Promise(r=>setTimeout(r,1100)));
+  return p;
+}
+function pgOcFillEnderecos(root){
+  (root||document).querySelectorAll('.pgOcEnd').forEach(sp=>{
+    if(sp.dataset.done) return; sp.dataset.done='1';
+    revGeo(+sp.dataset.lat,+sp.dataset.lon).then(txt=>{ sp.textContent = txt?('🏠 '+txt):'endereço indisponível'; });
+  });
+}
+// --- card compartilhado entre lista e popup do mapa ---
+function pgOcCard(s,popup){
+  const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
+  const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto</a>`:'';
+  const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+  const info=[s.local?('Local: '+s.local):'',s.consorcio||''].filter(Boolean).join(' · ');
+  const coord=(s.lat!=null&&s.lon!=null)?`<div class="sub" style="margin-top:3px">📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span></div>
+        <div class="sub" style="margin-top:2px"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}" style="color:var(--mut)">buscando endereço…</span></div>`:'';
+  const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
+  const wrap=popup?'padding:2px 1px':'background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px';
+  return `<div style="${wrap}">
         <div style="display:flex;gap:8px;align-items:center"><b>⚠️ ${s.tipo||'Ocorrência'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
         <div class="sub" style="margin-top:3px">${info}</div>
         <div class="sub" style="margin-top:2px">Por ${s.usuario||'—'} · ${foto}${mapa}</div>
+        ${coord}
         ${s.observacao?('<div class="sub" style="margin-top:3px">Obs: '+s.observacao+'</div>'):''}
         ${done}
         <div style="display:flex;gap:6px;margin-top:8px"><input class="pgOcOs" data-id="${s.id}" value="${(s.os_numero||'').replace(/"/g,'&quot;')}" placeholder="Nº da OS na COPASA" style="flex:1;min-width:0"/><button class="btn" data-ocsave="${s.id}" style="margin:0;width:auto;padding:9px 14px">Salvar</button></div>
       </div>`;
-    }).join('');
+}
+let pgOcData=[], pgOcMode='lista', pgOcMap=null, pgOcMarkers=null;
+function pgOcRenderTabs(){
+  const c=document.getElementById('pgOcTabs'); if(!c) return;
+  const opts=[['lista','📋 Lista'],['mapa','🗺️ Mapa']];
+  c.innerHTML=opts.map(o=>`<button class="btn ghost" data-ocv="${o[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${pgOcMode===o[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${o[1]}</button>`).join('');
+  c.querySelectorAll('[data-ocv]').forEach(b=>b.addEventListener('click',()=>{ pgOcMode=b.dataset.ocv; pgOcRenderTabs(); pgOcAplicarView(); }));
+}
+function pgOcAplicarView(){
+  const lst=document.getElementById('pgOcLista'), mp=document.getElementById('pgOcMapa'); if(!lst||!mp) return;
+  if(pgOcMode==='mapa'){ lst.classList.add('hidden'); mp.classList.remove('hidden'); pgOcCarregarMapa(); }
+  else { mp.classList.add('hidden'); lst.classList.remove('hidden'); }
+}
+function pgOcCarregarMapa(){
+  const cont=document.getElementById('pgOcMapa'); if(!cont) return;
+  if(!pgOcMap){ pgOcMap=L.map('pgOcMapa'); mapAddCamadaBase(pgOcMap); pgOcMarkers=L.layerGroup().addTo(pgOcMap);
+    pgOcMap.on('popupopen',ev=>{ const el=ev.popup.getElement(); if(!el)return; el.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave))); pgOcFillEnderecos(el); }); }
+  setTimeout(()=>pgOcMap.invalidateSize(),0);
+  pgOcMarkers.clearLayers();
+  const arr=(pgOcData||[]).filter(s=>s.lat!=null&&s.lon!=null), pts=[];
+  arr.forEach(s=>{
+    const cor=s.os_numero?'#1D9E75':'#dc2626';
+    const m=L.circleMarker([s.lat,s.lon],{radius:8,color:'#fff',weight:2,fillColor:cor,fillOpacity:1});
+    m.bindPopup(()=>pgOcCard(s,true),{maxWidth:320,minWidth:270});
+    pgOcMarkers.addLayer(m); pts.push([s.lat,s.lon]);
+  });
+  if(gps){ pgOcMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
+  if(pts.length) pgOcMap.fitBounds(pts,{padding:[30,30],maxZoom:17}); else pgOcMap.setView([-19.92,-44.05],11);
+}
+async function pgCarregarOc(){
+  const c=document.getElementById('pgOcLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; const arr=data||[]; pgOcData=arr;
+    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':''))+'.</p>'; if(pgOcMode==='mapa') pgOcCarregarMapa(); return; }
+    c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
     c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
+    pgOcFillEnderecos(c);
+    if(pgOcMode==='mapa') pgOcCarregarMapa();
   }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 async function pgSalvarOcOs(id){
   const inp=document.querySelector('.pgOcOs[data-id="'+id+'"]'); const os=inp?inp.value:'';
-  try{ const {error}=await sb.rpc('app_ocorrencia_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); pgCarregarOc(); }
+  try{ const {error}=await sb.rpc('app_ocorrencia_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); if(pgOcMap)pgOcMap.closePopup(); pgCarregarOc(); }
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
 if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
