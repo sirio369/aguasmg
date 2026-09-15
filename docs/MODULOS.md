@@ -1047,13 +1047,19 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     pick-up especial, utilitário pick-up simples, van 10 passageiros, caminhão carroceria 3/4 ou VUC
     c/ cabine suplementar — **substitui** a lista genérica antiga (picape/hatch/sedã/SUV/...). O
     único veículo real (`picape`) foi migrado pra `pickup_simples` na troca.
-  - **`centro_custo` virou `select` fechado** (`CENTROS_CUSTO_FROTA`, 33 pares `[código Nível 4,
-    descrição Nível 3]` — ex. `['01.001.007.002','GESTÃO DO PROJETO']`). **A regra é usar o código
-    completo do item "Equipamentos" (Nível 4), mas mostrar a descrição do pai (Nível 3)** — o Nível 4
-    quase sempre se chama só "EQUIPAMENTOS", não identifica nada sozinho. Lista fixa no frontend, sem
-    `CHECK` no banco (mudar a lista de centros de custo não deve exigir migração). O único veículo
-    real teve o `centro_custo` antigo (texto livre "4.2.8", formato incompatível) **zerado** na
-    migração — precisa ser reaberto e salvo de novo com o valor certo do dropdown.
+  - **`centro_custo` é um `select` fechado** (`CENTROS_CUSTO_FROTA`, `[código Nível 4, descrição Nível 3]`
+    — ex. `['01.001.007.002','GESTÃO DO PROJETO']`). **A regra é usar o código completo do item
+    "Equipamentos" (Nível 4), mas mostrar a descrição do pai (Nível 3)** — o Nível 4 quase sempre se chama
+    só "EQUIPAMENTOS", não identifica nada sozinho. Lista fixa no frontend, sem `CHECK` no banco (mudar a
+    lista de centros de custo não exige migração). **Reduzida de 33 → 16 opções pelo usuário (2026-09-15)**
+    — subconjunto das frentes que de fato usam veículo; um veículo com `centro_custo` fora da lista nova só
+    exibe o código cru (`labelOf` degrada graciosamente), sem quebrar. O único veículo real teve o
+    `centro_custo` antigo (texto livre "4.2.8", formato incompatível) **zerado** na migração — precisa ser
+    reaberto e salvo de novo com o valor certo do dropdown.
+  - **`consorcio` (dropdown `#fvfConsorcio`, obrigatório):** mostra os **nomes** dos consórcios —
+    **Águas Integradas** (valor `ZA1004`) e **Eficiência Hídrica** (valor `ZA0200`) — 2026-09-15. O
+    **valor gravado continua o código `ZA1004`/`ZA0200`** (todo o resto do app filtra por ZA), só o rótulo
+    do dropdown mudou. O relatório do veículo ainda exibe o código cru em `Consórcio` (não pedido mudar).
   - **Aluguel removido, só sobra o campo `contrato_numero`** (já existia) — pra vincular ao contrato
     de locação existente. **`app_frota_veiculo_aluguel_reajustar`/`_historico` foram apagados** (a
     tabela `frota_veiculo_aluguel_historico`, com 1 linha real de reajuste, **foi mantida** — só

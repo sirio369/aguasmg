@@ -282,8 +282,10 @@ parciais em `frota_veiculo_vinculo` garantem isso no banco; vincular/desvincular
 oscilar `status` entre `disponivel`/`em_uso` automaticamente. **Veículo, radicalmente simplificado:**
 `app_frota_veiculo_salvar` (18 params, **admin-only**: `app_frota_veiculos_listar` também virou
 admin-only nesta rodada) cadastra só identificação/combustível/motorização + **`tipo`** (lista
-fechada de 9 categorias reais de obra) + **`centro_custo`** (`select` de 33 pares código-Nível-4/
-descrição-Nível-3) + `consorcio` (obrigatório) + `contrato_numero` (vincula a um contrato de locação
+fechada de 9 categorias reais de obra) + **`centro_custo`** (`select` de 16 pares código-Nível-4/
+descrição-Nível-3, `CENTROS_CUSTO_FROTA` — subconjunto curado pelo usuário 2026-09-15) + `consorcio`
+(obrigatório; dropdown mostra os **nomes** dos consórcios — "Águas Integradas"=ZA1004,
+"Eficiência Hídrica"=ZA0200 — valor gravado continua o código ZA) + `contrato_numero` (vincula a um contrato de locação
 já existente — sem aluguel próprio). Tela de Frotas ganhou filtro (tipo/condutor) no topo da lista e
 um "Ver detalhes" por veículo que abre Editar/Vínculo(admin)/Histórico/Relatório/Devolver numa página
 só, em vez de 5 botões no card. **Colaborador**, no seu módulo: CNH (só dados de CNH, não lista mais
