@@ -484,8 +484,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="paBar" style="display:flex;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:8px 0"></div>
     <div id="paBarLeg" style="display:flex;gap:8px 14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:18px"></div>
     <div class="sec">Mapa — passadas de rede</div>
-    <div id="paLegend" style="display:flex;gap:8px 12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:8px 0"></div>
-    <div style="display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
       <button id="paTgOc" type="button" class="fchip" data-c="#1565c0">Ocorrências</button>
       <button id="paTgRep" type="button" class="fchip" data-c="#d81b60">Reporte de campo</button>
     </div>
@@ -2665,8 +2664,9 @@ function prodDesenhar(d){
 // Dashboard do time interno (análise de RESULTADO): KPIs (2 km + vaz/km por km de rede) · progresso das
 // 5 passadas do TR · mapa de passadas (heatmap por n_passada, por viewport) + ocorrências + reporte de
 // campo (ativáveis). RPCs app_pp_acompanhamento / app_pp_passadas_bbox. Reaproveita prodHojeStr/MesIniStr.
-let paMap=null, paHeat=null, paOcL=null, paRepL=null;
+let paMap=null, paHeat=null, paOcL=null, paRepL=null, paPassLegEl=null;
 let paShowOc=true, paShowRep=false;
+let paPassSel=new Set();   // buckets de passada selecionados (vazio = todas)
 const PA_PASS_COL=['#B4B2A9','#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#04342C']; // 0..5 passadas
 function paInit(){
   const cont=document.getElementById('paMapa');
@@ -2676,11 +2676,26 @@ function paInit(){
     mapAddCamadaBase(paMap);
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
     paMap.on('moveend',()=>paCarregarMapa());
+    // filtro de passadas dentro do mapa (igual legenda-filtro da Programação) — multi-seleção + zoom
+    const PaLg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+      const d=L.DomUtil.create('div','pa-legend');
+      d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.4 system-ui,sans-serif;color:#333;box-shadow:0 1px 4px rgba(0,0,0,.2)';
+      d.innerHTML='<b style="display:block;margin-bottom:3px">Passadas — clique p/ filtrar</b>'
+        + PA_PASS_COL.map((c,i)=>'<button type="button" data-p="'+i+'" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;padding:2px 0;font:inherit;cursor:pointer;color:inherit"><i style="width:16px;height:4px;background:'+c+';border-radius:2px;flex:none"></i>'+(i>=5?'5+':i)+'×</button>').join('');
+      L.DomEvent.disableClickPropagation(d);
+      d.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{
+        const p=+b.dataset.p;
+        if(paPassSel.has(p)) paPassSel.delete(p); else paPassSel.add(p);
+        paPintarPassLeg(); paCarregarMapa(true);
+      }));
+      paPassLegEl=d; return d;
+    }});
+    paMap.addControl(new PaLg());
   }
   const de=document.getElementById('paDe'), ate=document.getElementById('paAte');
   if(de && !de.value) de.value=prodMesIniStr();
   if(ate && !ate.value) ate.value=prodHojeStr();
-  paPintarToggles();
+  paPintarToggles(); paPintarPassLeg();
   setTimeout(()=>{ if(paMap) paMap.invalidateSize(); },60);
   paCarregarColabs();
   paAtualizar();
@@ -2744,22 +2759,30 @@ function paPintarToggles(){
     b.classList.toggle('on',!!on);
   });
 }
-function paLegendPassadas(){
-  document.getElementById('paLegend').innerHTML=PA_PASS_COL.map((c,i)=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:4px;border-radius:2px;background:'+c+';display:inline-block"></i>'+(i>=5?'5+':i)+'×</span>').join('');
+function paPintarPassLeg(){
+  if(!paPassLegEl) return;
+  paPassLegEl.querySelectorAll('[data-p]').forEach(b=>{
+    const on = paPassSel.size===0 || paPassSel.has(+b.dataset.p);
+    b.style.opacity=on?'1':'.35';
+    b.style.textDecoration=on?'none':'line-through';
+  });
 }
-async function paCarregarMapa(){
+async function paCarregarMapa(doFit){
   if(!paMap) return;
-  paLegendPassadas();
   [paHeat,paOcL,paRepL].forEach(l=>{ if(l&&paMap) paMap.removeLayer(l); }); paHeat=paOcL=paRepL=null;
   const f=paFiltros(), b=paMap.getBounds();
+  const mostra = n => paPassSel.size===0 || paPassSel.has(Math.min(n,5));   // filtro por bucket
   try{
     const {data,error}=await sb.rpc('app_pp_passadas_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:f.p_consorcio,p_colaborador:f.p_colaborador,p_data_ini:f.p_data_ini,p_data_fim:f.p_data_fim});
     if(error)throw error;
-    // base: heatmap por nº de passadas (0×=cinza … 5+×=teal escuro)
-    if(data.passadas&&(data.passadas.features||[]).length){
-      paHeat=L.geoJSON(data.passadas,{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.5};},
+    // base: heatmap por nº de passadas (0×=cinza … 5+×=teal escuro), filtrado pelos chips selecionados
+    const feats=((data.passadas&&data.passadas.features)||[]).filter(ft=>mostra(ft.properties.n_passada||0));
+    if(feats.length){
+      paHeat=L.geoJSON({type:'FeatureCollection',features:feats},{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.5};},
         onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip((n>=5?'5+':n)+'× pesquisado'); }}).addTo(paMap);
-    }
+      // zoom na seleção (só quando um filtro de passada está ativo e o disparo veio de um clique no chip)
+      if(doFit && paPassSel.size>0){ try{ paMap.fitBounds(paHeat.getBounds(),{padding:[30,30],maxZoom:17}); }catch(e){} }
+    } else if(doFit && paPassSel.size>0){ toast('Nenhum trecho nessa faixa de passadas no enquadramento atual'); }
     // reporte de campo (trajeto real início→fim) — ativável, p/ comparar com as passadas
     if(paShowRep && data.reportes&&(data.reportes.features||[]).length){
       paRepL=L.geoJSON(data.reportes,{style:{color:'#d81b60',weight:4,opacity:.85},
