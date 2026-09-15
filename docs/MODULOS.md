@@ -942,7 +942,11 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   `#relatorio`/`REL_CSS` dos loggers/equipamento (`frotaTermoVer`/`frotaTermoHtml`), com **assinatura
   eletrônica em canvas** (não é só clique como o termo de equipamento, §5.2) — reaproveita
   `epiSigInit`/`epiCanvasBlob`/`epiUpload` da retirada de EPI **como estão**, sem duplicar a lógica de
-  captura. Vermelho/verde igual ao termo de equipamento (`TERMO_CSS`, compartilhado). `condIrTermo`
+  captura. Vermelho/verde igual ao termo de equipamento (`TERMO_CSS`, compartilhado). **Conteúdo do
+  termo (2026-09-15):** além da declaração geral (a)-(e), a seção "Termo" lista as **17 normas de
+  utilização de veículos** da empresa (`FROTA_TERMO_NORMAS`, const no frontend — texto legal, não vem do
+  banco) + uma linha de "declaro ter lido e concordo". Os itens 14 e 16 da lista original do usuário eram
+  idênticos → mantido só uma vez. `condIrTermo`
   (banner "Minha CNH") abre pra assinar; `condIrTermoVer`/`frCondVerTermo` abrem read-only
   (`canSign=false`) — condutor já ativo, ou gestor conferindo. `app_frota_termo_ver(p_termo_id)` gate:
   o próprio condutor, ou `funcao in ('frotas','admin','aprovador')`. `app_frota_termo_assinar(p_termo_id,
