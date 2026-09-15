@@ -127,6 +127,15 @@
 - **Mapa novo no futuro → sempre chame esta função**, nunca `L.tileLayer(...).addTo(map)` direto — é
   assim que o toggle satélite continua valendo pra tudo sem precisar lembrar módulo por módulo.
 
+### Mapas — contorno das ZAs (2026-09-15) — `mapAddLimiteZA(map)`
+- Desenha o **limite das ZAs** (contorno tracejado, não-interativo, sob os dados) pra ajudar a delimitar
+  as áreas de cada consórcio. Chamado logo após `mapAddCamadaBase` nos mapas de **Pesquisa** (`pqMap`),
+  **Produtividade** (`prodMap`), **Acompanhamento** (`paMap`) e **Programação** (`ppMap`).
+- Fonte: RPC `app_limite_za(p_consorcio default null)` → `"1 - suporte_geografico".limite_za` (2 polígonos:
+  ZA0200 Betim / ZA1004 Contagem), simplificado (`st_simplifypreservetopology(geom,15)`) → ~19 KB. **Sem
+  gate de papel** (o geofonista também vê). O resultado é cacheado em `_limiteZaData` e reusado nos 4
+  mapas (1 fetch por sessão).
+
 ---
 
 ## 2. Coleta de campo (schema `"8 - coleta_campo"`)
@@ -436,6 +445,14 @@ sem intervenção manual.
   programador usa pra dirigir as 5 passadas do TR ("mostra tudo em 0×" pra 1ª rodada, "tudo em 2×" pra
   puxar a 3ª). Categoria de cor no frontend: `ppCat(p)` = `'programado'` se `pp_status='pendente'`, senão
   `'p'+min(n_passada,5)`. (As antigas "livre / sem pesquisa recente / pesquisado" saíram.)
+- **Cuidado de performance (fix 2026-09-15 — `statement_timeout=8s` do papel `authenticated` estourava
+  em cache frio):** `app_rede_bbox` agora **enriquece só depois do LIMIT** — um CTE `cand` faz só o bbox
+  + `limit 10000` (barato, índice GiST), e as subconsultas caras (`ultima_pesquisa` espacial, `n_passada`,
+  `programado_para`, `pp_status`) rodam só nesses ≤10000, não mais pra *todos* os segmentos do bbox antes
+  de limitar (num zoom largo/cold podiam ser ~46k subconsultas espaciais). O `p_nao_pesquisado_desde`
+  passou a filtrar **depois** do enrich (mudança de semântica só no caso raro de >10000 no viewport).
+  E o `progresso_passadas` do `app_pp_acompanhamento` usa `comprimento_m` (coluna, 100% populada) em vez
+  de `st_length(geom)`, pra não desserializar 46k geometrias no cold. Warm ~1s; a mudança é pro cold.
 - **Resumo** (`app_pp_resumo`) — km programado/executado/% por colaborador (agrega em subquery — `jsonb_agg`
   direto sobre `count(*)` aninhado dá erro de agregado aninhado).
 - **Cuidado (histórico, ainda vale):** nunca re-renderize a camada de seleção a partir de uma camada
@@ -625,8 +642,10 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   data/colaborador (o TR é um total, não um recorte de período).
 - **Mapa de resultado — passadas + ocorrências + reporte (revisado 2026-09-14):** é uma tela de
   **análise de resultado**, então saiu o "programado" e a "cobertura de programação" (isso é da tela
-  Programar, não daqui). O mapa é o **heatmap por nº de passadas** (base, `0×` cinza → `5+×` teal escuro,
-  por viewport via `app_pp_passadas_bbox`, recarrega no `moveend` — 46k segmentos, inviável de uma vez) +
+  Programar, não daqui). O mapa é o **heatmap por nº de passadas** (base, `0×` **vermelho** `#dc2626`
+  = nunca pesquisado → `5+×` teal escuro; `PA_PASS_COL`, mudou de cinza pra vermelho em 2026-09-15 porque
+  o cinza sumia no mapa; usado também na legenda-filtro da Programação), por viewport via
+  `app_pp_passadas_bbox`, recarrega no `moveend` — 46k segmentos, inviável de uma vez) +
   duas camadas **ativáveis** (chips acima do mapa): **Ocorrências** (pontos de vazamento, ligado por
   padrão) e **Reporte de campo** (trajeto real início→fim do colaborador — pedido do usuário pra comparar
   "o que andou" com o nº de passadas, desligado por padrão). O heatmap tem um **filtro-legenda dentro do

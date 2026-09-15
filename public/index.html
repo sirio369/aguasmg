@@ -793,6 +793,17 @@ function mapAddCamadaBase(map,tileOpts,ctlPos){
   }});
   map.addControl(new Btn());
 }
+// Contorno das ZAs (limite_za) pra ajudar a delimitar as áreas — camada não-interativa por cima da
+// base, sob os dados. Cacheia a RPC (2 polígonos, ~19 KB) e reusa nos vários mapas.
+let _limiteZaData=null;
+async function mapAddLimiteZA(map){
+  if(!map) return;
+  try{
+    if(!_limiteZaData){ const {data,error}=await sb.rpc('app_limite_za',{}); if(error) return; _limiteZaData=data; }
+    if(!(_limiteZaData&&_limiteZaData.features&&_limiteZaData.features.length)) return;
+    L.geoJSON(_limiteZaData,{interactive:false,style:{color:'#111827',weight:2.5,opacity:.9,dashArray:'7 5',fill:false}}).addTo(map);
+  }catch(e){}
+}
 
 // ---------- TESTE DE ESTANQUEIDADE (pontos de referência p/ bater pressão) ----------
 let estData=[], estFiltroS='todos', estView='lista', estMap=null, estMarkers=null, prAlvo=null, estLimites=null, estLimLayer=null;
@@ -2413,7 +2424,7 @@ function pqInit(){
   if(!pqMap){
     cont.innerHTML='';
     pqMap=L.map('pqMapa');
-    mapAddCamadaBase(pqMap);
+    mapAddCamadaBase(pqMap); mapAddLimiteZA(pqMap);
     pqProgLayer=L.layerGroup().addTo(pqMap);   // trechos programados p/ este geofonista
     pqLayer=L.layerGroup().addTo(pqMap);
     pqMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?17:12);
@@ -2612,7 +2623,7 @@ function prodInit(){
   if(window.L && !prodMap){
     cont.innerHTML='';
     prodMap=L.map('prodMapa');
-    mapAddCamadaBase(prodMap);
+    mapAddCamadaBase(prodMap); mapAddLimiteZA(prodMap);
     prodMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
   }
   const de=document.getElementById('prodDe'), ate=document.getElementById('prodAte');
@@ -2667,13 +2678,13 @@ function prodDesenhar(d){
 let paMap=null, paHeat=null, paOcL=null, paRepL=null, paPassLegEl=null;
 let paShowOc=true, paShowRep=false;
 let paPassSel=new Set();   // buckets de passada selecionados (vazio = todas)
-const PA_PASS_COL=['#B4B2A9','#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#04342C']; // 0..5 passadas
+const PA_PASS_COL=['#dc2626','#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#04342C']; // 0×=vermelho (não pesquisado) · 1..5×=teal
 function paInit(){
   const cont=document.getElementById('paMapa');
   if(window.L && !paMap){
     cont.innerHTML='';
     paMap=L.map('paMapa');
-    mapAddCamadaBase(paMap);
+    mapAddCamadaBase(paMap); mapAddLimiteZA(paMap);
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
     paMap.on('moveend',()=>paCarregarMapa());
     // filtro de passadas dentro do mapa (igual legenda-filtro da Programação) — multi-seleção + zoom
@@ -2818,7 +2829,7 @@ function ppInit(){
   if(!ppMap){
     cont.innerHTML='';
     ppMap=L.map('ppMapa').setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?16:13);
-    mapAddCamadaBase(ppMap,{opacity:.55},'topleft');
+    mapAddCamadaBase(ppMap,{opacity:.55},'topleft'); mapAddLimiteZA(ppMap);
     ppRedeLayer=L.layerGroup().addTo(ppMap);
     ppSelLayer=L.layerGroup().addTo(ppMap);   // seleção — sempre visível, por cima dos filtros
     ppDrawnLayer=L.featureGroup().addTo(ppMap);
