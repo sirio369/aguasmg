@@ -2675,7 +2675,7 @@ function prodDesenhar(d){
 // Dashboard do time interno (análise de RESULTADO): KPIs (2 km + vaz/km por km de rede) · progresso das
 // 5 passadas do TR · mapa de passadas (heatmap por n_passada, por viewport) + ocorrências + reporte de
 // campo (ativáveis). RPCs app_pp_acompanhamento / app_pp_passadas_bbox. Reaproveita prodHojeStr/MesIniStr.
-let paMap=null, paHeat=null, paOcL=null, paRepL=null, paPassLegEl=null;
+let paMap=null, paLayerGrp=null, paPassLegEl=null, paGen=0;
 let paShowOc=true, paShowRep=false;
 let paPassSel=new Set();   // buckets de passada selecionados (vazio = todas)
 const PA_PASS_COL=['#dc2626','#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#04342C']; // 0×=vermelho (não pesquisado) · 1..5×=teal
@@ -2685,6 +2685,7 @@ function paInit(){
     cont.innerHTML='';
     paMap=L.map('paMapa');
     mapAddCamadaBase(paMap); mapAddLimiteZA(paMap);
+    paLayerGrp=L.layerGroup().addTo(paMap);   // 1 grupo p/ heatmap+reporte+ocorrências — clearLayers evita camada órfã
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
     paMap.on('moveend',()=>paCarregarMapa());
     // filtro de passadas dentro do mapa (igual legenda-filtro da Programação): isola por categoria,
@@ -2779,30 +2780,32 @@ function paPintarPassLeg(){
   });
 }
 async function paCarregarMapa(){
-  if(!paMap) return;
-  [paHeat,paOcL,paRepL].forEach(l=>{ if(l&&paMap) paMap.removeLayer(l); }); paHeat=paOcL=paRepL=null;
+  if(!paMap||!paLayerGrp) return;
+  const gen=++paGen;   // guarda de concorrência: só a chamada mais nova desenha (evita órfã de pan/zoom)
   const f=paFiltros(), b=paMap.getBounds();
   const mostra = n => paPassSel.size===0 || paPassSel.has(Math.min(n,5));   // filtro por bucket (isola)
   try{
     const {data,error}=await sb.rpc('app_pp_passadas_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:f.p_consorcio,p_colaborador:f.p_colaborador,p_data_ini:f.p_data_ini,p_data_fim:f.p_data_fim});
     if(error)throw error;
+    if(gen!==paGen) return;   // uma chamada mais nova começou — não desenha nada desta
+    paLayerGrp.clearLayers();  // limpa TUDO (heatmap+reporte+ocorrências) só depois do await, na chamada vencedora
     // base: heatmap por nº de passadas (0×=vermelho … 5+×=teal escuro), filtrado pelos chips selecionados.
     // Sem fitBounds no clique (igual Programação) — só filtra o viewport atual, sem dar zoom.
     const feats=((data.passadas&&data.passadas.features)||[]).filter(ft=>mostra(ft.properties.n_passada||0));
     if(feats.length){
-      paHeat=L.geoJSON({type:'FeatureCollection',features:feats},{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.5};},
-        onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip((n>=5?'5+':n)+'× pesquisado'); }}).addTo(paMap);
+      L.geoJSON({type:'FeatureCollection',features:feats},{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.5};},
+        onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip((n>=5?'5+':n)+'× pesquisado'); }}).addTo(paLayerGrp);
     }
     // reporte de campo (trajeto real início→fim) — ativável, p/ comparar com as passadas
     if(paShowRep && data.reportes&&(data.reportes.features||[]).length){
-      paRepL=L.geoJSON(data.reportes,{style:{color:'#d81b60',weight:4,opacity:.85},
-        onEachFeature:(ft,l)=>{ const p=ft.properties||{}; l.bindTooltip('🧭 '+(p.metros||0)+' m · '+String(p.inicio||'').slice(0,10)); }}).addTo(paMap);
+      L.geoJSON(data.reportes,{style:{color:'#d81b60',weight:4,opacity:.85},
+        onEachFeature:(ft,l)=>{ const p=ft.properties||{}; l.bindTooltip('🧭 '+(p.metros||0)+' m · '+String(p.inicio||'').slice(0,10)); }}).addTo(paLayerGrp);
     }
     // ocorrências (vazamentos) — ativável
     if(paShowOc && data.ocorrencias&&(data.ocorrencias.features||[]).length){
-      paOcL=L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paMap);
+      L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paLayerGrp);
     }
-  }catch(e){ toast('Erro no mapa: '+(e.message||e)); }
+  }catch(e){ if(gen===paGen) toast('Erro no mapa: '+(e.message||e)); }
 }
 function paToggleOc(){ paShowOc=!paShowOc; paPintarToggles(); paCarregarMapa(); }
 function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(); }
