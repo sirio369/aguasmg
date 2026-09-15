@@ -237,8 +237,9 @@ pwa/
   o TR exige **5 passadas** de toda a rede → conceito de "passada" (`pp_execucao.n_passada`), `pp_recompute`
   só conta traço posterior à programação, e o módulo foi separado por público: geofonista tem Pesquisa +
   "Minha produtividade" pessoal simplificada (`app_pesquisa_minha`, `auth.uid()`); time interno tem, no
-  Auxiliar de Programação, **Programar** + **Acompanhamento** (tela `pp_acomp`: KPIs com 2 km + vaz/km por
-  km de rede, progresso das 5 passadas, mapa camadas↔passadas, resumo por colaborador). O cruzamento roda em
+  Auxiliar de Programação, **Programar** (rede colorida por nº de passadas 0×..5+×) + **Acompanhamento**
+  (tela `pp_acomp`: KPIs com 2 km + vaz/km por km de rede, progresso das 5 passadas, mapa heatmap de
+  passadas + ocorrências/reporte ativáveis, resumo por colaborador). O cruzamento roda em
   **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a

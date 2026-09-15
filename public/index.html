@@ -483,12 +483,12 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec">Progresso do TR — cada trecho 5×</div>
     <div id="paBar" style="display:flex;height:24px;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:8px 0"></div>
     <div id="paBarLeg" style="display:flex;gap:8px 14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:18px"></div>
-    <div class="sec">Mapa</div>
-    <div style="display:flex;gap:6px;margin:8px 0">
-      <button id="paModoCamadas" type="button" style="all:unset;cursor:pointer;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);text-align:center">Cobertura de rede</button>
-      <button id="paModoPassadas" type="button" style="all:unset;cursor:pointer;font-size:13px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);text-align:center">Passadas</button>
+    <div class="sec">Mapa — passadas de rede</div>
+    <div id="paLegend" style="display:flex;gap:8px 12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:8px 0"></div>
+    <div style="display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap">
+      <button id="paTgOc" type="button" class="fchip" data-c="#1565c0">Ocorrências</button>
+      <button id="paTgRep" type="button" class="fchip" data-c="#d81b60">Reporte de campo</button>
     </div>
-    <div id="paLegend" style="display:flex;gap:8px 12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:8px"></div>
     <div id="paMapa" style="height:48vh;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
     <div class="sec" style="margin-top:20px">Resumo por colaborador</div>
     <div id="paResumo" style="overflow-x:auto;margin-top:8px"></div>
@@ -2662,10 +2662,11 @@ function prodDesenhar(d){
 }
 
 // ---------- MÓDULO ACOMPANHAMENTO DA PESQUISA (interno — aprovador/admin) ----------
-// Dashboard do time interno: KPIs (2 km + vaz/km por km de rede) · progresso das 5 passadas do TR ·
-// mapa (modo camadas ↔ passadas) · resumo por colaborador. RPCs app_pp_acompanhamento / app_pp_mapa /
-// app_pp_passadas_bbox. Reaproveita prodHojeStr/prodMesIniStr do módulo de produtividade.
-let paMap=null, paMode='camadas', paLayers={}, paHeat=null;
+// Dashboard do time interno (análise de RESULTADO): KPIs (2 km + vaz/km por km de rede) · progresso das
+// 5 passadas do TR · mapa de passadas (heatmap por n_passada, por viewport) + ocorrências + reporte de
+// campo (ativáveis). RPCs app_pp_acompanhamento / app_pp_passadas_bbox. Reaproveita prodHojeStr/MesIniStr.
+let paMap=null, paHeat=null, paOcL=null, paRepL=null;
+let paShowOc=true, paShowRep=false;
 const PA_PASS_COL=['#B4B2A9','#9FE1CB','#5DCAA5','#1D9E75','#0F6E56','#04342C']; // 0..5 passadas
 function paInit(){
   const cont=document.getElementById('paMapa');
@@ -2674,12 +2675,12 @@ function paInit(){
     paMap=L.map('paMapa');
     mapAddCamadaBase(paMap);
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
-    paMap.on('moveend',()=>{ if(paMode==='passadas') paCarregarHeat(); });
+    paMap.on('moveend',()=>paCarregarMapa());
   }
   const de=document.getElementById('paDe'), ate=document.getElementById('paAte');
   if(de && !de.value) de.value=prodMesIniStr();
   if(ate && !ate.value) ate.value=prodHojeStr();
-  paStyleModeBtns();
+  paPintarToggles();
   setTimeout(()=>{ if(paMap) paMap.invalidateSize(); },60);
   paCarregarColabs();
   paAtualizar();
@@ -2705,7 +2706,7 @@ async function paAtualizar(){
     if(error)throw error;
     paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paResumo(data.resumo||[]);
   }catch(e){ toast('Erro no acompanhamento: '+(e.message||e)); }
-  paMapaRefresh();
+  paCarregarMapa();
 }
 function paCards(k){
   const cards=[
@@ -2713,7 +2714,6 @@ function paCards(k){
     {lbl:'Km andado (reporte)',val:Number(k.km_andado||0).toFixed(2)+' km'},
     {lbl:'Vazamentos',val:String(k.vazamentos||0)},
     {lbl:'Vaz / km de rede',val:Number(k.vaz_km||0).toFixed(2)},
-    {lbl:'Cobertura da programação',val:Number(k.pct_cobertura||0).toFixed(0)+'%'},
     {lbl:'Velocidade média',val:Number(k.velocidade_kmh||0).toFixed(1)+' km/h'}
   ];
   document.getElementById('paCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px"><div style="font-size:12px;color:var(--mut)">'+c.lbl+'</div><div style="font-size:21px;font-weight:700;margin-top:3px">'+c.val+'</div></div>').join('');
@@ -2731,67 +2731,48 @@ function paProgresso(arr){
 }
 function paResumo(rows){
   const el=document.getElementById('paResumo');
-  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem programação/execução no filtro.</p>'; return; }
-  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:420px">'
-    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;font-weight:400;padding:6px 4px">Colaborador</th><th style="font-weight:400;padding:6px 4px">km prog.</th><th style="font-weight:400;padding:6px 4px">km pesq.</th><th style="font-weight:400;padding:6px 4px">%</th><th style="font-weight:400;padding:6px 4px">vaz.</th><th style="font-weight:400;padding:6px 4px">km/h</th></tr></thead><tbody>'
-    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+(r.nome||'—')+'</td><td style="padding:7px 4px">'+Number(r.km_prog||0).toFixed(1)+'</td><td style="padding:7px 4px">'+Number(r.km_pesq||0).toFixed(1)+'</td><td style="padding:7px 4px">'+Number(r.pct||0).toFixed(0)+'%</td><td style="padding:7px 4px">'+(r.vazamentos||0)+'</td><td style="padding:7px 4px">'+Number(r.velocidade_kmh||0).toFixed(1)+'</td></tr>').join('')
+  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem execução no filtro.</p>'; return; }
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:460px">'
+    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;font-weight:400;padding:6px 4px">Colaborador</th><th style="font-weight:400;padding:6px 4px">km rede</th><th style="font-weight:400;padding:6px 4px">km andado</th><th style="font-weight:400;padding:6px 4px">vaz.</th><th style="font-weight:400;padding:6px 4px">vaz/km</th><th style="font-weight:400;padding:6px 4px">km/h</th></tr></thead><tbody>'
+    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+(r.nome||'—')+'</td><td style="padding:7px 4px">'+Number(r.km_rede_pesquisado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.km_andado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+(r.vazamentos||0)+'</td><td style="padding:7px 4px">'+Number(r.vaz_km||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.velocidade_kmh||0).toFixed(1)+'</td></tr>').join('')
     +'</tbody></table>';
 }
-function paStyleModeBtns(){
-  [['paModoCamadas','camadas'],['paModoPassadas','passadas']].forEach(([id,m])=>{
+function paPintarToggles(){
+  [['paTgOc',paShowOc],['paTgRep',paShowRep]].forEach(([id,on])=>{
     const b=document.getElementById(id); if(!b) return;
-    const on=paMode===m;
-    b.style.background=on?'var(--acc)':'transparent';
-    b.style.color=on?'var(--acc-ink)':'inherit';
-    b.style.borderColor=on?'var(--acc)':'var(--line)';
+    b.style.setProperty('--c',b.dataset.c);
+    b.classList.toggle('on',!!on);
   });
-}
-function paSetMode(m){ paMode=m; paStyleModeBtns(); paMapaRefresh(); }
-function paClearLayers(){
-  Object.values(paLayers).forEach(l=>{ if(l&&paMap) paMap.removeLayer(l); });
-  paLayers={};
-  if(paHeat&&paMap){ paMap.removeLayer(paHeat); paHeat=null; }
-}
-function paLegendCamadas(){
-  document.getElementById('paLegend').innerHTML=[['#7c3aed','Programado'],['#15803d','Pesquisado'],['#d81b60','Reporte'],['#0891b2','Histórico'],['#1565c0','Ocorrência']]
-    .map(([c,l])=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:4px;border-radius:2px;background:'+c+';display:inline-block"></i>'+l+'</span>').join('');
 }
 function paLegendPassadas(){
   document.getElementById('paLegend').innerHTML=PA_PASS_COL.map((c,i)=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;height:4px;border-radius:2px;background:'+c+';display:inline-block"></i>'+(i>=5?'5+':i)+'×</span>').join('');
 }
-async function paMapaRefresh(){
+async function paCarregarMapa(){
   if(!paMap) return;
-  paClearLayers();
-  if(paMode==='passadas'){ paLegendPassadas(); paCarregarHeat(); return; }
-  paLegendCamadas();
-  const f=paFiltros();
+  paLegendPassadas();
+  [paHeat,paOcL,paRepL].forEach(l=>{ if(l&&paMap) paMap.removeLayer(l); }); paHeat=paOcL=paRepL=null;
+  const f=paFiltros(), b=paMap.getBounds();
   try{
-    const {data,error}=await sb.rpc('app_pp_mapa',{p_colaborador:f.p_colaborador,p_consorcio:f.p_consorcio,p_data_ini:f.p_data_ini,p_data_fim:f.p_data_fim});
+    const {data,error}=await sb.rpc('app_pp_passadas_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:f.p_consorcio,p_colaborador:f.p_colaborador,p_data_ini:f.p_data_ini,p_data_fim:f.p_data_fim});
     if(error)throw error;
-    const bs=[];
-    const addLinha=(key,geo,style)=>{ const fs=(geo&&geo.features)||[]; if(!fs.length) return; const ly=L.geoJSON(geo,{style:style}).addTo(paMap); paLayers[key]=ly; try{bs.push(ly.getBounds());}catch(e){} };
-    addLinha('prog',data.cadastro_pendente,{color:'#7c3aed',weight:5,opacity:.8});
-    addLinha('exec',data.cadastro_executado,{color:'#15803d',weight:5,opacity:.85});
-    addLinha('hist',data.historico_execucoes,{color:'#0891b2',weight:3,opacity:.7,dashArray:'2 6'});
-    addLinha('rep',data.reportes_campo,{color:'#d81b60',weight:4,opacity:.8});
-    if(data.ocorrencias&&(data.ocorrencias.features||[]).length){
-      paLayers.oc=L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paMap);
-      try{bs.push(paLayers.oc.getBounds());}catch(e){}
+    // base: heatmap por nº de passadas (0×=cinza … 5+×=teal escuro)
+    if(data.passadas&&(data.passadas.features||[]).length){
+      paHeat=L.geoJSON(data.passadas,{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.5};},
+        onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip((n>=5?'5+':n)+'× pesquisado'); }}).addTo(paMap);
     }
-    if(bs.length){ let bb=bs[0]; for(let i=1;i<bs.length;i++) bb=bb.extend(bs[i]); try{paMap.fitBounds(bb,{padding:[30,30],maxZoom:16});}catch(e){} }
+    // reporte de campo (trajeto real início→fim) — ativável, p/ comparar com as passadas
+    if(paShowRep && data.reportes&&(data.reportes.features||[]).length){
+      paRepL=L.geoJSON(data.reportes,{style:{color:'#d81b60',weight:4,opacity:.85},
+        onEachFeature:(ft,l)=>{ const p=ft.properties||{}; l.bindTooltip('🧭 '+(p.metros||0)+' m · '+String(p.inicio||'').slice(0,10)); }}).addTo(paMap);
+    }
+    // ocorrências (vazamentos) — ativável
+    if(paShowOc && data.ocorrencias&&(data.ocorrencias.features||[]).length){
+      paOcL=L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paMap);
+    }
   }catch(e){ toast('Erro no mapa: '+(e.message||e)); }
 }
-async function paCarregarHeat(){
-  if(!paMap||paMode!=='passadas') return;
-  const b=paMap.getBounds(), cons=document.getElementById('paCons').value||null;
-  try{
-    const {data,error}=await sb.rpc('app_pp_passadas_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:cons});
-    if(error)throw error;
-    if(paHeat){ paMap.removeLayer(paHeat); paHeat=null; }
-    paHeat=L.geoJSON(data,{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.55};},
-      onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip(n+' passada(s)'); }}).addTo(paMap);
-  }catch(e){ toast('Erro no mapa de passadas: '+(e.message||e)); }
-}
+function paToggleOc(){ paShowOc=!paShowOc; paPintarToggles(); paCarregarMapa(); }
+function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(); }
 
 // ---------- MÓDULO PROGRAMAÇÃO DE PESQUISA ----------
 let ppMap=null, ppRedeLayer=null, ppSelLayer=null, ppDrawnLayer=null, ppDrawCtl=null, ppClearCtl=null;
@@ -2801,10 +2782,12 @@ let ppFeatById=new Map();            // rede_id -> layer leaflet (camada base fi
 let ppStatusById=new Map();          // rede_id -> pp_status
 let ppFiltroColab=null;              // null=modo rede | uuid=modo geofonista
 let ppResumoData=[];
-let ppVis={livre:true,pendente:true,executado:true,vencido:true};  // filtro pela legenda
-const PP_COL={livre:'#475569',pendente:'#7c3aed',executado:'#15803d',sel:'#f97316',vencido:'#dc2626'};
-const PP_W={livre:3.5,pendente:5,executado:4.5,vencido:5,sel:7};
-const PP_LBL={livre:'livre',pendente:'programado',executado:'pesquisado',vencido:'sem pesquisa recente'};
+// Categorias da legenda: "programado" (roxo, atribuído pendente — overlay) + nº de passadas 0×..5+×
+let ppVis={programado:true,p0:true,p1:true,p2:true,p3:true,p4:true,p5:true};  // filtro pela legenda
+const PP_SEL_COL='#f97316';
+const PP_CATS=[['programado','Programado','#7c3aed'],['p0','0×',PA_PASS_COL[0]],['p1','1×',PA_PASS_COL[1]],['p2','2×',PA_PASS_COL[2]],['p3','3×',PA_PASS_COL[3]],['p4','4×',PA_PASS_COL[4]],['p5','5+×',PA_PASS_COL[5]]];
+function ppCat(p){ if((p.pp_status||null)==='pendente') return 'programado'; return 'p'+Math.min(p.n_passada||0,5); }
+function ppCatCol(k){ return k==='programado'?'#7c3aed':PA_PASS_COL[+k.slice(1)]; }
 
 function ppInit(){
   const cont=document.getElementById('ppMapa');
@@ -2842,11 +2825,11 @@ function ppInit(){
     const Lg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
       const d=L.DomUtil.create('div','pp-legend');
       d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.4 system-ui,sans-serif;color:#333;box-shadow:0 1px 4px rgba(0,0,0,.2)';
-      d.innerHTML='<b style="display:block;margin-bottom:3px">Rede — clique p/ filtrar</b>'
-        + ['livre','pendente','executado','vencido'].map(k=>
+      d.innerHTML='<b style="display:block;margin-bottom:3px">Passadas — clique p/ filtrar</b>'
+        + PP_CATS.map(([k,lbl,col])=>
             '<button type="button" data-k="'+k+'" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;padding:2px 0;font:inherit;cursor:pointer;color:inherit">'
-            +'<i style="width:16px;height:4px;background:'+PP_COL[k]+';border-radius:2px;flex:none"></i>'+PP_LBL[k]+'</button>').join('')
-        + '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;opacity:.8"><i style="width:16px;height:4px;background:'+PP_COL.sel+';border-radius:2px;flex:none"></i>selecionado</div>';
+            +'<i style="width:16px;height:4px;background:'+col+';border-radius:2px;flex:none"></i>'+lbl+'</button>').join('')
+        + '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;opacity:.8"><i style="width:16px;height:4px;background:'+PP_SEL_COL+';border-radius:2px;flex:none"></i>selecionado</div>';
       L.DomEvent.disableClickPropagation(d);
       d.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>{
         const k=b.dataset.k; ppVis[k]=!ppVis[k];
@@ -2872,18 +2855,18 @@ async function ppCarregarColabs(){
 function ppRecarregar(){ return ppFiltroColab ? ppCarregarColabView() : ppCarregarRede(); }
 function ppRender(feats,tooltipExtra){
   ppRedeLayer.clearLayers(); ppFeatById.clear(); ppStatusById.clear();
-  const venceEm=document.getElementById('ppSemDesde').value;
   (feats||[]).forEach(f=>{
     const p=f.properties, id=p.id, st=p.pp_status||null;
     ppStatusById.set(id,st);
-    let key = st||'livre';
-    if(!st && venceEm && (!p.ultima_pesquisa || p.ultima_pesquisa.slice(0,10) < venceEm)) key='vencido';
+    const key = ppCat(p);   // 'programado' (pendente) ou 'p0'..'p5' (nº de passadas)
     if(!ppVis[key]) return;   // filtro da legenda
-    const ln=L.geoJSON(f,{style:{color:PP_COL[key],weight:PP_W[key]||3.5,opacity:1}});
+    const col=ppCatCol(key), w = key==='programado'?5:(key==='p0'?3.5:4.5);
+    const ln=L.geoJSON(f,{style:{color:col,weight:w,opacity:1}});
     ln.eachLayer(l=>{
       l.on('click',()=>ppToggle(id,f));
-      const up=p.ultima_pesquisa?('últ. pesq. '+p.ultima_pesquisa.slice(0,10)):'sem pesquisa';
-      l.bindTooltip((p.programado_para?('👤 '+p.programado_para+' · '):'')+(p.comprimento||0)+' m'+(tooltipExtra?(' · '+tooltipExtra(p)):' · '+up));
+      const np=Math.min(p.n_passada||0,5), passLbl=(np>=5?'5+':np)+'× pesquisado';
+      const up=p.ultima_pesquisa?('últ. '+p.ultima_pesquisa.slice(0,10)):'nunca';
+      l.bindTooltip((p.programado_para?('👤 '+p.programado_para+' · '):'')+(p.comprimento||0)+' m · '+passLbl+(tooltipExtra?(' · '+tooltipExtra(p)):' · '+up));
     });
     ln.addTo(ppRedeLayer); ppFeatById.set(id,ln);
   });
@@ -2895,7 +2878,7 @@ function ppRenderSel(){
   ppSelLayer.clearLayers();
   ppSelFeat.forEach((f,id)=>{
     if(!ppSel.has(id)) return;
-    const ln=L.geoJSON(f,{style:{color:PP_COL.sel,weight:PP_W.sel,opacity:1}});
+    const ln=L.geoJSON(f,{style:{color:PP_SEL_COL,weight:7,opacity:1}});
     ln.eachLayer(l=>{ l.on('click',()=>ppToggle(id,f)); });
     ln.addTo(ppSelLayer);
   });
@@ -3015,8 +2998,8 @@ if($('#paAte')) $('#paAte').addEventListener('change',paAtualizar);
 if($('#paHoje')) $('#paHoje').addEventListener('click',()=>{document.getElementById('paDe').value=prodHojeStr();document.getElementById('paAte').value=prodHojeStr();paAtualizar();});
 if($('#paMes')) $('#paMes').addEventListener('click',()=>{document.getElementById('paDe').value=prodMesIniStr();document.getElementById('paAte').value=prodHojeStr();paAtualizar();});
 if($('#paTudo')) $('#paTudo').addEventListener('click',()=>{document.getElementById('paDe').value='';document.getElementById('paAte').value='';paAtualizar();});
-if($('#paModoCamadas')) $('#paModoCamadas').addEventListener('click',()=>paSetMode('camadas'));
-if($('#paModoPassadas')) $('#paModoPassadas').addEventListener('click',()=>paSetMode('passadas'));
+if($('#paTgOc')) $('#paTgOc').addEventListener('click',paToggleOc);
+if($('#paTgRep')) $('#paTgRep').addEventListener('click',paToggleRep);
 
 // ---------- MÓDULO CAPTAÇÃO DE CLIENTES (mockup) ----------
 let captFotos={};
