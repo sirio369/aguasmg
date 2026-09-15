@@ -659,7 +659,13 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   `0×`..`5+×` **isola** aquela faixa (multi-seleção; vazio = todas), `paPassSel` (Set). **Só re-renderiza
   o viewport atual filtrado, SEM dar zoom no clique** — o `fitBounds`-no-clique foi removido porque, como
   `0×` é ~99% da rede (a rede quase toda ainda não pesquisada), clicar `0×` dava zoom-out e enchia a tela
-  de vermelho, parecendo que não filtrava. **Não** tem mais o toggle de modo nem as camadas
+  de vermelho, parecendo que não filtrava. **Bug de camada órfã corrigido (2026-09-15):** o mapa
+  rastreava o heatmap numa variável (`paHeat`) e removia só ela — mas `moveend` (pan/zoom) dispara vários
+  `paCarregarMapa` **concorrentes** sobre `sb.rpc` async, e as chamadas antigas deixavam heatmaps
+  **órfãos** (vermelho) no mapa; ao filtrar, só a rastreada saía, os órfãos vermelhos ficavam. Fix: um
+  **`layerGroup` único** (`paLayerGrp`) com `clearLayers()` + **guarda de geração** (`paGen` — só a
+  chamada mais nova, após o `await`, limpa e desenha). É o mesmo padrão da Programação (que usa
+  `ppRedeLayer` layerGroup, por isso nunca teve órfã). **Não** tem mais o toggle de modo nem as camadas
   "pesquisado"/"histórico" — eram redundantes: o heatmap de passadas **é** derivado do histórico
   (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
   permanente — pra análise só o histórico importa, e ele já vira o heatmap.)
