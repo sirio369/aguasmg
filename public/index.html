@@ -2817,7 +2817,7 @@ let ppStatusById=new Map();          // rede_id -> pp_status
 let ppFiltroColab=null;              // null=modo rede | uuid=modo geofonista
 let ppResumoData=[];
 // Categorias da legenda: "programado" (roxo, atribuído pendente — overlay) + nº de passadas 0×..5+×
-let ppVis={programado:true,p0:true,p1:true,p2:true,p3:true,p4:true,p5:true};  // filtro pela legenda
+let ppFiltro=new Set();  // filtro-legenda (isola): vazio = mostra todas; senão mostra só as categorias no set
 const PP_SEL_COL='#f97316';
 const PP_CATS=[['programado','Programado','#7c3aed'],['p0','0×',PA_PASS_COL[0]],['p1','1×',PA_PASS_COL[1]],['p2','2×',PA_PASS_COL[2]],['p3','3×',PA_PASS_COL[3]],['p4','4×',PA_PASS_COL[4]],['p5','5+×',PA_PASS_COL[5]]];
 function ppCat(p){ if((p.pp_status||null)==='pendente') return 'programado'; return 'p'+Math.min(p.n_passada||0,5); }
@@ -2865,12 +2865,12 @@ function ppInit(){
             +'<i style="width:16px;height:4px;background:'+col+';border-radius:2px;flex:none"></i>'+lbl+'</button>').join('')
         + '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;opacity:.8"><i style="width:16px;height:4px;background:'+PP_SEL_COL+';border-radius:2px;flex:none"></i>selecionado</div>';
       L.DomEvent.disableClickPropagation(d);
+      const pintar=()=>d.querySelectorAll('[data-k]').forEach(x=>{ x.style.opacity=(ppFiltro.size===0||ppFiltro.has(x.dataset.k))?'1':'.4'; });
       d.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>{
-        const k=b.dataset.k; ppVis[k]=!ppVis[k];
-        b.style.opacity=ppVis[k]?'1':'.35';
-        b.style.textDecoration=ppVis[k]?'none':'line-through';
-        ppRecarregar();
+        const k=b.dataset.k; if(ppFiltro.has(k)) ppFiltro.delete(k); else ppFiltro.add(k);
+        pintar(); ppRecarregar();
       }));
+      pintar();
       return d;
     }});
     ppMap.addControl(new Lg());
@@ -2893,7 +2893,7 @@ function ppRender(feats,tooltipExtra){
     const p=f.properties, id=p.id, st=p.pp_status||null;
     ppStatusById.set(id,st);
     const key = ppCat(p);   // 'programado' (pendente) ou 'p0'..'p5' (nº de passadas)
-    if(!ppVis[key]) return;   // filtro da legenda
+    if(!(ppFiltro.size===0||ppFiltro.has(key))) return;   // filtro-legenda (isola por categoria)
     const col=ppCatCol(key), w = key==='programado'?5:(key==='p0'?3.5:4.5);
     const ln=L.geoJSON(f,{style:{color:col,weight:w,opacity:1}});
     ln.eachLayer(l=>{
