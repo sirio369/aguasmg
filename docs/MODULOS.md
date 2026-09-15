@@ -627,9 +627,12 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   **análise de resultado**, então saiu o "programado" e a "cobertura de programação" (isso é da tela
   Programar, não daqui). O mapa é o **heatmap por nº de passadas** (base, `0×` cinza → `5+×` teal escuro,
   por viewport via `app_pp_passadas_bbox`, recarrega no `moveend` — 46k segmentos, inviável de uma vez) +
-  duas camadas **ativáveis** (chips): **Ocorrências** (pontos de vazamento, ligado por padrão) e
-  **Reporte de campo** (trajeto real início→fim do colaborador — pedido do usuário pra comparar "o que
-  andou" com o nº de passadas, desligado por padrão). **Não** tem mais o toggle de modo nem as camadas
+  duas camadas **ativáveis** (chips acima do mapa): **Ocorrências** (pontos de vazamento, ligado por
+  padrão) e **Reporte de campo** (trajeto real início→fim do colaborador — pedido do usuário pra comparar
+  "o que andou" com o nº de passadas, desligado por padrão). O heatmap tem um **filtro-legenda dentro do
+  mapa** (canto inf. dir., igual ao da tela Programar): clicar num bucket `0×`..`5+×` (multi-seleção)
+  mostra só aqueles trechos e **dá zoom** neles (`paPassSel`; vazio = todas; `paCarregarMapa(doFit)` só
+  enquadra quando o disparo veio de um clique no chip, não no `moveend`). **Não** tem mais o toggle de modo nem as camadas
   "pesquisado"/"histórico" — eram redundantes: o heatmap de passadas **é** derivado do histórico
   (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
   permanente — pra análise só o histórico importa, e ele já vira o heatmap.)
