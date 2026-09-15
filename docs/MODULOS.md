@@ -428,7 +428,14 @@ sem intervenção manual.
   reprogramar trecho já executado, o que quebrava a re-pesquisa legítima.)
 - Lista de colaboradores clicável (`app_pp_colaboradores`, inclui o próprio usuário logado) filtra o mapa
   pra "só a programação dele" (`app_pp_por_colaborador`). Botão "✕ Limpar seleção", filtro "não pesquisado
-  desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`), legenda clicável (filtro de status por cor).
+  desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`).
+- **Legenda-filtro por nº de passadas (2026-09-14, substituiu status por cor):** a rede é colorida por
+  **quantas vezes cada trecho já foi pesquisado** — `Programado` (roxo, atribuído pendente, é overlay pra
+  não reatribuir) + `0×` (cinza) / `1×` / `2×` / `3×` / `4×` / `5+×` (escala teal, = `pp_execucao` count).
+  `app_rede_bbox` e `app_pp_rede_no_poligono` passaram a expor `n_passada` por segmento. É o que o
+  programador usa pra dirigir as 5 passadas do TR ("mostra tudo em 0×" pra 1ª rodada, "tudo em 2×" pra
+  puxar a 3ª). Categoria de cor no frontend: `ppCat(p)` = `'programado'` se `pp_status='pendente'`, senão
+  `'p'+min(n_passada,5)`. (As antigas "livre / sem pesquisa recente / pesquisado" saíram.)
 - **Resumo** (`app_pp_resumo`) — km programado/executado/% por colaborador (agrega em subquery — `jsonb_agg`
   direto sobre `count(*)` aninhado dá erro de agregado aninhado).
 - **Cuidado (histórico, ainda vale):** nunca re-renderize a camada de seleção a partir de uma camada
@@ -616,17 +623,27 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 - **Progresso do TR (as 5 passadas):** barra empilhada mostrando quanto da rede já foi pesquisada 0/1/…/
   5+ vezes (cinza → teal escuro). É **cumulativo da rede inteira** (por consórcio) — **não** filtra por
   data/colaborador (o TR é um total, não um recorte de período).
-- **Mapa com 2 modos** (toggle): **"Cobertura de rede"** (camadas programado/pesquisado/reporte/
-  histórico/ocorrências, via `app_pp_mapa`, respeita filtros) e **"Passadas"** (heatmap da rede colorido
-  por `n_passada`, carregado **por viewport** via `app_pp_passadas_bbox` — recarrega no `moveend`; a rede
-  inteira são 46k segmentos, inviável de mandar de uma vez).
-- **Resumo por colaborador:** km programado/pesquisado/%/vazamentos/velocidade por pessoa.
-- **RPCs novas (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio,
-  p_colaborador, p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo`;
-  `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,p_consorcio)` → segmentos no viewport com `n_passada`.
-  `app_pp_mapa` estendido com a camada `ocorrencias` e casamento traço↔usuário por **nome OU email**
-  (mesma pegadinha da 4.3.5). O antigo dropdown "Todos os coletores" de análise que existia na
-  produtividade do geofonista vive agora **aqui** (é a tela de análise do time interno).
+- **Mapa de resultado — passadas + ocorrências + reporte (revisado 2026-09-14):** é uma tela de
+  **análise de resultado**, então saiu o "programado" e a "cobertura de programação" (isso é da tela
+  Programar, não daqui). O mapa é o **heatmap por nº de passadas** (base, `0×` cinza → `5+×` teal escuro,
+  por viewport via `app_pp_passadas_bbox`, recarrega no `moveend` — 46k segmentos, inviável de uma vez) +
+  duas camadas **ativáveis** (chips): **Ocorrências** (pontos de vazamento, ligado por padrão) e
+  **Reporte de campo** (trajeto real início→fim do colaborador — pedido do usuário pra comparar "o que
+  andou" com o nº de passadas, desligado por padrão). **Não** tem mais o toggle de modo nem as camadas
+  "pesquisado"/"histórico" — eram redundantes: o heatmap de passadas **é** derivado do histórico
+  (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
+  permanente — pra análise só o histórico importa, e ele já vira o heatmap.)
+- **KPIs (5):** km de rede pesquisado · km andado · vazamentos · vaz/km (por km de rede) · velocidade
+  média. (Saiu a "cobertura da programação".)
+- **Resumo por colaborador:** repete os indicadores de cima por pessoa — km rede pesquisado · km andado ·
+  vazamentos · vaz/km · velocidade. (Saíram "km programado" e "%".)
+- **RPCs (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio, p_colaborador,
+  p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo` (agora com km
+  rede/andado/vaz/vaz-km/velocidade por colaborador); `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,
+  p_consorcio, p_colaborador, p_data_ini, p_data_fim)` → `passadas` (heatmap) + `reportes` + `ocorrencias`
+  (as duas últimas filtradas por consórcio/colaborador/data; casamento traço↔usuário por **nome OU
+  email**, mesma pegadinha da 4.3.5). O dropdown "Todos os coletores" de análise vive **aqui** (tela do
+  time interno). `app_pp_mapa` deixou de ser usado por esta tela.
 - **Fora de escopo (registrado):** integração de um relatório do **SIGOS/COPASA** pra trazer a execução
   do vazamento (localizado ou não) — fica pra outro momento (decisão do usuário, 2026-09-14).
 - **Ideia registrada p/ a tela Programar (interno):** filtro por nº de passadas (0 / 1 / 2 / …) sobre os
