@@ -440,11 +440,17 @@ sem intervenção manual.
   desde X" (`p_nao_pesquisado_desde` em `app_rede_bbox`).
 - **Legenda-filtro por nº de passadas (2026-09-14, substituiu status por cor):** a rede é colorida por
   **quantas vezes cada trecho já foi pesquisado** — `Programado` (roxo, atribuído pendente, é overlay pra
-  não reatribuir) + `0×` (cinza) / `1×` / `2×` / `3×` / `4×` / `5+×` (escala teal, = `pp_execucao` count).
-  `app_rede_bbox` e `app_pp_rede_no_poligono` passaram a expor `n_passada` por segmento. É o que o
-  programador usa pra dirigir as 5 passadas do TR ("mostra tudo em 0×" pra 1ª rodada, "tudo em 2×" pra
-  puxar a 3ª). Categoria de cor no frontend: `ppCat(p)` = `'programado'` se `pp_status='pendente'`, senão
-  `'p'+min(n_passada,5)`. (As antigas "livre / sem pesquisa recente / pesquisado" saíram.)
+  não reatribuir) + `0×` (**vermelho** `#dc2626`) / `1×` / `2×` / `3×` / `4×` / `5+×` (escala teal, =
+  `pp_execucao` count). **As 3 RPCs que alimentam o mapa** expõem `n_passada` por segmento: `app_rede_bbox`
+  (toda a rede), `app_pp_rede_no_poligono` (seleção por polígono) e **`app_pp_por_colaborador`** (modo
+  geofonista — **fix 2026-09-15: faltava o `n_passada` aqui, então o executado do colaborador aparecia
+  `0×` vermelho em vez de `1×` teal**). Categoria de cor: `ppCat(p)` = `'programado'` se
+  `pp_status='pendente'`, senão `'p'+min(n_passada,5)`. (As antigas "livre / sem pesquisa recente /
+  pesquisado" saíram.)
+- **Filtro isola por categoria (2026-09-15):** a legenda-filtro (`ppFiltro`, Set) passou de *toggle*
+  (cada faixa liga/desliga, default tudo ligado) pra **isolar** — igual ao mapa do Acompanhamento:
+  clicar `0×` mostra **só** `0×` (esconde o resto); clicar mais faixas soma; nada selecionado = mostra
+  tudo. Antes o clique só *desligava* a faixa, o que confundia ("cliquei em 0× e o 1× não sumiu").
 - **Cuidado de performance (fix 2026-09-15 — `statement_timeout=8s` do papel `authenticated` estourava
   em cache frio):** `app_rede_bbox` agora **enriquece só depois do LIMIT** — um CTE `cand` faz só o bbox
   + `limit 10000` (barato, índice GiST), e as subconsultas caras (`ultima_pesquisa` espacial, `n_passada`,
