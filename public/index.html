@@ -5402,7 +5402,7 @@ async function uploadFoto2(alvo,pasta){ const b=FOTO2_BLOBS[alvo]; if(!b) return
 let frotaCur='home', frotaMeuVeiculo=null;
 function frotaBlocks(){
   const gestor=!!(ME&&(ME.pode_aprovar||ME.is_admin));
-  const adm=!!(ME&&(ME.funcao==='frotas'||ME.is_admin));
+  const adm=!!(ME&&(ME.is_admin||ME.frota_admin||ME.funcao==='frotas'));
   const temVeic=!!frotaMeuVeiculo;
   return [
     {t:'Colaborador',ic:'👤',on:true,acts:[
@@ -5432,7 +5432,7 @@ function frotaHome(){
   frotaCur='home';
   const blocks=frotaBlocks();
   $('#frotaView').innerHTML='<h1 style="margin-bottom:2px">Frota</h1><p class="sub">Escolha uma ação</p>'+
-    blocks.filter(b=>b.on).map(b=>`<div class="sec" style="margin-top:16px">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
+    blocks.filter(b=>b.on).map(b=>`<div class="sec" style="margin-top:16px;display:flex;align-items:center">${b.ic} ${b.t}${(b.t==='Equipe administrativa'&&ME&&ME.is_admin)?'<button id="frotaAdmGear" title="Definir quem vê a Equipe administrativa" style="all:unset;cursor:pointer;font-size:18px;margin-left:auto;padding:0 4px">⚙️</button>':''}</div><div class="grid" style="margin-top:10px">`+
       b.acts.map(a=>{
         if(a.precisaVeic && !frotaMeuVeiculo) return `<button class="mod" disabled style="opacity:.4;cursor:not-allowed" title="Vincule-se a um veículo primeiro em Veículos"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
         if(a.bloqueiaManutencao && frotaMeuVeiculo && frotaMeuVeiculo.status==='manutencao') return `<button class="mod" disabled style="opacity:.4;cursor:not-allowed" title="Veículo em manutenção no momento"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
@@ -5440,6 +5440,38 @@ function frotaHome(){
       }).join('')+
     '</div>').join('');
   $('#frotaView').querySelectorAll('[data-fract]').forEach(el=>el.addEventListener('click',()=>frotaOpen(el.dataset.fract)));
+  if($('#frotaAdmGear')) $('#frotaAdmGear').addEventListener('click',frotaAdminGate);
+}
+// Engrenagem (admin): definir quais usuários enxergam a Equipe administrativa da Frota (multi-seleção)
+let _frotaAdmUsers=[];
+async function frotaAdminGate(){
+  frotaCur='admin_gate';
+  $('#frotaView').innerHTML='<button class="btn ghost" id="frotaAdmVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🏢 Acesso à Equipe administrativa</div><p class="sub" style="margin:2px 0 10px">Marque quem pode ver os botões da Equipe administrativa. Admin e cargo <b>frotas</b> já têm acesso pelo cargo.</p><input id="frotaAdmBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/><div id="frotaAdmList"><p class="sub">Carregando…</p></div>';
+  $('#frotaAdmVoltar').addEventListener('click',frotaHome);
+  $('#frotaAdmBusca').addEventListener('input',frotaAdmRender);
+  try{ const {data,error}=await sb.rpc('app_frota_admin_listar'); if(error)throw error; _frotaAdmUsers=data||[]; }
+  catch(e){ $('#frotaAdmList').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  frotaAdmRender();
+}
+function frotaAdmRender(){
+  const termo=(($('#frotaAdmBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_frotaAdmUsers.filter(u=>!termo || (u.nome||'').toLowerCase().includes(termo) || (u.email||'').toLowerCase().includes(termo));
+  const cont=$('#frotaAdmList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{
+    const cargoLock=!!u.acesso_pelo_cargo;
+    const on=cargoLock||!!u.frota_admin;
+    const nota=cargoLock?'<span class="sub" style="font-size:11px">acesso pelo cargo</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="frotaAdmCk" data-id="${u.id}" ${on?'checked':''} ${cargoLock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${u.nome||u.email||'—'}</div>${nota}</div></label>`;
+  }).join('');
+  cont.querySelectorAll('.frotaAdmCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked;
+    ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_frota_admin_set',{p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_frotaAdmUsers.find(x=>x.id===id); if(u) u.frota_admin=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
 }
 function frotaOpen(id){
   const CONDACTS={cnh:'home',veiculos_meu:'veiculos',situacao:'situacao',abastecimento:'abastecimento',manutencao:'manutencao',lavagem:'lavagem'};
@@ -5806,7 +5838,7 @@ async function frotasRender(){
   frotasRenderHome();
 }
 function frotasRenderHome(){
-  const full = ME && (ME.funcao==='frotas'||ME.is_admin);
+  const full = ME && (ME.is_admin||ME.frota_admin||ME.funcao==='frotas');
   if(!full){
     $('#frotasView').innerHTML='<p class="sub" style="padding:24px 0;text-align:center">Nada por aqui — use <b>Frota › Colaborador</b> para suas ações, ou <b>Frota › Gestor</b> se você aprova manutenções.</p>';
     return;
