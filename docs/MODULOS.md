@@ -785,6 +785,17 @@ back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `
   `sup_ferramenta_devolucao_cancelar`, `sup_ferramenta_fila_aprovacao`, `sup_ferramenta_fila_almoxarife`,
   `sup_ferramenta_painel_multi`, `sup_ferramenta_devolucao_fila_recebimento`,
   `sup_ferramenta_devolucao_confirmar`.
+- **Correção de navegação (2026-09-15) — Ferramentas reusa código de Insumos que assumia o contexto de
+  Insumos:** (1) `supAlmoxWire` (fiação de segregar/entregar, compartilhada) recarregava fixo em
+  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega**, concluir uma
+  segregação ou entrega **pulava pra fila de Insumos**. Agora `supAlmoxWire(refreshFn)` recebe a função
+  de refresh (default `supVAlmox`; `supVFerramentaAlmox` passa a si mesma). (2) `supGoAct` (deep-link de
+  notificação) setava `supAreaId='insumos'` pra qualquer act não-`eq_`/`epi_` — os acts `ferramenta_*`
+  (devolução: `ferramenta_recebimento` p/ almoxarife, `ferramenta_pedidos` p/ colaborador) abriam a tela
+  certa mas na **área Insumos** (botão voltar "‹ Insumos", voltava pra Insumos). Corrigido o prefixo
+  `ferramenta_`→`'ferramenta'`. **Regra:** ao reusar `supAlmoxWire`/`supAcao` numa área nova (não-Insumos),
+  passe sempre o refresh da própria área; e todo prefixo de act novo precisa entrar no mapeamento de
+  `supAreaId` do `supGoAct`.
 
 ### 5.5 Baixas / Conferência (almoxarife)
 - Consolida entregas por período p/ baixa no **SIENGE**, **por consórcio** (do perfil de quem retirou).

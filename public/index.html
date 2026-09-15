@@ -3561,7 +3561,8 @@ function supSegRefresh(card){
   }
   if(blk) blk.style.display=semEstoque?'block':'none';
 }
-function supAlmoxWire(){
+function supAlmoxWire(refreshFn){
+  refreshFn = refreshFn || supVAlmox;   // Insumos por padrão; Ferramentas passa supVFerramentaAlmox p/ não pular pra fila de Insumos
   $('#supView').querySelectorAll('.supSegItem').forEach(it=>{
     it.querySelectorAll('.supS').forEach(b=>b.addEventListener('click',()=>{
       it.querySelectorAll('.supS').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
@@ -3584,13 +3585,13 @@ function supAlmoxWire(){
     const {data,error}=await sb.rpc('sup_segregar',{p_solicitacao_id:+b.dataset.seg,p_itens:itens});
     if(error){ toast('⚠ '+(error.message||error)); b.disabled=false; return; }
     toast(data&&data.status==='em_falta' ? '✓ Marcada em falta — colaborador avisado' : '✓ Segregado — código gerado');
-    supVAlmox();
+    refreshFn();
   }));
   $('#supView').querySelectorAll('[data-ent]').forEach(b=>b.addEventListener('click',()=>{
     const inp=$('#supView').querySelector('.supEntCod[data-id="'+b.dataset.ent+'"]');
     const cod=((inp||{}).value||'').trim();
     if(cod.length!==4) return toast('Digite o código de 4 dígitos');
-    supAcao('sup_entregar',{p_solicitacao_id:+b.dataset.ent,p_codigo:cod},'Entregue',supVAlmox);
+    supAcao('sup_entregar',{p_solicitacao_id:+b.dataset.ent,p_codigo:cod},'Entregue',refreshFn);
   }));
 }
 
@@ -3845,7 +3846,7 @@ async function supVFerramentaAlmox(){
     const arr=data||[];
     if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nada na fila de separação de ferramentas.</p>'; return; }
     $('#supView').innerHTML=arr.map(supAlmoxCard).join('');
-    supAlmoxWire();
+    supAlmoxWire(supVFerramentaAlmox);
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
@@ -6358,7 +6359,7 @@ async function supGoAct(act){
   try{ await supGetMe(); }catch(e){}
   SCREENS.forEach(s=>{ const el=$('#'+s); if(el) el.classList.toggle('hidden', s!=='suprimentos'); });
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.remove('on'));
-  supAreaId = act.indexOf('eq_')===0?'equip':(act.indexOf('epi_')===0?'epi':'insumos');
+  supAreaId = act.indexOf('eq_')===0?'equip':(act.indexOf('epi_')===0?'epi':(act.indexOf('ferramenta_')===0?'ferramenta':'insumos'));
   if(SUP_ACTS[act]) supOpen(act); else supHome();
 }
 const _btnNotif=$('#btnNotif'); if(_btnNotif) _btnNotif.addEventListener('click',()=>irPara('notificacoes'));
