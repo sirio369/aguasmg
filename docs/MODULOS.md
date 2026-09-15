@@ -745,9 +745,22 @@ back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `
 - Rastreio por pessoa via **termo de responsabilidade** (fica **vermelho até aceitar, verde depois**,
   botão dentro do próprio termo). Devolução por código; com defeito → manutenção corretiva.
   Preventiva por tipo (dias). Painel por responsável **destaca quebra/defeito**.
+- **Equipamentos cadastrados** (`eq_inventario`, categoria **Almoxarifado**, só almoxarife — 2026-09-15):
+  inventário do acervo pro almoxarife ter gestão do que cadastrou. `supVEqInventario()` lê o mesmo
+  `sup_equip_listar` (sem RPC nova) e monta filtros no topo — **busca** (nome ou nº de série),
+  **tipo** (`select` com os tipos presentes) e **situação** em chips: Todos / Em estoque / Em uso /
+  Manutenção (a chip Manutenção só aparece se houver algum). A **situação** é derivada por
+  `eqInvSituacao(e)`: `manutencao_aberta||status='manutencao'` → *manutenção*; senão
+  `status='em_uso'` → *em uso*; senão *em estoque* (`status='disponivel'`). A lista vem **agrupada por
+  tipo** (`🧰 <tipo> (n)`; `tipo` nulo → "Sem tipo"), com resumo de contagens no topo; cada card mostra
+  nº de série, chip de status (`eqStatusChip`), responsável (se em uso) e badges de manutenção/
+  devolução solicitada/preventiva vencida. Estado em `eqInvData/eqInvTipo/eqInvBusca/eqInvSit`;
+  filtros redesenham só `#eqInvLista` (a busca não perde foco). Só leitura — nenhuma ação de escrita.
 - RPCs: `sup_equip_cadastrar`, `sup_equip_tipo_cadastrar`, `sup_equip_tipos_listar`,
-  `sup_equip_listar`, `sup_equip_disponiveis`, `sup_equip_solicitacoes_pendentes`,
-  `sup_equip_historico`, `sup_termo_ver`, `sup_termo_aceitar`, `sup_minhas_solic_equip`.
+  `sup_equip_listar` (usada tb. pelo inventário acima — já traz tipo/status/responsável/
+  manutencao_aberta/devolucao_solicitada/preventiva_*), `sup_equip_disponiveis`,
+  `sup_equip_solicitacoes_pendentes`, `sup_equip_historico`, `sup_termo_ver`, `sup_termo_aceitar`,
+  `sup_minhas_solic_equip`.
   Tabelas `sup_equipamento`, `sup_equip_tipo`, `sup_termo`, `sup_manutencao`, `sup_equip_solicitacao`.
 
 ### 5.3 EPI / Uniforme
