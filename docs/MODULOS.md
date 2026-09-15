@@ -869,8 +869,17 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     ver §6.1). **"Emprestar" não existe mais como ação própria.**
   - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): **Aprovar manutenções** (tela própria) · **Relatório**
     (histórico/custos de acompanhamento, §6.2).
-  - **🏢 Equipe administrativa** (`funcao='frotas'||is_admin`): Veículos · Condutores · Lavagens a
-    agendar · Manutenções a agendar — sem mudança aqui nesta rodada.
+  - **🏢 Equipe administrativa** (`is_admin || frota_admin || funcao='frotas'`): Veículos · Condutores ·
+    Lavagens a agendar · Manutenções a agendar.
+    - **Engrenagem ⚙️ (2026-09-15, admin-only) — quem vê a Equipe administrativa:** no cabeçalho da seção
+      (só pra `is_admin`), abre `frotaAdminGate()` (sub-view de `#frotaView`, back → `frotaHome`): lista os
+      usuários ativos com busca e um checkbox por pessoa (`app_frota_admin_listar`/`app_frota_admin_set`,
+      admin-only). Marca o flag **`perfil.frota_admin`** (novo, exposto no `ME` pelo `app_me`). Admin e
+      `funcao='frotas'` aparecem **travados/marcados** ("acesso pelo cargo"). **Aditivo** — ninguém perde
+      acesso; o flag libera OUTROS usuários (ex.: um `campo`/`aprovador`). **O backend acompanha:** todas
+      as RPCs `app_frota_*` gateadas por `funcao in ('frotas','admin'[,'aprovador'])` ganharam
+      `or coalesce(frota_admin,false)` (bulk, 2026-09-15) — senão o usuário veria o botão e tomaria "sem
+      permissão" na ação. **Regra:** RPC nova de Equipe administrativa deve incluir `frota_admin` no gate.
 - **`frotaOpen(id)` é um roteador** — não duplica render. Seta um alvo e chama `irPara`:
   - ações de Colaborador → `condTarget={sub,act}` + `irPara('condutor')`; `condInit` consome o alvo
     depois do load (`condGoTarget`). Ação que precisa de veículo (`situacao`/`abastecimento`/
