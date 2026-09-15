@@ -867,10 +867,11 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     **renomeados na 5ª rodada** (eram "Registrar problema (manutenção)"/"Solicitar lavagem" —
     ficaram genéricos porque agora abrem uma tela de histórico + ação, não só um formulário avulso,
     ver §6.1). **"Emprestar" não existe mais como ação própria.**
-  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): **Aprovar manutenções** (tela própria) · **Relatório**
-    (histórico/custos de acompanhamento, §6.2).
+  - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): **Aprovar manutenções** (tela própria). *(O **Relatório**
+    saiu daqui em 2026-09-15 → foi pra Equipe administrativa, pra ser controlado pela engrenagem.)*
   - **🏢 Equipe administrativa** (`is_admin || frota_admin || funcao='frotas'`): Veículos · Condutores ·
-    Lavagens a agendar · Manutenções a agendar.
+    Lavagens a agendar · Manutenções a agendar · **Relatório** (histórico/custos de acompanhamento, §6.2 —
+    movido de Gestor em 2026-09-15 pra que quem for liberado na engrenagem também veja).
     - **Engrenagem ⚙️ (2026-09-15, admin-only) — quem vê a Equipe administrativa:** no cabeçalho da seção
       (só pra `is_admin`), abre `frotaAdminGate()` (sub-view de `#frotaView`, back → `frotaHome`): lista os
       usuários ativos com busca e um checkbox por pessoa (`app_frota_admin_listar`/`app_frota_admin_set`,
