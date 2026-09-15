@@ -655,9 +655,11 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   duas camadas **ativáveis** (chips acima do mapa): **Ocorrências** (pontos de vazamento, ligado por
   padrão) e **Reporte de campo** (trajeto real início→fim do colaborador — pedido do usuário pra comparar
   "o que andou" com o nº de passadas, desligado por padrão). O heatmap tem um **filtro-legenda dentro do
-  mapa** (canto inf. dir., igual ao da tela Programar): clicar num bucket `0×`..`5+×` (multi-seleção)
-  mostra só aqueles trechos e **dá zoom** neles (`paPassSel`; vazio = todas; `paCarregarMapa(doFit)` só
-  enquadra quando o disparo veio de um clique no chip, não no `moveend`). **Não** tem mais o toggle de modo nem as camadas
+  mapa** (canto inf. dir., **exatamente igual ao da tela Programar** — 2026-09-15): clicar num bucket
+  `0×`..`5+×` **isola** aquela faixa (multi-seleção; vazio = todas), `paPassSel` (Set). **Só re-renderiza
+  o viewport atual filtrado, SEM dar zoom no clique** — o `fitBounds`-no-clique foi removido porque, como
+  `0×` é ~99% da rede (a rede quase toda ainda não pesquisada), clicar `0×` dava zoom-out e enchia a tela
+  de vermelho, parecendo que não filtrava. **Não** tem mais o toggle de modo nem as camadas
   "pesquisado"/"histórico" — eram redundantes: o heatmap de passadas **é** derivado do histórico
   (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
   permanente — pra análise só o histórico importa, e ele já vira o heatmap.)

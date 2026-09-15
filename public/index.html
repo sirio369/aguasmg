@@ -2687,7 +2687,8 @@ function paInit(){
     mapAddCamadaBase(paMap); mapAddLimiteZA(paMap);
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
     paMap.on('moveend',()=>paCarregarMapa());
-    // filtro de passadas dentro do mapa (igual legenda-filtro da Programação) — multi-seleção + zoom
+    // filtro de passadas dentro do mapa (igual legenda-filtro da Programação): isola por categoria,
+    // multi-seleção, vazio = todas — re-renderiza o viewport atual filtrado, SEM dar zoom no clique.
     const PaLg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
       const d=L.DomUtil.create('div','pa-legend');
       d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.4 system-ui,sans-serif;color:#333;box-shadow:0 1px 4px rgba(0,0,0,.2)';
@@ -2697,7 +2698,7 @@ function paInit(){
       d.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{
         const p=+b.dataset.p;
         if(paPassSel.has(p)) paPassSel.delete(p); else paPassSel.add(p);
-        paPintarPassLeg(); paCarregarMapa(true);
+        paPintarPassLeg(); paCarregarMapa();
       }));
       paPassLegEl=d; return d;
     }});
@@ -2774,26 +2775,24 @@ function paPintarPassLeg(){
   if(!paPassLegEl) return;
   paPassLegEl.querySelectorAll('[data-p]').forEach(b=>{
     const on = paPassSel.size===0 || paPassSel.has(+b.dataset.p);
-    b.style.opacity=on?'1':'.35';
-    b.style.textDecoration=on?'none':'line-through';
+    b.style.opacity=on?'1':'.4';
   });
 }
-async function paCarregarMapa(doFit){
+async function paCarregarMapa(){
   if(!paMap) return;
   [paHeat,paOcL,paRepL].forEach(l=>{ if(l&&paMap) paMap.removeLayer(l); }); paHeat=paOcL=paRepL=null;
   const f=paFiltros(), b=paMap.getBounds();
-  const mostra = n => paPassSel.size===0 || paPassSel.has(Math.min(n,5));   // filtro por bucket
+  const mostra = n => paPassSel.size===0 || paPassSel.has(Math.min(n,5));   // filtro por bucket (isola)
   try{
     const {data,error}=await sb.rpc('app_pp_passadas_bbox',{p_xmin:b.getWest(),p_ymin:b.getSouth(),p_xmax:b.getEast(),p_ymax:b.getNorth(),p_consorcio:f.p_consorcio,p_colaborador:f.p_colaborador,p_data_ini:f.p_data_ini,p_data_fim:f.p_data_fim});
     if(error)throw error;
-    // base: heatmap por nº de passadas (0×=cinza … 5+×=teal escuro), filtrado pelos chips selecionados
+    // base: heatmap por nº de passadas (0×=vermelho … 5+×=teal escuro), filtrado pelos chips selecionados.
+    // Sem fitBounds no clique (igual Programação) — só filtra o viewport atual, sem dar zoom.
     const feats=((data.passadas&&data.passadas.features)||[]).filter(ft=>mostra(ft.properties.n_passada||0));
     if(feats.length){
       paHeat=L.geoJSON({type:'FeatureCollection',features:feats},{style:ft=>{const n=Math.min(ft.properties.n_passada||0,5);return {color:PA_PASS_COL[n],weight:n?4:2.5,opacity:n?0.9:0.5};},
         onEachFeature:(ft,l)=>{ const n=ft.properties.n_passada||0; l.bindTooltip((n>=5?'5+':n)+'× pesquisado'); }}).addTo(paMap);
-      // zoom na seleção (só quando um filtro de passada está ativo e o disparo veio de um clique no chip)
-      if(doFit && paPassSel.size>0){ try{ paMap.fitBounds(paHeat.getBounds(),{padding:[30,30],maxZoom:17}); }catch(e){} }
-    } else if(doFit && paPassSel.size>0){ toast('Nenhum trecho nessa faixa de passadas no enquadramento atual'); }
+    }
     // reporte de campo (trajeto real início→fim) — ativável, p/ comparar com as passadas
     if(paShowRep && data.reportes&&(data.reportes.features||[]).length){
       paRepL=L.geoJSON(data.reportes,{style:{color:'#d81b60',weight:4,opacity:.85},
