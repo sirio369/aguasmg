@@ -3268,6 +3268,11 @@ const SUP_ACTS={
   ferramenta_almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVFerramentaAlmox()},
   ferramenta_recebimento:{ic:'📥',lbl:'Recebimento (devolução)',fn:()=>supVFerramentaRecebimento()}
 };
+// Acesso dinâmico por engrenagem às categorias Almoxarifado/Conferência (ME.sup_areas vem do app_me).
+// admin sempre tem acesso. Substitui o antigo "só almoxarife" (2026-09-16).
+const SUP_AREA_LABEL={baixas:'Baixas / Conferência', insumo:'Insumos — Almoxarifado', equip:'Equipamentos — Almoxarifado', epi:'EPI / Uniforme — Almoxarifado', ferramenta:'Ferramentas — Almoxarifado'};
+function supAreaAcesso(key){ return !!(ME && (ME.is_admin || (ME.sup_areas && ME.sup_areas[key]))); }
+function supCatArea(cat){ return cat==='insumos'?'insumo':(cat==='equip'?'equip':(cat==='epi'?'epi':(cat==='ferramenta'?'ferramenta':null))); }
 function supBlocks(){
   const podeAp=!!(ME&&ME.pode_aprovar), almox=!!(ME&&ME.is_almoxarife), gestao=podeAp||almox;
   return [
@@ -3277,7 +3282,7 @@ function supBlocks(){
       {id:'aprovar',on:podeAp,papel:'Encarregado'},
       {id:'painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
-      {id:'almox',on:almox,papel:'Almoxarife'}]}
+      {id:'almox',on:supAreaAcesso('insumo'),papel:'Almoxarifado'}]}
   ];
 }
 function supBlocksEquip(){
@@ -3285,10 +3290,10 @@ function supBlocksEquip(){
   return [
     {t:'Campo',ic:'🧑‍🔧',acts:[{id:'eq_meus',on:true},{id:'eq_solicitar',on:true}]},
     {t:'Almoxarifado',ic:'📦',acts:[
-      {id:'eq_inventario',on:almox,papel:'Almoxarife'},
-      {id:'eq_gerir',on:almox,papel:'Almoxarife'},
-      {id:'eq_entregar',on:almox,papel:'Almoxarife'},
-      {id:'eq_alertas',on:almox,papel:'Almoxarife'}]},
+      {id:'eq_inventario',on:supAreaAcesso('equip'),papel:'Almoxarifado'},
+      {id:'eq_gerir',on:supAreaAcesso('equip'),papel:'Almoxarifado'},
+      {id:'eq_entregar',on:supAreaAcesso('equip'),papel:'Almoxarifado'},
+      {id:'eq_alertas',on:supAreaAcesso('equip'),papel:'Almoxarifado'}]},
     {t:'Gestão',ic:'📊',acts:[{id:'eq_painel',on:gestao,papel:'Encarregado / Almoxarife'}]}
   ];
 }
@@ -3302,9 +3307,9 @@ function supBlocksEpi(){
       {id:'epi_aprovar',on:podeAp,papel:'Encarregado / QSMS'},
       {id:'epi_painel',on:gestao,papel:'Encarregado / Almoxarife / QSMS'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
-      {id:'epi_segregar',on:almox,papel:'Almoxarife'},
-      {id:'epi_entregar',on:almox,papel:'Almoxarife'},
-      {id:'epi_baixa',on:almox,papel:'Almoxarife'}]}
+      {id:'epi_segregar',on:supAreaAcesso('epi'),papel:'Almoxarifado'},
+      {id:'epi_entregar',on:supAreaAcesso('epi'),papel:'Almoxarifado'},
+      {id:'epi_baixa',on:supAreaAcesso('epi'),papel:'Almoxarifado'}]}
   ];
 }
 function supBlocksFerramenta(){
@@ -3315,8 +3320,8 @@ function supBlocksFerramenta(){
       {id:'ferramenta_aprovar',on:podeAp,papel:'Encarregado'},
       {id:'ferramenta_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
-      {id:'ferramenta_almox',on:almox,papel:'Almoxarife'},
-      {id:'ferramenta_recebimento',on:almox,papel:'Almoxarife'}]}
+      {id:'ferramenta_almox',on:supAreaAcesso('ferramenta'),papel:'Almoxarifado'},
+      {id:'ferramenta_recebimento',on:supAreaAcesso('ferramenta'),papel:'Almoxarifado'}]}
   ];
 }
 function supHome(){
@@ -3324,7 +3329,8 @@ function supHome(){
   const bk=$('#supBack'); if(bk) bk.textContent='‹ Início';
   const tt=$('#supTitle'); if(tt) tt.textContent='';
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
-  const almox=!!(ME&&(ME.is_almoxarife||ME.is_admin));
+  const verBaixas=supAreaAcesso('baixas'), admin=!!(ME&&ME.is_admin);
+  const confGear=admin?'<button id="supConfGear" title="Definir quem vê Baixas / Conferência" style="all:unset;cursor:pointer;font-size:17px;margin-left:auto;padding:0 4px">⚙️</button>':'';
   $('#supView').innerHTML='<h1 style="margin-bottom:2px">Almoxarifado</h1><p class="sub">Escolha uma área</p>'+
     '<div class="sec" style="margin-top:14px">📦 Áreas</div>'+
     '<div class="grid" style="margin-top:10px">'+
@@ -3333,12 +3339,15 @@ function supHome(){
       '<button class="mod" data-suparea="epi"><div class="ic">🦺</div><div class="nm">EPI / Uniforme</div></button>'+
       '<button class="mod" data-suparea="ferramenta"><div class="ic">🔧</div><div class="nm">Ferramentas</div></button>'+
     '</div>'+
-    (almox?('<div class="sec" style="margin-top:20px">📋 Conferência</div>'+
+    ((verBaixas||admin)?('<div class="sec" style="margin-top:20px;display:flex;align-items:center">📋 Conferência'+confGear+'</div>'+
       '<div class="grid" style="margin-top:10px">'+
-        '<button class="mod" data-supbaixas="1"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div></button>'+
+        (verBaixas?'<button class="mod" data-supbaixas="1"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div></button>'
+                  :'<button class="mod soon" data-suplock="Baixas / Conferência"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div><span class="tag">via engrenagem</span></button>')+
       '</div>'):'');
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
   $('#supView').querySelectorAll('[data-supbaixas]').forEach(el=>el.addEventListener('click',()=>supVBaixas()));
+  $('#supView').querySelectorAll('[data-suplock]').forEach(el=>el.addEventListener('click',()=>toast('Liberado pela engrenagem (admin)')));
+  if($('#supConfGear')) $('#supConfGear').addEventListener('click',()=>supAreaGate('baixas',supHome));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
@@ -3346,17 +3355,56 @@ function supArea(cat){
   const tt=$('#supTitle'); if(tt) tt.textContent = cat==='equip'?'Equipamentos':(cat==='epi'?'EPI / Uniforme':(cat==='ferramenta'?'Ferramentas':'Insumos'));
   const cfg=$('#supCfg'); if(cfg){ cfg.classList.toggle('hidden', !(cat==='epi'&&ME&&ME.is_admin)); cfg.title='Cargos e cesta de EPI'; }
   const blocks = cat==='equip'?supBlocksEquip():(cat==='epi'?supBlocksEpi():(cat==='ferramenta'?supBlocksFerramenta():supBlocks()));
+  const areaKey=supCatArea(cat), admin=!!(ME&&ME.is_admin);
   $('#supView').innerHTML='<p class="sub" style="margin-top:2px">Escolha uma etapa</p>'+
-    blocks.map(b=>`<div class="sec">${b.ic} ${b.t}</div><div class="grid" style="margin-top:10px">`+
+    blocks.map(b=>{
+      const gear=(b.t==='Almoxarifado'&&areaKey&&admin)?`<button class="supAreaGear" data-area="${areaKey}" title="Definir quem vê ${b.t}" style="all:unset;cursor:pointer;font-size:17px;margin-left:auto;padding:0 4px">⚙️</button>`:'';
+      return `<div class="sec" style="display:flex;align-items:center">${b.ic} ${b.t}${gear}</div><div class="grid" style="margin-top:10px">`+
       b.acts.map(a=>{
         const A=SUP_ACTS[a.id];
         return a.on
           ? `<button class="mod" data-supact="${a.id}"><div class="ic">${A.ic}</div><div class="nm">${A.lbl}</div></button>`
           : `<button class="mod soon" data-suplock="${a.papel||''}"><div class="ic">${A.ic}</div><div class="nm">${A.lbl}</div><span class="tag">${a.papel||''}</span></button>`;
-      }).join('')+'</div>').join('');
+      }).join('')+'</div>';
+    }).join('');
   $('#supView').querySelectorAll('[data-supact]').forEach(el=>el.addEventListener('click',()=>supOpen(el.dataset.supact)));
-  $('#supView').querySelectorAll('[data-suplock]').forEach(el=>el.addEventListener('click',()=>toast('Etapa de '+el.dataset.suplock)));
+  $('#supView').querySelectorAll('[data-suplock]').forEach(el=>el.addEventListener('click',()=>toast(el.dataset.suplock==='Almoxarifado'?'Liberado pela engrenagem (admin)':('Etapa de '+el.dataset.suplock))));
+  $('#supView').querySelectorAll('.supAreaGear').forEach(el=>el.addEventListener('click',()=>supAreaGate(el.dataset.area,()=>supArea(cat))));
   if(cat==='equip') supEquipAviso();
+}
+// Engrenagem (admin): definir quem vê uma categoria Almoxarifado/Conferência (multi-seleção, estilo Frota)
+let _supAreaGateUsers=[], _supAreaGateKey=null, _supAreaGateBack=null;
+async function supAreaGate(areaKey, backFn){
+  supCurrent='area_gate'; _supAreaGateKey=areaKey; _supAreaGateBack=backFn||supHome;
+  const lbl=SUP_AREA_LABEL[areaKey]||areaKey;
+  $('#supView').innerHTML='<button class="btn ghost" id="supAreaGateVoltar" style="margin:0 0 12px">‹ Voltar</button>'
+    +'<div class="sec">🔐 Acesso — '+lbl+'</div>'
+    +'<p class="sub" style="margin:2px 0 10px">Marque quem pode ver esta categoria de telas. O admin sempre tem acesso.</p>'
+    +'<input id="supAreaBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>'
+    +'<div id="supAreaList"><p class="sub">Carregando…</p></div>';
+  $('#supAreaGateVoltar').addEventListener('click',()=>_supAreaGateBack());
+  $('#supAreaBusca').addEventListener('input',supAreaGateRender);
+  try{ const {data,error}=await sb.rpc('app_sup_area_listar',{p_area:areaKey}); if(error)throw error; _supAreaGateUsers=data||[]; }
+  catch(e){ $('#supAreaList').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  supAreaGateRender();
+}
+function supAreaGateRender(){
+  const termo=(($('#supAreaBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_supAreaGateUsers.filter(u=>!termo || (u.nome||'').toLowerCase().includes(termo) || (u.email||'').toLowerCase().includes(termo));
+  const cont=$('#supAreaList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{
+    const lock=!!u.acesso_pelo_cargo;
+    const nota=lock?'<span class="sub" style="font-size:11px">admin — acesso sempre</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="supAreaCk" data-id="${u.id}" ${u.acesso?'checked':''} ${lock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${u.nome||u.email||'—'}</div>${nota}</div></label>`;
+  }).join('');
+  cont.querySelectorAll('.supAreaCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_sup_area_set',{p_area:_supAreaGateKey,p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_supAreaGateUsers.find(x=>x.id===id); if(u) u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
 }
 async function supEquipAviso(){
   try{
