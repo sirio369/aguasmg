@@ -712,12 +712,28 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 `"9 - suprimentos"` continuam com o nome antigo, não vale a pena renomear isso).
 
 Home própria (`supHome`) com duas seções: **📦 Áreas** (**Insumos**, **Equipamentos**,
-**EPI/Uniforme**, **Ferramentas** — sempre visíveis) e, separada, **📋 Conferência**
-(**Baixas/Conferência**, só `is_almoxarife`/admin — visualmente apartada das 4 áreas porque não é
-"mais uma área", é a etapa de conferência que consolida as outras). `SUP_ACTS` mapeia act→função;
-`supBlocks*` montam os menus por papel (`ME`). Navegação interna por `supArea`/`supHome`/`supGoAct`;
-back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`,
-`sup_pode_aprovar(uuid)`.
+**EPI/Uniforme**, **Ferramentas** — os cards sempre visíveis) e, separada, **📋 Conferência**
+(**Baixas/Conferência** — visualmente apartada das 4 áreas porque não é "mais uma área", é a etapa de
+conferência que consolida as outras). `SUP_ACTS` mapeia act→função; `supBlocks*` montam os menus por
+papel (`ME`). Navegação interna por `supArea`/`supHome`/`supGoAct`; back inteligente em `#supBack`.
+Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`, `sup_pode_aprovar(uuid)`.
+
+**Acesso às categorias Almoxarifado/Conferência por engrenagem (2026-09-16, estilo Frota §6.0).** A
+categoria **Almoxarifado** de cada área (Insumos/Equipamentos/EPI/Ferramentas) e a **Conferência**
+(Baixas) **deixaram de ser gated por `is_almoxarife`** e passaram a ser controladas por **5 engrenagens
+independentes** (⚙️ no cabeçalho de cada seção, **só admin**), uma por "área":
+`baixas`/`insumo`/`equip`/`epi`/`ferramenta`. Tabela **`"9 - suprimentos".sup_acesso_area(colaborador_uuid,
+area)`**; RPCs admin-only `app_sup_area_listar(p_area)`/`app_sup_area_set(p_area,p_uuid,p_on)`;
+`app_me` devolve o mapa **`ME.sup_areas`** (`{baixas,insumo,equip,epi,ferramenta}`→bool; admin=todas).
+Front: `supAreaAcesso(key)` (= `is_admin || sup_areas[key]`) gateia os blocos Almoxarifado (`supBlocks*`)
+e a Conferência; `supCatArea(cat)` mapeia cat→área; `supAreaGate(areaKey,backFn)`/`supAreaGateRender`
+são a tela da engrenagem (multi-seleção com busca, admin travado "acesso sempre"). **Seed:** os
+almoxarifes atuais entraram nas 5 áreas (mantêm a visibilidade, agora removível). **Backend:**
+`sup_e_almox(uid)` virou **aditivo** — `admin/almoxarife OU qualquer área concedida` — então as ~41 RPCs
+que já gateavam por ele destravam automaticamente pra quem for concedido, **sem editar cada uma**
+(superset → nada perde acesso). ⚠️ *Contrapartida:* o backend é **coarse** — quem tem QUALQUER área
+concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade fina é no front, por
+área). Trava dura por área no backend fica pra uma 2ª rodada se necessário.
 
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:

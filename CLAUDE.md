@@ -376,8 +376,13 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 
 **Exibido como "Almoxarifado"** (só o rótulo — screen id `suprimentos`, funções `sup_*` e o schema
 seguem com o nome antigo). Home em duas seções: **📦 Áreas** — **Insumos**, **Equipamentos**,
-**EPI / Uniforme**, **Ferramentas** — e, separada, **📋 Conferência** — **Baixas/Conferência** (só
-almoxarife/admin). Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
+**EPI / Uniforme**, **Ferramentas** — e, separada, **📋 Conferência** — **Baixas/Conferência**.
+Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
+**Acesso às categorias Almoxarifado (de cada área) e Conferência não é mais por `is_almoxarife`** —
+2026-09-16 virou **5 engrenagens ⚙️ admin-only** (uma por área: baixas/insumo/equip/epi/ferramenta),
+tabela `sup_acesso_area` + RPCs `app_sup_area_listar`/`_set` + `ME.sup_areas`; front `supAreaAcesso(key)`
+/`supAreaGate`. `sup_e_almox` virou aditivo (admin/almoxarife OU qualquer área concedida). Detalhe em
+`docs/MODULOS.md §5`.
 
 - **Configurações (admin)** — `supAbrirConfig(from)`, roda dentro de `<main id="suprimentos">`. Duas
   portas: ⚙️ **na home** (`#homeCfg`, `homeGate()` → `ME.is_admin`) abre **👤 Usuários** (acesso, cargo,
