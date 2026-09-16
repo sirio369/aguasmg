@@ -1224,6 +1224,7 @@ function resumo(p){
 }
 // ---------- Relatório do ponto (PDF via impressão) ----------
 const REL_CONS={ZA1004:'Consórcio Águas Integradas · Contagem/MG', ZA0200:'Consórcio Eficiência Hídrica · Betim/MG'};
+const CONSORCIO_NOME={ZA1004:'Águas Integradas', ZA0200:'Eficiência Hídrica'}; // grupo econômico (nome curto do consórcio)
 const REL_ST={pendente:'Pendente — aguardando instalação',instalado:'Instalado',remocao_autorizada:'Instalado — remoção autorizada',removido:'Removido — dados pendentes',concluido:'Concluído'};
 const REL_CSS=`
 #relatorio{position:fixed;inset:0;background:#e5e7eb;overflow:auto;z-index:9999;display:none}
@@ -3728,6 +3729,19 @@ async function supVPainel(rpcNome){
   $('#supPLoad').addEventListener('click',load);
 }
 
+// --- Export XLSX (SheetJS carregado sob demanda do CDN oficial) ---
+let _xlsxLib=null;
+async function getXLSX(){ if(_xlsxLib) return _xlsxLib; _xlsxLib=await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs'); return _xlsxLib; }
+async function exportarXlsx(filename, sheetName, aoa){
+  try{
+    const XLSX=await getXLSX();
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, (sheetName||'Dados').slice(0,31));
+    XLSX.writeFile(wb, filename);
+  }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
+}
+const TIPO_BX_LBL={insumo:'📦 Insumo', ferramenta:'🔧 Ferramenta', epi:'🦺 EPI'};
 // --- Baixas / Conferência (almoxarife): consolidado de entregas por período ---
 async function supVBaixas(){
   supCurrent='area'; const bk=$('#supBack'); if(bk) bk.textContent='‹ Almoxarifado';
@@ -3736,19 +3750,21 @@ async function supVBaixas(){
   const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const hoje=new Date(), ini=new Date(hoje.getFullYear(),hoje.getMonth(),1);
   $('#supView').innerHTML=`
-    <p class="sub" style="margin-top:2px">Confira as entregas por período e marque o que já deu baixa no SIENGE. Consolidado por <b>consórcio</b> (de quem retirou), por código (insumos) e por nome + tamanho (EPIs) — a baixa é feita no estoque de cada consórcio.</p>
+    <p class="sub" style="margin-top:2px">Confira as entregas por período e marque o que já deu baixa no SIENGE. Consolidado por <b>consórcio</b> (de quem retirou), por código (insumos/ferramentas) e por nome + tamanho (EPIs) — a baixa é feita no estoque de cada consórcio.</p>
     <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
       <span class="sub">De</span><input id="bxDe" type="date" value="${iso(ini)}" style="flex:1;min-width:0;font-size:13px"/>
       <span class="sub">até</span><input id="bxAte" type="date" value="${iso(hoje)}" style="flex:1;min-width:0;font-size:13px"/>
     </div>
     <div style="display:flex;gap:6px;margin-top:6px">
-      <select id="bxTipo" style="flex:1;min-width:0"><option value="todos">Insumos e EPIs</option><option value="insumo">Só insumos</option><option value="epi">Só EPIs</option></select>
+      <select id="bxTipo" style="flex:1;min-width:0"><option value="todos">Insumos, ferramentas e EPIs</option><option value="insumo">Só insumos</option><option value="ferramenta">Só ferramentas</option><option value="epi">Só EPIs</option></select>
       <select id="bxStatus" style="flex:1;min-width:0"><option value="pendente">Pendente de baixa</option><option value="realizada">Baixa realizada</option></select>
     </div>
     <div style="display:flex;gap:6px;margin-top:6px">
       <select id="bxCons" style="flex:1;min-width:0"><option value="todos">Ambos os consórcios</option><option value="ZA1004">Contagem (ZA1004)</option><option value="ZA0200">Betim (ZA0200)</option></select>
+      <button id="bxXlsx" class="btn ghost" style="margin:0;width:auto;padding:0 14px;white-space:nowrap">⬇ XLSX</button>
     </div>
     <div id="bxOut" style="margin-top:10px"></div>`;
+  let bxUltimo=[], bxUltimoStatus='pendente';
   const load=async()=>{
     const de=$('#bxDe').value, ate=$('#bxAte').value, tipo=$('#bxTipo').value, status=$('#bxStatus').value, cons=$('#bxCons').value;
     if(!de||!ate){ $('#bxOut').innerHTML='<p class="sub">Informe o período.</p>'; return; }
@@ -3756,18 +3772,20 @@ async function supVBaixas(){
     try{
       const {data,error}=await sb.rpc('sup_baixas_relatorio',{p_de:de,p_ate:ate,p_tipo:tipo,p_status:status,p_consorcio:cons==='todos'?null:cons}); if(error)throw error;
       const arr=data||[], realizada=status==='realizada';
+      bxUltimo=arr; bxUltimoStatus=status;
       if(!arr.length){ $('#bxOut').innerHTML='<p class="sub">Nada '+(realizada?'com baixa realizada':'pendente de baixa')+' nesse período.</p>'; return; }
       const totQ=arr.reduce((a,r)=>a+(+r.qt_total||0),0), totE=arr.reduce((a,r)=>a+(+r.n||0),0);
       $('#bxOut').innerHTML='<div class="sub" style="margin-bottom:6px">'+arr.length+' item(ns) · '+totE+' entrega(s)</div>'+arr.map((r,idx)=>{
         const nome=r.descricao+(r.tamanho?(' <b>['+r.tamanho+']</b>'):'');
         const consLbl=r.consorcio==='ZA1004'?'Contagem':(r.consorcio==='ZA0200'?'Betim':(r.consorcio||'—'));
         const consPill='<span style="font-size:10px;padding:1px 7px;border-radius:999px;white-space:nowrap;background:var(--card);border:1px solid var(--line)">🏢 '+consLbl+'</span>';
+        const tipoPill='<span style="font-size:10px;padding:1px 7px;border-radius:999px;white-space:nowrap;background:var(--card);border:1px solid var(--line)">'+(TIPO_BX_LBL[r.tipo]||r.tipo)+'</span>';
         const codigo=r.codigo?('<span class="sub" style="font-size:11px">cód. '+r.codigo+'</span>'):'<span class="sub" style="font-size:11px">EPI</span>';
         const chip='<span style="font-size:10px;padding:1px 7px;border-radius:999px;white-space:nowrap;background:var('+(realizada?'--ok-bg':'--warn-bg')+');color:var('+(realizada?'--ok':'--warn')+')">'+(realizada?'Baixa realizada':'Pendente de baixa')+'</span>';
         const btn=realizada
           ? '<button class="btn ghost" data-bx="'+idx+'" data-baix="false" style="margin:0;width:auto;padding:7px 11px;font-size:12px">↩ Reabrir</button>'
           : '<button class="btn" data-bx="'+idx+'" data-baix="true" style="margin:0;width:auto;padding:8px 12px;font-size:13px">✓ Baixa realizada</button>';
-        return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><div style="font-size:14px">'+nome+' '+consPill+'</div><div style="margin-top:2px">'+codigo+' · <b>'+supNum(r.qt_total)+' '+r.unidade+'</b> · '+r.n+' entrega(s)</div></div>'+chip+'</div><div style="margin-top:8px;display:flex;justify-content:flex-end">'+btn+'</div></div>';
+        return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><div style="font-size:14px">'+nome+' '+tipoPill+' '+consPill+'</div><div style="margin-top:2px">'+codigo+' · <b>'+supNum(r.qt_total)+' '+r.unidade+'</b> · '+r.n+' entrega(s)</div></div>'+chip+'</div><div style="margin-top:8px;display:flex;justify-content:flex-end">'+btn+'</div></div>';
       }).join('');
       $('#bxOut').querySelectorAll('[data-bx]').forEach(b=>b.addEventListener('click',async()=>{
         if(!navigator.onLine) return toast('Marcar baixa precisa de conexão');
@@ -3779,6 +3797,15 @@ async function supVBaixas(){
     }catch(e){ $('#bxOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
   };
   ['bxDe','bxAte','bxTipo','bxStatus','bxCons'].forEach(id=>$('#'+id).addEventListener('change',load));
+  $('#bxXlsx').addEventListener('click',()=>{
+    if(!bxUltimo.length) return toast('Nada para exportar — filtre primeiro.');
+    const consLbl=c=>c==='ZA1004'?'Contagem':(c==='ZA0200'?'Betim':(c||'—'));
+    const stLbl=bxUltimoStatus==='realizada'?'Baixa realizada':'Pendente de baixa';
+    const aoa=[['Consórcio','Tipo','Código','Descrição','Tamanho','Unidade','Quantidade','Nº entregas','Status']];
+    bxUltimo.forEach(r=>aoa.push([consLbl(r.consorcio),(TIPO_BX_LBL[r.tipo]||r.tipo).replace(/^[^ ]+ /,''),r.codigo||'',r.descricao||'',r.tamanho||'',r.unidade||'',+r.qt_total||0,+r.n||0,stLbl]));
+    const nome='baixas_'+($('#bxDe').value||'')+'_a_'+($('#bxAte').value||'')+'.xlsx';
+    exportarXlsx(nome,'Baixas',aoa);
+  });
   load();
 }
 
@@ -6331,9 +6358,24 @@ function frotasRenderPainel(){
     frotasSub='painel_'+k; frotasRender();
   }));
 }
-let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''}, frManutCluirSel=null;
+let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''}, frManutCluirSel=null, frAbMode='lista';
+function frAbConsolRow(c){
+  const cc=c.centro_custo?labelOf(CENTROS_CUSTO_FROTA,c.centro_custo):'(sem centro de custo)';
+  const gr=c.consorcio?(CONSORCIO_NOME[c.consorcio]||c.consorcio):'';
+  const litros=(+c.litros_total||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  return `<div style="display:flex;justify-content:space-between;gap:8px"><b>${cc}</b><b>${fmtDinheiro(c.valor_total)}</b></div>`
+    +`<div class="sub" style="margin-top:2px">${c.centro_custo||''}${gr?(' · '+gr):''}</div>`
+    +`<div class="sub" style="margin-top:4px">${c.n_abastecimentos} abastecimento(s) · ${c.n_veiculos} veículo(s) · ${litros} L</div>`;
+}
 const PAINEL_CFG={
-  abastecimentos:{rpc:'app_frota_abastecimentos_listar',titulo:'⛽ Abastecimentos',row:a=>`<b>${a.placa}</b><div class="sub" style="margin-top:2px">${a.condutor_nome||''} · ${fmtData(a.data)} · ${a.litros||0} L · ${fmtDinheiro(a.valor_total)}${a.consorcio?(' · '+a.consorcio):''}</div>`},
+  abastecimentos:{rpc:'app_frota_abastecimentos_listar',titulo:'⛽ Abastecimentos',row:a=>{
+    const cc=a.centro_custo?labelOf(CENTROS_CUSTO_FROTA,a.centro_custo):'';
+    const gr=a.consorcio?(CONSORCIO_NOME[a.consorcio]||a.consorcio):'';
+    const nota=a.foto_cupom?` · <a href="${fotoURL(a.foto_cupom)}" target="_blank" rel="noopener">🧾 Nota</a>`:'';
+    return `<div style="display:flex;justify-content:space-between;gap:8px"><b>${a.placa}</b>${a.modelo?('<span class="sub">'+a.modelo+'</span>'):''}</div>`
+      +`<div class="sub" style="margin-top:2px">${a.condutor_nome||''} · ${fmtData(a.data)} · ${a.litros||0} L · ${fmtDinheiro(a.valor_total)}</div>`
+      +`<div class="sub" style="margin-top:2px">${cc?('CC '+cc):'sem centro de custo'}${gr?(' · '+gr):''}${nota}</div>`;
+  }},
   lavagens:{rpc:'app_frota_lavagens_listar',titulo:'🧼 Lavagens',row:l=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${l.placa}</b>${statusBadge(LAVAGEM_STATUS_LABEL,l.status)}</div><div class="sub" style="margin-top:2px">${l.condutor_nome||''}${l.data?(' · '+fmtData(l.data)):''}${l.valor!=null?(' · '+fmtDinheiro(l.valor)):''}${l.consorcio?(' · '+l.consorcio):''}</div>`},
   manutencoes:{rpc:'app_frota_manutencoes_listar',titulo:'🔧 Manutenções',row:m=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">solicitado por ${m.reportado_por_nome||''} em ${fmtData(m.reportado_em)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>${m.aprovado_por_nome?`<div class="sub" style="margin-top:2px">${m.status==='reprovado'?'Reprovado':'Aprovado'} por ${m.aprovado_por_nome}${m.motivo_reprovacao?(' — '+m.motivo_reprovacao):''}</div>`:''}${m.status==='agendado'?`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button data-mancluir="${m.id}" class="btn ghost" style="margin-top:8px;padding:8px;font-size:13px">Marcar como concluída</button>`:''}${m.status==='concluido'?`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}</div>`:''}`},
   custos:{rpc:'app_frota_custos_por_veiculo',titulo:'💰 Custos por veículo',row:c=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${c.placa}</b><b>${fmtDinheiro(c.custo_total)}</b></div><div class="sub" style="margin-top:2px">${c.modelo||''}</div><div class="sub" style="margin-top:6px">Abastecimento: ${fmtDinheiro(c.abastecimentos_total)} · Lavagem: ${fmtDinheiro(c.lavagens_total)} · Manutenção: ${fmtDinheiro(c.manutencoes_total)}${c.valor_devolucao!=null?(' · Devolução: '+fmtDinheiro(c.valor_devolucao)):''}</div>`}
@@ -6341,25 +6383,42 @@ const PAINEL_CFG={
 async function frotasRenderPainelLista(tipo){
   const CFG=PAINEL_CFG[tipo];
   const semFiltro=(tipo==='custos');
+  const isAbast=(tipo==='abastecimentos');
+  const consol=isAbast && frAbMode==='consolidado';
   if(!semFiltro) await frotasCarregarColaboradores();
   const colaboradores=semFiltro?[]:frotasColaboradoresOrdenados();
   let h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">${CFG.titulo}</div>`;
+  if(isAbast) h+='<div id="frAbTabs" style="display:flex;gap:6px;margin:10px 0"></div>';
   if(!semFiltro){
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><select id="pnlVeic" style="flex:1;min-width:140px"><option value="">Todos os veículos</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${frPnlFiltro.veiculo===String(v.id)?' selected':''}>${v.placa}</option>`).join('')+'</select><select id="pnlCondSel" style="flex:1;min-width:160px"><option value="">Todos os colaboradores</option>'+colaboradores.map(c=>`<option value="${c.id}"${frPnlFiltro.condutorId===String(c.id)?' selected':''}>${c.nome||c.email}</option>`).join('')+'</select></div>';
-    h+='<div style="display:flex;gap:8px"><input id="pnlDe" type="date" value="'+(frPnlFiltro.de||'')+'"/><input id="pnlAte" type="date" value="'+(frPnlFiltro.ate||'')+'"/><button id="pnlBuscar" class="btn" style="margin:0;width:auto;padding:0 16px">Filtrar</button></div>';
+    if(!consol) h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><select id="pnlVeic" style="flex:1;min-width:140px"><option value="">Todos os veículos</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${frPnlFiltro.veiculo===String(v.id)?' selected':''}>${v.placa}</option>`).join('')+'</select><select id="pnlCondSel" style="flex:1;min-width:160px"><option value="">Todos os colaboradores</option>'+colaboradores.map(c=>`<option value="${c.id}"${frPnlFiltro.condutorId===String(c.id)?' selected':''}>${c.nome||c.email}</option>`).join('')+'</select></div>';
+    h+='<div style="display:flex;gap:8px'+(consol?';margin-top:10px':'')+'"><input id="pnlDe" type="date" value="'+(frPnlFiltro.de||'')+'"/><input id="pnlAte" type="date" value="'+(frPnlFiltro.ate||'')+'"/><button id="pnlBuscar" class="btn" style="margin:0;width:auto;padding:0 16px">Filtrar</button></div>';
+    if(consol) h+='<p class="sub" style="margin-top:6px">Uma linha por centro de custo do veículo — total de litros e valor no período.</p>';
   }
   h+='<div id="pnlLista" style="margin-top:12px"></div>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>{frotasSub='painel';frotasRender();});
+  if(isAbast){
+    const tabs=$('#frAbTabs');
+    const opts=[['lista','📋 Lista'],['consolidado','📊 Por centro de custo']];
+    tabs.innerHTML=opts.map(o=>`<button class="btn ghost" data-abmode="${o[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${frAbMode===o[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${o[1]}</button>`).join('');
+    tabs.querySelectorAll('[data-abmode]').forEach(b=>b.addEventListener('click',()=>{ if(frAbMode===b.dataset.abmode)return; frAbMode=b.dataset.abmode; frotasRenderPainelLista('abastecimentos'); }));
+  }
   const carregar=async()=>{
     $('#pnlLista').innerHTML='<p class="sub">Carregando…</p>';
     try{
-      let params={};
       if(!semFiltro){
         const vid=$('#pnlVeic')?$('#pnlVeic').value:''; const condId=$('#pnlCondSel')?$('#pnlCondSel').value:'';
         frPnlFiltro={veiculo:vid,condutorId:condId,de:$('#pnlDe')?$('#pnlDe').value:'',ate:$('#pnlAte')?$('#pnlAte').value:''};
-        params={p_veiculo_id:vid?+vid:null,p_condutor_id:condId||null,p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null};
       }
+      if(consol){
+        const {data,error}=await sb.rpc('app_frota_abastecimentos_consolidado',{p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null});
+        if(error) throw error;
+        const lista=data||[];
+        $('#pnlLista').innerHTML = lista.length ? lista.map(x=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">${frAbConsolRow(x)}</div>`).join('') : '<p class="sub">Nada encontrado.</p>';
+        return;
+      }
+      let params={};
+      if(!semFiltro) params={p_veiculo_id:frPnlFiltro.veiculo?+frPnlFiltro.veiculo:null,p_condutor_id:frPnlFiltro.condutorId||null,p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null};
       const {data,error}=await sb.rpc(CFG.rpc,params);
       if(error) throw error;
       frotasPainelCache[tipo]=data||[];
