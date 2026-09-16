@@ -215,8 +215,12 @@ pwa/
   `logger_pressao_stats` e da view `vw_logger_pressao`, então cards, gráfico, CSV e qualquer BI que
   leia a view saem todos já corrigidos, sem passo extra — **não aparece no PDF** (removido 2026-09,
   é detalhe operacional do app/CSV). **CSV (2026-09)** mostra as 4 etapas do cálculo por linha:
-  `Pressao_Inicial_kPa → Multiplicador → Pressao_Final_kPa → Pressao_Final_mca` (nova coluna
-  `pressao_final_kpa` na view). Detalhe em `docs/MODULOS.md §2.2`.
+  `Pressao_Inicial + Unidade_Inicial → Multiplicador → Pressao_Ajustada → Pressao_Final + Unidade_Final
+  → Converteu_MCA` — **colunas sem unidade no nome, unidade só na pressão em coluna própria (2026-09-16)**;
+  `Unidade_Inicial` é dinâmica (`kPa` no "Sim", `mca` no "Não"), `Unidade_Final` sempre `mca`. A view
+  `vw_logger_pressao` foi recriada (drop+create) com esses nomes (`pressao_inicial`/`pressao_ajustada`/
+  `pressao_final`/`unidade_*`/`converteu_mca`); a vitrine `vw_gis_logger_pressao` manteve `pressao_kpa`/
+  `pressao_mca` p/ não quebrar o QGIS. Detalhe em `docs/MODULOS.md §2.2`.
   **Seletor "Necessário conversão para MCA?" (2026-09-16):** na tela de conclusão + no logger concluído,
   segmento Sim/Não (`instalacao_logger_calibracao.converter_mca`, default true, RPC
   `app_logger_set_converter_mca`) muda só o divisor — `mca = kpa*mult/DIV`, `DIV=9,80665` (Sim) ou `1`

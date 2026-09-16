@@ -223,10 +223,22 @@
   (2026-09) onde ficava sozinho, sem nada pra comparar do lado.
 - **Exportar CSV** (logger concluído): botão `lgExportarCsv(p)` → RPC `app_logger_pressao_export(id)`
   (espelha `vw_logger_pressao`, janela válida, `ts_real` local) → CSV `;`-separado, decimais com vírgula,
-  BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`. **Pressão em 4 colunas (2026-09), pra
-  deixar o multiplicador auditável linha a linha:** `Pressao_Inicial_kPa` (bruto, nunca muda) →
-  `Multiplicador` → `Pressao_Final_kPa` (=inicial×multiplicador, nova coluna `pressao_final_kpa` na
-  view) → `Pressao_Final_mca` (=final_kPa/9,80665 — mesmo valor que já aparecia nos cards/PDF).
+  BOM UTF-8 (abre no Excel PT-BR). Arquivo `logger_<codigo>.csv`.
+- **Colunas sem unidade no nome + unidade em coluna própria (2026-09-16) — reestruturação da view
+  `vw_logger_pressao` e do CSV.** Tirou-se a unidade do nome das colunas; a unidade da **pressão** virou
+  coluna à parte (temperatura/bateria ficaram sem unidade, a pedido). Fluxo por linha:
+  `Pressao_Inicial` + **`Unidade_Inicial`** → `Multiplicador` → `Pressao_Ajustada` (=inicial×multiplicador)
+  → `Pressao_Final` + **`Unidade_Final`** (sempre `mca`) → **`Converteu_MCA`** (Sim/Não) → `Temperatura` →
+  `Bateria`. **`Unidade_Inicial` é dinâmica pelo seletor:** `kPa` quando converte (Sim) — a inicial é o
+  bruto do sensor e só a final vira mca; **`mca` quando NÃO converte** (Não) — o dado já vem em mca e só
+  recebe o multiplicador. `Pressao_Final = pressao_inicial*mult/DIV` (`DIV=9,80665` no Sim, `1` no Não).
+  **Colunas antigas renomeadas na view:** `pressao_kpa`→`pressao_inicial`, `pressao_final_kpa`→
+  `pressao_ajustada`, `pressao_mca`→`pressao_final`, `multiplicador_pressao`→`multiplicador`; novas
+  `unidade_inicial`/`unidade_final`/`converteu_mca`. Como `create or replace view` não renomeia coluna,
+  a view foi **`drop`+`create`** (junto com a dependente **`0 - vitrine_gis.vw_gis_logger_pressao`**, que
+  **manteve** o contrato `pressao_kpa`/`pressao_mca` — agora sourced dos novos nomes — pra não quebrar o
+  QGIS, e ganhou de brinde `unidade_inicial`/`unidade_final`/`converteu_mca`; `grant select` a
+  `gis_visualizacao` refeito). `app_logger_pressao_export` e `lgExportarCsv` seguem os novos nomes.
 - **Filtro "concluído" segrega dados:** `app_loggers_listar` devolve `tem_pressao` (bool); o sub-filtro
   `#lgSub` (`lgSub`/`renderSubFiltros`/`lgMatchSub`) aparece só no filtro **concluído** com
   **✅ Com dados de pressão** / **⚠️ Sem dados** (+contagens) — torna visível a quantidade de loggers
