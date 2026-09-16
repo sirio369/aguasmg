@@ -5529,7 +5529,7 @@ const TIPOS_VEICULO=[
   ['van','Van 10 passageiro grupo van'],
   ['carroceria_34_vuc','Caminhão carroceria tipo 3/4 ou VUC c/ cabine suplementar']
 ];
-const COMBUSTIVEIS_VEICULO=[['flex','Flex'],['gasolina','Gasolina'],['diesel','Diesel'],['outros','Outros']];
+const COMBUSTIVEIS_VEICULO=[['etanol','Etanol'],['diesel','Diesel'],['outros','Outros']];
 // Centros de custo (Nível 4 — código completo de "Equipamentos" de cada frente) exibindo a
 // descrição do Nível 3 (o "pai"), que é a informação que de fato identifica a frente pro usuário.
 const CENTROS_CUSTO_FROTA=[
@@ -5581,7 +5581,7 @@ async function uploadFoto2(alvo,pasta){ const b=FOTO2_BLOBS[alvo]; if(!b) return
 let frotaCur='home', frotaMeuVeiculo=null;
 function frotaBlocks(){
   const gestor=!!(ME&&(ME.pode_aprovar||ME.is_admin));
-  const adm=!!(ME&&(ME.is_admin||ME.frota_admin||ME.funcao==='frotas'));
+  const adm=!!(ME&&(ME.is_admin||ME.frota_admin)); // Equipe administrativa (inclui Relatório): só admin + engrenagem
   const temVeic=!!frotaMeuVeiculo;
   return [
     {t:'Colaborador',ic:'👤',on:true,acts:[
@@ -5625,7 +5625,7 @@ function frotaHome(){
 let _frotaAdmUsers=[];
 async function frotaAdminGate(){
   frotaCur='admin_gate';
-  $('#frotaView').innerHTML='<button class="btn ghost" id="frotaAdmVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🏢 Acesso à Equipe administrativa</div><p class="sub" style="margin:2px 0 10px">Marque quem pode ver os botões da Equipe administrativa. Admin e cargo <b>frotas</b> já têm acesso pelo cargo.</p><input id="frotaAdmBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/><div id="frotaAdmList"><p class="sub">Carregando…</p></div>';
+  $('#frotaView').innerHTML='<button class="btn ghost" id="frotaAdmVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🏢 Acesso à Equipe administrativa</div><p class="sub" style="margin:2px 0 10px">Marque quem pode ver os botões da Equipe administrativa (inclui o <b>Relatório</b>). Só quem estiver marcado aqui — além do admin — terá acesso.</p><input id="frotaAdmBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/><div id="frotaAdmList"><p class="sub">Carregando…</p></div>';
   $('#frotaAdmVoltar').addEventListener('click',frotaHome);
   $('#frotaAdmBusca').addEventListener('input',frotaAdmRender);
   try{ const {data,error}=await sb.rpc('app_frota_admin_listar'); if(error)throw error; _frotaAdmUsers=data||[]; }
@@ -6017,7 +6017,7 @@ async function frotasRender(){
   frotasRenderHome();
 }
 function frotasRenderHome(){
-  const full = ME && (ME.is_admin||ME.frota_admin||ME.funcao==='frotas');
+  const full = ME && (ME.is_admin||ME.frota_admin); // só admin + engrenagem (cargo 'frotas' não é usado)
   if(!full){
     $('#frotasView').innerHTML='<p class="sub" style="padding:24px 0;text-align:center">Nada por aqui — use <b>Frota › Colaborador</b> para suas ações, ou <b>Frota › Gestor</b> se você aprova manutenções.</p>';
     return;
