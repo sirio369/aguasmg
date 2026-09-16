@@ -219,8 +219,8 @@ pwa/
   → Converteu_MCA` — **colunas sem unidade no nome, unidade só na pressão em coluna própria (2026-09-16)**;
   `Unidade_Inicial` é dinâmica (`kPa` no "Sim", `mca` no "Não"), `Unidade_Final` sempre `mca`. A view
   `vw_logger_pressao` foi recriada (drop+create) com esses nomes (`pressao_inicial`/`pressao_ajustada`/
-  `pressao_final`/`unidade_*`/`converteu_mca`); a vitrine `vw_gis_logger_pressao` manteve `pressao_kpa`/
-  `pressao_mca` p/ não quebrar o QGIS. Detalhe em `docs/MODULOS.md §2.2`.
+  `pressao_final`/`unidade_*`/`converteu_mca`); a vitrine `vw_gis_logger_pressao` **também** foi renomeada
+  igual (saíram `pressao_kpa`/`pressao_mca` — **repontar a camada no QGIS**). Detalhe em `docs/MODULOS.md §2.2`.
   **Seletor "Necessário conversão para MCA?" (2026-09-16):** na tela de conclusão + no logger concluído,
   segmento Sim/Não (`instalacao_logger_calibracao.converter_mca`, default true, RPC
   `app_logger_set_converter_mca`) muda só o divisor — `mca = kpa*mult/DIV`, `DIV=9,80665` (Sim) ou `1`
