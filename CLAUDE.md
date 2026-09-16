@@ -264,7 +264,9 @@ pwa/
 
 **Frota** (card único `frota` na home; telas internas `condutor`/`frotas` — schema `10 - Frotas`) —
 o card abre um **hub estilo Suprimentos** (`frotaInit`/`frotaHome`/`frotaBlocks`) com 3 seções
-gateadas: **👤 Colaborador**, **🖊️ Gestor**, **🏢 Equipe administrativa**. `frotaOpen(id)` é só
+gateadas: **👤 Colaborador**, **🖊️ Gestor**, **🏢 Equipe administrativa** (esta — incl. o **Relatório** —
+liberada **só por admin + engrenagem** `frota_admin`; o cargo `funcao='frotas'` não é usado e saiu dos
+gates, 2026-09-16). `frotaOpen(id)` é só
 roteador: seta `condTarget`/`frotasTarget` e faz `irPara('condutor'|'frotas')`. Detalhe em
 `docs/MODULOS.md §6.0`. QSMS/treinamento, Equipes, Ocorrência genérica e aluguel-com-histórico foram
 **removidos por completo** numa rodada anterior; **nesta rodada (2026-09, 3ª) o empréstimo também

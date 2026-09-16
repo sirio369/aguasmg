@@ -917,18 +917,22 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     ver §6.1). **"Emprestar" não existe mais como ação própria.**
   - **🖊️ Gestor** (`ME.pode_aprovar||is_admin`): **Aprovar manutenções** (tela própria). *(O **Relatório**
     saiu daqui em 2026-09-15 → foi pra Equipe administrativa, pra ser controlado pela engrenagem.)*
-  - **🏢 Equipe administrativa** (`is_admin || frota_admin || funcao='frotas'`): Veículos · Condutores ·
-    Lavagens a agendar · Manutenções a agendar · **Relatório** (histórico/custos de acompanhamento, §6.2 —
-    movido de Gestor em 2026-09-15 pra que quem for liberado na engrenagem também veja).
+  - **🏢 Equipe administrativa** (`is_admin || frota_admin` — **só admin + engrenagem**, 2026-09-16):
+    Veículos · Condutores · Lavagens a agendar · Manutenções a agendar · **Relatório** (histórico/custos de
+    acompanhamento, §6.2 — movido de Gestor em 2026-09-15 pra que quem for liberado na engrenagem veja).
+    **O cargo `funcao='frotas'` NÃO é usado (não existe ninguém com ele) e foi tirado dos gates** `adm`
+    (`frotaBlocks`) e `full` (`frotasRenderHome`), a pedido do usuário — o acesso à categoria inteira,
+    incluindo o Relatório, vem **exclusivamente da engrenagem (+ admin)**.
     - **Engrenagem ⚙️ (2026-09-15, admin-only) — quem vê a Equipe administrativa:** no cabeçalho da seção
       (só pra `is_admin`), abre `frotaAdminGate()` (sub-view de `#frotaView`, back → `frotaHome`): lista os
       usuários ativos com busca e um checkbox por pessoa (`app_frota_admin_listar`/`app_frota_admin_set`,
-      admin-only). Marca o flag **`perfil.frota_admin`** (novo, exposto no `ME` pelo `app_me`). Admin e
-      `funcao='frotas'` aparecem **travados/marcados** ("acesso pelo cargo"). **Aditivo** — ninguém perde
-      acesso; o flag libera OUTROS usuários (ex.: um `campo`/`aprovador`). **O backend acompanha:** todas
-      as RPCs `app_frota_*` gateadas por `funcao in ('frotas','admin'[,'aprovador'])` ganharam
-      `or coalesce(frota_admin,false)` (bulk, 2026-09-15) — senão o usuário veria o botão e tomaria "sem
-      permissão" na ação. **Regra:** RPC nova de Equipe administrativa deve incluir `frota_admin` no gate.
+      admin-only). Marca o flag **`perfil.frota_admin`** (exposto no `ME` pelo `app_me`). **Só o admin
+      aparece travado** ("acesso pelo cargo" = `funcao='admin'`); todos os outros têm checkbox
+      **destravável** — inclusive quem já é `frota_admin` (antes `acesso_pelo_cargo` incluía `frotas` e o
+      próprio `frota_admin`, o que travava a concessão e impedia revogar; corrigido 2026-09-16). **O backend
+      acompanha:** as RPCs `app_frota_*` gateadas incluem `or coalesce(frota_admin,false)` (o `funcao='frotas'`
+      segue tolerado no SQL por ser inócuo, mas não concede nada na prática). **Regra:** RPC nova de Equipe
+      administrativa deve incluir `frota_admin` no gate.
 - **`frotaOpen(id)` é um roteador** — não duplica render. Seta um alvo e chama `irPara`:
   - ações de Colaborador → `condTarget={sub,act}` + `irPara('condutor')`; `condInit` consome o alvo
     depois do load (`condGoTarget`). Ação que precisa de veículo (`situacao`/`abastecimento`/
@@ -1148,6 +1152,10 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     exibe o código cru (`labelOf` degrada graciosamente), sem quebrar. O único veículo real teve o
     `centro_custo` antigo (texto livre "4.2.8", formato incompatível) **zerado** na migração — precisa ser
     reaberto e salvo de novo com o valor certo do dropdown.
+  - **`tipo_combustivel` (dropdown `#fvfCombustivel`, `COMBUSTIVEIS_VEICULO`):** lista atualizada para
+    **Etanol / Diesel / Outros** (2026-09-16) — **substitui** Flex/Gasolina/Diesel/Outros. Sem `CHECK` no
+    banco; veículo com valor antigo (`flex`/`gasolina`) só exibe o código cru via `labelOf` até ser
+    reaberto e salvo. (Não confundir com `COMBUSTIVEIS` do abastecimento — Etanol/Diesel/Arla, §6.2 acima.)
   - **`consorcio` (dropdown `#fvfConsorcio`, obrigatório):** mostra os **nomes** dos consórcios —
     **Águas Integradas** (valor `ZA1004`) e **Eficiência Hídrica** (valor `ZA0200`) — 2026-09-15. O
     **valor gravado continua o código `ZA1004`/`ZA0200`** (todo o resto do app filtra por ZA), só o rótulo
