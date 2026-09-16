@@ -156,7 +156,7 @@
 - **RPCs:** `app_loggers_listar()` (retorna a lista já achatada), `app_logger_criar` (avulso, já
   instalado), `app_logger_instalar`, `app_logger_remover`, `app_logger_finalizar` (anexa .json +
   OS SIGOS), `app_logger_editar(p_id, p_campos jsonb, p_foto_* ...)`, `logger_pressao_importar`,
-  `logger_pressao_stats`, `app_logger_set_multiplicador`.
+  `logger_pressao_stats`, `app_logger_set_multiplicador`, `app_logger_set_converter_mca`.
 - **Fotos:** instalação = HD, leitura, numeração, cavalete, fachada + **extra** (opcional);
   remoção = HD + cavalete. Params: `p_foto_hd`, `p_foto_leitura_hd`, `p_foto_numeracao_hd`,
   `p_foto_cavalete`, `p_foto_fachada`, `p_foto_extra`. Colunas: `foto_hd_instalacao`,
@@ -200,6 +200,18 @@
   cards, gráfico e o próprio card do multiplicador atualizam juntos. **Não aparece no PDF** (removido
   2026-09 — o multiplicador é detalhe operacional do app/CSV, não precisa poluir o relatório impresso;
   o número que importa pro relatório, já corrigido, continua nos 4 cards Mínima/Média/Mediana/Máxima).
+- **Seletor "Necessário conversão para MCA?" (2026-09-16, na tela de conclusão + no logger concluído):**
+  card `lgMcaCardHtml`/`lgMcaWire` (segmento **Sim / Não**) **acima** do multiplicador, mesma permissão
+  (`ME.pode_aprovar`; só-leitura pros demais, e escondido quando é o padrão "Sim"). Coluna
+  `instalacao_logger_calibracao.converter_mca` (boolean, **default true**), gravada por
+  `app_logger_set_converter_mca(p_id,p_converter)` (gate `sup_funcao in ('admin','aprovador')`).
+  **Semântica:** entra no MESMO cálculo, mudando só o divisor — `mca = round(kpa * multiplicador / DIV, 4)`,
+  `DIV = 9,80665` quando `converter_mca=true` (kPa→mca, como sempre) **ou `1` quando `false`** (assume que
+  os dados **já estão em MCA** — não converte, só aplica o multiplicador). Espelhado em
+  `logger_pressao_stats` (devolve `converter_mca`) e na view `vw_logger_pressao` (nova coluna
+  `converter_mca` no fim; CSV/BI saem coerentes). O **multiplicador permanece** editável e persistente do
+  mesmo jeito. Ambos os controles agora aparecem também na **tela de conclusão** (`fzResumo`, chamada de
+  `lgCarregarPressao(...,true)`), não só no logger já concluído.
 - **Card "📐 Modelo (previsto)" (2026-09):** card extra logo acima do grid Mínima/Média/Mediana/Máxima
   (`lgCardModelo`, borda tracejada p/ não confundir com dado medido), com o valor de projeto/simulação
   (`instalacao_logger_calibracao.pressao`, já vinha em `p.pressao_modelo` via `app_loggers_listar` —

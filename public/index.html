@@ -1353,6 +1353,36 @@ function lgCardModelo(mca){ return '<div style="border:1px dashed var(--acc);bor
 // calibração/instalação). Vive em instalacao_logger_calibracao.multiplicador_pressao (padrão 1),
 // já vem calculado no retorno de logger_pressao_stats (campo `multiplicador`) — todo o resto
 // (cards, gráfico, PDF, CSV/view) deriva do mesmo cálculo, então salvar aqui atualiza tudo junto.
+// Seletor de conversão p/ MCA (na conclusão): Sim = kPa→mca (/9,80665, como hoje); Não = dados já em
+// MCA (aplica só o multiplicador). Persiste em instalacao_logger_calibracao.converter_mca e recalcula
+// stats/gráfico/PDF/CSV/view junto (mesma origem `logger_pressao_stats`). Editável por aprovador/admin.
+function lgMcaCardHtml(d,podeEd){
+  const conv=(d&&d.converter_mca!=null)?!!d.converter_mca:true;
+  if(!podeEd){
+    if(conv) return '';
+    return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:12px;color:var(--mut)">Conversão kPa→MCA</div><b style="font-size:13px;color:var(--acc)">Não — dados já em MCA</b></div>';
+  }
+  const seg=(on,val,lbl)=>'<button class="lgMcaOpt" data-mca="'+val+'" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:8px 0;font-size:13px;font-weight:600;border-radius:7px;'+(on?'background:var(--acc);color:var(--acc-ink);':'color:var(--mut);')+'">'+lbl+'</button>';
+  return '<div style="border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--card);margin-bottom:6px">'
+    +'<div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px">Necessário conversão para MCA?</div>'
+    +'<div style="display:flex;gap:4px;border:1px solid var(--line);border-radius:9px;padding:3px">'+seg(conv,'1','Sim (kPa→MCA)')+seg(!conv,'0','Não — já em MCA')+'</div>'
+    +'<div class="sub" style="font-size:11px;margin-top:6px">'+(conv?'Divide a pressão por 9,80665 (kPa→mca) e aplica o multiplicador.':'Não converte — assume que os dados já estão em MCA; aplica só o multiplicador.')+'</div>'
+    +'</div>';
+}
+function lgMcaWire(p,elId){
+  const box=document.getElementById(elId); if(!box) return;
+  box.querySelectorAll('.lgMcaOpt').forEach(b=>b.addEventListener('click',async()=>{
+    const want=b.dataset.mca==='1';
+    if(!navigator.onLine) return toast('Conecte-se para alterar a conversão');
+    box.querySelectorAll('.lgMcaOpt').forEach(x=>x.disabled=true);
+    try{
+      const {error}=await sb.rpc('app_logger_set_converter_mca',{p_id:p.id,p_converter:want});
+      if(error) throw error;
+      toast('✓ '+(want?'Conversão kPa→MCA ativada':'Sem conversão (dados já em MCA)')+' — recalculando');
+      await lgCarregarPressao(p,elId,null,true);
+    }catch(e){ toast('⚠ '+(e.message||e)); box.querySelectorAll('.lgMcaOpt').forEach(x=>x.disabled=false); }
+  }));
+}
 function lgMultCardHtml(d,podeEd){
   const v=(d&&d.multiplicador!=null)?Number(d.multiplicador):1;
   const vTxt=(Math.round(v*10000)/10000).toString().replace('.',',');
@@ -1403,9 +1433,9 @@ async function lgCarregarPressao(p, elId, cb, comMult){
   if(!navigator.onLine){ box.innerHTML='<div class="banner warn">Conecte-se para ver os dados de pressão.</div>'; return; }
   try{ const {data,error}=await sb.rpc('logger_pressao_stats',{p_logger_id:p.id}); if(error) throw error;
     const podeEd=!!(ME&&ME.pode_aprovar);
-    box.innerHTML=(comMult?lgMultCardHtml(data,podeEd):'')+lgPressaoBox(data,p.pressao_modelo);
+    box.innerHTML=(comMult?(lgMcaCardHtml(data,podeEd)+lgMultCardHtml(data,podeEd)):'')+lgPressaoBox(data,p.pressao_modelo);
     if(cb) cb(data);
-    if(comMult&&podeEd) lgMultWire(p,elId);
+    if(comMult&&podeEd){ lgMcaWire(p,elId); lgMultWire(p,elId); }
   }catch(e){ box.innerHTML='<div class="banner bad">Erro ao carregar pressão: '+(e.message||e)+'</div>'; }
 }
 async function lgExportarCsv(p){
@@ -1559,9 +1589,9 @@ function ligarDetalhe(p){
   if(fz){
     const habilita=(d)=>{ fz.disabled=!(d&&d.pulsos_total>0); };   // só libera Concluir após ver os dados
     const file=document.getElementById('fzFile');
-    if(file) file.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f,'#fzMsg',()=>{ lgCarregarPressao(p,'fzResumo',habilita); }); });
+    if(file) file.addEventListener('change',ev=>{ const f=ev.target.files[0]; if(f) importarDadosLogger(p,f,'#fzMsg',()=>{ lgCarregarPressao(p,'fzResumo',habilita,true); }); });
     fz.addEventListener('click',finalizarLogger);
-    lgCarregarPressao(p,'fzResumo',habilita);   // ao abrir: mostra o que já existe e habilita se houver dados
+    lgCarregarPressao(p,'fzResumo',habilita,true);   // ao abrir: mostra o que já existe (com conversão MCA + multiplicador) e habilita se houver dados
   }
   lgOnGps();
 }

@@ -217,6 +217,10 @@ pwa/
   é detalhe operacional do app/CSV). **CSV (2026-09)** mostra as 4 etapas do cálculo por linha:
   `Pressao_Inicial_kPa → Multiplicador → Pressao_Final_kPa → Pressao_Final_mca` (nova coluna
   `pressao_final_kpa` na view). Detalhe em `docs/MODULOS.md §2.2`.
+  **Seletor "Necessário conversão para MCA?" (2026-09-16):** na tela de conclusão + no logger concluído,
+  segmento Sim/Não (`instalacao_logger_calibracao.converter_mca`, default true, RPC
+  `app_logger_set_converter_mca`) muda só o divisor — `mca = kpa*mult/DIV`, `DIV=9,80665` (Sim) ou `1`
+  (Não = dados já em MCA, só aplica o multiplicador). Espelhado em `logger_pressao_stats`/`vw_logger_pressao`.
   **Card "Modelo (previsto)"** (2026-09): logo acima do grid Mínima/Média/Mediana/Máxima, com
   `p.pressao_modelo` (já existia, sem RPC nova) — comparação rápida modelo × medido, no logger
   concluído e no preview de finalização. **No PDF mora no tópico 5 · Pressão** (saiu do tópico
