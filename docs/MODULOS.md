@@ -841,9 +841,17 @@ back inteligente em `#supBack`. Helpers de papel no banco: `sup_funcao(uuid)`, `
 - Consolida entregas por período p/ baixa no **SIENGE**, **por consórcio** (do perfil de quem retirou).
   RPCs: `sup_baixas_relatorio` (5 args, com `p_consorcio`), `sup_baixas_marcar`,
   `sup_epi_baixa_fila`/`_solicitar`/`_cancelar`, `sup_epi_minhas_baixas`.
-- **Nunca inclui item `ferramenta`** (fix 2026-09 — tinha ficado de fora do rollout do §5.4): ferramenta
-  se empresta/devolve, não é custo consumido, então não faz sentido baixar no SIENGE junto com insumo.
-  `sup_baixas_relatorio`'s CTE `ins` filtra `and not m.ferramenta`.
+- **Ferramentas passaram a entrar na baixa (2026-09-16, a pedido do usuário — reverte o fix anterior
+  que as excluía).** `sup_baixas_relatorio` agora tem 3 CTEs: `ins` (`not m.ferramenta`), `fer`
+  (`m.ferramenta`, `tipo='ferramenta'`, mesmo caminho `sup_solicitacao_item`) e `epi`; o filtro `bxTipo`
+  ganhou a opção **"Só ferramentas"** e o "todos" virou "Insumos, ferramentas e EPIs". `sup_baixas_marcar`
+  aceita `p_tipo='ferramenta'` (roteia pro mesmo `update sup_solicitacao_item` do insumo). Cada linha
+  mostra um **pill de tipo** (📦/🔧/🦺).
+- **Export XLSX (2026-09-16):** botão **⬇ XLSX** exporta a lista filtrada (o `bxUltimo` corrente) via
+  helper genérico `exportarXlsx(nome,aba,aoa)` — carrega **SheetJS sob demanda** por `import()` do CDN
+  oficial (`cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs`, cacheado em `_xlsxLib`); colunas
+  Consórcio/Tipo/Código/Descrição/Tamanho/Unidade/Quantidade/Nº entregas/Status. Reutilizável por
+  outras telas.
 
 ### 5.6 Configurações (admin) — `// tela: Configurações` (~L3824)
 - **Duas entradas, uma tela** (`supAbrirConfig(from)`, `from` = `'home'` | `'epi'`; roda dentro do
@@ -1246,6 +1254,16 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   `p_condutor_id` — antes era campo de e-mail livre + `app_perfil_por_email`). `PAINEL_CFG` (const)
   só descreve `{rpc,titulo,row}` por tipo; `frotasRenderPainelLista` monta o formulário de filtro +
   chama `carregar()`.
+- **Relatório de abastecimento — centro de custo/modelo/grupo + Lista×Consolidado (2026-09-16):**
+  `app_frota_abastecimentos_listar` passou a retornar tb. `centro_custo`/`modelo` do veículo e
+  `foto_cupom` do abastecimento (`consorcio` já vinha); a linha da **Lista** mostra placa+modelo, o
+  cabeçalho de sempre, e uma linha "CC <descrição> · <grupo econômico> · 🧾 Nota" (grupo econômico =
+  **nome do consórcio**, `CONSORCIO_NOME` — Águas Integradas/Eficiência Hídrica; a foto do cupom abre
+  via `fotoURL(foto_cupom)`). Só no tipo **abastecimentos** há um **toggle 📋 Lista / 📊 Por centro de
+  custo** (`frAbMode`); o **Consolidado** chama a RPC nova `app_frota_abastecimentos_consolidado(p_data_ini,
+  p_data_fim)` — uma linha por `centro_custo` do veículo (filtrável só por período), somando
+  litros/valor e contando abastecimentos/veículos (`frAbConsolRow`). Grupo econômico na linha
+  consolidada só aparece quando o CC é de um único consórcio.
   **"Tempo real" aqui significa só "sempre atualizado quando busca"** — sem Supabase Realtime.
 - **Custos por veículo** (`app_frota_custos_por_veiculo()`/`app_frota_veiculo_relatorio()`, **sem
   filtro** — visão agregada por veículo, dentro de Relatório): soma `frota_checklist_abastecimento`
