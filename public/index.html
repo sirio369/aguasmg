@@ -5650,10 +5650,24 @@ function statusBadge(map,status){ const st=map[status]||{l:status||'—',bg:'--l
 function fmtData(d){ if(!d) return '—'; try{ const p=String(d).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }catch(e){ return d; } }
 function fmtDinheiro(v){ if(v==null) return '—'; return 'R$ '+(Math.round(+v*100)/100).toFixed(2).replace('.',','); }
 async function comprimirGeral(file){ return comprimir(file); }
-function fotoPickHtml(id,label){ return `<label style="margin-top:8px">${label}</label><div class="pick"><label class="pickb">📷 Câmera<input class="fFoto2" data-alvo="${id}" type="file" accept="image/*" capture="environment"/></label><label class="pickb">🖼️ Galeria<input class="fFoto2" data-alvo="${id}" type="file" accept="image/*"/></label></div><img id="${id}_prev" class="hidden" style="max-width:100%;border-radius:10px;margin-top:6px"/>`; }
+// opts.pdf=true adiciona um botão 📄 PDF (além de câmera/galeria) — usado no cadastro de CNH.
+function fotoPickHtml(id,label,opts){ opts=opts||{};
+  const pdfBtn = opts.pdf ? `<label class="pickb">📄 PDF<input class="fFoto2" data-alvo="${id}" type="file" accept="application/pdf"/></label>` : '';
+  const pdfEl = opts.pdf ? `<div id="${id}_pdf" class="sub hidden" style="margin-top:6px">📄 PDF anexado</div>` : '';
+  return `<label style="margin-top:8px">${label}</label><div class="pick"><label class="pickb">📷 Câmera<input class="fFoto2" data-alvo="${id}" type="file" accept="image/*" capture="environment"/></label><label class="pickb">🖼️ Galeria<input class="fFoto2" data-alvo="${id}" type="file" accept="image/*"/></label>${pdfBtn}</div><img id="${id}_prev" class="hidden" style="max-width:100%;border-radius:10px;margin-top:6px"/>${pdfEl}`; }
 const FOTO2_BLOBS={};
-function wireFotoPick(root){ root.querySelectorAll('.fFoto2').forEach(fi=>fi.addEventListener('change',async e=>{ const f=e.target.files[0]||null; const alvo=fi.dataset.alvo; const img=$('#'+alvo+'_prev'); if(f){ FOTO2_BLOBS[alvo]=await comprimirGeral(f); img.src=URL_obj(FOTO2_BLOBS[alvo]); img.classList.remove('hidden'); } else { FOTO2_BLOBS[alvo]=null; img.classList.add('hidden'); } })); }
-async function uploadFoto2(alvo,pasta){ const b=FOTO2_BLOBS[alvo]; if(!b) return null; const path=pasta+'/'+crypto.randomUUID()+'.jpg'; const {error}=await sb.storage.from('fotos-campo').upload(path,b,{contentType:'image/jpeg',upsert:true}); if(error) throw error; return path; }
+function foto2EhPdf(b){ return !!b && (b.type==='application/pdf' || /\.pdf$/i.test(b.name||'')); }
+function wireFotoPick(root){ root.querySelectorAll('.fFoto2').forEach(fi=>fi.addEventListener('change',async e=>{
+  const f=e.target.files[0]||null; const alvo=fi.dataset.alvo; const img=$('#'+alvo+'_prev'); const pdfEl=$('#'+alvo+'_pdf');
+  if(f){
+    if(foto2EhPdf(f)){ FOTO2_BLOBS[alvo]=f; if(img){ img.classList.add('hidden'); img.removeAttribute('src'); } if(pdfEl){ pdfEl.textContent='📄 '+(f.name||'PDF anexado'); pdfEl.classList.remove('hidden'); } }
+    else { FOTO2_BLOBS[alvo]=await comprimirGeral(f); if(img){ img.src=URL_obj(FOTO2_BLOBS[alvo]); img.classList.remove('hidden'); } if(pdfEl) pdfEl.classList.add('hidden'); }
+  } else { FOTO2_BLOBS[alvo]=null; if(img) img.classList.add('hidden'); if(pdfEl) pdfEl.classList.add('hidden'); }
+})); }
+async function uploadFoto2(alvo,pasta){ const b=FOTO2_BLOBS[alvo]; if(!b) return null;
+  const pdf=foto2EhPdf(b); const ext=pdf?'pdf':'jpg', ct=pdf?'application/pdf':'image/jpeg';
+  const path=pasta+'/'+crypto.randomUUID()+'.'+ext;
+  const {error}=await sb.storage.from('fotos-campo').upload(path,b,{contentType:ct,upsert:true}); if(error) throw error; return path; }
 
 // ----- HUB da Frota (estilo Suprimentos: seções -> botões -> abre o fluxo que já existe) -----
 let frotaCur='home', frotaMeuVeiculo=null;
@@ -5839,7 +5853,7 @@ function condRenderCadastro(){
   <label>Número da CNH *</label><input id="condfNum" value="${(d.cnh_numero||'').replace(/"/g,'&quot;')}"/>
   <label>Categoria *</label><select id="condfCat">${CNH_CATS.map(c=>`<option${d.cnh_categoria===c?' selected':''}>${c}</option>`).join('')}</select>
   <label>Validade *</label><input id="condfVal" type="date" value="${d.cnh_validade?String(d.cnh_validade).slice(0,10):''}"/>
-  ${fotoPickHtml('condfFoto','Foto da CNH')}
+  ${fotoPickHtml('condfFoto','Foto ou PDF da CNH',{pdf:true})}
   <button class="btn" id="condfSalvar" style="margin-top:14px">Salvar</button>`;
   $('#condView').innerHTML=h; wireFotoPick($('#condView'));
   $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
@@ -6251,7 +6265,7 @@ function frotasRenderCondutorCadastro(){
     h+=`<label>Número da CNH *</label><input id="frcNum" value="${(c.cnh_numero||'').replace(/"/g,'&quot;')}"/>
     <label>Categoria *</label><select id="frcCat">${CNH_CATS.map(cc=>`<option${c.cnh_categoria===cc?' selected':''}>${cc}</option>`).join('')}</select>
     <label>Validade *</label><input id="frcVal" type="date" value="${c.cnh_validade?String(c.cnh_validade).slice(0,10):''}"/>
-    ${fotoPickHtml('frcFoto','Foto da CNH (opcional)')}
+    ${fotoPickHtml('frcFoto','Foto ou PDF da CNH (opcional)',{pdf:true})}
     <button class="btn" id="frcSalvar" style="margin-top:14px">Salvar${c.tem_condutor?' — reabre o termo p/ nova assinatura':''}</button>`;
   }
   $('#frotasView').innerHTML=h; wireFotoPick($('#frotasView'));

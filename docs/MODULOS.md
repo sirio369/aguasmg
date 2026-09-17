@@ -1016,6 +1016,14 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   mesmo gate) — marca quem nunca vai dirigir, some da contagem "Sem CNH" sem precisar de linha em
   `frota_condutor`. Foto continua opcional, via `uploadFoto2(...,'cnh')` → bucket `fotos-campo`
   (**mesmo bucket público das fotos de campo** — sem storage dedicado/privado para CNH).
+  **Anexo aceita PDF além de foto (2026-09-17):** os dois pickers de CNH (gestor `frcFoto` e
+  colaborador `condfFoto`) usam `fotoPickHtml(...,{pdf:true})` — ganham um 3º botão **📄 PDF**
+  (`accept="application/pdf"`) ao lado de Câmera/Galeria. O `fotoPickHtml`/`wireFotoPick`/`uploadFoto2`
+  passaram a ser genéricos: PDF **não** é comprimido (imagem segue via `comprimirGeral`), mostra
+  "📄 PDF anexado" no lugar do preview `<img>`, e sobe como `.pdf`/`application/pdf` (helper
+  `foto2EhPdf`); a exibição já era **link** ("Ver foto da CNH"), então abre PDF ou imagem igual. O
+  bucket `fotos-campo` teve `application/pdf` **adicionado ao `allowed_mime_types`** (antes só
+  jpeg/png/webp). `opts.pdf` é opcional → todos os outros forms que usam `fotoPickHtml` seguem só-imagem.
 - **Autoatualização (colaborador):** `condRenderCadastro`/`condSalvarCnh` agora só serve pra
   **atualizar** CNH já cadastrada (ex.: renovou) — `app_condutor_atualizar_cnh`, mesma assinatura de
   antes. Também reabre o termo (novo `termo_pendente` + termo novo) — qualquer mudança de CNH exige
