@@ -1669,22 +1669,37 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     andamento/não iniciada/finalizada), toggle **Mapa/Lista** (`.pjseg`). Mapa é **SVG esquemático**
     (ilustrativo; pinos p/ ponto, polilinha p/ rede) — a versão integrada usa as geometrias reais do GIS.
     Lista = cards com barra de progresso e status. `pjInit()`/`pjRefresh()`/`pjRenderMap()`/`pjRenderList()`.
-  - `projeto_det` — **dia a dia de campo.** Resumo (ring de % + contadores concluídas/em andamento/não
-    iniciadas) + **árvore de subatividades robusta** (`pjNodeHtml()` recursivo): grupos colapsáveis com
-    linha-resumo (`X/Y etapas ✓ · Z%`), folhas com badge de unidade (`%`/`m`), barra + %, meta ultrapassada
-    marcada (>100% em âmbar), badges `⟳N` replicável / `ativável` (liga-desliga) / `registro` (OS SIGOS,
-    hidrômetro). Toque na folha abre o painel **"avanço de hoje" + 📷 + Lançar** (incremental/acumulado).
-  - `projeto_rel` — **gestão, tela à parte** (não polui o campo). Aberta pelo botão `📄 Relatório e
-    documentos` no detalhe. Contém: **Documentos** (projeto executivo PDF + as-built PDF, este pendente até
-    concluir), **mini-Gantt** (`pjRel()` monta janelas planejadas em cascata + barra de avanço), **avanços
-    por atividade·subatividade** com fotos diárias, e **anexos no PDF final** (o PDF consolidado sai como
-    documento único: capa + Gantt + avanços + projeto + as-built no fim).
+  - `projeto_det` — **dia a dia de campo** (`pjRenderDet()`, re-render idempotente após toggles/steppers;
+    `pjOpen()` só troca de tela). Resumo (ring de % + contadores) + **árvore de subatividades robusta**
+    (`pjNodeHtml()` recursivo): **cada bloco nível-1 é um card separado** (segregação clara p/ campo),
+    grupos colapsáveis com linha-resumo (`X/Y etapas ✓ · Z%` — só em grupo **ativo**, senão daria `null%`),
+    folhas com badge de unidade (`%`/`m`), barra + %, meta ultrapassada em âmbar. Controles interativos:
+    **toggle "No escopo?"** (`data-toggle` → `node.ativo`) para ligar/desligar etapa; **stepper "Quantidade"**
+    (`data-repadd`/`data-repdel` → `pjRepAdd`/`pjRepDel`) que gera N blocos numerados (ex.: Interligação 1..N)
+    — interligações replicáveis vêm de `pjILrep(nome,n,…)` (container de N `pjIL`). Cada folha mensurável tem
+    botão claro **＋ Lançar** que abre o painel: **lançamentos anteriores** (`pjLeafHist()`, data/delta/
+    acumulado/observação) + **acumulado**, e novo avanço com **2 fotos + observação** (`pjPh2`) + Lançar.
+    Botão **📄 Relatório e documentos** fica **no fim da rolagem** (não atrapalha o campo).
+  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
+    cada um com **Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba), **Anexar** e
+    **Remover** (só adm/aprovador: `ME.is_admin||ME.pode_aprovar`). **mini-Gantt** (`pjRel()`) — cada barra vai
+    do **1º ao último avanço** da atividade (datas reais de `pjLeafHist`; eixo min→méd→máx); atividade sem
+    avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação. **PDF consolidado**
+    = documento único (capa + Gantt + avanços + projeto/licença/alvará/as-built no fim).
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
-  `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil: escavação/escoramento/reaterro/recomposição),
-  `pjIL` (interligação). `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos
-  filhos. `ativo:false` e `k:'reg'` não entram na média. Meta **não** é limitador (pode passar de 100%).
+  `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil), `pjIL` (interligação), `pjILrep`
+  (container replicável). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
+  `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos filhos. `ativo:false`
+  e `k:'reg'` não entram na média (nem viram `null%`). Meta **não** é limitador (pode passar de 100%).
 - **Idioma do app:** script é `type="module"` → funções **não** são globais; handlers via `.onclick=`
   (não `onclick=` inline), exceto `toast()` que está em `window`. Telas registradas em `SCREENS` +
   `if(id==='projetos') pjInit()` em `irPara()`.
-- **Próximo passo:** modelar o schema (intervenção ↔ geometria GIS de projetos, árvore de nós, lançamentos
-  diários com foto, registros) e trocar `PJ_IVS` por RPCs `app_proj_*`. Depois: resumo diário multi-intervenção.
+- **Schema-alvo (a criar):** um schema próprio **`13 - projetos_obra`** (segue o padrão 1-módulo-1-schema:
+  8 coleta / 9 suprimentos / 10 Frotas / 11 perdas). Cadastro da intervenção **vem de camada georref de
+  projetos** — hoje não existe no banco; as georref correlatas são `7 - setorizacao.dmc_projetado`/
+  `vrp_projetada` e `2 - infra_agua.vrps`/`unidades_macromedicao`/`rede`. Tabelas previstas: `intervencao`
+  (↔ geometria), `no_arvore` (template + instância por intervenção, com unidade/formato/meta/ativo/rep),
+  `avanco` (lançamento diário: valor incremental + observação, N fotos em `fotos-campo`), `registro`
+  (OS SIGOS/hidrômetro), `documento` (projeto/licença/alvará/as-built). RPCs `app_proj_*`.
+- **Próximo passo:** modelar esse schema e trocar `PJ_IVS` por RPCs `app_proj_*`. Depois: resumo diário
+  multi-intervenção.
