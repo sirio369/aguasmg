@@ -1652,3 +1652,39 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     é que restringem. Não colocar segredo no `perdas.html`.
   - Editar o cockpit: o fonte "de trabalho" é o mesmo arquivo; só cuidar do `<head>` próprio
     (doctype+charset) e do overlay `#nrwGate` + guarda no fim ao regerar a partir do mockup.
+
+---
+
+## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos` / `projeto_det` / `projeto_rel`
+
+Acompanhamento diário de campo das intervenções de obra (macromedidores, VRPs, redes VCA/HDD).
+**Estado: preview embutido, gated só ao meu usuário** (`sander.sirio@aguasmg.com.br`) — dados de exemplo
+no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro do app antes de modelar o banco.
+
+- **Gate:** card `#cardProj` na home (Execução). Em `homeGate()` (~L944) espelha o `cardPerdas`: se
+  `ME.email==='sander.sirio@aguasmg.com.br'` vira botão ativo → `irPara('projetos')`, senão fica `.soon` +
+  🔒 e `toast('Acesso restrito')`. Trocar/ampliar o acesso = mudar essa condição (futuro: engrenagem/RLS).
+- **Três telas (segregação proposital campo × gestão):**
+  - `projetos` — **dia a dia de campo.** Filtros em **dropdown** (`#pjTipo` por tipo, `#pjStatus` em
+    andamento/não iniciada/finalizada), toggle **Mapa/Lista** (`.pjseg`). Mapa é **SVG esquemático**
+    (ilustrativo; pinos p/ ponto, polilinha p/ rede) — a versão integrada usa as geometrias reais do GIS.
+    Lista = cards com barra de progresso e status. `pjInit()`/`pjRefresh()`/`pjRenderMap()`/`pjRenderList()`.
+  - `projeto_det` — **dia a dia de campo.** Resumo (ring de % + contadores concluídas/em andamento/não
+    iniciadas) + **árvore de subatividades robusta** (`pjNodeHtml()` recursivo): grupos colapsáveis com
+    linha-resumo (`X/Y etapas ✓ · Z%`), folhas com badge de unidade (`%`/`m`), barra + %, meta ultrapassada
+    marcada (>100% em âmbar), badges `⟳N` replicável / `ativável` (liga-desliga) / `registro` (OS SIGOS,
+    hidrômetro). Toque na folha abre o painel **"avanço de hoje" + 📷 + Lançar** (incremental/acumulado).
+  - `projeto_rel` — **gestão, tela à parte** (não polui o campo). Aberta pelo botão `📄 Relatório e
+    documentos` no detalhe. Contém: **Documentos** (projeto executivo PDF + as-built PDF, este pendente até
+    concluir), **mini-Gantt** (`pjRel()` monta janelas planejadas em cascata + barra de avanço), **avanços
+    por atividade·subatividade** com fotos diárias, e **anexos no PDF final** (o PDF consolidado sai como
+    documento único: capa + Gantt + avanços + projeto + as-built no fim).
+- **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
+  `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil: escavação/escoramento/reaterro/recomposição),
+  `pjIL` (interligação). `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos
+  filhos. `ativo:false` e `k:'reg'` não entram na média. Meta **não** é limitador (pode passar de 100%).
+- **Idioma do app:** script é `type="module"` → funções **não** são globais; handlers via `.onclick=`
+  (não `onclick=` inline), exceto `toast()` que está em `window`. Telas registradas em `SCREENS` +
+  `if(id==='projetos') pjInit()` em `irPara()`.
+- **Próximo passo:** modelar o schema (intervenção ↔ geometria GIS de projetos, árvore de nós, lançamentos
+  diários com foto, registros) e trocar `PJ_IVS` por RPCs `app_proj_*`. Depois: resumo diário multi-intervenção.
