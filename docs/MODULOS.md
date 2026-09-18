@@ -1673,12 +1673,15 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     `pjOpen()` só troca de tela). Resumo (ring de % + contadores) + **árvore de subatividades robusta**
     (`pjNodeHtml()` recursivo): **cada bloco nível-1 é um card separado** (segregação clara p/ campo),
     grupos colapsáveis com linha-resumo (`X/Y etapas ✓ · Z%` — só em grupo **ativo**, senão daria `null%`),
-    folhas com badge de unidade (`%`/`m`), barra + %, meta ultrapassada em âmbar. Controles interativos:
-    **toggle "No escopo?"** (`data-toggle` → `node.ativo`) para ligar/desligar etapa; **stepper "Quantidade"**
-    (`data-repadd`/`data-repdel` → `pjRepAdd`/`pjRepDel`) que gera N blocos numerados (ex.: Interligação 1..N)
-    — interligações replicáveis vêm de `pjILrep(nome,n,…)` (container de N `pjIL`). Cada folha mensurável tem
-    botão claro **＋ Lançar** que abre o painel: **lançamentos anteriores** (`pjLeafHist()`, data/delta/
-    acumulado/observação) + **acumulado**, e novo avanço com **2 fotos + observação** (`pjPh2`) + Lançar.
+    folhas com badge de unidade (`%`/`m`), barra + %, meta ultrapassada em âmbar. **Grupos (ramificações)**
+    têm botão **Detalhes** (`data-detbtn` → `#{rid}D` `.pjdetpanel`, começa oculto) que revela as
+    subatividades-filho **e** os controles de configuração. Esses controles são **restritos a aprovador/admin**
+    (`podeConfig = ME.is_admin||ME.pode_aprovar`): **toggle "No escopo?"** (`data-toggle` → `node.ativo`) e
+    **stepper "Quantidade"** (`data-repadd`/`data-repdel` → `pjRepAdd`/`pjRepDel`, gera N blocos numerados,
+    ex.: Interligação 1..N — vêm de `pjILrep(nome,n,…)`, container de N `pjIL`). Campo (sem papel) vê as
+    ramificações e os avanços, mas a Quantidade só em leitura e sem toggle. Cada folha mensurável tem botão
+    **＋ Lançar** → painel com **lançamentos anteriores** (`pjLeafHist()`) + **acumulado** e novo avanço com
+    **2 fotos + observação**. Re-render após toggle/stepper preserva os painéis abertos (`pjSnapOpen`→`keep`).
     Botão **📄 Relatório e documentos** fica **no fim da rolagem** (não atrapalha o campo).
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
     cada um com **Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba), **Anexar** e

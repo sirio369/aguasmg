@@ -223,7 +223,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 /* botão claro de lançar avanço na folha mensurável */
 .pjgo{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:5px;background:var(--acc);color:var(--acc-ink);font-size:12px;font-weight:700;padding:8px 12px;border-radius:9px;cursor:pointer;flex:0 0 auto;white-space:nowrap}
 .pjgo.open{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.pjgo.det{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.pjgo.det.open{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
 .pjnode:not(.g).inact .pjgo{display:none}
+.pjdetpanel{margin:0 0 6px}
+.pjdetpanel[hidden]{display:none}
 /* strip de controle: ativar/desativar + quantidade */
 .pjctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px dashed var(--line);border-radius:9px;padding:8px 11px;margin:0 0 10px}
 .pjctl .lbl{font-size:12px;font-weight:600;color:var(--mut)}
@@ -1265,6 +1269,7 @@ function pjMakePdfUrl(title,sub){
 function pjOpenPdf(title){ try{ const u=pjMakePdfUrl(title); window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),60000); }catch(e){ toast('Não consegui abrir o PDF de exemplo'); } }
 function pjNodeHtml(node){
   const t=node.k,p=pjPct(node),isG=node.f&&node.f.length,inact=node.ativo===false;
+  const podeConfig=!!(ME&&(ME.is_admin||ME.pode_aprovar));
   const rid='pn'+Math.random().toString(36).slice(2,8); pjReg[rid]=node;
   let right='';
   if(t==='reg')right=`<span class="pjregv">${node.v}</span>`;
@@ -1272,16 +1277,24 @@ function pjNodeHtml(node){
     right=`<div class="pjnb"><div class="pjbar ${over?'over':(done?'ok':'')}"><i style="width:${Math.min(p,100)}%"></i></div></div><div class="pjnp ${over?'ov':(done?'dn':'')}">${p}%</div>`;
     if(!isG&&(t==='%'||t==='m')&&!inact) right+=`<button class="pjgo" data-go="${rid}">＋ Lançar</button>`;
   } else right=`<div class="pjnb"></div><div class="pjnp"></div>`;
+  if(isG) right+=`<button class="pjgo det" data-detbtn="${rid}">Detalhes</button>`;
   let tags='';
   if(t==='%')tags+=`<span class="pjtag unit">%</span>`;
   if(t==='m')tags+=`<span class="pjtag unit">${node.un}</span>`;
   if(t==='reg')tags+=`<span class="pjtag reg">registro</span>`;
-  let h=`<div class="pjnode ${isG?'g':''} ${inact?'inact':''}"><div class="pjnrow" ${isG?`data-tg="${rid}"`:(t==='reg'?'':`data-leaf="${rid}"`)}><span class="tw">${isG?'▸':'·'}</span><div class="pjnn">${node.n}${tags}</div>${right}</div>`;
+  let h=`<div class="pjnode ${isG?'g':''} ${inact?'inact':''}"><div class="pjnrow" ${isG?`data-det="${rid}"`:(t==='reg'?'':`data-leaf="${rid}"`)}><span class="tw">${isG?'▸':'·'}</span><div class="pjnn">${node.n}${tags}</div>${right}</div>`;
   if(isG&&!inact){ const ls=pjLeaves(node),done=ls.filter(x=>pjPct(x)>=100).length; h+=`<div class="pjgsum"><span class="chipx">${done}/${ls.length} etapas ✓</span><span>${p}% concluído</span></div>`; }
-  if('ativo' in node) h+=`<div class="pjctl"><span class="lbl">No escopo?</span><span class="pjsw ${inact?'':'on'}" data-toggle="${rid}"></span><span class="val">${inact?'fora do escopo':'ativa'}</span></div>`;
-  if(node.rep) h+=`<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button data-repdel="${rid}"${node.f.length<=1?' disabled':''}>−</button><b>${node.rep}</b><button data-repadd="${rid}">+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)</span></div>`;
-  if(t==='m')h+=`<div class="pjmeta">executado ${node.exec} / meta ${node.meta} ${node.un}${p>100?` · <b style="color:var(--warn)">+${p-100}% acima da meta</b>`:''}</div>`;
-  else if(node.sub)h+=`<div class="pjmeta">${node.sub}</div>`;
+  if(node.sub)h+=`<div class="pjmeta">${node.sub}</div>`;
+  if(isG){
+    let ctl='';
+    if('ativo' in node){ ctl += podeConfig
+      ? `<div class="pjctl"><span class="lbl">No escopo?</span><span class="pjsw ${inact?'':'on'}" data-toggle="${rid}"></span><span class="val">${inact?'fora do escopo':'ativa'}</span></div>`
+      : (inact?`<div class="pjctl"><span class="lbl">⚠️ Etapa fora do escopo</span></div>`:''); }
+    if(node.rep){ ctl += podeConfig
+      ? `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button data-repdel="${rid}"${node.f.length<=1?' disabled':''}>−</button><b>${node.rep}</b><button data-repadd="${rid}">+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)</span></div>`
+      : `<div class="pjctl"><span class="lbl">Quantidade</span><span class="val">${node.f.length} bloco(s)</span></div>`; }
+    h+=`<div class="pjdetpanel" id="${rid}D" hidden>${ctl}<div class="pjchildren">${node.f.map(pjNodeHtml).join('')}</div></div>`;
+  }
   if(!isG&&(t==='%'||t==='m')&&!inact){
     const H=pjLeafHist(node);
     const hist=H.ents.length
@@ -1297,11 +1310,11 @@ function pjNodeHtml(node){
       <span class="pjhint">Incremental — soma ao acumulado. 2 fotos + observação por lançamento.</span>
     </div>`;
   }
-  if(isG)h+=`<div class="pjchildren" id="${rid}C" hidden>${node.f.map(pjNodeHtml).join('')}</div>`;
   return h+`</div>`;
 }
 function pjOpen(id){ pjCur=id; irPara('projeto_det'); pjRenderDet(); window.scrollTo(0,0); }
-function pjRenderDet(){
+function pjSnapOpen(d){ const s=new Set(); d.querySelectorAll('.pjdetpanel:not([hidden])').forEach(pnl=>{ const n=pjReg[pnl.id.slice(0,-1)]; if(n)s.add(n); }); return s; }
+function pjRenderDet(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={};
   const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status];
   const leaves=iv.arv.flatMap(n=>pjLeaves(n)),done=leaves.filter(x=>pjPct(x)>=100).length,run=leaves.filter(x=>{const v=pjPct(x);return v>0&&v<100;}).length,zero=leaves.length-done-run;
@@ -1316,20 +1329,23 @@ function pjRenderDet(){
      </div>
    </div>
    <div class="sec">🧱 Subatividades</div>
-   <p class="pjhint" style="margin:2px 0 10px">Cada bloco é uma subatividade. Toque em <b>＋ Lançar</b> para registrar o avanço do dia (2 📷 + observação). Use <b>No escopo?</b> para ligar/desligar uma etapa e <b>Quantidade</b> para definir quantos blocos (ex.: interligações).</p>
+   <p class="pjhint" style="margin:2px 0 10px">Toque em <b>＋ Lançar</b> para registrar o avanço do dia (2 📷 + observação). Blocos com ramificações abrem em <b>Detalhes</b>. Definir escopo/quantidade é restrito a aprovador e admin.</p>
    <div class="pjtree">${iv.arv.map(pjNodeHtml).join('')}</div>
    <button class="btn ghost" id="pjRelBtn" style="margin-top:8px">📄 Relatório e documentos</button>`;
   const d=$('#pjDet');
   $('#pjRelBtn').onclick=()=>pjRel(pjCur);
-  const toggleLaunch=(nodeEl,btn)=>{ const l=nodeEl.querySelector(':scope > .pjlaunch'); if(!l)return; d.querySelectorAll('.pjlaunch.on').forEach(x=>{if(x!==l){x.classList.remove('on');const b=x.parentElement.querySelector('.pjgo');if(b){b.classList.remove('open');b.textContent='＋ Lançar';}}}); const on=l.classList.toggle('on'); if(btn){btn.classList.toggle('open',on);btn.textContent=on?'✕ Fechar':'＋ Lançar';} };
-  d.querySelectorAll('[data-tg]').forEach(r=>r.onclick=()=>{const c=document.getElementById(r.dataset.tg+'C'),tw=r.querySelector('.tw');if(c){c.hidden=!c.hidden;tw.textContent=c.hidden?'▸':'▾';}});
+  const toggleLaunch=(nodeEl,btn)=>{ const l=nodeEl.querySelector(':scope > .pjlaunch'); if(!l)return; d.querySelectorAll('.pjlaunch.on').forEach(x=>{if(x!==l){x.classList.remove('on');const b=x.parentElement.querySelector('.pjgo:not(.det)');if(b){b.classList.remove('open');b.textContent='＋ Lançar';}}}); const on=l.classList.toggle('on'); if(btn){btn.classList.toggle('open',on);btn.textContent=on?'✕ Fechar':'＋ Lançar';} };
+  const detToggle=(rid,btn)=>{ const pnl=document.getElementById(rid+'D'); if(!pnl)return; const nowOpen=pnl.hidden; pnl.hidden=!nowOpen; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent=nowOpen?'▾':'▸'; if(btn){btn.textContent=nowOpen?'Fechar':'Detalhes';btn.classList.toggle('open',nowOpen);} };
+  d.querySelectorAll('[data-detbtn]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); detToggle(b.dataset.detbtn,b); });
+  d.querySelectorAll('[data-det]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; const b=r.querySelector('[data-detbtn]'); if(b)b.click(); });
   d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
   d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
-  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ n.ativo=!s.classList.contains('on'); pjRenderDet(); } });
-  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ pjRepAdd(n); pjRenderDet(); } });
-  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ pjRepDel(n); pjRenderDet(); } }; });
+  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjRenderDet(k); } });
+  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjRenderDet(k); } });
+  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); pjRenderDet(k); } }; });
   d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
   d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>toast('Lançamento registrado (prévia) — na versão integrada grava avanço + 2 fotos + observação no banco'));
+  if(keep&&keep.size){ Object.keys(pjReg).forEach(rid=>{ if(keep.has(pjReg[rid])){ const pnl=document.getElementById(rid+'D'); if(pnl&&pnl.hidden){ pnl.hidden=false; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent='▾'; const b=row&&row.querySelector('[data-detbtn]'); if(b){b.textContent='Fechar';b.classList.add('open');} } } }); }
 }
 function pjRel(id){
   const iv=PJ_IVS.find(i=>i.id===id); if(!iv)return; pjCur=id;
