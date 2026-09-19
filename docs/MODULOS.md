@@ -1687,11 +1687,16 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     cada um com **Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba), **Anexar** e
     **Remover** (só adm/aprovador: `ME.is_admin||ME.pode_aprovar`). **mini-Gantt** (`pjRel()`) — cada barra vai
     do **1º ao último avanço** da atividade (datas reais de `pjLeafHist`; eixo min→méd→máx); atividade sem
-    avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação. **PDF consolidado**
+    avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação, com toggle de
+    ordenação (`#pjAdvSeg`): **Sequência lógica** (árvore atividade›subatividade) × **Ordem de envio** (feed
+    cronológico de todos os lançamentos, mais recente primeiro, fora da sequência). **PDF consolidado**
     = documento único (capa + Gantt + avanços + projeto/licença/alvará/as-built no fim).
+    (Sem gradientes nos cards de atividade — removidos a pedido.)
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
   `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil), `pjIL` (interligação), `pjILrep`
-  (container replicável). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
+  (container replicável), `pjRamal`/`pjRamais` (ramais — grupo **ativável** `No escopo?` + replicável, pois
+  pode ser só reforço de rede sem ramais; VCA e HDD têm ramais) e `pjPeca`/`pjPecas` (peças/acessórios —
+  grupo replicável para adicionar itens conforme necessidade, ativável, como o ramal). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
   `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos filhos. `ativo:false`
   e `k:'reg'` não entram na média (nem viram `null%`). Meta **não** é limitador (pode passar de 100%).
 - **Idioma do app:** script é `type="module"` → funções **não** são globais; handlers via `.onclick=`
