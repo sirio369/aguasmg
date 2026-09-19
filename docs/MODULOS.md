@@ -1694,7 +1694,9 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     (Sem gradientes nos cards de atividade — removidos a pedido.)
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
   `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil), `pjIL` (interligação), `pjILrep`
-  (container replicável). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
+  (container replicável), `pjRamal`/`pjRamais` (ramais — grupo **ativável** `No escopo?` + replicável, pois
+  pode ser só reforço de rede sem ramais; VCA e HDD têm ramais) e `pjPeca`/`pjPecas` (peças/acessórios —
+  grupo replicável para adicionar itens conforme necessidade, ativável, como o ramal). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
   `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos filhos. `ativo:false`
   e `k:'reg'` não entram na média (nem viram `null%`). Meta **não** é limitador (pode passar de 100%).
 - **Idioma do app:** script é `type="module"` → funções **não** são globais; handlers via `.onclick=`

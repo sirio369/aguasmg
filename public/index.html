@@ -1147,6 +1147,12 @@ const pjOc=(e,es,r,rc)=>[pjP('Escavação',e),pjP('Escoramento',es),pjP('Reaterr
 const pjIL=(nome,m,ex,t,civOff=true)=>pjG(nome||'Interligação',[{...pjG('Obra civil da caixa',pjOc(0,0,0,0)),ativo:!civOff},pjP('Manobra / parada de rede',m),pjP('Execução (corte / peças / junta)',ex),pjP('Teste / religação',t)]);
 // interligações replicáveis: container com N interligações numeradas (a quantidade é setável na tela)
 const pjILrep=(nome,n,m,ex,t)=>({...pjG(nome,Array.from({length:n},(_,i)=>pjIL(nome.replace(/\s*\/.*$/,'').trim()+' '+(i+1),m,ex,t))),rep:n});
+// ramais (ativável — pode ser só reforço de rede, sem ramais — e replicável)
+const pjRamal=(i,esc,ass,lig,os,hd)=>pjG('Ramal '+i,[pjP('Escavação',esc),pjP('Assentamento',ass),pjP('Ligação à rede',lig),pjR('OS SIGOS',os),pjR('Hidrômetro',hd)]);
+const pjRamais=(kids)=>({...pjG('Ramais',kids),rep:kids.length,ativo:true});
+// peças/acessórios: bloco replicável (adiciona itens conforme necessidade), como o ramal
+const pjPeca=(i,inst,espec)=>pjG('Peça/acessório '+i,[pjP('Instalação',inst),pjR('Especificação',espec)]);
+const pjPecas=(kids)=>({...pjG('Peças e acessórios (registros, ventosas, descargas)',kids),rep:kids.length,ativo:true});
 const PJ_IVS=[
  {id:'iv1',tipo:'macro_impl',cod:'PRJ-2026-014',local:'DMC Contagem — Bairro Cincão',cons:'Águas Integradas',resp:'Equipe A · João R.',ini:'12/09/2026',status:'run',pt:[26,22],
   arv:[pjP('Locação e cadastro de interferências',100),
@@ -1175,16 +1181,17 @@ const PJ_IVS=[
  {id:'iv5',tipo:'rede_vca',cod:'PRJ-2026-003',local:'Rede VCA — Contagem, Av. Apio Cardoso',cons:'Águas Integradas',resp:'Equipe D · Sérgio M.',ini:'01/09/2026',status:'run',ln:[[15,33],[27,37],[39,33]],
   arv:[pjP('Locação e topografia do traçado',100),pjP('Sinalização e segurança da obra',100),pjP('Escavação de vala',70),
    pjM('Assentamento de tubulação (rede)',320,330),pjP('Reaterro compactado',55),pjP('Recomposição de pavimento',20),
-   pjP('Peças e acessórios (registros, ventosas, descargas)',40),
-   {...pjG('Ramais',[pjG('Ramal 1',[pjP('Escavação',100),pjP('Assentamento',100),pjP('Ligação à rede',100),pjR('OS SIGOS','41-2026-8892'),pjR('Hidrômetro','Y24A-00771')]),
-                  pjG('Ramal 2',[pjP('Escavação',100),pjP('Assentamento',70),pjP('Ligação à rede',0),pjR('OS SIGOS','41-2026-8940'),pjR('Hidrômetro','—')]),
-                  pjG('Ramal 3',[pjP('Escavação',20),pjP('Assentamento',0),pjP('Ligação à rede',0),pjR('OS SIGOS','—'),pjR('Hidrômetro','—')])]),rep:3},
+   pjPecas([pjPeca(1,60,'Registro DN150'),pjPeca(2,20,'Ventosa DN50'),pjPeca(3,0,'Descarga DN100')]),
+   pjRamais([pjRamal(1,100,100,100,'41-2026-8892','Y24A-00771'),
+             pjRamal(2,100,70,0,'41-2026-8940','—'),
+             pjRamal(3,20,0,0,'—','—')]),
    pjILrep('Interligação (tronco)',2,60,30,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]},
  {id:'iv6',tipo:'rede_hdd',cod:'PRJ-2026-018',local:'Rede HDD — Betim, travessia Av. Juscelino',cons:'Eficiência Hídrica',resp:'Equipe E · HDD Sul',ini:'05/09/2026',status:'run',ln:[[56,52],[64,54],[71,49]],
   arv:[pjP('Locação e cadastro de interferências',100),
    pjG('Cova',[pjG('Cova de entrada',pjOc(100,100,100,80)),pjG('Cova de saída',pjOc(100,80,0,0))]),
    pjM('Perfuração piloto (pilot bore)',180,180),pjM('Alargamento (reaming)',180,190),
    pjG('Tubulação: fusão + puxamento',[pjP('Solda / fusão das juntas',90),pjM('Puxamento (pullback)',180,96)]),
+   pjRamais([pjRamal(1,100,60,0,'41-2026-9012','—'),pjRamal(2,0,0,0,'—','—')]),
    pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]}
 ];
 function pjPct(node){
