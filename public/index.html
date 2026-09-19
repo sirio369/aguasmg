@@ -145,7 +145,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjnode.g{border-top:2px solid var(--line)}
 .pjtree>.pjnode:first-child{border-top:none}
 .pjnrow{display:flex;align-items:center;gap:10px;padding:11px 2px;cursor:pointer}
-.pjnode.g>.pjnrow{background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 5%,transparent),transparent)}
 .pjnrow .tw{width:15px;text-align:center;color:var(--mut);font-size:11px;flex:0 0 auto}
 .pjnn{flex:1;min-width:0;font-size:14px;line-height:1.3}
 .pjnode.g>.pjnrow .pjnn{font-weight:600}
@@ -1371,6 +1370,12 @@ function pjRel(id){
   const measLeaves=iv.arv.flatMap(n=>pjLeaves(n));
   const advHtml=measLeaves.map(l=>{const H=pjLeafHist(l),pp=pjPct(l),isM=l.k==='m';
     return `<div class="pjadvg"><div class="h"><span>${l.n}</span><span class="pjnp ${pp>100?'ov':(pp>=100?'dn':'')}" style="width:auto">${pp}%${isM?` · ${l.exec}/${l.meta} ${l.un}`:''}</span></div>${H.ents.length?H.ents.map(e=>`<div class="pjadv"><div class="pjthumb">📷</div><div class="ai"><div><b>${e.d}</b> <span class="delta">${e.delta}</span></div><div class="d">acumulado ${e.acc}${e.obs?` · "${e.obs}"`:''}</div></div></div>`).join(''):'<div class="pjhint" style="margin-top:5px">Sem lançamentos ainda.</div>'}</div>`;}).join('');
+  // ordem de envio: feed cronológico de todos os avanços (mais recente primeiro), independente da sequência lógica
+  const feed=[]; measLeaves.forEach(l=>pjLeafHist(l).ents.forEach(e=>feed.push({nome:l.n,e})));
+  feed.sort((a,b)=>ddmm(b.e.d)-ddmm(a.e.d));
+  const feedHtml=feed.length
+    ? `<div class="pjadvg">${feed.map(f=>`<div class="pjadv"><div class="pjthumb">📷</div><div class="ai"><div><b>${f.e.d}</b> <span class="delta">${f.e.delta}</span> · <span style="color:var(--mut)">${f.nome}</span></div><div class="d">acumulado ${f.e.acc}${f.e.obs?` · "${f.e.obs}"`:''}</div></div></div>`).join('')}</div>`
+    : '<div class="pjadvg"><div class="pjhint">Sem lançamentos ainda.</div></div>';
   $('#pjRel').innerHTML=`<div class="pjreltop"><div class="k">Relatório consolidado da intervenção</div><h2>${iv.local}</h2><div class="s">${iv.cod} · ${t.n} · ${iv.cons} · ${iv.resp}</div><div class="s">início ${iv.ini}${iv.fim?` · concluído ${iv.fim}`:' · em andamento'}</div></div>
    <div class="sec">📎 Documentos</div>
    ${docsHtml}
@@ -1380,8 +1385,10 @@ function pjRel(id){
    <div class="pjgantt">${gantHtml}</div>
    <div class="pjgaxis">${axis}</div>
    <div class="sec">📈 Avanços por atividade · subatividade</div>
-   <p class="pjhint" style="margin:2px 0 8px">Cada subatividade lista os lançamentos diários com foto e observação.</p>
-   ${advHtml}
+   <div class="pjseg" id="pjAdvSeg" style="margin:4px 0 8px"><button data-adv="logica" class="sel">🧭 Sequência lógica</button><button data-adv="envio">🕑 Ordem de envio</button></div>
+   <p class="pjhint" id="pjAdvHint" style="margin:0 0 8px">Ordem prevista de execução (atividade › subatividade), com os lançamentos diários de cada uma.</p>
+   <div id="pjAdvLogica">${advHtml}</div>
+   <div id="pjAdvEnvio" hidden>${feedHtml}</div>
    <div class="sec">📎 Anexos no PDF final</div>
    <p class="pjhint">O PDF sai como <b>documento único</b>: capa + mini-Gantt + avanços com fotos diárias + <b>projeto executivo, licença, alvará</b> e <b>as-built</b> anexados no final.</p>
    <button class="btn" onclick="toast('Gerar PDF — na versão integrada monta o documento completo')">🖨️ Gerar PDF consolidado</button>`;
@@ -1389,6 +1396,7 @@ function pjRel(id){
   rr.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>pjOpenPdf(b.getAttribute('data-pdf')));
   rr.querySelectorAll('[data-attach]').forEach(b=>{ if(!b.disabled) b.onclick=()=>toast('Anexar PDF — na versão integrada abre arquivos/galeria'); });
   rr.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>toast('Remover documento — na versão integrada exclui o arquivo (só adm/aprovador)'));
+  rr.querySelectorAll('#pjAdvSeg button').forEach(b=>b.onclick=()=>{ const v=b.dataset.adv; rr.querySelectorAll('#pjAdvSeg button').forEach(x=>x.classList.toggle('sel',x===b)); document.getElementById('pjAdvLogica').hidden=v!=='logica'; document.getElementById('pjAdvEnvio').hidden=v!=='envio'; document.getElementById('pjAdvHint').textContent=v==='logica'?'Ordem prevista de execução (atividade › subatividade), com os lançamentos diários de cada uma.':'Todos os avanços na ordem em que foram enviados (mais recente primeiro), independente da sequência lógica.'; });
   irPara('projeto_rel'); window.scrollTo(0,0);
 }
 

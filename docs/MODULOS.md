@@ -1687,8 +1687,11 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     cada um com **Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba), **Anexar** e
     **Remover** (só adm/aprovador: `ME.is_admin||ME.pode_aprovar`). **mini-Gantt** (`pjRel()`) — cada barra vai
     do **1º ao último avanço** da atividade (datas reais de `pjLeafHist`; eixo min→méd→máx); atividade sem
-    avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação. **PDF consolidado**
+    avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação, com toggle de
+    ordenação (`#pjAdvSeg`): **Sequência lógica** (árvore atividade›subatividade) × **Ordem de envio** (feed
+    cronológico de todos os lançamentos, mais recente primeiro, fora da sequência). **PDF consolidado**
     = documento único (capa + Gantt + avanços + projeto/licença/alvará/as-built no fim).
+    (Sem gradientes nos cards de atividade — removidos a pedido.)
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
   `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil), `pjIL` (interligação), `pjILrep`
   (container replicável). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
