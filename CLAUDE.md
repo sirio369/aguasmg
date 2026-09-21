@@ -355,23 +355,30 @@ Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Vol
 direto do hub deve ser `irPara('frota')`, nunca `='home'`.
 
 **Gestão de Pessoas** (`pessoas`, schema `14 - pessoas`) — Fase 1: fluxo de candidato em
-contratação até a ativação. RH cadastra o candidato (`app_pessoas_candidato_cadastrar`) → um
-aprovador fixo de RH (flag `perfil.pessoas_admin`, mesmo molde de `frota_admin`) aprova/reprova
-(`app_pessoas_candidato_aprovar`) → o gestor (`candidato.gestor_uuid`) preenche área/empresa
-(`app_pessoas_candidato_area_salvar`) → RH gera a carta proposta e depois anexa o PDF assinado
-fora do sistema (`app_pessoas_carta_gerar`/`app_pessoas_carta_anexar`/
-`app_pessoas_candidato_marcar_assinado`) → RH ativa no primeiro dia, vinculando a um `perfil` já
-existente (dropdown, o módulo **não cria conta nova**) e gravando CPF/matrícula/admissão/tamanhos
-de uniforme (`app_pessoas_candidato_ativar` — também atualiza `public.perfil`, fonte única de
-verdade dessas colunas pro resto do app; um `perfil` só liga a um `candidato` por vez, índice único
-parcial). Notificação/trigger segue o invariante §0.9: trigger `"14 - pessoas".trg_candidato()`
-(nunca chamado inline), cobrindo INSERT (avisa RH) e as transições de UPDATE pra
-`aguardando_area`/`proposta_pendente` (avisa RH de novo)/`ativo` (avisa o gestor). RH também
-**desliga** colaboradores pela tela Colaboradores (`app_pessoas_colaborador_desligar` — zera
-`perfil.ativo`, grava `demissao` + histórico em `"14 - pessoas".desligamento`) — a gestão de
-pessoas do dia a dia (admissão e desligamento) passa a ser sempre por este módulo, não mais só por
-edição direta de planilha/banco. Acesso de RH é concedido pela engrenagem ⚙️ do próprio hub
-(admin-only), igual Frotas. Painel de headcount/orçamento por área fica para uma Fase 2. Detalhe em
+contratação até a ativação, com aprovação de vaga restrita a uma lista fechada de gestores por
+área (`"14 - pessoas".area_aprovador`, ~18 áreas → 6 pessoas, mantida por SQL direto). RH cadastra
+o candidato escolhendo o gestor da área na lista fechada (`app_pessoas_candidato_cadastrar`,
+`p_gestor_uuid` validado contra `area_aprovador`) → **só esse gestor mapeado** (ou `funcao='admin'`
+como override) aprova/reprova **e** preenche área/empresa/projeto/custo numa única RPC
+(`app_pessoas_candidato_aprovar`, gate `candidato.gestor_uuid=auth.uid() or funcao='admin'`) → RH
+gera a carta proposta e depois anexa o PDF assinado fora do sistema
+(`app_pessoas_carta_gerar`/`app_pessoas_carta_anexar`/`app_pessoas_candidato_marcar_assinado`) → RH
+ativa no primeiro dia, vinculando a um `perfil` já existente (dropdown, o módulo **não cria conta
+nova**) e gravando CPF/matrícula/admissão/tamanhos de uniforme (`app_pessoas_candidato_ativar` —
+também atualiza `public.perfil`, fonte única de verdade dessas colunas pro resto do app; um
+`perfil` só liga a um `candidato` por vez, índice único parcial). Dados confidenciais do candidato
+(CPF/endereço/formação/salário/motivo de reprovação) só aparecem pro gestor mapeado da vaga +
+RH/admin, nunca pro par genérico `aprovador_uuid`/`aprovador2_uuid` de `perfil` — esse par só entra
+depois que o colaborador já está `ativo`, e só vê campos simples (nome/área/empresa/admissão) via
+`app_pessoas_meus_colaboradores`. Notificação/trigger segue o invariante §0.9: trigger
+`"14 - pessoas".trg_candidato()` (nunca chamado inline), cobrindo INSERT (avisa só o gestor
+mapeado) e as transições de UPDATE pra `proposta_pendente` (avisa RH) e `ativo` (avisa o gestor **e**
+o aprovador1/2 do `perfil` ativado, "novo colaborador"). RH também **desliga** colaboradores pela
+tela Colaboradores (`app_pessoas_colaborador_desligar` — zera `perfil.ativo`, grava `demissao` +
+histórico em `"14 - pessoas".desligamento`) — a gestão de pessoas do dia a dia (admissão e
+desligamento) passa a ser sempre por este módulo, não mais só por edição direta de planilha/banco.
+Acesso de RH é concedido pela engrenagem ⚙️ do próprio hub (admin-only), igual Frotas. Painel de
+headcount/orçamento por área fica para uma Fase 2. Detalhe em
 `docs/MODULOS.md §12`.
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
