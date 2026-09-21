@@ -363,10 +363,16 @@ fora do sistema (`app_pessoas_carta_gerar`/`app_pessoas_carta_anexar`/
 `app_pessoas_candidato_marcar_assinado`) → RH ativa no primeiro dia, vinculando a um `perfil` já
 existente (dropdown, o módulo **não cria conta nova**) e gravando CPF/matrícula/admissão/tamanhos
 de uniforme (`app_pessoas_candidato_ativar` — também atualiza `public.perfil`, fonte única de
-verdade dessas colunas pro resto do app). Notificação/trigger segue o invariante §0.9: trigger
-`"13 - pessoas".trg_candidato()` (nunca chamado inline), cobrindo INSERT (avisa RH) e as
-transições de UPDATE pra `aguardando_area`/`ativo` (avisa o gestor). Painel de headcount/orçamento
-por área fica para uma Fase 2. Detalhe em `docs/MODULOS.md §13`.
+verdade dessas colunas pro resto do app; um `perfil` só liga a um `candidato` por vez, índice único
+parcial). Notificação/trigger segue o invariante §0.9: trigger `"14 - pessoas".trg_candidato()`
+(nunca chamado inline), cobrindo INSERT (avisa RH) e as transições de UPDATE pra
+`aguardando_area`/`proposta_pendente` (avisa RH de novo)/`ativo` (avisa o gestor). RH também
+**desliga** colaboradores pela tela Colaboradores (`app_pessoas_colaborador_desligar` — zera
+`perfil.ativo`, grava `demissao` + histórico em `"14 - pessoas".desligamento`) — a gestão de
+pessoas do dia a dia (admissão e desligamento) passa a ser sempre por este módulo, não mais só por
+edição direta de planilha/banco. Acesso de RH é concedido pela engrenagem ⚙️ do próprio hub
+(admin-only), igual Frotas. Painel de headcount/orçamento por área fica para uma Fase 2. Detalhe em
+`docs/MODULOS.md §12`.
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 

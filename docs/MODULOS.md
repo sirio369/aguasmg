@@ -1741,31 +1741,51 @@ produzido por nenhuma RPC nesta fase).
   checklist de setup (`app_pessoas_checklist_setup_salvar` — celular/notebook (se área
   indireta)/EPIs/usuário AcquaHub, todos **desmarcados por padrão**, mesmo padrão do checklist
   diário de Frotas — colunas booleanas individuais, sem jsonb).
-- **Ativação não cria conta nova.** O RH escolhe, num `<select>`, um `perfil` **já existente**
-  (`app_pessoas_usuarios_listar`) — mesmo padrão "campo e-mail do colaborador virou dropdown de
-  nome" já usado em Frotas. `app_pessoas_candidato_ativar` grava `candidato_admissao` (tamanhos de
-  uniforme + matrícula + data de admissão) **e também atualiza `public.perfil`**
-  (`cpf`/`matricula`/`admissao`/`codigo_area`/`area`/`frente_empresa`/`projeto`/
-  `custo_direto_indireto`/`cargo_id`/`ativo=true`) — essas colunas já existem em `perfil` (usadas
-  pela planilha de usuários e por Frotas) e continuam com fonte única de verdade ali, não duplicada
-  em Pessoas.
+- **Ativação não cria conta nova.** O RH escolhe, num `<select>`, um `perfil` existente
+  (`app_pessoas_usuarios_listar(p_apenas_ativos)` — `true` no cadastro/gestor, `false` na ativação,
+  pra permitir vincular a um `perfil` já `ativo=false`, ex.: recontratação). `app_pessoas_candidato_ativar`
+  grava `candidato_admissao` (tamanhos de uniforme + matrícula + data de admissão) **e também
+  atualiza `public.perfil`** (`cpf`/`matricula`/`admissao`/`codigo_area`/`area`/`frente_empresa`/
+  `projeto`/`custo_direto_indireto`/`cargo_id`/`ativo=true`) — essas colunas já existem em `perfil`
+  (usadas pela planilha de usuários e por Frotas) e continuam com fonte única de verdade ali, não
+  duplicada em Pessoas. **Um `perfil` só pode estar vinculado a um `candidato` por vez** — índice
+  único parcial `candidato_perfil_id_uk` (`where perfil_id is not null`) + checagem amigável na RPC,
+  e a `UPDATE` final de `candidato` re-checa `status='proposta_assinada'` (com as outras RPCs de
+  transição de status — `area_salvar` incluída — todas fazendo o mesmo: status guard **na própria
+  `UPDATE`**, não só numa `SELECT` anterior, pra fechar corrida de duplo clique/dupla aprovação).
 - **Notificação** segue o invariante §0.9, nunca chamada inline nas RPCs: trigger
   `"14 - pessoas".trg_candidato()` `AFTER INSERT OR UPDATE on candidato` — cobre **INSERT** (avisa
   o grupo `pessoas_admin`/admin, `link='pessoas_candidato'`) e as transições de **UPDATE** pra
-  `aguardando_area` (avisa o gestor, `link='pessoas_area'`) e `ativo` (avisa o gestor,
+  `aguardando_area` (avisa o gestor, `link='pessoas_area'`), `proposta_pendente` (avisa o grupo
+  `pessoas_admin`/admin de novo — área preenchida, hora de gerar a carta) e `ativo` (avisa o gestor,
   `link='pessoas_checklist'`) — mesmo cuidado já documentado em Frotas de cobrir os dois `TG_OP`,
   não só `UPDATE`.
 - **Cargo do candidato** vem de `sup_cargos_ativos()` (schema `9 - suprimentos`, mesma RPC já usada
   em Suprimentos) — reaproveitada, não duplicada.
+- **Desligamento** (`app_pessoas_colaborador_desligar(p_perfil_id, p_data_demissao, p_motivo)`,
+  `pessoas_admin`/admin-only): tela **Colaboradores** (`app_pessoas_colaboradores_listar`, busca por
+  nome/e-mail sobre todo `perfil`, ativos e inativos) → abrir um colaborador ativo mostra o form de
+  desligamento. Grava histórico em `"14 - pessoas".desligamento` (append-only, 1 linha por evento —
+  permite recontratação futura sem perder o registro) e espelha o estado atual em
+  `public.perfil.ativo=false`/`demissao=p_data_demissao`, mesma fonte única de verdade da ativação.
+  Sem trigger de notificação nesta fase (RH é quem inicia e confirma na hora).
 - **Tabelas:** `candidato` (dados pessoais + CPF/endereço + status + campos da carta proposta),
-  `candidato_admissao` (1:1, tamanhos de uniforme/matrícula/data de admissão), `colaborador_checklist_setup`
-  (1:1, checklist de setup). RLS ligada, `revoke all` de `anon`/`authenticated` — acesso só via RPC
+  `candidato_admissao` (1:1, tamanhos de uniforme/matrícula/data de admissão),
+  `colaborador_checklist_setup` (1:1, checklist de setup), `desligamento` (histórico, N:1 por
+  `perfil_id`). RLS ligada, `revoke all` de `anon`/`authenticated` — acesso só via RPC
   `SECURITY DEFINER`, mesmo padrão dos outros schemas app-only (`9`/`10`/`11`/`12`).
 - **`app_me()`** ganhou `pessoas_admin` no retorno (igual `frota_admin`).
+- **Acesso de RH** (`perfil.pessoas_admin`) é concedido pela engrenagem ⚙️ na seção RH do hub
+  (admin-only) — `pessoasRenderAdminGate`/`pessoasAdmRender`, `app_pessoas_admin_listar`/
+  `app_pessoas_admin_set` — mesmo molde de `frotaAdminGate`/`app_frota_admin_*`. `funcao='admin'`
+  sempre tem acesso (`acesso_pelo_cargo`, checkbox travado), assim como em Frotas.
 - **Cuidados:** o schema é `14`, não `13` — `13 - projetos_obra` já está reservado no roteiro do
   módulo Projetos (§8, ainda não criado) e não podia ser reaproveitado. `SCREENS` ganhou `'pessoas'`
   + `if(id==='pessoas') pessoasInit()` em `irPara()`; roteamento das notificações em `supGoAct`
-  (`pessoas_candidato`/`pessoas_area`/`pessoas_checklist`).
+  (`pessoas_candidato`/`pessoas_area`/`pessoas_checklist`). O upload de anexo da carta proposta
+  (`FOTO2_BLOBS.peCartaAnexo`, via `uploadFoto2`/`fotoPickHtml`) é resetado a cada render da tela de
+  detalhe do candidato — sem isso, o blob em memória de um candidato anterior poderia vazar e ser
+  anexado ao candidato errado se o RH não escolher um arquivo novo.
 - **Próximo passo (Fase 2):** tabela de orçamento mensal por vaga (código de área/função/setor/
   modalidade/projeto/custo/headcount por mês — fonte é uma planilha de orçamento existente fora do
   app) + painel do gestor comparando contratados (via `perfil.ativo`+`area`) × orçado × em
