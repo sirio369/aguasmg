@@ -284,6 +284,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
+      <button class="mod" data-go="pessoas"><div class="ic">👥</div><div class="nm">Gestão de Pessoas</div></button>
     </div>
   </main>
 
@@ -726,6 +727,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="frotasView"></div>
   </main>
 
+  <main id="pessoas" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Gestão de Pessoas</b></div>
+    <div id="pessoasView"></div>
+  </main>
+
   <main id="notificacoes" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Avisos</b><button id="ntfMarcar" class="hidden" style="all:unset;margin-left:auto;cursor:pointer;font-size:12px;color:var(--acc);padding:4px 6px">marcar todas lidas</button></div>
     <div id="ntfPush" style="padding:0 2px 10px"></div>
@@ -1090,7 +1096,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_det','projeto_rel'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_det','projeto_rel','pessoas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1119,6 +1125,7 @@ function irPara(id){
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='projetos') pjInit();
+  if(id==='pessoas') pessoasInit();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
@@ -7143,7 +7150,302 @@ async function ntfInit(){
   }catch(e){ $('#ntfView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 async function ntfMarcarTodas(){ try{ await sb.rpc('app_notif_marcar_lidas',{}); }catch(e){} toast('✓ Avisos marcados como lidos'); ntfBadge(); ntfInit(); }
+
+// ---------- MÓDULO GESTÃO DE PESSOAS ----------
+let pessoasSub='home', pessoasTarget=null, pessoasCandidatos=[], pessoasMeus=[], pessoasCandSel=null,
+  pessoasUsuarios=[], pessoasCargos=[], pessoasViewGestor=false;
+const PESSOAS_STATUS_LABEL={
+  em_aprovacao_rh:{l:'Em aprovação (RH)',bg:'--warn-bg',fg:'--warn'},
+  reprovado:{l:'Reprovado',bg:'--bad-bg',fg:'--bad'},
+  aguardando_area:{l:'Aguardando área (gestor)',bg:'--warn-bg',fg:'--warn'},
+  proposta_pendente:{l:'Proposta pendente',bg:'--warn-bg',fg:'--warn'},
+  proposta_assinada:{l:'Proposta assinada — pronto p/ ativar',bg:'--ok-bg',fg:'--ok'},
+  ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},
+  cancelado:{l:'Cancelado',bg:'--line',fg:'--mut'}
+};
+async function pessoasInit(){
+  if(!ME){ try{ const {data}=await sb.rpc('app_me'); if(data) ME=data; }catch(e){} }
+  const tgt=pessoasTarget; pessoasTarget=null;
+  pessoasSub = tgt ? tgt.sub : 'home';
+  pessoasRender();
+}
+function pessoasBlocks(){
+  const rh=!!(ME&&(ME.pessoas_admin||ME.is_admin));
+  return [
+    {t:'RH',ic:'🗂️',on:rh,acts:[
+      {id:'rh_novo',ic:'➕',lbl:'Cadastrar candidato'},
+      {id:'rh_lista',ic:'📋',lbl:'Candidatos'}]},
+    {t:'Gestor',ic:'🖊️',on:true,acts:[
+      {id:'minha_equipe',ic:'👥',lbl:'Minha equipe'}]}
+  ];
+}
+function pessoasHome(){
+  pessoasSub='home';
+  const blocks=pessoasBlocks();
+  $('#pessoasView').innerHTML='<h1 style="margin-bottom:2px">Gestão de Pessoas</h1><p class="sub">Escolha uma ação</p>'+
+    blocks.filter(b=>b.on).map(b=>'<div class="sec" style="margin-top:16px">'+b.ic+' '+b.t+'</div><div class="grid" style="margin-top:10px">'+
+      b.acts.map(a=>'<button class="mod" data-pact="'+a.id+'"><div class="ic">'+a.ic+'</div><div class="nm">'+a.lbl+'</div></button>').join('')+
+    '</div>').join('');
+  $('#pessoasView').querySelectorAll('[data-pact]').forEach(el=>el.addEventListener('click',()=>pessoasOpen(el.dataset.pact)));
+}
+function pessoasOpen(id){
+  if(id==='rh_novo'){ pessoasSub='rh_novo'; pessoasRenderCandidatoNovo(); return; }
+  if(id==='rh_lista'){ pessoasSub='rh_lista'; pessoasRenderRhLista(); return; }
+  if(id==='minha_equipe'){ pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe(); return; }
+}
+function pessoasRender(){
+  if(pessoasSub==='rh_novo') return pessoasRenderCandidatoNovo();
+  if(pessoasSub==='rh_lista') return pessoasRenderRhLista();
+  if(pessoasSub==='minha_equipe') return pessoasRenderMinhaEquipe();
+  if(pessoasSub==='candidato_det') return pessoasRenderCandidatoDet();
+  if(pessoasSub==='checklist') return pessoasRenderChecklist();
+  pessoasHome();
+}
+function pessoasEmitirCarta(c){
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio');
+  if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div>'+
+    '<div id="relDoc"><h2>Carta Proposta</h2>'+
+    '<p><b>Candidato:</b> '+(c.nome_completo||'')+'</p>'+
+    '<p><b>Cargo:</b> '+(c.cargo_proposto||'')+'</p>'+
+    '<p><b>Salário:</b> '+fmtDinheiro(c.salario)+'</p>'+
+    '<p><b>Data de início:</b> '+fmtData(c.data_inicio_proposta)+'</p>'+
+    '<p><b>Benefícios:</b> '+(c.beneficios||'—')+'</p></div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+async function pessoasRenderCandidatoNovo(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const [{data:cargos},{data:usuarios}] = await Promise.all([sb.rpc('sup_cargos_ativos'), sb.rpc('app_pessoas_usuarios_listar')]);
+    pessoasCargos=cargos||[]; pessoasUsuarios=usuarios||[];
+  }catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">➕ Cadastrar candidato</div>';
+  h+='<label>Nome completo *</label><input id="peNome"/>';
+  h+='<label>CPF *</label><input id="peCpf" inputmode="numeric"/>';
+  h+='<label>Função</label><select id="peCargo"><option value="">—</option>'+pessoasCargos.map(c=>'<option value="'+c.id+'">'+c.nome+'</option>').join('')+'</select>';
+  h+='<label>Formação</label><input id="peFormacao"/>';
+  h+='<label>Endereço — Rua</label><input id="peRua"/>';
+  h+='<div style="display:flex;gap:8px"><div style="flex:1"><label>Número</label><input id="peNumero"/></div><div style="flex:2"><label>Complemento</label><input id="peCompl"/></div></div>';
+  h+='<label>Bairro</label><input id="peBairro"/>';
+  h+='<div style="display:flex;gap:8px"><div style="flex:2"><label>Cidade</label><input id="peCidade"/></div><div style="flex:1"><label>UF</label><input id="peUf" maxlength="2"/></div></div>';
+  h+='<label>CEP</label><input id="peCep"/>';
+  h+='<label>Gênero</label><select id="peGenero"><option value="">—</option><option>MASCULINO</option><option>FEMININO</option></select>';
+  h+='<label>Modalidade *</label><select id="peModalidade"><option value="CLT">CLT</option><option value="PJ">PJ</option></select>';
+  h+='<label>Previsão de início</label><input id="pePrevisao" type="date"/>';
+  h+='<label>Gestor (quem vai preencher área/empresa) *</label><select id="peGestor"><option value="">—</option>'+pessoasUsuarios.map(u=>'<option value="'+u.id+'">'+(u.nome||u.email)+'</option>').join('')+'</select>';
+  h+='<button class="btn" id="peSalvar" style="margin-top:14px">Enviar para aprovação</button>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#peSalvar').addEventListener('click',async()=>{
+    const nome=$('#peNome').value.trim(), cpf=$('#peCpf').value.trim(), gestor=$('#peGestor').value;
+    if(!nome||!cpf) return toast('Preencha nome e CPF');
+    if(!gestor) return toast('Selecione o gestor');
+    $('#peSalvar').disabled=true;
+    try{
+      const {error}=await sb.rpc('app_pessoas_candidato_cadastrar',{
+        p_id:null, p_nome_completo:nome, p_cpf:cpf, p_cargo_id:$('#peCargo').value||null, p_formacao:$('#peFormacao').value||null,
+        p_endereco_rua:$('#peRua').value||null, p_endereco_numero:$('#peNumero').value||null, p_endereco_complemento:$('#peCompl').value||null,
+        p_endereco_bairro:$('#peBairro').value||null, p_endereco_cidade:$('#peCidade').value||null, p_endereco_uf:$('#peUf').value||null,
+        p_endereco_cep:$('#peCep').value||null, p_genero:$('#peGenero').value||null, p_modalidade:$('#peModalidade').value,
+        p_previsao_inicio:$('#pePrevisao').value||null, p_gestor_uuid:gestor
+      });
+      if(error) throw error;
+      toast('✓ Candidato cadastrado — enviado para aprovação');
+      pessoasSub='rh_lista'; pessoasRenderRhLista();
+    }catch(e){ toast('Erro: '+(e.message||e)); $('#peSalvar').disabled=false; }
+  });
+}
+async function pessoasRenderRhLista(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pessoas_candidatos_listar',{p_status:null}); if(error) throw error; pessoasCandidatos=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📋 Candidatos</div>';
+  h+=pessoasCandidatos.length ? pessoasCandidatos.map(c=>
+    '<div class="peRow" data-id="'+c.id+'" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+c.nome_completo+'</b>'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>'+
+      '<div class="sub" style="margin-top:2px">'+(c.cargo||'—')+' · gestor: '+(c.gestor||'—')+'</div></div>'
+  ).join('') : '<p class="sub" style="margin-top:10px">Nenhum candidato cadastrado.</p>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#pessoasView').querySelectorAll('.peRow').forEach(el=>el.addEventListener('click',()=>{ pessoasCandSel=el.dataset.id; pessoasViewGestor=false; pessoasSub='candidato_det'; pessoasRenderCandidatoDet(); }));
+}
+async function pessoasRenderMinhaEquipe(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pessoas_meus_candidatos'); if(error) throw error; pessoasMeus=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">👥 Minha equipe</div>';
+  h+=pessoasMeus.length ? pessoasMeus.map(c=>{
+    const pend = c.status==='ativo' && !c.tem_checklist;
+    return '<div class="peRow" data-id="'+c.id+'" data-checklist="'+(pend?'1':'0')+'" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+c.nome_completo+'</b>'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>'+
+      (pend?'<div class="sub" style="margin-top:2px;color:var(--warn)">Checklist de setup pendente</div>':'')+'</div>';
+  }).join('') : '<p class="sub" style="margin-top:10px">Nenhum candidato na sua equipe no momento.</p>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#pessoasView').querySelectorAll('.peRow').forEach(el=>el.addEventListener('click',()=>{
+    pessoasCandSel=el.dataset.id; pessoasViewGestor=true;
+    if(el.dataset.checklist==='1'){ pessoasSub='checklist'; pessoasRenderChecklist(); }
+    else { pessoasSub='candidato_det'; pessoasRenderCandidatoDet(); }
+  }));
+}
+async function pessoasRenderCandidatoDet(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  let c=null;
+  try{
+    if(pessoasViewGestor){ const {data,error}=await sb.rpc('app_pessoas_meus_candidatos'); if(error) throw error; c=(data||[]).find(x=>String(x.id)===String(pessoasCandSel)); }
+    else { const {data,error}=await sb.rpc('app_pessoas_candidatos_listar',{p_status:null}); if(error) throw error; c=(data||[]).find(x=>String(x.id)===String(pessoasCandSel)); }
+  }catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  const back=()=>{ pessoasSub=pessoasViewGestor?'minha_equipe':'rh_lista'; pessoasRender(); };
+  if(!c){ return back(); }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button>';
+  h+='<div class="sec">'+c.nome_completo+'</div><p class="sub" style="margin-top:2px">'+(c.cargo||'')+'</p>';
+  h+='<div style="margin-top:8px">'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>';
+  if(c.motivo_reprovacao) h+='<p class="sub" style="margin-top:8px;color:var(--bad)">Motivo: '+c.motivo_reprovacao+'</p>';
+
+  if(c.status==='em_aprovacao_rh' && !pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Aprovação</div>';
+    h+='<label>Motivo (se reprovar)</label><textarea id="peMotivo" rows="2"></textarea>';
+    h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="peAprovar" style="flex:1">✓ Aprovar</button><button class="btn ghost" id="peReprovar" style="flex:1">✕ Reprovar</button></div>';
+  }
+  if(c.status==='aguardando_area' && pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Preencher área/empresa</div>';
+    h+='<label>Código da área</label><input id="peCodArea"/>';
+    h+='<label>Área</label><input id="peArea"/>';
+    h+='<label>Frente (empresa)</label><select id="peFrente"><option value="">—</option><option>ÁGUAS INTEGRADAS</option><option>EFICIÊNCIA HÍDRICA</option></select>';
+    h+='<label>Projeto</label><select id="peProjeto"><option value="">—</option><option>Contagem</option><option>Betim</option><option>Ambos</option></select>';
+    h+='<label>Custo</label><select id="peCusto"><option value="">—</option><option>Direto</option><option>Indireto</option></select>';
+    h+='<button class="btn" id="peSalvarArea" style="margin-top:14px">Salvar</button>';
+  }
+  if(c.status==='aguardando_area' && !pessoasViewGestor){
+    h+='<p class="sub" style="margin-top:16px">Aguardando o gestor ('+(c.gestor||'—')+') preencher área/empresa.</p>';
+  }
+  if(c.status==='proposta_pendente' && !pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Carta proposta</div>';
+    if(!c.carta_proposta_gerada_em){
+      h+='<label>Cargo</label><input id="peCargoProp"/>';
+      h+='<label>Salário</label><input id="peSalario" inputmode="decimal"/>';
+      h+='<label>Data de início</label><input id="peDataInicio" type="date"/>';
+      h+='<label>Benefícios</label><textarea id="peBeneficios" rows="3"></textarea>';
+      h+='<button class="btn" id="peGerarCarta" style="margin-top:14px">Gerar carta</button>';
+    } else if(!c.carta_proposta_anexo_path){
+      h+='<p class="sub">Carta gerada. Pré-visualize, imprima/assine fora do sistema e anexe o arquivo final abaixo.</p>';
+      h+='<button class="btn ghost" id="peVerCarta" style="margin-bottom:10px">👁️ Ver carta</button>';
+      h+=fotoPickHtml('peCartaAnexo','Anexar carta proposta assinada (PDF)',{pdf:true});
+      h+='<button class="btn" id="peAnexarCarta" style="margin-top:14px">Anexar</button>';
+    } else {
+      h+='<p class="sub">Carta anexada.</p><button class="btn" id="peMarcarAssinado" style="margin-top:6px">✓ Marcar como assinada</button>';
+    }
+  }
+  if(c.status==='proposta_pendente' && pessoasViewGestor){
+    h+='<p class="sub" style="margin-top:16px">Aguardando RH gerar/anexar a carta proposta.</p>';
+  }
+  if(c.status==='proposta_assinada' && !pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Ativar — primeiro dia</div>';
+    h+='<label>Vincular a usuário do AcquaHub *</label><select id="peUsuario"><option value="">—</option></select>';
+    h+='<label>CPF *</label><input id="peCpfAtiv" value="'+(c.cpf||'')+'"/>';
+    h+='<label>Matrícula</label><input id="peMatricula"/>';
+    h+='<label>Data de admissão *</label><input id="peDataAdmissao" type="date"/>';
+    h+='<label>Tamanho da bota</label><input id="peBota"/>';
+    h+='<label>Tamanho da calça</label><input id="peCalca"/>';
+    h+='<label>Tamanho da camiseta</label><input id="peCamiseta"/>';
+    h+='<button class="btn" id="peAtivar" style="margin-top:14px">Ativar</button>';
+  }
+  if(c.status==='ativo'){
+    h+='<p class="sub" style="margin-top:16px">Colaborador ativo.</p>';
+    if(pessoasViewGestor && !c.tem_checklist){
+      h+='<button class="btn" id="peIrChecklist" style="margin-top:8px">Preencher checklist de setup</button>';
+    }
+  }
+  $('#pessoasView').innerHTML=h;
+  wireFotoPick($('#pessoasView'));
+  $('#peVoltar').addEventListener('click',back);
+
+  const av=$('#peAprovar'); if(av) av.addEventListener('click',async()=>{
+    av.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_aprovar',{p_candidato_id:c.id,p_aprovado:true,p_motivo_reprovacao:null}); if(error) throw error;
+      toast('✓ Aprovado'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); av.disabled=false; }
+  });
+  const rp=$('#peReprovar'); if(rp) rp.addEventListener('click',async()=>{
+    rp.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_aprovar',{p_candidato_id:c.id,p_aprovado:false,p_motivo_reprovacao:($('#peMotivo').value||null)}); if(error) throw error;
+      toast('Reprovado'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); rp.disabled=false; }
+  });
+  const sa=$('#peSalvarArea'); if(sa) sa.addEventListener('click',async()=>{
+    sa.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_area_salvar',{p_candidato_id:c.id,
+      p_codigo_area:$('#peCodArea').value||null, p_area:$('#peArea').value||null, p_frente_empresa:$('#peFrente').value||null,
+      p_projeto:$('#peProjeto').value||null, p_custo_direto_indireto:$('#peCusto').value||null}); if(error) throw error;
+      toast('✓ Salvo — RH foi avisado'); back();
+    }catch(e){ toast('Erro: '+(e.message||e)); sa.disabled=false; }
+  });
+  const gc=$('#peGerarCarta'); if(gc) gc.addEventListener('click',async()=>{
+    gc.disabled=true;
+    try{ const sal=parseFloat(($('#peSalario').value||'0').replace(',','.'));
+      const {error}=await sb.rpc('app_pessoas_carta_gerar',{p_candidato_id:c.id,
+        p_cargo_proposto:$('#peCargoProp').value||null, p_salario:isNaN(sal)?null:sal,
+        p_data_inicio_proposta:$('#peDataInicio').value||null, p_beneficios:$('#peBeneficios').value||null}); if(error) throw error;
+      toast('✓ Carta gerada'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); gc.disabled=false; }
+  });
+  const vc=$('#peVerCarta'); if(vc) vc.addEventListener('click',()=>pessoasEmitirCarta(c));
+  const ac=$('#peAnexarCarta'); if(ac) ac.addEventListener('click',async()=>{
+    ac.disabled=true;
+    try{ const path=await uploadFoto2('peCartaAnexo','pessoas');
+      if(!path) throw new Error('Anexe o arquivo da carta');
+      const {error}=await sb.rpc('app_pessoas_carta_anexar',{p_candidato_id:c.id,p_arquivo_path:path}); if(error) throw error;
+      toast('✓ Carta anexada'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); ac.disabled=false; }
+  });
+  const ma=$('#peMarcarAssinado'); if(ma) ma.addEventListener('click',async()=>{
+    ma.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_marcar_assinado',{p_candidato_id:c.id}); if(error) throw error;
+      toast('✓ Marcada como assinada'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); ma.disabled=false; }
+  });
+  const us=$('#peUsuario'); if(us){
+    try{ const {data,error}=await sb.rpc('app_pessoas_usuarios_listar'); if(error) throw error;
+      us.innerHTML='<option value="">—</option>'+(data||[]).map(u=>'<option value="'+u.id+'">'+(u.nome||u.email)+' ('+(u.email||'')+')</option>').join('');
+    }catch(e){}
+  }
+  const at=$('#peAtivar'); if(at) at.addEventListener('click',async()=>{
+    const perfilId=$('#peUsuario').value, cpf=$('#peCpfAtiv').value.trim(), dataAdm=$('#peDataAdmissao').value;
+    if(!perfilId) return toast('Selecione o usuário');
+    if(!cpf||!dataAdm) return toast('Preencha CPF e data de admissão');
+    at.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_ativar',{p_candidato_id:c.id,p_perfil_id:perfilId,p_cpf:cpf,
+      p_matricula:$('#peMatricula').value||null, p_data_admissao:dataAdm,
+      p_tamanho_bota:$('#peBota').value||null, p_tamanho_calca:$('#peCalca').value||null, p_tamanho_camiseta:$('#peCamiseta').value||null}); if(error) throw error;
+      toast('✓ Ativado — gestor foi avisado'); back();
+    }catch(e){ toast('Erro: '+(e.message||e)); at.disabled=false; }
+  });
+  const ic=$('#peIrChecklist'); if(ic) ic.addEventListener('click',()=>{ pessoasSub='checklist'; pessoasRenderChecklist(); });
+}
+function pessoasRenderChecklist(){
+  const items=[['peCkCelular','Celular'],['peCkNotebook','Notebook (se área indireta)'],['peCkEpis','EPIs'],['peCkUsuario','Usuário no AcquaHub']];
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">✅ Checklist de setup — novo funcionário</div>';
+  h+=items.map(([id,lbl])=>'<label style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px"><input type="checkbox" id="'+id+'" style="width:auto"/> <span>'+lbl+'</span></label>').join('');
+  h+='<label style="margin-top:10px">Observações</label><textarea id="peCkObs" rows="3"></textarea>';
+  h+='<button class="btn" id="peCkSalvar" style="margin-top:14px">Salvar</button>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',()=>{ pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe(); });
+  $('#peCkSalvar').addEventListener('click',async()=>{
+    $('#peCkSalvar').disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_checklist_setup_salvar',{p_candidato_id:pessoasCandSel,
+      p_celular_ok:$('#peCkCelular').checked, p_notebook_ok:$('#peCkNotebook').checked,
+      p_epis_ok:$('#peCkEpis').checked, p_usuario_acquahub_ok:$('#peCkUsuario').checked, p_observacoes:$('#peCkObs').value||null}); if(error) throw error;
+      toast('✓ Checklist salvo'); pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe();
+    }catch(e){ toast('Erro: '+(e.message||e)); $('#peCkSalvar').disabled=false; }
+  });
+}
+
 async function supGoAct(act){
+  if(act==='pessoas_candidato'){ pessoasTarget={sub:'rh_lista'}; irPara('pessoas'); return; }
+  if(act==='pessoas_area'||act==='pessoas_checklist'){ pessoasTarget={sub:'minha_equipe'}; irPara('pessoas'); return; }
   if(act==='condutor_aprovar'||act==='condutor_status'||act==='condutor_termo'||act==='frota_emprestimo'){ irPara('condutor'); return; }
   if(act==='frota_checklist'){ condTarget={sub:'situacao',act:'situacao'}; irPara('condutor'); return; }
   if(act==='frota_minhas_lavagens'){ condTarget={sub:'lavagem',act:'lavagem'}; irPara('condutor'); return; }

@@ -1711,3 +1711,62 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
   (OS SIGOS/hidrômetro), `documento` (projeto/licença/alvará/as-built). RPCs `app_proj_*`.
 - **Próximo passo:** modelar esse schema e trocar `PJ_IVS` por RPCs `app_proj_*`. Depois: resumo diário
   multi-intervenção.
+
+## 12. Gestão de Pessoas — schema `"14 - pessoas"` · tela-hub `pessoas`
+
+**Fase 1** (esta rodada): fluxo de candidato em contratação até a ativação. Orçamento/headcount
+por área (comparar contratados × previstos no orçamento × em contratação) fica para uma Fase 2 —
+não implementado ainda.
+
+**Ciclo de status** (`candidato.status`): `em_aprovacao_rh` → (RH aprova) → `aguardando_area` →
+(gestor preenche área/empresa) → `proposta_pendente` → (RH gera a carta, depois anexa o PDF
+assinado fora do sistema) → `proposta_assinada` → (RH ativa, vinculando a um `perfil` existente) →
+`ativo`. `reprovado` sai direto de `em_aprovacao_rh`; `cancelado` é reservado para uso futuro (não
+produzido por nenhuma RPC nesta fase).
+
+- **RH** (flag `perfil.pessoas_admin`, mesmo molde de `frota_admin` — **não** reaproveita o par
+  aprovador1/aprovador2 genérico do app, porque aqui quem aprova é RH, não o gestor direto da
+  pessoa; ligado/desligado por `app_pessoas_admin_set`, admin-only): cadastra o candidato
+  (`app_pessoas_candidato_cadastrar` — `p_id` null cria, preenchido atualiza só enquanto
+  `em_aprovacao_rh`), aprova/reprova (`app_pessoas_candidato_aprovar`), gera a carta proposta
+  (`app_pessoas_carta_gerar` — cargo/salário/data de início/benefícios, prévia via o mesmo overlay
+  `#relatorio`/`REL_CSS` usado nos outros relatórios do app, `pessoasEmitirCarta`), anexa o PDF
+  final assinado (`app_pessoas_carta_anexar`, upload via `uploadFoto2`/`fotoPickHtml(...,{pdf:true})`
+  — bucket `fotos-campo`, pasta `pessoas/`), marca como assinada
+  (`app_pessoas_candidato_marcar_assinado`) e ativa no primeiro dia
+  (`app_pessoas_candidato_ativar`).
+- **Gestor** (`candidato.gestor_uuid`, definido pelo RH no cadastro — **não** é o par
+  aprovador1/aprovador2): preenche área/empresa quando `aguardando_area`
+  (`app_pessoas_candidato_area_salvar`) e, depois que o colaborador está `ativo`, preenche o
+  checklist de setup (`app_pessoas_checklist_setup_salvar` — celular/notebook (se área
+  indireta)/EPIs/usuário AcquaHub, todos **desmarcados por padrão**, mesmo padrão do checklist
+  diário de Frotas — colunas booleanas individuais, sem jsonb).
+- **Ativação não cria conta nova.** O RH escolhe, num `<select>`, um `perfil` **já existente**
+  (`app_pessoas_usuarios_listar`) — mesmo padrão "campo e-mail do colaborador virou dropdown de
+  nome" já usado em Frotas. `app_pessoas_candidato_ativar` grava `candidato_admissao` (tamanhos de
+  uniforme + matrícula + data de admissão) **e também atualiza `public.perfil`**
+  (`cpf`/`matricula`/`admissao`/`codigo_area`/`area`/`frente_empresa`/`projeto`/
+  `custo_direto_indireto`/`cargo_id`/`ativo=true`) — essas colunas já existem em `perfil` (usadas
+  pela planilha de usuários e por Frotas) e continuam com fonte única de verdade ali, não duplicada
+  em Pessoas.
+- **Notificação** segue o invariante §0.9, nunca chamada inline nas RPCs: trigger
+  `"14 - pessoas".trg_candidato()` `AFTER INSERT OR UPDATE on candidato` — cobre **INSERT** (avisa
+  o grupo `pessoas_admin`/admin, `link='pessoas_candidato'`) e as transições de **UPDATE** pra
+  `aguardando_area` (avisa o gestor, `link='pessoas_area'`) e `ativo` (avisa o gestor,
+  `link='pessoas_checklist'`) — mesmo cuidado já documentado em Frotas de cobrir os dois `TG_OP`,
+  não só `UPDATE`.
+- **Cargo do candidato** vem de `sup_cargos_ativos()` (schema `9 - suprimentos`, mesma RPC já usada
+  em Suprimentos) — reaproveitada, não duplicada.
+- **Tabelas:** `candidato` (dados pessoais + CPF/endereço + status + campos da carta proposta),
+  `candidato_admissao` (1:1, tamanhos de uniforme/matrícula/data de admissão), `colaborador_checklist_setup`
+  (1:1, checklist de setup). RLS ligada, `revoke all` de `anon`/`authenticated` — acesso só via RPC
+  `SECURITY DEFINER`, mesmo padrão dos outros schemas app-only (`9`/`10`/`11`/`12`).
+- **`app_me()`** ganhou `pessoas_admin` no retorno (igual `frota_admin`).
+- **Cuidados:** o schema é `14`, não `13` — `13 - projetos_obra` já está reservado no roteiro do
+  módulo Projetos (§8, ainda não criado) e não podia ser reaproveitado. `SCREENS` ganhou `'pessoas'`
+  + `if(id==='pessoas') pessoasInit()` em `irPara()`; roteamento das notificações em `supGoAct`
+  (`pessoas_candidato`/`pessoas_area`/`pessoas_checklist`).
+- **Próximo passo (Fase 2):** tabela de orçamento mensal por vaga (código de área/função/setor/
+  modalidade/projeto/custo/headcount por mês — fonte é uma planilha de orçamento existente fora do
+  app) + painel do gestor comparando contratados (via `perfil.ativo`+`area`) × orçado × em
+  contratação (via `candidato.status`).

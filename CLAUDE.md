@@ -148,6 +148,7 @@ pwa/
 | `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
+| `14 - pessoas` | Gestão de Pessoas: candidatos em contratação (PII: CPF/endereço), admissão, checklist de setup do novo funcionário — *app-only* (`13 - projetos_obra` está reservado no roteiro do módulo Projetos, §8 do MODULOS.md, ainda não criado) |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -352,6 +353,20 @@ agendar) — corrigidos pra `irPara('frota')`. "Registrar problema" (2 pontos de
 Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão de `frHistBackTo`.
 Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
 direto do hub deve ser `irPara('frota')`, nunca `='home'`.
+
+**Gestão de Pessoas** (`pessoas`, schema `14 - pessoas`) — Fase 1: fluxo de candidato em
+contratação até a ativação. RH cadastra o candidato (`app_pessoas_candidato_cadastrar`) → um
+aprovador fixo de RH (flag `perfil.pessoas_admin`, mesmo molde de `frota_admin`) aprova/reprova
+(`app_pessoas_candidato_aprovar`) → o gestor (`candidato.gestor_uuid`) preenche área/empresa
+(`app_pessoas_candidato_area_salvar`) → RH gera a carta proposta e depois anexa o PDF assinado
+fora do sistema (`app_pessoas_carta_gerar`/`app_pessoas_carta_anexar`/
+`app_pessoas_candidato_marcar_assinado`) → RH ativa no primeiro dia, vinculando a um `perfil` já
+existente (dropdown, o módulo **não cria conta nova**) e gravando CPF/matrícula/admissão/tamanhos
+de uniforme (`app_pessoas_candidato_ativar` — também atualiza `public.perfil`, fonte única de
+verdade dessas colunas pro resto do app). Notificação/trigger segue o invariante §0.9: trigger
+`"13 - pessoas".trg_candidato()` (nunca chamado inline), cobrindo INSERT (avisa RH) e as
+transições de UPDATE pra `aguardando_area`/`ativo` (avisa o gestor). Painel de headcount/orçamento
+por área fica para uma Fase 2. Detalhe em `docs/MODULOS.md §13`.
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 
