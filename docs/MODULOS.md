@@ -288,6 +288,12 @@
   coluna no `jsonb_build_object` das `properties`**; nada a mexer no frontend. Ex.: `cd_no_agua` das
   unidades operacionais (reservatório/booster+bomba/elevatória/poço/macromedição) foi adicionado só na
   RPC (a coluna já existia em `"2 - infra_agua".unidades_operacionais`, só não estava no `SELECT`).
+  - **Amarração do trecho (2026-09-22, `CAD_VER v4→v5`):** mesma técnica — a **rede** agora traz no popup
+    `trecho` (`nu_trecho`) e **`amarração`** (`no_agua_ini → no_agua_fim`, composta na RPC; 100% preenchida,
+    17.350 trechos); a **ligação** traz `trecho` (`nu_trecho`, amarração da ligação ao trecho de rede;
+    100% preenchida). Colunas já existiam em `"2 - infra_agua".rede` / `"3 - comercial".ligacoes`, só não
+    estavam no `jsonb_build_object`. **VRPs e unidades já expõem `cd_no_agua`** (o nó de amarração delas) —
+    nada a fazer. Só a RPC mudou; frontend inalterado além do bump de `CAD_VER`.
 - Marcador **"Você"** (GPS): `cadOnGps()` cria/atualiza `cadVoce` (não é apagado nos redraws de
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
