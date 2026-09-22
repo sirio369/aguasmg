@@ -292,8 +292,10 @@
     `trecho` (`nu_trecho`) e **`amarração`** (`no_agua_ini → no_agua_fim`, composta na RPC; 100% preenchida,
     17.350 trechos); a **ligação** traz `trecho` (`nu_trecho`, amarração da ligação ao trecho de rede;
     100% preenchida). Colunas já existiam em `"2 - infra_agua".rede` / `"3 - comercial".ligacoes`, só não
-    estavam no `jsonb_build_object`. **VRPs e unidades já expõem `cd_no_agua`** (o nó de amarração delas) —
-    nada a fazer. Só a RPC mudou; frontend inalterado além do bump de `CAD_VER`.
+    estavam no `jsonb_build_object`. A rede também traz **`observação`** (`rede.observacao`, ~8% preenchida) —
+    incluída **só quando não-vazia** (concatenando `|| case when ... jsonb_build_object('observação',...) else '{}' end`),
+    pra não poluir o popup dos 92% sem observação com uma linha `—`. **VRPs e unidades já expõem `cd_no_agua`**
+    (o nó de amarração delas) — nada a fazer. Só a RPC mudou; frontend inalterado além do bump de `CAD_VER`.
 - Marcador **"Você"** (GPS): `cadOnGps()` cria/atualiza `cadVoce` (não é apagado nos redraws de
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
