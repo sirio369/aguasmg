@@ -1663,7 +1663,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ---
 
-## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_rel`
+## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel`
 
 Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD).
 **Estado: preview embutido, gated só ao meu usuário** (`sander.sirio@aguasmg.com.br`) — dados de exemplo
@@ -1710,6 +1710,12 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     as-built. Wiring da árvore compartilhado com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários com toggle de
     acesso (admin sempre ligado). Persiste em localStorage (protótipo).
+  - `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
+    (atalhos Hoje/7 dias/Este mês/Tudo + `de`/`até` custom) + consórcio + tipo. **KPIs** (nº avanços, intervenções
+    com movimento, subatividades, metros executados), **timeline por dia**, **por intervenção** e **por atividade**,
+    + **Exportar CSV**. Fonte de dados: **`pjAllAvancos()`** achata todos os avanços de `pjLeafHist` (mock) com a
+    atividade de nível 1 e metadados da intervenção; `pjRsRange()` resolve o período. ⚠️ **Prévia:** datas/valores
+    são os do mock `pjLeafHist` (derivado do % atual) — viram reais quando existir o **log de avanço** (ver abaixo).
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
     **só com botão Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba) — **anexar/remover
     saíram daqui e ficam na configuração** (`projeto_cfg`). **mini-Gantt** (`pjRel()`) — cada barra vai
@@ -1735,8 +1741,18 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
   destravada). `pjZero` reseta `sel`→'' ao replicar bloco.
 - **Idioma do app:** script é `type="module"` → funções **não** são globais; handlers via `.onclick=`
   (não `onclick=` inline), exceto `toast()` que está em `window`. Telas em `SCREENS` +
-  `irPara()`: `projetos`→`pjHub()`, `projeto_campo`→`pjInit()`, `projeto_sup`→`pjSupList()` (det/cfg abrem
-  via `pjOpen`/`pjOpenCfg`). Back buttons das 6 telas ligados uma vez no load.
+  `irPara()`: `projetos`→`pjHub()`, `projeto_campo`→`pjInit()`, `projeto_sup`→`pjSupEnter()`,
+  `projeto_acesso`→`pjSupAcesso()`, `projeto_resumo`→`pjResumoEnter()` (det/cfg abrem via `pjOpen`/`pjOpenCfg`).
+  Back buttons das telas ligados uma vez no load.
+- **⚠️ Fragilidades conhecidas (protótipo — corrigir com o backend):** (1) **avanço não é gravado** —
+  `data-launch` só dá `toast` e **`pjLeafHist` FABRICA** o histórico a partir do % atual (split 60/40, datas de
+  uma lista fixa semeada por `node.n` → subatividades homônimas caem nas mesmas datas); o `projeto_resumo`
+  herda esse mock. (2) **Nada persiste** — `PJ_IVS`, toggles de escopo, quantidades, tipos, registros e o
+  `iv.locked` são de memória; reload zera. (3) **Grant do Suporte é localStorage por-navegador** → não gateia de
+  fato entre usuários. (4) `status` (run/new/done) é **fixo**, não deriva do progresso. (5) `pjHasAdv` = "% > 0"
+  (não "avanço real"). (6) Datas só DD/MM com ano fixo 2026 no parse. (7) Avanço sem autor/equipe/hora; sem
+  planejado × realizado (Gantt não detecta atraso); fotos do avanço não são guardadas. (8) Toggles são `<span>`
+  (sem teclado). Todas se resolvem com o **log de avanço real** + persistência (schema abaixo).
 - **Schema-alvo (a criar):** um schema próprio **`13 - projetos_obra`** (segue o padrão 1-módulo-1-schema:
   8 coleta / 9 suprimentos / 10 Frotas / 11 perdas). Cadastro da intervenção **vem de camada georref de
   projetos** — hoje não existe no banco; as georref correlatas são `7 - setorizacao.dmc_projetado`/
