@@ -361,15 +361,17 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` no hub, gated em `homeGate(
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
-`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes VCA/HDD). Card `#cardProj`
-gated em `homeGate()` **só para o Sander** (`ME.email`), igual ao Perdas. **Hub em 2 categorias (espelha o
-Almoxarifado):** **🏗️ Campo** (`projeto_campo` mapa/lista + `projeto_det` lançar avanços) e **🧰 Suporte**
-(`projeto_sup`→`projeto_cfg` configurar escopo/quantidade + **cadeado de liberação**), esta gateada por
-`pjPodeSup()` (hoje `ME.is_admin`; futuro grant por pessoa tipo `sup_acesso_area`). **Cadeado (1 por
-intervenção, `iv.locked`):** o Suporte configura e **libera**; enquanto em configuração os **avanços ficam
-bloqueados** no campo (evita desativar atividade com avanço lançado). Toggle **No escopo?** em toda
-atividade E subatividade; peça começa pelo **tipo de componente** (`pjSel`), ramal por **OS SIGOS + Hidrômetro**
-(+ imóvel, as-built A1/A2/A3/P1). `projeto_rel` = gestão à parte (documentos, mini-Gantt, PDF consolidado).
+`projeto_acesso`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes VCA/HDD). Card
+`#cardProj` gated em `homeGate()` **só para o Sander** (`ME.email`), igual ao Perdas. **Hub em 2 categorias
+(espelha o Almoxarifado):** **🏗️ Campo** (`projeto_campo` mapa/lista + `projeto_det` lançar avanços) e **🧰
+Suporte** (card **⚙️**; `projeto_sup` mapa/lista+filtros → `projeto_cfg` configurar escopo/quantidade + **cadeado
+de liberação**), gateada por `pjPodeSup()` = admin **ou** grant por pessoa definido no **mini-cadeado 🔐** →
+`projeto_acesso` (protótipo em localStorage; futuro `proj_acesso`/`ME.proj_areas`). **Cadeado (1 por intervenção,
+`iv.locked`):** o Suporte configura e **libera**; enquanto em configuração os **avanços ficam bloqueados** no
+campo. **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado aberto, item com lançamento não sai do escopo
+(toggle 🔒, `−` da quantidade bloqueado). Toggle **No escopo?** em toda atividade E subatividade; peça começa
+pelo **tipo de componente** (`pjSel`), ramal por **OS SIGOS + Hidrômetro** (+ imóvel, as-built A1/A2/A3/P1).
+**Documentos:** anexar/abrir/remover ficam **na configuração** (`projeto_cfg`); no `projeto_rel` é **só abrir**.
 Dados de exemplo em `PJ_IVS` (sem backend ainda; futuro: RPCs `app_proj_*`). Detalhe em `docs/MODULOS.md §8`.
 
 ## 7. Notificações e Web Push

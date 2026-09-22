@@ -1663,7 +1663,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ---
 
-## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_rel`
+## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_rel`
 
 Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD).
 **Estado: preview embutido, gated só ao meu usuário** (`sander.sirio@aguasmg.com.br`) — dados de exemplo
@@ -1673,13 +1673,18 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
   `ME.email==='sander.sirio@aguasmg.com.br'` vira botão ativo → `irPara('projetos')`, senão fica `.soon` +
   🔒 e `toast('Acesso restrito')`.
 - **Hub (`projetos`, `pjHub()`) — 2 categorias, espelha o Almoxarifado:** **🏗️ Campo** → `projeto_campo`
-  (dia a dia) e **🧰 Suporte** → `projeto_sup` (configuração/cadeado). A categoria Suporte é gateada por
-  **`pjPodeSup()`** (hoje `ME.is_admin` — placeholder; **TODO:** virar grant por pessoa tipo `sup_acesso_area`
-  → `ME.proj_areas` quando houver backend). Sem acesso, o card fica `.soon`+🔒.
+  (dia a dia) e **🧰 Suporte** → `projeto_sup` (configuração/cadeado, card com ícone **⚙️** — engrenagem, distinto
+  do cadeado). A categoria Suporte é gateada por **`pjPodeSup()`** = admin **ou** grant por pessoa. O grant é
+  definido no **mini-cadeado 🔐** ao lado do título "🧰 Suporte" (só admin, `pjPodeSetSup()`) → tela `projeto_acesso`
+  (`pjSupAcesso()`, lista real de usuários via `sup_admin_usuarios`, admin sempre ligado). **Protótipo:** o grant
+  fica em **localStorage** (`pj_sup_acesso`, `pjSupGrants`/`pjSupSetGrant`) até haver backend (`proj_acesso` → `ME.proj_areas`).
 - **Cadeado (1 por intervenção):** `iv.locked`. **Liberada** (`locked`) = configuração **congelada**, o campo
   lança avanços. **Em configuração** (`!locked`) = só o Suporte edita escopo/quantidade; **avanços bloqueados**
   (evita desativar atividade que já tem avanço). Default: liberada, exceto `status==='new'` (segue em config).
   Chip de estado na lista/Suporte (`.pjlockchip` lib/cfg).
+- **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado **aberto**, um item que já tem **lançamento**
+  (folha %/m com avanço >0, ou grupo com descendente lançado) **não pode sair do escopo** — o toggle vira 🔒
+  e o `−` da Quantidade não remove um bloco com lançamento. "O que foi lançado não pode ser desativado."
 - **Telas de campo:**
   - `projeto_campo` — filtros **dropdown** (`#pjTipo`/`#pjStatus`), toggle **Mapa/Lista** (`.pjseg`). Mapa é
     **SVG esquemático** (a versão integrada usa geometrias reais do GIS). `pjInit`/`pjRefresh`/`pjRenderMap`/`pjRenderList`.
@@ -1691,17 +1696,23 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     histórico (`pjLeafHist`) + acumulado + **2 fotos + observação**. **Nenhum controle de config aqui** (foi p/ Suporte).
     Botão **📄 Relatório e documentos** no fim da rolagem.
 - **Suporte (config + cadeado):**
-  - `projeto_sup` (`pjSupList()`) — lista as intervenções com chip de cadeado; toca → `projeto_cfg`.
+  - `projeto_sup` (`pjSupEnter()`→`pjInit('sup')`) — **mesma visualização de mapa + filtros do campo** (SVG,
+    dropdowns, toggle Mapa/Lista), via **`PJ_CTX`** (mapa de ids campo×sup + ação de toque `pjOpen`×`pjOpenCfg`);
+    `pjInit`/`pjSetView`/`pjRefresh`/`pjRenderMap`/`pjRenderList` recebem `ctx`. Toca numa intervenção → `projeto_cfg`.
+    Mini-cadeado 🔐 no cabeçalho (`#pjSupAcessoBtn`, só admin) → `projeto_acesso`.
   - `projeto_cfg` (`pjRenderCfg()`, `pjMode='cfg'`) — **cartão do cadeado** no topo (`pjLockcard`): **Liberar para
     execução** (`#pjLock`→`iv.locked=true`) / **Reabrir configuração** (`#pjUnlock`; se já há avanços, exige
     **2 cliques** com aviso, sem `confirm()` nativo). Árvore em **modo config**: **toggle "No escopo?"** (`.pjsw.sm`,
-    `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m); **stepper
-    Quantidade** (`data-repadd/repdel`) nos grupos replicáveis; **select de tipo** (`sel`, `data-sel`) nas peças.
-    Tudo **desabilitado quando `pjLocked`** (frozen) — reabrir o cadeado libera a edição. Wiring compartilhado com
-    o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen` (preserva painéis abertos no re-render).
+    `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m; item lançado
+    congela — ver `pjHasAdv` acima); **stepper Quantidade** (`data-repadd/repdel`); **select de tipo** (`sel`,
+    `data-sel`) nas peças. Tudo **desabilitado quando `pjLocked`** (frozen). Abaixo do escopo, **📎 Documentos**
+    (`data-attach`/`data-pdf`/`data-remove`) — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/
+    as-built. Wiring da árvore compartilhado com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
+  - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários com toggle de
+    acesso (admin sempre ligado). Persiste em localStorage (protótipo).
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
-    cada um com **Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba), **Anexar** e
-    **Remover** (só adm/aprovador: `ME.is_admin||ME.pode_aprovar`). **mini-Gantt** (`pjRel()`) — cada barra vai
+    **só com botão Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba) — **anexar/remover
+    saíram daqui e ficam na configuração** (`projeto_cfg`). **mini-Gantt** (`pjRel()`) — cada barra vai
     do **1º ao último avanço** da atividade (datas reais de `pjLeafHist`; eixo min→méd→máx); atividade sem
     avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação, com toggle de
     ordenação (`#pjAdvSeg`): **Sequência lógica** (árvore atividade›subatividade) × **Ordem de envio** (feed

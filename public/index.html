@@ -270,6 +270,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjlockcard .tx span{font-size:12px;color:var(--mut);line-height:1.35}
 .pjlockcard .btn{flex:0 0 auto}
 .pjtree.frozen .pjnrow{opacity:.92}
+.pjfroz{font-size:12px;flex:0 0 auto;opacity:.85}
+/* lista de acesso do Suporte (mini-cadeado) */
+.pjacrow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -811,14 +814,51 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="projeto_sup" class="hidden">
     <div class="bar"><button class="bk" id="pjSupBack">‹ Projetos</button></div>
-    <h1>Suporte · Configuração</h1>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <h1 style="margin:0">Suporte · Configuração</h1>
+      <button id="pjSupAcessoBtn" class="hidden" title="Quem acessa o Suporte" style="all:unset;cursor:pointer;font-size:20px;padding:4px 6px;border-radius:9px;border:1px solid var(--line)">🔐</button>
+    </div>
     <p class="sub">Configure o escopo e as quantidades de cada intervenção e libere (cadeado) para o campo lançar avanços.</p>
-    <div id="pjSup"></div>
+    <div class="pjfilt">
+      <select id="pjSupTipo"></select>
+      <select id="pjSupStatus">
+        <option value="">Todos os status</option>
+        <option value="run">Em andamento</option>
+        <option value="new">Não iniciada</option>
+        <option value="done">Finalizada</option>
+      </select>
+    </div>
+    <div class="pjseg" id="pjSupSeg"><button data-v="mapa" class="sel">🗺️ Mapa</button><button data-v="lista">☰ Lista</button></div>
+    <div id="pjSupCount" class="pjcount"></div>
+    <div id="pjSupMapaWrap">
+      <div class="pjmap">
+        <svg viewBox="0 0 100 62" role="img" aria-label="Mapa esquemático das intervenções">
+          <rect x="0" y="0" width="100" height="62" fill="var(--bg)"/>
+          <ellipse cx="30" cy="27" rx="26" ry="19" fill="var(--acc)" opacity=".07"/>
+          <ellipse cx="68" cy="43" rx="24" ry="17" fill="var(--ok)" opacity=".09"/>
+          <path d="M2 9 C 24 19, 40 15, 52 31 C 62 45, 80 41, 99 53" fill="none" stroke="var(--acc)" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>
+          <path d="M8 47 C 30 41, 46 49, 70 39 M 14 13 C 34 23, 58 21, 90 31" fill="none" stroke="var(--line)" stroke-width=".5"/>
+          <text class="zlabel" x="14" y="11">ZA1004 · CONTAGEM</text>
+          <text class="zlabel" x="52" y="60">ZA0200 · BETIM</text>
+          <g id="pjSupMarkers"></g>
+        </svg>
+      </div>
+      <div class="pjleg" id="pjSupLeg"></div>
+      <p class="pjhint" style="margin-top:8px">Toque numa intervenção para configurar o escopo e o cadeado.</p>
+    </div>
+    <div id="pjSupLista" hidden style="margin-top:6px"></div>
   </main>
 
   <main id="projeto_cfg" class="hidden">
     <div class="bar"><button class="bk" id="pjCfgBack">‹ Suporte</button></div>
     <div id="pjCfg"></div>
+  </main>
+
+  <main id="projeto_acesso" class="hidden">
+    <div class="bar"><button class="bk" id="pjAcessoBack">‹ Suporte</button></div>
+    <h1>Suporte · Acesso</h1>
+    <p class="sub">Defina quem pode acessar as telas da categoria Suporte (configuração e cadeado das intervenções).</p>
+    <div id="pjAcesso"></div>
   </main>
 
   <main id="projeto_rel" class="hidden">
@@ -1140,7 +1180,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_rel'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_rel'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1170,7 +1210,8 @@ function irPara(id){
   if(id==='notificacoes') ntfInit();
   if(id==='projetos') pjHub();
   if(id==='projeto_campo') pjInit();
-  if(id==='projeto_sup') pjSupList();
+  if(id==='projeto_sup') pjSupEnter();
+  if(id==='projeto_acesso') pjSupAcesso();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
@@ -1272,72 +1313,103 @@ let pjFtipo='',pjFst='',pjView='mapa',pjCur=null,pjReg={};
 function pjZero(n){ if(n.k==='%')n.p=0; if(n.k==='m')n.exec=0; if(n.k==='reg')n.v='—'; if(n.k==='sel')n.v=''; if(n.f)n.f.forEach(pjZero); return n; }
 let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (configurar escopo/quantidade, só Suporte)
 let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o render da árvore
-const pjPodeSup=()=>!!(ME&&ME.is_admin);   // acesso à categoria Suporte (config/cadeado). TODO: virar grant por pessoa (tipo sup_acesso_area → ME.proj_areas) quando houver backend.
+// node tem lançamento? (subatividade %/m com avanço > 0, ou grupo com algum filho lançado) — regardless de ativo
+function pjHasAdv(node){ if(node.k==='%')return (node.p||0)>0; if(node.k==='m')return (node.exec||0)>0; if(node.f)return node.f.some(pjHasAdv); return false; }
+// acesso à categoria Suporte: admin sempre; senão precisa de grant. Protótipo em localStorage (mini-cadeado da categoria) até haver backend (proj_acesso → ME.proj_areas).
+const PJ_SUP_LSKEY='pj_sup_acesso';
+function pjSupGrants(){ try{ return JSON.parse(localStorage.getItem(PJ_SUP_LSKEY)||'{}')||{}; }catch(e){ return {}; } }
+function pjSupSetGrant(uuid,on){ const g=pjSupGrants(); if(on)g[uuid]=1; else delete g[uuid]; try{ localStorage.setItem(PJ_SUP_LSKEY,JSON.stringify(g)); }catch(e){} }
+const pjPodeSup=()=>!!(ME&&(ME.is_admin || (ME.id && pjSupGrants()[ME.id])));
+const pjPodeSetSup=()=>!!(ME&&ME.is_admin);   // só admin define quem acessa o Suporte (mini-cadeado)
 // back buttons das telas do módulo (uma vez, no load — as telas já existem no DOM)
-['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjDetBack:projeto_campo','pjRelBack:projeto_det'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
+['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjDetBack:projeto_campo','pjRelBack:projeto_det','pjAcessoBack:projeto_sup'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
 function pjRepAdd(node){ const last=node.f[node.f.length-1]; const c=pjZero(JSON.parse(JSON.stringify(last))); const m=last.n.match(/^(.*?)(\d+)\s*$/); c.n=m?(m[1]+(node.f.length+1)):(last.n+' '+(node.f.length+1)); node.f.push(c); node.rep=node.f.length; }
 function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.length; } }
 
-function pjInit(){
-  const st=$('#pjTipo'); if(st && !st.dataset.ready){ st.innerHTML='<option value="">Todos os tipos</option>'+Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}">${t.n}</option>`).join(''); st.dataset.ready='1';
-    st.onchange=()=>{pjFtipo=st.value;pjRefresh();};
-    $('#pjStatus').onchange=e=>{pjFst=e.target.value;pjRefresh();};
-    $('#pjSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>pjSetView(b.dataset.v));
-    $('#pjLeg').innerHTML=Object.entries(PJ_TIPOS).map(([k,t])=>`<span><i style="background:${t.c}"></i>${t.n.replace('Implantação de ','Impl. ').replace('Substituição de ','Subst. ')}</span>`).join('');
+// contexto de tela (campo × suporte): ids dos elementos + ação ao tocar num card/pino
+const PJ_CTX={
+  campo:{tipo:'pjTipo',status:'pjStatus',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',markers:'pjMarkers',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
+  sup:{tipo:'pjSupTipo',status:'pjSupStatus',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',markers:'pjSupMarkers',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
+};
+function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.tipo);
+  if(st && !st.dataset.ready){ st.innerHTML='<option value="">Todos os tipos</option>'+Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}">${t.n}</option>`).join(''); st.dataset.ready='1';
+    st.onchange=()=>{pjFtipo=st.value;pjRefresh(ctx);};
+    $('#'+E.status).onchange=e=>{pjFst=e.target.value;pjRefresh(ctx);};
+    $('#'+E.seg).querySelectorAll('button').forEach(b=>b.onclick=()=>pjSetView(b.dataset.v,ctx));
+    $('#'+E.leg).innerHTML=Object.entries(PJ_TIPOS).map(([k,t])=>`<span><i style="background:${t.c}"></i>${t.n.replace('Implantação de ','Impl. ').replace('Substituição de ','Subst. ')}</span>`).join('');
   }
-  pjSetView(pjView); pjRefresh();
+  if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst;   // sincroniza controles ao estado compartilhado
+  pjSetView(pjView,ctx); pjRefresh(ctx);
 }
 const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===iv.status);
-function pjSetView(v){ pjView=v; $('#pjSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); $('#pjMapaWrap').hidden=v!=='mapa'; $('#pjLista').hidden=v!=='lista'; }
-function pjRefresh(){ pjRenderMap(); pjRenderList(); const n=PJ_IVS.filter(pjOk).length; $('#pjCount').textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
-function pjRenderMap(){
-  const mk=$('#pjMarkers'); if(!mk)return;
+function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; }
+function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(pjOk).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
+function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
+  const mk=$('#'+E.markers); if(!mk)return;
   mk.innerHTML=PJ_IVS.map(iv=>{ const c=PJ_TIPOS[iv.tipo].c,hide=pjOk(iv)?'':'hide';
     if(iv.pt){const[x,y]=iv.pt;return `<g class="mk ${hide}" data-id="${iv.id}"><ellipse cx="${x}" cy="${y+3.2}" rx="1.9" ry=".8" fill="rgba(0,0,0,.16)"/><path d="M${x} ${y-4} a3 3 0 0 1 3 3 c0 2.2 -3 4.6 -3 4.6 s-3 -2.4 -3 -4.6 a3 3 0 0 1 3 -3z" fill="${c}" stroke="#fff" stroke-width=".5"/><circle cx="${x}" cy="${y-1}" r="1.05" fill="#fff"/></g>`;}
     const pts=iv.ln.map(p=>p.join(',')).join(' ');const[sx,sy]=iv.ln[0],[ex,ey]=iv.ln[iv.ln.length-1];
     return `<g class="mk ${hide}" data-id="${iv.id}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sx}" cy="${sy}" r="1.3" fill="${c}" stroke="#fff" stroke-width=".4"/><circle cx="${ex}" cy="${ey}" r="1.3" fill="${c}" stroke="#fff" stroke-width=".4"/></g>`;
   }).join('');
-  mk.querySelectorAll('.mk').forEach(g=>g.onclick=()=>pjOpen(g.dataset.id));
+  mk.querySelectorAll('.mk').forEach(g=>g.onclick=()=>E.open(g.dataset.id));
 }
-function pjRenderList(){
+function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx==='sup';
   const arr=PJ_IVS.filter(pjOk);
-  $('#pjLista').innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status],cl=p>100?'over':(p>=100?'ok':'');
-   return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span style="display:flex;gap:6px;align-items:center"><span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em config.'}</span><span class="pjpill ${sc}">${sl}</span></span></div>
+  $('#'+E.lista).innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status],cl=p>100?'over':(p>=100?'ok':'');
+   const chip=`<span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em config.'}</span>`;
+   return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span style="display:flex;gap:6px;align-items:center">${chip}${sup?'':`<span class="pjpill ${sc}">${sl}</span>`}</span></div>
     <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
     <div class="pjbar ${cl}"><i style="width:${Math.min(p,100)}%"></i></div>
-    <div class="pjfoot"><span>${iv.resp}</span><span class="pjpc" style="color:${p>100?'var(--warn)':'var(--ink)'}">${p}%</span></div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção nesse filtro.</p>';
-  $('#pjLista').querySelectorAll('.pjcard').forEach(el=>el.onclick=()=>pjOpen(el.dataset.id));
+    <div class="pjfoot"><span>${iv.resp}</span>${sup?`<span class="pjgo det" style="pointer-events:none">${iv.locked?'Revisar':'Configurar'} ›</span>`:`<span class="pjpc" style="color:${p>100?'var(--warn)':'var(--ink)'}">${p}%</span>`}</div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção nesse filtro.</p>';
+  $('#'+E.lista).querySelectorAll('.pjcard').forEach(el=>el.onclick=()=>E.open(el.dataset.id));
 }
+// entrar no Suporte: gate de acesso (mini-cadeado) + render mapa/lista
+function pjSupEnter(){ if(!pjPodeSup()){ toast('Acesso restrito à equipe de configuração'); irPara('projetos'); return; } const ab=$('#pjSupAcessoBtn'); if(ab){ ab.classList.toggle('hidden',!pjPodeSetSup()); ab.onclick=()=>irPara('projeto_acesso'); } pjInit('sup'); }
 // hub do módulo: categorias Campo (feito) e Suporte (config/cadeado, acesso restrito) — espelha o Almoxarifado
 function pjHub(){
-  const sup=pjPodeSup();
+  const sup=pjPodeSup(), setSup=pjPodeSetSup();
   $('#pjHub').innerHTML=`
    <div class="sec" style="margin-top:8px">🏗️ Campo</div>
    <p class="pjhint" style="margin:0 0 8px">Dia a dia de obra: registro de avanços por intervenção liberada.</p>
    <div class="grid">
      <button class="mod" data-pjgo="projeto_campo"><div class="ic">📋</div><div class="nm">Intervenções</div></button>
    </div>
-   <div class="sec" style="margin-top:20px">🧰 Suporte</div>
+   <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🧰 Suporte${setSup?'<button id="pjHubAcesso" title="Quem acessa o Suporte" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">🔐</button>':''}</div>
    <p class="pjhint" style="margin:0 0 8px">Retaguarda: configurar escopo/quantidades e liberar o cadeado. ${sup?'':'Acesso restrito.'}</p>
    <div class="grid">
-     <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_sup':''}"><div class="ic">🔒</div><div class="nm">Configuração de intervenções${sup?'':' 🔒'}</div></button>
+     <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_sup':''}"><div class="ic">⚙️</div><div class="nm">Configuração de intervenções${sup?'':' 🔒'}</div></button>
    </div>`;
   $('#pjHub').querySelectorAll('[data-pjgo]').forEach(b=>b.onclick=()=>{ const dst=b.dataset.pjgo; if(!dst){ toast('Acesso restrito à equipe de configuração'); return; } irPara(dst); });
+  const ac=$('#pjHubAcesso'); if(ac) ac.onclick=e=>{ e.stopPropagation(); irPara('projeto_acesso'); };
 }
-// Suporte: lista de intervenções para configurar/liberar
-function pjSupList(){
-  if(!pjPodeSup()){ $('#pjSup').innerHTML='<p class="sub">Acesso restrito à equipe de configuração.</p>'; return; }
-  $('#pjSup').innerHTML=PJ_IVS.map(iv=>{const t=PJ_TIPOS[iv.tipo];
-    return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em configuração'}</span></div>
-     <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
-     <div class="pjfoot"><span>${iv.resp}</span><span class="pjgo det" style="pointer-events:none">${iv.locked?'Revisar':'Configurar'} ›</span></div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção.</p>';
-  $('#pjSup').querySelectorAll('.pjcard').forEach(el=>el.onclick=()=>pjOpenCfg(el.dataset.id));
+// Suporte · Acesso — mini-cadeado da categoria: define quem acessa (protótipo localStorage; lista real de usuários via sup_admin_usuarios)
+let _pjAcessoUsers=[];
+async function pjSupAcesso(){
+  if(!pjPodeSetSup()){ toast('Só admin define o acesso ao Suporte'); irPara('projeto_sup'); return; }
+  $('#pjAcesso').innerHTML='<p class="sub">Carregando usuários…</p>';
+  try{ const {data,error}=await sb.rpc('sup_admin_usuarios'); if(error)throw error; _pjAcessoUsers=data||[]; }
+  catch(e){ $('#pjAcesso').innerHTML='<div class="banner bad">Erro ao listar usuários: '+(e.message||e)+'</div>'; return; }
+  pjSupAcessoRender();
+}
+function pjSupAcessoRender(){
+  const termo=(($('#pjAcessoBusca')||{}).value||'').toLowerCase().trim();
+  const g=pjSupGrants();
+  const arr=_pjAcessoUsers.filter(u=>!termo||(u.nome||'').toLowerCase().includes(termo)||(u.email||'').toLowerCase().includes(termo));
+  $('#pjAcesso').innerHTML=`<input id="pjAcessoBusca" class="pjinp" placeholder="Buscar por nome ou e-mail" value="${termo?termo.replace(/"/g,'&quot;'):''}" style="margin-bottom:10px">
+   <p class="pjhint" style="margin:0 0 8px">Admin sempre tem acesso. Marque quem mais pode entrar no Suporte. <b>Protótipo:</b> a marcação fica só neste dispositivo (localStorage) até o backend do módulo (grant tipo acesso de área do Almoxarifado).</p>
+   ${arr.map(u=>{const adm=u.funcao==='admin';const on=adm||!!g[u.id];
+     return `<div class="pjacrow"><span style="flex:1;min-width:0"><b>${u.nome||u.email||'—'}</b>${u.email&&u.nome?`<span class="pjmono" style="display:block;font-size:11px;color:var(--mut)">${u.email}</span>`:''}${adm?'<span class="pjlockchip lib" style="margin-left:6px">admin</span>':''}</span><span class="pjsw ${on?'on':''} ${adm?'dis':''}" ${adm?'':`data-acc="${u.id}"`}></span></div>`;}).join('')||'<p class="sub">Nenhum usuário.</p>'}`;
+  const bs=$('#pjAcessoBusca'); if(bs) bs.oninput=()=>{ const v=bs.value; pjSupAcessoRender(); const n=$('#pjAcessoBusca'); if(n){ n.focus(); n.value=v; } };
+  $('#pjAcesso').querySelectorAll('[data-acc]').forEach(s=>s.onclick=()=>{ const id=s.dataset.acc, on=!s.classList.contains('on'); pjSupSetGrant(id,on); s.classList.toggle('on',on); toast(on?'✓ Acesso concedido':'✓ Acesso removido'); });
 }
 function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); pjRenderCfg(); window.scrollTo(0,0); }
 function pjRenderCfg(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo];
   const hasAdv=iv.arv.flatMap(n=>pjLeaves(n)).some(l=>pjLeafHist(l).ents.length);
+  // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
+  const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:iv.status==='done'}];
+  const docsHtml=DOCS.map(dc=>`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${dc.ok?'ok':'pend'}">${dc.ok?'anexado':(iv.status==='new'?'aguarda conclusão':'pendente')}</span></span><span class="pjdocbtns">${dc.ok?`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="1">📎 Anexar</button>${dc.ok?`<button class="btn ghost pjmini bad" data-remove="1">🗑 Remover</button>`:''}</span></div>`).join('');
   const lockCard=iv.locked
     ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Intervenção liberada para execução</b><span>Configuração congelada — o campo já lança avanços. Reabra só se precisar mudar escopo/quantidade.</span></div><button class="btn ghost" id="pjUnlock">Reabrir configuração</button></div>`
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b><span>Defina escopo, quantidades e tipos. Ao liberar, o cadeado trava a configuração e o campo passa a lançar avanços.</span></div><button class="btn" id="pjLock">🔓 Liberar para execução</button></div>`;
@@ -1345,11 +1417,17 @@ function pjRenderCfg(keep){
    <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
    ${lockCard}
    <div class="sec">🧱 Escopo da intervenção</div>
-   <p class="pjhint" style="margin:2px 0 10px">Ative/desative atividades e subatividades em <b>No escopo?</b>, ajuste as <b>quantidades</b> (ramais, interligações, peças) e escolha o <b>tipo</b> de cada peça. ${iv.locked?'<b>Travada</b> — reabra o cadeado acima para editar.':'Ao terminar, libere no cadeado acima.'}</p>
-   <div class="pjtree ${iv.locked?'frozen':''}">${iv.arv.map(pjNodeHtml).join('')}</div>`;
+   <p class="pjhint" style="margin:2px 0 10px">Ative/desative atividades e subatividades em <b>No escopo?</b>, ajuste as <b>quantidades</b> (ramais, interligações, peças) e escolha o <b>tipo</b> de cada peça. Itens com lançamento ficam <b>congelados</b> (🔒) e não saem do escopo. ${iv.locked?'<b>Travada</b> — reabra o cadeado acima para editar.':'Ao terminar, libere no cadeado acima.'}</p>
+   <div class="pjtree ${iv.locked?'frozen':''}">${iv.arv.map(pjNodeHtml).join('')}</div>
+   <div class="sec" style="margin-top:16px">📎 Documentos</div>
+   <p class="pjhint" style="margin:2px 0 8px">Anexe, abra e remova aqui os documentos da intervenção. No <b>relatório</b> eles ficam só para <b>abrir</b>.</p>
+   ${docsHtml}`;
   const d=$('#pjCfg');
   const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
   const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; toast('🔒 Configuração reaberta'); pjRenderCfg(); };
+  d.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>pjOpenPdf(b.getAttribute('data-pdf')));
+  d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>toast('Anexar PDF — na versão integrada abre arquivos/galeria'));
+  d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>toast('Remover documento — na versão integrada exclui o arquivo'));
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
 }
@@ -1391,9 +1469,12 @@ function pjNodeHtml(node){
   const rid='pn'+Math.random().toString(36).slice(2,8); pjReg[rid]=node;
   // cadeado congela a configuração: em cfg, só edita se a intervenção estiver DEStravada (!pjLocked)
   const editar=cfg&&!pjLocked;
+  // item com lançamento não pode sair do escopo, mesmo com o cadeado aberto (congela individualmente)
+  const advTog=(cfg&&(isG||t==='%'||t==='m'))?pjHasAdv(node):false;
+  const togEdit=editar&&!advTog;
   // toggle "No escopo?" em cfg: para toda atividade (grupo) e toda subatividade mensurável (%/m)
   const tog=(cfg&&(isG||t==='%'||t==='m'))
-    ? `<span class="pjsw sm ${inact?'':'on'} ${editar?'':'dis'}" ${editar?`data-toggle="${rid}"`:''} title="No escopo?"></span>` : '';
+    ? `<span class="pjsw sm ${inact?'':'on'} ${togEdit?'':'dis'}" ${togEdit?`data-toggle="${rid}"`:''} title="${advTog?'Tem lançamento — não pode sair do escopo':'No escopo?'}"></span>${(editar&&advTog)?'<span class="pjfroz" title="Congelado: já tem lançamento">🔒</span>':''}` : '';
   let right='';
   if(t==='reg'){
     right = cfg
@@ -1424,8 +1505,8 @@ function pjNodeHtml(node){
   if(isG){
     let ctl='';
     if(cfg){
-      if(node.rep){ const delDis=!editar||node.f.length<=1;
-        ctl += `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button ${delDis?'disabled':`data-repdel="${rid}"`}>−</button><b>${node.rep}</b><button ${editar?`data-repadd="${rid}"`:'disabled'}>+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)</span></div>`; }
+      if(node.rep){ const lastAdv=pjHasAdv(node.f[node.f.length-1]); const delDis=!editar||node.f.length<=1||lastAdv;
+        ctl += `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button ${delDis?'disabled':`data-repdel="${rid}"`}>−</button><b>${node.rep}</b><button ${editar?`data-repadd="${rid}"`:'disabled'}>+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)${lastAdv?' · último bloco tem lançamento (não remove)':''}</span></div>`; }
       if(inact) ctl += `<div class="pjctl"><span class="lbl">⚠️ Fora do escopo — não entra na execução desta intervenção</span></div>`;
     }
     h+=`<div class="pjdetpanel" id="${rid}D" hidden>${ctl}<div class="pjchildren">${node.f.map(pjNodeHtml).join('')}</div></div>`;
@@ -1496,10 +1577,9 @@ function pjRenderDet(keep){
 function pjRel(id){
   const iv=PJ_IVS.find(i=>i.id===id); if(!iv)return; pjCur=id;
   const t=PJ_TIPOS[iv.tipo],asbuilt=iv.status==='done';
-  const podeRem=!!(ME&&(ME.is_admin||ME.pode_aprovar));
-  // documentos da intervenção
-  const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:asbuilt,pend:!asbuilt}];
-  const docBtns=dc=>{ let b=''; if(dc.ok)b+=`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`; b+=`<button class="btn ghost pjmini" data-attach="1"${(dc.pend&&iv.status==='new')?' disabled':''}>📎 Anexar</button>`; if(dc.ok&&podeRem)b+=`<button class="btn ghost pjmini bad" data-remove="1">🗑 Remover</button>`; return b; };
+  // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
+  const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:asbuilt}];
+  const docBtns=dc=>dc.ok?`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>';
   const docsHtml=DOCS.map(dc=>`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${dc.ok?'ok':'pend'}">${dc.ok?'anexado':(iv.status==='new'?'aguarda conclusão':'pendente')}</span></span><span class="pjdocbtns">${docBtns(dc)}</span></div>`).join('');
   // mini-gantt: janela = 1º avanço → último avanço, por atividade (nível 1 ativa)
   const ddmm=s=>{const[d,m]=s.split('/').map(Number);return new Date(2026,m-1,d).getTime();};
@@ -1526,7 +1606,7 @@ function pjRel(id){
   $('#pjRel').innerHTML=`<div class="pjreltop"><div class="k">Relatório consolidado da intervenção</div><h2>${iv.local}</h2><div class="s">${iv.cod} · ${t.n} · ${iv.cons} · ${iv.resp}</div><div class="s">início ${iv.ini}${iv.fim?` · concluído ${iv.fim}`:' · em andamento'}</div></div>
    <div class="sec">📎 Documentos</div>
    ${docsHtml}
-   ${podeRem?'':'<p class="pjhint" style="margin-top:2px">Remoção de documentos é restrita a administradores e aprovadores.</p>'}
+   <p class="pjhint" style="margin-top:2px">Anexar/remover documentos é feito na <b>configuração da intervenção</b> (Suporte).</p>
    <div class="sec">📅 Linha do tempo (mini-Gantt)</div>
    <p class="pjhint" style="margin:2px 0 8px">Cada barra vai do <b>1º avanço</b> ao <b>último avanço</b> da atividade.</p>
    <div class="pjgantt">${gantHtml}</div>
