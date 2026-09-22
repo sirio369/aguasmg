@@ -1820,6 +1820,14 @@ vez, então os passos foram fundidos.
   proposta (`FOTO2_BLOBS.peCartaAnexo`, via `uploadFoto2`/`fotoPickHtml`) é resetado a cada render
   da tela de detalhe do candidato — sem isso, o blob em memória de um candidato anterior poderia
   vazar e ser anexado ao candidato errado se o RH não escolher um arquivo novo.
+- **Card do hub travado** (`#cardPessoas`, `homeGate()`, mesmo padrão de `cardPerdas`/`cardProj` —
+  `HOME_GATE_EMAILS`): só Geovana e Sander veem/clicam o card "Gestão de Pessoas" na tela inicial —
+  pra qualquer outro e-mail ele aparece com 🔒 e um toast de "Acesso restrito" no clique. Isso só
+  esconde o módulo do menu geral; não é o controle de acesso real (esse continua sendo as RPCs
+  `SECURITY DEFINER` + `pessoas_admin`/`gestor_uuid`/`aprovador_uuid`/`aprovador2_uuid`) — por isso
+  um gestor de área que recebe notificação de aprovação de vaga (`supGoAct` → `irPara('pessoas')`)
+  continua conseguindo entrar pelo link da notificação mesmo sem estar na lista do card, porque
+  `irPara('pessoas')` não tem gate próprio, só o card do home tem.
 - **Próximo passo (Fase 2):** tabela de orçamento mensal por vaga (código de área/função/setor/
   modalidade/projeto/custo/headcount por mês — fonte é uma planilha de orçamento existente fora do
   app) + painel do gestor comparando contratados (via `perfil.ativo`+`area`) × orçado × em
