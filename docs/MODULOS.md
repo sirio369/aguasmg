@@ -1759,9 +1759,11 @@ vez, então os passos foram fundidos.
   booleanas individuais, sem jsonb).
 - **Visibilidade em camadas (dados confidenciais do candidato — CPF, endereço, formação,
   salário/benefícios, motivo de reprovação):** só o gestor mapeado da área da vaga (via
-  `candidato.gestor_uuid`) + RH/admin veem esses campos, e só durante a contratação
-  (`app_pessoas_meus_candidatos` devolve o conjunto completo, filtrado por
-  `gestor_uuid = auth.uid()` — isolamento automático por pessoa, não por "equipe"). O par genérico
+  `candidato.gestor_uuid`) + RH/admin veem esses campos, e só durante a contratação — as duas RPCs
+  devolvem o conjunto completo: `app_pessoas_meus_candidatos` (visão do gestor, filtrado por
+  `gestor_uuid = auth.uid()` — isolamento automático por pessoa, não por "equipe") e
+  `app_pessoas_candidatos_listar` (visão do RH, gate `app_pessoas_admin_check`); o frontend mostra
+  o mesmo bloco "Dados do candidato" pras duas visões. O par genérico
   `aprovador_uuid`/`aprovador2_uuid` de `perfil` **nunca** vê esses campos nem participa da
   aprovação da vaga — ele só passa a enxergar o colaborador **depois** de `ativo`, e só campos
   simples (nome/área/empresa/data de admissão) via `app_pessoas_meus_colaboradores` (`select
