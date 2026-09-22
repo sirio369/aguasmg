@@ -239,6 +239,37 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjstep button{all:unset;cursor:pointer;width:34px;height:30px;text-align:center;color:var(--acc);font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center}
 .pjstep button[disabled]{opacity:.35;cursor:default}
 .pjstep b{min-width:30px;text-align:center;font-size:14px;font-family:ui-monospace,monospace;border-left:1px solid var(--line);border-right:1px solid var(--line);align-self:stretch;display:flex;align-items:center;justify-content:center}
+/* switch pequeno (toggle "No escopo?" inline na linha, em config) */
+.pjsw.sm{width:34px;height:20px}
+.pjsw.sm::after{width:16px;height:16px}
+.pjsw.sm.on::after{left:16px}
+.pjsw.dis{opacity:.45;cursor:default}
+/* campo de registro editável (campo) e select de tipo (config) */
+.pjreginp{all:unset;box-sizing:border-box;min-width:0;flex:1 1 120px;max-width:190px;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--ink)}
+.pjreginp:focus{border-color:var(--acc)}
+.pjreginp:disabled{opacity:.55}
+.pjselc{box-sizing:border-box;flex:1 1 120px;max-width:200px;font-size:13px;background:var(--bg);border:1px solid var(--acc);border-radius:8px;padding:6px 9px;color:var(--ink)}
+.pjselc:disabled{border-color:var(--line);opacity:.7}
+.pjregv.mut{color:var(--mut);font-style:italic}
+.pjtype{color:var(--mut);font-weight:600}
+/* banner de estado (campo) */
+.pjbanner{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35;border-radius:10px;padding:9px 12px;margin:2px 0 10px}
+.pjbanner.ok{background:var(--ok-bg);color:var(--ink);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.pjbanner.warn{background:var(--warn-bg);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+/* chip de cadeado na lista */
+.pjlockchip{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.pjlockchip.lib{background:var(--ok-bg);color:var(--ok)}
+.pjlockchip.cfg{background:var(--warn-bg);color:var(--warn)}
+/* cartão do cadeado (tela de config) */
+.pjlockcard{display:flex;gap:12px;align-items:center;border-radius:13px;padding:13px 14px;margin:12px 0 4px;flex-wrap:wrap}
+.pjlockcard.cfg{background:var(--warn-bg);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.pjlockcard.lib{background:var(--ok-bg);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.pjlockcard .ico{font-size:26px;flex:0 0 auto}
+.pjlockcard .tx{flex:1 1 190px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pjlockcard .tx b{font-size:14px}
+.pjlockcard .tx span{font-size:12px;color:var(--mut);line-height:1.35}
+.pjlockcard .btn{flex:0 0 auto}
+.pjtree.frozen .pjnrow{opacity:.92}
 </style>
 </head>
 <body>
@@ -735,7 +766,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="projetos" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>Projetos · Intervenções</h1>
-    <p class="sub">Acompanhamento diário de campo por intervenção. Cadastro vem da camada georreferenciada de projetos (GIS).</p>
+    <p class="sub">Acompanhamento diário de obra por intervenção. Cadastro vem da camada georreferenciada de projetos (GIS).</p>
+    <div id="pjHub"></div>
+  </main>
+
+  <main id="projeto_campo" class="hidden">
+    <div class="bar"><button class="bk" id="pjCampoBack">‹ Projetos</button></div>
+    <h1>Campo · Intervenções</h1>
+    <p class="sub">Registro diário de avanços por intervenção liberada.</p>
     <div class="pjfilt">
       <select id="pjTipo"></select>
       <select id="pjStatus">
@@ -767,8 +805,20 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="projeto_det" class="hidden">
-    <div class="bar"><button class="bk" id="pjDetBack">‹ Intervenções</button></div>
+    <div class="bar"><button class="bk" id="pjDetBack">‹ Campo</button></div>
     <div id="pjDet"></div>
+  </main>
+
+  <main id="projeto_sup" class="hidden">
+    <div class="bar"><button class="bk" id="pjSupBack">‹ Projetos</button></div>
+    <h1>Suporte · Configuração</h1>
+    <p class="sub">Configure o escopo e as quantidades de cada intervenção e libere (cadeado) para o campo lançar avanços.</p>
+    <div id="pjSup"></div>
+  </main>
+
+  <main id="projeto_cfg" class="hidden">
+    <div class="bar"><button class="bk" id="pjCfgBack">‹ Suporte</button></div>
+    <div id="pjCfg"></div>
   </main>
 
   <main id="projeto_rel" class="hidden">
@@ -1090,7 +1140,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_det','projeto_rel'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_rel'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1118,7 +1168,9 @@ function irPara(id){
   if(id==='matriculas') mtInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
-  if(id==='projetos') pjInit();
+  if(id==='projetos') pjHub();
+  if(id==='projeto_campo') pjInit();
+  if(id==='projeto_sup') pjSupList();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
@@ -1142,17 +1194,26 @@ const PJ_ST={run:['Em andamento','run'],new:['Não iniciada','new'],done:['Final
 const pjP=(n,p,o={})=>({n,k:'%',p,...o});
 const pjM=(n,meta,exec,o={})=>({n,k:'m',meta,exec,un:o.un||'m',...o});
 const pjR=(n,v)=>({n,k:'reg',v});
+const PJ_PECA_TIPOS=['Válvula de manobra','Ventosa','Descarga','Registro','Redução','Tê','Cap','Luva','Outro'];
+const pjSel=(n,v,opts)=>({n,k:'sel',v:v||'',opts:opts||PJ_PECA_TIPOS});   // seleção de tipo (config): não é mensurável
 const pjG=(n,f,o={})=>({n,k:'g',f,...o});
 const pjOc=(e,es,r,rc)=>[pjP('Escavação',e),pjP('Escoramento',es),pjP('Reaterro',r),pjP('Recomposição de pavimento',rc)];
 const pjIL=(nome,m,ex,t,civOff=true)=>pjG(nome||'Interligação',[{...pjG('Obra civil da caixa',pjOc(0,0,0,0)),ativo:!civOff},pjP('Manobra / parada de rede',m),pjP('Execução (corte / peças / junta)',ex),pjP('Teste / religação',t)]);
 // interligações replicáveis: container com N interligações numeradas (a quantidade é setável na tela)
 const pjILrep=(nome,n,m,ex,t)=>({...pjG(nome,Array.from({length:n},(_,i)=>pjIL(nome.replace(/\s*\/.*$/,'').trim()+' '+(i+1),m,ex,t))),rep:n});
-// ramais (ativável — pode ser só reforço de rede, sem ramais — e replicável)
-const pjRamal=(i,esc,ass,lig,os,hd)=>pjG('Ramal '+i,[pjP('Escavação',esc),pjP('Assentamento',ass),pjP('Ligação à rede',lig),pjR('OS SIGOS',os),pjR('Hidrômetro',hd)]);
+// ramais (ativável — pode ser só reforço de rede, sem ramais — e replicável). Campos: OS SIGOS + Hidrômetro primeiro,
+// depois nº do imóvel e as-built (A1/A2/A3/P1), depois execução (etapas % ativáveis).
+const pjRamal=(i,os,hd,im,esc,ass,lig)=>pjG('Ramal '+i,[
+  pjR('OS SIGOS',os||'—'),pjR('Nº do Hidrômetro',hd||'—'),pjR('Nº do imóvel',im||'—'),
+  pjR('A1 (as-built)','—'),pjR('A2 (as-built)','—'),pjR('A3 (as-built)','—'),pjR('P1 (as-built)','—'),
+  pjP('Escavação',esc||0),pjP('Assentamento',ass||0),pjP('Ligação à rede',lig||0)]);
 const pjRamais=(kids)=>({...pjG('Ramais',kids),rep:kids.length,ativo:true});
-// peças/acessórios: bloco replicável (adiciona itens conforme necessidade), como o ramal
-const pjPeca=(i,inst,espec)=>pjG('Peça/acessório '+i,[pjP('Instalação',inst),pjR('Especificação',espec)]);
-const pjPecas=(kids)=>({...pjG('Peças e acessórios (registros, ventosas, descargas)',kids),rep:kids.length,ativo:true});
+// peças/acessórios: bloco replicável. Especificação (tipo do componente) primeiro + etapas físicas (todas ativáveis).
+const pjPeca=(i,tipo,esc,esco,mont,rea,rec)=>pjG('Peça/acessório '+i,[
+  pjSel('Especificação (tipo de componente)',tipo),
+  pjP('Escavação',esc||0),pjP('Escoramento',esco||0),pjP('Montagem hidráulica',mont||0),
+  pjP('Reaterro',rea||0),pjP('Recomposição de pavimento',rec||0)]);
+const pjPecas=(kids)=>({...pjG('Peças e acessórios',kids),rep:kids.length,ativo:true});
 const PJ_IVS=[
  {id:'iv1',tipo:'macro_impl',cod:'PRJ-2026-014',local:'DMC Contagem — Bairro Cincão',cons:'Águas Integradas',resp:'Equipe A · João R.',ini:'12/09/2026',status:'run',pt:[26,22],
   arv:[pjP('Locação e cadastro de interferências',100),
@@ -1181,21 +1242,24 @@ const PJ_IVS=[
  {id:'iv5',tipo:'rede_vca',cod:'PRJ-2026-003',local:'Rede VCA — Contagem, Av. Apio Cardoso',cons:'Águas Integradas',resp:'Equipe D · Sérgio M.',ini:'01/09/2026',status:'run',ln:[[15,33],[27,37],[39,33]],
   arv:[pjP('Locação e topografia do traçado',100),pjP('Sinalização e segurança da obra',100),pjP('Escavação de vala',70),
    pjM('Assentamento de tubulação (rede)',320,330),pjP('Reaterro compactado',55),pjP('Recomposição de pavimento',20),
-   pjPecas([pjPeca(1,60,'Registro DN150'),pjPeca(2,20,'Ventosa DN50'),pjPeca(3,0,'Descarga DN100')]),
-   pjRamais([pjRamal(1,100,100,100,'41-2026-8892','Y24A-00771'),
-             pjRamal(2,100,70,0,'41-2026-8940','—'),
-             pjRamal(3,20,0,0,'—','—')]),
+   pjPecas([pjPeca(1,'Registro',60,40,30,20,10),pjPeca(2,'Ventosa',20,0,0,0,0),pjPeca(3,'Descarga',0,0,0,0,0)]),
+   pjRamais([pjRamal(1,'41-2026-8892','Y24A-00771','128',100,100,100),
+             pjRamal(2,'41-2026-8940','—','130',100,70,0),
+             pjRamal(3,'—','—','—',20,0,0)]),
    pjILrep('Interligação (tronco)',2,60,30,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]},
  {id:'iv6',tipo:'rede_hdd',cod:'PRJ-2026-018',local:'Rede HDD — Betim, travessia Av. Juscelino',cons:'Eficiência Hídrica',resp:'Equipe E · HDD Sul',ini:'05/09/2026',status:'run',ln:[[56,52],[64,54],[71,49]],
   arv:[pjP('Locação e cadastro de interferências',100),
    pjG('Cova',[pjG('Cova de entrada',pjOc(100,100,100,80)),pjG('Cova de saída',pjOc(100,80,0,0))]),
    pjM('Perfuração piloto (pilot bore)',180,180),pjM('Alargamento (reaming)',180,190),
    pjG('Tubulação: fusão + puxamento',[pjP('Solda / fusão das juntas',90),pjM('Puxamento (pullback)',180,96)]),
-   pjRamais([pjRamal(1,100,60,0,'41-2026-9012','—'),pjRamal(2,0,0,0,'—','—')]),
+   pjRamais([pjRamal(1,'41-2026-9012','—','44',100,60,0),pjRamal(2,'—','—','—',0,0,0)]),
    pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]}
 ];
+// cadeado por intervenção: locked=liberada p/ avanços (config congelada); !locked=em configuração (Suporte).
+// default: liberada, exceto as ainda não iniciadas (que seguem em configuração).
+PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 function pjPct(node){
-  if(node.ativo===false||node.k==='reg')return null;
+  if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
   if(node.k==='m')return Math.round(node.exec/node.meta*100);
   if(node.f&&node.f.length){const vs=node.f.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;}
@@ -1205,7 +1269,12 @@ const pjIvPct=iv=>{const vs=iv.arv.map(pjPct).filter(v=>v!=null);return vs.lengt
 // conta folhas mensuráveis ativas (para o resumo)
 function pjLeaves(node,acc){ acc=acc||[]; if(node.ativo===false)return acc; if(node.f&&node.f.length){node.f.forEach(c=>pjLeaves(c,acc));} else if(node.k==='%'||node.k==='m'){acc.push(node);} return acc; }
 let pjFtipo='',pjFst='',pjView='mapa',pjCur=null,pjReg={};
-function pjZero(n){ if(n.k==='%')n.p=0; if(n.k==='m')n.exec=0; if(n.k==='reg')n.v='—'; if(n.f)n.f.forEach(pjZero); return n; }
+function pjZero(n){ if(n.k==='%')n.p=0; if(n.k==='m')n.exec=0; if(n.k==='reg')n.v='—'; if(n.k==='sel')n.v=''; if(n.f)n.f.forEach(pjZero); return n; }
+let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (configurar escopo/quantidade, só Suporte)
+let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o render da árvore
+const pjPodeSup=()=>!!(ME&&ME.is_admin);   // acesso à categoria Suporte (config/cadeado). TODO: virar grant por pessoa (tipo sup_acesso_area → ME.proj_areas) quando houver backend.
+// back buttons das telas do módulo (uma vez, no load — as telas já existem no DOM)
+['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjDetBack:projeto_campo','pjRelBack:projeto_det'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
 function pjRepAdd(node){ const last=node.f[node.f.length-1]; const c=pjZero(JSON.parse(JSON.stringify(last))); const m=last.n.match(/^(.*?)(\d+)\s*$/); c.n=m?(m[1]+(node.f.length+1)):(last.n+' '+(node.f.length+1)); node.f.push(c); node.rep=node.f.length; }
 function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.length; } }
 
@@ -1214,8 +1283,6 @@ function pjInit(){
     st.onchange=()=>{pjFtipo=st.value;pjRefresh();};
     $('#pjStatus').onchange=e=>{pjFst=e.target.value;pjRefresh();};
     $('#pjSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>pjSetView(b.dataset.v));
-    $('#pjDetBack').onclick=()=>irPara('projetos');
-    $('#pjRelBack').onclick=()=>irPara('projeto_det');
     $('#pjLeg').innerHTML=Object.entries(PJ_TIPOS).map(([k,t])=>`<span><i style="background:${t.c}"></i>${t.n.replace('Implantação de ','Impl. ').replace('Substituição de ','Subst. ')}</span>`).join('');
   }
   pjSetView(pjView); pjRefresh();
@@ -1235,11 +1302,56 @@ function pjRenderMap(){
 function pjRenderList(){
   const arr=PJ_IVS.filter(pjOk);
   $('#pjLista').innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status],cl=p>100?'over':(p>=100?'ok':'');
-   return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span class="pjpill ${sc}">${sl}</span></div>
+   return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span style="display:flex;gap:6px;align-items:center"><span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em config.'}</span><span class="pjpill ${sc}">${sl}</span></span></div>
     <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
     <div class="pjbar ${cl}"><i style="width:${Math.min(p,100)}%"></i></div>
     <div class="pjfoot"><span>${iv.resp}</span><span class="pjpc" style="color:${p>100?'var(--warn)':'var(--ink)'}">${p}%</span></div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção nesse filtro.</p>';
   $('#pjLista').querySelectorAll('.pjcard').forEach(el=>el.onclick=()=>pjOpen(el.dataset.id));
+}
+// hub do módulo: categorias Campo (feito) e Suporte (config/cadeado, acesso restrito) — espelha o Almoxarifado
+function pjHub(){
+  const sup=pjPodeSup();
+  $('#pjHub').innerHTML=`
+   <div class="sec" style="margin-top:8px">🏗️ Campo</div>
+   <p class="pjhint" style="margin:0 0 8px">Dia a dia de obra: registro de avanços por intervenção liberada.</p>
+   <div class="grid">
+     <button class="mod" data-pjgo="projeto_campo"><div class="ic">📋</div><div class="nm">Intervenções</div></button>
+   </div>
+   <div class="sec" style="margin-top:20px">🧰 Suporte</div>
+   <p class="pjhint" style="margin:0 0 8px">Retaguarda: configurar escopo/quantidades e liberar o cadeado. ${sup?'':'Acesso restrito.'}</p>
+   <div class="grid">
+     <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_sup':''}"><div class="ic">🔒</div><div class="nm">Configuração de intervenções${sup?'':' 🔒'}</div></button>
+   </div>`;
+  $('#pjHub').querySelectorAll('[data-pjgo]').forEach(b=>b.onclick=()=>{ const dst=b.dataset.pjgo; if(!dst){ toast('Acesso restrito à equipe de configuração'); return; } irPara(dst); });
+}
+// Suporte: lista de intervenções para configurar/liberar
+function pjSupList(){
+  if(!pjPodeSup()){ $('#pjSup').innerHTML='<p class="sub">Acesso restrito à equipe de configuração.</p>'; return; }
+  $('#pjSup').innerHTML=PJ_IVS.map(iv=>{const t=PJ_TIPOS[iv.tipo];
+    return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em configuração'}</span></div>
+     <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
+     <div class="pjfoot"><span>${iv.resp}</span><span class="pjgo det" style="pointer-events:none">${iv.locked?'Revisar':'Configurar'} ›</span></div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção.</p>';
+  $('#pjSup').querySelectorAll('.pjcard').forEach(el=>el.onclick=()=>pjOpenCfg(el.dataset.id));
+}
+function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); pjRenderCfg(); window.scrollTo(0,0); }
+function pjRenderCfg(keep){
+  const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
+  const t=PJ_TIPOS[iv.tipo];
+  const hasAdv=iv.arv.flatMap(n=>pjLeaves(n)).some(l=>pjLeafHist(l).ents.length);
+  const lockCard=iv.locked
+    ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Intervenção liberada para execução</b><span>Configuração congelada — o campo já lança avanços. Reabra só se precisar mudar escopo/quantidade.</span></div><button class="btn ghost" id="pjUnlock">Reabrir configuração</button></div>`
+    : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b><span>Defina escopo, quantidades e tipos. Ao liberar, o cadeado trava a configuração e o campo passa a lançar avanços.</span></div><button class="btn" id="pjLock">🔓 Liberar para execução</button></div>`;
+  $('#pjCfg').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
+   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
+   ${lockCard}
+   <div class="sec">🧱 Escopo da intervenção</div>
+   <p class="pjhint" style="margin:2px 0 10px">Ative/desative atividades e subatividades em <b>No escopo?</b>, ajuste as <b>quantidades</b> (ramais, interligações, peças) e escolha o <b>tipo</b> de cada peça. ${iv.locked?'<b>Travada</b> — reabra o cadeado acima para editar.':'Ao terminar, libere no cadeado acima.'}</p>
+   <div class="pjtree ${iv.locked?'frozen':''}">${iv.arv.map(pjNodeHtml).join('')}</div>`;
+  const d=$('#pjCfg');
+  const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
+  const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; toast('🔒 Configuração reaberta'); pjRenderCfg(); };
+  pjWireTree(d,pjRenderCfg);
+  pjReopen(d,keep);
 }
 // histórico de lançamentos (mock derivado do % atual) — entradas mais antigas → recentes, com acumulado corrente
 function pjLeafHist(node){
@@ -1275,33 +1387,50 @@ function pjMakePdfUrl(title,sub){
 function pjOpenPdf(title){ try{ const u=pjMakePdfUrl(title); window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),60000); }catch(e){ toast('Não consegui abrir o PDF de exemplo'); } }
 function pjNodeHtml(node){
   const t=node.k,p=pjPct(node),isG=node.f&&node.f.length,inact=node.ativo===false;
-  const podeConfig=!!(ME&&(ME.is_admin||ME.pode_aprovar));
+  const cfg=pjMode==='cfg';                          // cfg = tela de configuração (Suporte); senão = campo (avanços)
   const rid='pn'+Math.random().toString(36).slice(2,8); pjReg[rid]=node;
+  // cadeado congela a configuração: em cfg, só edita se a intervenção estiver DEStravada (!pjLocked)
+  const editar=cfg&&!pjLocked;
+  // toggle "No escopo?" em cfg: para toda atividade (grupo) e toda subatividade mensurável (%/m)
+  const tog=(cfg&&(isG||t==='%'||t==='m'))
+    ? `<span class="pjsw sm ${inact?'':'on'} ${editar?'':'dis'}" ${editar?`data-toggle="${rid}"`:''} title="No escopo?"></span>` : '';
   let right='';
-  if(t==='reg')right=`<span class="pjregv">${node.v}</span>`;
-  else if(p!=null){const over=t==='m'&&p>100,done=p>=100&&!over;
+  if(t==='reg'){
+    right = cfg
+      ? `<span class="pjregv mut">${node.v&&node.v!=='—'?node.v:'• campo'}</span>`
+      : `<input class="pjreginp" data-reg="${rid}" value="${node.v&&node.v!=='—'?String(node.v).replace(/"/g,'&quot;'):''}" placeholder="—"${pjLocked?'':' disabled'}>`;
+  } else if(t==='sel'){
+    const opts=node.opts||PJ_PECA_TIPOS;
+    right = cfg
+      ? `<select class="pjselc" ${editar?`data-sel="${rid}"`:'disabled'}><option value=""${node.v?'':' selected'}>— escolher —</option>${opts.map(o=>`<option${o===node.v?' selected':''}>${o}</option>`).join('')}</select>`
+      : `<span class="pjregv">${node.v||'(não definido)'}</span>`;
+  } else if(p!=null){const over=t==='m'&&p>100,done=p>=100&&!over;
     right=`<div class="pjnb"><div class="pjbar ${over?'over':(done?'ok':'')}"><i style="width:${Math.min(p,100)}%"></i></div></div><div class="pjnp ${over?'ov':(done?'dn':'')}">${p}%</div>`;
-    if(!isG&&(t==='%'||t==='m')&&!inact) right+=`<button class="pjgo" data-go="${rid}">＋ Lançar</button>`;
+    if(pjMode==='campo'&&!isG&&(t==='%'||t==='m')&&!inact&&pjLocked) right+=`<button class="pjgo" data-go="${rid}">＋ Lançar</button>`;
   } else right=`<div class="pjnb"></div><div class="pjnp"></div>`;
   if(isG) right+=`<button class="pjgo det" data-detbtn="${rid}">Detalhes</button>`;
+  right+=tog;
   let tags='';
   if(t==='%')tags+=`<span class="pjtag unit">%</span>`;
   if(t==='m')tags+=`<span class="pjtag unit">${node.un}</span>`;
   if(t==='reg')tags+=`<span class="pjtag reg">registro</span>`;
-  let h=`<div class="pjnode ${isG?'g':''} ${inact?'inact':''}"><div class="pjnrow" ${isG?`data-det="${rid}"`:(t==='reg'?'':`data-leaf="${rid}"`)}><span class="tw">${isG?'▸':'·'}</span><div class="pjnn">${node.n}${tags}</div>${right}</div>`;
+  if(t==='sel')tags+=`<span class="pjtag reg">tipo</span>`;
+  let nm=node.n;
+  if(isG){ const sc=node.f&&node.f.find(c=>c.k==='sel'&&c.v); if(sc) nm+=` <span class="pjtype">· ${sc.v}</span>`; }
+  const rowAttr=isG?`data-det="${rid}"`:((pjMode==='campo'&&(t==='%'||t==='m'))?`data-leaf="${rid}"`:'');
+  let h=`<div class="pjnode ${isG?'g':''} ${inact?'inact':''}"><div class="pjnrow" ${rowAttr}><span class="tw">${isG?'▸':'·'}</span><div class="pjnn">${nm}${tags}</div>${right}</div>`;
   if(isG&&!inact){ const ls=pjLeaves(node),done=ls.filter(x=>pjPct(x)>=100).length; h+=`<div class="pjgsum"><span class="chipx">${done}/${ls.length} etapas ✓</span><span>${p}% concluído</span></div>`; }
   if(node.sub)h+=`<div class="pjmeta">${node.sub}</div>`;
   if(isG){
     let ctl='';
-    if('ativo' in node){ ctl += podeConfig
-      ? `<div class="pjctl"><span class="lbl">No escopo?</span><span class="pjsw ${inact?'':'on'}" data-toggle="${rid}"></span><span class="val">${inact?'fora do escopo':'ativa'}</span></div>`
-      : (inact?`<div class="pjctl"><span class="lbl">⚠️ Etapa fora do escopo</span></div>`:''); }
-    if(node.rep){ ctl += podeConfig
-      ? `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button data-repdel="${rid}"${node.f.length<=1?' disabled':''}>−</button><b>${node.rep}</b><button data-repadd="${rid}">+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)</span></div>`
-      : `<div class="pjctl"><span class="lbl">Quantidade</span><span class="val">${node.f.length} bloco(s)</span></div>`; }
+    if(cfg){
+      if(node.rep){ const delDis=!editar||node.f.length<=1;
+        ctl += `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button ${delDis?'disabled':`data-repdel="${rid}"`}>−</button><b>${node.rep}</b><button ${editar?`data-repadd="${rid}"`:'disabled'}>+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)</span></div>`; }
+      if(inact) ctl += `<div class="pjctl"><span class="lbl">⚠️ Fora do escopo — não entra na execução desta intervenção</span></div>`;
+    }
     h+=`<div class="pjdetpanel" id="${rid}D" hidden>${ctl}<div class="pjchildren">${node.f.map(pjNodeHtml).join('')}</div></div>`;
   }
-  if(!isG&&(t==='%'||t==='m')&&!inact){
+  if(pjMode==='campo'&&!isG&&(t==='%'||t==='m')&&!inact&&pjLocked){
     const H=pjLeafHist(node);
     const hist=H.ents.length
       ? `${H.ents.map(e=>`<div class="pjhrow"><span class="pjthumb sm">📷</span><span class="pjhd">${e.d}</span><span class="pjhdelta">${e.delta}</span><span class="pjhacc">${e.acc}</span></div>${e.obs?`<div class="pjhobs">"${e.obs}"</div>`:''}`).join('')}<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec}/${node.meta} ${node.un} · ${p}%`:`${p}%`}</b></div>`
@@ -1320,11 +1449,31 @@ function pjNodeHtml(node){
 }
 function pjOpen(id){ pjCur=id; irPara('projeto_det'); pjRenderDet(); window.scrollTo(0,0); }
 function pjSnapOpen(d){ const s=new Set(); d.querySelectorAll('.pjdetpanel:not([hidden])').forEach(pnl=>{ const n=pjReg[pnl.id.slice(0,-1)]; if(n)s.add(n); }); return s; }
+function pjReopen(d,keep){ if(keep&&keep.size){ Object.keys(pjReg).forEach(rid=>{ if(keep.has(pjReg[rid])){ const pnl=document.getElementById(rid+'D'); if(pnl&&pnl.hidden){ pnl.hidden=false; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent='▾'; const b=row&&row.querySelector('[data-detbtn]'); if(b){b.textContent='Fechar';b.classList.add('open');} } } }); } }
+// wiring compartilhado da árvore (campo + config). rerender = função de re-render da tela (recebe o snapshot de painéis abertos).
+function pjWireTree(d,rerender){
+  const detToggle=(rid,btn)=>{ const pnl=document.getElementById(rid+'D'); if(!pnl)return; const nowOpen=pnl.hidden; pnl.hidden=!nowOpen; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent=nowOpen?'▾':'▸'; if(btn){btn.textContent=nowOpen?'Fechar':'Detalhes';btn.classList.toggle('open',nowOpen);} };
+  const toggleLaunch=(nodeEl,btn)=>{ const l=nodeEl.querySelector(':scope > .pjlaunch'); if(!l)return; d.querySelectorAll('.pjlaunch.on').forEach(x=>{if(x!==l){x.classList.remove('on');const b=x.parentElement.querySelector('.pjgo:not(.det)');if(b){b.classList.remove('open');b.textContent='＋ Lançar';}}}); const on=l.classList.toggle('on'); if(btn){btn.classList.toggle('open',on);btn.textContent=on?'✕ Fechar':'＋ Lançar';} };
+  d.querySelectorAll('[data-detbtn]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); detToggle(b.dataset.detbtn,b); });
+  d.querySelectorAll('[data-det]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo')||e.target.closest('.pjsw')||e.target.closest('select')||e.target.closest('input'))return; const b=r.querySelector('[data-detbtn]'); if(b)b.click(); });
+  d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
+  d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
+  d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
+  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>toast('Lançamento registrado (prévia) — na versão integrada grava avanço + 2 fotos + observação no banco'));
+  d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n) n.v=inp.value.trim()||'—'; });
+  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); rerender(k); } });
+  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); rerender(k); } });
+  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); rerender(k); } }; });
+  d.querySelectorAll('[data-sel]').forEach(s=>s.onchange=()=>{ const n=pjReg[s.dataset.sel]; if(n){ const k=pjSnapOpen(d); n.v=s.value; rerender(k); } });
+}
 function pjRenderDet(keep){
-  const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={};
+  const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={}; pjMode='campo'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status];
   const leaves=iv.arv.flatMap(n=>pjLeaves(n)),done=leaves.filter(x=>pjPct(x)>=100).length,run=leaves.filter(x=>{const v=pjPct(x);return v>0&&v<100;}).length,zero=leaves.length-done-run;
   const ringc=p>100?'var(--warn)':(p>=100?'var(--ok)':'var(--acc)');
+  const banner=iv.locked
+    ? `<div class="pjbanner ok">🔓 <b>Liberada para execução</b> — configuração travada. Registre os avanços do dia.</div>`
+    : `<div class="pjbanner warn">⏳ <b>Em configuração</b> — aguardando liberação pelo Suporte. Os avanços ficam bloqueados até o cadeado ser liberado.</div>`;
   $('#pjDet').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
    <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp} · início ${iv.ini}</p>
    <div class="pjsum">
@@ -1335,23 +1484,14 @@ function pjRenderDet(keep){
      </div>
    </div>
    <div class="sec">🧱 Subatividades</div>
-   <p class="pjhint" style="margin:2px 0 10px">Toque em <b>＋ Lançar</b> para registrar o avanço do dia (2 📷 + observação). Blocos com ramificações abrem em <b>Detalhes</b>. Definir escopo/quantidade é restrito a aprovador e admin.</p>
+   ${banner}
+   <p class="pjhint" style="margin:2px 0 10px">${iv.locked?'Toque em <b>＋ Lançar</b> para registrar o avanço do dia (2 📷 + observação). Blocos com ramificações abrem em <b>Detalhes</b>. Escopo, quantidades e tipos são definidos no <b>Suporte</b>.':'A configuração (escopo, quantidades, tipos de componente) é feita na aba <b>Suporte</b>. Aqui os avanços abrem quando a intervenção for liberada.'}</p>
    <div class="pjtree">${iv.arv.map(pjNodeHtml).join('')}</div>
    <button class="btn ghost" id="pjRelBtn" style="margin-top:8px">📄 Relatório e documentos</button>`;
   const d=$('#pjDet');
   $('#pjRelBtn').onclick=()=>pjRel(pjCur);
-  const toggleLaunch=(nodeEl,btn)=>{ const l=nodeEl.querySelector(':scope > .pjlaunch'); if(!l)return; d.querySelectorAll('.pjlaunch.on').forEach(x=>{if(x!==l){x.classList.remove('on');const b=x.parentElement.querySelector('.pjgo:not(.det)');if(b){b.classList.remove('open');b.textContent='＋ Lançar';}}}); const on=l.classList.toggle('on'); if(btn){btn.classList.toggle('open',on);btn.textContent=on?'✕ Fechar':'＋ Lançar';} };
-  const detToggle=(rid,btn)=>{ const pnl=document.getElementById(rid+'D'); if(!pnl)return; const nowOpen=pnl.hidden; pnl.hidden=!nowOpen; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent=nowOpen?'▾':'▸'; if(btn){btn.textContent=nowOpen?'Fechar':'Detalhes';btn.classList.toggle('open',nowOpen);} };
-  d.querySelectorAll('[data-detbtn]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); detToggle(b.dataset.detbtn,b); });
-  d.querySelectorAll('[data-det]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; const b=r.querySelector('[data-detbtn]'); if(b)b.click(); });
-  d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
-  d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
-  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjRenderDet(k); } });
-  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjRenderDet(k); } });
-  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); pjRenderDet(k); } }; });
-  d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
-  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>toast('Lançamento registrado (prévia) — na versão integrada grava avanço + 2 fotos + observação no banco'));
-  if(keep&&keep.size){ Object.keys(pjReg).forEach(rid=>{ if(keep.has(pjReg[rid])){ const pnl=document.getElementById(rid+'D'); if(pnl&&pnl.hidden){ pnl.hidden=false; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent='▾'; const b=row&&row.querySelector('[data-detbtn]'); if(b){b.textContent='Fechar';b.classList.add('open');} } } }); }
+  pjWireTree(d,pjRenderDet);
+  pjReopen(d,keep);
 }
 function pjRel(id){
   const iv=PJ_IVS.find(i=>i.id===id); if(!iv)return; pjCur=id;

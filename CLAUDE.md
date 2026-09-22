@@ -360,13 +360,17 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` no hub, gated em `homeGate(
 (`ME.email`); opaco (`.mod soon`) + 🔒 para os demais. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
 
-**Projetos · Intervenções** (`projetos`/`projeto_det`/`projeto_rel`) — acompanhamento diário de obra
-(macromedidores, VRPs, redes VCA/HDD). Card `#cardProj` gated em `homeGate()` **só para o Sander**
-(`ME.email`), igual ao Perdas. **Segregação proposital:** `projetos` (mapa/lista + filtros dropdown) e
-`projeto_det` (resumo + árvore robusta de subatividades com lançamento diário + foto) são o **dia a dia
-de campo**; `projeto_rel` é a **tela à parte** de gestão (documentos PDF projeto/as-built, mini-Gantt,
-avanços com fotos, PDF consolidado). Dados de exemplo em `PJ_IVS` (sem backend ainda; futuro: RPCs
-`app_proj_*` + geometria do GIS de projetos). Detalhe em `docs/MODULOS.md §8`.
+**Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
+`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes VCA/HDD). Card `#cardProj`
+gated em `homeGate()` **só para o Sander** (`ME.email`), igual ao Perdas. **Hub em 2 categorias (espelha o
+Almoxarifado):** **🏗️ Campo** (`projeto_campo` mapa/lista + `projeto_det` lançar avanços) e **🧰 Suporte**
+(`projeto_sup`→`projeto_cfg` configurar escopo/quantidade + **cadeado de liberação**), esta gateada por
+`pjPodeSup()` (hoje `ME.is_admin`; futuro grant por pessoa tipo `sup_acesso_area`). **Cadeado (1 por
+intervenção, `iv.locked`):** o Suporte configura e **libera**; enquanto em configuração os **avanços ficam
+bloqueados** no campo (evita desativar atividade com avanço lançado). Toggle **No escopo?** em toda
+atividade E subatividade; peça começa pelo **tipo de componente** (`pjSel`), ramal por **OS SIGOS + Hidrômetro**
+(+ imóvel, as-built A1/A2/A3/P1). `projeto_rel` = gestão à parte (documentos, mini-Gantt, PDF consolidado).
+Dados de exemplo em `PJ_IVS` (sem backend ainda; futuro: RPCs `app_proj_*`). Detalhe em `docs/MODULOS.md §8`.
 
 ## 7. Notificações e Web Push
 
