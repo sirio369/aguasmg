@@ -361,7 +361,10 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` no hub, gated em `homeGate(
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
-`projeto_acesso`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes VCA/HDD). Card
+`projeto_acesso`/`projeto_resumo`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes
+VCA/HDD). Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
+KPIs+timeline por dia/intervenção/atividade+CSV, sobre o feed `pjAllAvancos`). ⚠️ **Protótipo:** avanços não são
+gravados (`pjLeafHist` é mock) e nada persiste — ver fragilidades em `docs/MODULOS.md §8`. Card
 `#cardProj` gated em `homeGate()` **só para o Sander** (`ME.email`), igual ao Perdas. **Hub em 2 categorias
 (espelha o Almoxarifado):** **🏗️ Campo** (`projeto_campo` mapa/lista + `projeto_det` lançar avanços) e **🧰
 Suporte** (card **⚙️**; `projeto_sup` mapa/lista+filtros → `projeto_cfg` configurar escopo/quantidade + **cadeado
