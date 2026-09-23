@@ -290,8 +290,11 @@
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
 - Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
-  **VRPs**, rede, ligações (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
+  **VRPs**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
   `step` (célula de cache).
+  - **Rede de gás (2026-09, `CAD_VER v5→v6`):** camada **`rede_gas`** (GASMIG, `"4 - redes_terceiros".rede_gas`,
+    1.271 linhas MULTILINESTRING, âmbar `#f9a825`, `whole:true`, começa desligada). Só leitura/visualização;
+    branch `rede_gas` na RPC `app_cadastro_geojson` (props id/material/diametro/municipio) — popup genérico.
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
