@@ -142,6 +142,9 @@
 
 ### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
+- **Unidade de medida (2026-09):** ao lado do valor há `#pressao_un` (**MCA/BAR/KPA**, default MCA). O valor é
+  **convertido p/ mca no cliente** antes de enviar (`vmca`: kpa÷9,80665; bar×10,1971621; mca as-is) — a coluna
+  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend. `prAposSalvar(vmca)`.
 - Alvo opcional vindo do Teste de estanqueidade (`prAlvo`). Botões: `#prEst` (estanqueidade), `#prProd`.
 - Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
   `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
@@ -152,6 +155,9 @@
   borda weight 2** (mesmo padrão de ativar/desativar do Cadastro técnico). GeoJSON (4326, `ST_SimplifyPreserveTopology 1m`)
   via RPC **`app_estanq_poligonos(p_layer)`** (`zonas_pressao`|`dmcs`, definer, só `authenticated`); cache em
   localStorage (`est_cam_zp`/`est_cam_dmc`). Camadas ficam **abaixo** dos pontos (`bringToBack`); começam desligadas.
+- **Popup no ponto do mapa (2026-09):** clicar num marcador abre popup (`bindPopup`+`popupopen`) com **🧭 Navegar
+  até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
+  → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
 ### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
