@@ -1065,8 +1065,12 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   "termo assinado"). Reaproveita a coluna `treinamento_confirmado_em` pra guardar o timestamp da
   assinatura — nome ficou desatualizado (era específico de treinamento), não valeu a pena renomear
   só por isso.
-- **Ver a própria CNH:** `condRenderHome` mostra link "Ver foto da CNH" (`SBASE+cnh_foto`) quando
-  `condData.cnh_foto` existe.
+- **Ver a foto/PDF da CNH:** `condRenderHome` mostra link "Ver foto da CNH" (`SBASE+cnh_foto`) pro
+  próprio condutor quando `condData.cnh_foto` existe. **Do lado do gestor (2026-09-23):**
+  `frotasRenderCondutorCadastro` ganhou o mesmo link ("ver CNH", ao lado de "ver termo") — antes
+  `app_frota_usuarios_completo()` não devolvia `cnh_foto`, então o gestor só via número/categoria/
+  validade em texto e não conseguia conferir o arquivo anexado sem entrar como o próprio condutor;
+  a RPC agora devolve `cnh_foto` também. Mesmo helper `fotoURL(p)` (=`SBASE+p`) dos dois lados.
 - **Alerta de vencimento:** `app_condutor_meu` retorna `cnh_vencendo` (validade ≤ hoje+30) **e**
   `cnh_dias_para_vencer` (`cnh_validade - current_date`, pode ser negativo se já venceu). Exibido
   como banner (com a contagem de dias) em `condRenderHome` quando `status==='ativo'`, e como
