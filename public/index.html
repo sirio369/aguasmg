@@ -389,6 +389,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </select>
     <div id="estFiltros" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px"></div>
     <div id="estLista"></div>
+    <div id="estCamadas" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
     <div id="estMapa" style="display:none;height:60vh;border-radius:12px;overflow:hidden"></div>
   </main>
 
@@ -1160,7 +1161,8 @@ function estSetView(v){
   $('#estVwLista').style.color=(v==='lista')?'var(--acc-ink)':'var(--ink)';
   $('#estVwMapa').style.background=(v==='mapa')?'var(--acc)':'transparent';
   $('#estVwMapa').style.color=(v==='mapa')?'var(--acc-ink)':'var(--ink)';
-  if(v==='mapa') estMapaRender();
+  $('#estCamadas').style.display=(v==='mapa')?'flex':'none';
+  if(v==='mapa'){ estCamRender(); estMapaRender(); }
 }
 function estMapaRender(){
   const cont=$('#estMapa');
@@ -1189,6 +1191,33 @@ async function estDesenharLimites(){
   if(gj && estMap && !estLimLayer){
     estLimLayer=L.geoJSON(gj,{style:{color:'#8e24aa',weight:2,fill:false,dashArray:'5,4',opacity:.9},interactive:false}).addTo(estMap);
     estLimLayer.bringToBack();
+  }
+}
+// camadas COPASA (polígonos) ativáveis no mapa — preenchimento ~30% + borda definida, toggle igual ao Cadastro técnico
+let estCamOn={zp:false,dmc:false};
+const estCamLayers={zp:null,dmc:null}, estCamCache={zp:null,dmc:null};
+const EST_CAM=[{k:'zp',rpc:'zonas_pressao',nome:'Zonas de pressão',cor:'#1565c0',ls:'est_cam_zp'},
+               {k:'dmc',rpc:'dmcs',nome:'DMCs',cor:'#ef6c00',ls:'est_cam_dmc'}];
+function estCamRender(){
+  const el=$('#estCamadas'); if(!el)return;
+  el.innerHTML=EST_CAM.map(d=>`<button class="estcam" data-k="${d.k}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${estCamOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);'}">${d.nome}</button>`).join('');
+  el.querySelectorAll('.estcam').forEach(b=>b.addEventListener('click',()=>estCamToggle(b.dataset.k)));
+}
+async function estCamToggle(k){
+  const d=EST_CAM.find(x=>x.k===k); if(!d)return;
+  estCamOn[k]=!estCamOn[k]; estCamRender();
+  if(!estMap||!window.L)return;
+  if(!estCamOn[k]){ if(estCamLayers[k]){ estMap.removeLayer(estCamLayers[k]); estCamLayers[k]=null; } return; }
+  let gj=estCamCache[k];
+  if(!gj){ try{ const c=localStorage.getItem(d.ls); if(c) gj=JSON.parse(c); }catch(e){} }
+  if(!gj){ try{ const {data,error}=await sb.rpc('app_estanq_poligonos',{p_layer:d.rpc}); if(error)throw error; gj=data; try{localStorage.setItem(d.ls,JSON.stringify(gj));}catch(e){} }
+           catch(e){ toast('Não consegui carregar '+d.nome); estCamOn[k]=false; estCamRender(); return; } }
+  estCamCache[k]=gj;
+  if(estCamOn[k] && !estCamLayers[k] && estMap){
+    estCamLayers[k]=L.geoJSON(gj,{style:{color:d.cor,weight:2,opacity:1,fillColor:d.cor,fillOpacity:.3},
+      onEachFeature:(f,ly)=>{const p=f.properties||{}; const lbl=(p.codigo?('<b>'+p.codigo+'</b>'):'')+(p.nome?(' '+p.nome):'')+(p.consorcio?(' · '+p.consorcio):''); if(lbl.trim())ly.bindTooltip(lbl,{sticky:true});}
+    }).addTo(estMap);
+    estCamLayers[k].bringToBack();
   }
 }
 function estSelecionar(id){
