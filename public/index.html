@@ -362,6 +362,15 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <label for="numero_hd">Número do HD</label>
     <input id="numero_hd" autocomplete="off"/>
 
+    <label>Foto do número HD</label>
+    <div class="photo">
+      <div class="pick">
+        <label class="pickb">📷 Câmera<input class="fFotoHd" type="file" accept="image/*" capture="environment"/></label>
+        <label class="pickb">🖼️ Galeria<input class="fFotoHd" type="file" accept="image/*"/></label>
+      </div>
+      <img id="fotoHdPrev" class="hidden" alt=""/>
+    </div>
+
     <label for="consorcio">Consórcio</label>
     <select id="consorcio">
       <option value="ZA1004">ZA1004 — Contagem</option>
@@ -951,7 +960,7 @@ async function pushAutoSync(){ try{ if(pushSuportado() && Notification.permissio
 
 const $ = s => document.querySelector(s);
 const screens = { login:$('#login'), app:$('#app') };
-let gps = null, fotoBlob = null, enviando = false;
+let gps = null, fotoBlob = null, fotoHdBlob = null, enviando = false;
 
 // ---------- IndexedDB (fila offline) ----------
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('coleta',1);r.onupgradeneeded=()=>r.result.createObjectStore('fila',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
@@ -1051,6 +1060,12 @@ document.querySelectorAll('#pressao .fFoto').forEach(fi=>fi.addEventListener('ch
   else { fotoBlob=null; img.classList.add('hidden'); }
   validar();
 }));
+// foto do número HD (opcional)
+document.querySelectorAll('#pressao .fFotoHd').forEach(fi=>fi.addEventListener('change',async e=>{
+  const f=e.target.files[0]||null; const img=$('#fotoHdPrev');
+  if(f){ fotoHdBlob=await comprimir(f); img.src=URL_obj(fotoHdBlob); img.classList.remove('hidden'); }
+  else { fotoHdBlob=null; img.classList.add('hidden'); }
+}));
 function URL_obj(b){return window.URL.createObjectURL(b);}
 
 $('#salvar').addEventListener('click',async()=>{
@@ -1064,7 +1079,7 @@ $('#salvar').addEventListener('click',async()=>{
   if(!fotoBlob) return toast('Tire a foto do manômetro');
   enviando=true; $('#salvar').disabled=true;
   const uid=crypto.randomUUID();
-  const item={id:uid,tipo:'pressao',rpc:'app_registrar_pressao',pasta:'pressao',fotos:{p_foto:fotoBlob},fields:{
+  const item={id:uid,tipo:'pressao',rpc:'app_registrar_pressao',pasta:'pressao',fotos:{p_foto:fotoBlob,p_foto_hd:fotoHdBlob},fields:{
     p_id:uid,p_pressao_mca:vmca,p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,
     p_consorcio:$('#consorcio').value,p_numero_hd:$('#numero_hd').value||null,
     p_cota_m:gps.alt!=null?Math.round(gps.alt*10)/10:null,p_gps_ts:gps.ts,p_dispositivo:navigator.userAgent.slice(0,60)
@@ -1080,7 +1095,7 @@ $('#salvar').addEventListener('click',async()=>{
   }catch(e){ toast('Erro ao salvar: '+e.message); }
   finally{ enviando=false; validar(); }
 });
-function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;document.querySelectorAll('#pressao .fFoto').forEach(i=>i.value='');$('#fotoPrev').classList.add('hidden');validar();}
+function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;fotoHdBlob=null;document.querySelectorAll('#pressao .fFoto,#pressao .fFotoHd').forEach(i=>i.value='');$('#fotoPrev').classList.add('hidden');$('#fotoHdPrev').classList.add('hidden');validar();}
 
 // ---------- MAPAS — camada base rua/satélite (compartilhado por todos os módulos com mapa) ----------
 function mapAddCamadaBase(map,tileOpts,ctlPos){

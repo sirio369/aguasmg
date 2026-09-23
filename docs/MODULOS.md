@@ -142,6 +142,10 @@
 
 ### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
+- **Duas fotos (2026-09):** **Foto do manômetro** (obrigatória, `fotoBlob`→`p_foto`) e **Foto do número HD**
+  (opcional, `fotoHdBlob`→`p_foto_hd`, inputs `.fFotoHd`/preview `#fotoHdPrev`). Ambas vão no `item.fotos`
+  (`enviar` faz upload por param e seta o path). Coluna nova `"8 - coleta_campo".mapeamento_pressao.foto_hd`
+  + param `p_foto_hd` na RPC (recriada com `drop`+`create` p/ não gerar overload — regra §0.6; grant só `authenticated`).
 - **Unidade de medida (2026-09):** ao lado do valor há `#pressao_un` (**MCA/BAR/KPA**, default MCA). O valor é
   **convertido p/ mca no cliente** antes de enviar (`vmca`: kpa÷9,80665; bar×10,1971621; mca as-is) — a coluna
   do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend. `prAposSalvar(vmca)`.
