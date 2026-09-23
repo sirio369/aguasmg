@@ -146,6 +146,12 @@
 - Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
   `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
+- **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
+  `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
+  137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
+  borda weight 2** (mesmo padrão de ativar/desativar do Cadastro técnico). GeoJSON (4326, `ST_SimplifyPreserveTopology 1m`)
+  via RPC **`app_estanq_poligonos(p_layer)`** (`zonas_pressao`|`dmcs`, definer, só `authenticated`); cache em
+  localStorage (`est_cam_zp`/`est_cam_dmc`). Camadas ficam **abaixo** dos pontos (`bringToBack`); começam desligadas.
 
 ### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
@@ -1554,7 +1560,7 @@ real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (g
 ## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
-**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`.
+**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`, `app_estanq_poligonos` (camadas ZP/DMC COPASA).
 **Loggers:** `app_loggers_listar`, `app_logger_criar/instalar/remover/finalizar/editar`,
 `logger_pressao_importar/stats`.
 **Pesquisa/Ocorrência:** `app_pesquisa_filtros`, `app_pesquisa_produtividade`,
