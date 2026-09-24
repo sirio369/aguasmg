@@ -153,9 +153,12 @@
 - Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
   `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
-  No mapa da produtividade, o **popup de cada ponto** traz pressão/HD/data/coletor + **link "📷 Ver foto do
-  manômetro"** (`SBASE+pr.foto`, aba nova) quando há foto — `app_pressao_produtividade` passou a devolver
-  `foto` nas `properties` dos pontos (2026-09-24).
+  No mapa da produtividade, o **popup de cada ponto** traz pressão/**cota**/**cota+pressão**/HD/data/coletor +
+  **link "📷 Ver foto do manômetro"** (`SBASE+pr.foto`, aba nova) quando há foto. **Chips de métrica**
+  (`#prpMetric`/`PR_MET`/`prpSetMetric`, 2026-09-24) alternam a visualização entre **Pressão** (mca, escala de
+  cor fixa 10–50), **Cota** e **Cota + Pressão** (m, escala de cor **automática** por min/máx dos pontos) —
+  muda a cor + o rótulo do marcador e recalcula os cards (média/mín/máx) no cliente a partir de `prpData`.
+  `app_pressao_produtividade` devolve `foto` **e `cota`** (=`cota_m`) nas `properties` dos pontos.
 - **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
   `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
   137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
@@ -259,6 +262,11 @@
   `pressao_final`/`unidade_final`/`converteu_mca` (saíram `pressao_kpa`/`pressao_mca`); `grant select` a
   `gis_visualizacao` refeito. ⚠️ **Repontar a camada no projeto QGIS** — os campos `pressao_kpa`/`pressao_mca`
   deixaram de existir na vitrine. `app_logger_pressao_export` e `lgExportarCsv` seguem os novos nomes.
+  **Cota + rótulo na vitrine (2026-09-24):** a base `vw_logger_pressao` passou a expor **`cota`** (= `i.elev`
+  do ponto do logger); a vitrine **`vw_gis_logger_pressao`** ganhou **`cota`**, **`cota_mais_pressao`**
+  (= `cota + pressao_final`, a linha piezométrica) e **`rotulo`** no formato **`XX mca | XX m - XX m`**
+  (pressão | cota – cota+pressão, arredondados; só pressão quando não há cota). `grant select` a
+  `gis_visualizacao` mantido — usar `rotulo` como campo de rótulo no QGIS.
 - **Filtro "concluído" segrega dados:** `app_loggers_listar` devolve `tem_pressao` (bool); o sub-filtro
   `#lgSub` (`lgSub`/`renderSubFiltros`/`lgMatchSub`) aparece só no filtro **concluído** com
   **✅ Com dados de pressão** / **⚠️ Sem dados** (+contagens) — torna visível a quantidade de loggers
