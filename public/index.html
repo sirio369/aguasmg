@@ -333,13 +333,21 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
-      <button class="mod soon" id="cardPessoas"><div class="ic">👥</div><div class="nm">Gestão de Pessoas 🔒</div></button>
     </div>
-    <div class="sec" style="margin-top:20px">🚧 Em desenvolvimento</div>
+    <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
       <button class="mod soon" id="cardProj"><div class="ic">📐</div><div class="nm">Projetos 🔒</div></button>
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
+      <button class="mod soon" id="cardPessoas"><div class="ic">👥</div><div class="nm">Gestão de Pessoas 🔒</div></button>
     </div>
+  </main>
+
+  <main id="dev_acesso" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Módulos em desenvolvimento · Acesso</h1>
+    <p class="sub">Marque quem pode ver e entrar nos módulos em desenvolvimento (Projetos e Perdas). O admin sempre tem acesso.</p>
+    <input id="devAcessoBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
+    <div id="devAcessoList"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="pressao" class="hidden">
@@ -1268,7 +1276,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','pessoas'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','dev_acesso','pessoas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1296,6 +1304,7 @@ function irPara(id){
   if(id==='matriculas') mtInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
+  if(id==='dev_acesso') devAcessoInit();
   if(id==='projetos') pjHub();
   if(id==='projeto_campo') pjInit();
   if(id==='projeto_sup') pjSupEnter();
@@ -1305,11 +1314,38 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-const HOME_GATE_EMAILS=['sander.sirio@aguasmg.com.br','geovana.mendonca@aguasmg.com.br'];
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const cp=document.getElementById('cardPerdas'); if(cp){ const okP=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cp.classList.toggle('soon',!okP); cp.querySelector('.nm').textContent=okP?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okP?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cj=document.getElementById('cardProj'); if(cj){ const okJ=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cj.classList.toggle('soon',!okJ); cj.querySelector('.nm').textContent=okJ?'Projetos':'Projetos 🔒'; cj.onclick=okJ?(()=>irPara('projetos')):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ const okPe=!!(ME&&HOME_GATE_EMAILS.includes(String(ME.email||'').toLowerCase())); cpe.classList.toggle('soon',!okPe); cpe.querySelector('.nm').textContent=okPe?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okPe?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cj=document.getElementById('cardProj'); if(cj){ cj.classList.toggle('soon',!okDev); cj.querySelector('.nm').textContent=okDev?'Projetos':'Projetos 🔒'; cj.onclick=okDev?(()=>irPara('projetos')):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
+if($('#homeDevAcesso')) $('#homeDevAcesso').addEventListener('click',()=>irPara('dev_acesso'));
+// Acesso aos módulos "Em desenvolvimento" (Projetos/Perdas) — engrenagem admin, backend em perfil.dev_acesso (padrão almoxarifado)
+let _devAcessoUsers=[];
+async function devAcessoInit(){
+  if(!(ME&&ME.is_admin)){ irPara('home'); return; }
+  const cont=$('#devAcessoList'); if(cont) cont.innerHTML='<p class="sub">Carregando…</p>';
+  const bu=$('#devAcessoBusca'); if(bu && !bu.dataset.ready){ bu.dataset.ready='1'; bu.addEventListener('input',devAcessoRender); }
+  try{ const {data,error}=await sb.rpc('app_dev_acesso_listar'); if(error)throw error; _devAcessoUsers=data||[]; }
+  catch(e){ if(cont) cont.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  devAcessoRender();
+}
+function devAcessoRender(){
+  const termo=(($('#devAcessoBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_devAcessoUsers.filter(u=>!termo || (u.nome||'').toLowerCase().includes(termo) || (u.email||'').toLowerCase().includes(termo));
+  const cont=$('#devAcessoList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{ const lock=!!u.acesso_pelo_cargo;
+    const nota=lock?'<span class="sub" style="font-size:11px">admin — acesso sempre</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="devAcessoCk" data-id="${u.id}" ${u.acesso?'checked':''} ${lock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${u.nome||u.email||'—'}</div>${nota}</div></label>`;
+  }).join('');
+  cont.querySelectorAll('.devAcessoCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_dev_acesso_set',{p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_devAcessoUsers.find(x=>x.id===id); if(u) u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
+}
 ['condBar','frotasBar'].forEach(bid=>{ const b=$('#'+bid); if(b) b.addEventListener('click',()=>irPara('frota')); });
 
 // ---------- MÓDULO PROJETOS / INTERVENÇÕES ----------

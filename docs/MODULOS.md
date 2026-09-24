@@ -1635,11 +1635,13 @@ uma **página HTML separada** (`public/perdas.html`, autocontida: CSS/JS própri
 Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card do hub que faz
 `location.href='perdas.html'`.
 
-- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na seção 🧰 Suporte do `#home`. Nasce
-  `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera **só** para
-  `ME.email === 'sander.sirio@aguasmg.com.br'` (tira `soon`/🔒 e liga `onclick`); os demais ficam
-  opacos e o clique dá `toast('Acesso restrito')`. Segue o padrão de gate da §1 (nasce restrito,
-  revela no `homeGate` quando `ME` resolve).
+- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na categoria **🚧 Em desenvolvimento** do `#home`
+  (junto do `#cardProj`). Nasce `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera por
+  **`ME.dev_acesso`** (tira `soon`/🔒 e liga `onclick`); quem não tem fica opaco e o clique dá `toast('Acesso
+  restrito')`. **Controle de acesso (2026-09):** engrenagem ⚙️ `#homeDevAcesso` na categoria (só admin) → tela
+  `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`) que lista usuários com toggle; backend
+  `perfil.dev_acesso` + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set` (admin-only) + `app_me` repassa
+  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded.
 - **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
   supabase-js (mesma `SB_URL`/anon key do app), lê `auth.getSession()` e, se o e-mail ≠ Sander (ou sem
   sessão), mantém o overlay `#nrwGate` (🔒). Funciona offline (a sessão vem do `localStorage` do mesmo
@@ -1890,11 +1892,11 @@ vez, então os passos foram fundidos.
   proposta (`FOTO2_BLOBS.peCartaAnexo`, via `uploadFoto2`/`fotoPickHtml`) é resetado a cada render
   da tela de detalhe do candidato — sem isso, o blob em memória de um candidato anterior poderia
   vazar e ser anexado ao candidato errado se o RH não escolher um arquivo novo.
-- **Card do hub travado** (`#cardPessoas`, `homeGate()`, mesmo padrão de `cardPerdas`/`cardProj` —
-  `HOME_GATE_EMAILS`): só Geovana e Sander veem/clicam o card "Gestão de Pessoas" na tela inicial —
-  pra qualquer outro e-mail ele aparece com 🔒 e um toast de "Acesso restrito" no clique. Isso só
-  esconde o módulo do menu geral; não é o controle de acesso real (esse continua sendo as RPCs
-  `SECURITY DEFINER` + `pessoas_admin`/`gestor_uuid`/`aprovador_uuid`/`aprovador2_uuid`) — por isso
+- **Card do hub travado** (`#cardPessoas`, na categoria **🚧 Em desenvolvimento**, `homeGate()`, mesmo
+  padrão de `cardPerdas`/`cardProj` — gate por **`ME.dev_acesso`**, controlado pela engrenagem ⚙️ da categoria
+  `dev_acesso`): só quem tem acesso "Em desenvolvimento" vê/clica o card "Gestão de Pessoas" — pros demais
+  aparece com 🔒 e toast de "Acesso restrito". Isso só esconde o módulo do menu geral; não é o controle de
+  acesso real (esse continua sendo as RPCs `SECURITY DEFINER` + `pessoas_admin`/`gestor_uuid`/`aprovador_uuid`/`aprovador2_uuid`) — por isso
   um gestor de área que recebe notificação de aprovação de vaga (`supGoAct` → `irPara('pessoas')`)
   continua conseguindo entrar pelo link da notificação mesmo sem estar na lista do card, porque
   `irPara('pessoas')` não tem gate próprio, só o card do home tem.

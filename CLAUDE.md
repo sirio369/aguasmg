@@ -384,8 +384,9 @@ headcount/orçamento por área fica para uma Fase 2. Detalhe em
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).
 
 **Perdas / NRW** (`public/perdas.html` — **página separada**, não é tela `<main>`) — cockpit de
-acompanhamento de perdas por DMC. Card `#cardPerdas` no hub, gated em `homeGate()` **só para o Sander**
-(`ME.email`); opaco (`.mod soon`) + 🔒 para os demais. A página tem guarda própria pela sessão Supabase.
+acompanhamento de perdas por DMC. Card `#cardPerdas` na categoria **🚧 Em desenvolvimento**, gated em
+`homeGate()` por **`ME.dev_acesso`** (controle de acesso por engrenagem — ver abaixo); opaco (`.mod soon`) + 🔒
+para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
@@ -393,7 +394,11 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 VCA/HDD). Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
 KPIs+timeline por dia/intervenção/atividade+CSV, sobre o feed `pjAllAvancos`). ⚠️ **Protótipo:** avanços não são
 gravados (`pjLeafHist` é mock) e nada persiste — ver fragilidades em `docs/MODULOS.md §8`. Card
-`#cardProj` gated em `homeGate()` **só para o Sander** (`ME.email`), igual ao Perdas. **Hub em 2 categorias
+`#cardProj` (categoria **🚧 Em desenvolvimento**) gated em `homeGate()` por **`ME.dev_acesso`**, igual ao Perdas.
+**Controle de acesso "Em desenvolvimento" (2026-09):** engrenagem ⚙️ na categoria (`#homeDevAcesso`, só admin,
+`homeGate` mostra) → tela `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`): lista usuários
+com toggle. Backend: coluna **`perfil.dev_acesso`** (admin sempre) + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set`
+(admin-only) + `app_me` repassa `dev_acesso`. **Aposentou o gate por e-mail hardcoded.** **Hub em 2 categorias
 (espelha o Almoxarifado):** **🏗️ Campo** (`projeto_campo` mapa/lista + `projeto_det` lançar avanços) e **🧰
 Suporte** (card **⚙️**; `projeto_sup` mapa/lista+filtros → `projeto_cfg` configurar escopo/quantidade + **cadeado
 de liberação**), gateada por `pjPodeSup()` = admin **ou** grant por pessoa definido no **mini-cadeado 🔐** →
