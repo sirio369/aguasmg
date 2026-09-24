@@ -433,6 +433,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="prpMes" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Este mês</button>
       <button id="prpTudo" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Tudo</button>
     </div>
+    <div id="prpMetric" style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="prpMetChip" data-met="pressao" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Pressão</button>
+      <button class="prpMetChip" data-met="cota" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Cota</button>
+      <button class="prpMetChip" data-met="soma" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Cota + Pressão</button>
+    </div>
     <div id="prpCards" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"></div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut);margin-bottom:6px">
       <span>baixa</span>
@@ -6336,15 +6341,32 @@ if($('#bibCfg')) $('#bibCfg').addEventListener('click',bibViewAdmin);
 if($('#bibBack')) $('#bibBack').addEventListener('click',()=>irPara('home'));
 
 // ---------- MÓDULO PRODUTIVIDADE DE PRESSÃO ----------
-let prpMap=null, prpLayer=null;
-const PR_MIN=10, PR_MAX=50;   // faixa da escala de cor (mca) — ajustável
-function prPCor(p){
-  let t=((+p||0)-PR_MIN)/(PR_MAX-PR_MIN); t=Math.max(0,Math.min(1,t));
+let prpMap=null, prpLayer=null, prpMetric='pressao', prpData=null;
+const PR_MIN=10, PR_MAX=50;   // faixa fixa da escala de cor p/ pressão (mca)
+// métricas selecionáveis por chip: pressão (mca, escala fixa) · cota / cota+pressão (m, escala automática)
+const PR_MET={
+  pressao:{lbl:'Pressão',un:'mca',fixo:[PR_MIN,PR_MAX],val:pr=>pr.pressao},
+  cota:{lbl:'Cota',un:'m',fixo:null,val:pr=>pr.cota},
+  soma:{lbl:'Cota + Pressão',un:'m',fixo:null,val:pr=>(pr.cota!=null&&pr.pressao!=null)?(+pr.cota + +pr.pressao):null}
+};
+function prPCorR(v,mn,mx){
+  let t=((+v||0)-mn)/((mx-mn)||1); t=Math.max(0,Math.min(1,t));
   const stops=[[215,48,39],[255,255,191],[69,117,180]];   // vermelho → claro → azul
   const seg=t<0.5?0:1, lt=t<0.5?t/0.5:(t-0.5)/0.5, a=stops[seg], b=stops[seg+1];
   return 'rgb('+Math.round(a[0]+(b[0]-a[0])*lt)+','+Math.round(a[1]+(b[1]-a[1])*lt)+','+Math.round(a[2]+(b[2]-a[2])*lt)+')';
 }
+function prPCor(p){ return prPCorR(p,PR_MIN,PR_MAX); }
 function prpFmt(v){ return (Math.round((+v||0)*10)/10).toString().replace('.',','); }
+function prpMetRender(){
+  document.querySelectorAll('#prpMetric .prpMetChip').forEach(b=>{
+    const on=b.dataset.met===prpMetric;
+    b.style.background=on?'var(--acc)':'transparent';
+    b.style.color=on?'var(--acc-ink)':'var(--mut)';
+    b.style.borderColor=on?'var(--acc)':'var(--line)';
+    b.style.fontWeight=on?'600':'400';
+  });
+}
+function prpSetMetric(m){ if(!PR_MET[m]) return; prpMetric=m; prpMetRender(); if(prpData){ prProdCards(prpData); prProdDesenhar(prpData); } }
 function prProdInit(){
   const cont=document.getElementById('prpMapa');
   if(window.L && !prpMap){
@@ -6357,6 +6379,7 @@ function prProdInit(){
   if(de && !de.value) de.value=prodMesIniStr();
   if(ate && !ate.value) ate.value=prodHojeStr();
   setTimeout(()=>{ if(prpMap) prpMap.invalidateSize(); },60);
+  prpMetRender();
   prProdFiltros().then(prProdAtualizar);
 }
 async function prProdFiltros(){
@@ -6376,15 +6399,19 @@ async function prProdAtualizar(){
   try{
     const {data,error}=await sb.rpc('app_pressao_produtividade',{p_usuario:u,p_data_ini:de,p_data_fim:ate});
     if(error)throw error;
-    prProdCards(data); prProdDesenhar(data);
+    prpData=data; prProdCards(data); prProdDesenhar(data);
   }catch(e){ toast('Erro na produtividade: '+(e.message||e)); }
 }
 function prProdCards(d){
+  const met=PR_MET[prpMetric]||PR_MET.pressao, u=met.un;
+  const vals=((d.pontos&&d.pontos.features)||[]).map(f=>met.val(f.properties||{})).filter(v=>v!=null&&!isNaN(+v)).map(Number);
+  const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+  const mn=vals.length?Math.min(...vals):0, mx=vals.length?Math.max(...vals):0;
   const cards=[
-    {ic:'📍',lbl:'Pontos medidos',val:String(d.n_pontos||0)},
-    {ic:'💧',lbl:'Pressão média',val:prpFmt(d.pressao_media)+' mca'},
-    {ic:'⬇️',lbl:'Mínima',val:prpFmt(d.pressao_min)+' mca'},
-    {ic:'⬆️',lbl:'Máxima',val:prpFmt(d.pressao_max)+' mca'}
+    {ic:'📍',lbl:'Pontos medidos',val:String(d.n_pontos||vals.length||0)},
+    {ic:'💧',lbl:met.lbl+' média',val:prpFmt(avg)+' '+u},
+    {ic:'⬇️',lbl:'Mínima',val:prpFmt(mn)+' '+u},
+    {ic:'⬆️',lbl:'Máxima',val:prpFmt(mx)+' '+u}
   ];
   document.getElementById('prpCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px"><div style="font-size:12px;color:var(--mut)">'+c.ic+' '+c.lbl+'</div><div style="font-size:22px;font-weight:700;margin-top:4px">'+c.val+'</div></div>').join('');
 }
@@ -6393,13 +6420,24 @@ function prProdDesenhar(d){
   if(prpLayer){ prpMap.removeLayer(prpLayer); prpLayer=null; }
   const fc=(d.pontos&&d.pontos.features)||[];
   if(!fc.length) return;
+  const met=PR_MET[prpMetric]||PR_MET.pressao;
+  let mn,mx;
+  if(met.fixo){ mn=met.fixo[0]; mx=met.fixo[1]; }
+  else { const vs=fc.map(f=>met.val(f.properties||{})).filter(v=>v!=null&&!isNaN(+v)).map(Number); mn=vs.length?Math.min(...vs):0; mx=vs.length?Math.max(...vs):1; }
   prpLayer=L.geoJSON(d.pontos,{
     pointToLayer:function(f,ll){
-      const p=(f.properties&&f.properties.pressao);
-      const m=L.circleMarker(ll,{radius:9,color:'#fff',weight:1.5,fillColor:prPCor(p),fillOpacity:1});
-      m.bindTooltip(prpFmt(p),{permanent:true,direction:'top',offset:[0,-6],className:'prlbl'});
       const pr=f.properties||{};
-      m.bindPopup('<b>'+prpFmt(pr.pressao)+' mca</b>'+(pr.numero_hd?('<br>HD '+pr.numero_hd):'')+(pr.data?('<br>'+pr.data):'')+(pr.usuario?('<br>'+pr.usuario):'')+(pr.foto?('<br><a href="'+SBASE+pr.foto+'" target="_blank" rel="noopener">📷 Ver foto do manômetro</a>'):''));
+      const v=met.val(pr);
+      const m=L.circleMarker(ll,{radius:9,color:'#fff',weight:1.5,fillColor:prPCorR(v,mn,mx),fillOpacity:1});
+      m.bindTooltip(v!=null?prpFmt(v):'—',{permanent:true,direction:'top',offset:[0,-6],className:'prlbl'});
+      const soma=(pr.cota!=null&&pr.pressao!=null)?(+pr.cota + +pr.pressao):null;
+      m.bindPopup('<b>'+prpFmt(pr.pressao)+' mca</b>'
+        +(pr.cota!=null?('<br>Cota '+prpFmt(pr.cota)+' m'):'')
+        +(soma!=null?('<br>Cota+Pressão '+prpFmt(soma)+' m'):'')
+        +(pr.numero_hd?('<br>HD '+pr.numero_hd):'')
+        +(pr.data?('<br>'+pr.data):'')
+        +(pr.usuario?('<br>'+pr.usuario):'')
+        +(pr.foto?('<br><a href="'+SBASE+pr.foto+'" target="_blank" rel="noopener">📷 Ver foto do manômetro</a>'):''));
       return m;
     }
   }).addTo(prpMap);
@@ -6407,6 +6445,7 @@ function prProdDesenhar(d){
 }
 if($('#prProd')) $('#prProd').addEventListener('click',()=>irPara('pr_prod'));
 if($('#prProdBack')) $('#prProdBack').addEventListener('click',()=>irPara('pressao'));
+document.querySelectorAll('#prpMetric .prpMetChip').forEach(b=>b.addEventListener('click',()=>prpSetMetric(b.dataset.met)));
 if($('#prpUser')) $('#prpUser').addEventListener('change',prProdAtualizar);
 if($('#prpDe')) $('#prpDe').addEventListener('change',prProdAtualizar);
 if($('#prpAte')) $('#prpAte').addEventListener('change',prProdAtualizar);
