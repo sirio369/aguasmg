@@ -1583,138 +1583,240 @@ const MM_CLASS={
 // situação da ligação (cd_situaca): R=Real/ativa, I=Inativa/cortada, F=Factível, P=Potencial
 const MM_SIT={R:{l:'Ativa',c:'#3fb27f'},I:{l:'Inativa/cortada',c:'#d6336c'},F:{l:'Factível',c:'#e6a23c'},P:{l:'Potencial',c:'#e6a23c'}};
 function mmSitLabel(s){ const o=MM_SIT[s]; return o?o.l:(s||'—'); }
-let mmClass='', mmBusca='', mmResumo=null, mmRank=[], mmSaz=[];
+let mmClass='', mmBusca='', mmResumo=null, mmRank=[], mmMensal=[], mmDmc=[], mmSel=null, mmDetSel=null, mmDetCache={};
 const MM_MES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 function mmCons(){ return za==='all'?null:za; }
+function mmCmp(c){ return (''+c).replace(/(\d{4})(\d{2})/,'$2/$1'); }
+function br1(n){ return (Number(n)||0).toFixed(1).replace('.',','); }
+function mmSig(n){ return (n>=0?'+':'')+br1(n); }
+function mmHeat(t){ t=Math.max(0,Math.min(1,t)); return `rgba(75,159,224,${(0.10+t*0.72).toFixed(3)})`; }
+function mmDiv(pct,maxAbs){ const t=Math.min(1,Math.abs(pct)/(maxAbs||1)); return (pct>=0?`rgba(230,162,60,`:`rgba(75,159,224,`)+(0.12+t*0.72).toFixed(3)+')'; }
+function mmDelta(v){ return v==null?'inherit':(v>0?'#4b9fe0':(v<0?'#e6a23c':'inherit')); }
+const MM_INFO={
+ lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume faturado do mês ÷ nº de ligações faturadas ÷ <b>30 dias</b> × 1000.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume faturado</b> = medido (leitura real) + não medido (estimado + faturado mínimo).</p>`},
+ season:{t:'Sazonalidade & tendência',h:`<p>Tudo em <b>L/lig/dia</b> para "empatar" as variáveis e não distorcer a percepção.</p><p><b>Heatmap</b>: cada célula é o L/lig/dia daquele mês/ano (mais claro = maior). A linha <b>Sazonal</b> mostra o desvio médio de cada mês‑calendário vs a média geral (laranja acima / azul abaixo).</p><p><b>Gráfico</b>: linha = ano mais recente; a <b>sombra</b> é a faixa mín–máx dos anos anteriores. ⚠️ Base atual = 18 meses (2025‑03 a 2026‑08): a sombra hoje reflete só 2025 e alguns meses ainda não têm sobreposição ano a ano.</p>`},
+ dmc:{t:'DMCs mais sensíveis',h:`<p>Cruzamento espacial <b>matrícula → DMC</b> (ponto da ligação dentro do limite vigente do DMC) × micromedição.</p><p><b>L/lig/dia</b> por DMC no último mês, com variação <b>MoM</b> (mês anterior) e <b>YoY</b> (mesmo mês do ano anterior), <b>% não medido</b>, nº de <b>fraudes potenciais</b> e <b>score médio</b> de anomalia. DMCs no topo (maior L/lig/dia ou piores deltas) são candidatos a priorização de campanha.</p>`},
+ rank:{t:'Ranking de anomalia — variáveis e método',h:`<ul style="padding-left:18px;margin:0;line-height:1.65">
+  <li><b>Comportamento</b>: classe derivada das métricas, na precedência fraude → nulo recorrente → pico isolado → queda contínua → crescimento contínuo → instável → estável.</li>
+  <li><b>Situação</b>: situação da ligação (cd_situaca) na última competência — Ativa (R), Inativa/cortada (I), Factível (F), Potencial (P). O selo <b>N× c/água</b> conta os meses com a ligação I/F/P faturando volume (indício de fraude).</li>
+  <li><b>Média m³</b>: média mensal do volume faturado nos 18 meses.</li>
+  <li><b>CV</b>: coeficiente de variação = desvio‑padrão ÷ média. Alto = consumo instável.</li>
+  <li><b>Tendência</b>: inclinação (slope) da regressão linear do volume ao longo dos meses, em m³/mês.</li>
+  <li><b>Zeros</b>: meses com volume zero sobre o total de meses.</li>
+  <li><b>Score (0–100)</b>: Índice de Anomalia = (3·pico + 2·tendência + 2·CV + 1·zeros + 3·fraude) ÷ 11 × 100. Pico = máx ÷ média; fraude = nº de meses cortada com água.</li>
+ </ul>`}
+};
+function mmModal(title,html){ let o=document.getElementById('mmModal');
+ if(!o){ o=document.createElement('div'); o.id='mmModal'; o.className='mmmodal';
+  o.innerHTML='<div class="mmmodal-bx"><button class="mmmodal-x" aria-label="Fechar">✕</button><div class="mmmodal-h"></div><div class="mmmodal-c"></div></div>';
+  document.body.appendChild(o); o.onclick=e=>{ if(e.target===o||e.target.classList.contains('mmmodal-x')) o.classList.remove('on'); }; }
+ o.querySelector('.mmmodal-h').innerHTML=title; o.querySelector('.mmmodal-c').innerHTML=html; o.classList.add('on'); }
+function mmIB(key){ return `<button class="mminfo" data-info="${key}" title="Sobre este bloco">ⓘ</button>`; }
 function mmCss(){ if(document.getElementById('mmcss'))return; const st=document.createElement('style'); st.id='mmcss'; st.textContent=`
  #s-mm td.r,#s-mm th.r{text-align:right;font-variant-numeric:tabular-nums}
+ .mminfo{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;flex:0 0 auto}
+ .mminfo:hover{color:var(--accent);border-color:var(--accent)}
+ .mmsel{background:var(--surface-2,#12212a);border:1px solid var(--line);color:inherit;border-radius:8px;padding:5px 9px;font-size:13px}
+ .mmmodal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:18px}
+ .mmmodal.on{display:flex}
+ .mmmodal-bx{background:var(--card,#0f1a1f);border:1px solid var(--line);border-radius:12px;max-width:560px;width:100%;max-height:82vh;overflow:auto;padding:18px 20px;position:relative}
+ .mmmodal-x{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer}
+ .mmmodal-h{font-size:15px;font-weight:600;margin:0 24px 10px 0}
+ .mmmodal-c{font-size:13px;color:var(--ink-2,#c9d6da);line-height:1.55}
+ .mmmodal-c p{margin:0 0 8px}
+ .mmkpiwrap{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch}
+ .mmhero{display:flex;flex-direction:column;justify-content:center;min-width:190px;padding:4px 18px 4px 2px;border-right:1px solid var(--line)}
+ .mmhero-v{font-size:42px;font-weight:700;line-height:1;color:var(--accent)}
+ .mmhero-u{font-size:13px;color:var(--muted);margin-top:3px}
+ .mmhero-s{font-size:11.5px;color:var(--muted);margin-top:7px;max-width:200px}
+ .mmkpismall{flex:1;min-width:270px}
+ @media(max-width:640px){.mmhero{border-right:none;border-bottom:1px solid var(--line);width:100%;padding-bottom:12px}}
+ .mmheat{display:grid;grid-template-columns:58px repeat(12,1fr);gap:3px;font-variant-numeric:tabular-nums;overflow-x:auto}
+ .mmhcell{padding:5px 2px;text-align:center;font-size:10.5px;border-radius:3px;color:#eaf1f5;min-width:30px}
+ .mmhhdr,.mmhlbl{color:var(--muted);background:none!important;font-size:10px}
+ .mmhlbl{text-align:right;padding-right:6px;white-space:nowrap}
+ .mmhna{background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.05) 3px,rgba(255,255,255,.05) 6px)}
+ .mmhsel{outline:2px solid var(--accent);outline-offset:-2px}
+ .mmhdev{color:#0d1418;font-weight:600}
+ .mmdmc{width:100%}
  .mmdistwrap{display:flex;flex-direction:column;gap:8px}
- .mmdist{display:grid;grid-template-columns:160px 1fr 96px;align-items:center;gap:10px;cursor:pointer;padding:2px 0}
- .mmdist.sel{font-weight:600}
+ .mmdist{display:grid;grid-template-columns:158px 1fr 92px;align-items:center;gap:10px;cursor:pointer;padding:2px 0;border-radius:6px}
+ .mmdist.sel{font-weight:600;background:rgba(var(--accent-rgb),.07)}
  .mmdist .mmdlab{font-size:12.5px;display:flex;align-items:center;gap:7px}
  .mmdist .mmdlab i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
  .mmdbar{height:9px;border-radius:5px;background:var(--surface-2,#12212a);overflow:hidden}
  .mmdbar span{display:block;height:100%;border-radius:5px}
  .mmdval{font-size:11.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+ .mmanalgrid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-top:12px;align-items:start}
+ @media(max-width:860px){.mmanalgrid{grid-template-columns:1fr}}
+ .mmdetail-sticky{position:sticky;top:8px}
  .mmfilters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
  .mmchip{border:1px solid var(--line);background:none;color:var(--ink-2,#c9d6da);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer}
  .mmchip.on{background:rgba(var(--accent-rgb),.15);border-color:var(--accent);color:var(--accent);font-weight:600}
- .mmfilters input{margin-left:auto;background:var(--surface-2,#12212a);border:1px solid var(--line);color:inherit;border-radius:8px;padding:6px 10px;font-size:13px;max-width:180px}
+ .mmfilters input{margin-left:auto;background:var(--surface-2,#12212a);border:1px solid var(--line);color:inherit;border-radius:8px;padding:6px 10px;font-size:13px;max-width:160px}
  .mmtag{font-size:11px;padding:2px 8px;border-radius:999px;color:var(--cc);border:1px solid var(--cc);white-space:nowrap}
  #mmtbl tbody tr:hover{background:rgba(var(--accent-rgb),.06)}
+ #mmtbl tbody tr.rowsel{background:rgba(var(--accent-rgb),.14)}
  .mmdhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
  .mmstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 14px;margin-top:4px}
  .mmstats>div{display:flex;flex-direction:column}
  .mmstats .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
- .mmstats .v{font-size:14px;font-weight:600}
- .mmseasrow{display:flex;gap:8px;align-items:flex-end;margin-top:14px;flex-wrap:wrap}
- .mmseastit{font-size:11px;color:var(--muted);width:100%;margin-bottom:0}
- .mmseas{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:40px;flex:1}
- .mmseasbar{height:34px;width:100%;display:flex;align-items:flex-end;justify-content:center}
- .mmseasbar span{width:16px;border-radius:3px 3px 0 0;display:block;min-height:2px}
- .mmseasbar span.up{background:#4b9fe0}.mmseasbar span.dn{background:#e6a23c}
- .mmseasm{font-size:10px;color:var(--muted)}
- .mmseasv{font-size:10px;font-variant-numeric:tabular-nums}
- .mmseasv.up{color:#4b9fe0}.mmseasv.dn{color:#e6a23c}`; document.head.appendChild(st); }
+ .mmstats .v{font-size:14px;font-weight:600}`; document.head.appendChild(st); }
 async function mmInit(){ mmCss();
  const body=$('#mmBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise do micromedido…</p></div></div>';
- let r,k,z;
+ let r,k,mn,dm;
  try{
-  [r,k,z]=await Promise.all([
+  [r,k,mn,dm]=await Promise.all([
    sbg.rpc('app_nrw_mm_resumo',{p_consorcio:mmCons()}),
    sbg.rpc('app_nrw_mm_ranking',{p_consorcio:mmCons(),p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:150,p_offset:0}),
-   sbg.rpc('app_nrw_mm_sazonalidade',{p_consorcio:mmCons()})
+   sbg.rpc('app_nrw_mm_mensal',{p_consorcio:mmCons()}),
+   sbg.rpc('app_nrw_mm_dmc',{p_consorcio:mmCons()})
   ]);
-  if(r.error)throw r.error; if(k.error)throw k.error; if(z.error)throw z.error;
+  if(r.error)throw r.error; if(k.error)throw k.error; if(mn.error)throw mn.error; if(dm.error)throw dm.error;
  }catch(e){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; return; }
- mmResumo=r.data; mmRank=k.data||[]; mmSaz=z.data||[]; mmRender();
+ mmResumo=r.data; mmRank=k.data||[]; mmMensal=mn.data||[]; mmDmc=dm.data||[];
+ if(mmSel==null || !mmMensal.some(p=>p.competencia===mmSel)) mmSel=mmMensal.length?mmMensal[mmMensal.length-1].competencia:null;
+ mmDetSel=null; mmDetCache={}; mmRenderAll();
 }
-function mmCmp(c){ return (''+c).replace(/(\d{4})(\d{2})/,'$2/$1'); }
-function mmSazPanel(){
- const S=mmSaz||[]; if(S.length<2) return '';
- const vals=S.map(p=>Number(p.media_matricula)||0);
- const mean=vals.reduce((a,b)=>a+b,0)/(vals.length||1);
- const W=900,H=175,pl=42,pr=12,pt=14,pb=26, maxv=Math.max(...vals), minv=Math.min(...vals), lo=Math.min(minv,mean)*0.92, hi=maxv*1.05;
- const X=i=>pl+(S.length<=1?0:i/(S.length-1))*(W-pl-pr), Y=v=>pt+(1-(v-lo)/((hi-lo)||1))*(H-pt-pb);
- const pts=S.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
- const meanY=Y(mean);
- const dots=S.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="3" fill="var(--accent)"><title>${mmCmp(p.competencia)}: ${vals[i].toFixed(1)} m³/matrícula · ${fmt(p.faturadas)} faturadas</title></circle>`).join('');
- const xlabels=S.map((p,i)=>(S.length>13&&i%2)?'':`<text x="${X(i).toFixed(1)}" y="${H-8}" fill="#ffffff66" font-size="8.5" text-anchor="middle">${mmCmp(p.competencia)}</text>`).join('');
- // perfil sazonal por mês-calendário (média do mês ÷ média geral)
- const byMes={}; S.forEach((p,i)=>{ const m=p.competencia%100; (byMes[m]=byMes[m]||[]).push(vals[i]); });
- const prof=[]; for(let m=1;m<=12;m++){ if(byMes[m]){ const a=byMes[m].reduce((x,y)=>x+y,0)/byMes[m].length; prof.push({m,pct:(a/mean-1)*100}); } }
- const maxAbs=Math.max(1,...prof.map(p=>Math.abs(p.pct)));
- const profBars=prof.map(p=>{ const up=p.pct>=0, h=Math.max(2,Math.round(Math.abs(p.pct)/maxAbs*32));
-   return `<div class="mmseas"><div class="mmseasbar"><span class="${up?'up':'dn'}" style="height:${h}px"></span></div><span class="mmseasm">${MM_MES[p.m-1]}</span><span class="mmseasv ${up?'up':'dn'}">${up?'+':''}${Math.round(p.pct)}%</span></div>`;
- }).join('');
- // Δ ano a ano: meses com o mesmo mês do ano anterior na série
- const byC={}; S.forEach((p,i)=>byC[p.competencia]=vals[i]);
- const yoy=[]; S.forEach((p,i)=>{ const prev=byC[p.competencia-100]; if(prev!=null&&prev>0) yoy.push((vals[i]-prev)/prev); });
- const yoyAvg=yoy.length?Math.round(yoy.reduce((a,b)=>a+b,0)/yoy.length*100):null;
- const trend=Math.round((vals[vals.length-1]-vals[0])/(vals[0]||1)*100);
- return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Sazonalidade & tendência</h3><span class="chip real">real</span></div>
+async function mmLoadRank(){
+ try{ const k=await sbg.rpc('app_nrw_mm_ranking',{p_consorcio:mmCons(),p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:150,p_offset:0}); if(k.error)throw k.error; mmRank=k.data||[]; }
+ catch(e){ if(window.toast)toast('Erro no ranking: '+(e.message||e)); return; }
+ mmDetSel=null; mmRenderAll();
+}
+function mmSetMes(c){ mmSel=+c; mmRenderAll(); }
+/* ---- painel 1: indicador do mês (L/lig/dia) ---- */
+function mmKpiPanel(){
+ if(!mmMensal.length) return '';
+ const byC={}; mmMensal.forEach(p=>byC[p.competencia]=p);
+ const idx=mmMensal.findIndex(p=>p.competencia===mmSel);
+ const cur=byC[mmSel]||mmMensal[mmMensal.length-1]||{};
+ const prev=idx>0?mmMensal[idx-1]:null, yoy=byC[mmSel-100]||null;
+ const mom=(prev&&prev.lpd)?((cur.lpd-prev.lpd)/prev.lpd*100):null;
+ const yy=(yoy&&yoy.lpd)?((cur.lpd-yoy.lpd)/yoy.lpd*100):null;
+ const opts=mmMensal.map(p=>`<option value="${p.competencia}"${p.competencia===mmSel?' selected':''}>${mmCmp(p.competencia)}</option>`).join('');
+ const nf=(mmResumo||{}).n_fraude||0;
+ const kp=(l,v,s,col)=>`<div class="kpi"><span class="lab">${l}</span><span class="val"${col?` style="color:${col}"`:''}>${v}</span><span class="sub">${s}</span></div>`;
+ return `<div class="panel" id="mmKpi"><div class="phead"><h3>Indicador do mês</h3>
+   <div style="display:flex;gap:8px;align-items:center;margin-left:auto"><select id="mmMesSel" class="mmsel">${opts}</select>${mmIB('lpd')}</div></div>
+  <div class="pbody"><div class="mmkpiwrap">
+   <div class="mmhero"><span class="mmhero-v">${br1(cur.lpd)}</span><span class="mmhero-u">L/lig·dia</span><span class="mmhero-s">consumo faturado por ligação — ${mmCmp(mmSel)} (base 30 dias)</span></div>
+   <div class="kpis mmkpismall">
+    ${kp('vs mês anterior', mom!=null?mmSig(mom)+'%':'—', 'MoM', mmDelta(mom))}
+    ${kp('vs ano anterior', yy!=null?mmSig(yy)+'%':'—', yy==null?'YoY (sem base)':'YoY', mmDelta(yy))}
+    ${kp('Volume faturado', fmt(Math.round(cur.volume_total||0))+'<small> m³</small>', 'no mês')}
+    ${kp('% não medido', br1(cur.pct_naomedido)+'%', 'estimado + mínimo')}
+    ${kp('Ligações faturadas', fmt(cur.n_faturadas||0), 'no mês')}
+    ${kp('Fraude potencial', fmt(nf), 'cortada c/ água', nf>0?'#d6336c':null)}
+   </div>
+  </div></div></div>`;
+}
+/* ---- painel 2: sazonalidade & tendência (heatmap + linha, sobre L/lig/dia) ---- */
+function mmSeasonPanel(){
+ const S=mmMensal; if(S.length<2) return '';
+ const byYM={}, years=[]; S.forEach(p=>{ const y=Math.floor(p.competencia/100), m=p.competencia%100; byYM[y+'-'+m]=p; if(!years.includes(y))years.push(y); }); years.sort();
+ const lpds=S.map(p=>+p.lpd), lo=Math.min(...lpds), hi=Math.max(...lpds), overall=lpds.reduce((a,b)=>a+b,0)/lpds.length;
+ // perfil sazonal por mês-calendário
+ const seasDev={}; for(let m=1;m<=12;m++){ const arr=S.filter(p=>p.competencia%100===m).map(p=>+p.lpd); if(arr.length) seasDev[m]=((arr.reduce((a,b)=>a+b,0)/arr.length)/overall-1)*100; }
+ const maxDev=Math.max(1,...Object.values(seasDev).map(Math.abs));
+ // heatmap grid
+ let grid='<div class="mmheat"><div class="mmhcell mmhlbl"></div>'+MM_MES.map(mn=>`<div class="mmhcell mmhhdr">${mn}</div>`).join('');
+ years.forEach(y=>{ grid+=`<div class="mmhcell mmhlbl">${y}</div>`; for(let m=1;m<=12;m++){ const p=byYM[y+'-'+m]; if(!p){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const t=(+p.lpd-lo)/((hi-lo)||1), sel=p.competencia===mmSel; grid+=`<div class="mmhcell${sel?' mmhsel':''}" style="background:${mmHeat(t)}" title="${mmCmp(p.competencia)}: ${br1(p.lpd)} L/lig/dia">${Math.round(p.lpd)}</div>`; } });
+ grid+='<div class="mmhcell mmhlbl">Sazonal</div>'; for(let m=1;m<=12;m++){ if(seasDev[m]==null){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const d=seasDev[m]; grid+=`<div class="mmhcell mmhdev" style="background:${mmDiv(d,maxDev)}" title="${MM_MES[m-1]}: ${mmSig(d)}% vs média geral">${d>=0?'+':''}${Math.round(d)}%</div>`; }
+ grid+='</div>';
+ // gráfico: último ano em linha + sombra min/max dos anteriores
+ const maxYear=years[years.length-1], W=900,H=190,pl=46,pr=14,pt=14,pb=26;
+ const ylo=Math.min(...lpds)*0.9, yhi=Math.max(...lpds)*1.06;
+ const X=m=>pl+((m-1)/11)*(W-pl-pr), Y=v=>pt+(1-(v-ylo)/((yhi-ylo)||1))*(H-pt-pb);
+ const prior=years.filter(y=>y!==maxYear);
+ const bTop=[],bBot=[]; for(let m=1;m<=12;m++){ const arr=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(p=>+p.lpd); if(arr.length){ bTop.push([m,Math.max(...arr)]); bBot.push([m,Math.min(...arr)]); } }
+ let band=''; if(bTop.length){ const up=bTop.map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)); const dn=bBot.slice().reverse().map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)); band=`<polygon points="${up.concat(dn).join(' ')}" fill="rgba(138,143,152,.20)" stroke="rgba(138,143,152,.35)" stroke-width=".6"/>`; }
+ const lp=[]; for(let m=1;m<=12;m++){ const p=byYM[maxYear+'-'+m]; if(p)lp.push([m,+p.lpd]); }
+ const line=lp.length?`<polyline points="${lp.map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>`:'';
+ const dots=lp.map(([m,v])=>{ const pri=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(p=>+p.lpd); const pv=pri.length?pri.reduce((a,b)=>a+b,0)/pri.length:null; return `<circle cx="${X(m).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="var(--accent)"><title>${MM_MES[m-1]}/${maxYear}: ${br1(v)} L/lig/dia${pv!=null?' · anos ant.: '+br1(pv):''}</title></circle>`; }).join('');
+ const gl=[0,.5,1].map(f=>{ const v=ylo+(yhi-ylo)*f, yy=Y(v); return `<line x1="${pl}" y1="${yy.toFixed(1)}" x2="${W-pr}" y2="${yy.toFixed(1)}" stroke="#ffffff14"/><text x="${pl-6}" y="${(yy+3).toFixed(1)}" fill="#ffffff66" font-size="8.5" text-anchor="end">${Math.round(v)}</text>`; }).join('');
+ const xlab=MM_MES.map((mn,i)=>`<text x="${X(i+1).toFixed(1)}" y="${H-8}" fill="#ffffff66" font-size="9" text-anchor="middle">${mn}</text>`).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Sazonalidade & tendência</h3>${mmIB('season')}<span class="chip real" style="margin-left:auto">real</span></div>
   <div class="pbody">
-   <p class="note" style="margin-top:0">Consumo <b>médio por matrícula</b> (m³/mês) — normaliza o crescimento do nº de ligações (o volume total sobe só porque entram mais matrículas). ${yoyAvg!=null?`<b>Δ ano a ano</b> (meses sobrepostos): <b style="color:${yoyAvg>=0?'#3fb27f':'#e05d5d'}">${yoyAvg>=0?'+':''}${yoyAvg}%</b> · `:''}variação no período: <b>${trend>=0?'+':''}${trend}%</b></p>
-   <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px">
-    <line x1="${pl}" y1="${meanY.toFixed(1)}" x2="${W-pr}" y2="${meanY.toFixed(1)}" stroke="#ffffff33" stroke-dasharray="4 4"/>
-    <text x="${(pl-6).toFixed(0)}" y="${(meanY-3).toFixed(1)}" fill="#ffffff66" font-size="8.5" text-anchor="end">${mean.toFixed(1)}</text>
-    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.8"/>${dots}${xlabels}</svg>
-   <div class="mmseasrow"><span class="mmseastit">Perfil sazonal — desvio de cada mês vs a média (↑ acima / ↓ abaixo)</span>${profBars}</div>
+   <p class="note" style="margin-top:0">Tudo em <b>L/lig/dia</b> para empatar as variáveis. Heatmap por mês/ano + perfil sazonal; abaixo, <b>${maxYear}</b> em linha e a faixa mín–máx dos anos anteriores como sombra.</p>
+   ${grid}
+   <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin-top:12px">${gl}${band}${line}${dots}${xlab}</svg>
+   <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). Passe o mouse nos pontos para o valor exato.</p>
   </div></div>`;
 }
-function mmRender(){
- const R=mmResumo||{}, tot=R.n_matriculas||1;
- const K=[
-  {l:'Volume medido/mês',v:((R.volume_medio_mensal||0)>=1e6?((R.volume_medio_mensal/1e6).toFixed(2).replace('.',',')+'<small> mi m³</small>'):fmt(R.volume_medio_mensal||0)+'<small> m³</small>'),s:'soma das médias por matrícula'},
-  {l:'Matrículas',v:fmt(R.n_matriculas||0),s:'com histórico'},
-  {l:'Fraude potencial',v:fmt(R.n_fraude||0),s:'cortada/inativa faturando',hi:(R.n_fraude||0)>0?'#d6336c':null},
-  {l:'Anômalas',v:fmt(R.n_anomalas||0),s:'comportamento ≠ estável'},
-  {l:'Score elevado',v:fmt(R.n_score_alto||0),s:'índice ≥ 50'},
-  {l:'CV médio',v:Math.round((R.cv_medio||0)*100)+'%',s:'estabilidade do consumo'},
-  {l:'Score médio',v:(R.score_medio||0),s:'anomalia 0–100'}
- ];
- const kpisHtml='<div class="kpis">'+K.map(c=>`<div class="kpi"><span class="lab">${c.l}</span><span class="val"${c.hi?` style="color:${c.hi}"`:''}>${c.v}</span><span class="sub"><span class="chip real">real</span> ${c.s}</span></div>`).join('')+'</div>';
- const pc=R.por_classificacao||{}, order=['fraude_potencial','instavel','pico_isolado','queda_continua','crescimento_continuo','nulo_recorrente','estavel'];
- const distBars=order.filter(k=>pc[k]!=null).map(k=>{const m=MM_CLASS[k],n=pc[k],w=Math.round(n/tot*100);
+/* ---- painel 3: DMCs mais sensíveis ---- */
+function mmDmcPanel(){
+ if(!mmDmc.length) return '';
+ const dl=mmDmc.map(x=>+x.lpd), dlo=Math.min(...dl), dhi=Math.max(...dl);
+ const rows=mmDmc.map(x=>{ const t=(dhi>dlo)?((+x.lpd-dlo)/(dhi-dlo)):0.5;
+  return `<tr><td><b>${x.codigo_dmc||('DMC-'+x.numero_dmc)}</b></td><td>${x.consorcio==='ZA0200'?'Betim':'Contagem'}</td><td class="r">${fmt(x.n_faturadas||0)}</td>`
+   +`<td class="r" style="background:${mmHeat(t)};border-radius:4px"><b>${br1(x.lpd)}</b></td>`
+   +`<td class="r" style="color:${mmDelta(x.lpd_mom)}">${x.lpd_mom!=null?mmSig(x.lpd_mom)+'%':'—'}</td>`
+   +`<td class="r" style="color:${mmDelta(x.lpd_yoy)}">${x.lpd_yoy!=null?mmSig(x.lpd_yoy)+'%':'—'}</td>`
+   +`<td class="r">${br1(x.pct_naomedido)}%</td>`
+   +`<td class="r"${x.n_fraude>0?' style="color:#d6336c;font-weight:600"':''}>${fmt(x.n_fraude||0)}</td>`
+   +`<td class="r">${x.score_medio!=null?x.score_medio:'—'}</td></tr>`;
+ }).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>DMCs mais sensíveis</h3>${mmIB('dmc')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody"><div style="overflow-x:auto"><table class="mmdmc"><thead><tr><th>DMC</th><th>Cons.</th><th class="r">Lig. fat.</th><th class="r">L/lig·dia</th><th class="r">MoM</th><th class="r">YoY</th><th class="r">% não med.</th><th class="r">Fraude</th><th class="r">Score</th></tr></thead><tbody>${rows}</tbody></table></div>
+   <p class="note" style="margin-top:8px">Ordenado por <b>L/lig/dia</b> (mais claro = maior). Cruzamento espacial matrícula→DMC no limite vigente. Toque no ⓘ para o método.</p></div></div>`;
+}
+/* ---- painel 4: análise por matrícula (distribuição + ranking + detalhe lado a lado) ---- */
+function mmAnalysisPanel(){
+ const R=mmResumo||{}, tot=R.n_matriculas||1, pc=R.por_classificacao||{};
+ const order=['fraude_potencial','instavel','pico_isolado','queda_continua','crescimento_continuo','nulo_recorrente','estavel'];
+ const distBars=order.filter(k=>pc[k]!=null).map(k=>{ const m=MM_CLASS[k],n=pc[k],w=Math.round(n/tot*100);
   return `<div class="mmdist ${mmClass===k?'sel':''}" data-cls="${k}"><span class="mmdlab"><i style="background:${m.c}"></i>${m.l}</span><div class="mmdbar"><span style="width:${w}%;background:${m.c}"></span></div><span class="mmdval">${fmt(n)} · ${w}%</span></div>`;
  }).join('');
  const chips='<button class="mmchip '+(mmClass===''?'on':'')+'" data-cls="">Todas</button>'+order.map(k=>`<button class="mmchip ${mmClass===k?'on':''}" data-cls="${k}">${MM_CLASS[k].l}</button>`).join('');
- const rows=mmRank.map(x=>{const m=MM_CLASS[x.classificacao]||{l:x.classificacao,c:'#888'}, si=MM_SIT[x.situacao_atual]||{l:x.situacao_atual||'—',c:'#8a8f98'};
+ const rows=mmRank.map(x=>{ const m=MM_CLASS[x.classificacao]||{l:x.classificacao,c:'#888'}, si=MM_SIT[x.situacao_atual]||{l:x.situacao_atual||'—',c:'#8a8f98'};
   const irr=(x.meses_irregular||0)>0?` <span class="mmtag" style="--cc:#d6336c" title="meses inativa/cortada com volume faturado">${x.meses_irregular}× c/água</span>`:'';
-  return `<tr data-mat="${x.matricula}" data-cons="${x.consorcio}" style="cursor:pointer"><td>${x.matricula}</td><td><span class="mmtag" style="--cc:${m.c}">${m.l}</span></td><td><span style="color:${si.c}">${si.l}</span>${irr}</td><td class="r">${(Number(x.media)||0).toFixed(1)}</td><td class="r">${x.cv!=null?Math.round(x.cv*100)+'%':'—'}</td><td class="r">${x.slope!=null?(x.slope>0?'+':'')+x.slope:'—'}</td><td class="r">${x.n_zeros}/${x.n_meses}</td><td class="r"><b>${x.score_anomalia}</b></td></tr>`;
- }).join('')||'<tr><td colspan="8" class="note">Nenhuma matrícula nesse filtro.</td></tr>';
- $('#mmBody').innerHTML=`${kpisHtml}
-  ${mmSazPanel()}
-  <div class="consol" style="margin-top:14px">
-   <div class="panel"><div class="phead"><h3>Distribuição por comportamento</h3><span class="chip real">real</span></div>
-    <div class="pbody"><div class="mmdistwrap">${distBars}</div>
-     <p class="note" style="margin-top:10px">O <b>Índice de Anomalia (0–100)</b> combina variabilidade (CV), tendência, picos e meses zerados. Toque numa faixa para filtrar o ranking.</p></div></div>
-   <div class="panel"><div class="phead"><h3>Detalhe da matrícula</h3><span class="hint">toque numa linha do ranking</span></div>
-    <div class="pbody" id="mmDetail"><p class="note" style="margin:0">Selecione uma matrícula no ranking para ver a série de 18 meses e a ação sugerida.</p></div></div>
-  </div>
-  <div class="panel" style="margin-top:14px"><div class="phead"><h3>Ranking de anomalia — matrículas mais críticas</h3><span class="chip real">real</span></div>
-   <div class="pbody"><div class="mmfilters">${chips}<input id="mmBusca" placeholder="Buscar matrícula…" value="${mmBusca}" inputmode="numeric"/></div>
-    <div style="overflow-x:auto;max-height:520px"><table id="mmtbl"><thead><tr><th>Matrícula</th><th>Comportamento</th><th>Situação</th><th class="r">Média m³</th><th class="r">CV</th><th class="r">Tend.</th><th class="r">Zeros</th><th class="r">Score</th></tr></thead><tbody>${rows}</tbody></table></div>
-   </div></div>`;
- $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls);mmInit();});
- $('#mmBody').querySelectorAll('.mmchip').forEach(el=>el.onclick=()=>{mmClass=el.dataset.cls;mmInit();});
- const bu=$('#mmBusca'); if(bu) bu.onkeydown=e=>{ if(e.key==='Enter'){ mmBusca=bu.value.trim(); mmInit(); } };
- $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>mmDetail(tr.dataset.cons,tr.dataset.mat));
+  return `<tr data-mat="${x.matricula}" data-cons="${x.consorcio}" style="cursor:pointer"><td>${x.matricula}</td><td><span class="mmtag" style="--cc:${m.c}">${m.l}</span></td><td><span style="color:${si.c}">${si.l}</span>${irr}</td><td class="r"><b>${x.score_anomalia}</b></td></tr>`;
+ }).join('')||'<tr><td colspan="4" class="note">Nenhuma matrícula nesse filtro.</td></tr>';
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Análise por matrícula</h3>${mmIB('rank')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">
+   <div class="mmdistwrap">${distBars}</div>
+   <p class="note" style="margin:8px 0 0">Toque numa faixa (ou num chip) para filtrar o ranking; toque numa matrícula para ver o detalhe ao lado. <b>Índice de Anomalia 0–100</b> = variabilidade + tendência + picos + zeros + fraude.</p>
+   <div class="mmanalgrid">
+    <div>
+     <div class="mmfilters">${chips}<input id="mmBusca" placeholder="Buscar matrícula…" value="${mmBusca}" inputmode="numeric"/></div>
+     <div style="overflow:auto;max-height:460px"><table id="mmtbl"><thead><tr><th>Matrícula</th><th>Comportamento</th><th>Situação</th><th class="r">Score</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div><div class="panel mmdetail-sticky"><div class="phead"><h3>Detalhe da matrícula</h3><span class="hint">18 meses</span></div>
+     <div class="pbody" id="mmDetail"><p class="note" style="margin:0">Selecione uma matrícula no ranking.</p></div></div></div>
+   </div>
+  </div></div>`;
 }
-async function mmDetail(cons,mat){
- const box=$('#mmDetail'); if(!box)return;
+function mmRenderAll(){
+ $('#mmBody').innerHTML = mmKpiPanel()+mmSeasonPanel()+mmDmcPanel()+mmAnalysisPanel();
+ const sel=$('#mmMesSel'); if(sel) sel.onchange=()=>mmSetMes(sel.value);
+ $('#mmBody').querySelectorAll('.mminfo').forEach(b=>b.onclick=()=>{ const i=MM_INFO[b.dataset.info]; if(i)mmModal(i.t,i.h); });
+ $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{ mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls); mmLoadRank(); });
+ $('#mmBody').querySelectorAll('.mmchip').forEach(el=>el.onclick=()=>{ mmClass=el.dataset.cls; mmLoadRank(); });
+ const bu=$('#mmBusca'); if(bu) bu.onkeydown=e=>{ if(e.key==='Enter'){ mmBusca=bu.value.trim(); mmLoadRank(); } };
+ $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>mmDetailFill(tr.dataset.cons,tr.dataset.mat));
+ const box=$('#mmDetail');
+ if(box){ if(mmDetSel) mmDetailFill(mmDetSel.cons,mmDetSel.mat); else if(mmRank.length) mmDetailFill(mmRank[0].consorcio,mmRank[0].matricula); }
+}
+async function mmDetailFill(cons,mat){
+ const box=$('#mmDetail'); if(!box)return; mmDetSel={cons:cons,mat:''+mat};
+ $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.classList.toggle('rowsel', tr.dataset.mat===(''+mat)&&tr.dataset.cons===cons));
+ const key=cons+'|'+mat;
+ if(mmDetCache[key]){ mmDetailRender(mmDetCache[key],cons,mat); return; }
  box.innerHTML='<p class="note" style="margin:0">Carregando série…</p>';
  let d; try{ d=await sbg.rpc('app_nrw_mm_serie',{p_consorcio:cons,p_matricula:Number(mat)}); if(d.error)throw d.error; }catch(e){ box.innerHTML='<p class="note" style="color:#e05d5d">Erro: '+(e.message||e)+'</p>'; return; }
- const st=(d.data&&d.data.stats)||{}, serie=(d.data&&d.data.serie)||[], m=MM_CLASS[st.classificacao]||{l:st.classificacao,c:'#888',acao:''};
+ mmDetCache[key]=d.data; mmDetailRender(d.data,cons,mat);
+}
+function mmDetailRender(data,cons,mat){
+ const box=$('#mmDetail'); if(!box)return;
+ const st=(data&&data.stats)||{}, serie=(data&&data.serie)||[], m=MM_CLASS[st.classificacao]||{l:st.classificacao,c:'#888',acao:''};
  const W=520,H=150,pl=34,pr=10,pt=12,pb=22, vals=serie.map(p=>Number(p.volume)||0), maxv=Math.max(1,...vals);
  const X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
  const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
  const dots=serie.map((p,i)=>p.irregular
   ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="4.2" fill="#d6336c" stroke="#fff" stroke-width="1"><title>${mmCmp(p.competencia)}: ${vals[i]} m³ — ligação ${mmSitLabel(p.sit_lig)} com faturamento (irregular)</title></circle>`
   : `<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="${p.estimado?'2.3':'3'}" fill="${p.estimado?'#8a8f98':m.c}"><title>${mmCmp(p.competencia)}: ${vals[i]} m³${p.estimado?' (estimado)':''} · ${mmSitLabel(p.sit_lig)}</title></circle>`).join('');
- const nIrr=serie.filter(p=>p.irregular).length;
- const medY=Y(Number(st.media)||0);
+ const nIrr=serie.filter(p=>p.irregular).length, medY=Y(Number(st.media)||0);
  box.innerHTML=`<div class="mmdhead"><div><b style="font-size:16px">Matrícula ${st.matricula}</b> <span class="mmtag" style="--cc:${m.c}">${m.l}</span> <span class="note">${cons==='ZA0200'?'Betim':'Contagem'}</span></div><div class="note">score <b style="color:${m.c}">${st.score_anomalia}</b></div></div>
   <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin:8px 0">
    <line x1="${pl}" y1="${medY.toFixed(1)}" x2="${W-pr}" y2="${medY.toFixed(1)}" stroke="#ffffff30" stroke-dasharray="4 4"/>
@@ -1732,7 +1834,7 @@ async function mmDetail(cons,mat){
    <div><span class="k">Situação atual</span><span class="v" style="color:${(MM_SIT[st.situacao_atual]||{}).c||'inherit'}">${mmSitLabel(st.situacao_atual)}</span></div>
    <div><span class="k">Meses cortada c/ água</span><span class="v" style="color:${(st.meses_irregular||nIrr)>0?'#d6336c':'inherit'}">${st.meses_irregular!=null?st.meses_irregular:nIrr}</span></div>
   </div>
-  ${(st.meses_irregular||nIrr)>0?`<p class="note" style="margin-top:10px;color:#d6336c"><b>⚠ Indício de fraude:</b> ${st.meses_irregular!=null?st.meses_irregular:nIrr} mês(es) com a ligação inativa/cortada (I/F/P) porém faturando volume — pontos em <b>vermelho</b> no gráfico.</p>`:''}
+  ${(st.meses_irregular||nIrr)>0?`<p class="note" style="margin-top:10px;color:#d6336c"><b>⚠ Indício de fraude:</b> ${st.meses_irregular!=null?st.meses_irregular:nIrr} mês(es) com a ligação inativa/cortada (I/F/P) porém faturando volume — pontos em <b>vermelho</b>.</p>`:''}
   <p class="note" style="margin-top:10px"><b>Ação sugerida:</b> ${m.acao}</p>`;
 }
 /* ---------- nav ---------- */
