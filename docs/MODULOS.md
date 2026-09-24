@@ -1878,9 +1878,12 @@ vez, então os passos foram fundidos.
   `pessoasRenderColaboradores` ganhou chips **Ativos/Inativos/Todos** (com contagem, mesmo padrão
   visual de `frCondChip` em Frotas/Condutores) + `<select>` de área (opções derivadas dos próprios
   dados carregados, sem RPC extra) — tudo filtrado client-side em `pessoasRenderColabLista`, já que
-  a lista inteira já vem numa chamada só. Clicar num colaborador (`pessoasRenderColaboradorDet`)
-  agora mostra a ficha completa (CPF, matrícula, modalidade, área+código, frente/empresa, projeto,
-  custo, admissão, aprovador 1 e 2) antes do bloco de desligamento.
+  a lista inteira já vem numa chamada só. **Busca ignora o chip de status quando há termo digitado**
+  (achado numa 2ª revisão: com o chip padrão "Ativos" e busca aplicada em AND, procurar um
+  desligado pelo nome não achava nada — corrigido antes do merge; sem termo, o chip filtra normal).
+  Clicar num colaborador (`pessoasRenderColaboradorDet`) agora mostra a ficha completa (CPF,
+  matrícula, modalidade, área+código, frente/empresa, projeto, custo, admissão, aprovador 1 e 2)
+  antes do bloco de desligamento.
 - **Desligamento** (`app_pessoas_colaborador_desligar(p_perfil_id, p_data_demissao, p_motivo)`,
   `pessoas_admin`/admin-only): tela **Colaboradores** (`app_pessoas_colaboradores_listar`, busca por
   nome/e-mail sobre todo `perfil`, ativos e inativos) → abrir um colaborador ativo mostra o form de
