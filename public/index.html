@@ -7587,6 +7587,7 @@ const PESSOAS_STATUS_LABEL={
   ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},
   cancelado:{l:'Cancelado',bg:'--line',fg:'--mut'}
 };
+const PESSOAS_BENEFICIOS=[['vt','Vale-Transporte'],['vr_va','Vale-Refeição/Alimentação'],['saude','Plano de Saúde'],['odontologico','Plano Odontológico'],['seguro_vida','Seguro de Vida']];
 async function pessoasInit(){
   if(!ME){ try{ const {data}=await sb.rpc('app_me'); if(data) ME=data; }catch(e){} }
   const tgt=pessoasTarget; pessoasTarget=null;
@@ -7599,7 +7600,8 @@ function pessoasBlocks(){
     {t:'RH',ic:'🗂️',on:rh,acts:[
       {id:'rh_novo',ic:'➕',lbl:'Cadastrar candidato'},
       {id:'rh_lista',ic:'📋',lbl:'Candidatos'},
-      {id:'rh_colaboradores',ic:'🧑‍🤝‍🧑',lbl:'Colaboradores'}]},
+      {id:'rh_colaboradores',ic:'🧑‍🤝‍🧑',lbl:'Colaboradores'},
+      {id:'rh_beneficios',ic:'💳',lbl:'Premissas de benefícios'}]},
     {t:'Gestor',ic:'🖊️',on:true,acts:[
       {id:'minha_equipe',ic:'👥',lbl:'Minha equipe'}]},
     {t:'Meu Time',ic:'🧑‍💼',on:true,acts:[
@@ -7622,6 +7624,7 @@ function pessoasOpen(id){
   if(id==='rh_novo'){ pessoasSub='rh_novo'; pessoasRenderCandidatoNovo(); return; }
   if(id==='rh_lista'){ pessoasSub='rh_lista'; pessoasRenderRhLista(); return; }
   if(id==='rh_colaboradores'){ pessoasSub='colaboradores'; pessoasRenderColaboradores(); return; }
+  if(id==='rh_beneficios'){ pessoasSub='beneficios_premissas'; pessoasRenderBeneficiosPremissas(); return; }
   if(id==='minha_equipe'){ pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe(); return; }
   if(id==='meus_colaboradores'){ pessoasSub='meus_colaboradores'; pessoasRenderMeusColaboradores(); return; }
 }
@@ -7641,11 +7644,42 @@ async function pessoasRenderMeusColaboradores(){
   $('#pessoasView').innerHTML=h;
   $('#peVoltar').addEventListener('click',pessoasHome);
 }
+async function pessoasRenderBeneficiosPremissas(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  let arr=[];
+  try{ const {data,error}=await sb.rpc('app_pessoas_beneficios_premissas_listar'); if(error) throw error; arr=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">💳 Premissas de benefícios</div>';
+  h+='<p class="sub" style="margin:2px 0 10px">Valores usados só pra estimar o custo total de cada proposta — não aparecem na carta do candidato.</p>';
+  h+=arr.map(b=>
+    '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<b>'+b.nome+'</b>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><span class="sub">R$</span><input class="peBenVal" data-cod="'+b.codigo+'" inputmode="decimal" value="'+String(b.valor).replace('.',',')+'" style="max-width:120px"/></div>'+
+      '<input class="peBenRegra" data-cod="'+b.codigo+'" placeholder="Regra (ex.: desconto, quem paga)" value="'+(b.regra||'').replace(/"/g,'&quot;')+'" style="margin-top:6px"/>'+
+      '<button class="btn ghost peBenSalvar" data-cod="'+b.codigo+'" style="margin-top:8px;padding:6px 12px;font-size:13px">Salvar</button>'+
+    '</div>'
+  ).join('');
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#pessoasView').querySelectorAll('.peBenSalvar').forEach(btn=>btn.addEventListener('click',async()=>{
+    const cod=btn.dataset.cod;
+    const valInput=$('#pessoasView').querySelector('.peBenVal[data-cod="'+cod+'"]');
+    const regraInput=$('#pessoasView').querySelector('.peBenRegra[data-cod="'+cod+'"]');
+    const val=parseFloat((valInput.value||'0').replace(/\./g,'').replace(',','.'));
+    if(isNaN(val)||val<0) return toast('Valor inválido');
+    btn.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_beneficio_premissa_salvar',{p_codigo:cod,p_valor:val,p_regra:regraInput.value||null}); if(error) throw error;
+      toast('✓ Salvo');
+    }catch(e){ toast('Erro: '+(e.message||e)); }
+    btn.disabled=false;
+  }));
+}
 function pessoasRender(){
   if(pessoasSub==='rh_novo') return pessoasRenderCandidatoNovo();
   if(pessoasSub==='rh_lista') return pessoasRenderRhLista();
   if(pessoasSub==='colaboradores') return pessoasRenderColaboradores();
   if(pessoasSub==='colaborador_det') return pessoasRenderColaboradorDet();
+  if(pessoasSub==='beneficios_premissas') return pessoasRenderBeneficiosPremissas();
   if(pessoasSub==='minha_equipe') return pessoasRenderMinhaEquipe();
   if(pessoasSub==='meus_colaboradores') return pessoasRenderMeusColaboradores();
   if(pessoasSub==='candidato_det') return pessoasRenderCandidatoDet();
@@ -7739,7 +7773,7 @@ function pessoasEmitirCarta(c){
     '<p><b>Cargo:</b> '+(c.cargo_proposto||'')+'</p>'+
     '<p><b>Salário:</b> '+fmtDinheiro(c.salario)+'</p>'+
     '<p><b>Data de início:</b> '+fmtData(c.data_inicio_proposta)+'</p>'+
-    '<p><b>Benefícios:</b> '+(c.beneficios||'—')+'</p></div>';
+    '<p><b>Benefícios:</b> '+(PESSOAS_BENEFICIOS.filter(([cod])=>c['beneficio_'+cod]).map(([,lbl])=>lbl).join(', ')||'—')+'</p></div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
@@ -7832,6 +7866,10 @@ async function pessoasRenderCandidatoDet(){
   }catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   const back=()=>{ pessoasSub=pessoasViewGestor?'minha_equipe':'rh_lista'; pessoasRender(); };
   if(!c){ return back(); }
+  let premissas=[];
+  if(c.status==='proposta_pendente' && !pessoasViewGestor && !c.carta_proposta_gerada_em){
+    try{ const {data,error}=await sb.rpc('app_pessoas_beneficios_premissas_listar'); if(error) throw error; premissas=data||[]; }catch(e){}
+  }
   let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button>';
   h+='<div class="sec">'+c.nome_completo+'</div><p class="sub" style="margin-top:2px">'+(c.cargo||'')+'</p>';
   h+='<div style="margin-top:8px">'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>';
@@ -7866,7 +7904,13 @@ async function pessoasRenderCandidatoDet(){
       h+='<label>Cargo</label><input id="peCargoProp"/>';
       h+='<label>Salário</label><input id="peSalario" inputmode="decimal"/>';
       h+='<label>Data de início</label><input id="peDataInicio" type="date"/>';
-      h+='<label>Benefícios</label><textarea id="peBeneficios" rows="3"></textarea>';
+      h+='<div class="sec" style="margin-top:14px">Benefícios</div>';
+      h+='<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;margin-top:6px">'+
+        PESSOAS_BENEFICIOS.map(([cod,lbl],i)=>{
+          const p=premissas.find(x=>x.codigo===cod);
+          return '<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;'+(i?'border-top:1px solid var(--line)':'')+'"><span>'+lbl+'</span><input type="checkbox" class="peBenChk" data-cod="'+cod+'" data-valor="'+(p?p.valor:0)+'" style="width:20px;height:20px;flex:none"/></label>';
+        }).join('')+'</div>';
+      h+='<p class="sub" style="margin-top:8px">Custo estimado em benefícios: <b id="peBenTotal">R$ 0,00</b> (só pra referência interna — não aparece na carta)</p>';
       h+='<button class="btn" id="peGerarCarta" style="margin-top:14px">Gerar carta</button>';
     } else if(!c.carta_proposta_anexo_path){
       h+='<p class="sub">Carta gerada. Pré-visualize, imprima/assine fora do sistema e anexe o arquivo final abaixo.</p>';
@@ -7918,12 +7962,22 @@ async function pessoasRenderCandidatoDet(){
       toast('Reprovado'); back();
     }catch(e){ toast('Erro: '+(e.message||e)); rp.disabled=false; }
   });
+  const atualizaBenTotal=()=>{
+    const el=$('#peBenTotal'); if(!el) return;
+    let tot=0; $('#pessoasView').querySelectorAll('.peBenChk:checked').forEach(chk=>{ tot+=parseFloat(chk.dataset.valor)||0; });
+    el.textContent='R$ '+tot.toFixed(2).replace('.',',');
+  };
+  $('#pessoasView').querySelectorAll('.peBenChk').forEach(chk=>chk.addEventListener('change',atualizaBenTotal));
+  atualizaBenTotal();
   const gc=$('#peGerarCarta'); if(gc) gc.addEventListener('click',async()=>{
     gc.disabled=true;
+    const benOn=cod=>{ const el=$('#pessoasView').querySelector('.peBenChk[data-cod="'+cod+'"]'); return !!(el&&el.checked); };
     try{ const sal=parseFloat(($('#peSalario').value||'0').replace(/\./g,'').replace(',','.'));
       const {error}=await sb.rpc('app_pessoas_carta_gerar',{p_candidato_id:c.id,
         p_cargo_proposto:$('#peCargoProp').value||null, p_salario:isNaN(sal)?null:sal,
-        p_data_inicio_proposta:$('#peDataInicio').value||null, p_beneficios:$('#peBeneficios').value||null}); if(error) throw error;
+        p_data_inicio_proposta:$('#peDataInicio').value||null,
+        p_beneficio_vt:benOn('vt'), p_beneficio_vr_va:benOn('vr_va'), p_beneficio_saude:benOn('saude'),
+        p_beneficio_odontologico:benOn('odontologico'), p_beneficio_seguro_vida:benOn('seguro_vida')}); if(error) throw error;
       toast('✓ Carta gerada'); pessoasRenderCandidatoDet();
     }catch(e){ toast('Erro: '+(e.message||e)); gc.disabled=false; }
   });
