@@ -1796,7 +1796,8 @@ contratação até a ativação, com aprovação de vaga restrita a uma lista fe
 contratação) fica para uma Fase 2 — não implementado ainda.
 
 **Ciclo de status** (`candidato.status`): `aguardando_gestor` → (o gestor da área aprova **e**
-preenche área/empresa/projeto/custo numa única ação) → `proposta_pendente` → (RH gera a carta,
+confirma área/empresa/projeto numa única ação — custo é derivado, não escolhido) →
+`proposta_pendente` → (RH gera a carta,
 depois anexa o PDF assinado fora do sistema) → `proposta_assinada` → (RH ativa, vinculando a um
 `perfil` existente) → `ativo`. `reprovado` sai direto de `aguardando_gestor`; `cancelado` é
 reservado para uso futuro (não produzido por nenhuma RPC nesta fase). Não existe mais o status
@@ -1824,12 +1825,18 @@ vez, então os passos foram fundidos.
   ativa no primeiro dia (`app_pessoas_candidato_ativar`).
 - **Gestor da área** (`candidato.gestor_uuid`, restrito à lista `area_aprovador`): aprova ou
   reprova a vaga numa única RPC (`app_pessoas_candidato_aprovar` — quando `p_aprovado=true`,
-  exige/grava `p_codigo_area`/`p_area`/`p_frente_empresa`/`p_projeto`/`p_custo_direto_indireto` e
-  avança pra `proposta_pendente`; quando `false`, grava `p_motivo_reprovacao` e vai pra
-  `reprovado`). Gate: `candidato.gestor_uuid = auth.uid() or funcao='admin'` — nem RH comum
-  (`pessoas_admin` sem `funcao='admin'`) nem qualquer outro gestor mapeado de outra área consegue
-  aprovar; só o gestor exato da vaga (ou o admin de fato, como override). Depois que o colaborador
-  está `ativo`, o mesmo gestor preenche o checklist de setup
+  exige/grava `p_codigo_area`/`p_area`/`p_frente_empresa`/`p_projeto` e avança pra
+  `proposta_pendente`; quando `false`, grava `p_motivo_reprovacao` e vai pra `reprovado`). Gate:
+  `candidato.gestor_uuid = auth.uid() or funcao='admin'` — nem RH comum (`pessoas_admin` sem
+  `funcao='admin'`) nem qualquer outro gestor mapeado de outra área consegue aprovar; só o gestor
+  exato da vaga (ou o admin de fato, como override). **`custo_direto_indireto` não é mais escolhido
+  pelo gestor (2026-09-24)** — a RPC deriva sozinha: `projeto='Ambos'` → `Indireto`, qualquer
+  projeto específico (Contagem/Betim) → `Direto`. **Área também não é mais texto livre**: nova RPC
+  `app_pessoas_minhas_areas()` (qualquer autenticado, sem exigir `pessoas_admin` — é sobre *ser* o
+  gestor mapeado) devolve só as linhas de `area_aprovador` do próprio chamador; se só 1 linha (5 dos
+  6 gestores hoje), o frontend mostra a área como texto fixo e nem pede confirmação; se mais de 1
+  (só Raulmar, que cobre ~12 áreas), mostra um `<select>` restrito às áreas dele, não as 18 inteiras.
+  Depois que o colaborador está `ativo`, o mesmo gestor preenche o checklist de setup
   (`app_pessoas_checklist_setup_salvar` — celular/notebook (se área indireta)/EPIs/usuário
   AcquaHub, todos **desmarcados por padrão**, mesmo padrão do checklist diário de Frotas — colunas
   booleanas individuais, sem jsonb).
@@ -1838,6 +1845,10 @@ vez, então os passos foram fundidos.
   `candidato.gestor_uuid`) + RH/admin veem esses campos, e só durante a contratação — as duas RPCs
   devolvem o conjunto completo: `app_pessoas_meus_candidatos` (visão do gestor, filtrado por
   `gestor_uuid = auth.uid()` — isolamento automático por pessoa, não por "equipe") e
+  **"Minha equipe" (`pessoasRenderMinhaEquipe`) filtra no frontend quem já terminou o processo
+  (2026-09-24)**: some da lista quem está `ativo` **e** já tem checklist de setup preenchido —
+  continua aparecendo enquanto `ativo` sem checklist (é assim que o gestor acha o aviso "Checklist
+  de setup pendente"), e some de vez só depois de completo; e
   `app_pessoas_candidatos_listar` (visão do RH, gate `app_pessoas_admin_check`); o frontend mostra
   o mesmo bloco "Dados do candidato" pras duas visões. O par genérico
   `aprovador_uuid`/`aprovador2_uuid` de `perfil` **nunca** vê esses campos nem participa da
@@ -1845,11 +1856,15 @@ vez, então os passos foram fundidos.
   simples (nome/área/empresa/data de admissão) via `app_pessoas_meus_colaboradores` (`select
   id,nome,area,frente_empresa,admissao from perfil where aprovador_uuid=auth.uid() or
   aprovador2_uuid=auth.uid()` — qualquer autenticado pode chamar, não precisa de `pessoas_admin`,
-  porque é sobre *ser* aprovador1/2 de alguém, mecanismo já genérico do app). Tela "Meu Time →
-  Meus colaboradores" no hub mostra essa lista simples.
+  porque é sobre *ser* aprovador1/2 de alguém, mecanismo já genérico do app). Tela "Gestor → Meus
+  colaboradores" no hub mostra essa lista simples (2026-09-24: a seção "Meu Time" separada foi
+  removida — a ação virou uma segunda opção dentro de "Gestor", junto de "Minha equipe").
 - **Ativação não cria conta nova.** O RH escolhe, num `<select>`, um `perfil` existente
-  (`app_pessoas_usuarios_listar(p_apenas_ativos)` — `true` no cadastro/gestor, `false` na ativação,
-  pra permitir vincular a um `perfil` já `ativo=false`, ex.: recontratação). `app_pessoas_candidato_ativar`
+  (`app_pessoas_usuarios_listar(p_apenas_ativos, p_somente_novos)` — `p_apenas_ativos=true` no
+  cadastro/gestor, `false` na ativação, pra permitir vincular a um `perfil` já `ativo=false`, ex.:
+  recontratação; **`p_somente_novos=true` na ativação (2026-09-24)** filtra `where codigo_area is
+  null` — só aparecem perfis que nunca passaram por `app_pessoas_candidato_ativar` antes, pra não
+  misturar candidatos novos com colaboradores que já têm ficha completa). `app_pessoas_candidato_ativar`
   grava `candidato_admissao` (tamanhos de uniforme + matrícula + data de admissão) **e também
   atualiza `public.perfil`** (`cpf`/`matricula`/`admissao`/`codigo_area`/`area`/`frente_empresa`/
   `projeto`/`custo_direto_indireto`/`cargo_id`/`ativo=true`) — essas colunas já existem em `perfil`

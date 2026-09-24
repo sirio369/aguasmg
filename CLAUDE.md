@@ -359,12 +359,18 @@ contratação até a ativação, com aprovação de vaga restrita a uma lista fe
 área (`"14 - pessoas".area_aprovador`, ~18 áreas → 6 pessoas, mantida por SQL direto). RH cadastra
 o candidato escolhendo o gestor da área na lista fechada (`app_pessoas_candidato_cadastrar`,
 `p_gestor_uuid` validado contra `area_aprovador`) → **só esse gestor mapeado** (ou `funcao='admin'`
-como override) aprova/reprova **e** preenche área/empresa/projeto/custo numa única RPC
-(`app_pessoas_candidato_aprovar`, gate `candidato.gestor_uuid=auth.uid() or funcao='admin'`) → RH
-gera a carta proposta e depois anexa o PDF assinado fora do sistema
+como override) aprova/reprova **e** confirma área/empresa/projeto numa única RPC
+(`app_pessoas_candidato_aprovar`, gate `candidato.gestor_uuid=auth.uid() or funcao='admin'`) — área
+não é mais texto livre nem escolha manual pra quem cobre 1 área só (5 dos 6 gestores):
+`app_pessoas_minhas_areas()` devolve as áreas do próprio chamador, o frontend auto-preenche quando
+é 1 linha só e só mostra `<select>` pra quem cobre várias (Raulmar); `custo_direto_indireto`
+**deixou de ser escolhido** (2026-09-24) — a RPC deriva sozinha: `projeto='Ambos'`→`Indireto`,
+projeto específico→`Direto` → RH gera a carta proposta e depois anexa o PDF assinado fora do sistema
 (`app_pessoas_carta_gerar`/`app_pessoas_carta_anexar`/`app_pessoas_candidato_marcar_assinado`) → RH
-ativa no primeiro dia, vinculando a um `perfil` já existente (dropdown, o módulo **não cria conta
-nova**) e gravando CPF/matrícula/admissão/tamanhos de uniforme (`app_pessoas_candidato_ativar` —
+ativa no primeiro dia, vinculando a um `perfil` já existente (dropdown restrito a quem ainda não
+tem `codigo_area` preenchido — `app_pessoas_usuarios_listar(p_apenas_ativos,p_somente_novos)`, o
+módulo **não cria conta nova**) e gravando CPF/matrícula/admissão/tamanhos de uniforme
+(`app_pessoas_candidato_ativar` —
 também atualiza `public.perfil`, fonte única de verdade dessas colunas pro resto do app; um
 `perfil` só liga a um `candidato` por vez, índice único parcial). Dados confidenciais do candidato
 (CPF/endereço/formação/salário/motivo de reprovação) só aparecem pro gestor mapeado da vaga +
