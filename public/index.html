@@ -7654,22 +7654,32 @@ function pessoasRender(){
   pessoasHome();
 }
 const PESSOAS_ATIVO_LABEL={ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},inativo:{l:'Desligado',bg:'--line',fg:'--mut'}};
-let pessoasColaboradores=[], pessoasColabBusca='', pessoasColabSel=null;
+let pessoasColaboradores=[], pessoasColabBusca='', pessoasColabSel=null, pessoasColabFiltro='ativos', pessoasColabArea='';
 async function pessoasRenderColaboradores(){
   $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_pessoas_colaboradores_listar',{p_q:null}); if(error) throw error; pessoasColaboradores=data||[]; }
   catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  const nAtivos=pessoasColaboradores.filter(c=>c.ativo).length, nInativos=pessoasColaboradores.length-nAtivos;
+  const areas=[...new Set(pessoasColaboradores.map(c=>c.area).filter(Boolean))].sort();
   let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🧑‍🤝‍🧑 Colaboradores</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px">'+[['ativos','Ativos ('+nAtivos+')'],['inativos','Inativos ('+nInativos+')'],['todos','Todos ('+pessoasColaboradores.length+')']].map(([v,l])=>`<button type="button" class="peColabChip${pessoasColabFiltro===v?' sel':''}" data-f="${v}" style="all:unset;cursor:pointer;font-size:12px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);${pessoasColabFiltro===v?'background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':'color:var(--mut)'}">${l}</button>`).join('')+'</div>';
   h+='<input id="peColabBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin:8px 0" value="'+pessoasColabBusca.replace(/"/g,'&quot;')+'"/>';
+  h+='<select id="peColabArea" style="margin-bottom:8px"><option value="">Todas as áreas</option>'+areas.map(a=>'<option'+(pessoasColabArea===a?' selected':'')+'>'+a+'</option>').join('')+'</select>';
   h+='<div id="peColabLista"></div>';
   $('#pessoasView').innerHTML=h;
   $('#peVoltar').addEventListener('click',pessoasHome);
   $('#peColabBusca').addEventListener('input',e=>{ pessoasColabBusca=e.target.value; pessoasRenderColabLista(); });
+  $('#peColabArea').addEventListener('change',e=>{ pessoasColabArea=e.target.value; pessoasRenderColabLista(); });
+  $('#pessoasView').querySelectorAll('.peColabChip').forEach(b=>b.addEventListener('click',()=>{ pessoasColabFiltro=b.dataset.f; pessoasRenderColaboradores(); }));
   pessoasRenderColabLista();
 }
 function pessoasRenderColabLista(){
   const termo=pessoasColabBusca.trim().toLowerCase();
-  const arr=pessoasColaboradores.filter(c=>!termo||(c.nome||'').toLowerCase().includes(termo)||(c.email||'').toLowerCase().includes(termo));
+  const arr=pessoasColaboradores.filter(c=>
+    (pessoasColabFiltro==='todos'||(pessoasColabFiltro==='ativos')===!!c.ativo) &&
+    (!pessoasColabArea||c.area===pessoasColabArea) &&
+    (!termo||(c.nome||'').toLowerCase().includes(termo)||(c.email||'').toLowerCase().includes(termo))
+  );
   const cont=$('#peColabLista'); if(!cont) return;
   cont.innerHTML = arr.length ? arr.map(c=>
     '<div class="peRow" data-id="'+c.id+'" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
@@ -7684,6 +7694,14 @@ function pessoasRenderColaboradorDet(){
   let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button>';
   h+='<div class="sec">'+(c.nome||c.email)+'</div><p class="sub" style="margin-top:2px">'+(c.email||'')+' · '+(c.cargo||'—')+'</p>';
   h+='<div style="margin-top:8px">'+statusBadge(PESSOAS_ATIVO_LABEL,c.ativo?'ativo':'inativo')+(c.ativo?'':' <span class="sub">desde '+fmtData(c.demissao)+'</span>')+'</div>';
+  h+='<div class="sec" style="margin-top:16px">Ficha</div>';
+  h+='<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:6px">'+
+    [['CPF',c.cpf],['Matrícula',c.matricula],['Modalidade',c.modalidade],
+     ['Área',(c.area||'—')+(c.codigo_area?' ('+c.codigo_area+')':'')],
+     ['Frente (empresa)',c.frente_empresa],['Projeto',c.projeto],['Custo',c.custo_direto_indireto],
+     ['Admissão',fmtData(c.admissao)],['Aprovador 1',c.aprovador1],['Aprovador 2',c.aprovador2]]
+    .map(([lbl,val],i)=>'<div style="padding:6px 0;'+(i?'border-top:1px solid var(--line)':'')+';display:flex;justify-content:space-between;gap:10px"><span class="sub">'+lbl+'</span><span>'+(val||'—')+'</span></div>').join('')+
+  '</div>';
   if(c.ativo){
     h+='<div class="sec" style="margin-top:16px">Desligamento</div>';
     h+='<label>Data do desligamento *</label><input id="peDeslData" type="date"/>';

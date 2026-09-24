@@ -1870,6 +1870,17 @@ vez, então os passos foram fundidos.
   cuidado já documentado em Frotas de cobrir os dois `TG_OP`, não só `UPDATE`.
 - **Cargo do candidato** vem de `sup_cargos_ativos()` (schema `9 - suprimentos`, mesma RPC já usada
   em Suprimentos) — reaproveitada, não duplicada.
+- **Colaboradores: filtros + ficha completa (2026-09-24).** `app_pessoas_colaboradores_listar`
+  passou a devolver o registro inteiro relevante de `perfil` (`codigo_area`/`area`/
+  `frente_empresa`/`projeto`/`custo_direto_indireto`/`cpf`/`matricula`/`modalidade`, mais
+  `aprovador1`/`aprovador2` via `left join` em `perfil` de novo pelos uuids de aprovador) —
+  assinatura da RPC não mudou (mesmo `p_q`), só o `jsonb_build_object` ficou maior. Tela
+  `pessoasRenderColaboradores` ganhou chips **Ativos/Inativos/Todos** (com contagem, mesmo padrão
+  visual de `frCondChip` em Frotas/Condutores) + `<select>` de área (opções derivadas dos próprios
+  dados carregados, sem RPC extra) — tudo filtrado client-side em `pessoasRenderColabLista`, já que
+  a lista inteira já vem numa chamada só. Clicar num colaborador (`pessoasRenderColaboradorDet`)
+  agora mostra a ficha completa (CPF, matrícula, modalidade, área+código, frente/empresa, projeto,
+  custo, admissão, aprovador 1 e 2) antes do bloco de desligamento.
 - **Desligamento** (`app_pessoas_colaborador_desligar(p_perfil_id, p_data_demissao, p_motivo)`,
   `pessoas_admin`/admin-only): tela **Colaboradores** (`app_pessoas_colaboradores_listar`, busca por
   nome/e-mail sobre todo `perfil`, ativos e inativos) → abrir um colaborador ativo mostra o form de
