@@ -153,6 +153,9 @@
 - Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
   `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
+  No mapa da produtividade, o **popup de cada ponto** traz pressão/HD/data/coletor + **link "📷 Ver foto do
+  manômetro"** (`SBASE+pr.foto`, aba nova) quando há foto — `app_pressao_produtividade` passou a devolver
+  `foto` nas `properties` dos pontos (2026-09-24).
 - **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
   `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
   137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
