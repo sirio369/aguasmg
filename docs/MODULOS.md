@@ -1897,11 +1897,33 @@ vez, então os passos foram fundidos.
   `p_beneficio_* boolean` (assinatura antiga dropada explicitamente antes de criar a nova, mesmo
   cuidado do bug de overload da 2ª revisão do PR #104). A tela de geração de carta soma os valores
   dos benefícios marcados contra as premissas e mostra "Custo estimado em benefícios" **só pro
-  RH**, como referência interna — **os valores não aparecem na carta** que o candidato recebe
-  (decisão confirmada: a carta mantém texto descritivo fixo por benefício, sem imprimir R$; isso é
-  desenhado na 3ª rodada, que reescreve `pessoasEmitirCarta` pro modelo legal completo). A coluna
-  `beneficios` (texto) continua existindo na tabela por enquanto (não é mais escrita nem lida por
-  nenhuma RPC/tela) — pode ser dropada quando a 3ª rodada estiver pronta e confirmada.
+  RH**, como referência interna — **os valores não aparecem na carta** que o candidato recebe (a
+  carta mantém texto descritivo fixo por benefício, sem imprimir R$). A coluna `beneficios` (texto)
+  continua existindo na tabela por enquanto (não é mais escrita nem lida por nenhuma RPC/tela) —
+  pode ser dropada quando o modelo novo de carta estiver validado em produção.
+- **Carta proposta no modelo legal completo (2026-09-24, só pra `modalidade='CLT'`):**
+  `pessoasEmitirCarta` virou um dispatcher — `modalidade==='CLT'` monta `pessoasCartaHtmlClt` (texto
+  fiel ao modelo oficial que a Geovana forneceu: cabeçalho com a logo do consórcio, saudação,
+  função/área, jornada de trabalho fixa, local de trabalho fixo — mesmo endereço pras duas
+  empresas, só muda o nome/logo —, remuneração fixa com **valor por extenso** (`valorPorExtenso`/
+  `numeroPorExtenso`, PT-BR, cobre a regra "de" antes de milhão/bilhão — "um milhão **de** reais" —
+  e a regra "e" antes de centena exata no último grupo — "mil **e** cem reais", não "mil, cem
+  reais"; achado numa 2ª revisão, corrigido no mesmo PR), PLR, tabela de benefícios só com as
+  linhas marcadas sim (texto fixo por tipo, Vale-Refeição e
+  Café da manhã do modelo original viraram uma linha só "VR/VA"), declaração de não-vínculo e bloco
+  de aceite/assinatura); `modalidade==='PJ'` continua com `pessoasCartaHtmlSimples` (a versão
+  minimalista de antes) — sem modelo de referência pra PJ ainda. **Logo por empresa:**
+  `PESSOAS_EMPRESA_INFO['ÁGUAS INTEGRADAS'|'EFICIÊNCIA HÍDRICA']` mapeia pra
+  `./logo-aguas-integradas.png`/`./logo-eficiencia-hidrica.png` (novos assets em `public/`,
+  extraídos dos `.ai` originais da identidade visual — recorte de bounding box, fundo transparente
+  — e adicionados ao `ASSETS` do `sw.js` pra cache offline). `fmtDinheiroExtenso` (novo,
+  `Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'})`) é usado só nessa carta — o
+  `fmtDinheiro` genérico do app não tem separador de milhar e ficaria errado num documento legal.
+  **`app_pessoas_candidatos_listar`/`app_pessoas_meus_candidatos` ganharam `frente_empresa` no
+  retorno** (achado numa 2ª revisão antes do merge: `pessoasCartaHtmlClt` lê `c.frente_empresa` pra
+  escolher logo/nome, mas nenhuma das duas RPCs devolvia essa coluna — a carta saía sem logo e com
+  "—" no cabeçalho em 100% dos casos; mesma classe de risco dos bugs de contrato RPC↔frontend já
+  vistos nesta série de PRs, só que dessa vez pego antes do merge).
 - **Desligamento** (`app_pessoas_colaborador_desligar(p_perfil_id, p_data_demissao, p_motivo)`,
   `pessoas_admin`/admin-only): tela **Colaboradores** (`app_pessoas_colaboradores_listar`, busca por
   nome/e-mail sobre todo `perfil`, ativos e inativos) → abrir um colaborador ativo mostra o form de
