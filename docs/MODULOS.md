@@ -1656,11 +1656,20 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   `"5 - info_copasa".micromedicao_historico`. Motor: tabela **`"11 - perdas_nrw".mm_matricula_stats`** (1 linha
   por matrícula, 134.868, computada em buckets `mod(nu_matricu,4)` p/ não estourar o statement timeout do MCP):
   média/mediana/mín/máx/desvio/**CV**, **slope** (regr sobre índice de mês uniforme), n_zeros, **classificação**
-  (estável/nulo_recorrente/pico_isolado/queda_continua/crescimento_continuo/instável) e **`score_anomalia` 0–100**
-  (Índice de Anomalia = 3·pico + 2·tendência + 2·CV + 1·zeros). RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie`
-  (definer, admin **ou** `dev_acesso`; anon revogado). A tela: KPIs + distribuição por comportamento + ranking
-  filtrável (chip de classe + busca) + detalhe com série de 18 meses (SVG) + ação sugerida. Recomputar =
-  re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+  (fraude_potencial/estável/nulo_recorrente/pico_isolado/queda_continua/crescimento_continuo/instável) e
+  **`score_anomalia` 0–100** (Índice de Anomalia = 3·pico + 2·tendência + 2·CV + 1·zeros + **3·fraude**; denom 11).
+  RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie` (definer, admin **ou** `dev_acesso`; anon revogado). A tela: KPIs
+  (inclui **Fraude potencial**) + distribuição por comportamento + ranking filtrável (chip de classe + busca,
+  coluna **Situação** + badge `N× c/água`) + detalhe com série de 18 meses (SVG, meses irregulares em **vermelho**)
+  + situação atual + ação sugerida. Recomputar = re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+  - **Dimensão de fraude (2026-09-24):** colunas **`situacao_atual`** (`cd_situaca` da última competência: R=Ativa,
+    I=Inativa/cortada, F=Factível, P=Potencial) e **`meses_irregular`** (nº de meses com a ligação em I/F/P **porém
+    faturando volume** `qt_volume_>0` — "cortado mas com água") em `mm_matricula_stats`. Classe **`fraude_potencial`**
+    (precedência máxima) quando `meses_irregular >= 2`; **2.485** matrículas (score médio 67,3). Detecta religação
+    clandestina / by-pass. `_serie` devolve `sit_lig`+`irregular` por mês; `_ranking` devolve `situacao_atual`+
+    `meses_irregular`; `_resumo` tem KPI `n_fraude`. Recomputar a dimensão = re-rodar o UPDATE de `meses_irregular`
+    (buckets `mod(nu_matricu,4)`, `count(*) filter (where cd_situaca in ('I','F','P') and coalesce(qt_volume_,0)>0)`)
+    + `situacao_atual` (join `competencia=ultimo_competencia`) antes do UPDATE de classificação/score.
   - **Sazonalidade & tendência (mesma tela):** tabela leve **`"11 - perdas_nrw".mm_mensal`** (agregado por
     consórcio×competência, 35 linhas — 1 INSERT simples, sem bucket) + RPC **`app_nrw_mm_sazonalidade`**. Painel
     com evolução mensal do **consumo médio por matrícula** (não o volume total — este só cresce porque entram
