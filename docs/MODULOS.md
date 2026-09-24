@@ -1661,6 +1661,11 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   (definer, admin **ou** `dev_acesso`; anon revogado). A tela: KPIs + distribuição por comportamento + ranking
   filtrável (chip de classe + busca) + detalhe com série de 18 meses (SVG) + ação sugerida. Recomputar =
   re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+  - **Sazonalidade & tendência (mesma tela):** tabela leve **`"11 - perdas_nrw".mm_mensal`** (agregado por
+    consórcio×competência, 35 linhas — 1 INSERT simples, sem bucket) + RPC **`app_nrw_mm_sazonalidade`**. Painel
+    com evolução mensal do **consumo médio por matrícula** (não o volume total — este só cresce porque entram
+    mais matrículas nos meses recentes: 57k→134k), **perfil sazonal** (desvio de cada mês-calendário vs a média)
+    e **Δ ano a ano** dos meses sobrepostos (2025 vs 2026). Recomputar = re-rodar o INSERT do `mm_mensal`.
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
   auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
