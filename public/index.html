@@ -334,11 +334,20 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
     </div>
-    <div class="sec" style="margin-top:20px">🚧 Em desenvolvimento</div>
+    <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
       <button class="mod soon" id="cardProj"><div class="ic">📐</div><div class="nm">Projetos 🔒</div></button>
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
+      <button class="mod soon" id="cardPessoas"><div class="ic">👥</div><div class="nm">Gestão de Pessoas 🔒</div></button>
     </div>
+  </main>
+
+  <main id="dev_acesso" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Módulos em desenvolvimento · Acesso</h1>
+    <p class="sub">Marque quem pode ver e entrar nos módulos em desenvolvimento (Projetos e Perdas). O admin sempre tem acesso.</p>
+    <input id="devAcessoBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
+    <div id="devAcessoList"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="pressao" class="hidden">
@@ -795,6 +804,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="frotas" class="hidden">
     <div class="bar"><button class="bk" id="frotasBar">‹ Frota</button><b style="font-size:16px">Frotas</b></div>
     <div id="frotasView"></div>
+  </main>
+
+  <main id="pessoas" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button><b style="font-size:16px">Gestão de Pessoas</b></div>
+    <div id="pessoasView"></div>
   </main>
 
   <main id="notificacoes" class="hidden">
@@ -1262,7 +1276,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','dev_acesso','pessoas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1290,18 +1304,48 @@ function irPara(id){
   if(id==='matriculas') mtInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
+  if(id==='dev_acesso') devAcessoInit();
   if(id==='projetos') pjHub();
   if(id==='projeto_campo') pjInit();
   if(id==='projeto_sup') pjSupEnter();
   if(id==='projeto_acesso') pjSupAcesso();
   if(id==='projeto_resumo') pjResumoEnter();
+  if(id==='pessoas') pessoasInit();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const cp=document.getElementById('cardPerdas'); if(cp){ const okP=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cp.classList.toggle('soon',!okP); cp.querySelector('.nm').textContent=okP?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okP?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cj=document.getElementById('cardProj'); if(cj){ const okJ=!!(ME&&String(ME.email||'').toLowerCase()==='sander.sirio@aguasmg.com.br'); cj.classList.toggle('soon',!okJ); cj.querySelector('.nm').textContent=okJ?'Projetos':'Projetos 🔒'; cj.onclick=okJ?(()=>irPara('projetos')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cj=document.getElementById('cardProj'); if(cj){ cj.classList.toggle('soon',!okDev); cj.querySelector('.nm').textContent=okDev?'Projetos':'Projetos 🔒'; cj.onclick=okDev?(()=>irPara('projetos')):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
+if($('#homeDevAcesso')) $('#homeDevAcesso').addEventListener('click',()=>irPara('dev_acesso'));
+// Acesso aos módulos "Em desenvolvimento" (Projetos/Perdas) — engrenagem admin, backend em perfil.dev_acesso (padrão almoxarifado)
+let _devAcessoUsers=[];
+async function devAcessoInit(){
+  if(!(ME&&ME.is_admin)){ irPara('home'); return; }
+  const cont=$('#devAcessoList'); if(cont) cont.innerHTML='<p class="sub">Carregando…</p>';
+  const bu=$('#devAcessoBusca'); if(bu && !bu.dataset.ready){ bu.dataset.ready='1'; bu.addEventListener('input',devAcessoRender); }
+  try{ const {data,error}=await sb.rpc('app_dev_acesso_listar'); if(error)throw error; _devAcessoUsers=data||[]; }
+  catch(e){ if(cont) cont.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  devAcessoRender();
+}
+function devAcessoRender(){
+  const termo=(($('#devAcessoBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_devAcessoUsers.filter(u=>!termo || (u.nome||'').toLowerCase().includes(termo) || (u.email||'').toLowerCase().includes(termo));
+  const cont=$('#devAcessoList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{ const lock=!!u.acesso_pelo_cargo;
+    const nota=lock?'<span class="sub" style="font-size:11px">admin — acesso sempre</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="devAcessoCk" data-id="${u.id}" ${u.acesso?'checked':''} ${lock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${u.nome||u.email||'—'}</div>${nota}</div></label>`;
+  }).join('');
+  cont.querySelectorAll('.devAcessoCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_dev_acesso_set',{p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_devAcessoUsers.find(x=>x.id===id); if(u) u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
+}
 ['condBar','frotasBar'].forEach(bid=>{ const b=$('#'+bid); if(b) b.addEventListener('click',()=>irPara('frota')); });
 
 // ---------- MÓDULO PROJETOS / INTERVENÇÕES ----------
@@ -7531,7 +7575,413 @@ async function ntfInit(){
   }catch(e){ $('#ntfView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 async function ntfMarcarTodas(){ try{ await sb.rpc('app_notif_marcar_lidas',{}); }catch(e){} toast('✓ Avisos marcados como lidos'); ntfBadge(); ntfInit(); }
+
+// ---------- MÓDULO GESTÃO DE PESSOAS ----------
+let pessoasSub='home', pessoasTarget=null, pessoasCandidatos=[], pessoasMeus=[], pessoasCandSel=null,
+  pessoasUsuarios=[], pessoasCargos=[], pessoasViewGestor=false;
+const PESSOAS_STATUS_LABEL={
+  aguardando_gestor:{l:'Aguardando aprovação do gestor',bg:'--warn-bg',fg:'--warn'},
+  reprovado:{l:'Reprovado',bg:'--bad-bg',fg:'--bad'},
+  proposta_pendente:{l:'Proposta pendente',bg:'--warn-bg',fg:'--warn'},
+  proposta_assinada:{l:'Proposta assinada — pronto p/ ativar',bg:'--ok-bg',fg:'--ok'},
+  ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},
+  cancelado:{l:'Cancelado',bg:'--line',fg:'--mut'}
+};
+async function pessoasInit(){
+  if(!ME){ try{ const {data}=await sb.rpc('app_me'); if(data) ME=data; }catch(e){} }
+  const tgt=pessoasTarget; pessoasTarget=null;
+  pessoasSub = tgt ? tgt.sub : 'home';
+  pessoasRender();
+}
+function pessoasBlocks(){
+  const rh=!!(ME&&(ME.pessoas_admin||ME.is_admin));
+  return [
+    {t:'RH',ic:'🗂️',on:rh,acts:[
+      {id:'rh_novo',ic:'➕',lbl:'Cadastrar candidato'},
+      {id:'rh_lista',ic:'📋',lbl:'Candidatos'},
+      {id:'rh_colaboradores',ic:'🧑‍🤝‍🧑',lbl:'Colaboradores'}]},
+    {t:'Gestor',ic:'🖊️',on:true,acts:[
+      {id:'minha_equipe',ic:'👥',lbl:'Minha equipe'}]},
+    {t:'Meu Time',ic:'🧑‍💼',on:true,acts:[
+      {id:'meus_colaboradores',ic:'📇',lbl:'Meus colaboradores'}]}
+  ];
+}
+function pessoasHome(){
+  pessoasSub='home';
+  const blocks=pessoasBlocks();
+  $('#pessoasView').innerHTML='<h1 style="margin-bottom:2px">Gestão de Pessoas</h1><p class="sub">Escolha uma ação</p>'+
+    blocks.filter(b=>b.on).map(b=>'<div class="sec" style="margin-top:16px;display:flex;align-items:center">'+b.ic+' '+b.t+
+      (b.t==='RH'&&ME&&ME.is_admin?'<button id="pessoasAdmGear" title="Definir quem é RH (pessoas_admin)" style="all:unset;cursor:pointer;font-size:18px;margin-left:auto;padding:0 4px">⚙️</button>':'')+
+      '</div><div class="grid" style="margin-top:10px">'+
+      b.acts.map(a=>'<button class="mod" data-pact="'+a.id+'"><div class="ic">'+a.ic+'</div><div class="nm">'+a.lbl+'</div></button>').join('')+
+    '</div>').join('');
+  $('#pessoasView').querySelectorAll('[data-pact]').forEach(el=>el.addEventListener('click',()=>pessoasOpen(el.dataset.pact)));
+  const gear=$('#pessoasAdmGear'); if(gear) gear.addEventListener('click',()=>{ pessoasSub='admin_gate'; pessoasRenderAdminGate(); });
+}
+function pessoasOpen(id){
+  if(id==='rh_novo'){ pessoasSub='rh_novo'; pessoasRenderCandidatoNovo(); return; }
+  if(id==='rh_lista'){ pessoasSub='rh_lista'; pessoasRenderRhLista(); return; }
+  if(id==='rh_colaboradores'){ pessoasSub='colaboradores'; pessoasRenderColaboradores(); return; }
+  if(id==='minha_equipe'){ pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe(); return; }
+  if(id==='meus_colaboradores'){ pessoasSub='meus_colaboradores'; pessoasRenderMeusColaboradores(); return; }
+}
+async function pessoasRenderMeusColaboradores(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  let arr=[];
+  try{ const {data,error}=await sb.rpc('app_pessoas_meus_colaboradores'); if(error) throw error; arr=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📇 Meus colaboradores</div>';
+  h+='<p class="sub" style="margin:2px 0 10px">Pessoas que têm você como aprovador — área, empresa e data de admissão.</p>';
+  h+=arr.length ? arr.map(u=>
+    '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<b>'+(u.nome||'—')+'</b>'+
+      '<div class="sub" style="margin-top:2px">'+(u.area||'—')+' · '+(u.frente_empresa||'—')+'</div>'+
+      '<div class="sub" style="margin-top:2px">Admissão: '+fmtData(u.admissao)+'</div></div>'
+  ).join('') : '<p class="sub" style="margin-top:10px">Nenhum colaborador vinculado a você como aprovador.</p>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+}
+function pessoasRender(){
+  if(pessoasSub==='rh_novo') return pessoasRenderCandidatoNovo();
+  if(pessoasSub==='rh_lista') return pessoasRenderRhLista();
+  if(pessoasSub==='colaboradores') return pessoasRenderColaboradores();
+  if(pessoasSub==='colaborador_det') return pessoasRenderColaboradorDet();
+  if(pessoasSub==='minha_equipe') return pessoasRenderMinhaEquipe();
+  if(pessoasSub==='meus_colaboradores') return pessoasRenderMeusColaboradores();
+  if(pessoasSub==='candidato_det') return pessoasRenderCandidatoDet();
+  if(pessoasSub==='checklist') return pessoasRenderChecklist();
+  if(pessoasSub==='admin_gate') return pessoasRenderAdminGate();
+  pessoasHome();
+}
+const PESSOAS_ATIVO_LABEL={ativo:{l:'Ativo',bg:'--ok-bg',fg:'--ok'},inativo:{l:'Desligado',bg:'--line',fg:'--mut'}};
+let pessoasColaboradores=[], pessoasColabBusca='', pessoasColabSel=null;
+async function pessoasRenderColaboradores(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pessoas_colaboradores_listar',{p_q:null}); if(error) throw error; pessoasColaboradores=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🧑‍🤝‍🧑 Colaboradores</div>';
+  h+='<input id="peColabBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin:8px 0" value="'+pessoasColabBusca.replace(/"/g,'&quot;')+'"/>';
+  h+='<div id="peColabLista"></div>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#peColabBusca').addEventListener('input',e=>{ pessoasColabBusca=e.target.value; pessoasRenderColabLista(); });
+  pessoasRenderColabLista();
+}
+function pessoasRenderColabLista(){
+  const termo=pessoasColabBusca.trim().toLowerCase();
+  const arr=pessoasColaboradores.filter(c=>!termo||(c.nome||'').toLowerCase().includes(termo)||(c.email||'').toLowerCase().includes(termo));
+  const cont=$('#peColabLista'); if(!cont) return;
+  cont.innerHTML = arr.length ? arr.map(c=>
+    '<div class="peRow" data-id="'+c.id+'" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+(c.nome||c.email)+'</b>'+statusBadge(PESSOAS_ATIVO_LABEL,c.ativo?'ativo':'inativo')+'</div>'+
+      '<div class="sub" style="margin-top:2px">'+(c.cargo||'—')+(c.area?(' · '+c.area):'')+'</div></div>'
+  ).join('') : '<p class="sub" style="margin-top:10px">Nenhum colaborador encontrado.</p>';
+  cont.querySelectorAll('.peRow').forEach(el=>el.addEventListener('click',()=>{ pessoasColabSel=el.dataset.id; pessoasSub='colaborador_det'; pessoasRenderColaboradorDet(); }));
+}
+function pessoasRenderColaboradorDet(){
+  const c=pessoasColaboradores.find(x=>String(x.id)===String(pessoasColabSel));
+  if(!c){ pessoasSub='colaboradores'; return pessoasRenderColaboradores(); }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button>';
+  h+='<div class="sec">'+(c.nome||c.email)+'</div><p class="sub" style="margin-top:2px">'+(c.email||'')+' · '+(c.cargo||'—')+'</p>';
+  h+='<div style="margin-top:8px">'+statusBadge(PESSOAS_ATIVO_LABEL,c.ativo?'ativo':'inativo')+(c.ativo?'':' <span class="sub">desde '+fmtData(c.demissao)+'</span>')+'</div>';
+  if(c.ativo){
+    h+='<div class="sec" style="margin-top:16px">Desligamento</div>';
+    h+='<label>Data do desligamento *</label><input id="peDeslData" type="date"/>';
+    h+='<label>Motivo</label><textarea id="peDeslMotivo" rows="3"></textarea>';
+    h+='<button class="btn ghost" id="peDesligar" style="margin-top:14px;color:var(--bad)">Marcar como desligado</button>';
+  }
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',()=>{ pessoasSub='colaboradores'; pessoasRenderColaboradores(); });
+  const bt=$('#peDesligar'); if(bt) bt.addEventListener('click',async()=>{
+    const data=$('#peDeslData').value;
+    if(!data) return toast('Informe a data do desligamento');
+    if(!confirm('Confirma o desligamento de '+(c.nome||c.email)+'? Isso marca o colaborador como inativo no AcquaHub.')) return;
+    bt.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_colaborador_desligar',{p_perfil_id:c.id,p_data_demissao:data,p_motivo:$('#peDeslMotivo').value||null}); if(error) throw error;
+      toast('✓ Colaborador desligado'); pessoasSub='colaboradores'; pessoasRenderColaboradores();
+    }catch(e){ toast('Erro: '+(e.message||e)); bt.disabled=false; }
+  });
+}
+let _pessoasAdmUsers=[];
+async function pessoasRenderAdminGate(){
+  $('#pessoasView').innerHTML='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🗂️ Acesso de RH (Gestão de Pessoas)</div><p class="sub" style="margin:2px 0 10px">Marque quem pode aprovar candidatos, gerar carta proposta e ativar/desligar colaboradores.</p><input id="peAdmBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/><div id="peAdmList"><p class="sub">Carregando…</p></div>';
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#peAdmBusca').addEventListener('input',pessoasAdmRender);
+  try{ const {data,error}=await sb.rpc('app_pessoas_admin_listar'); if(error) throw error; _pessoasAdmUsers=data||[]; }
+  catch(e){ $('#peAdmList').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  pessoasAdmRender();
+}
+function pessoasAdmRender(){
+  const termo=(($('#peAdmBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_pessoasAdmUsers.filter(u=>!termo||(u.nome||'').toLowerCase().includes(termo)||(u.email||'').toLowerCase().includes(termo));
+  const cont=$('#peAdmList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{
+    const cargoLock=!!u.acesso_pelo_cargo, on=cargoLock||!!u.pessoas_admin;
+    const nota=cargoLock?'<span class="sub" style="font-size:11px">acesso pelo cargo (admin)</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="peAdmCk" data-id="'+u.id+'" '+(on?'checked':'')+' '+(cargoLock?'disabled':'')+' style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">'+(u.nome||u.email||'—')+'</div>'+nota+'</div></label>';
+  }).join('');
+  cont.querySelectorAll('.peAdmCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_admin_set',{p_uuid:id,p_on:on}); if(error) throw error;
+      const u=_pessoasAdmUsers.find(x=>x.id===id); if(u) u.pessoas_admin=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
+}
+function pessoasEmitirCarta(c){
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio');
+  if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div>'+
+    '<div id="relDoc"><h2>Carta Proposta</h2>'+
+    '<p><b>Candidato:</b> '+(c.nome_completo||'')+'</p>'+
+    '<p><b>Cargo:</b> '+(c.cargo_proposto||'')+'</p>'+
+    '<p><b>Salário:</b> '+fmtDinheiro(c.salario)+'</p>'+
+    '<p><b>Data de início:</b> '+fmtData(c.data_inicio_proposta)+'</p>'+
+    '<p><b>Benefícios:</b> '+(c.beneficios||'—')+'</p></div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+let pessoasAreaAprovadores=[];
+async function pessoasRenderCandidatoNovo(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const [rCargos,rAreas] = await Promise.all([sb.rpc('sup_cargos_ativos'), sb.rpc('app_pessoas_area_aprovadores_listar')]);
+    if(rCargos.error) throw rCargos.error;
+    if(rAreas.error) throw rAreas.error;
+    pessoasCargos=rCargos.data||[]; pessoasAreaAprovadores=rAreas.data||[];
+  }catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">➕ Cadastrar candidato</div>';
+  h+='<label>Nome completo *</label><input id="peNome"/>';
+  h+='<label>CPF *</label><input id="peCpf" inputmode="numeric"/>';
+  h+='<label>Função</label><select id="peCargo"><option value="">—</option>'+pessoasCargos.map(c=>'<option value="'+c.id+'">'+c.nome+'</option>').join('')+'</select>';
+  h+='<label>Formação</label><input id="peFormacao"/>';
+  h+='<label>Endereço — Rua</label><input id="peRua"/>';
+  h+='<div style="display:flex;gap:8px"><div style="flex:1"><label>Número</label><input id="peNumero"/></div><div style="flex:2"><label>Complemento</label><input id="peCompl"/></div></div>';
+  h+='<label>Bairro</label><input id="peBairro"/>';
+  h+='<div style="display:flex;gap:8px"><div style="flex:2"><label>Cidade</label><input id="peCidade"/></div><div style="flex:1"><label>UF</label><input id="peUf" maxlength="2"/></div></div>';
+  h+='<label>CEP</label><input id="peCep"/>';
+  h+='<label>Gênero</label><select id="peGenero"><option value="">—</option><option>MASCULINO</option><option>FEMININO</option></select>';
+  h+='<label>Modalidade *</label><select id="peModalidade"><option value="CLT">CLT</option><option value="PJ">PJ</option></select>';
+  h+='<label>Previsão de início</label><input id="pePrevisao" type="date"/>';
+  h+='<label>Área da vaga *</label><select id="peGestor"><option value="">—</option>'+pessoasAreaAprovadores.map(a=>'<option value="'+a.aprovador_uuid+'">'+a.area+' — '+a.gestor_nome+'</option>').join('')+'</select>';
+  h+='<p class="sub" style="margin-top:4px">Escolhida a área, a aprovação vai direto pro gestor responsável por ela.</p>';
+  h+='<button class="btn" id="peSalvar" style="margin-top:14px">Enviar para aprovação</button>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#peSalvar').addEventListener('click',async()=>{
+    const nome=$('#peNome').value.trim(), cpf=$('#peCpf').value.trim(), gestor=$('#peGestor').value;
+    if(!nome||!cpf) return toast('Preencha nome e CPF');
+    if(!gestor) return toast('Selecione o gestor');
+    $('#peSalvar').disabled=true;
+    try{
+      const {error}=await sb.rpc('app_pessoas_candidato_cadastrar',{
+        p_id:null, p_nome_completo:nome, p_cpf:cpf, p_cargo_id:$('#peCargo').value||null, p_formacao:$('#peFormacao').value||null,
+        p_endereco_rua:$('#peRua').value||null, p_endereco_numero:$('#peNumero').value||null, p_endereco_complemento:$('#peCompl').value||null,
+        p_endereco_bairro:$('#peBairro').value||null, p_endereco_cidade:$('#peCidade').value||null, p_endereco_uf:$('#peUf').value||null,
+        p_endereco_cep:$('#peCep').value||null, p_genero:$('#peGenero').value||null, p_modalidade:$('#peModalidade').value,
+        p_previsao_inicio:$('#pePrevisao').value||null, p_gestor_uuid:gestor
+      });
+      if(error) throw error;
+      toast('✓ Candidato cadastrado — enviado para aprovação');
+      pessoasSub='rh_lista'; pessoasRenderRhLista();
+    }catch(e){ toast('Erro: '+(e.message||e)); $('#peSalvar').disabled=false; }
+  });
+}
+async function pessoasRenderRhLista(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pessoas_candidatos_listar',{p_status:null}); if(error) throw error; pessoasCandidatos=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📋 Candidatos</div>';
+  h+=pessoasCandidatos.length ? pessoasCandidatos.map(c=>
+    '<div class="peRow" data-id="'+c.id+'" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+c.nome_completo+'</b>'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>'+
+      '<div class="sub" style="margin-top:2px">'+(c.cargo||'—')+' · gestor: '+(c.gestor||'—')+'</div></div>'
+  ).join('') : '<p class="sub" style="margin-top:10px">Nenhum candidato cadastrado.</p>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#pessoasView').querySelectorAll('.peRow').forEach(el=>el.addEventListener('click',()=>{ pessoasCandSel=el.dataset.id; pessoasViewGestor=false; pessoasSub='candidato_det'; pessoasRenderCandidatoDet(); }));
+}
+async function pessoasRenderMinhaEquipe(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pessoas_meus_candidatos'); if(error) throw error; pessoasMeus=data||[]; }
+  catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">👥 Minha equipe</div>';
+  h+=pessoasMeus.length ? pessoasMeus.map(c=>{
+    const pend = c.status==='ativo' && !c.tem_checklist;
+    return '<div class="peRow" data-id="'+c.id+'" data-checklist="'+(pend?'1':'0')+'" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>'+c.nome_completo+'</b>'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>'+
+      (pend?'<div class="sub" style="margin-top:2px;color:var(--warn)">Checklist de setup pendente</div>':'')+'</div>';
+  }).join('') : '<p class="sub" style="margin-top:10px">Nenhum candidato na sua equipe no momento.</p>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',pessoasHome);
+  $('#pessoasView').querySelectorAll('.peRow').forEach(el=>el.addEventListener('click',()=>{
+    pessoasCandSel=el.dataset.id; pessoasViewGestor=true;
+    if(el.dataset.checklist==='1'){ pessoasSub='checklist'; pessoasRenderChecklist(); }
+    else { pessoasSub='candidato_det'; pessoasRenderCandidatoDet(); }
+  }));
+}
+async function pessoasRenderCandidatoDet(){
+  $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
+  let c=null;
+  try{
+    if(pessoasViewGestor){ const {data,error}=await sb.rpc('app_pessoas_meus_candidatos'); if(error) throw error; c=(data||[]).find(x=>String(x.id)===String(pessoasCandSel)); }
+    else { const {data,error}=await sb.rpc('app_pessoas_candidatos_listar',{p_status:null}); if(error) throw error; c=(data||[]).find(x=>String(x.id)===String(pessoasCandSel)); }
+  }catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  const back=()=>{ pessoasSub=pessoasViewGestor?'minha_equipe':'rh_lista'; pessoasRender(); };
+  if(!c){ return back(); }
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button>';
+  h+='<div class="sec">'+c.nome_completo+'</div><p class="sub" style="margin-top:2px">'+(c.cargo||'')+'</p>';
+  h+='<div style="margin-top:8px">'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>';
+  if(c.motivo_reprovacao) h+='<p class="sub" style="margin-top:8px;color:var(--bad)">Motivo: '+c.motivo_reprovacao+'</p>';
+
+  // dados confidenciais — só o gestor mapeado (candidato.gestor_uuid) e RH/admin chegam aqui,
+  // as duas RPCs (app_pessoas_meus_candidatos / app_pessoas_candidatos_listar) já garantem o filtro
+  h+='<div class="sec" style="margin-top:16px">Dados do candidato</div>';
+  h+='<div class="sub">CPF: '+(c.cpf||'—')+'</div>';
+  h+='<div class="sub" style="margin-top:2px">Formação: '+(c.formacao||'—')+'</div>';
+  h+='<div class="sub" style="margin-top:2px">Endereço: '+([c.endereco_rua,c.endereco_numero,c.endereco_complemento,c.endereco_bairro,c.endereco_cidade,c.endereco_uf].filter(Boolean).join(', ')||'—')+'</div>';
+  h+='<div class="sub" style="margin-top:2px">Gênero: '+(c.genero||'—')+' · Modalidade: '+(c.modalidade||'—')+'</div>';
+  if(c.status==='aguardando_gestor' && pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Aprovação da vaga</div>';
+    h+='<p class="sub" style="margin:2px 0 8px">Ao aprovar, informe a área/empresa — isso já conta como a aprovação.</p>';
+    h+='<label>Código da área</label><input id="peCodArea"/>';
+    h+='<label>Área</label><input id="peArea"/>';
+    h+='<label>Frente (empresa)</label><select id="peFrente"><option value="">—</option><option>ÁGUAS INTEGRADAS</option><option>EFICIÊNCIA HÍDRICA</option></select>';
+    h+='<label>Projeto</label><select id="peProjeto"><option value="">—</option><option>Contagem</option><option>Betim</option><option>Ambos</option></select>';
+    h+='<label>Custo</label><select id="peCusto"><option value="">—</option><option>Direto</option><option>Indireto</option></select>';
+    h+='<button class="btn" id="peAprovar" style="margin-top:14px;width:100%">✓ Aprovar</button>';
+    h+='<div class="sec" style="margin-top:18px">Reprovar</div>';
+    h+='<label>Motivo</label><textarea id="peMotivo" rows="2"></textarea>';
+    h+='<button class="btn ghost" id="peReprovar" style="margin-top:8px;width:100%">✕ Reprovar</button>';
+  }
+  if(c.status==='aguardando_gestor' && !pessoasViewGestor){
+    h+='<p class="sub" style="margin-top:16px">Aguardando aprovação do gestor ('+(c.gestor||'—')+').</p>';
+  }
+  if(c.status==='proposta_pendente' && !pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Carta proposta</div>';
+    if(!c.carta_proposta_gerada_em){
+      h+='<label>Cargo</label><input id="peCargoProp"/>';
+      h+='<label>Salário</label><input id="peSalario" inputmode="decimal"/>';
+      h+='<label>Data de início</label><input id="peDataInicio" type="date"/>';
+      h+='<label>Benefícios</label><textarea id="peBeneficios" rows="3"></textarea>';
+      h+='<button class="btn" id="peGerarCarta" style="margin-top:14px">Gerar carta</button>';
+    } else if(!c.carta_proposta_anexo_path){
+      h+='<p class="sub">Carta gerada. Pré-visualize, imprima/assine fora do sistema e anexe o arquivo final abaixo.</p>';
+      h+='<button class="btn ghost" id="peVerCarta" style="margin-bottom:10px">👁️ Ver carta</button>';
+      h+=fotoPickHtml('peCartaAnexo','Anexar carta proposta assinada (PDF)',{pdf:true});
+      h+='<button class="btn" id="peAnexarCarta" style="margin-top:14px">Anexar</button>';
+    } else {
+      h+='<p class="sub">Carta anexada.</p><button class="btn" id="peMarcarAssinado" style="margin-top:6px">✓ Marcar como assinada</button>';
+    }
+  }
+  if(c.status==='proposta_pendente' && pessoasViewGestor){
+    h+='<p class="sub" style="margin-top:16px">Aguardando RH gerar/anexar a carta proposta.</p>';
+  }
+  if(c.status==='proposta_assinada' && !pessoasViewGestor){
+    h+='<div class="sec" style="margin-top:16px">Ativar — primeiro dia</div>';
+    h+='<label>Vincular a usuário do AcquaHub *</label><select id="peUsuario"><option value="">—</option></select>';
+    h+='<label>CPF *</label><input id="peCpfAtiv" value="'+(c.cpf||'')+'"/>';
+    h+='<label>Matrícula</label><input id="peMatricula"/>';
+    h+='<label>Data de admissão *</label><input id="peDataAdmissao" type="date"/>';
+    h+='<label>Tamanho da bota</label><input id="peBota"/>';
+    h+='<label>Tamanho da calça</label><input id="peCalca"/>';
+    h+='<label>Tamanho da camiseta</label><input id="peCamiseta"/>';
+    h+='<button class="btn" id="peAtivar" style="margin-top:14px">Ativar</button>';
+  }
+  if(c.status==='ativo'){
+    h+='<p class="sub" style="margin-top:16px">Colaborador ativo.</p>';
+    if(pessoasViewGestor && !c.tem_checklist){
+      h+='<button class="btn" id="peIrChecklist" style="margin-top:8px">Preencher checklist de setup</button>';
+    }
+  }
+  $('#pessoasView').innerHTML=h;
+  FOTO2_BLOBS.peCartaAnexo=null; // evita reaproveitar o PDF de um candidato anterior nesta mesma sessão
+  wireFotoPick($('#pessoasView'));
+  $('#peVoltar').addEventListener('click',back);
+
+  const av=$('#peAprovar'); if(av) av.addEventListener('click',async()=>{
+    const codigoArea=$('#peCodArea').value.trim(), area=$('#peArea').value.trim();
+    if(!codigoArea||!area) return toast('Preencha código da área e área');
+    av.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_aprovar',{p_candidato_id:c.id,p_aprovado:true,p_motivo_reprovacao:null,
+      p_codigo_area:codigoArea, p_area:area, p_frente_empresa:$('#peFrente').value||null,
+      p_projeto:$('#peProjeto').value||null, p_custo_direto_indireto:$('#peCusto').value||null}); if(error) throw error;
+      toast('✓ Aprovado — RH foi avisado pra gerar a carta'); back();
+    }catch(e){ toast('Erro: '+(e.message||e)); av.disabled=false; }
+  });
+  const rp=$('#peReprovar'); if(rp) rp.addEventListener('click',async()=>{
+    rp.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_aprovar',{p_candidato_id:c.id,p_aprovado:false,p_motivo_reprovacao:($('#peMotivo').value||null)}); if(error) throw error;
+      toast('Reprovado'); back();
+    }catch(e){ toast('Erro: '+(e.message||e)); rp.disabled=false; }
+  });
+  const gc=$('#peGerarCarta'); if(gc) gc.addEventListener('click',async()=>{
+    gc.disabled=true;
+    try{ const sal=parseFloat(($('#peSalario').value||'0').replace(/\./g,'').replace(',','.'));
+      const {error}=await sb.rpc('app_pessoas_carta_gerar',{p_candidato_id:c.id,
+        p_cargo_proposto:$('#peCargoProp').value||null, p_salario:isNaN(sal)?null:sal,
+        p_data_inicio_proposta:$('#peDataInicio').value||null, p_beneficios:$('#peBeneficios').value||null}); if(error) throw error;
+      toast('✓ Carta gerada'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); gc.disabled=false; }
+  });
+  const vc=$('#peVerCarta'); if(vc) vc.addEventListener('click',()=>pessoasEmitirCarta(c));
+  const ac=$('#peAnexarCarta'); if(ac) ac.addEventListener('click',async()=>{
+    ac.disabled=true;
+    try{ const path=await uploadFoto2('peCartaAnexo','pessoas');
+      if(!path) throw new Error('Anexe o arquivo da carta');
+      const {error}=await sb.rpc('app_pessoas_carta_anexar',{p_candidato_id:c.id,p_arquivo_path:path}); if(error) throw error;
+      toast('✓ Carta anexada'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); ac.disabled=false; }
+  });
+  const ma=$('#peMarcarAssinado'); if(ma) ma.addEventListener('click',async()=>{
+    ma.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_marcar_assinado',{p_candidato_id:c.id}); if(error) throw error;
+      toast('✓ Marcada como assinada'); pessoasRenderCandidatoDet();
+    }catch(e){ toast('Erro: '+(e.message||e)); ma.disabled=false; }
+  });
+  const us=$('#peUsuario'); if(us){
+    try{ const {data,error}=await sb.rpc('app_pessoas_usuarios_listar',{p_apenas_ativos:false}); if(error) throw error;
+      us.innerHTML='<option value="">—</option>'+(data||[]).map(u=>'<option value="'+u.id+'">'+(u.nome||u.email)+' ('+(u.email||'')+')'+(u.ativo?'':' — inativo')+'</option>').join('');
+    }catch(e){ toast('Erro ao carregar usuários: '+(e.message||e)); }
+  }
+  const at=$('#peAtivar'); if(at) at.addEventListener('click',async()=>{
+    const perfilId=$('#peUsuario').value, cpf=$('#peCpfAtiv').value.trim(), dataAdm=$('#peDataAdmissao').value;
+    if(!perfilId) return toast('Selecione o usuário');
+    if(!cpf||!dataAdm) return toast('Preencha CPF e data de admissão');
+    at.disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_candidato_ativar',{p_candidato_id:c.id,p_perfil_id:perfilId,p_cpf:cpf,
+      p_matricula:$('#peMatricula').value||null, p_data_admissao:dataAdm,
+      p_tamanho_bota:$('#peBota').value||null, p_tamanho_calca:$('#peCalca').value||null, p_tamanho_camiseta:$('#peCamiseta').value||null}); if(error) throw error;
+      toast('✓ Ativado — gestor foi avisado'); back();
+    }catch(e){ toast('Erro: '+(e.message||e)); at.disabled=false; }
+  });
+  const ic=$('#peIrChecklist'); if(ic) ic.addEventListener('click',()=>{ pessoasSub='checklist'; pessoasRenderChecklist(); });
+}
+function pessoasRenderChecklist(){
+  const items=[['peCkCelular','Celular'],['peCkNotebook','Notebook (se área indireta)'],['peCkEpis','EPIs'],['peCkUsuario','Usuário no AcquaHub']];
+  let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">✅ Checklist de setup — novo funcionário</div>';
+  h+=items.map(([id,lbl])=>'<label style="display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px"><input type="checkbox" id="'+id+'" style="width:auto"/> <span>'+lbl+'</span></label>').join('');
+  h+='<label style="margin-top:10px">Observações</label><textarea id="peCkObs" rows="3"></textarea>';
+  h+='<button class="btn" id="peCkSalvar" style="margin-top:14px">Salvar</button>';
+  $('#pessoasView').innerHTML=h;
+  $('#peVoltar').addEventListener('click',()=>{ pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe(); });
+  $('#peCkSalvar').addEventListener('click',async()=>{
+    $('#peCkSalvar').disabled=true;
+    try{ const {error}=await sb.rpc('app_pessoas_checklist_setup_salvar',{p_candidato_id:pessoasCandSel,
+      p_celular_ok:$('#peCkCelular').checked, p_notebook_ok:$('#peCkNotebook').checked,
+      p_epis_ok:$('#peCkEpis').checked, p_usuario_acquahub_ok:$('#peCkUsuario').checked, p_observacoes:$('#peCkObs').value||null}); if(error) throw error;
+      toast('✓ Checklist salvo'); pessoasSub='minha_equipe'; pessoasRenderMinhaEquipe();
+    }catch(e){ toast('Erro: '+(e.message||e)); $('#peCkSalvar').disabled=false; }
+  });
+}
+
 async function supGoAct(act){
+  if(act==='pessoas_candidato'){ pessoasTarget={sub:'rh_lista'}; irPara('pessoas'); return; }
+  if(act==='pessoas_checklist'){ pessoasTarget={sub:'minha_equipe'}; irPara('pessoas'); return; }
+  if(act==='pessoas_meus_colaboradores'){ pessoasTarget={sub:'meus_colaboradores'}; irPara('pessoas'); return; }
   if(act==='condutor_aprovar'||act==='condutor_status'||act==='condutor_termo'||act==='frota_emprestimo'){ irPara('condutor'); return; }
   if(act==='frota_checklist'){ condTarget={sub:'situacao',act:'situacao'}; irPara('condutor'); return; }
   if(act==='frota_minhas_lavagens'){ condTarget={sub:'lavagem',act:'lavagem'}; irPara('condutor'); return; }

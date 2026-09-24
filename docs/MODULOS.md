@@ -1639,11 +1639,13 @@ uma **página HTML separada** (`public/perdas.html`, autocontida: CSS/JS própri
 Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card do hub que faz
 `location.href='perdas.html'`.
 
-- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na seção 🧰 Suporte do `#home`. Nasce
-  `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera **só** para
-  `ME.email === 'sander.sirio@aguasmg.com.br'` (tira `soon`/🔒 e liga `onclick`); os demais ficam
-  opacos e o clique dá `toast('Acesso restrito')`. Segue o padrão de gate da §1 (nasce restrito,
-  revela no `homeGate` quando `ME` resolve).
+- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na categoria **🚧 Em desenvolvimento** do `#home`
+  (junto do `#cardProj`). Nasce `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera por
+  **`ME.dev_acesso`** (tira `soon`/🔒 e liga `onclick`); quem não tem fica opaco e o clique dá `toast('Acesso
+  restrito')`. **Controle de acesso (2026-09):** engrenagem ⚙️ `#homeDevAcesso` na categoria (só admin) → tela
+  `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`) que lista usuários com toggle; backend
+  `perfil.dev_acesso` + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set` (admin-only) + `app_me` repassa
+  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded.
 - **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
   supabase-js (mesma `SB_URL`/anon key do app), lê `auth.getSession()` e, se o e-mail ≠ Sander (ou sem
   sessão), mantém o overlay `#nrwGate` (🔒). Funciona offline (a sessão vem do `localStorage` do mesmo
@@ -1785,3 +1787,124 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
   (OS SIGOS/hidrômetro), `documento` (projeto/licença/alvará/as-built). RPCs `app_proj_*`.
 - **Próximo passo:** modelar esse schema e trocar `PJ_IVS` por RPCs `app_proj_*`. Depois: resumo diário
   multi-intervenção.
+
+## 12. Gestão de Pessoas — schema `"14 - pessoas"` · tela-hub `pessoas`
+
+**Fase 1** (esta rodada, incluindo o incremento de aprovação por área): fluxo de candidato em
+contratação até a ativação, com aprovação de vaga restrita a uma lista fechada de gestores por
+área. Orçamento/headcount por área (comparar contratados × previstos no orçamento × em
+contratação) fica para uma Fase 2 — não implementado ainda.
+
+**Ciclo de status** (`candidato.status`): `aguardando_gestor` → (o gestor da área aprova **e**
+preenche área/empresa/projeto/custo numa única ação) → `proposta_pendente` → (RH gera a carta,
+depois anexa o PDF assinado fora do sistema) → `proposta_assinada` → (RH ativa, vinculando a um
+`perfil` existente) → `ativo`. `reprovado` sai direto de `aguardando_gestor`; `cancelado` é
+reservado para uso futuro (não produzido por nenhuma RPC nesta fase). Não existe mais o status
+intermediário `aguardando_area` — antes eram dois passos (RH aprova, depois um gestor qualquer
+preenche a área); agora é a mesma pessoa (o gestor mapeado da área) que faz as duas coisas de uma
+vez, então os passos foram fundidos.
+
+- **Quem aprova vaga não é mais RH genérico — é uma lista fechada de gestores por área**, tabela
+  `"14 - pessoas".area_aprovador` (`codigo_area` PK, `area`, `aprovador_uuid → public.perfil`,
+  ~18 linhas, 6 pessoas distintas; hoje mantida só por SQL direto, sem tela de edição — muda raro).
+  No cadastro (`app_pessoas_candidato_cadastrar`), o RH escolhe o **gestor da área** da vaga a
+  partir dessa lista (`p_gestor_uuid` validado contra `area_aprovador` — RH não pode apontar
+  qualquer `perfil`, só um dos mapeados). Isso é **separado** do par genérico
+  `perfil.aprovador_uuid`/`aprovador2_uuid` usado no resto do app (EPI/insumos/etc.) — aqui esse par
+  só entra em cena **depois** que o colaborador já está `ativo` (ver "Visibilidade em camadas"
+  abaixo).
+- **RH** (flag `perfil.pessoas_admin`, mesmo molde de `frota_admin`; ligado/desligado por
+  `app_pessoas_admin_set`, admin-only): cadastra o candidato (`app_pessoas_candidato_cadastrar` —
+  `p_id` null cria, preenchido atualiza só enquanto `aguardando_gestor`), acompanha o status (não
+  aprova mais — só o gestor mapeado decide), gera a carta proposta (`app_pessoas_carta_gerar` —
+  cargo/salário/data de início/benefícios, prévia via o mesmo overlay `#relatorio`/`REL_CSS` usado
+  nos outros relatórios do app, `pessoasEmitirCarta`), anexa o PDF final assinado
+  (`app_pessoas_carta_anexar`, upload via `uploadFoto2`/`fotoPickHtml(...,{pdf:true})` — bucket
+  `fotos-campo`, pasta `pessoas/`), marca como assinada (`app_pessoas_candidato_marcar_assinado`) e
+  ativa no primeiro dia (`app_pessoas_candidato_ativar`).
+- **Gestor da área** (`candidato.gestor_uuid`, restrito à lista `area_aprovador`): aprova ou
+  reprova a vaga numa única RPC (`app_pessoas_candidato_aprovar` — quando `p_aprovado=true`,
+  exige/grava `p_codigo_area`/`p_area`/`p_frente_empresa`/`p_projeto`/`p_custo_direto_indireto` e
+  avança pra `proposta_pendente`; quando `false`, grava `p_motivo_reprovacao` e vai pra
+  `reprovado`). Gate: `candidato.gestor_uuid = auth.uid() or funcao='admin'` — nem RH comum
+  (`pessoas_admin` sem `funcao='admin'`) nem qualquer outro gestor mapeado de outra área consegue
+  aprovar; só o gestor exato da vaga (ou o admin de fato, como override). Depois que o colaborador
+  está `ativo`, o mesmo gestor preenche o checklist de setup
+  (`app_pessoas_checklist_setup_salvar` — celular/notebook (se área indireta)/EPIs/usuário
+  AcquaHub, todos **desmarcados por padrão**, mesmo padrão do checklist diário de Frotas — colunas
+  booleanas individuais, sem jsonb).
+- **Visibilidade em camadas (dados confidenciais do candidato — CPF, endereço, formação,
+  salário/benefícios, motivo de reprovação):** só o gestor mapeado da área da vaga (via
+  `candidato.gestor_uuid`) + RH/admin veem esses campos, e só durante a contratação — as duas RPCs
+  devolvem o conjunto completo: `app_pessoas_meus_candidatos` (visão do gestor, filtrado por
+  `gestor_uuid = auth.uid()` — isolamento automático por pessoa, não por "equipe") e
+  `app_pessoas_candidatos_listar` (visão do RH, gate `app_pessoas_admin_check`); o frontend mostra
+  o mesmo bloco "Dados do candidato" pras duas visões. O par genérico
+  `aprovador_uuid`/`aprovador2_uuid` de `perfil` **nunca** vê esses campos nem participa da
+  aprovação da vaga — ele só passa a enxergar o colaborador **depois** de `ativo`, e só campos
+  simples (nome/área/empresa/data de admissão) via `app_pessoas_meus_colaboradores` (`select
+  id,nome,area,frente_empresa,admissao from perfil where aprovador_uuid=auth.uid() or
+  aprovador2_uuid=auth.uid()` — qualquer autenticado pode chamar, não precisa de `pessoas_admin`,
+  porque é sobre *ser* aprovador1/2 de alguém, mecanismo já genérico do app). Tela "Meu Time →
+  Meus colaboradores" no hub mostra essa lista simples.
+- **Ativação não cria conta nova.** O RH escolhe, num `<select>`, um `perfil` existente
+  (`app_pessoas_usuarios_listar(p_apenas_ativos)` — `true` no cadastro/gestor, `false` na ativação,
+  pra permitir vincular a um `perfil` já `ativo=false`, ex.: recontratação). `app_pessoas_candidato_ativar`
+  grava `candidato_admissao` (tamanhos de uniforme + matrícula + data de admissão) **e também
+  atualiza `public.perfil`** (`cpf`/`matricula`/`admissao`/`codigo_area`/`area`/`frente_empresa`/
+  `projeto`/`custo_direto_indireto`/`cargo_id`/`ativo=true`) — essas colunas já existem em `perfil`
+  (usadas pela planilha de usuários e por Frotas) e continuam com fonte única de verdade ali, não
+  duplicada em Pessoas. **Um `perfil` só pode estar vinculado a um `candidato` por vez** — índice
+  único parcial `candidato_perfil_id_uk` (`where perfil_id is not null`) + checagem amigável na RPC,
+  e a `UPDATE` final de `candidato` re-checa `status='proposta_assinada'` (com as outras RPCs de
+  transição de status fazendo o mesmo: status guard **na própria `UPDATE`**, não só numa `SELECT`
+  anterior, pra fechar corrida de duplo clique/dupla aprovação).
+- **Notificação** segue o invariante §0.9, nunca chamada inline nas RPCs: trigger
+  `"14 - pessoas".trg_candidato()` `AFTER INSERT OR UPDATE on candidato` — cobre **INSERT** (avisa
+  só `NEW.gestor_uuid`, o gestor mapeado escolhido no cadastro — não mais o grupo `pessoas_admin`
+  inteiro, porque é ele quem precisa agir agora — `link='pessoas_candidato'`), **UPDATE** pra
+  `proposta_pendente` (avisa o grupo `pessoas_admin`/admin — área preenchida, hora de gerar a
+  carta) e **UPDATE** pra `ativo` (avisa `NEW.gestor_uuid`, `link='pessoas_checklist'`, **e também**
+  o `aprovador_uuid`/`aprovador2_uuid` atuais do `NEW.perfil_id`, lookup em `perfil` de dentro do
+  trigger — "Você tem um novo colaborador: `<nome>`", `link='pessoas_meus_colaboradores'`) — mesmo
+  cuidado já documentado em Frotas de cobrir os dois `TG_OP`, não só `UPDATE`.
+- **Cargo do candidato** vem de `sup_cargos_ativos()` (schema `9 - suprimentos`, mesma RPC já usada
+  em Suprimentos) — reaproveitada, não duplicada.
+- **Desligamento** (`app_pessoas_colaborador_desligar(p_perfil_id, p_data_demissao, p_motivo)`,
+  `pessoas_admin`/admin-only): tela **Colaboradores** (`app_pessoas_colaboradores_listar`, busca por
+  nome/e-mail sobre todo `perfil`, ativos e inativos) → abrir um colaborador ativo mostra o form de
+  desligamento. Grava histórico em `"14 - pessoas".desligamento` (append-only, 1 linha por evento —
+  permite recontratação futura sem perder o registro) e espelha o estado atual em
+  `public.perfil.ativo=false`/`demissao=p_data_demissao`, mesma fonte única de verdade da ativação.
+  Sem trigger de notificação nesta fase (RH é quem inicia e confirma na hora). Não muda com o
+  incremento de aprovação por área.
+- **Tabelas:** `candidato` (dados pessoais + CPF/endereço + status + campos da carta proposta),
+  `candidato_admissao` (1:1, tamanhos de uniforme/matrícula/data de admissão),
+  `colaborador_checklist_setup` (1:1, checklist de setup), `desligamento` (histórico, N:1 por
+  `perfil_id`), `area_aprovador` (mapeamento área → gestor de aprovação de vaga). RLS ligada,
+  `revoke all` de `anon`/`authenticated` — acesso só via RPC `SECURITY DEFINER`, mesmo padrão dos
+  outros schemas app-only (`9`/`10`/`11`/`12`).
+- **`app_me()`** ganhou `pessoas_admin` no retorno (igual `frota_admin`).
+- **Acesso de RH** (`perfil.pessoas_admin`) é concedido pela engrenagem ⚙️ na seção RH do hub
+  (admin-only) — `pessoasRenderAdminGate`/`pessoasAdmRender`, `app_pessoas_admin_listar`/
+  `app_pessoas_admin_set` — mesmo molde de `frotaAdminGate`/`app_frota_admin_*`. `funcao='admin'`
+  sempre tem acesso (`acesso_pelo_cargo`, checkbox travado), assim como em Frotas.
+- **Cuidados:** o schema é `14`, não `13` — `13 - projetos_obra` já está reservado no roteiro do
+  módulo Projetos (§8, ainda não criado) e não podia ser reaproveitado. `SCREENS` ganhou `'pessoas'`
+  + `if(id==='pessoas') pessoasInit()` em `irPara()`; roteamento das notificações em `supGoAct`
+  (`pessoas_candidato`/`pessoas_checklist`/`pessoas_meus_colaboradores`). O upload de anexo da carta
+  proposta (`FOTO2_BLOBS.peCartaAnexo`, via `uploadFoto2`/`fotoPickHtml`) é resetado a cada render
+  da tela de detalhe do candidato — sem isso, o blob em memória de um candidato anterior poderia
+  vazar e ser anexado ao candidato errado se o RH não escolher um arquivo novo.
+- **Card do hub travado** (`#cardPessoas`, na categoria **🚧 Em desenvolvimento**, `homeGate()`, mesmo
+  padrão de `cardPerdas`/`cardProj` — gate por **`ME.dev_acesso`**, controlado pela engrenagem ⚙️ da categoria
+  `dev_acesso`): só quem tem acesso "Em desenvolvimento" vê/clica o card "Gestão de Pessoas" — pros demais
+  aparece com 🔒 e toast de "Acesso restrito". Isso só esconde o módulo do menu geral; não é o controle de
+  acesso real (esse continua sendo as RPCs `SECURITY DEFINER` + `pessoas_admin`/`gestor_uuid`/`aprovador_uuid`/`aprovador2_uuid`) — por isso
+  um gestor de área que recebe notificação de aprovação de vaga (`supGoAct` → `irPara('pessoas')`)
+  continua conseguindo entrar pelo link da notificação mesmo sem estar na lista do card, porque
+  `irPara('pessoas')` não tem gate próprio, só o card do home tem.
+- **Próximo passo (Fase 2):** tabela de orçamento mensal por vaga (código de área/função/setor/
+  modalidade/projeto/custo/headcount por mês — fonte é uma planilha de orçamento existente fora do
+  app) + painel do gestor comparando contratados (via `perfil.ativo`+`area`) × orçado × em
+  contratação (via `candidato.status`).
