@@ -383,8 +383,11 @@ o aprovador1/2 do `perfil` ativado, "novo colaborador"). RH também **desliga** 
 tela Colaboradores (`app_pessoas_colaborador_desligar` — zera `perfil.ativo`, grava `demissao` +
 histórico em `"14 - pessoas".desligamento`) — a gestão de pessoas do dia a dia (admissão e
 desligamento) passa a ser sempre por este módulo, não mais só por edição direta de planilha/banco.
-Acesso de RH é concedido pela engrenagem ⚙️ do próprio hub (admin-only), igual Frotas. Painel de
-headcount/orçamento por área fica para uma Fase 2. Detalhe em
+Acesso de RH é concedido pela engrenagem ⚙️ do próprio hub (admin-only), igual Frotas. RH configura
+os valores de referência dos benefícios (`"14 - pessoas".beneficio_premissa`, tela "Premissas de
+benefícios") e marca sim/não por candidato (substituiu o texto livre `beneficios`) — a RPC soma o
+custo estimado só pra visão interna do RH, a carta em si mantém texto fixo por benefício, sem
+imprimir valores. Painel de headcount/orçamento por área fica para uma Fase 2. Detalhe em
 `docs/MODULOS.md §12`.
 
 **Avisos/Notificações** (`notificacoes`) — inbox + badge + web push (§7).

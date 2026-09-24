@@ -1885,6 +1885,23 @@ vez, então os passos foram fundidos.
   cuidado já documentado em Frotas de cobrir os dois `TG_OP`, não só `UPDATE`.
 - **Cargo do candidato** vem de `sup_cargos_ativos()` (schema `9 - suprimentos`, mesma RPC já usada
   em Suprimentos) — reaproveitada, não duplicada.
+- **Premissas de benefícios (2026-09-24):** tabela nova `"14 - pessoas".beneficio_premissa`
+  (`codigo` PK texto — `vt`/`vr_va`/`saude`/`odontologico`/`seguro_vida` —, `nome`, `valor`,
+  `regra` texto livre), seed com os 5 valores que a Geovana passou. Tela RH "Premissas de
+  benefícios" (`pessoasRenderBeneficiosPremissas`, RPCs
+  `app_pessoas_beneficios_premissas_listar`/`app_pessoas_beneficio_premissa_salvar`, ambas
+  `app_pessoas_admin_check`). **`candidato.beneficios` (texto livre) foi substituído por 5 colunas
+  booleanas** (`beneficio_vt`/`beneficio_vr_va`/`beneficio_saude`/`beneficio_odontologico`/
+  `beneficio_seguro_vida`, default `false`) — RH marca sim/não por candidato em vez de digitar
+  texto; `app_pessoas_carta_gerar` trocou o parâmetro `p_beneficios text` pelos 5
+  `p_beneficio_* boolean` (assinatura antiga dropada explicitamente antes de criar a nova, mesmo
+  cuidado do bug de overload da 2ª revisão do PR #104). A tela de geração de carta soma os valores
+  dos benefícios marcados contra as premissas e mostra "Custo estimado em benefícios" **só pro
+  RH**, como referência interna — **os valores não aparecem na carta** que o candidato recebe
+  (decisão confirmada: a carta mantém texto descritivo fixo por benefício, sem imprimir R$; isso é
+  desenhado na 3ª rodada, que reescreve `pessoasEmitirCarta` pro modelo legal completo). A coluna
+  `beneficios` (texto) continua existindo na tabela por enquanto (não é mais escrita nem lida por
+  nenhuma RPC/tela) — pode ser dropada quando a 3ª rodada estiver pronta e confirmada.
 - **Desligamento** (`app_pessoas_colaborador_desligar(p_perfil_id, p_data_demissao, p_motivo)`,
   `pessoas_admin`/admin-only): tela **Colaboradores** (`app_pessoas_colaboradores_listar`, busca por
   nome/e-mail sobre todo `perfil`, ativos e inativos) → abrir um colaborador ativo mostra o form de
