@@ -142,10 +142,26 @@
 
 ### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
+- **Duas fotos (2026-09):** **Foto do manômetro** (obrigatória, `fotoBlob`→`p_foto`) e **Foto do número HD**
+  (opcional, `fotoHdBlob`→`p_foto_hd`, inputs `.fFotoHd`/preview `#fotoHdPrev`). Ambas vão no `item.fotos`
+  (`enviar` faz upload por param e seta o path). Coluna nova `"8 - coleta_campo".mapeamento_pressao.foto_hd`
+  + param `p_foto_hd` na RPC (recriada com `drop`+`create` p/ não gerar overload — regra §0.6; grant só `authenticated`).
+- **Unidade de medida (2026-09):** ao lado do valor há `#pressao_un` (**MCA/BAR/KPA**, default MCA). O valor é
+  **convertido p/ mca no cliente** antes de enviar (`vmca`: kpa÷9,80665; bar×10,1971621; mca as-is) — a coluna
+  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend. `prAposSalvar(vmca)`.
 - Alvo opcional vindo do Teste de estanqueidade (`prAlvo`). Botões: `#prEst` (estanqueidade), `#prProd`.
 - Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
   `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
+- **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
+  `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
+  137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
+  borda weight 2** (mesmo padrão de ativar/desativar do Cadastro técnico). GeoJSON (4326, `ST_SimplifyPreserveTopology 1m`)
+  via RPC **`app_estanq_poligonos(p_layer)`** (`zonas_pressao`|`dmcs`, definer, só `authenticated`); cache em
+  localStorage (`est_cam_zp`/`est_cam_dmc`). Camadas ficam **abaixo** dos pontos (`bringToBack`); começam desligadas.
+- **Popup no ponto do mapa (2026-09):** clicar num marcador abre popup (`bindPopup`+`popupopen`) com **🧭 Navegar
+  até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
+  → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
 ### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
@@ -278,8 +294,11 @@
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
 - Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
-  **VRPs**, rede, ligações (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
+  **VRPs**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
   `step` (célula de cache).
+  - **Rede de gás (2026-09, `CAD_VER v5→v6`):** camada **`rede_gas`** (GASMIG, `"4 - redes_terceiros".rede_gas`,
+    1.271 linhas MULTILINESTRING, âmbar `#f9a825`, `whole:true`, começa desligada). Só leitura/visualização;
+    branch `rede_gas` na RPC `app_cadastro_geojson` (props id/material/diametro/municipio) — popup genérico.
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
@@ -1558,7 +1577,7 @@ real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (g
 ## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
-**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`.
+**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`, `app_estanq_poligonos` (camadas ZP/DMC COPASA).
 **Loggers:** `app_loggers_listar`, `app_logger_criar/instalar/remover/finalizar/editar`,
 `logger_pressao_importar/stats`.
 **Pesquisa/Ocorrência:** `app_pesquisa_filtros`, `app_pesquisa_produtividade`,

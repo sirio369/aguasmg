@@ -350,10 +350,26 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="gpsBanner" class="banner warn">Obtendo GPS…</div>
 
     <label for="pressao_v">Pressão *</label>
-    <input id="pressao_v" class="big" inputmode="decimal" placeholder="0,0"/>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input id="pressao_v" class="big" inputmode="decimal" placeholder="0,0" style="flex:1;min-width:0"/>
+      <select id="pressao_un" style="flex:0 0 auto;width:auto;align-self:stretch" title="Unidade de medida">
+        <option value="mca">MCA</option>
+        <option value="bar">BAR</option>
+        <option value="kpa">KPA</option>
+      </select>
+    </div>
 
     <label for="numero_hd">Número do HD</label>
     <input id="numero_hd" autocomplete="off"/>
+
+    <label>Foto do número HD</label>
+    <div class="photo">
+      <div class="pick">
+        <label class="pickb">📷 Câmera<input class="fFotoHd" type="file" accept="image/*" capture="environment"/></label>
+        <label class="pickb">🖼️ Galeria<input class="fFotoHd" type="file" accept="image/*"/></label>
+      </div>
+      <img id="fotoHdPrev" class="hidden" alt=""/>
+    </div>
 
     <label for="consorcio">Consórcio</label>
     <select id="consorcio">
@@ -389,6 +405,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </select>
     <div id="estFiltros" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px"></div>
     <div id="estLista"></div>
+    <div id="estCamadas" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
     <div id="estMapa" style="display:none;height:60vh;border-radius:12px;overflow:hidden"></div>
   </main>
 
@@ -943,7 +960,7 @@ async function pushAutoSync(){ try{ if(pushSuportado() && Notification.permissio
 
 const $ = s => document.querySelector(s);
 const screens = { login:$('#login'), app:$('#app') };
-let gps = null, fotoBlob = null, enviando = false;
+let gps = null, fotoBlob = null, fotoHdBlob = null, enviando = false;
 
 // ---------- IndexedDB (fila offline) ----------
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('coleta',1);r.onupgradeneeded=()=>r.result.createObjectStore('fila',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
@@ -1043,6 +1060,12 @@ document.querySelectorAll('#pressao .fFoto').forEach(fi=>fi.addEventListener('ch
   else { fotoBlob=null; img.classList.add('hidden'); }
   validar();
 }));
+// foto do número HD (opcional)
+document.querySelectorAll('#pressao .fFotoHd').forEach(fi=>fi.addEventListener('change',async e=>{
+  const f=e.target.files[0]||null; const img=$('#fotoHdPrev');
+  if(f){ fotoHdBlob=await comprimir(f); img.src=URL_obj(fotoHdBlob); img.classList.remove('hidden'); }
+  else { fotoHdBlob=null; img.classList.add('hidden'); }
+}));
 function URL_obj(b){return window.URL.createObjectURL(b);}
 
 $('#salvar').addEventListener('click',async()=>{
@@ -1050,11 +1073,14 @@ $('#salvar').addEventListener('click',async()=>{
   if(!gps||gps.acc>PRECISAO_MAX) return toast('GPS insuficiente');
   const v=parseFloat($('#pressao_v').value.replace(',','.'));
   if(isNaN(v)) return toast('Informe a pressão');
+  // unidade escolhida pelo usuário → converte p/ mca (coluna do banco é sempre mca)
+  const prUn=($('#pressao_un')&&$('#pressao_un').value)||'mca';
+  const vmca=Math.round((prUn==='kpa'?v/9.80665:prUn==='bar'?v*10.1971621:v)*100)/100;
   if(!fotoBlob) return toast('Tire a foto do manômetro');
   enviando=true; $('#salvar').disabled=true;
   const uid=crypto.randomUUID();
-  const item={id:uid,tipo:'pressao',rpc:'app_registrar_pressao',pasta:'pressao',fotos:{p_foto:fotoBlob},fields:{
-    p_id:uid,p_pressao_mca:v,p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,
+  const item={id:uid,tipo:'pressao',rpc:'app_registrar_pressao',pasta:'pressao',fotos:{p_foto:fotoBlob,p_foto_hd:fotoHdBlob},fields:{
+    p_id:uid,p_pressao_mca:vmca,p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,
     p_consorcio:$('#consorcio').value,p_numero_hd:$('#numero_hd').value||null,
     p_cota_m:gps.alt!=null?Math.round(gps.alt*10)/10:null,p_gps_ts:gps.ts,p_dispositivo:navigator.userAgent.slice(0,60)
   }};
@@ -1062,14 +1088,14 @@ $('#salvar').addEventListener('click',async()=>{
   localStorage.setItem('consorcio',$('#consorcio').value);
   try{
     if(navigator.onLine){
-      try{ await enviar(item); toast('✓ Coleta enviada'); prAposSalvar(v); resetForm(); return; }
+      try{ await enviar(item); toast('✓ Coleta enviada'); prAposSalvar(vmca); resetForm(); return; }
       catch(e){ /* rede falhou — cai pra fila */ }
     }
-    await filaAdd(item); toast('Sem conexão — salvo na fila'); prAposSalvar(v); resetForm(); atualizarFila();
+    await filaAdd(item); toast('Sem conexão — salvo na fila'); prAposSalvar(vmca); resetForm(); atualizarFila();
   }catch(e){ toast('Erro ao salvar: '+e.message); }
   finally{ enviando=false; validar(); }
 });
-function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;document.querySelectorAll('#pressao .fFoto').forEach(i=>i.value='');$('#fotoPrev').classList.add('hidden');validar();}
+function resetForm(){$('#pressao_v').value='';$('#numero_hd').value='';fotoBlob=null;fotoHdBlob=null;document.querySelectorAll('#pressao .fFoto,#pressao .fFotoHd').forEach(i=>i.value='');$('#fotoPrev').classList.add('hidden');$('#fotoHdPrev').classList.add('hidden');validar();}
 
 // ---------- MAPAS — camada base rua/satélite (compartilhado por todos os módulos com mapa) ----------
 function mapAddCamadaBase(map,tileOpts,ctlPos){
@@ -1160,7 +1186,8 @@ function estSetView(v){
   $('#estVwLista').style.color=(v==='lista')?'var(--acc-ink)':'var(--ink)';
   $('#estVwMapa').style.background=(v==='mapa')?'var(--acc)':'transparent';
   $('#estVwMapa').style.color=(v==='mapa')?'var(--acc-ink)':'var(--ink)';
-  if(v==='mapa') estMapaRender();
+  $('#estCamadas').style.display=(v==='mapa')?'flex':'none';
+  if(v==='mapa'){ estCamRender(); estMapaRender(); }
 }
 function estMapaRender(){
   const cont=$('#estMapa');
@@ -1172,8 +1199,9 @@ function estMapaRender(){
   const arr=estFiltrada().filter(p=>p.lat&&p.lon); const pts=[];
   arr.forEach(p=>{
     const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:(EST_SIT[p.situacao]||{}).cor||'#888',fillOpacity:1});
-    m.on('click',()=>estSelecionar(p.id));
     m.bindTooltip(p.par_id+' ('+p.posicao+') · '+((EST_SIT[p.situacao]||{}).lbl||''));
+    m.bindPopup(`<div style="text-align:center;min-width:150px"><b>${p.par_id}</b> <span style="color:var(--mut)">(${p.posicao})</span><br><span style="font-size:11px;color:var(--mut)">${(EST_SIT[p.situacao]||{}).lbl||''}</span><br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:var(--acc);font-weight:600">🧭 Navegar até o local</a><br><a class="estPopFill" style="display:inline-block;margin-top:8px;color:var(--acc);font-weight:600;cursor:pointer">📝 Preencher informações</a></div>`,{minWidth:160});
+    m.on('popupopen',ev=>{ const el=ev.popup.getElement(); if(!el)return; const f=el.querySelector('.estPopFill'); if(f) f.onclick=()=>{ if(estMap)estMap.closePopup(); estSelecionar(p.id); }; });
     estMarkers.addLayer(m); pts.push([p.lat,p.lon]);
   });
   if(gps){ estMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
@@ -1189,6 +1217,33 @@ async function estDesenharLimites(){
   if(gj && estMap && !estLimLayer){
     estLimLayer=L.geoJSON(gj,{style:{color:'#8e24aa',weight:2,fill:false,dashArray:'5,4',opacity:.9},interactive:false}).addTo(estMap);
     estLimLayer.bringToBack();
+  }
+}
+// camadas COPASA (polígonos) ativáveis no mapa — preenchimento ~30% + borda definida, toggle igual ao Cadastro técnico
+let estCamOn={zp:false,dmc:false};
+const estCamLayers={zp:null,dmc:null}, estCamCache={zp:null,dmc:null};
+const EST_CAM=[{k:'zp',rpc:'zonas_pressao',nome:'Zonas de pressão',cor:'#1565c0',ls:'est_cam_zp'},
+               {k:'dmc',rpc:'dmcs',nome:'DMCs',cor:'#ef6c00',ls:'est_cam_dmc'}];
+function estCamRender(){
+  const el=$('#estCamadas'); if(!el)return;
+  el.innerHTML=EST_CAM.map(d=>`<button class="estcam" data-k="${d.k}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${estCamOn[d.k]?('background:'+d.cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);'}">${d.nome}</button>`).join('');
+  el.querySelectorAll('.estcam').forEach(b=>b.addEventListener('click',()=>estCamToggle(b.dataset.k)));
+}
+async function estCamToggle(k){
+  const d=EST_CAM.find(x=>x.k===k); if(!d)return;
+  estCamOn[k]=!estCamOn[k]; estCamRender();
+  if(!estMap||!window.L)return;
+  if(!estCamOn[k]){ if(estCamLayers[k]){ estMap.removeLayer(estCamLayers[k]); estCamLayers[k]=null; } return; }
+  let gj=estCamCache[k];
+  if(!gj){ try{ const c=localStorage.getItem(d.ls); if(c) gj=JSON.parse(c); }catch(e){} }
+  if(!gj){ try{ const {data,error}=await sb.rpc('app_estanq_poligonos',{p_layer:d.rpc}); if(error)throw error; gj=data; try{localStorage.setItem(d.ls,JSON.stringify(gj));}catch(e){} }
+           catch(e){ toast('Não consegui carregar '+d.nome); estCamOn[k]=false; estCamRender(); return; } }
+  estCamCache[k]=gj;
+  if(estCamOn[k] && !estCamLayers[k] && estMap){
+    estCamLayers[k]=L.geoJSON(gj,{style:{color:d.cor,weight:2,opacity:1,fillColor:d.cor,fillOpacity:.3},
+      onEachFeature:(f,ly)=>{const p=f.properties||{}; const lbl=(p.codigo?('<b>'+p.codigo+'</b>'):'')+(p.nome?(' '+p.nome):'')+(p.consorcio?(' · '+p.consorcio):''); if(lbl.trim())ly.bindTooltip(lbl,{sticky:true});}
+    }).addTo(estMap);
+    estCamLayers[k].bringToBack();
   }
 }
 function estSelecionar(id){
@@ -2994,7 +3049,7 @@ if($('#vrpBusca')){ $('#vrpBusca').addEventListener('input',vrpBuscar); $('#vrpB
 if($('#vrpBuscaX')) $('#vrpBuscaX').addEventListener('click',vrpBuscaGo);
 
 // ---------- CADASTRO TÉCNICO ----------
-let cadMap=null, cadCamadas={}, cadOn={reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,rede:false,ligacoes:false}, cadCarregando=false;
+let cadMap=null, cadCamadas={}, cadOn={reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,rede:false,ligacoes:false,rede_gas:false}, cadCarregando=false;
 let cadRendered={}, cadMem={}, cadDeb=null;   // cache: área já renderizada por camada / geojson em memória / timer de debounce
 let cadVoce=null;                             // marcador da posição do usuário (GPS)
 function cadOnGps(){
@@ -3002,10 +3057,10 @@ function cadOnGps(){
   if(cadVoce) cadVoce.setLatLng([gps.lat,gps.lon]);
   else cadVoce=L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você').addTo(cadMap);
 }
-const CAD_VER='v5|';                          // prefixo p/ invalidar o cache do cadastro se o dado mudar (v5: amarração do trecho — nu_trecho + nó ini→fim na rede; nu_trecho na ligação)
+const CAD_VER='v6|';                          // prefixo p/ invalidar o cache do cadastro se o dado mudar (v6: camada rede_gas — GASMIG, schema 4)
 // whole:true = camada leve e estática → busca a ZA inteira 1x e cacheia; step = tamanho da célula de cache (graus) p/ camadas pesadas
 // Unidades operacionais separadas por tipo (grupo em "2 - infra_agua".unidades_operacionais); resolvidas no RPC app_cadastro_geojson via p_layer.
-const CAD_DEF=[{k:'reservatorio',nome:'Reservatórios',min:0,cor:'#6a1b9a',whole:true},{k:'booster_bomba',nome:'Booster+Bomba',min:0,cor:'#c62828',whole:true},{k:'elevatoria',nome:'Elevatórias',min:0,cor:'#00838f',whole:true},{k:'poco',nome:'Poços',min:0,cor:'#4e342e',whole:true},{k:'macromedicao',nome:'Macromedição',min:0,cor:'#ef6c00',whole:true},{k:'vrps',nome:'VRPs',min:0,cor:'#d81b60',whole:true},{k:'rede',nome:'Rede',min:14,cor:'#1565c0',step:0.008},{k:'ligacoes',nome:'Ligações',min:16,cor:'#2e7d32',step:0.004}];
+const CAD_DEF=[{k:'reservatorio',nome:'Reservatórios',min:0,cor:'#6a1b9a',whole:true},{k:'booster_bomba',nome:'Booster+Bomba',min:0,cor:'#c62828',whole:true},{k:'elevatoria',nome:'Elevatórias',min:0,cor:'#00838f',whole:true},{k:'poco',nome:'Poços',min:0,cor:'#4e342e',whole:true},{k:'macromedicao',nome:'Macromedição',min:0,cor:'#ef6c00',whole:true},{k:'vrps',nome:'VRPs',min:0,cor:'#d81b60',whole:true},{k:'rede',nome:'Rede',min:14,cor:'#1565c0',step:0.008},{k:'ligacoes',nome:'Ligações',min:16,cor:'#2e7d32',step:0.004},{k:'rede_gas',nome:'Rede de gás',min:0,cor:'#f9a825',whole:true}];
 function cadInit(){
   if(!window.L){document.getElementById('cadMapa').innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>';return;}
   if(!cadMap){
