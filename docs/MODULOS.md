@@ -1647,12 +1647,22 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   `perfil.dev_acesso` + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set` (admin-only) + `app_me` repassa
   `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded.
 - **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
-  supabase-js (mesma `SB_URL`/anon key do app), lê `auth.getSession()` e, se o e-mail ≠ Sander (ou sem
-  sessão), mantém o overlay `#nrwGate` (🔒). Funciona offline (a sessão vem do `localStorage` do mesmo
-  domínio). É gate de **UX/2ª camada**; o enforcement real virá com **RLS** quando os dados saírem de
-  snapshot para RPC.
-- **Dados:** hoje é **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
-  auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`/`dmc_resumo`).
+  supabase-js (mesma `SB_URL`/anon key do app; exposto em **`window.sbg`** p/ o script principal usar nos RPCs),
+  lê `auth.getSession()` e, **se `app_me().dev_acesso` for falso** (ou sem sessão), mantém o overlay `#nrwGate`
+  (🔒). **Gate unificado por `dev_acesso`** (2026-09, mesmo controle "Em desenvolvimento" da home — antes era
+  e-mail do Sander hardcoded). Funciona offline (sessão do `localStorage` do mesmo domínio). O enforcement real
+  é **server-side** nas RPCs (checam `dev_acesso`/admin).
+- **Análise do micromedido (2026-09, tela REAL — `s-mm`/nav "Análise do micromedido"):** dados de verdade da
+  `"5 - info_copasa".micromedicao_historico`. Motor: tabela **`"11 - perdas_nrw".mm_matricula_stats`** (1 linha
+  por matrícula, 134.868, computada em buckets `mod(nu_matricu,4)` p/ não estourar o statement timeout do MCP):
+  média/mediana/mín/máx/desvio/**CV**, **slope** (regr sobre índice de mês uniforme), n_zeros, **classificação**
+  (estável/nulo_recorrente/pico_isolado/queda_continua/crescimento_continuo/instável) e **`score_anomalia` 0–100**
+  (Índice de Anomalia = 3·pico + 2·tendência + 2·CV + 1·zeros). RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie`
+  (definer, admin **ou** `dev_acesso`; anon revogado). A tela: KPIs + distribuição por comportamento + ranking
+  filtrável (chip de classe + busca) + detalhe com série de 18 meses (SVG) + ação sugerida. Recomputar =
+  re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+- **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
+  auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
   **Próximo passo:** trocar o snapshot por RPCs `app_nrw_*` (a criar) sobre `"7 - setorizacao"` (geometria/
   cadastro DMC) e `"11 - perdas_nrw"` (`parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc`).

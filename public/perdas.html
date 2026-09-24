@@ -261,6 +261,7 @@ tbody tr:hover{background:var(--surface-2)}
       <div class="navlab">2 · Dados & diagnóstico</div>
       <button class="navi" data-s="medicoes"><span class="ic">〜</span>Medições / Entrada</button>
       <button class="navi" data-s="consumo"><span class="ic">₪</span>Consumo / Faturamento</button>
+      <button class="navi" data-s="mm"><span class="ic">📈</span>Análise do micromedido</button>
       <button class="navi" data-s="nrw_balanco"><span class="ic">∑</span>Balanço hídrico</button>
       <button class="navi" data-s="nrw_mnf"><span class="ic">☾</span>Vazão mínima noturna</button>
       <button class="navi" data-s="nrw_eventos"><span class="ic">◉</span>Eventos & alertas</button>
@@ -1063,6 +1064,8 @@ tbody tr:hover{background:var(--surface-2)}
         </div>
       </section>
 
+      <section class="screen" id="s-mm"><div id="mmBody"></div></section>
+
       <!-- CONFIG -->
       <section class="screen" id="s-config">
         <div class="cols">
@@ -1567,8 +1570,117 @@ function grandesTool(){
  $('#grBody').innerHTML=s.map(d=>`<tr><td><b>${d.code}</b> ${tagza(d)}</td><td class="mono">${fmt(d.cons)}</td><td class="mono">${fmt1(d.cons/d.ativas)}</td></tr>`).join('');
 }
 
+/* ---------- Análise do micromedido (dados REAIS via RPC) ---------- */
+const MM_CLASS={
+ estavel:{l:'Estável',c:'#3fb27f',acao:'Consumo típico — sem ação.'},
+ nulo_recorrente:{l:'Nulo recorrente',c:'#8a8f98',acao:'Verificar hidrômetro parado / imóvel desocupado / cadastro.'},
+ pico_isolado:{l:'Pico isolado',c:'#e6a23c',acao:'Inspeção de vazamento interno ou erro de leitura.'},
+ queda_continua:{l:'Queda contínua',c:'#e05d5d',acao:'Conferir leitura, desocupação, fraude ou vazamento corrigido.'},
+ crescimento_continuo:{l:'Crescimento contínuo',c:'#4b9fe0',acao:'Revisão cadastral / categoria (possível ampliação/ocupação).'},
+ instavel:{l:'Instável',c:'#c678dd',acao:'Cliente prioritário para fiscalização (alta variabilidade).'}
+};
+let mmClass='', mmBusca='', mmResumo=null, mmRank=[];
+function mmCons(){ return za==='all'?null:za; }
+function mmCss(){ if(document.getElementById('mmcss'))return; const st=document.createElement('style'); st.id='mmcss'; st.textContent=`
+ #s-mm td.r,#s-mm th.r{text-align:right;font-variant-numeric:tabular-nums}
+ .mmdistwrap{display:flex;flex-direction:column;gap:8px}
+ .mmdist{display:grid;grid-template-columns:160px 1fr 96px;align-items:center;gap:10px;cursor:pointer;padding:2px 0}
+ .mmdist.sel{font-weight:600}
+ .mmdist .mmdlab{font-size:12.5px;display:flex;align-items:center;gap:7px}
+ .mmdist .mmdlab i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+ .mmdbar{height:9px;border-radius:5px;background:var(--surface-2,#12212a);overflow:hidden}
+ .mmdbar span{display:block;height:100%;border-radius:5px}
+ .mmdval{font-size:11.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+ .mmfilters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+ .mmchip{border:1px solid var(--line);background:none;color:var(--ink-2,#c9d6da);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer}
+ .mmchip.on{background:rgba(var(--accent-rgb),.15);border-color:var(--accent);color:var(--accent);font-weight:600}
+ .mmfilters input{margin-left:auto;background:var(--surface-2,#12212a);border:1px solid var(--line);color:inherit;border-radius:8px;padding:6px 10px;font-size:13px;max-width:180px}
+ .mmtag{font-size:11px;padding:2px 8px;border-radius:999px;color:var(--cc);border:1px solid var(--cc);white-space:nowrap}
+ #mmtbl tbody tr:hover{background:rgba(var(--accent-rgb),.06)}
+ .mmdhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+ .mmstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 14px;margin-top:4px}
+ .mmstats>div{display:flex;flex-direction:column}
+ .mmstats .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+ .mmstats .v{font-size:14px;font-weight:600}`; document.head.appendChild(st); }
+async function mmInit(){ mmCss();
+ const body=$('#mmBody');
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise do micromedido…</p></div></div>';
+ let r,k;
+ try{
+  [r,k]=await Promise.all([
+   sbg.rpc('app_nrw_mm_resumo',{p_consorcio:mmCons()}),
+   sbg.rpc('app_nrw_mm_ranking',{p_consorcio:mmCons(),p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:150,p_offset:0})
+  ]);
+  if(r.error)throw r.error; if(k.error)throw k.error;
+ }catch(e){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; return; }
+ mmResumo=r.data; mmRank=k.data||[]; mmRender();
+}
+function mmCmp(c){ return (''+c).replace(/(\d{4})(\d{2})/,'$2/$1'); }
+function mmRender(){
+ const R=mmResumo||{}, tot=R.n_matriculas||1;
+ const K=[
+  {l:'Volume medido/mês',v:((R.volume_medio_mensal||0)>=1e6?((R.volume_medio_mensal/1e6).toFixed(2).replace('.',',')+'<small> mi m³</small>'):fmt(R.volume_medio_mensal||0)+'<small> m³</small>'),s:'soma das médias por matrícula'},
+  {l:'Matrículas',v:fmt(R.n_matriculas||0),s:'com histórico'},
+  {l:'Anômalas',v:fmt(R.n_anomalas||0),s:'comportamento ≠ estável'},
+  {l:'Score elevado',v:fmt(R.n_score_alto||0),s:'índice ≥ 50'},
+  {l:'CV médio',v:Math.round((R.cv_medio||0)*100)+'%',s:'estabilidade do consumo'},
+  {l:'Score médio',v:(R.score_medio||0),s:'anomalia 0–100'}
+ ];
+ const kpisHtml='<div class="kpis">'+K.map(c=>`<div class="kpi"><span class="lab">${c.l}</span><span class="val">${c.v}</span><span class="sub"><span class="chip real">real</span> ${c.s}</span></div>`).join('')+'</div>';
+ const pc=R.por_classificacao||{}, order=['nulo_recorrente','pico_isolado','queda_continua','crescimento_continuo','instavel','estavel'];
+ const distBars=order.filter(k=>pc[k]!=null).map(k=>{const m=MM_CLASS[k],n=pc[k],w=Math.round(n/tot*100);
+  return `<div class="mmdist ${mmClass===k?'sel':''}" data-cls="${k}"><span class="mmdlab"><i style="background:${m.c}"></i>${m.l}</span><div class="mmdbar"><span style="width:${w}%;background:${m.c}"></span></div><span class="mmdval">${fmt(n)} · ${w}%</span></div>`;
+ }).join('');
+ const chips='<button class="mmchip '+(mmClass===''?'on':'')+'" data-cls="">Todas</button>'+order.map(k=>`<button class="mmchip ${mmClass===k?'on':''}" data-cls="${k}">${MM_CLASS[k].l}</button>`).join('');
+ const rows=mmRank.map(x=>{const m=MM_CLASS[x.classificacao]||{l:x.classificacao,c:'#888'};
+  return `<tr data-mat="${x.matricula}" data-cons="${x.consorcio}" style="cursor:pointer"><td>${x.matricula}</td><td><span class="mmtag" style="--cc:${m.c}">${m.l}</span></td><td class="r">${(Number(x.media)||0).toFixed(1)}</td><td class="r">${x.cv!=null?Math.round(x.cv*100)+'%':'—'}</td><td class="r">${x.slope!=null?(x.slope>0?'+':'')+x.slope:'—'}</td><td class="r">${x.n_zeros}/${x.n_meses}</td><td class="r"><b>${x.score_anomalia}</b></td></tr>`;
+ }).join('')||'<tr><td colspan="7" class="note">Nenhuma matrícula nesse filtro.</td></tr>';
+ $('#mmBody').innerHTML=`${kpisHtml}
+  <div class="consol" style="margin-top:14px">
+   <div class="panel"><div class="phead"><h3>Distribuição por comportamento</h3><span class="chip real">real</span></div>
+    <div class="pbody"><div class="mmdistwrap">${distBars}</div>
+     <p class="note" style="margin-top:10px">O <b>Índice de Anomalia (0–100)</b> combina variabilidade (CV), tendência, picos e meses zerados. Toque numa faixa para filtrar o ranking.</p></div></div>
+   <div class="panel"><div class="phead"><h3>Detalhe da matrícula</h3><span class="hint">toque numa linha do ranking</span></div>
+    <div class="pbody" id="mmDetail"><p class="note" style="margin:0">Selecione uma matrícula no ranking para ver a série de 18 meses e a ação sugerida.</p></div></div>
+  </div>
+  <div class="panel" style="margin-top:14px"><div class="phead"><h3>Ranking de anomalia — matrículas mais críticas</h3><span class="chip real">real</span></div>
+   <div class="pbody"><div class="mmfilters">${chips}<input id="mmBusca" placeholder="Buscar matrícula…" value="${mmBusca}" inputmode="numeric"/></div>
+    <div style="overflow-x:auto;max-height:520px"><table id="mmtbl"><thead><tr><th>Matrícula</th><th>Comportamento</th><th class="r">Média m³</th><th class="r">CV</th><th class="r">Tend.</th><th class="r">Zeros</th><th class="r">Score</th></tr></thead><tbody>${rows}</tbody></table></div>
+   </div></div>`;
+ $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls);mmInit();});
+ $('#mmBody').querySelectorAll('.mmchip').forEach(el=>el.onclick=()=>{mmClass=el.dataset.cls;mmInit();});
+ const bu=$('#mmBusca'); if(bu) bu.onkeydown=e=>{ if(e.key==='Enter'){ mmBusca=bu.value.trim(); mmInit(); } };
+ $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>mmDetail(tr.dataset.cons,tr.dataset.mat));
+}
+async function mmDetail(cons,mat){
+ const box=$('#mmDetail'); if(!box)return;
+ box.innerHTML='<p class="note" style="margin:0">Carregando série…</p>';
+ let d; try{ d=await sbg.rpc('app_nrw_mm_serie',{p_consorcio:cons,p_matricula:Number(mat)}); if(d.error)throw d.error; }catch(e){ box.innerHTML='<p class="note" style="color:#e05d5d">Erro: '+(e.message||e)+'</p>'; return; }
+ const st=(d.data&&d.data.stats)||{}, serie=(d.data&&d.data.serie)||[], m=MM_CLASS[st.classificacao]||{l:st.classificacao,c:'#888',acao:''};
+ const W=520,H=150,pl=34,pr=10,pt=12,pb=22, vals=serie.map(p=>Number(p.volume)||0), maxv=Math.max(1,...vals);
+ const X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
+ const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
+ const dots=serie.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="${p.estimado?'2.3':'3'}" fill="${p.estimado?'#8a8f98':m.c}"><title>${mmCmp(p.competencia)}: ${vals[i]} m³${p.estimado?' (estimado)':''}</title></circle>`).join('');
+ const medY=Y(Number(st.media)||0);
+ box.innerHTML=`<div class="mmdhead"><div><b style="font-size:16px">Matrícula ${st.matricula}</b> <span class="mmtag" style="--cc:${m.c}">${m.l}</span> <span class="note">${cons==='ZA0200'?'Betim':'Contagem'}</span></div><div class="note">score <b style="color:${m.c}">${st.score_anomalia}</b></div></div>
+  <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin:8px 0">
+   <line x1="${pl}" y1="${medY.toFixed(1)}" x2="${W-pr}" y2="${medY.toFixed(1)}" stroke="#ffffff30" stroke-dasharray="4 4"/>
+   <text x="${pl}" y="${(medY-3).toFixed(1)}" fill="#ffffff66" font-size="9">média ${(Number(st.media)||0).toFixed(1)}</text>
+   <polyline points="${pts}" fill="none" stroke="${m.c}" stroke-width="1.6"/>${dots}
+   <text x="${pl}" y="${H-6}" fill="#ffffff66" font-size="9">${serie.length?mmCmp(serie[0].competencia):''}</text>
+   <text x="${W-pr}" y="${H-6}" fill="#ffffff66" font-size="9" text-anchor="end">${serie.length?mmCmp(serie[serie.length-1].competencia):''}</text></svg>
+  <div class="mmstats">
+   <div><span class="k">Média</span><span class="v">${(Number(st.media)||0).toFixed(1)} m³</span></div>
+   <div><span class="k">Mediana</span><span class="v">${(Number(st.mediana)||0).toFixed(1)}</span></div>
+   <div><span class="k">Mín–Máx</span><span class="v">${st.minimo}–${st.maximo}</span></div>
+   <div><span class="k">CV</span><span class="v">${st.cv!=null?Math.round(st.cv*100)+'%':'—'}</span></div>
+   <div><span class="k">Tendência</span><span class="v">${st.slope!=null?(st.slope>0?'+':'')+st.slope+' m³/mês':'—'}</span></div>
+   <div><span class="k">Meses zerados</span><span class="v">${st.n_zeros}/${st.n_meses}</span></div>
+  </div>
+  <p class="note" style="margin-top:10px"><b>Ação sugerida:</b> ${m.acao}</p>`;
+}
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",dmcs:"DMCs (mapa)",ficha:"Ficha do DMC",nrw_balanco:"Balanço hídrico",nrw_mnf:"Vazão mínima noturna",nrw_eventos:"Eventos & alertas",nrw_plano:"Plano de ação por DMC",nrw_simulador:"Simulador de cenários",nrw_ell:"Nível econômico & ROI",nrw_contrato:"Performance contratual",nrw_indicadores:"Indicadores & benchmarking",nrw_os:"Gestão de OS / reparos",nrw_renovacao:"Renovação de rede",nrw_vrp_gestao:"Gestão de VRPs",nrw_reservatorios:"Reservatórios",nrw_setorizacao:"Integridade de setorização",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_leitura:"Gestão de leitura",nrw_grandes:"Grandes consumidores",nrw_governanca:"Governança do dado",componentes:"Componentes IWA",troca_hd:"Substituição de HD",fraude:"Indicativo de fraude",rede:"Substituição de rede",ramais:"Substituição de ramais",pressao_vrp:"Gestão de pressão",auditoria:"Auditoria cadastral",medicoes:"Medições / Entrada",consumo:"Consumo / Faturamento",config:"Parâmetros & Metas"};
+const TITLES={painel:"Painel de Perdas",dmcs:"DMCs (mapa)",ficha:"Ficha do DMC",nrw_balanco:"Balanço hídrico",nrw_mnf:"Vazão mínima noturna",nrw_eventos:"Eventos & alertas",nrw_plano:"Plano de ação por DMC",nrw_simulador:"Simulador de cenários",nrw_ell:"Nível econômico & ROI",nrw_contrato:"Performance contratual",nrw_indicadores:"Indicadores & benchmarking",nrw_os:"Gestão de OS / reparos",nrw_renovacao:"Renovação de rede",nrw_vrp_gestao:"Gestão de VRPs",nrw_reservatorios:"Reservatórios",nrw_setorizacao:"Integridade de setorização",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_leitura:"Gestão de leitura",nrw_grandes:"Grandes consumidores",nrw_governanca:"Governança do dado",componentes:"Componentes IWA",troca_hd:"Substituição de HD",fraude:"Indicativo de fraude",rede:"Substituição de rede",ramais:"Substituição de ramais",pressao_vrp:"Gestão de pressão",auditoria:"Auditoria cadastral",medicoes:"Medições / Entrada",consumo:"Consumo / Faturamento",mm:"Análise do micromedido",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_balanco','nrw_mnf','nrw_eventos','nrw_contrato','nrw_indicadores','consumo']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
@@ -1622,6 +1734,7 @@ function go(s,dmc){
  if(s==='pressao_vrp')pressaoVrp();
  if(s==='auditoria')auditoria();
  if(s==='consumo')consumo();
+ if(s==='mm')mmInit();
  applyFocus(s);
 }
 document.querySelectorAll('.navi[data-s]').forEach(n=>n.onclick=()=>go(n.dataset.s));
@@ -1638,14 +1751,17 @@ kpis();consolidado();rank();renderMaps();
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const sbg = createClient('https://lwttadkctfznidzvmury.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3dHRhZGtjdGZ6bmlkenZtdXJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MzQ4NjksImV4cCI6MjEwMTUxMDg2OX0._M5FOmACjrYeRgQ6hXrvmxFp3Et8Jrt-fElYohiiVZc');
-const OK = 'sander.sirio@aguasmg.com.br';
+window.sbg = sbg;   // exposto p/ o script principal (RPCs da análise do micromedido)
 const g = document.getElementById('nrwGate'), gm = document.getElementById('gm');
 try{
   const { data } = await sbg.auth.getSession();
-  const em = ((data.session && data.session.user && data.session.user.email) || '').toLowerCase();
-  if (em === OK) g.remove();
-  else if (em) gm.textContent = 'Acesso restrito — ' + em + ' não tem permissão para o Cockpit de Perdas.';
-  else gm.textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.';
+  if(!(data.session && data.session.user)){ gm.textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.'; }
+  else {
+    const em = (data.session.user.email || '').toLowerCase();
+    const { data: me } = await sbg.rpc('app_me');   // gate unificado por dev_acesso (controle "Em desenvolvimento")
+    if (me && me.dev_acesso) g.remove();
+    else gm.textContent = 'Acesso restrito — ' + em + ' não tem acesso aos módulos em desenvolvimento.';
+  }
 }catch(e){ gm.textContent = 'Não foi possível verificar o acesso. Faça login no AcquaHub.'; }
 </script>
 </body>
