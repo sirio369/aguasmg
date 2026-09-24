@@ -7601,8 +7601,7 @@ function pessoasBlocks(){
       {id:'rh_lista',ic:'📋',lbl:'Candidatos'},
       {id:'rh_colaboradores',ic:'🧑‍🤝‍🧑',lbl:'Colaboradores'}]},
     {t:'Gestor',ic:'🖊️',on:true,acts:[
-      {id:'minha_equipe',ic:'👥',lbl:'Minha equipe'}]},
-    {t:'Meu Time',ic:'🧑‍💼',on:true,acts:[
+      {id:'minha_equipe',ic:'👥',lbl:'Minha equipe'},
       {id:'meus_colaboradores',ic:'📇',lbl:'Meus colaboradores'}]}
   ];
 }
@@ -7806,7 +7805,8 @@ async function pessoasRenderRhLista(){
 }
 async function pessoasRenderMinhaEquipe(){
   $('#pessoasView').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_pessoas_meus_candidatos'); if(error) throw error; pessoasMeus=data||[]; }
+  try{ const {data,error}=await sb.rpc('app_pessoas_meus_candidatos'); if(error) throw error;
+    pessoasMeus=(data||[]).filter(c=>c.status!=='ativo'||!c.tem_checklist); }
   catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">👥 Minha equipe</div>';
   h+=pessoasMeus.length ? pessoasMeus.map(c=>{
@@ -7832,6 +7832,10 @@ async function pessoasRenderCandidatoDet(){
   }catch(e){ $('#pessoasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   const back=()=>{ pessoasSub=pessoasViewGestor?'minha_equipe':'rh_lista'; pessoasRender(); };
   if(!c){ return back(); }
+  let minhasAreas=[];
+  if(c.status==='aguardando_gestor' && pessoasViewGestor){
+    try{ const {data,error}=await sb.rpc('app_pessoas_minhas_areas'); if(error) throw error; minhasAreas=data||[]; }catch(e){}
+  }
   let h='<button class="btn ghost" id="peVoltar" style="margin:0 0 12px">‹ Voltar</button>';
   h+='<div class="sec">'+c.nome_completo+'</div><p class="sub" style="margin-top:2px">'+(c.cargo||'')+'</p>';
   h+='<div style="margin-top:8px">'+statusBadge(PESSOAS_STATUS_LABEL,c.status)+'</div>';
@@ -7846,12 +7850,16 @@ async function pessoasRenderCandidatoDet(){
   h+='<div class="sub" style="margin-top:2px">Gênero: '+(c.genero||'—')+' · Modalidade: '+(c.modalidade||'—')+'</div>';
   if(c.status==='aguardando_gestor' && pessoasViewGestor){
     h+='<div class="sec" style="margin-top:16px">Aprovação da vaga</div>';
-    h+='<p class="sub" style="margin:2px 0 8px">Ao aprovar, informe a área/empresa — isso já conta como a aprovação.</p>';
-    h+='<label>Código da área</label><input id="peCodArea"/>';
-    h+='<label>Área</label><input id="peArea"/>';
+    h+='<p class="sub" style="margin:2px 0 8px">Ao aprovar, informe empresa/projeto — isso já conta como a aprovação.</p>';
+    if(minhasAreas.length>1){
+      h+='<label>Área</label><select id="peArea2"><option value="">—</option>'+minhasAreas.map(a=>'<option value="'+a.codigo_area+'">'+a.area+' ('+a.codigo_area+')</option>').join('')+'</select>';
+    } else if(minhasAreas.length===1){
+      h+='<p class="sub">Área: <b>'+minhasAreas[0].area+'</b> ('+minhasAreas[0].codigo_area+')</p>';
+    } else {
+      h+='<p class="sub" style="color:var(--bad)">Você não está mapeado como aprovador de nenhuma área — fale com o RH.</p>';
+    }
     h+='<label>Frente (empresa)</label><select id="peFrente"><option value="">—</option><option>ÁGUAS INTEGRADAS</option><option>EFICIÊNCIA HÍDRICA</option></select>';
     h+='<label>Projeto</label><select id="peProjeto"><option value="">—</option><option>Contagem</option><option>Betim</option><option>Ambos</option></select>';
-    h+='<label>Custo</label><select id="peCusto"><option value="">—</option><option>Direto</option><option>Indireto</option></select>';
     h+='<button class="btn" id="peAprovar" style="margin-top:14px;width:100%">✓ Aprovar</button>';
     h+='<div class="sec" style="margin-top:18px">Reprovar</div>';
     h+='<label>Motivo</label><textarea id="peMotivo" rows="2"></textarea>';
@@ -7903,12 +7911,21 @@ async function pessoasRenderCandidatoDet(){
   $('#peVoltar').addEventListener('click',back);
 
   const av=$('#peAprovar'); if(av) av.addEventListener('click',async()=>{
-    const codigoArea=$('#peCodArea').value.trim(), area=$('#peArea').value.trim();
-    if(!codigoArea||!area) return toast('Preencha código da área e área');
+    let codigoArea=null, area=null;
+    if(minhasAreas.length>1){
+      const sel=$('#peArea2').value;
+      if(!sel) return toast('Selecione a área');
+      const found=minhasAreas.find(a=>a.codigo_area===sel);
+      codigoArea=found.codigo_area; area=found.area;
+    } else if(minhasAreas.length===1){
+      codigoArea=minhasAreas[0].codigo_area; area=minhasAreas[0].area;
+    } else {
+      return toast('Você não está mapeado como aprovador de nenhuma área');
+    }
     av.disabled=true;
     try{ const {error}=await sb.rpc('app_pessoas_candidato_aprovar',{p_candidato_id:c.id,p_aprovado:true,p_motivo_reprovacao:null,
       p_codigo_area:codigoArea, p_area:area, p_frente_empresa:$('#peFrente').value||null,
-      p_projeto:$('#peProjeto').value||null, p_custo_direto_indireto:$('#peCusto').value||null}); if(error) throw error;
+      p_projeto:$('#peProjeto').value||null}); if(error) throw error;
       toast('✓ Aprovado — RH foi avisado pra gerar a carta'); back();
     }catch(e){ toast('Erro: '+(e.message||e)); av.disabled=false; }
   });
@@ -7943,7 +7960,7 @@ async function pessoasRenderCandidatoDet(){
     }catch(e){ toast('Erro: '+(e.message||e)); ma.disabled=false; }
   });
   const us=$('#peUsuario'); if(us){
-    try{ const {data,error}=await sb.rpc('app_pessoas_usuarios_listar',{p_apenas_ativos:false}); if(error) throw error;
+    try{ const {data,error}=await sb.rpc('app_pessoas_usuarios_listar',{p_apenas_ativos:false,p_somente_novos:true}); if(error) throw error;
       us.innerHTML='<option value="">—</option>'+(data||[]).map(u=>'<option value="'+u.id+'">'+(u.nome||u.email)+' ('+(u.email||'')+')'+(u.ativo?'':' — inativo')+'</option>').join('');
     }catch(e){ toast('Erro ao carregar usuários: '+(e.message||e)); }
   }
