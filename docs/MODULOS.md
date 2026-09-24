@@ -1635,11 +1635,13 @@ uma **página HTML separada** (`public/perdas.html`, autocontida: CSS/JS própri
 Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card do hub que faz
 `location.href='perdas.html'`.
 
-- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na seção 🧰 Suporte do `#home`. Nasce
-  `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera **só** para
-  `ME.email === 'sander.sirio@aguasmg.com.br'` (tira `soon`/🔒 e liga `onclick`); os demais ficam
-  opacos e o clique dá `toast('Acesso restrito')`. Segue o padrão de gate da §1 (nasce restrito,
-  revela no `homeGate` quando `ME` resolve).
+- **Entrada (hub):** card `#cardPerdas` ("Perdas (NRW)") na categoria **🚧 Em desenvolvimento** do `#home`
+  (junto do `#cardProj`). Nasce `class="mod soon"` (opaco). O gate roda em **`homeGate()`** (§1): libera por
+  **`ME.dev_acesso`** (tira `soon`/🔒 e liga `onclick`); quem não tem fica opaco e o clique dá `toast('Acesso
+  restrito')`. **Controle de acesso (2026-09):** engrenagem ⚙️ `#homeDevAcesso` na categoria (só admin) → tela
+  `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`) que lista usuários com toggle; backend
+  `perfil.dev_acesso` + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set` (admin-only) + `app_me` repassa
+  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded.
 - **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
   supabase-js (mesma `SB_URL`/anon key do app), lê `auth.getSession()` e, se o e-mail ≠ Sander (ou sem
   sessão), mantém o overlay `#nrwGate` (🔒). Funciona offline (a sessão vem do `localStorage` do mesmo
