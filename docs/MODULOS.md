@@ -142,10 +142,26 @@
 
 ### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
+- **Duas fotos (2026-09):** **Foto do manômetro** (obrigatória, `fotoBlob`→`p_foto`) e **Foto do número HD**
+  (opcional, `fotoHdBlob`→`p_foto_hd`, inputs `.fFotoHd`/preview `#fotoHdPrev`). Ambas vão no `item.fotos`
+  (`enviar` faz upload por param e seta o path). Coluna nova `"8 - coleta_campo".mapeamento_pressao.foto_hd`
+  + param `p_foto_hd` na RPC (recriada com `drop`+`create` p/ não gerar overload — regra §0.6; grant só `authenticated`).
+- **Unidade de medida (2026-09):** ao lado do valor há `#pressao_un` (**MCA/BAR/KPA**, default MCA). O valor é
+  **convertido p/ mca no cliente** antes de enviar (`vmca`: kpa÷9,80665; bar×10,1971621; mca as-is) — a coluna
+  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend. `prAposSalvar(vmca)`.
 - Alvo opcional vindo do Teste de estanqueidade (`prAlvo`). Botões: `#prEst` (estanqueidade), `#prProd`.
 - Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
   `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
+- **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
+  `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
+  137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
+  borda weight 2** (mesmo padrão de ativar/desativar do Cadastro técnico). GeoJSON (4326, `ST_SimplifyPreserveTopology 1m`)
+  via RPC **`app_estanq_poligonos(p_layer)`** (`zonas_pressao`|`dmcs`, definer, só `authenticated`); cache em
+  localStorage (`est_cam_zp`/`est_cam_dmc`). Camadas ficam **abaixo** dos pontos (`bringToBack`); começam desligadas.
+- **Popup no ponto do mapa (2026-09):** clicar num marcador abre popup (`bindPopup`+`popupopen`) com **🧭 Navegar
+  até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
+  → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
 ### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
@@ -278,8 +294,11 @@
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
 - Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
-  **VRPs**, rede, ligações (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
+  **VRPs**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
   `step` (célula de cache).
+  - **Rede de gás (2026-09, `CAD_VER v5→v6`):** camada **`rede_gas`** (GASMIG, `"4 - redes_terceiros".rede_gas`,
+    1.271 linhas MULTILINESTRING, âmbar `#f9a825`, `whole:true`, começa desligada). Só leitura/visualização;
+    branch `rede_gas` na RPC `app_cadastro_geojson` (props id/material/diametro/municipio) — popup genérico.
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
@@ -288,6 +307,14 @@
   coluna no `jsonb_build_object` das `properties`**; nada a mexer no frontend. Ex.: `cd_no_agua` das
   unidades operacionais (reservatório/booster+bomba/elevatória/poço/macromedição) foi adicionado só na
   RPC (a coluna já existia em `"2 - infra_agua".unidades_operacionais`, só não estava no `SELECT`).
+  - **Amarração do trecho (2026-09-22, `CAD_VER v4→v5`):** mesma técnica — a **rede** agora traz no popup
+    `trecho` (`nu_trecho`) e **`amarração`** (`no_agua_ini → no_agua_fim`, composta na RPC; 100% preenchida,
+    17.350 trechos); a **ligação** traz `trecho` (`nu_trecho`, amarração da ligação ao trecho de rede;
+    100% preenchida). Colunas já existiam em `"2 - infra_agua".rede` / `"3 - comercial".ligacoes`, só não
+    estavam no `jsonb_build_object`. A rede também traz **`observação`** (`rede.observacao`, ~8% preenchida) —
+    incluída **só quando não-vazia** (concatenando `|| case when ... jsonb_build_object('observação',...) else '{}' end`),
+    pra não poluir o popup dos 92% sem observação com uma linha `—`. **VRPs e unidades já expõem `cd_no_agua`**
+    (o nó de amarração delas) — nada a fazer. Só a RPC mudou; frontend inalterado além do bump de `CAD_VER`.
 - Marcador **"Você"** (GPS): `cadOnGps()` cria/atualiza `cadVoce` (não é apagado nos redraws de
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
@@ -1546,7 +1573,7 @@ real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (g
 ## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
-**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`.
+**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`, `app_estanq_poligonos` (camadas ZP/DMC COPASA).
 **Loggers:** `app_loggers_listar`, `app_logger_criar/instalar/remover/finalizar/editar`,
 `logger_pressao_importar/stats`.
 **Pesquisa/Ocorrência:** `app_pesquisa_filtros`, `app_pesquisa_produtividade`,
@@ -1655,37 +1682,62 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ---
 
-## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos` / `projeto_det` / `projeto_rel`
+## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel`
 
-Acompanhamento diário de campo das intervenções de obra (macromedidores, VRPs, redes VCA/HDD).
+Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD).
 **Estado: preview embutido, gated só ao meu usuário** (`sander.sirio@aguasmg.com.br`) — dados de exemplo
 no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro do app antes de modelar o banco.
 
-- **Gate:** card `#cardProj` na home (Execução). Em `homeGate()` (~L944) espelha o `cardPerdas`: se
+- **Gate:** card `#cardProj` na home. Em `homeGate()` espelha o `cardPerdas`: se
   `ME.email==='sander.sirio@aguasmg.com.br'` vira botão ativo → `irPara('projetos')`, senão fica `.soon` +
-  🔒 e `toast('Acesso restrito')`. Trocar/ampliar o acesso = mudar essa condição (futuro: engrenagem/RLS).
-- **Três telas (segregação proposital campo × gestão):**
-  - `projetos` — **dia a dia de campo.** Filtros em **dropdown** (`#pjTipo` por tipo, `#pjStatus` em
-    andamento/não iniciada/finalizada), toggle **Mapa/Lista** (`.pjseg`). Mapa é **SVG esquemático**
-    (ilustrativo; pinos p/ ponto, polilinha p/ rede) — a versão integrada usa as geometrias reais do GIS.
-    Lista = cards com barra de progresso e status. `pjInit()`/`pjRefresh()`/`pjRenderMap()`/`pjRenderList()`.
-  - `projeto_det` — **dia a dia de campo** (`pjRenderDet()`, re-render idempotente após toggles/steppers;
-    `pjOpen()` só troca de tela). Resumo (ring de % + contadores) + **árvore de subatividades robusta**
-    (`pjNodeHtml()` recursivo): **cada bloco nível-1 é um card separado** (segregação clara p/ campo),
-    grupos colapsáveis com linha-resumo (`X/Y etapas ✓ · Z%` — só em grupo **ativo**, senão daria `null%`),
-    folhas com badge de unidade (`%`/`m`), barra + %, meta ultrapassada em âmbar. **Grupos (ramificações)**
-    têm botão **Detalhes** (`data-detbtn` → `#{rid}D` `.pjdetpanel`, começa oculto) que revela as
-    subatividades-filho **e** os controles de configuração. Esses controles são **restritos a aprovador/admin**
-    (`podeConfig = ME.is_admin||ME.pode_aprovar`): **toggle "No escopo?"** (`data-toggle` → `node.ativo`) e
-    **stepper "Quantidade"** (`data-repadd`/`data-repdel` → `pjRepAdd`/`pjRepDel`, gera N blocos numerados,
-    ex.: Interligação 1..N — vêm de `pjILrep(nome,n,…)`, container de N `pjIL`). Campo (sem papel) vê as
-    ramificações e os avanços, mas a Quantidade só em leitura e sem toggle. Cada folha mensurável tem botão
-    **＋ Lançar** → painel com **lançamentos anteriores** (`pjLeafHist()`) + **acumulado** e novo avanço com
-    **2 fotos + observação**. Re-render após toggle/stepper preserva os painéis abertos (`pjSnapOpen`→`keep`).
-    Botão **📄 Relatório e documentos** fica **no fim da rolagem** (não atrapalha o campo).
+  🔒 e `toast('Acesso restrito')`.
+- **Hub (`projetos`, `pjHub()`) — 2 categorias, espelha o Almoxarifado:** **🏗️ Campo** → `projeto_campo`
+  (dia a dia) e **🧰 Suporte** → `projeto_sup` (configuração/cadeado, card com ícone **⚙️** — engrenagem, distinto
+  do cadeado). A categoria Suporte é gateada por **`pjPodeSup()`** = admin **ou** grant por pessoa. O grant é
+  definido no **mini-cadeado 🔐** ao lado do título "🧰 Suporte" (só admin, `pjPodeSetSup()`) → tela `projeto_acesso`
+  (`pjSupAcesso()`, lista real de usuários via `sup_admin_usuarios`, admin sempre ligado). **Protótipo:** o grant
+  fica em **localStorage** (`pj_sup_acesso`, `pjSupGrants`/`pjSupSetGrant`) até haver backend (`proj_acesso` → `ME.proj_areas`).
+- **Cadeado (1 por intervenção):** `iv.locked`. **Liberada** (`locked`) = configuração **congelada**, o campo
+  lança avanços. **Em configuração** (`!locked`) = só o Suporte edita escopo/quantidade; **avanços bloqueados**
+  (evita desativar atividade que já tem avanço). Default: liberada, exceto `status==='new'` (segue em config).
+  Chip de estado na lista/Suporte (`.pjlockchip` lib/cfg).
+- **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado **aberto**, um item que já tem **lançamento**
+  (folha %/m com avanço >0, ou grupo com descendente lançado) **não pode sair do escopo** — o toggle vira 🔒
+  e o `−` da Quantidade não remove um bloco com lançamento. "O que foi lançado não pode ser desativado."
+- **Telas de campo:**
+  - `projeto_campo` — filtros **dropdown** (`#pjTipo`/`#pjStatus`), toggle **Mapa/Lista** (`.pjseg`). Mapa é
+    **SVG esquemático** (a versão integrada usa geometrias reais do GIS). `pjInit`/`pjRefresh`/`pjRenderMap`/`pjRenderList`.
+  - `projeto_det` — **lançar avanços** (`pjRenderDet()`, `pjMode='campo'`, `pjLocked=iv.locked`). Banner de estado
+    (liberada/em config). **Só lança se liberada:** `＋ Lançar` e os inputs de registro (OS SIGOS etc.) só aparecem/
+    editam com `pjLocked`. Árvore robusta (`pjNodeHtml()`): cada bloco nível-1 é card separado, grupos colapsáveis
+    com **Detalhes** (`data-detbtn`→`.pjdetpanel`) e linha-resumo (`X/Y etapas ✓ · Z%`). Registros viram **inputs
+    editáveis** no campo (`data-reg`→`node.v`); tipo de peça (`sel`) fica só-leitura. `＋ Lançar` → painel com
+    histórico (`pjLeafHist`) + acumulado + **2 fotos + observação**. **Nenhum controle de config aqui** (foi p/ Suporte).
+    Botão **📄 Relatório e documentos** no fim da rolagem.
+- **Suporte (config + cadeado):**
+  - `projeto_sup` (`pjSupEnter()`→`pjInit('sup')`) — **mesma visualização de mapa + filtros do campo** (SVG,
+    dropdowns, toggle Mapa/Lista), via **`PJ_CTX`** (mapa de ids campo×sup + ação de toque `pjOpen`×`pjOpenCfg`);
+    `pjInit`/`pjSetView`/`pjRefresh`/`pjRenderMap`/`pjRenderList` recebem `ctx`. Toca numa intervenção → `projeto_cfg`.
+    Mini-cadeado 🔐 no cabeçalho (`#pjSupAcessoBtn`, só admin) → `projeto_acesso`.
+  - `projeto_cfg` (`pjRenderCfg()`, `pjMode='cfg'`) — **cartão do cadeado** no topo (`pjLockcard`): **Liberar para
+    execução** (`#pjLock`→`iv.locked=true`) / **Reabrir configuração** (`#pjUnlock`; se já há avanços, exige
+    **2 cliques** com aviso, sem `confirm()` nativo). Árvore em **modo config**: **toggle "No escopo?"** (`.pjsw.sm`,
+    `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m; item lançado
+    congela — ver `pjHasAdv` acima); **stepper Quantidade** (`data-repadd/repdel`); **select de tipo** (`sel`,
+    `data-sel`) nas peças. Tudo **desabilitado quando `pjLocked`** (frozen). Abaixo do escopo, **📎 Documentos**
+    (`data-attach`/`data-pdf`/`data-remove`) — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/
+    as-built. Wiring da árvore compartilhado com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
+  - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários com toggle de
+    acesso (admin sempre ligado). Persiste em localStorage (protótipo).
+  - `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
+    (atalhos Hoje/7 dias/Este mês/Tudo + `de`/`até` custom) + consórcio + tipo. **KPIs** (nº avanços, intervenções
+    com movimento, subatividades, metros executados), **timeline por dia**, **por intervenção** e **por atividade**,
+    + **Exportar CSV**. Fonte de dados: **`pjAllAvancos()`** achata todos os avanços de `pjLeafHist` (mock) com a
+    atividade de nível 1 e metadados da intervenção; `pjRsRange()` resolve o período. ⚠️ **Prévia:** datas/valores
+    são os do mock `pjLeafHist` (derivado do % atual) — viram reais quando existir o **log de avanço** (ver abaixo).
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
-    cada um com **Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba), **Anexar** e
-    **Remover** (só adm/aprovador: `ME.is_admin||ME.pode_aprovar`). **mini-Gantt** (`pjRel()`) — cada barra vai
+    **só com botão Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba) — **anexar/remover
+    saíram daqui e ficam na configuração** (`projeto_cfg`). **mini-Gantt** (`pjRel()`) — cada barra vai
     do **1º ao último avanço** da atividade (datas reais de `pjLeafHist`; eixo min→méd→máx); atividade sem
     avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação, com toggle de
     ordenação (`#pjAdvSeg`): **Sequência lógica** (árvore atividade›subatividade) × **Ordem de envio** (feed
@@ -1693,15 +1745,33 @@ no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro
     = documento único (capa + Gantt + avanços + projeto/licença/alvará/as-built no fim).
     (Sem gradientes nos cards de atividade — removidos a pedido.)
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
-  `pjR` (registro), `pjG` (grupo); helpers `pjOc` (obra civil), `pjIL` (interligação), `pjILrep`
-  (container replicável), `pjRamal`/`pjRamais` (ramais — grupo **ativável** `No escopo?` + replicável, pois
-  pode ser só reforço de rede sem ramais; VCA e HDD têm ramais) e `pjPeca`/`pjPecas` (peças/acessórios —
-  grupo replicável para adicionar itens conforme necessidade, ativável, como o ramal). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers de toggle/stepper.
-  `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos filhos. `ativo:false`
-  e `k:'reg'` não entram na média (nem viram `null%`). Meta **não** é limitador (pode passar de 100%).
+  `pjR` (registro), `pjSel` (**seleção de tipo**, `k:'sel'` — não mensurável), `pjG` (grupo); helpers `pjOc`
+  (obra civil), `pjIL` (interligação), `pjILrep` (container replicável), `pjRamal`/`pjRamais` e
+  `pjPeca`/`pjPecas`. **Ramal** (`pjRamal`) traz, nesta ordem: **OS SIGOS** e **Nº do Hidrômetro** (primeiro),
+  **Nº do imóvel**, as-built **A1/A2/A3/P1** (registros), depois execução **Escavação/Assentamento/Ligação à
+  rede** (% ativáveis). **Peça** (`pjPeca`) traz **Especificação (tipo de componente)** primeiro (`pjSel`, opções
+  em `PJ_PECA_TIPOS`: válvula de manobra, ventosa, descarga, registro, redução, tê, cap, luva, outro; o tipo
+  escolhido aparece no cabeçalho do bloco), depois **Escavação/Escoramento/Montagem hidráulica/Reaterro/
+  Recomposição de pavimento** (% ativáveis). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers.
+  `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos filhos. `ativo:false`,
+  `k:'reg'` e `k:'sel'` não entram na média (nem viram `null%`). Meta **não** é limitador (passa de 100%).
+- **Render dual (`pjNodeHtml`):** módulo-global `pjMode` (`'campo'`|`'cfg'`) + `pjLocked` decidem o que
+  aparece: campo = `＋Lançar`/inputs de registro (só se liberada); cfg = toggles/steppers/selects (só se
+  destravada). `pjZero` reseta `sel`→'' ao replicar bloco.
 - **Idioma do app:** script é `type="module"` → funções **não** são globais; handlers via `.onclick=`
-  (não `onclick=` inline), exceto `toast()` que está em `window`. Telas registradas em `SCREENS` +
-  `if(id==='projetos') pjInit()` em `irPara()`.
+  (não `onclick=` inline), exceto `toast()` que está em `window`. Telas em `SCREENS` +
+  `irPara()`: `projetos`→`pjHub()`, `projeto_campo`→`pjInit()`, `projeto_sup`→`pjSupEnter()`,
+  `projeto_acesso`→`pjSupAcesso()`, `projeto_resumo`→`pjResumoEnter()` (det/cfg abrem via `pjOpen`/`pjOpenCfg`).
+  Back buttons das telas ligados uma vez no load.
+- **⚠️ Fragilidades conhecidas (protótipo — corrigir com o backend):** (1) **avanço não é gravado** —
+  `data-launch` só dá `toast` e **`pjLeafHist` FABRICA** o histórico a partir do % atual (split 60/40, datas de
+  uma lista fixa semeada por `node.n` → subatividades homônimas caem nas mesmas datas); o `projeto_resumo`
+  herda esse mock. (2) **Nada persiste** — `PJ_IVS`, toggles de escopo, quantidades, tipos, registros e o
+  `iv.locked` são de memória; reload zera. (3) **Grant do Suporte é localStorage por-navegador** → não gateia de
+  fato entre usuários. (4) `status` (run/new/done) é **fixo**, não deriva do progresso. (5) `pjHasAdv` = "% > 0"
+  (não "avanço real"). (6) Datas só DD/MM com ano fixo 2026 no parse. (7) Avanço sem autor/equipe/hora; sem
+  planejado × realizado (Gantt não detecta atraso); fotos do avanço não são guardadas. (8) Toggles são `<span>`
+  (sem teclado). Todas se resolvem com o **log de avanço real** + persistência (schema abaixo).
 - **Schema-alvo (a criar):** um schema próprio **`13 - projetos_obra`** (segue o padrão 1-módulo-1-schema:
   8 coleta / 9 suprimentos / 10 Frotas / 11 perdas). Cadastro da intervenção **vem de camada georref de
   projetos** — hoje não existe no banco; as georref correlatas são `7 - setorizacao.dmc_projetado`/
