@@ -1658,10 +1658,27 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   média/mediana/mín/máx/desvio/**CV**, **slope** (regr sobre índice de mês uniforme), n_zeros, **classificação**
   (fraude_potencial/estável/nulo_recorrente/pico_isolado/queda_continua/crescimento_continuo/instável) e
   **`score_anomalia` 0–100** (Índice de Anomalia = 3·pico + 2·tendência + 2·CV + 1·zeros + **3·fraude**; denom 11).
-  RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie` (definer, admin **ou** `dev_acesso`; anon revogado). A tela: KPIs
-  (inclui **Fraude potencial**) + distribuição por comportamento + ranking filtrável (chip de classe + busca,
-  coluna **Situação** + badge `N× c/água`) + detalhe com série de 18 meses (SVG, meses irregulares em **vermelho**)
-  + situação atual + ação sugerida. Recomputar = re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+  RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie` (definer, admin **ou** `dev_acesso`; anon revogado). Recomputar =
+  re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+  - **Reforma da tela (2026-09-24):** removidos os KPIs técnicos (score elevado/CV médio/score médio). Nova
+    disposição em 4 painéis: **(1) Indicador do mês** — headline **L/lig·dia** (litros por ligação por dia =
+    volume faturado ÷ nº ligações faturadas ÷ **30 dias** × 1000; assume 30 dias, sem componente diário) com
+    **seletor de competência** (default = **último mês**), **MoM** (vs mês anterior) e **YoY** (vs mesmo mês do ano
+    anterior), volume faturado, % não medido, ligações faturadas, fraude potencial; popup ⓘ explica o cálculo.
+    **(2) Sazonalidade & tendência** — reconstruída **sobre L/lig·dia** (empata as variáveis): **heatmap** ano×mês +
+    linha "Sazonal" (desvio de cada mês-calendário vs média) e **gráfico** com o último ano em linha + faixa mín–máx
+    dos anos anteriores como **sombra** (hover por mês corrigido — antes o tooltip não batia com a data). **(3) DMCs
+    mais sensíveis** — L/lig·dia por DMC (último mês) + MoM/YoY + %não medido + fraude + score, ordenado por
+    L/lig·dia. **(4) Análise por matrícula** — distribuição por comportamento (filtro) + ranking (Matrícula/
+    Comportamento/Situação/Score, chips + busca) **lado a lado** com o detalhe *sticky* (auto-seleciona o topo);
+    popup ⓘ descreve todas as variáveis e o método. Detalhe da matrícula mantém série 18m + meses irregulares em
+    vermelho. RPCs novas **`app_nrw_mm_mensal`** (série mensal enriquecida) e **`app_nrw_mm_dmc`** (sensibilidade por
+    DMC). `app_nrw_mm_sazonalidade` **aposentada** (sazonalidade agora sai do `_mensal`).
+  - **Cruzamento matrícula→DMC (2026-09-24):** `"11 - perdas_nrw".mm_dmc_map` (spatial join `ligacoes.geom` ×
+    `"7 - setorizacao".dmc.geom` vigente, `distinct on` p/ dedup de borda; 134.867 lig, ZA0200 6 DMCs / ZA1004 9) +
+    `"11 - perdas_nrw".mm_dmc_mensal` (por DMC×mês: n_faturadas/volume_total/medido/não medido, populada em loop por
+    competência p/ não estourar o timeout; 261 linhas). **Reconcilia 100% com `mm_mensal`.** Recompor = recriar
+    `mm_dmc_map` (após editar limites de DMC) + repopular `mm_dmc_mensal`.
   - **Dimensão de fraude (2026-09-24):** colunas **`situacao_atual`** (`cd_situaca` da última competência: R=Ativa,
     I=Inativa/cortada, F=Factível, P=Potencial) e **`meses_irregular`** (nº de meses com a ligação em I/F/P **porém
     faturando volume** `qt_volume_>0` — "cortado mas com água") em `mm_matricula_stats`. Classe **`fraude_potencial`**
@@ -1670,11 +1687,12 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     `meses_irregular`; `_resumo` tem KPI `n_fraude`. Recomputar a dimensão = re-rodar o UPDATE de `meses_irregular`
     (buckets `mod(nu_matricu,4)`, `count(*) filter (where cd_situaca in ('I','F','P') and coalesce(qt_volume_,0)>0)`)
     + `situacao_atual` (join `competencia=ultimo_competencia`) antes do UPDATE de classificação/score.
-  - **Sazonalidade & tendência (mesma tela):** tabela leve **`"11 - perdas_nrw".mm_mensal`** (agregado por
-    consórcio×competência, 35 linhas — 1 INSERT simples, sem bucket) + RPC **`app_nrw_mm_sazonalidade`**. Painel
-    com evolução mensal do **consumo médio por matrícula** (não o volume total — este só cresce porque entram
-    mais matrículas nos meses recentes: 57k→134k), **perfil sazonal** (desvio de cada mês-calendário vs a média)
-    e **Δ ano a ano** dos meses sobrepostos (2025 vs 2026). Recomputar = re-rodar o INSERT do `mm_mensal`.
+  - **Base mensal:** tabela leve **`"11 - perdas_nrw".mm_mensal`** (agregado por consórcio×competência, 35 linhas —
+    1 INSERT simples, sem bucket): n_faturadas, volume_total/medido/não medido, media_matricula. É a base do painel
+    de **Indicador do mês** e da **Sazonalidade** (ambos hoje sobre **L/lig·dia**, não mais o consumo médio por
+    matrícula — a reforma de 2026-09-24 acima substituiu essa métrica). ⚠️ Base = 18 meses (2025‑03→2026‑08), então
+    a sombra/YoY hoje refletem só 2025 e alguns meses ainda sem sobreposição. Recomputar = re-rodar o INSERT do
+    `mm_mensal`.
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
   auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
