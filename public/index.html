@@ -6541,6 +6541,56 @@ const LAVAGEM_STATUS_LABEL={
 function statusBadge(map,status){ const st=map[status]||{l:status||'—',bg:'--line',fg:'--mut'}; return `<span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span>`; }
 function fmtData(d){ if(!d) return '—'; try{ const p=String(d).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }catch(e){ return d; } }
 function fmtDinheiro(v){ if(v==null) return '—'; return 'R$ '+(Math.round(+v*100)/100).toFixed(2).replace('.',','); }
+// --- número por extenso (PT-BR, valores monetários) — usado na carta proposta ---
+const _EXT_UNID=['','um','dois','três','quatro','cinco','seis','sete','oito','nove'];
+const _EXT_DEZ10_19=['dez','onze','doze','treze','catorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+const _EXT_DEZ=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+const _EXT_CEM=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+function _extGrupo3(n){
+  if(n===0) return '';
+  if(n===100) return 'cem';
+  const c=Math.floor(n/100), r=n%100;
+  const partes=[];
+  if(c>0) partes.push(_EXT_CEM[c]);
+  if(r>0){
+    if(r<10) partes.push(_EXT_UNID[r]);
+    else if(r<20) partes.push(_EXT_DEZ10_19[r-10]);
+    else { const d=Math.floor(r/10), u=r%10; partes.push(u===0?_EXT_DEZ[d]:_EXT_DEZ[d]+' e '+_EXT_UNID[u]); }
+  }
+  return partes.join(' e ');
+}
+function numeroPorExtenso(n){
+  n=Math.floor(Math.abs(n));
+  if(n===0) return 'zero';
+  const grupos=[]; let x=n;
+  while(x>0){ grupos.unshift(x%1000); x=Math.floor(x/1000); }
+  const partes=[];
+  for(let i=0;i<grupos.length;i++){
+    const g=grupos[i]; if(g===0) continue;
+    const ordem=grupos.length-1-i;
+    let texto=_extGrupo3(g);
+    if(ordem===1) texto = (g===1)?'mil':(texto+' mil');
+    else if(ordem===2) texto += (g===1)?' milhão':' milhões';
+    else if(ordem===3) texto += (g===1)?' bilhão':' bilhões';
+    partes.push(texto);
+  }
+  if(partes.length===1) return partes[0];
+  const last=partes[partes.length-1], resto=partes.slice(0,-1);
+  const ultimoGrupoVal=grupos[grupos.length-1];
+  const juncao=(ultimoGrupoVal>0 && ultimoGrupoVal<100)?' e ':', ';
+  return resto.join(', ')+juncao+last;
+}
+function fmtDinheiroExtenso(v){ if(v==null) return '—'; return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(+v); }
+function valorPorExtenso(v){
+  v=+v||0;
+  const reais=Math.floor(v), centavos=Math.round((v-reais)*100);
+  let txt=numeroPorExtenso(reais);
+  txt=txt.charAt(0).toUpperCase()+txt.slice(1);
+  const precisaDe=/milh(ão|ões)$|bilh(ão|ões)$/.test(txt); // "um milhão DE reais", não "um milhão reais"
+  txt+=(precisaDe?' de':'')+(reais===1?' real':' reais');
+  if(centavos>0) txt+=' e '+numeroPorExtenso(centavos)+(centavos===1?' centavo':' centavos');
+  return txt;
+}
 async function comprimirGeral(file){ return comprimir(file); }
 // opts.pdf=true adiciona um botão 📄 PDF (além de câmera/galeria) — usado no cadastro de CNH.
 function fotoPickHtml(id,label,opts){ opts=opts||{};
@@ -7763,20 +7813,80 @@ function pessoasAdmRender(){
     ck.disabled=false;
   }));
 }
+const PESSOAS_EMPRESA_INFO={
+  'ÁGUAS INTEGRADAS':{nome:'Consórcio Águas Integradas', logo:'./logo-aguas-integradas.png'},
+  'EFICIÊNCIA HÍDRICA':{nome:'Consórcio Eficiência Hídrica', logo:'./logo-eficiencia-hidrica.png'}
+};
+const PESSOAS_CARTA_ENDERECO='Av. Engenheiro Gerhard Ett, 1610, Betim-MG';
+const PESSOAS_BENEFICIO_TEXTO={
+  vr_va:{titulo:'Vale-Refeição/Alimentação', detalhe:'É concedido conforme a política de benefícios vigente, para uso em alimentação/refeição.'},
+  vt:{titulo:'Vale-transporte', detalhe:'É concedido conforme opção do colaborador para a utilização efetiva em despesas de deslocamento da residência/trabalho/residência, através do sistema de transporte coletivo – seja urbano, intermunicipal ou interestadual.'},
+  saude:{titulo:'Assistência Médica', detalhe:'Amil, concedido a você e aos seus dependentes legais.<br><br>Este plano não tem custo mensal ao colaborador, sendo pago somente os valores dos dependentes.<br><br>No ato da admissão, o colaborador deverá optar pela inclusão dos dependentes, caso contrário, deverá cumprir os prazos de carência estipulados em contrato e preencher a Declaração de Saúde.'},
+  odontologico:{titulo:'Plano Odontológico', detalhe:'Amil, concedido para você.<br><br>Esse plano não tem custo mensal ao colaborador.'},
+  seguro_vida:{titulo:'Seguro de Vida', detalhe:'O valor de indenização e coberturas estão previstas em convenção coletiva.'}
+};
 function pessoasEmitirCarta(c){
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio');
   if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  const doc=(c.modalidade==='CLT')?pessoasCartaHtmlClt(c):pessoasCartaHtmlSimples(c);
   ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div>'+
-    '<div id="relDoc"><h2>Carta Proposta</h2>'+
+    '<div id="relDoc">'+doc+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+function pessoasCartaHtmlSimples(c){
+  return '<div style="padding:24px 34px"><h2>Carta Proposta</h2>'+
     '<p><b>Candidato:</b> '+(c.nome_completo||'')+'</p>'+
     '<p><b>Cargo:</b> '+(c.cargo_proposto||'')+'</p>'+
     '<p><b>Salário:</b> '+fmtDinheiro(c.salario)+'</p>'+
     '<p><b>Data de início:</b> '+fmtData(c.data_inicio_proposta)+'</p>'+
     '<p><b>Benefícios:</b> '+(PESSOAS_BENEFICIOS.filter(([cod])=>c['beneficio_'+cod]).map(([,lbl])=>lbl).join(', ')||'—')+'</p></div>';
-  ov.style.display='block'; ov.scrollTop=0;
-  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
-  document.getElementById('relPrint').onclick=()=>window.print();
+}
+function pessoasCartaHtmlClt(c){
+  const emp=PESSOAS_EMPRESA_INFO[c.frente_empresa]||{nome:c.frente_empresa||'—',logo:''};
+  const saud=c.genero==='FEMININO'?'Prezada':(c.genero==='MASCULINO'?'Prezado':'Prezado(a)');
+  const dataCarta=c.carta_proposta_gerada_em?new Date(c.carta_proposta_gerada_em):new Date();
+  const dataCartaTxt=dataCarta.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const ordem=['vr_va','vt','saude','odontologico','seguro_vida'];
+  const beneficiosHtml=ordem.filter(cod=>c['beneficio_'+cod]).map(cod=>{
+    const t=PESSOAS_BENEFICIO_TEXTO[cod];
+    return '<tr><td style="padding:10px 12px;border:1px solid #ccc;font-weight:700;vertical-align:top;width:34%">'+t.titulo+'</td><td style="padding:10px 12px;border:1px solid #ccc">'+t.detalhe+'</td></tr>';
+  }).join('');
+  return '<div style="padding:24px 34px;font-size:13px;line-height:1.5">'+
+    '<div style="text-align:center;margin-bottom:18px">'+(emp.logo?'<img src="'+emp.logo+'" style="height:64px"/>':'<div style="font-weight:700;font-size:16px">'+emp.nome+'</div>')+'</div>'+
+    '<p style="font-weight:700">Carta Oferta</p>'+
+    '<p>Minas Gerais, '+dataCartaTxt+'.</p>'+
+    '<p>'+saud+' <b>'+(c.nome_completo||'')+'</b>,</p>'+
+    '<p>É com grande satisfação que apresentamos nossa proposta com as principais condições para a sua '+
+    'contratação como profissional na <b>'+emp.nome+'</b>, na função de <b>'+(c.cargo_proposto||'')+'</b>.</p>'+
+    '<p>Nesta posição, você atuará na área de <b>'+(c.area||'')+'</b>.</p>'+
+    '<p>Contamos com seu início em <b>'+fmtData(c.data_inicio_proposta)+'</b>, sendo a sua jornada de trabalho de:</p>'+
+    '<p style="margin-left:16px">▪ segunda-feira a quinta-feira das 7h00 às 17h00 com 1 hora de intervalo.<br>'+
+    '▪ sexta-feira das 7h00 às 16h00 com 1 hora de intervalo.</p>'+
+    '<p style="font-weight:700">Local de trabalho</p>'+
+    '<p>O seu local de trabalho será no canteiro de obras de Minas Gerais, localizado na '+PESSOAS_CARTA_ENDERECO+'.</p>'+
+    '<p style="font-weight:700">Informações sobre sua Remuneração</p>'+
+    '<div style="background:#eee;padding:10px 14px;border-radius:4px;margin-top:8px"><b>Remuneração Fixa</b></div>'+
+    '<p>Contratação CLT, sendo o salário de '+fmtDinheiroExtenso(c.salario)+' ('+valorPorExtenso(c.salario)+'), pago mensalmente '+
+    'de acordo com as condições atuais de mercado.</p>'+
+    '<p>Décimo terceiro salário, de acordo com a legislação vigente.</p>'+
+    '<div style="background:#eee;padding:10px 14px;border-radius:4px;margin-top:8px"><b>Remuneração Variável</b></div>'+
+    '<p style="font-weight:700;margin-top:10px">PLR</p>'+
+    '<p>O valor de PLR é concedido com base no atingimento das metas do acordo de Participação nos Lucros e Resultados.</p>'+
+    (beneficiosHtml?('<p style="font-weight:700;margin-top:18px">Informações sobre seus Benefícios</p>'+
+      '<table style="width:100%;border-collapse:collapse;margin-top:8px"><tr><th style="background:#0a7d5e;color:#fff;padding:8px 12px;text-align:left">Benefício</th><th style="background:#0a7d5e;color:#fff;padding:8px 12px;text-align:left">Detalhes</th></tr>'+beneficiosHtml+'</table>'):'')+
+    '<p style="margin-top:18px">Ao aceitar esta oferta, você declara e concorda que não está vinculado a nenhuma outra '+
+    'oferta de trabalho, contrato de confidencialidade ou outra obrigação que possa violar ou entrar em conflito com '+
+    'os termos desta, tampouco onerar/prejudicar o desempenho das funções designadas a você.</p>'+
+    '<p>Desejamos boas-vindas e muito sucesso em sua jornada profissional na BBL Engenharia.</p>'+
+    '<p>Colocamo-nos à sua disposição sobre qualquer aspecto desta oferta.</p>'+
+    '<p style="margin-top:26px"><b>Aceite:</b></p>'+
+    '<div style="display:flex;justify-content:space-between;margin-top:50px;gap:30px">'+
+    '<div style="flex:1;text-align:center;border-top:1px solid #333;padding-top:6px">'+emp.nome+'</div>'+
+    '<div style="flex:1;text-align:center;border-top:1px solid #333;padding-top:6px">'+(c.nome_completo||'')+'</div>'+
+    '</div></div>';
 }
 let pessoasAreaAprovadores=[];
 async function pessoasRenderCandidatoNovo(){
