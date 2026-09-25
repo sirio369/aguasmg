@@ -1455,9 +1455,17 @@ async function pjLoad(force){
       local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,
       lls,arv:PJ_ARV.rede_vca(p.extensao_m)}); });
-  PJ_IVS=ivs; PJ_IVS.forEach(iv=>{ iv.locked=false; });   // recém-importadas: em configuração
-  pjLoaded=true;
+  // sobrepõe o estado salvo (snapshot) nos templates
+  let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
+  const byKey={}; est.forEach(s=>byKey[s.kind+'|'+s.gid]=s);
+  ivs.forEach(iv=>{ const s=byKey[iv.kind+'|'+iv.gid]; if(s){ if(s.arv) iv.arv=s.arv; iv.locked=!!s.locked; if(s.status) iv.status=s.status; } else iv.locked=false; });
+  PJ_IVS=ivs; pjLoaded=true;
 }
+// snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
+const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
+let pjSaveT={};
+async function pjSaveNow(iv){ if(!iv||iv.gid==null||!iv.kind) return; try{ await sb.rpc('app_proj_estado_set',{p_kind:iv.kind,p_gid:iv.gid,p_arv:iv.arv,p_locked:!!iv.locked,p_status:iv.status||null}); }catch(e){ if(window.toast)toast('Erro ao salvar: '+(e.message||e)); } }
+function pjSave(iv){ if(!iv||iv.gid==null) return; const k=iv.kind+'|'+iv.gid; clearTimeout(pjSaveT[k]); pjSaveT[k]=setTimeout(()=>pjSaveNow(iv),500); }
 function pjPct(node){
   if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
@@ -1672,8 +1680,8 @@ function pjRenderCfg(keep){
    <p class="pjhint" style="margin:2px 0 8px">Anexe, abra e remova aqui os documentos da intervenção. No <b>relatório</b> eles ficam só para <b>abrir</b>.</p>
    ${docsHtml}`;
   const d=$('#pjCfg');
-  const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
-  const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; toast('🔒 Configuração reaberta'); pjRenderCfg(); };
+  const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; pjSave(iv); toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
+  const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; pjSave(iv); toast('🔒 Configuração reaberta'); pjRenderCfg(); };
   d.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>pjOpenPdf(b.getAttribute('data-pdf')));
   d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>toast('Anexar PDF — na versão integrada abre arquivos/galeria'));
   d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>toast('Remover documento — na versão integrada exclui o arquivo'));
@@ -1771,7 +1779,7 @@ function pjNodeHtml(node){
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
       <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label></div>
       <textarea class="pjobs" rows="2" placeholder="Observação (opcional)"></textarea>
-      <button class="btn" data-launch="1">Lançar avanço</button>
+      <button class="btn" data-launch="${rid}">Lançar avanço</button>
       <span class="pjhint">Incremental — soma ao acumulado. 2 fotos + observação por lançamento.</span>
     </div>`;
   }
@@ -1789,12 +1797,17 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
   d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
   d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
-  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>toast('Lançamento registrado (prévia) — na versão integrada grava avanço + 2 fotos + observação no banco'));
-  d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n) n.v=inp.value.trim()||'—'; });
-  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); rerender(k); } });
-  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); rerender(k); } });
-  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); rerender(k); } }; });
-  d.querySelectorAll('[data-sel]').forEach(s=>s.onchange=()=>{ const n=pjReg[s.dataset.sel]; if(n){ const k=pjSnapOpen(d); n.v=s.value; rerender(k); } });
+  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.launch]; if(!n)return;
+    const wrap=b.closest('.pjlaunch'), inp=wrap&&wrap.querySelector('.pjinp');
+    const val=parseFloat(((inp&&inp.value)||'').replace(',','.'));
+    if(!(val>0)){ toast('Informe o avanço (número > 0)'); return; }
+    if(n.k==='m') n.exec=Math.max(0,(n.exec||0)+val); else n.p=Math.max(0,Math.min(100,(n.p||0)+val));
+    pjSave(pjCurIv()); toast('Avanço lançado'); const k=pjSnapOpen(d); rerender(k); });
+  d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n){ n.v=inp.value.trim()||'—'; pjSave(pjCurIv()); } });
+  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjSave(pjCurIv()); rerender(k); } });
+  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjSave(pjCurIv()); rerender(k); } });
+  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); pjSave(pjCurIv()); rerender(k); } }; });
+  d.querySelectorAll('[data-sel]').forEach(s=>s.onchange=()=>{ const n=pjReg[s.dataset.sel]; if(n){ const k=pjSnapOpen(d); n.v=s.value; pjSave(pjCurIv()); rerender(k); } });
 }
 function pjRenderDet(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={}; pjMode='campo'; pjLocked=!!iv.locked;

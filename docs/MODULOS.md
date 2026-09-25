@@ -1760,8 +1760,16 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   `var()`), linhas = `polyline`; tooltip com código+tipo, clique abre a intervenção. `iv.ll`=[lat,lon] / `iv.lls`
   (do GeoJSON 4326). ⚠️ **Cuidado:** `fitBounds` roda **dentro** do `setTimeout` do `invalidateSize` (senão, com o
   container ainda sem tamanho, o zoom trava no `maxZoom` centrado no meio). `pjSetView('mapa')` também dá
-  `invalidateSize`. Containers `#pjMapaL`/`#pjSupMapaL` (46vh). ⚠️ **Ainda pendente:** **avanços não persistem**
-  (nada grava de volta nas tabelas) — próximo passo.
+  `invalidateSize`. Containers `#pjMapaL`/`#pjSupMapaL` (46vh).
+- **Persistência por snapshot (2026-09-25):** schema **app-only `13 - projetos_obra`** + tabela
+  **`intervencao_estado`** (`kind`,`gid`, **`arv jsonb`** = snapshot da árvore, `locked`, `status`, quem/quando;
+  RLS deny-all, acesso só por RPC). RPCs **`app_proj_estados`** (lê todos) e **`app_proj_estado_set`** (upsert),
+  definer, gated admin/`dev_acesso`. No `pjLoad`, após instanciar os templates, **sobrepõe** o estado salvo
+  (arv/locked/status). Salva (debounce 500 ms — `pjSave`/`pjSaveNow`, chave `kind|gid`) em **toda mutação**:
+  toggle "No escopo?", quantidade (±), tipo de peça, registro, **cadeado** (liberar/reabrir) e **lançamento de
+  avanço** no campo — o "Lançar avanço" agora é **real** (lê o input `.pjinp` e soma ao `%`/`exec` da folha) e
+  persiste. ⚠️ O histórico "Lançamentos anteriores" (`pjLeafHist`) segue **ilustrativo** (derivado do % atual) —
+  histórico real por lançamento seria a abordagem de **log** (não escolhida nesta etapa; só snapshot).
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
