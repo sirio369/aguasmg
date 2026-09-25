@@ -845,20 +845,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="pjseg" id="pjSeg"><button data-v="mapa" class="sel">🗺️ Mapa</button><button data-v="lista">☰ Lista</button></div>
     <div id="pjCount" class="pjcount"></div>
     <div id="pjMapaWrap">
-      <div class="pjmap">
-        <svg viewBox="0 0 100 62" role="img" aria-label="Mapa esquemático das intervenções">
-          <rect x="0" y="0" width="100" height="62" fill="var(--bg)"/>
-          <ellipse cx="30" cy="27" rx="26" ry="19" fill="var(--acc)" opacity=".07"/>
-          <ellipse cx="68" cy="43" rx="24" ry="17" fill="var(--ok)" opacity=".09"/>
-          <path d="M2 9 C 24 19, 40 15, 52 31 C 62 45, 80 41, 99 53" fill="none" stroke="var(--acc)" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>
-          <path d="M8 47 C 30 41, 46 49, 70 39 M 14 13 C 34 23, 58 21, 90 31" fill="none" stroke="var(--line)" stroke-width=".5"/>
-          <text class="zlabel" x="14" y="11">ZA1004 · CONTAGEM</text>
-          <text class="zlabel" x="52" y="60">ZA0200 · BETIM</text>
-          <g id="pjMarkers"></g>
-        </svg>
-      </div>
-      <div class="pjleg" id="pjLeg"></div>
-      <p class="pjhint" style="margin-top:8px">Mapa esquemático (ilustrativo). Na versão integrada os pinos virão das geometrias reais do GIS.</p>
+      <div id="pjMapaL" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+      <div class="pjleg" id="pjLeg" style="margin-top:8px"></div>
+      <p class="pjhint" style="margin-top:6px">Toque num pino ou traçado para abrir a intervenção.</p>
     </div>
     <div id="pjLista" hidden style="margin-top:6px"></div>
   </main>
@@ -887,19 +876,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="pjseg" id="pjSupSeg"><button data-v="mapa" class="sel">🗺️ Mapa</button><button data-v="lista">☰ Lista</button></div>
     <div id="pjSupCount" class="pjcount"></div>
     <div id="pjSupMapaWrap">
-      <div class="pjmap">
-        <svg viewBox="0 0 100 62" role="img" aria-label="Mapa esquemático das intervenções">
-          <rect x="0" y="0" width="100" height="62" fill="var(--bg)"/>
-          <ellipse cx="30" cy="27" rx="26" ry="19" fill="var(--acc)" opacity=".07"/>
-          <ellipse cx="68" cy="43" rx="24" ry="17" fill="var(--ok)" opacity=".09"/>
-          <path d="M2 9 C 24 19, 40 15, 52 31 C 62 45, 80 41, 99 53" fill="none" stroke="var(--acc)" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>
-          <path d="M8 47 C 30 41, 46 49, 70 39 M 14 13 C 34 23, 58 21, 90 31" fill="none" stroke="var(--line)" stroke-width=".5"/>
-          <text class="zlabel" x="14" y="11">ZA1004 · CONTAGEM</text>
-          <text class="zlabel" x="52" y="60">ZA0200 · BETIM</text>
-          <g id="pjSupMarkers"></g>
-        </svg>
-      </div>
-      <div class="pjleg" id="pjSupLeg"></div>
+      <div id="pjSupMapaL" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+      <div class="pjleg" id="pjSupLeg" style="margin-top:8px"></div>
       <p class="pjhint" style="margin-top:8px">Toque numa intervenção para configurar o escopo e o cadeado.</p>
     </div>
     <div id="pjSupLista" hidden style="margin-top:6px"></div>
@@ -1363,6 +1341,9 @@ const PJ_TIPOS={
   rede_hdd:{n:'Implantação de Rede HDD',c:'var(--t-rede_hdd)'},
   valvula:{n:'Válvula',c:'var(--t-valvula)'},
 };
+// cores reais (espelham as CSS vars --t-* acima) — Leaflet precisa de cor resolvida, não var()
+const PJ_TIPO_COR={macro_impl:'#0e639c',macro_subst:'#2a9d8f',vrp_impl:'#8a5a00',vrp_subst:'#b3261e',rede_vca:'#6a4bb3',rede_hdd:'#0a7d5e',valvula:'#c026a3'};
+const pjMaps={};   // ctx -> {map, layer}
 const PJ_ST={run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
 // construtores de nó: P=%  M=metros(meta/exec)  R=registro  G=grupo
 const pjP=(n,p,o={})=>({n,k:'%',p,...o});
@@ -1463,22 +1444,17 @@ async function pjLoad(force){
   const d=r.data||{}, pts=(d.pontos&&d.pontos.features)||[], lns=(d.linhas&&d.linhas.features)||[];
   const cs=[]; pts.forEach(f=>cs.push(f.geometry.coordinates)); lns.forEach(f=>(f.geometry.coordinates||[]).forEach(c=>cs.push(c)));
   if(!cs.length){ PJ_IVS=[]; pjLoaded=true; return; }
-  const xs=cs.map(c=>+c[0]),ys=cs.map(c=>+c[1]);
-  const mnx=Math.min(...xs),mxx=Math.max(...xs),mny=Math.min(...ys),mxy=Math.max(...ys);
-  const PX=8,PY=8,W=100,H=62;
-  const nx=x=>(mxx>mnx)?+(PX+(x-mnx)/(mxx-mnx)*(W-2*PX)).toFixed(2):W/2;
-  const ny=y=>(mxy>mny)?+((H-PY)-(y-mny)/(mxy-mny)*(H-2*PY)).toFixed(2):H/2;
   const ivs=[];
   pts.forEach(f=>{ const p=f.properties,[lo,la]=f.geometry.coordinates,tp=pjMapTipo(p.tipo,false);
     ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),
       local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,
-      pt:[nx(lo),ny(la)],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
-  lns.forEach(f=>{ const p=f.properties,ln=(f.geometry.coordinates||[]).map(c=>[nx(+c[0]),ny(+c[1])]);
+      ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
+  lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
     ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:'rede_vca',cod:p.codigo||p.layer_dwg||('#'+p.gid),
       local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,
-      ln,arv:PJ_ARV.rede_vca(p.extensao_m)}); });
+      lls,arv:PJ_ARV.rede_vca(p.extensao_m)}); });
   PJ_IVS=ivs; PJ_IVS.forEach(iv=>{ iv.locked=false; });   // recém-importadas: em configuração
   pjLoaded=true;
 }
@@ -1511,8 +1487,8 @@ function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.leng
 
 // contexto de tela (campo × suporte): ids dos elementos + ação ao tocar num card/pino
 const PJ_CTX={
-  campo:{tipo:'pjTipo',status:'pjStatus',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',markers:'pjMarkers',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
-  sup:{tipo:'pjSupTipo',status:'pjSupStatus',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',markers:'pjSupMarkers',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
+  campo:{tipo:'pjTipo',status:'pjStatus',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',mapEl:'pjMapaL',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
+  sup:{tipo:'pjSupTipo',status:'pjSupStatus',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
 };
 function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.tipo);
   if(st && !st.dataset.ready){ st.innerHTML='<option value="">Todos os tipos</option>'+Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}">${t.n}</option>`).join(''); st.dataset.ready='1';
@@ -1525,16 +1501,21 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
 const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===iv.status);
-function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; }
+function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
 function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(pjOk).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
-  const mk=$('#'+E.markers); if(!mk)return;
-  mk.innerHTML=PJ_IVS.map(iv=>{ const c=PJ_TIPOS[iv.tipo].c,hide=pjOk(iv)?'':'hide';
-    if(iv.pt){const[x,y]=iv.pt;return `<g class="mk ${hide}" data-id="${iv.id}"><ellipse cx="${x}" cy="${y+3.2}" rx="1.9" ry=".8" fill="rgba(0,0,0,.16)"/><path d="M${x} ${y-4} a3 3 0 0 1 3 3 c0 2.2 -3 4.6 -3 4.6 s-3 -2.4 -3 -4.6 a3 3 0 0 1 3 -3z" fill="${c}" stroke="#fff" stroke-width=".5"/><circle cx="${x}" cy="${y-1}" r="1.05" fill="#fff"/></g>`;}
-    const pts=iv.ln.map(p=>p.join(',')).join(' ');const[sx,sy]=iv.ln[0],[ex,ey]=iv.ln[iv.ln.length-1];
-    return `<g class="mk ${hide}" data-id="${iv.id}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sx}" cy="${sy}" r="1.3" fill="${c}" stroke="#fff" stroke-width=".4"/><circle cx="${ex}" cy="${ey}" r="1.3" fill="${c}" stroke="#fff" stroke-width=".4"/></g>`;
-  }).join('');
-  mk.querySelectorAll('.mk').forEach(g=>g.onclick=()=>E.open(g.dataset.id));
+  const el=$('#'+E.mapEl); if(!el||!window.L) return;
+  let M=pjMaps[ctx];
+  if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map)}; }
+  const map=M.map, layer=M.layer; layer.clearLayers();
+  const arr=PJ_IVS.filter(pjOk), bounds=[];
+  arr.forEach(iv=>{ const col=PJ_TIPO_COR[iv.tipo]||'#888';
+    if(iv.ll){ const m=L.circleMarker(iv.ll,{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
+      m.on('click',()=>E.open(iv.id)); m.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); m.addTo(layer); bounds.push(iv.ll); }
+    else if(iv.lls&&iv.lls.length){ const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.9});
+      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p)); }
+  });
+  setTimeout(()=>{ try{ map.invalidateSize(); if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:16}); }catch(e){} },80);
 }
 function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx==='sup';
   const arr=PJ_IVS.filter(pjOk);

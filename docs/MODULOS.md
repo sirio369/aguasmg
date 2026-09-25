@@ -1753,8 +1753,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   instancia a **árvore-modelo** do tipo (`PJ_ARV[tipo]()`, zerada). As coords reais (GeoJSON 4326) são
   **normalizadas** no mapa esquemático (viewBox 100×62, bbox→[8..92]×[8..54], y invertido). Toda intervenção
   recém-importada entra **`locked=false`** (em configuração no Suporte). O mock antigo de 6 IVs vira só fallback
-  (mostrado se a RPC falhar/offline). ⚠️ **Ainda pendente:** mapa é esquemático (não Leaflet real) e **avanços não
-  persistem** (nada grava de volta nas tabelas) — próximos passos.
+  (mostrado se a RPC falhar/offline).
+- **Mapa Leaflet real (2026-09-25):** `pjRenderMap` deixou de ser o SVG esquemático — agora é **Leaflet**
+  (`mapAddCamadaBase`, um mapa por contexto em `pjMaps[ctx]`, `L.layerGroup` recriado a cada refresh). Pontos =
+  `circleMarker` coloridos por tipo (`PJ_TIPO_COR`, hex que espelha as CSS `--t-*`, porque Leaflet não aceita
+  `var()`), linhas = `polyline`; tooltip com código+tipo, clique abre a intervenção. `iv.ll`=[lat,lon] / `iv.lls`
+  (do GeoJSON 4326). ⚠️ **Cuidado:** `fitBounds` roda **dentro** do `setTimeout` do `invalidateSize` (senão, com o
+  container ainda sem tamanho, o zoom trava no `maxZoom` centrado no meio). `pjSetView('mapa')` também dá
+  `invalidateSize`. Containers `#pjMapaL`/`#pjSupMapaL` (46vh). ⚠️ **Ainda pendente:** **avanços não persistem**
+  (nada grava de volta nas tabelas) — próximo passo.
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
