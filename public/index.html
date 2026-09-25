@@ -1663,7 +1663,7 @@ function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); pjRenderCfg(); window.s
 function pjRenderCfg(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo];
-  const hasAdv=iv.arv.flatMap(n=>pjLeaves(n)).some(l=>pjLeafHist(l).ents.length);
+  const hasAdv=iv.arv.some(pjHasAdv);
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
   const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:iv.status==='done'}];
   const docsHtml=DOCS.map(dc=>`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${dc.ok?'ok':'pend'}">${dc.ok?'anexado':(iv.status==='new'?'aguarda conclusão':'pendente')}</span></span><span class="pjdocbtns">${dc.ok?`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="1">📎 Anexar</button>${dc.ok?`<button class="btn ghost pjmini bad" data-remove="1">🗑 Remover</button>`:''}</span></div>`).join('');
@@ -1688,21 +1688,9 @@ function pjRenderCfg(keep){
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
 }
-// histórico de lançamentos (mock derivado do % atual) — entradas mais antigas → recentes, com acumulado corrente
-function pjLeafHist(node){
-  const isM=node.k==='m',cur=isM?node.exec:node.p;
-  if(!cur||cur<=0)return {ents:[]};
-  const OBS=['Frente liberada, sem interferências.','Chuva no período da tarde.','Aguardando liberação da concessionária.','Equipe reforçada.',''];
-  const DATAS=['05/09','08/09','10/09','12/09','15/09','17/09'];
-  const seed=[...node.n].reduce((a,c)=>a+c.charCodeAt(0),0);
-  const a=Math.round(cur*0.6),b=cur-a,parts=[];
-  if(a>0)parts.push(a); if(b>0)parts.push(b);
-  let run=0; const ents=parts.map((d,i)=>{ run+=d;
-    return {d:DATAS[(seed+i)%DATAS.length], delta:'+'+d+(isM?' m':'%'),
-      acc:isM?`${run}/${node.meta} m · ${Math.round(run/node.meta*100)}%`:`${run}%`,
-      obs:OBS[(seed+i)%OBS.length]}; });
-  return {ents};
-}
+// snapshot não guarda histórico por lançamento — só o acumulado real da folha (sem entradas fabricadas).
+// (histórico real por lançamento seria a abordagem de "log", não adotada nesta etapa.)
+function pjLeafHist(node){ return {ents:[]}; }
 // gera um PDF mínimo válido (blob) e abre em nova aba — prévia; a versão integrada abre o PDF real anexado
 function pjMakePdfUrl(title,sub){
   const esc=s=>String(s).replace(/([()\\])/g,'\\$1');
@@ -1769,12 +1757,12 @@ function pjNodeHtml(node){
     h+=`<div class="pjdetpanel" id="${rid}D" hidden>${ctl}<div class="pjchildren">${node.f.map(pjNodeHtml).join('')}</div></div>`;
   }
   if(pjMode==='campo'&&!isG&&(t==='%'||t==='m')&&!inact&&pjLocked){
-    const H=pjLeafHist(node);
-    const hist=H.ents.length
-      ? `${H.ents.map(e=>`<div class="pjhrow"><span class="pjthumb sm">📷</span><span class="pjhd">${e.d}</span><span class="pjhdelta">${e.delta}</span><span class="pjhacc">${e.acc}</span></div>${e.obs?`<div class="pjhobs">"${e.obs}"</div>`:''}`).join('')}<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec}/${node.meta} ${node.un} · ${p}%`:`${p}%`}</b></div>`
+    const cur=t==='m'?(node.exec||0):(node.p||0);
+    const hist=cur>0
+      ? `<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec||0}/${node.meta||0} ${node.un} · ${p}%`:`${node.p||0}%`}</b></div>`
       : `<div class="pjhrow" style="color:var(--mut)">Sem lançamentos ainda.</div>`;
     h+=`<div class="pjlaunch" id="${rid}L">
-      <div class="pjhistwrap"><div class="pjhisttit">📋 Lançamentos anteriores</div>${hist}</div>
+      <div class="pjhistwrap"><div class="pjhisttit">📊 Acumulado</div>${hist}</div>
       <div class="pjnewtit">➕ Novo avanço de hoje</div>
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
       <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label></div>

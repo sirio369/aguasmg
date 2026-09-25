@@ -1768,8 +1768,11 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   (arv/locked/status). Salva (debounce 500 ms — `pjSave`/`pjSaveNow`, chave `kind|gid`) em **toda mutação**:
   toggle "No escopo?", quantidade (±), tipo de peça, registro, **cadeado** (liberar/reabrir) e **lançamento de
   avanço** no campo — o "Lançar avanço" agora é **real** (lê o input `.pjinp` e soma ao `%`/`exec` da folha) e
-  persiste. ⚠️ O histórico "Lançamentos anteriores" (`pjLeafHist`) segue **ilustrativo** (derivado do % atual) —
-  histórico real por lançamento seria a abordagem de **log** (não escolhida nesta etapa; só snapshot).
+  persiste. **Histórico fabricado removido (2026-09-25):** `pjLeafHist` foi zerado (`return {ents:[]}`) — o painel
+  de campo mostra só o **acumulado real** ("📊 Acumulado" / "Sem lançamentos ainda"), `hasAdv` da config usa
+  `pjHasAdv` (avanço real) e o **Resumo por período** fica vazio até haver lançamentos (não há mais datas/obs
+  inventadas). O estado inicial começa **sem avanços** (tabela `intervencao_estado` truncada). Histórico real por
+  lançamento (com datas/fotos/obs) seria a abordagem de **log** — não adotada nesta etapa (só snapshot).
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
