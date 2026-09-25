@@ -104,7 +104,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pickb input{display:none}
 .pickb:active{transform:scale(.98)}
 /* ---------- MÓDULO PROJETOS / INTERVENÇÕES ---------- */
-#projetos{--t-macro_impl:#0e639c;--t-macro_subst:#2a9d8f;--t-vrp_impl:#8a5a00;--t-vrp_subst:#b3261e;--t-rede_vca:#6a4bb3;--t-rede_hdd:#0a7d5e}
+#projetos{--t-macro_impl:#0e639c;--t-macro_subst:#2a9d8f;--t-vrp_impl:#8a5a00;--t-vrp_subst:#b3261e;--t-rede_vca:#6a4bb3;--t-rede_hdd:#0a7d5e;--t-valvula:#c026a3}
 .pjfilt{display:flex;gap:8px;margin:12px 0 10px}
 .pjfilt select{flex:1;font-size:14px;padding:9px 10px}
 .pjseg{display:flex;gap:8px;margin-bottom:10px}
@@ -845,20 +845,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="pjseg" id="pjSeg"><button data-v="mapa" class="sel">🗺️ Mapa</button><button data-v="lista">☰ Lista</button></div>
     <div id="pjCount" class="pjcount"></div>
     <div id="pjMapaWrap">
-      <div class="pjmap">
-        <svg viewBox="0 0 100 62" role="img" aria-label="Mapa esquemático das intervenções">
-          <rect x="0" y="0" width="100" height="62" fill="var(--bg)"/>
-          <ellipse cx="30" cy="27" rx="26" ry="19" fill="var(--acc)" opacity=".07"/>
-          <ellipse cx="68" cy="43" rx="24" ry="17" fill="var(--ok)" opacity=".09"/>
-          <path d="M2 9 C 24 19, 40 15, 52 31 C 62 45, 80 41, 99 53" fill="none" stroke="var(--acc)" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>
-          <path d="M8 47 C 30 41, 46 49, 70 39 M 14 13 C 34 23, 58 21, 90 31" fill="none" stroke="var(--line)" stroke-width=".5"/>
-          <text class="zlabel" x="14" y="11">ZA1004 · CONTAGEM</text>
-          <text class="zlabel" x="52" y="60">ZA0200 · BETIM</text>
-          <g id="pjMarkers"></g>
-        </svg>
-      </div>
-      <div class="pjleg" id="pjLeg"></div>
-      <p class="pjhint" style="margin-top:8px">Mapa esquemático (ilustrativo). Na versão integrada os pinos virão das geometrias reais do GIS.</p>
+      <div id="pjMapaL" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+      <div class="pjleg" id="pjLeg" style="margin-top:8px"></div>
+      <p class="pjhint" style="margin-top:6px">Toque num pino ou traçado para abrir a intervenção.</p>
     </div>
     <div id="pjLista" hidden style="margin-top:6px"></div>
   </main>
@@ -887,19 +876,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="pjseg" id="pjSupSeg"><button data-v="mapa" class="sel">🗺️ Mapa</button><button data-v="lista">☰ Lista</button></div>
     <div id="pjSupCount" class="pjcount"></div>
     <div id="pjSupMapaWrap">
-      <div class="pjmap">
-        <svg viewBox="0 0 100 62" role="img" aria-label="Mapa esquemático das intervenções">
-          <rect x="0" y="0" width="100" height="62" fill="var(--bg)"/>
-          <ellipse cx="30" cy="27" rx="26" ry="19" fill="var(--acc)" opacity=".07"/>
-          <ellipse cx="68" cy="43" rx="24" ry="17" fill="var(--ok)" opacity=".09"/>
-          <path d="M2 9 C 24 19, 40 15, 52 31 C 62 45, 80 41, 99 53" fill="none" stroke="var(--acc)" stroke-width="1.2" opacity=".3" stroke-linecap="round"/>
-          <path d="M8 47 C 30 41, 46 49, 70 39 M 14 13 C 34 23, 58 21, 90 31" fill="none" stroke="var(--line)" stroke-width=".5"/>
-          <text class="zlabel" x="14" y="11">ZA1004 · CONTAGEM</text>
-          <text class="zlabel" x="52" y="60">ZA0200 · BETIM</text>
-          <g id="pjSupMarkers"></g>
-        </svg>
-      </div>
-      <div class="pjleg" id="pjSupLeg"></div>
+      <div id="pjSupMapaL" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+      <div class="pjleg" id="pjSupLeg" style="margin-top:8px"></div>
       <p class="pjhint" style="margin-top:8px">Toque numa intervenção para configurar o escopo e o cadeado.</p>
     </div>
     <div id="pjSupLista" hidden style="margin-top:6px"></div>
@@ -1310,11 +1288,11 @@ function irPara(id){
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='dev_acesso') devAcessoInit();
-  if(id==='projetos') pjHub();
-  if(id==='projeto_campo') pjInit();
-  if(id==='projeto_sup') pjSupEnter();
+  if(id==='projetos') pjLoad().then(pjHub);
+  if(id==='projeto_campo') pjLoad().then(()=>pjInit());
+  if(id==='projeto_sup') pjLoad().then(pjSupEnter);
   if(id==='projeto_acesso') pjSupAcesso();
-  if(id==='projeto_resumo') pjResumoEnter();
+  if(id==='projeto_resumo') pjLoad().then(pjResumoEnter);
   if(id==='pessoas') pessoasInit();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
@@ -1361,7 +1339,11 @@ const PJ_TIPOS={
   vrp_subst:{n:'Substituição de VRP',c:'var(--t-vrp_subst)'},
   rede_vca:{n:'Implantação de Rede VCA',c:'var(--t-rede_vca)'},
   rede_hdd:{n:'Implantação de Rede HDD',c:'var(--t-rede_hdd)'},
+  valvula:{n:'Válvula',c:'var(--t-valvula)'},
 };
+// cores reais (espelham as CSS vars --t-* acima) — Leaflet precisa de cor resolvida, não var()
+const PJ_TIPO_COR={macro_impl:'#0e639c',macro_subst:'#2a9d8f',vrp_impl:'#8a5a00',vrp_subst:'#b3261e',rede_vca:'#6a4bb3',rede_hdd:'#0a7d5e',valvula:'#c026a3'};
+const pjMaps={};   // ctx -> {map, layer}
 const PJ_ST={run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
 // construtores de nó: P=%  M=metros(meta/exec)  R=registro  G=grupo
 const pjP=(n,p,o={})=>({n,k:'%',p,...o});
@@ -1387,7 +1369,7 @@ const pjPeca=(i,tipo,esc,esco,mont,rea,rec)=>pjG('Peça/acessório '+i,[
   pjP('Escavação',esc||0),pjP('Escoramento',esco||0),pjP('Montagem hidráulica',mont||0),
   pjP('Reaterro',rea||0),pjP('Recomposição de pavimento',rec||0)]);
 const pjPecas=(kids)=>({...pjG('Peças e acessórios',kids),rep:kids.length,ativo:true});
-const PJ_IVS=[
+let PJ_IVS=[
  {id:'iv1',tipo:'macro_impl',cod:'PRJ-2026-014',local:'DMC Contagem — Bairro Cincão',cons:'Águas Integradas',resp:'Equipe A · João R.',ini:'12/09/2026',status:'run',pt:[26,22],
   arv:[pjP('Locação e cadastro de interferências',100),
    pjG('Câmara de medição',[...pjOc(100,100,60,0),pjP('Execução da câmara (alvenaria/concreto)',80)]),
@@ -1431,10 +1413,63 @@ const PJ_IVS=[
 // cadeado por intervenção: locked=liberada p/ avanços (config congelada); !locked=em configuração (Suporte).
 // default: liberada, exceto as ainda não iniciadas (que seguem em configuração).
 PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
+// ---- REGROUND: intervenções reais (app_proj_intervencoes) substituem o mock acima ----
+let pjLoaded=false;
+// árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
+const PJ_ARV={
+  vrp_impl:()=>[pjP('Locação e cadastro de interferências',0),
+    pjG('Câmara da VRP',[...pjOc(0,0,0,0),pjP('Execução da câmara',0)]),
+    pjP('Montagem hidráulica (VRP + by-pass, registros, filtro, manômetros)',0),
+    pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade',0),pjP('Calibração / ajuste de set point',0),
+    {...pjP('Telemetria / macromedidor associado',0),ativo:true},pjP('Comissionamento',0)],
+  valvula:()=>[pjP('Locação e cadastro de interferências',0),
+    pjG('Obra civil (vala/caixa)',pjOc(0,0,0,0)),
+    {...pjP('Retirada da válvula antiga (se substituição)',0),ativo:false},
+    pjP('Instalação da válvula + acessórios',0),
+    pjIL('Interligação / religação',0,0,0),
+    pjP('Teste de estanqueidade / manobra',0),pjP('Cadastro / as-built',0)],
+  rede_vca:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
+    pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
+    pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
+    pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
+    pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]
+};
+const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
+const pjMapTipo=(tipo,isLine)=>isLine?'rede_vca':(PJ_TIPO_MAP[tipo]||'vrp_impl');
+const pjConsName=c=>c==='ZA0200'?'Eficiência Hídrica':(c==='ZA1004'?'Águas Integradas':(c||'—'));
+async function pjLoad(force){
+  if(pjLoaded&&!force) return;
+  let r; try{ r=await sb.rpc('app_proj_intervencoes',{}); if(r.error)throw r.error; }
+  catch(e){ if(window.toast)toast('Erro ao carregar intervenções: '+(e.message||e)); return; }
+  const d=r.data||{}, pts=(d.pontos&&d.pontos.features)||[], lns=(d.linhas&&d.linhas.features)||[];
+  const cs=[]; pts.forEach(f=>cs.push(f.geometry.coordinates)); lns.forEach(f=>(f.geometry.coordinates||[]).forEach(c=>cs.push(c)));
+  if(!cs.length){ PJ_IVS=[]; pjLoaded=true; return; }
+  const ivs=[];
+  pts.forEach(f=>{ const p=f.properties,[lo,la]=f.geometry.coordinates,tp=pjMapTipo(p.tipo,false);
+    ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),
+      local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,
+      ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
+  lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
+    ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:'rede_vca',cod:p.codigo||p.layer_dwg||('#'+p.gid),
+      local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,
+      lls,arv:PJ_ARV.rede_vca(p.extensao_m)}); });
+  // sobrepõe o estado salvo (snapshot) nos templates
+  let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
+  const byKey={}; est.forEach(s=>byKey[s.kind+'|'+s.gid]=s);
+  ivs.forEach(iv=>{ const s=byKey[iv.kind+'|'+iv.gid]; if(s){ if(s.arv) iv.arv=s.arv; iv.locked=!!s.locked; if(s.status) iv.status=s.status; } else iv.locked=false; });
+  PJ_IVS=ivs; pjLoaded=true;
+}
+// snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
+const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
+let pjSaveT={};
+async function pjSaveNow(iv){ if(!iv||iv.gid==null||!iv.kind) return; try{ await sb.rpc('app_proj_estado_set',{p_kind:iv.kind,p_gid:iv.gid,p_arv:iv.arv,p_locked:!!iv.locked,p_status:iv.status||null}); }catch(e){ if(window.toast)toast('Erro ao salvar: '+(e.message||e)); } }
+function pjSave(iv){ if(!iv||iv.gid==null) return; const k=iv.kind+'|'+iv.gid; clearTimeout(pjSaveT[k]); pjSaveT[k]=setTimeout(()=>pjSaveNow(iv),500); }
 function pjPct(node){
   if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
-  if(node.k==='m')return Math.round(node.exec/node.meta*100);
+  if(node.k==='m')return node.meta?Math.round(node.exec/node.meta*100):0;
   if(node.f&&node.f.length){const vs=node.f.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;}
   return 0;
 }
@@ -1460,8 +1495,8 @@ function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.leng
 
 // contexto de tela (campo × suporte): ids dos elementos + ação ao tocar num card/pino
 const PJ_CTX={
-  campo:{tipo:'pjTipo',status:'pjStatus',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',markers:'pjMarkers',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
-  sup:{tipo:'pjSupTipo',status:'pjSupStatus',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',markers:'pjSupMarkers',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
+  campo:{tipo:'pjTipo',status:'pjStatus',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',mapEl:'pjMapaL',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
+  sup:{tipo:'pjSupTipo',status:'pjSupStatus',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
 };
 function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.tipo);
   if(st && !st.dataset.ready){ st.innerHTML='<option value="">Todos os tipos</option>'+Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}">${t.n}</option>`).join(''); st.dataset.ready='1';
@@ -1474,16 +1509,21 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
 const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===iv.status);
-function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; }
+function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
 function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(pjOk).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
-  const mk=$('#'+E.markers); if(!mk)return;
-  mk.innerHTML=PJ_IVS.map(iv=>{ const c=PJ_TIPOS[iv.tipo].c,hide=pjOk(iv)?'':'hide';
-    if(iv.pt){const[x,y]=iv.pt;return `<g class="mk ${hide}" data-id="${iv.id}"><ellipse cx="${x}" cy="${y+3.2}" rx="1.9" ry=".8" fill="rgba(0,0,0,.16)"/><path d="M${x} ${y-4} a3 3 0 0 1 3 3 c0 2.2 -3 4.6 -3 4.6 s-3 -2.4 -3 -4.6 a3 3 0 0 1 3 -3z" fill="${c}" stroke="#fff" stroke-width=".5"/><circle cx="${x}" cy="${y-1}" r="1.05" fill="#fff"/></g>`;}
-    const pts=iv.ln.map(p=>p.join(',')).join(' ');const[sx,sy]=iv.ln[0],[ex,ey]=iv.ln[iv.ln.length-1];
-    return `<g class="mk ${hide}" data-id="${iv.id}"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${sx}" cy="${sy}" r="1.3" fill="${c}" stroke="#fff" stroke-width=".4"/><circle cx="${ex}" cy="${ey}" r="1.3" fill="${c}" stroke="#fff" stroke-width=".4"/></g>`;
-  }).join('');
-  mk.querySelectorAll('.mk').forEach(g=>g.onclick=()=>E.open(g.dataset.id));
+  const el=$('#'+E.mapEl); if(!el||!window.L) return;
+  let M=pjMaps[ctx];
+  if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map)}; }
+  const map=M.map, layer=M.layer; layer.clearLayers();
+  const arr=PJ_IVS.filter(pjOk), bounds=[];
+  arr.forEach(iv=>{ const col=PJ_TIPO_COR[iv.tipo]||'#888';
+    if(iv.ll){ const m=L.circleMarker(iv.ll,{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
+      m.on('click',()=>E.open(iv.id)); m.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); m.addTo(layer); bounds.push(iv.ll); }
+    else if(iv.lls&&iv.lls.length){ const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.9});
+      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p)); }
+  });
+  setTimeout(()=>{ try{ map.invalidateSize(); if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:16}); }catch(e){} },80);
 }
 function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx==='sup';
   const arr=PJ_IVS.filter(pjOk);
@@ -1623,7 +1663,7 @@ function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); pjRenderCfg(); window.s
 function pjRenderCfg(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo];
-  const hasAdv=iv.arv.flatMap(n=>pjLeaves(n)).some(l=>pjLeafHist(l).ents.length);
+  const hasAdv=iv.arv.some(pjHasAdv);
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
   const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:iv.status==='done'}];
   const docsHtml=DOCS.map(dc=>`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${dc.ok?'ok':'pend'}">${dc.ok?'anexado':(iv.status==='new'?'aguarda conclusão':'pendente')}</span></span><span class="pjdocbtns">${dc.ok?`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="1">📎 Anexar</button>${dc.ok?`<button class="btn ghost pjmini bad" data-remove="1">🗑 Remover</button>`:''}</span></div>`).join('');
@@ -1640,29 +1680,17 @@ function pjRenderCfg(keep){
    <p class="pjhint" style="margin:2px 0 8px">Anexe, abra e remova aqui os documentos da intervenção. No <b>relatório</b> eles ficam só para <b>abrir</b>.</p>
    ${docsHtml}`;
   const d=$('#pjCfg');
-  const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
-  const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; toast('🔒 Configuração reaberta'); pjRenderCfg(); };
+  const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; pjSave(iv); toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
+  const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; pjSave(iv); toast('🔒 Configuração reaberta'); pjRenderCfg(); };
   d.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>pjOpenPdf(b.getAttribute('data-pdf')));
   d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>toast('Anexar PDF — na versão integrada abre arquivos/galeria'));
   d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>toast('Remover documento — na versão integrada exclui o arquivo'));
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
 }
-// histórico de lançamentos (mock derivado do % atual) — entradas mais antigas → recentes, com acumulado corrente
-function pjLeafHist(node){
-  const isM=node.k==='m',cur=isM?node.exec:node.p;
-  if(!cur||cur<=0)return {ents:[]};
-  const OBS=['Frente liberada, sem interferências.','Chuva no período da tarde.','Aguardando liberação da concessionária.','Equipe reforçada.',''];
-  const DATAS=['05/09','08/09','10/09','12/09','15/09','17/09'];
-  const seed=[...node.n].reduce((a,c)=>a+c.charCodeAt(0),0);
-  const a=Math.round(cur*0.6),b=cur-a,parts=[];
-  if(a>0)parts.push(a); if(b>0)parts.push(b);
-  let run=0; const ents=parts.map((d,i)=>{ run+=d;
-    return {d:DATAS[(seed+i)%DATAS.length], delta:'+'+d+(isM?' m':'%'),
-      acc:isM?`${run}/${node.meta} m · ${Math.round(run/node.meta*100)}%`:`${run}%`,
-      obs:OBS[(seed+i)%OBS.length]}; });
-  return {ents};
-}
+// snapshot não guarda histórico por lançamento — só o acumulado real da folha (sem entradas fabricadas).
+// (histórico real por lançamento seria a abordagem de "log", não adotada nesta etapa.)
+function pjLeafHist(node){ return {ents:[]}; }
 // gera um PDF mínimo válido (blob) e abre em nova aba — prévia; a versão integrada abre o PDF real anexado
 function pjMakePdfUrl(title,sub){
   const esc=s=>String(s).replace(/([()\\])/g,'\\$1');
@@ -1729,17 +1757,17 @@ function pjNodeHtml(node){
     h+=`<div class="pjdetpanel" id="${rid}D" hidden>${ctl}<div class="pjchildren">${node.f.map(pjNodeHtml).join('')}</div></div>`;
   }
   if(pjMode==='campo'&&!isG&&(t==='%'||t==='m')&&!inact&&pjLocked){
-    const H=pjLeafHist(node);
-    const hist=H.ents.length
-      ? `${H.ents.map(e=>`<div class="pjhrow"><span class="pjthumb sm">📷</span><span class="pjhd">${e.d}</span><span class="pjhdelta">${e.delta}</span><span class="pjhacc">${e.acc}</span></div>${e.obs?`<div class="pjhobs">"${e.obs}"</div>`:''}`).join('')}<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec}/${node.meta} ${node.un} · ${p}%`:`${p}%`}</b></div>`
+    const cur=t==='m'?(node.exec||0):(node.p||0);
+    const hist=cur>0
+      ? `<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec||0}/${node.meta||0} ${node.un} · ${p}%`:`${node.p||0}%`}</b></div>`
       : `<div class="pjhrow" style="color:var(--mut)">Sem lançamentos ainda.</div>`;
     h+=`<div class="pjlaunch" id="${rid}L">
-      <div class="pjhistwrap"><div class="pjhisttit">📋 Lançamentos anteriores</div>${hist}</div>
+      <div class="pjhistwrap"><div class="pjhisttit">📊 Acumulado</div>${hist}</div>
       <div class="pjnewtit">➕ Novo avanço de hoje</div>
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
       <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label></div>
       <textarea class="pjobs" rows="2" placeholder="Observação (opcional)"></textarea>
-      <button class="btn" data-launch="1">Lançar avanço</button>
+      <button class="btn" data-launch="${rid}">Lançar avanço</button>
       <span class="pjhint">Incremental — soma ao acumulado. 2 fotos + observação por lançamento.</span>
     </div>`;
   }
@@ -1757,12 +1785,17 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
   d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
   d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
-  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>toast('Lançamento registrado (prévia) — na versão integrada grava avanço + 2 fotos + observação no banco'));
-  d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n) n.v=inp.value.trim()||'—'; });
-  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); rerender(k); } });
-  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); rerender(k); } });
-  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); rerender(k); } }; });
-  d.querySelectorAll('[data-sel]').forEach(s=>s.onchange=()=>{ const n=pjReg[s.dataset.sel]; if(n){ const k=pjSnapOpen(d); n.v=s.value; rerender(k); } });
+  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.launch]; if(!n)return;
+    const wrap=b.closest('.pjlaunch'), inp=wrap&&wrap.querySelector('.pjinp');
+    const val=parseFloat(((inp&&inp.value)||'').replace(',','.'));
+    if(!(val>0)){ toast('Informe o avanço (número > 0)'); return; }
+    if(n.k==='m') n.exec=Math.max(0,(n.exec||0)+val); else n.p=Math.max(0,Math.min(100,(n.p||0)+val));
+    pjSave(pjCurIv()); toast('Avanço lançado'); const k=pjSnapOpen(d); rerender(k); });
+  d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n){ n.v=inp.value.trim()||'—'; pjSave(pjCurIv()); } });
+  d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjSave(pjCurIv()); rerender(k); } });
+  d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjSave(pjCurIv()); rerender(k); } });
+  d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); pjSave(pjCurIv()); rerender(k); } }; });
+  d.querySelectorAll('[data-sel]').forEach(s=>s.onchange=()=>{ const n=pjReg[s.dataset.sel]; if(n){ const k=pjSnapOpen(d); n.v=s.value; pjSave(pjCurIv()); rerender(k); } });
 }
 function pjRenderDet(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={}; pjMode='campo'; pjLocked=!!iv.locked;
