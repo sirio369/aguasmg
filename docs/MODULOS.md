@@ -1820,8 +1820,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m; item lançado
     congela — ver `pjHasAdv` acima); **stepper Quantidade** (`data-repadd/repdel`); **select de tipo** (`sel`,
     `data-sel`) nas peças. Tudo **desabilitado quando `pjLocked`** (frozen). Abaixo do escopo, **📎 Documentos**
-    (`data-attach`/`data-pdf`/`data-remove`) — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/
-    as-built. Wiring da árvore compartilhado com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
+    — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/as-built. Wiring da árvore compartilhado
+    com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
+    - **Documentos REAIS (2026-09-25):** 1 arquivo (PDF) por tipo (`PJ_DOCS`: executivo/licenca/alvara/as_built).
+      Upload no bucket **`fotos-campo`** (reaproveitado, prefixo `projetos/<kind>/<gid>/`), registro em
+      **`"13 - projetos_obra".intervencao_documento`** (PK `kind,gid,tipo`; RLS deny-all). RPCs **`app_proj_docs_listar`**
+      / **`app_proj_doc_set`** (upsert, devolve o path antigo p/ apagar do Storage) / **`app_proj_doc_remover`**
+      (devolve o path removido), definer/gated `dev_acesso`. Front: `pjDocsLoad`/`pjDocAnexar`/`pjDocRemover`;
+      **Anexar** (input file PDF → upload + `_set`, substitui e apaga o antigo), **Abrir** (`SBASE+path`, nova aba),
+      **Remover** (`_remover` + `storage.remove`). `pjOpenCfg` e `pjRel` viraram **async** (carregam docs antes de
+      renderizar). No `projeto_rel` os documentos são **só Abrir** (real). O mock `pjMakePdfUrl`/`pjOpenPdf` deixou
+      de ser usado pelos docs.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários com toggle de
     acesso (admin sempre ligado). Persiste em localStorage (protótipo).
   - `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
