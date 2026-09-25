@@ -104,7 +104,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pickb input{display:none}
 .pickb:active{transform:scale(.98)}
 /* ---------- MÓDULO PROJETOS / INTERVENÇÕES ---------- */
-#projetos{--t-macro_impl:#0e639c;--t-macro_subst:#2a9d8f;--t-vrp_impl:#8a5a00;--t-vrp_subst:#b3261e;--t-rede_vca:#6a4bb3;--t-rede_hdd:#0a7d5e}
+#projetos{--t-macro_impl:#0e639c;--t-macro_subst:#2a9d8f;--t-vrp_impl:#8a5a00;--t-vrp_subst:#b3261e;--t-rede_vca:#6a4bb3;--t-rede_hdd:#0a7d5e;--t-valvula:#c026a3}
 .pjfilt{display:flex;gap:8px;margin:12px 0 10px}
 .pjfilt select{flex:1;font-size:14px;padding:9px 10px}
 .pjseg{display:flex;gap:8px;margin-bottom:10px}
@@ -1310,11 +1310,11 @@ function irPara(id){
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='dev_acesso') devAcessoInit();
-  if(id==='projetos') pjHub();
-  if(id==='projeto_campo') pjInit();
-  if(id==='projeto_sup') pjSupEnter();
+  if(id==='projetos') pjLoad().then(pjHub);
+  if(id==='projeto_campo') pjLoad().then(()=>pjInit());
+  if(id==='projeto_sup') pjLoad().then(pjSupEnter);
   if(id==='projeto_acesso') pjSupAcesso();
-  if(id==='projeto_resumo') pjResumoEnter();
+  if(id==='projeto_resumo') pjLoad().then(pjResumoEnter);
   if(id==='pessoas') pessoasInit();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
@@ -1361,6 +1361,7 @@ const PJ_TIPOS={
   vrp_subst:{n:'Substituição de VRP',c:'var(--t-vrp_subst)'},
   rede_vca:{n:'Implantação de Rede VCA',c:'var(--t-rede_vca)'},
   rede_hdd:{n:'Implantação de Rede HDD',c:'var(--t-rede_hdd)'},
+  valvula:{n:'Válvula',c:'var(--t-valvula)'},
 };
 const PJ_ST={run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
 // construtores de nó: P=%  M=metros(meta/exec)  R=registro  G=grupo
@@ -1387,7 +1388,7 @@ const pjPeca=(i,tipo,esc,esco,mont,rea,rec)=>pjG('Peça/acessório '+i,[
   pjP('Escavação',esc||0),pjP('Escoramento',esco||0),pjP('Montagem hidráulica',mont||0),
   pjP('Reaterro',rea||0),pjP('Recomposição de pavimento',rec||0)]);
 const pjPecas=(kids)=>({...pjG('Peças e acessórios',kids),rep:kids.length,ativo:true});
-const PJ_IVS=[
+let PJ_IVS=[
  {id:'iv1',tipo:'macro_impl',cod:'PRJ-2026-014',local:'DMC Contagem — Bairro Cincão',cons:'Águas Integradas',resp:'Equipe A · João R.',ini:'12/09/2026',status:'run',pt:[26,22],
   arv:[pjP('Locação e cadastro de interferências',100),
    pjG('Câmara de medição',[...pjOc(100,100,60,0),pjP('Execução da câmara (alvenaria/concreto)',80)]),
@@ -1431,10 +1432,60 @@ const PJ_IVS=[
 // cadeado por intervenção: locked=liberada p/ avanços (config congelada); !locked=em configuração (Suporte).
 // default: liberada, exceto as ainda não iniciadas (que seguem em configuração).
 PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
+// ---- REGROUND: intervenções reais (app_proj_intervencoes) substituem o mock acima ----
+let pjLoaded=false;
+// árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
+const PJ_ARV={
+  vrp_impl:()=>[pjP('Locação e cadastro de interferências',0),
+    pjG('Câmara da VRP',[...pjOc(0,0,0,0),pjP('Execução da câmara',0)]),
+    pjP('Montagem hidráulica (VRP + by-pass, registros, filtro, manômetros)',0),
+    pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade',0),pjP('Calibração / ajuste de set point',0),
+    {...pjP('Telemetria / macromedidor associado',0),ativo:true},pjP('Comissionamento',0)],
+  valvula:()=>[pjP('Locação e cadastro de interferências',0),
+    pjG('Obra civil (vala/caixa)',pjOc(0,0,0,0)),
+    {...pjP('Retirada da válvula antiga (se substituição)',0),ativo:false},
+    pjP('Instalação da válvula + acessórios',0),
+    pjIL('Interligação / religação',0,0,0),
+    pjP('Teste de estanqueidade / manobra',0),pjP('Cadastro / as-built',0)],
+  rede_vca:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
+    pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
+    pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
+    pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
+    pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]
+};
+const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
+const pjMapTipo=(tipo,isLine)=>isLine?'rede_vca':(PJ_TIPO_MAP[tipo]||'vrp_impl');
+const pjConsName=c=>c==='ZA0200'?'Eficiência Hídrica':(c==='ZA1004'?'Águas Integradas':(c||'—'));
+async function pjLoad(force){
+  if(pjLoaded&&!force) return;
+  let r; try{ r=await sb.rpc('app_proj_intervencoes',{}); if(r.error)throw r.error; }
+  catch(e){ if(window.toast)toast('Erro ao carregar intervenções: '+(e.message||e)); return; }
+  const d=r.data||{}, pts=(d.pontos&&d.pontos.features)||[], lns=(d.linhas&&d.linhas.features)||[];
+  const cs=[]; pts.forEach(f=>cs.push(f.geometry.coordinates)); lns.forEach(f=>(f.geometry.coordinates||[]).forEach(c=>cs.push(c)));
+  if(!cs.length){ PJ_IVS=[]; pjLoaded=true; return; }
+  const xs=cs.map(c=>+c[0]),ys=cs.map(c=>+c[1]);
+  const mnx=Math.min(...xs),mxx=Math.max(...xs),mny=Math.min(...ys),mxy=Math.max(...ys);
+  const PX=8,PY=8,W=100,H=62;
+  const nx=x=>(mxx>mnx)?+(PX+(x-mnx)/(mxx-mnx)*(W-2*PX)).toFixed(2):W/2;
+  const ny=y=>(mxy>mny)?+((H-PY)-(y-mny)/(mxy-mny)*(H-2*PY)).toFixed(2):H/2;
+  const ivs=[];
+  pts.forEach(f=>{ const p=f.properties,[lo,la]=f.geometry.coordinates,tp=pjMapTipo(p.tipo,false);
+    ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),
+      local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,
+      pt:[nx(lo),ny(la)],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
+  lns.forEach(f=>{ const p=f.properties,ln=(f.geometry.coordinates||[]).map(c=>[nx(+c[0]),ny(+c[1])]);
+    ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:'rede_vca',cod:p.codigo||p.layer_dwg||('#'+p.gid),
+      local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,
+      ln,arv:PJ_ARV.rede_vca(p.extensao_m)}); });
+  PJ_IVS=ivs; PJ_IVS.forEach(iv=>{ iv.locked=false; });   // recém-importadas: em configuração
+  pjLoaded=true;
+}
 function pjPct(node){
   if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
-  if(node.k==='m')return Math.round(node.exec/node.meta*100);
+  if(node.k==='m')return node.meta?Math.round(node.exec/node.meta*100):0;
   if(node.f&&node.f.length){const vs=node.f.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;}
   return 0;
 }

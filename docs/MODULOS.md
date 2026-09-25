@@ -1743,9 +1743,27 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel`
 
-Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD).
-**Estado: preview embutido, gated só ao meu usuário** (`sander.sirio@aguasmg.com.br`) — dados de exemplo
-no HTML (`PJ_IVS`), sem backend ainda. Objetivo desta etapa: validar a UX dentro do app antes de modelar o banco.
+Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD, **válvulas**).
+
+- **⭐ Reground nos dados reais (2026-09-25):** `PJ_IVS` deixou de ser mock — agora é **carregado do banco** por
+  **`pjLoad()`** (RPC **`app_proj_intervencoes`**, gated admin/`dev_acesso`) a partir das tabelas-base
+  **`"7 - setorizacao".intervencoes_pontuais`** (21: VRP 16, Valvula 5) e **`intervencoes_lineares`** (1 rede),
+  importadas do GeoPackage `CRONOGRAMA_MG`. `pjLoad` roda no dispatch de cada tela do módulo (`pjLoad().then(...)`),
+  mapeia o **`tipo`** real → tipo do módulo (`PJ_TIPO_MAP`: VRP→`vrp_impl`, Valvula→`valvula`; linha→`rede_vca`) e
+  instancia a **árvore-modelo** do tipo (`PJ_ARV[tipo]()`, zerada). As coords reais (GeoJSON 4326) são
+  **normalizadas** no mapa esquemático (viewBox 100×62, bbox→[8..92]×[8..54], y invertido). Toda intervenção
+  recém-importada entra **`locked=false`** (em configuração no Suporte). O mock antigo de 6 IVs vira só fallback
+  (mostrado se a RPC falhar/offline). ⚠️ **Ainda pendente:** mapa é esquemático (não Leaflet real) e **avanços não
+  persistem** (nada grava de volta nas tabelas) — próximos passos.
+- **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
+  off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
+  (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
+- **Trava do editor GIS (`gis_editor_2s`):** nas tabelas-base ele tem **SELECT/INSERT/UPDATE, sem DELETE/TRUNCATE**
+  (revogados) + auditoria append-only (`intervencoes_audit` via trigger) → alimenta as camadas sem nunca apagar.
+  Ver [[copasa-projetos-intervencoes]] na memória.
+
+**Estado anterior (preview):** dados de exemplo no HTML (`PJ_IVS` mock), sem backend. Gate hoje é por
+`ME.dev_acesso` (categoria "Em desenvolvimento"), não mais o e-mail hardcoded.
 
 - **Gate:** card `#cardProj` na home. Em `homeGate()` espelha o `cardPerdas`: se
   `ME.email==='sander.sirio@aguasmg.com.br'` vira botão ativo → `irPara('projetos')`, senão fica `.soon` +
