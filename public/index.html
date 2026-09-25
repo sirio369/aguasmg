@@ -1659,14 +1659,34 @@ function pjResumoCsv(feed){
   const csv=[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u; a.download='resumo_avancos_projetos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('CSV gerado'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
-function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); pjRenderCfg(); window.scrollTo(0,0); }
+// ---------- documentos da intervenção (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por tipo ----------
+const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'as_built',ic:'📐',n:'As-built'}];
+let pjDocsCur={};   // tipo -> {tipo,nome,path} da intervenção corrente
+async function pjDocsLoad(iv){ pjDocsCur={}; if(!iv||iv.gid==null) return pjDocsCur; try{ const {data,error}=await sb.rpc('app_proj_docs_listar',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(dd=>{ pjDocsCur[dd.tipo]=dd; }); }catch(e){} return pjDocsCur; }
+async function pjDocAnexar(iv,tipo,file){ if(!iv||!file) return;
+  if(file.type&&file.type!=='application/pdf'){ toast('Envie um arquivo PDF'); return; }
+  toast('Enviando documento…');
+  const path='projetos/'+iv.kind+'/'+iv.gid+'/'+tipo+'_'+crypto.randomUUID()+'.pdf';
+  try{ const up=await sb.storage.from('fotos-campo').upload(path,file,{contentType:'application/pdf',upsert:true}); if(up.error) throw up.error;
+    const {data:old,error}=await sb.rpc('app_proj_doc_set',{p_kind:iv.kind,p_gid:iv.gid,p_tipo:tipo,p_nome:file.name,p_path:path}); if(error) throw error;
+    if(old){ try{ await sb.storage.from('fotos-campo').remove([old]); }catch(_){} }   // apaga o arquivo anterior
+    pjDocsCur[tipo]={tipo,nome:file.name,path}; toast('Documento anexado'); pjRenderCfg();
+  }catch(e){ toast('Erro ao anexar: '+(e.message||e)); }
+}
+async function pjDocRemover(iv,tipo){ if(!iv) return;
+  try{ const {data:path,error}=await sb.rpc('app_proj_doc_remover',{p_kind:iv.kind,p_gid:iv.gid,p_tipo:tipo}); if(error) throw error;
+    if(path){ try{ await sb.storage.from('fotos-campo').remove([path]); }catch(_){} }
+    delete pjDocsCur[tipo]; toast('Documento removido'); pjRenderCfg();
+  }catch(e){ toast('Erro ao remover: '+(e.message||e)); }
+}
+async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
 function pjRenderCfg(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo];
   const hasAdv=iv.arv.some(pjHasAdv);
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
-  const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:iv.status==='done'}];
-  const docsHtml=DOCS.map(dc=>`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${dc.ok?'ok':'pend'}">${dc.ok?'anexado':(iv.status==='new'?'aguarda conclusão':'pendente')}</span></span><span class="pjdocbtns">${dc.ok?`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="1">📎 Anexar</button>${dc.ok?`<button class="btn ghost pjmini bad" data-remove="1">🗑 Remover</button>`:''}</span></div>`).join('');
+  const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
+    return `<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,28)}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="${dc.t}">📎 ${ok?'Substituir':'Anexar'}</button>${ok?`<button class="btn ghost pjmini bad" data-remove="${dc.t}">🗑 Remover</button>`:''}<input type="file" accept="application/pdf" hidden data-file="${dc.t}"></span></div>`; }).join('');
   const lockCard=iv.locked
     ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Intervenção liberada para execução</b><span>Configuração congelada — o campo já lança avanços. Reabra só se precisar mudar escopo/quantidade.</span></div><button class="btn ghost" id="pjUnlock">Reabrir configuração</button></div>`
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b><span>Defina escopo, quantidades e tipos. Ao liberar, o cadeado trava a configuração e o campo passa a lançar avanços.</span></div><button class="btn" id="pjLock">🔓 Liberar para execução</button></div>`;
@@ -1682,9 +1702,10 @@ function pjRenderCfg(keep){
   const d=$('#pjCfg');
   const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; pjSave(iv); toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
   const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; pjSave(iv); toast('🔒 Configuração reaberta'); pjRenderCfg(); };
-  d.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>pjOpenPdf(b.getAttribute('data-pdf')));
-  d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>toast('Anexar PDF — na versão integrada abre arquivos/galeria'));
-  d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>toast('Remover documento — na versão integrada exclui o arquivo'));
+  d.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
+  d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>{ const inp=d.querySelector('[data-file="'+b.dataset.attach+'"]'); if(inp)inp.click(); });
+  d.querySelectorAll('[data-file]').forEach(inp=>inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) pjDocAnexar(iv,inp.dataset.file,f); });
+  d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>pjDocRemover(iv,b.dataset.remove));
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
 }
@@ -1824,13 +1845,13 @@ function pjRenderDet(keep){
   pjWireTree(d,pjRenderDet);
   pjReopen(d,keep);
 }
-function pjRel(id){
+async function pjRel(id){
   const iv=PJ_IVS.find(i=>i.id===id); if(!iv)return; pjCur=id;
   const t=PJ_TIPOS[iv.tipo],asbuilt=iv.status==='done';
+  await pjDocsLoad(iv);
   // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
-  const DOCS=[{ic:'📄',n:'Projeto executivo',ok:true},{ic:'📃',n:'Licença ambiental',ok:true},{ic:'🏛️',n:'Alvará de execução',ok:true},{ic:'📐',n:'As-built',ok:asbuilt}];
-  const docBtns=dc=>dc.ok?`<button class="btn ghost pjmini" data-pdf="${dc.n} · ${iv.cod}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>';
-  const docsHtml=DOCS.map(dc=>`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${dc.ok?'ok':'pend'}">${dc.ok?'anexado':(iv.status==='new'?'aguarda conclusão':'pendente')}</span></span><span class="pjdocbtns">${docBtns(dc)}</span></div>`).join('');
+  const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
+    return `<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`; }).join('');
   // mini-gantt: janela = 1º avanço → último avanço, por atividade (nível 1 ativa)
   const ddmm=s=>{const[d,m]=s.split('/').map(Number);return new Date(2026,m-1,d).getTime();};
   const fmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
@@ -1870,9 +1891,7 @@ function pjRel(id){
    <p class="pjhint">O PDF sai como <b>documento único</b>: capa + mini-Gantt + avanços com fotos diárias + <b>projeto executivo, licença, alvará</b> e <b>as-built</b> anexados no final.</p>
    <button class="btn" onclick="toast('Gerar PDF — na versão integrada monta o documento completo')">🖨️ Gerar PDF consolidado</button>`;
   const rr=$('#pjRel');
-  rr.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>pjOpenPdf(b.getAttribute('data-pdf')));
-  rr.querySelectorAll('[data-attach]').forEach(b=>{ if(!b.disabled) b.onclick=()=>toast('Anexar PDF — na versão integrada abre arquivos/galeria'); });
-  rr.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>toast('Remover documento — na versão integrada exclui o arquivo (só adm/aprovador)'));
+  rr.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
   rr.querySelectorAll('#pjAdvSeg button').forEach(b=>b.onclick=()=>{ const v=b.dataset.adv; rr.querySelectorAll('#pjAdvSeg button').forEach(x=>x.classList.toggle('sel',x===b)); document.getElementById('pjAdvLogica').hidden=v!=='logica'; document.getElementById('pjAdvEnvio').hidden=v!=='envio'; document.getElementById('pjAdvHint').textContent=v==='logica'?'Ordem prevista de execução (atividade › subatividade), com os lançamentos diários de cada uma.':'Todos os avanços na ordem em que foram enviados (mais recente primeiro), independente da sequência lógica.'; });
   irPara('projeto_rel'); window.scrollTo(0,0);
 }
