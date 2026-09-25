@@ -1483,10 +1483,8 @@ let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o r
 // node tem lançamento? (subatividade %/m com avanço > 0, ou grupo com algum filho lançado) — regardless de ativo
 function pjHasAdv(node){ if(node.k==='%')return (node.p||0)>0; if(node.k==='m')return (node.exec||0)>0; if(node.f)return node.f.some(pjHasAdv); return false; }
 // acesso à categoria Suporte: admin sempre; senão precisa de grant. Protótipo em localStorage (mini-cadeado da categoria) até haver backend (proj_acesso → ME.proj_areas).
-const PJ_SUP_LSKEY='pj_sup_acesso';
-function pjSupGrants(){ try{ return JSON.parse(localStorage.getItem(PJ_SUP_LSKEY)||'{}')||{}; }catch(e){ return {}; } }
-function pjSupSetGrant(uuid,on){ const g=pjSupGrants(); if(on)g[uuid]=1; else delete g[uuid]; try{ localStorage.setItem(PJ_SUP_LSKEY,JSON.stringify(g)); }catch(e){} }
-const pjPodeSup=()=>!!(ME&&(ME.is_admin || (ME.id && pjSupGrants()[ME.id])));
+// acesso ao Suporte: admin sempre; senão precisa de grant persistido no banco (perfil.proj_sup_acesso → ME.proj_sup)
+const pjPodeSup=()=>!!(ME&&(ME.is_admin || ME.proj_sup));
 const pjPodeSetSup=()=>!!(ME&&ME.is_admin);   // só admin define quem acessa o Suporte (mini-cadeado)
 // back buttons das telas do módulo (uma vez, no load — as telas já existem no DOM)
 ['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjDetBack:projeto_campo','pjRelBack:projeto_det','pjAcessoBack:projeto_sup','pjRsBack:projetos'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
@@ -1560,20 +1558,26 @@ let _pjAcessoUsers=[];
 async function pjSupAcesso(){
   if(!pjPodeSetSup()){ toast('Só admin define o acesso ao Suporte'); irPara('projeto_sup'); return; }
   $('#pjAcesso').innerHTML='<p class="sub">Carregando usuários…</p>';
-  try{ const {data,error}=await sb.rpc('sup_admin_usuarios'); if(error)throw error; _pjAcessoUsers=data||[]; }
+  try{ const {data,error}=await sb.rpc('app_proj_acesso_listar'); if(error)throw error; _pjAcessoUsers=data||[]; }
   catch(e){ $('#pjAcesso').innerHTML='<div class="banner bad">Erro ao listar usuários: '+(e.message||e)+'</div>'; return; }
+  $('#pjAcesso').innerHTML=`<input id="pjAcessoBusca" class="pjinp" placeholder="Buscar por nome ou e-mail" style="margin-bottom:10px">
+   <p class="pjhint" style="margin:0 0 8px">Admin sempre tem acesso. Marque quem mais pode entrar no Suporte (configuração de intervenções e resumo por período). O acesso vale em qualquer dispositivo.</p>
+   <div id="pjAcessoList"></div>`;
+  const bs=$('#pjAcessoBusca'); if(bs) bs.oninput=()=>pjSupAcessoRender();   // só a LISTA re-renderiza; o input fica intacto
   pjSupAcessoRender();
 }
 function pjSupAcessoRender(){
   const termo=(($('#pjAcessoBusca')||{}).value||'').toLowerCase().trim();
-  const g=pjSupGrants();
   const arr=_pjAcessoUsers.filter(u=>!termo||(u.nome||'').toLowerCase().includes(termo)||(u.email||'').toLowerCase().includes(termo));
-  $('#pjAcesso').innerHTML=`<input id="pjAcessoBusca" class="pjinp" placeholder="Buscar por nome ou e-mail" value="${termo?termo.replace(/"/g,'&quot;'):''}" style="margin-bottom:10px">
-   <p class="pjhint" style="margin:0 0 8px">Admin sempre tem acesso. Marque quem mais pode entrar no Suporte. <b>Protótipo:</b> a marcação fica só neste dispositivo (localStorage) até o backend do módulo (grant tipo acesso de área do Almoxarifado).</p>
-   ${arr.map(u=>{const adm=u.funcao==='admin';const on=adm||!!g[u.id];
-     return `<div class="pjacrow"><span style="flex:1;min-width:0"><b>${u.nome||u.email||'—'}</b>${u.email&&u.nome?`<span class="pjmono" style="display:block;font-size:11px;color:var(--mut)">${u.email}</span>`:''}${adm?'<span class="pjlockchip lib" style="margin-left:6px">admin</span>':''}</span><span class="pjsw ${on?'on':''} ${adm?'dis':''}" ${adm?'':`data-acc="${u.id}"`}></span></div>`;}).join('')||'<p class="sub">Nenhum usuário.</p>'}`;
-  const bs=$('#pjAcessoBusca'); if(bs) bs.oninput=()=>{ const v=bs.value; pjSupAcessoRender(); const n=$('#pjAcessoBusca'); if(n){ n.focus(); n.value=v; } };
-  $('#pjAcesso').querySelectorAll('[data-acc]').forEach(s=>s.onclick=()=>{ const id=s.dataset.acc, on=!s.classList.contains('on'); pjSupSetGrant(id,on); s.classList.toggle('on',on); toast(on?'✓ Acesso concedido':'✓ Acesso removido'); });
+  const box=$('#pjAcessoList'); if(!box) return;
+  box.innerHTML=arr.map(u=>{const adm=u.funcao==='admin';const on=!!u.acesso;
+     return `<div class="pjacrow"><span style="flex:1;min-width:0"><b>${u.nome||u.email||'—'}</b>${u.email&&u.nome?`<span class="pjmono" style="display:block;font-size:11px;color:var(--mut)">${u.email}</span>`:''}${adm?'<span class="pjlockchip lib" style="margin-left:6px">admin</span>':''}</span><span class="pjsw ${on?'on':''} ${adm?'dis':''}" ${adm?'':`data-acc="${u.id}"`}></span></div>`;}).join('')||'<p class="sub">Nenhum usuário.</p>';
+  box.querySelectorAll('[data-acc]').forEach(s=>s.onclick=async()=>{ const id=s.dataset.acc, on=!s.classList.contains('on');
+    s.classList.toggle('on',on);
+    try{ const {error}=await sb.rpc('app_proj_acesso_set',{p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_pjAcessoUsers.find(x=>x.id===id); if(u)u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ s.classList.toggle('on',!on); toast('Erro: '+(e.message||e)); }
+  });
 }
 // ---- Suporte · Resumo por período (protótipo sobre o feed atual; datas/valores viram reais com o log de avanço) ----
 let pjRsQuick='tudo', pjRsDe='', pjRsAte='', pjRsCons='', pjRsTipo='';

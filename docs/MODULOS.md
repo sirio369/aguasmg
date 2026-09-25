@@ -1788,10 +1788,14 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   🔒 e `toast('Acesso restrito')`.
 - **Hub (`projetos`, `pjHub()`) — 2 categorias, espelha o Almoxarifado:** **🏗️ Campo** → `projeto_campo`
   (dia a dia) e **🧰 Suporte** → `projeto_sup` (configuração/cadeado, card com ícone **⚙️** — engrenagem, distinto
-  do cadeado). A categoria Suporte é gateada por **`pjPodeSup()`** = admin **ou** grant por pessoa. O grant é
-  definido no **mini-cadeado 🔐** ao lado do título "🧰 Suporte" (só admin, `pjPodeSetSup()`) → tela `projeto_acesso`
-  (`pjSupAcesso()`, lista real de usuários via `sup_admin_usuarios`, admin sempre ligado). **Protótipo:** o grant
-  fica em **localStorage** (`pj_sup_acesso`, `pjSupGrants`/`pjSupSetGrant`) até haver backend (`proj_acesso` → `ME.proj_areas`).
+  do cadeado). A categoria Suporte é gateada por **`pjPodeSup()`** = admin **ou** `ME.proj_sup`. O grant é
+  definido no **mini-cadeado 🔐** ao lado do título "🧰 Suporte" (só admin, `pjPodeSetSup()`) → tela `projeto_acesso`.
+  **Grant persistido no banco (2026-09-25, espelha o `dev_acesso`):** coluna **`perfil.proj_sup_acesso`**, RPCs
+  **`app_proj_acesso_listar`** / **`app_proj_acesso_set`** (admin-only) + `app_me` devolve **`proj_sup`**
+  (admin **ou** flag). Vale **em qualquer dispositivo** (o localStorage antigo `pj_sup_acesso` foi aposentado).
+  ⚠️ **Bug corrigido:** o campo de busca (`#pjAcessoBusca`) recriava o próprio input a cada tecla (`oninput` →
+  render total) → cursor/foco pulava e o texto virava minúsculo. Agora o input é fixo e só a **lista**
+  (`#pjAcessoList`) re-renderiza (`pjSupAcesso`/`pjSupAcessoRender`).
 - **Cadeado (1 por intervenção):** `iv.locked`. **Liberada** (`locked`) = configuração **congelada**, o campo
   lança avanços. **Em configuração** (`!locked`) = só o Suporte edita escopo/quantidade; **avanços bloqueados**
   (evita desativar atividade que já tem avanço). Default: liberada, exceto `status==='new'` (segue em config).
@@ -1831,8 +1835,9 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       **Remover** (`_remover` + `storage.remove`). `pjOpenCfg` e `pjRel` viraram **async** (carregam docs antes de
       renderizar). No `projeto_rel` os documentos são **só Abrir** (real). O mock `pjMakePdfUrl`/`pjOpenPdf` deixou
       de ser usado pelos docs.
-  - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários com toggle de
-    acesso (admin sempre ligado). Persiste em localStorage (protótipo).
+  - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
+    `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
+    (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
   - `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
     (atalhos Hoje/7 dias/Este mês/Tudo + `de`/`até` custom) + consórcio + tipo. **KPIs** (nº avanços, intervenções
     com movimento, subatividades, metros executados), **timeline por dia**, **por intervenção** e **por atividade**,
@@ -1867,24 +1872,21 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   `irPara()`: `projetos`→`pjHub()`, `projeto_campo`→`pjInit()`, `projeto_sup`→`pjSupEnter()`,
   `projeto_acesso`→`pjSupAcesso()`, `projeto_resumo`→`pjResumoEnter()` (det/cfg abrem via `pjOpen`/`pjOpenCfg`).
   Back buttons das telas ligados uma vez no load.
-- **⚠️ Fragilidades conhecidas (protótipo — corrigir com o backend):** (1) **avanço não é gravado** —
-  `data-launch` só dá `toast` e **`pjLeafHist` FABRICA** o histórico a partir do % atual (split 60/40, datas de
-  uma lista fixa semeada por `node.n` → subatividades homônimas caem nas mesmas datas); o `projeto_resumo`
-  herda esse mock. (2) **Nada persiste** — `PJ_IVS`, toggles de escopo, quantidades, tipos, registros e o
-  `iv.locked` são de memória; reload zera. (3) **Grant do Suporte é localStorage por-navegador** → não gateia de
-  fato entre usuários. (4) `status` (run/new/done) é **fixo**, não deriva do progresso. (5) `pjHasAdv` = "% > 0"
-  (não "avanço real"). (6) Datas só DD/MM com ano fixo 2026 no parse. (7) Avanço sem autor/equipe/hora; sem
-  planejado × realizado (Gantt não detecta atraso); fotos do avanço não são guardadas. (8) Toggles são `<span>`
-  (sem teclado). Todas se resolvem com o **log de avanço real** + persistência (schema abaixo).
-- **Schema-alvo (a criar):** um schema próprio **`13 - projetos_obra`** (segue o padrão 1-módulo-1-schema:
-  8 coleta / 9 suprimentos / 10 Frotas / 11 perdas). Cadastro da intervenção **vem de camada georref de
-  projetos** — hoje não existe no banco; as georref correlatas são `7 - setorizacao.dmc_projetado`/
-  `vrp_projetada` e `2 - infra_agua.vrps`/`unidades_macromedicao`/`rede`. Tabelas previstas: `intervencao`
-  (↔ geometria), `no_arvore` (template + instância por intervenção, com unidade/formato/meta/ativo/rep),
-  `avanco` (lançamento diário: valor incremental + observação, N fotos em `fotos-campo`), `registro`
-  (OS SIGOS/hidrômetro), `documento` (projeto/licença/alvará/as-built). RPCs `app_proj_*`.
-- **Próximo passo:** modelar esse schema e trocar `PJ_IVS` por RPCs `app_proj_*`. Depois: resumo diário
-  multi-intervenção.
+- **✅ Resolvido (2026-09-25):** reground nos dados reais; **persistência por snapshot** (`intervencao_estado`);
+  **lançamento de avanço real** (grava no `%`/`exec`); **grant do Suporte no banco** (`proj_sup_acesso`/`ME.proj_sup`,
+  vale entre dispositivos); histórico fabricado **removido** (`pjLeafHist`→vazio; `pjHasAdv` já usa "% real");
+  **documentos reais**; schema `13 - projetos_obra` **criado**.
+- **⚠️ Ainda pendente:** (a) `status` (run/new/done) é **fixo**, não deriva do progresso; (b) datas só DD/MM com
+  ano fixo 2026 no parse; (c) avanço **sem autor/equipe/hora**, sem **planejado × realizado** (Gantt não detecta
+  atraso) e **fotos do avanço não são guardadas** → resolve com o **log de avanço** (não adotado; hoje é só
+  snapshot, então o **Resumo por período fica vazio** até haver log); (d) toggles são `<span>` (sem teclado).
+- **Schema `13 - projetos_obra` (CRIADO 2026-09-25):** já tem **`intervencao_estado`** (snapshot da árvore),
+  **`intervencao_documento`** (docs por tipo). Cadastro georref das intervenções vem de
+  **`7 - setorizacao.intervencoes_pontuais`/`intervencoes_lineares`** (importadas do gpkg CRONOGRAMA_MG).
+  **Ainda a criar** (se/quando adotar o log): tabela de **`avanco`** (lançamento diário: valor incremental +
+  autor/equipe/hora + observação + N fotos em `fotos-campo`) — que também torna o **Resumo por período** real.
+- **Próximos passos sugeridos:** controle de atividades = **prazos & atraso** (planejado × realizado, farol) +
+  **log de avanço real** (com fotos/equipe), depois impedimentos, painel e alertas.
 
 ## 12. Gestão de Pessoas — schema `"14 - pessoas"` · tela-hub `pessoas`
 
