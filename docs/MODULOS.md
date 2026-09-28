@@ -1827,10 +1827,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   "Finalizada"** (≥100%, via `pjIvPct`). Usado em `pjOk` (filtro), nas listas, no as-built e salvo em `p_status`
   (`pjSaveNow`). Nova opção **"Em configuração"** nos selects de status + pill `.pjpill.cfg` (âmbar). Isso responde
   "como o status é atribuído": antes não era — ficava tudo "Não iniciada".
-- **Mapa — início/fim do traçado (2026-09-28):** cada linha ganha 2 marcadores (`divIcon` `.pjenddot`): **início = "I"
-  verde**, **fim = "F" vermelho** (nas pontas `lls[0]`/`lls[-1]`), p/ deixar o sentido do traçado legível. **Removidos**
-  a legenda de cores (`#pjLeg`/`#pjSupLeg`) e os textos de dica sob os dois mapas ("Toque num pino…"/"Toque numa
-  intervenção…").
+- **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
+  `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
+  anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
+  (`#pjLeg`/`#pjSupLeg`) e os textos de dica sob os dois mapas ("Toque num pino…"/"Toque numa intervenção…").
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
