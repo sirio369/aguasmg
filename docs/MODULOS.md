@@ -1449,6 +1449,37 @@ Frotas **não tem** tabela de aprovadores/setor própria — usa exatamente o me
   diretamente** — crie/edite o trigger da tabela correspondente. Testado via rollback E2E
   (`set_config('request.jwt.claims',...)` trocando de ator no meio da transação).
 
+### 6.5 Equipamentos + abastecimento (novo, 2026-09-28)
+**Não é o mesmo conceito de `sup_equipamento`** (schema `9 - suprimentos` — bombas/geradores
+emprestados por termo de responsabilidade, sem noção de combustível). Isso aqui é um cadastro novo
+dentro de `"10 - Frotas"`, pro caso de equipamento que consome combustível (gerador, compressor,
+motobomba etc.) e precisa ter abastecimento registrado, no mesmo espírito do abastecimento de
+veículo — mas **sem vínculo pessoa↔equipamento** (não existe "meu equipamento" — qualquer um da
+Equipe administrativa vê/gerencia todos).
+- **Tabelas:** `frota_equipamento` (nome, tipo, identificação/nº série, status, tipo_combustivel,
+  ativo, obs, consorcio, fotos array) e `frota_equipamento_abastecimento` (equipamento_id, leitura
+  — horímetro ou km, o rótulo não assume qual —, tipo_combustivel, litros, valor_litro, valor_total,
+  posto, foto_cupom, observações, reportado_por, consorcio).
+- **Acesso:** hub Frota → "Equipe administrativa" → **Equipamentos** (`frotaOpen('equipamentos')` →
+  `frotasTarget='equipamentos'` → `irPara('frotas')`), mesmo gate de sempre em Frotas (`funcao in
+  ('frotas','admin') or frota_admin`) — cadastro, edição, inativação e registro de abastecimento
+  são **todos admin/frotas-only nesta 1ª rodada** (diferente do abastecimento de veículo, que é
+  self-service do condutor vinculado — aqui não há vínculo pessoa↔equipamento pra apoiar
+  self-service; pode virar Fase 2 se fizer sentido depois).
+- **RPCs:** `app_frota_equipamentos_listar()`, `app_frota_equipamento_salvar(p_id,...)` (cria ou
+  atualiza — `p_id null` cria; fotos são opcionais, `coalesce(p_fotos, fotos)` no update preserva as
+  antigas se não mandar novas, mesmo padrão de `frotasSalvarVeiculo`), `app_frota_equipamento_
+  ativo_set(p_id,p_ativo)` (inativar/reativar — zera pra `status='inativo'`/`'disponivel'`),
+  `app_frota_equipamento_abastecimento_salvar(...)`, `app_frota_equipamento_abastecimentos_listar
+  (p_equipamento_id)` (histórico, mostra quem registrou via `reportado_por_nome`).
+- **Frontend:** `frotasRenderEquipamentos` (lista + ➕ Novo) → `frotasRenderEquipamentoEdit`
+  (cadastro/edição, até 3 fotos, reaproveitando `COMBUSTIVEIS_VEICULO` e o mesmo par de opções de
+  consórcio usado em `frotasRenderVeiculoEdit`) → `frotasRenderEquipamentoDetalhe` (fotos, botões
+  Editar/Registrar abastecimento, histórico) → `frotasRenderEquipamentoAbastecimento` (leitura,
+  combustível, litros, valor total, posto, 1 foto de cupom — calcula `valor_litro` no cliente antes
+  de mandar, mesmo cálculo do abastecimento de veículo). Tudo direto via `sb.rpc(...)`, sem fila
+  offline (tela admin/online-only, como Vincular/desvincular).
+
 ### Tabelas (`"10 - Frotas"`)
 `frota_veiculo` (cadastro/combustível/consórcio/contrato — §6.2; **`uso_tipo`/`equipe_id`/
 `condutor_exclusivo_id` ficaram sem uso**, ninguém mais escreve neles, não foram dropados; **`status`
@@ -1472,6 +1503,9 @@ rodada** — `CHECK` trocado, 0 linhas na tabela no momento da troca, sem migra�
 2026-09, 3ª rodada** — mesmo tratamento do histórico de aluguel: RPCs e trigger apagados, 1 linha
 real preservada, virou só leitura via Histórico, §6.2), `frota_manutencao` (ganhou
 `tipo_problema`/`data_agendada`, ciclo `pendente→aprovado/reprovado→agendado→concluido` — §6.1/§6.2).
+`frota_equipamento`/`frota_equipamento_abastecimento` (**novas, 2026-09-28** — §6.5, cadastro de
+equipamento + abastecimento, sem `CHECK` de `tipo_combustivel` — texto livre, diferente do
+`frota_checklist_abastecimento` de veículo).
 `public.perfil` ganhou `frota_isento` (não é tabela de Frotas mas é usada só por ela).
 **Apagadas** (estavam vazias ou já totalmente substituídas, sem dado real a perder):
 `frota_equipe`/`frota_equipe_membro` (substituída por `frota_veiculo_vinculo`), `frota_ocorrencia`
