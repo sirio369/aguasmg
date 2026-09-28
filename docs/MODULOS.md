@@ -1891,6 +1891,13 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
   anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
   (`#pjLeg`/`#pjSupLeg`) e os textos de dica sob os dois mapas ("Toque num pino…"/"Toque numa intervenção…").
+- **Contorno das ZAs no mapa (2026-09-28):** `app_proj_intervencoes` ganhou a chave **`limites`** (GeoJSON das 2 ZAs
+  de `"1 - suporte_geografico".limite_za`, `ST_SimplifyPreserveTopology(geom,30)`→4326, ~15 KB; mesma assinatura, só
+  `CREATE OR REPLACE`). `pjLoad` guarda em `PJ_LIMITES`; `pjRenderMap` desenha o contorno tracejado (Betim vermelho /
+  Contagem azul, `fillOpacity .04`) **embaixo** dos marcadores, **respeitando o filtro de consórcio** (`pjFcons`) e
+  **fora do `fitBounds`** (não afasta o zoom das intervenções). **Marcadores pontuais reduzidos** (`radius` 8→6).
+- **⚠️ `sw.js` ASSETS:** restaurados `logo-aguas-integradas.png`/`logo-eficiencia-hidrica.png` no precache (tinham
+  caído da lista na resolução de conflito ao empilhar os PRs da Geovana; os arquivos sempre estiveram no repo).
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
