@@ -1702,10 +1702,12 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     colunas. Detalhe da matrícula mantém série 18m + meses irregulares em
     vermelho. RPCs novas **`app_nrw_mm_mensal`** (série mensal enriquecida) e **`app_nrw_mm_dmc`** (sensibilidade por
     DMC). `app_nrw_mm_sazonalidade` **aposentada** (sazonalidade agora sai do `_mensal`).
-  - **Cabeçalho + filtro por DMC (2026-09-28):** painel-cabeçalho no topo do `s-mm` (`mmHeadPanel`) com **chips de
-    consórcio** (Ambos/Betim/Contagem → `mmSetZa`, sincroniza a barra global `#zaseg` + reload), **seletor de mês**
-    (saiu do "Indicador do mês") e **seletor de DMC** (`mmDmcSel={cons,num}`, opções dependem da cidade via
-    `mmDmcList()` sobre o `mmDmc`). **Filtro de mês** → Indicador + Abertura por DMC (recarrega `app_nrw_mm_dmc` com
+  - **Filtros SÓ no cabeçalho (barra do topo) — 2026-09-28:** removido o painel-cabeçalho duplicado dentro do card
+    (`mmHeadPanel`); os filtros do micromedido vivem só na **barra do topo** (à direita de "Análise do micromedido"):
+    **consórcio = `#zaseg`** (global, já existente), **mês = `#mes`** e **DMC = `#mesDmc`** (novo). `mmSyncHeader()`
+    (chamado no fim do `mmRenderAll`) popula `#mes`/`#mesDmc` com os meses reais e os DMCs (`mmDmcList()`) e liga
+    `onchange`→`mmSetMes`/`mmSetDmc`; `mmHeaderReset()` (no `go()` p/ telas ≠ mm) esconde o `#mesDmc` e restaura o `#mes`
+    mock. Estado `mmDmcSel={cons,num}`. **Filtro de mês** → Indicador + Abertura por DMC (recarrega `app_nrw_mm_dmc` com
     `p_competencia`, via `mmReloadDmc`). **Filtro de DMC** → Indicador + Sazonalidade + Análise por matrícula
     (recarrega resumo/ranking/mensal com `p_dmc`; consórcio efetivo = o do DMC). As 4 RPCs ganharam parâmetro:
     `app_nrw_mm_mensal(p_consorcio,p_dmc)` (usa `mm_dmc_mensal` quando filtrado, `mm_mensal` p/ total exato),
@@ -1827,10 +1829,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   "Finalizada"** (≥100%, via `pjIvPct`). Usado em `pjOk` (filtro), nas listas, no as-built e salvo em `p_status`
   (`pjSaveNow`). Nova opção **"Em configuração"** nos selects de status + pill `.pjpill.cfg` (âmbar). Isso responde
   "como o status é atribuído": antes não era — ficava tudo "Não iniciada".
-- **Mapa — início/fim do traçado (2026-09-28):** cada linha ganha 2 marcadores (`divIcon` `.pjenddot`): **início = "I"
-  verde**, **fim = "F" vermelho** (nas pontas `lls[0]`/`lls[-1]`), p/ deixar o sentido do traçado legível. **Removidos**
-  a legenda de cores (`#pjLeg`/`#pjSupLeg`) e os textos de dica sob os dois mapas ("Toque num pino…"/"Toque numa
-  intervenção…").
+- **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
+  `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
+  anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
+  (`#pjLeg`/`#pjSupLeg`) e os textos de dica sob os dois mapas ("Toque num pino…"/"Toque numa intervenção…").
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.

@@ -311,6 +311,7 @@ tbody tr:hover{background:var(--surface-2)}
       <select class="sel" id="mes" aria-label="competência">
         <option>set/2026</option><option>ago/2026</option><option>jul/2026</option>
       </select>
+      <select class="sel" id="mesDmc" aria-label="DMC" hidden></select>
     </div>
     <div class="wrap">
       <!-- PAINEL -->
@@ -1848,21 +1849,20 @@ function mmAnalysisPanel(){
    </div>
   </div></div>`;
 }
-function mmHeadPanel(){
- const zaChips=[['all','Ambos'],['ZA0200','Betim'],['ZA1004','Contagem']].map(([v,l])=>`<button class="mmchip ${za===v?'on':''}" data-za2="${v}">${l}</button>`).join('');
- const mesOpts=mmMensal.map(p=>`<option value="${p.competencia}"${p.competencia===mmSel?' selected':''}>${mmCmp(p.competencia)}</option>`).join('')||'<option>—</option>';
- const dmcOpts='<option value="">Todos os DMCs</option>'+mmDmcList().map(d=>{ const v=d.consorcio+'|'+d.numero_dmc, sc=mmDmcSel&&mmDmcSel.cons===d.consorcio&&mmDmcSel.num===d.numero_dmc; return `<option value="${v}"${sc?' selected':''}>${d.codigo_dmc||('DMC-'+d.numero_dmc)}${za==='all'?' · '+(d.consorcio==='ZA0200'?'BET':'CTG'):''}</option>`; }).join('');
- return `<div class="panel mmhead"><div class="pbody mmheadwrap">
-   <div class="mmfilters" style="margin:0">${zaChips}</div>
-   <label class="mmheadf">Mês <select id="mmMesSel" class="mmsel">${mesOpts}</select></label>
-   <label class="mmheadf">DMC <select id="mmDmcSel" class="mmsel">${dmcOpts}</select></label>
-  </div></div>`;
+// filtros do micromedido moram SÓ no cabeçalho (barra do topo): consórcio = #zaseg (global), mês = #mes, DMC = #mesDmc
+function mmSyncHeader(){
+ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes) return;
+ mes.disabled=false; mes.title='';
+ mes.innerHTML=mmMensal.map(p=>`<option value="${p.competencia}"${p.competencia===mmSel?' selected':''}>${mmCmp(p.competencia)}</option>`).join('')||'<option>—</option>';
+ mes.onchange=()=>mmSetMes(mes.value);
+ if(dmc){ dmc.hidden=false;
+  dmc.innerHTML='<option value="">Todos os DMCs</option>'+mmDmcList().map(d=>{ const v=d.consorcio+'|'+d.numero_dmc, sc=mmDmcSel&&mmDmcSel.cons===d.consorcio&&mmDmcSel.num===d.numero_dmc; return `<option value="${v}"${sc?' selected':''}>${d.codigo_dmc||('DMC-'+d.numero_dmc)}${za==='all'?' · '+(d.consorcio==='ZA0200'?'BET':'CTG'):''}</option>`; }).join('');
+  dmc.onchange=()=>mmSetDmc(dmc.value); }
 }
+function mmHeaderReset(){ const dmc=$('#mesDmc'); if(dmc){ dmc.hidden=true; dmc.onchange=null; } const mes=$('#mes'); if(mes){ mes.onchange=null; mes.innerHTML='<option>set/2026</option><option>ago/2026</option><option>jul/2026</option>'; } }
 function mmRenderAll(){
- $('#mmBody').innerHTML = mmHeadPanel()+mmKpiPanel()+mmSeasonPanel()+mmDmcPanel()+mmAnalysisPanel();
- const sel=$('#mmMesSel'); if(sel) sel.onchange=()=>mmSetMes(sel.value);
- const ds=$('#mmDmcSel'); if(ds) ds.onchange=()=>mmSetDmc(ds.value);
- $('#mmBody').querySelectorAll('[data-za2]').forEach(b=>b.onclick=()=>mmSetZa(b.dataset.za2));
+ $('#mmBody').innerHTML = mmKpiPanel()+mmSeasonPanel()+mmDmcPanel()+mmAnalysisPanel();
+ mmSyncHeader();
  $('#mmBody').querySelectorAll('.mminfo').forEach(b=>b.onclick=()=>{ const i=MM_INFO[b.dataset.info]; if(i)mmModal(i.t,i.h); });
  $('#mmBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ mmSeasMet=el.dataset.seas; mmRenderAll(); });
  $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{ mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls); mmLoadRank(); });
@@ -1940,6 +1940,7 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
+ if(s!=='mm') mmHeaderReset();   // fora do micromedido, restaura o #mes mock e esconde o filtro de DMC
  $('#side').classList.remove('open');
  if(s==='painel'){kpis();consolidado();rank();renderMaps();}
  if(s==='dmcs')renderMaps();

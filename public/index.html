@@ -117,8 +117,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjleg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:11px;color:var(--mut)}
 .pjleg span{display:inline-flex;align-items:center;gap:5px}
 .pjleg i{width:10px;height:10px;border-radius:50%;display:inline-block}
-.pjend{background:none!important;border:none!important}
-.pjenddot{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:2px solid #fff;color:#fff;font-size:9px;font-weight:800;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.45)}
 .pjcount{font-size:12px;color:var(--mut);margin:2px 0 10px}
 .pjcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--tc,var(--acc));border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .pjcard:active{transform:scale(.995)}
@@ -1354,6 +1352,8 @@ const PJ_TIPOS={
 };
 // cores reais (espelham as CSS vars --t-* acima) — Leaflet precisa de cor resolvida, não var()
 const PJ_TIPO_COR={macro_impl:'#0e639c',macro_subst:'#2a9d8f',vrp_impl:'#8a5a00',vrp_subst:'#b3261e',rede_vca:'#6a4bb3',rede_hdd:'#0a7d5e',valvula:'#c026a3'};
+// paleta categórica p/ dar cor distinta a cada traçado (linhas sobrepostas) — indexada por gid
+const PJ_LINE_PAL=['#0a7d5e','#e0563b','#0e639c','#b3261e','#6a4bb3','#c026a3','#d99400','#2a9d8f','#4b9fe0','#7c3aed','#0d9488','#a16207'];
 const pjMaps={};   // ctx -> {map, layer}
 const PJ_ST={cfg:['Em configuração','cfg'],run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
 // status DERIVADO do estado real: travada p/ config → 'cfg'; liberada e 0% → 'new'; 100%+ → 'done'; entre → 'run'
@@ -1542,16 +1542,14 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map)}; }
   const map=M.map, layer=M.layer; layer.clearLayers();
   const arr=PJ_IVS.filter(pjOk), bounds=[];
-  arr.forEach(iv=>{ const col=PJ_TIPO_COR[iv.tipo]||'#888';
-    if(iv.ll){ const m=L.circleMarker(iv.ll,{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
+  arr.forEach(iv=>{
+    if(iv.ll){ const col=PJ_TIPO_COR[iv.tipo]||'#888'; const m=L.circleMarker(iv.ll,{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
       m.on('click',()=>E.open(iv.id)); m.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); m.addTo(layer); bounds.push(iv.ll); }
-    else if(iv.lls&&iv.lls.length){ const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.9});
-      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p));
-      // marcadores de início (verde) e fim (vermelho) p/ deixar o sentido do traçado visível no mapa
-      const a=iv.lls[0], b=iv.lls[iv.lls.length-1];
-      const endMk=(pt,fill,lbl,letra)=>L.marker(pt,{icon:L.divIcon({className:'pjend',iconSize:[16,16],iconAnchor:[8,8],html:`<span class="pjenddot" style="background:${fill}">${letra}</span>`})})
-        .on('click',()=>E.open(iv.id)).bindTooltip(lbl+' · '+iv.cod).addTo(layer);
-      endMk(a,'#1f9d55','Início','I'); endMk(b,'#e5484d','Fim','F'); }
+    else if(iv.lls&&iv.lls.length){
+      // cada traçado recebe uma cor distinta (por gid) p/ separar linhas sobrepostas; o tipo (VCA/HDD) fica no tooltip
+      const col=PJ_LINE_PAL[(iv.gid||0)%PJ_LINE_PAL.length];
+      const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.95});
+      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p)); }
   });
   setTimeout(()=>{ try{ map.invalidateSize(); if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:16}); }catch(e){} },80);
 }
