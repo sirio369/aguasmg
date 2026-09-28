@@ -6785,6 +6785,7 @@ function frotaBlocks(){
     {t:'Equipe administrativa',ic:'🏢',on:adm,papel:'Frotas / Admin',acts:[
       {id:'veiculos',ic:'🚗',lbl:'Veículos'},
       {id:'condutores',ic:'🪪',lbl:'Condutores'},
+      {id:'equipamentos',ic:'🔧',lbl:'Equipamentos'},
       {id:'lavagem_fila',ic:'🧼',lbl:'Lavagens a agendar'},
       {id:'manutencao_fila',ic:'🔧',lbl:'Manutenções a agendar'},
       {id:'relatorio',ic:'📊',lbl:'Relatório'}]}
@@ -6847,7 +6848,7 @@ function frotaOpen(id){
   if(id==='veiculos'){ frotasTarget='home'; irPara('frotas'); return; }
   if(id==='ap_manutencao'){ frotasTarget='manutencao_aprovar'; irPara('frotas'); return; }
   if(id==='relatorio'){ frotasTarget='painel'; irPara('frotas'); return; }
-  if(id==='condutores'||id==='lavagem_fila'||id==='manutencao_fila'){ frotasTarget=id; irPara('frotas'); return; }
+  if(id==='condutores'||id==='lavagem_fila'||id==='manutencao_fila'||id==='equipamentos'){ frotasTarget=id; irPara('frotas'); return; }
 }
 
 let condSub='home', condData=null, condMeuVeiculo=null, condMinhasLavagens=[], condManutencoes=[], condManutencaoSel=null, condOcorrenciaBackTo='manutencao', condTarget=null, frotasTarget=null;
@@ -7182,7 +7183,7 @@ async function condRenderCnhHistorico(){
 }
 
 let frotasVeiculos=[], frotasSub='home', frotasVeiculoSel=null, frVeicFiltroTipo='', frVeicFiltroCond='';
-async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
+async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar','equipamentos'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
 async function frotasRender(){
   frotasSetBar();
   $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
@@ -7207,6 +7208,10 @@ async function frotasRender(){
   if(frotasSub==='painel_lavagens') return frotasRenderPainelLista('lavagens');
   if(frotasSub==='painel_manutencoes') return frotasRenderPainelLista('manutencoes');
   if(frotasSub==='painel_custos') return frotasRenderPainelLista('custos');
+  if(frotasSub==='equipamentos') return frotasRenderEquipamentos();
+  if(frotasSub==='equipamento_edit') return frotasRenderEquipamentoEdit();
+  if(frotasSub==='equipamento_detalhe') return frotasRenderEquipamentoDetalhe();
+  if(frotasSub==='equipamento_abastecimento') return frotasRenderEquipamentoAbastecimento();
   frotasRenderHome();
 }
 function frotasRenderHome(){
@@ -7427,6 +7432,121 @@ async function frotasRenderVinculo(){
       if(error) throw error;
       toast('✓ Vinculado'); frotasRender();
     }catch(e){ toast('Erro: '+(e.message||e)); bs.disabled=false; }
+  });
+}
+
+// --- Equipamentos da frota (cadastro + abastecimento) ---
+let frotasEquipamentos=[], frotasEquipamentoSel=null;
+async function frotasCarregarEquipamentos(){
+  try{ const {data,error}=await sb.rpc('app_frota_equipamentos_listar'); if(error) throw error; frotasEquipamentos=data||[]; }
+  catch(e){ frotasEquipamentos=[]; }
+  return frotasEquipamentos;
+}
+async function frotasRenderEquipamentos(){
+  $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
+  await frotasCarregarEquipamentos();
+  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔧 Equipamentos <button id="frEquipNovo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">➕ Novo</button></div>';
+  h+=frotasEquipamentos.length ? frotasEquipamentos.map(e=>
+    `<div class="peRow" data-id="${e.id}" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px${e.ativo?'':';opacity:.55'}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${e.nome}</b><span class="sub">${e.ativo?e.status:'Inativo'}</span></div>
+      <div class="sub" style="margin-top:2px">${e.tipo||'—'}${e.identificacao?(' · '+e.identificacao):''} · ${e.abastecimentos_total} abastecimento(s)</div>
+    </div>`
+  ).join('') : '<p class="sub" style="margin-top:10px">Nenhum equipamento cadastrado.</p>';
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#frEquipNovo').addEventListener('click',()=>{ frotasEquipamentoSel=null; frotasSub='equipamento_edit'; frotasRender(); });
+  $('#frotasView').querySelectorAll('.peRow').forEach(el=>el.addEventListener('click',()=>{ frotasEquipamentoSel=el.dataset.id; frotasSub='equipamento_detalhe'; frotasRender(); }));
+}
+function frotasRenderEquipamentoEdit(){
+  const e=frotasEquipamentos.find(x=>String(x.id)===String(frotasEquipamentoSel))||{};
+  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>';
+  h+='<div class="sec">'+(e.id?'✏️ Editar equipamento':'➕ Novo equipamento')+'</div>';
+  h+=`<label>Nome *</label><input id="feqNome" value="${(e.nome||'').replace(/"/g,'&quot;')}"/>
+  <label>Tipo</label><input id="feqTipo" placeholder="ex.: gerador, compressor, motobomba…" value="${(e.tipo||'').replace(/"/g,'&quot;')}"/>
+  <label>Identificação (nº série/patrimônio)</label><input id="feqIdent" value="${(e.identificacao||'').replace(/"/g,'&quot;')}"/>
+  <label>Combustível</label><select id="feqComb"><option value="">—</option>${COMBUSTIVEIS_VEICULO.map(c=>`<option value="${c[0]}"${e.tipo_combustivel===c[0]?' selected':''}>${c[1]}</option>`).join('')}</select>
+  <label>Consórcio</label><select id="feqCons"><option value="">—</option><option value="ZA1004"${e.consorcio==='ZA1004'?' selected':''}>ZA1004 — Contagem</option><option value="ZA0200"${e.consorcio==='ZA0200'?' selected':''}>ZA0200 — Betim</option></select>
+  <label>Observações</label><textarea id="feqObs" rows="2">${e.obs||''}</textarea>`;
+  h+='<div class="sec" style="margin-top:12px">📷 Fotos</div>';
+  if(e.fotos&&e.fotos.length) h+='<div class="sub" style="margin-bottom:6px">'+e.fotos.map(f=>`<a href="${SBASE+f}" target="_blank" rel="noopener" style="margin-right:8px">Ver foto</a>`).join('')+'</div>';
+  h+=[1,2,3].map(n=>fotoPickHtml('feqFoto'+n,'Foto '+n)).join('');
+  h+='<button class="btn" id="feqSalvar" style="margin-top:14px">Salvar</button>';
+  if(e.id) h+='<button class="btn ghost" id="feqAtivo" style="margin-top:8px">'+(e.ativo?'Marcar como inativo':'Reativar')+'</button>';
+  $('#frotasView').innerHTML=h; wireFotoPick($('#frotasView'));
+  $('#frVoltar').addEventListener('click',()=>{ frotasSub=e.id?'equipamento_detalhe':'equipamentos'; frotasRender(); });
+  $('#feqSalvar').addEventListener('click',async(ev)=>{
+    const nome=$('#feqNome').value.trim(); if(!nome) return toast('Informe o nome');
+    ev.target.disabled=true;
+    try{
+      const fotos=(await Promise.all([1,2,3].map(n=>uploadFoto2('feqFoto'+n,'frota').catch(()=>null)))).filter(Boolean);
+      const {error}=await sb.rpc('app_frota_equipamento_salvar',{p_id:e.id||null,p_nome:nome,p_tipo:$('#feqTipo').value||null,
+        p_identificacao:$('#feqIdent').value||null,p_tipo_combustivel:$('#feqComb').value||null,p_consorcio:$('#feqCons').value||null,
+        p_obs:$('#feqObs').value||null,p_fotos:fotos.length?fotos:null});
+      if(error) throw error;
+      toast('✓ Salvo'); frotasSub='equipamentos'; frotasRender();
+    }catch(e2){ toast('Erro: '+(e2.message||e2)); ev.target.disabled=false; }
+  });
+  const at=$('#feqAtivo'); if(at) at.addEventListener('click',async()=>{
+    at.disabled=true;
+    try{ const {error}=await sb.rpc('app_frota_equipamento_ativo_set',{p_id:e.id,p_ativo:!e.ativo}); if(error) throw error;
+      toast('✓ Salvo'); frotasSub='equipamentos'; frotasRender();
+    }catch(e2){ toast('Erro: '+(e2.message||e2)); at.disabled=false; }
+  });
+}
+async function frotasRenderEquipamentoDetalhe(){
+  const e=frotasEquipamentos.find(x=>String(x.id)===String(frotasEquipamentoSel));
+  if(!e){ frotasSub='equipamentos'; return frotasRenderEquipamentos(); }
+  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>';
+  h+='<div class="sec">🔧 '+e.nome+'</div><p class="sub" style="margin-top:2px">'+(e.tipo||'—')+(e.identificacao?(' · '+e.identificacao):'')+' · '+(e.ativo?e.status:'Inativo')+'</p>';
+  if(e.fotos&&e.fotos.length) h+='<div class="sub" style="margin-top:6px">'+e.fotos.map(f=>`<a href="${SBASE+f}" target="_blank" rel="noopener" style="margin-right:8px">Ver foto</a>`).join('')+'</div>';
+  h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost" id="feqEditar" style="flex:1">✏️ Editar</button><button class="btn" id="feqAbastecer" style="flex:1">⛽ Registrar abastecimento</button></div>';
+  h+='<div class="sec" style="margin-top:16px">Histórico de abastecimentos</div><div id="feqAbList" class="sub" style="margin-top:8px">Carregando…</div>';
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>{ frotasSub='equipamentos'; frotasRender(); });
+  $('#feqEditar').addEventListener('click',()=>{ frotasSub='equipamento_edit'; frotasRender(); });
+  $('#feqAbastecer').addEventListener('click',()=>{ frotasSub='equipamento_abastecimento'; frotasRender(); });
+  try{
+    const {data,error}=await sb.rpc('app_frota_equipamento_abastecimentos_listar',{p_equipamento_id:+e.id}); if(error) throw error;
+    const arr=data||[];
+    $('#feqAbList').outerHTML = arr.length ? '<div id="feqAbList">'+arr.map(a=>
+      `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px">
+        <div class="sub">${fmtData(a.data)} · ${a.litros||'—'} L · ${fmtDinheiro(a.valor_total)}${a.leitura!=null?(' · Leitura '+a.leitura):''}</div>
+        <div class="sub" style="margin-top:2px">${a.reportado_por_nome||'—'}${a.foto_cupom?(' · <a href="'+fotoURL(a.foto_cupom)+'" target="_blank" rel="noopener">ver cupom</a>'):''}</div>
+      </div>`
+    ).join('')+'</div>' : '<div id="feqAbList" class="sub" style="margin-top:8px">Nenhum abastecimento registrado ainda.</div>';
+  }catch(err){ $('#feqAbList').outerHTML='<div id="feqAbList" class="banner bad">Erro: '+(err.message||err)+'</div>'; }
+}
+function frotasRenderEquipamentoAbastecimento(){
+  const e=frotasEquipamentos.find(x=>String(x.id)===String(frotasEquipamentoSel));
+  if(!e){ frotasSub='equipamentos'; return frotasRenderEquipamentos(); }
+  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">⛽ Abastecimento — '+e.nome+'</div>';
+  h+=`<label>Leitura (horímetro/km, opcional)</label><input id="feqAbLeitura" inputmode="decimal"/>
+  <label>Combustível</label><select id="feqAbComb"><option value="">—</option>${COMBUSTIVEIS_VEICULO.map(c=>`<option value="${c[0]}"${e.tipo_combustivel===c[0]?' selected':''}>${c[1]}</option>`).join('')}</select>
+  <label>Litros</label><input id="feqAbLitros" inputmode="decimal"/>
+  <label>Valor total (R$)</label><input id="feqAbValor" inputmode="decimal"/>
+  <label>Posto</label><input id="feqAbPosto"/>`;
+  h+=fotoPickHtml('feqAbFoto','Foto da nota fiscal');
+  h+='<label>Observações</label><textarea id="feqAbObs" rows="2"></textarea>';
+  h+='<button class="btn" id="feqAbSalvar" style="margin-top:14px">Salvar</button>';
+  $('#frotasView').innerHTML=h; wireFotoPick($('#frotasView'));
+  $('#frVoltar').addEventListener('click',()=>{ frotasSub='equipamento_detalhe'; frotasRender(); });
+  $('#feqAbSalvar').addEventListener('click',async(ev)=>{
+    const litros=parseFloat(($('#feqAbLitros').value||'').replace(',','.'));
+    const valorTotal=parseFloat(($('#feqAbValor').value||'').replace(',','.'));
+    if(isNaN(litros)||isNaN(valorTotal)) return toast('Preencha litros e valor total');
+    ev.target.disabled=true;
+    try{
+      const foto=await uploadFoto2('feqAbFoto','frota').catch(()=>null);
+      const leitura=$('#feqAbLeitura').value?parseFloat($('#feqAbLeitura').value.replace(',','.')):null;
+      const valorLitro=litros>0?Math.round((valorTotal/litros)*1000)/1000:null;
+      const {error}=await sb.rpc('app_frota_equipamento_abastecimento_salvar',{
+        p_equipamento_id:+e.id,p_leitura:leitura,p_tipo_combustivel:$('#feqAbComb').value||null,
+        p_litros:litros,p_valor_litro:valorLitro,p_valor_total:valorTotal,p_posto:$('#feqAbPosto').value||null,
+        p_foto_cupom:foto,p_gps_lat:gps?gps.lat:null,p_gps_lon:gps?gps.lon:null,
+        p_observacoes:$('#feqAbObs').value||null,p_consorcio:e.consorcio||null});
+      if(error) throw error;
+      toast('✓ Abastecimento registrado'); frotasSub='equipamento_detalhe'; frotasRender();
+    }catch(e2){ toast('Erro: '+(e2.message||e2)); ev.target.disabled=false; }
   });
 }
 
