@@ -1120,7 +1120,15 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     manutenção, ver abaixo) — checklist e problema são passos separados, mas o segundo é um atalho
     de dentro do primeiro. **Itens começam desmarcados (5ª rodada)** — antes vinham todos pré-`checked`,
     então "tudo OK" era o estado inicial mesmo sem o colaborador de fato ter olhado cada item; agora
-    é preciso marcar item por item pra registrar `p_status='ok'` de verdade.
+    é preciso marcar item por item pra registrar `p_status='ok'` de verdade. **Até 6 fotos opcionais
+    (2026-09-28)** — antes só `sitfFoto1`; `app_frota_situacao_salvar` ganhou `p_foto2..p_foto6 text
+    default null` **no fim da assinatura** (aditivo — não removeu/renomeou `p_fotos text[]`
+    existente) e monta o array final com `coalesce(p_fotos,'{}') || array_remove(array[p_foto2..6],
+    null)`. Mesmo assim, como Postgres/PostgREST tratam qualquer mudança na lista de parâmetros
+    como um **overload novo** mesmo só acrescentando opcionais no fim (não é um "replace" de
+    verdade), foi preciso **dropar explicitamente a assinatura antiga de 14 parâmetros** depois de
+    criar a nova de 19 — confirmado ao vivo que não sobrou overload ambíguo e que chamadas no
+    formato antigo (14 params) continuam resolvendo normal contra a função nova.
   - **Manutenção** (`condRenderManutencao`, `condSub='manutencao'`, **tela própria desde a 5ª
     rodada** — antes o botão do hub ia direto pro formulário de reportar problema, sem nenhum
     histórico visível): lista tudo que o colaborador já reportou (`app_frota_minhas_manutencoes()`,
@@ -1280,7 +1288,12 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   quando o veículo **não** tem ninguém vinculado (desde a 3ª rodada, só dá pra ter **um** vínculo
   aberto por vez, não mais vários — ver §6.1; as duas RPCs também recusam com mensagem clara se o
   veículo já estiver ocupado ou a pessoa já vinculada em outro lugar, e fazem o mesmo `UPDATE` de
-  `status` que a versão self-service).
+  `status` que a versão self-service). **Fotos na entrega (2026-09-28, opcional, até 3):**
+  `frota_veiculo_vinculo` ganhou coluna nova `fotos text[]`; `app_frota_veiculo_vincular` ganhou
+  `p_fotos text[] default null` **no fim** da assinatura (mesmo cuidado do checklist acima — a
+  assinatura antiga de 2 parâmetros foi dropada explicitamente depois de criar a de 3, pra não
+  sobrar overload ambíguo). Fotos sobem via `uploadFoto2`/`Promise.all` antes de chamar a RPC (não
+  passa pela fila offline — essa tela já é admin/online-only).
 - **Histórico** (`frotasRenderHistorico`, alcançável pelo Detalhe do veículo **ou** de dentro de
   Relatório, ver abaixo — `frHistBackTo` guarda de onde veio pro "‹ Voltar" certo): busca por
   **veículo** (dropdown) ou por **colaborador** (4ª rodada: **dropdown de todos os colaboradores**,
@@ -1370,7 +1383,18 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   `status='concluido'`** (**simplificado na 5ª rodada** — antes incluía `agendado` também, mas
   `orcamento_valor` nunca é preenchido nesse estágio desde que o custo virou parte da conclusão, ver
   acima; manter `agendado` no filtro não somava nada a mais, só confundia) + `valor_devolucao` do
-  próprio veículo. `custo_total` é a soma de tudo. Read-only.
+  próprio veículo. `custo_total` é a soma de tudo. Read-only. **Galerias de fotos (2026-09-28):**
+  além da seção 5 já existente (`v.fotos`, fotos do cadastro do veículo), o relatório ganhou seção 6
+  "Fotos de vinculação" (`vinculos_fotos` — uma galeria por vínculo que teve foto, com nome do
+  condutor e período) e seção 7 "Fotos de checklists" (`checklists_fotos` — uma galeria por
+  checklist que teve foto, com data/km/status). Mesma assinatura de `app_frota_veiculo_relatorio`
+  (só `p_veiculo_id`), só o retorno cresceu — sem risco de overload.
+- **Relatório do condutor (novo, 2026-09-28):** não existia — só a tela de cadastro/CNH mostrava a
+  foto da CNH sozinha. Botão "📄 Relatório do condutor" em `frotasRenderCondutorCadastro` (só quando
+  `c.tem_condutor`) → `frotasRelatorioCondutor(condutorId)` → RPC nova `app_frota_condutor_relatorio
+  (p_condutor_id)`, mesmo overlay `#relatorio`/`REL_CSS` do relatório de veículo. Mostra CNH (com
+  foto), termo de responsabilidade, veículos vinculados (com fotos de entrega, se houver) e galerias
+  de fotos de cada checklist e cupom de cada abastecimento que esse condutor registrou.
 - **Estado:** `frotasSub, frotasVeiculoSel, frVeicFiltroTipo, frVeicFiltroCond, frHistVeiculoSel,
   frHistCondutorSel, frHistBackTo, frLavagemSel, frManutSel, frManutRepSel, frManutCluirSel,
   frotasCondutores, frCondBusca, frCondFiltro, frCondSel, frotasPainelCache, frPnlFiltro`.
