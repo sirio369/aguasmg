@@ -843,7 +843,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <select id="pjTipo"></select>
       <select id="pjStatus">
         <option value="">Todos os status</option>
-        <option value="cfg">Em configuração</option>
         <option value="new">Não iniciada</option>
         <option value="run">Em andamento</option>
         <option value="done">Finalizada</option>
@@ -1358,6 +1357,8 @@ const pjMaps={};   // ctx -> {map, layer}
 const PJ_ST={cfg:['Em configuração','cfg'],run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
 // status DERIVADO do estado real: travada p/ config → 'cfg'; liberada e 0% → 'new'; 100%+ → 'done'; entre → 'run'
 function pjStatusDe(iv){ if(!iv||!iv.locked) return 'cfg'; const p=pjIvPct(iv); return p<=0?'new':(p>=100?'done':'run'); }
+// status exibido ao usuário: no Campo o "Em configuração" (cfg) não aparece — vira "Não iniciada"; só o Suporte vê cfg
+function pjStatusView(iv,ctx){ const s=pjStatusDe(iv); return (ctx!=='sup' && s==='cfg')?'new':s; }
 // construtores de nó: P=%  M=metros(meta/exec)  R=registro  G=grupo
 const pjP=(n,p,o={})=>({n,k:'%',p,...o});
 const pjM=(n,meta,exec,o={})=>({n,k:'m',meta,exec,un:o.un||'m',...o});
@@ -1451,7 +1452,7 @@ const PJ_ARV={
     pjP('Mobilização e montagem do equipamento HDD',0),pjG('Valas de entrada e saída',pjOc(0,0,0,0)),
     pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
     pjM('Puxamento da tubulação (pullback)',ext||1,0),
-    pjPecas([pjPeca(1,'',0,0,0,0,0)]),
+    pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]
 };
 const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
@@ -1525,6 +1526,7 @@ const PJ_CTX={
   sup:{tipo:'pjSupTipo',status:'pjSupStatus',cons:'pjSupCons',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
 };
 function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.tipo);
+  if(ctx!=='sup' && pjFst==='cfg') pjFst='';   // "Em configuração" só existe no Suporte; não vaza filtro pro Campo
   if(st && !st.dataset.ready){ st.innerHTML='<option value="">Todos os tipos</option>'+Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}">${t.n}</option>`).join(''); st.dataset.ready='1';
     st.onchange=()=>{pjFtipo=st.value;pjRefresh(ctx);};
     $('#'+E.status).onchange=e=>{pjFst=e.target.value;pjRefresh(ctx);};
@@ -1534,9 +1536,9 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
   if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst; const sco=$('#'+E.cons); if(sco) sco.value=pjFcons;   // sincroniza controles ao estado compartilhado
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
-const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusDe(iv))&&(!pjFcons||pjFcons===iv.za);
+const pjOk=(iv,ctx)=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusView(iv,ctx))&&(!pjFcons||pjFcons===iv.za);
 function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
-function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(pjOk).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
+function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(iv=>pjOk(iv,ctx)).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   const el=$('#'+E.mapEl); if(!el||!window.L) return;
   let M=pjMaps[ctx];
@@ -1546,7 +1548,7 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   (PJ_LIMITES||[]).forEach(f=>{ const za=f.properties&&f.properties.consorcio; if(pjFcons && pjFcons!==za) return;
     try{ L.geoJSON(f,{style:{color:za==='ZA0200'?'#b3261e':'#0e639c',weight:1.5,opacity:.8,fill:true,fillColor:za==='ZA0200'?'#b3261e':'#0e639c',fillOpacity:.04,dashArray:'6 4'}})
       .bindTooltip((za==='ZA0200'?'Betim':'Contagem')+' · limite da ZA',{sticky:true}).addTo(layer); }catch(e){} });
-  const arr=PJ_IVS.filter(pjOk), bounds=[];
+  const arr=PJ_IVS.filter(iv=>pjOk(iv,ctx)), bounds=[];
   arr.forEach(iv=>{
     if(iv.ll){ const col=PJ_TIPO_COR[iv.tipo]||'#888'; const m=L.circleMarker(iv.ll,{radius:6,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
       m.on('click',()=>E.open(iv.id)); m.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); m.addTo(layer); bounds.push(iv.ll); }
@@ -1559,10 +1561,11 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   setTimeout(()=>{ try{ map.invalidateSize(); if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:16}); }catch(e){} },80);
 }
 function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx==='sup';
-  const arr=PJ_IVS.filter(pjOk);
-  $('#'+E.lista).innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[pjStatusDe(iv)],cl=p>100?'over':(p>=100?'ok':'');
+  const arr=PJ_IVS.filter(iv=>pjOk(iv,ctx));
+  $('#'+E.lista).innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[pjStatusView(iv,ctx)],cl=p>100?'over':(p>=100?'ok':'');
+   // Campo: só a pill de status (3 estados); Suporte: só o chip do cadeado (lib/config). Usuário final não vê "Em config.".
    const chip=`<span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em config.'}</span>`;
-   return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span style="display:flex;gap:6px;align-items:center">${chip}${sup?'':`<span class="pjpill ${sc}">${sl}</span>`}</span></div>
+   return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span style="display:flex;gap:6px;align-items:center">${sup?chip:`<span class="pjpill ${sc}">${sl}</span>`}</span></div>
     <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
     <div class="pjbar ${cl}"><i style="width:${Math.min(p,100)}%"></i></div>
     <div class="pjfoot"><span>${iv.resp}</span>${sup?`<span class="pjgo det" style="pointer-events:none">${iv.locked?'Revisar':'Configurar'} ›</span>`:`<span class="pjpc" style="color:${p>100?'var(--warn)':'var(--ink)'}">${p}%</span>`}</div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção nesse filtro.</p>';
@@ -1887,7 +1890,7 @@ function pjWireTree(d,rerender){
 }
 function pjRenderDet(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={}; pjMode='campo'; pjLocked=!!iv.locked;
-  const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[pjStatusDe(iv)];
+  const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[pjStatusView(iv,'campo')];
   const leaves=iv.arv.flatMap(n=>pjLeaves(n)),done=leaves.filter(x=>pjPct(x)>=100).length,run=leaves.filter(x=>{const v=pjPct(x);return v>0&&v<100;}).length,zero=leaves.length-done-run;
   const ringc=p>100?'var(--warn)':(p>=100?'var(--ok)':'var(--acc)');
   const banner=iv.locked
