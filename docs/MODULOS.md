@@ -1702,6 +1702,21 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     colunas. Detalhe da matrícula mantém série 18m + meses irregulares em
     vermelho. RPCs novas **`app_nrw_mm_mensal`** (série mensal enriquecida) e **`app_nrw_mm_dmc`** (sensibilidade por
     DMC). `app_nrw_mm_sazonalidade` **aposentada** (sazonalidade agora sai do `_mensal`).
+  - **Cabeçalho + filtro por DMC (2026-09-28):** painel-cabeçalho no topo do `s-mm` (`mmHeadPanel`) com **chips de
+    consórcio** (Ambos/Betim/Contagem → `mmSetZa`, sincroniza a barra global `#zaseg` + reload), **seletor de mês**
+    (saiu do "Indicador do mês") e **seletor de DMC** (`mmDmcSel={cons,num}`, opções dependem da cidade via
+    `mmDmcList()` sobre o `mmDmc`). **Filtro de mês** → Indicador + Abertura por DMC (recarrega `app_nrw_mm_dmc` com
+    `p_competencia`, via `mmReloadDmc`). **Filtro de DMC** → Indicador + Sazonalidade + Análise por matrícula
+    (recarrega resumo/ranking/mensal com `p_dmc`; consórcio efetivo = o do DMC). As 4 RPCs ganharam parâmetro:
+    `app_nrw_mm_mensal(p_consorcio,p_dmc)` (usa `mm_dmc_mensal` quando filtrado, `mm_mensal` p/ total exato),
+    `app_nrw_mm_resumo(p_consorcio,p_dmc)` e `app_nrw_mm_ranking(...,p_dmc)` (filtram matrículas via `mm_dmc_map`),
+    `app_nrw_mm_dmc(p_consorcio,p_competencia)` (+ colunas `volume_total/medido/naomedido`). **DROP+CREATE** (assinatura
+    nova). Removidos os textos "Prévia…", "Composição da micromedição…", "Exibindo Vol…" e o parágrafo da análise.
+    **Indicador do mês** só micromedição, cards com rótulo **"Vol."** em 1 linha (`.mmcard .lab` nowrap+ellipsis).
+    **Sazonalidade:** volumes por extenso; heatmap com **fundo sólido claro→azul** (`mmHeat` deixou de usar alpha) +
+    **texto escuro** (`#0d1418`) — corrige branco-em-azul-claro no valor baixo. **Abertura por DMC** (ex-"DMCs mais
+    sensíveis"): sem coluna Cons., **+ Micro total/lido/estimado**, sem Score, ordenação livre. **Análise por
+    matrícula:** removida a busca por matrícula.
   - **Cruzamento matrícula→DMC (2026-09-24):** `"11 - perdas_nrw".mm_dmc_map` (spatial join `ligacoes.geom` ×
     `"7 - setorizacao".dmc.geom` vigente, `distinct on` p/ dedup de borda; 134.867 lig, ZA0200 6 DMCs / ZA1004 9) +
     `"11 - perdas_nrw".mm_dmc_mensal` (por DMC×mês: n_faturadas/volume_total/medido/não medido, populada em loop por
