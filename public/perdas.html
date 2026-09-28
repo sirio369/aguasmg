@@ -1609,7 +1609,7 @@ function mmCompact(v){ v=Number(v)||0; const a=Math.abs(v);
  return a>=100?(''+Math.round(v)):br1(v); }
 function mmSeasFmt(v){ return (mmSeasMet==='lpd'?br1(v):fmt(v))+' '+MM_SEAS_MET[mmSeasMet].u; }
 const MM_INFO={
- lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume faturado do mês ÷ nº de ligações faturadas ÷ <b>30 dias</b> × 1000.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume faturado</b> = medido (leitura real) + não medido (estimado + faturado mínimo).</p>`},
+ lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume <b>micromedido total</b> do mês ÷ nº de ligações ÷ <b>30 dias</b> × 1000. Esta análise olha <b>só a micromedição</b> — o volume faturado não entra.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume micromedido (total)</b> = <b>lido</b> (leitura real do hidrômetro) + <b>estimado</b> (imputado + faturado mínimo). Os cards decompõem justamente essas parcelas para achar a origem de cada oscilação.</p>`},
  season:{t:'Sazonalidade & tendência',h:`<p>Por padrão tudo em <b>L/lig/dia</b> para "empatar" as variáveis e não distorcer a percepção.</p><p><b>Chips de composição</b>: alternam a visualização entre <b>L/lig·dia</b>, <b>volume micromedido</b> (total faturado), <b>volume lido</b> (leitura real do hidrômetro), <b>volume estimado</b> (não medido = estimado + mínimo) e <b>ligações</b> faturadas. Decompor assim ajuda a achar <b>o que</b> causa uma flutuação: se o L/lig/dia oscilou, foi o volume lido que caiu, o estimado que subiu, ou só entraram mais ligações?</p><p><b>Heatmap</b>: cada célula é a composição escolhida naquele mês/ano (mais claro = maior). A linha <b>Sazonal</b> mostra o desvio médio de cada mês‑calendário vs a média geral (laranja acima / azul abaixo).</p><p><b>Gráfico</b>: linha = ano mais recente; a <b>sombra</b> é a faixa mín–máx dos anos anteriores. ⚠️ Base atual = 18 meses (2025‑03 a 2026‑08): a sombra hoje reflete só 2025 e alguns meses ainda não têm sobreposição ano a ano.</p>`},
  dmc:{t:'DMCs mais sensíveis',h:`<p>Cruzamento espacial <b>matrícula → DMC</b> (ponto da ligação dentro do limite vigente do DMC) × micromedição.</p><p><b>L/lig/dia</b> por DMC no último mês, com variação <b>MoM</b> (mês anterior) e <b>YoY</b> (mesmo mês do ano anterior), <b>% não medido</b>, nº de <b>fraudes potenciais</b> e <b>score médio</b> de anomalia. DMCs no topo (maior L/lig/dia ou piores deltas) são candidatos a priorização de campanha.</p>`},
  rank:{t:'Ranking de anomalia — variáveis e método',h:`<ul style="padding-left:18px;margin:0;line-height:1.65">
@@ -1647,6 +1647,17 @@ function mmCss(){ if(document.getElementById('mmcss'))return; const st=document.
  .mmhero-s{font-size:11.5px;color:var(--muted);margin-top:7px;max-width:200px}
  .mmkpismall{flex:1;min-width:270px}
  @media(max-width:640px){.mmhero{border-right:none;border-bottom:1px solid var(--line);width:100%;padding-bottom:12px}}
+ .mmcards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+ @media(max-width:900px){.mmcards{grid-template-columns:repeat(2,1fr)}}
+ .mmcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;display:flex;flex-direction:column;gap:6px}
+ .mmcard.hd{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+ .mmcard .lab{font-size:11px;color:var(--muted);letter-spacing:.3px;text-transform:uppercase;min-height:26px}
+ .mmcard .val{font-size:25px;font-weight:600;line-height:1.05;letter-spacing:-.5px}
+ .mmcard.hd .val{color:var(--accent)}
+ .mmcard .val small{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0}
+ .mmcard .ft{display:flex;gap:14px;margin-top:auto;padding-top:8px;border-top:1px dashed var(--line);font-size:11px;font-variant-numeric:tabular-nums}
+ .mmcard .ft .t{color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-right:4px}
+ .mmcard .ft b{font-weight:600}
  .mmheat{display:grid;grid-template-columns:58px repeat(12,1fr);gap:3px;font-variant-numeric:tabular-nums;overflow-x:auto}
  .mmhcell{padding:5px 2px;text-align:center;font-size:10.5px;border-radius:3px;color:#eaf1f5;min-width:30px}
  .mmhhdr,.mmhlbl{color:var(--muted);background:none!important;font-size:10px}
@@ -1701,31 +1712,36 @@ async function mmLoadRank(){
  mmDetSel=null; mmRenderAll();
 }
 function mmSetMes(c){ mmSel=+c; mmRenderAll(); }
-/* ---- painel 1: indicador do mês (L/lig/dia) ---- */
+/* ---- painel 1: indicador do mês (só micromedição — faturado não entra) ---- */
 function mmKpiPanel(){
  if(!mmMensal.length) return '';
  const byC={}; mmMensal.forEach(p=>byC[p.competencia]=p);
- const idx=mmMensal.findIndex(p=>p.competencia===mmSel);
  const cur=byC[mmSel]||mmMensal[mmMensal.length-1]||{};
- const prev=idx>0?mmMensal[idx-1]:null, yoy=byC[mmSel-100]||null;
- const mom=(prev&&prev.lpd)?((cur.lpd-prev.lpd)/prev.lpd*100):null;
- const yy=(yoy&&yoy.lpd)?((cur.lpd-yoy.lpd)/yoy.lpd*100):null;
+ const prevM=(function(){ const i=mmMensal.findIndex(p=>p.competencia===mmSel); return i>0?mmMensal[i-1]:null; })();
+ const yoy=byC[mmSel-100]||null;
  const opts=mmMensal.map(p=>`<option value="${p.competencia}"${p.competencia===mmSel?' selected':''}>${mmCmp(p.competencia)}</option>`).join('');
- const nf=(mmResumo||{}).n_fraude||0;
- const kp=(l,v,s,col)=>`<div class="kpi"><span class="lab">${l}</span><span class="val"${col?` style="color:${col}"`:''}>${v}</span><span class="sub">${s}</span></div>`;
+ // cada card: valor + MoM + YoY (calculados sobre o próprio indicador — "refaça os cálculos")
+ const CARDS=[
+  {k:'lpd',              lab:'L/lig·dia',                      hd:true,  fmtv:v=>br1(v),                 dec:1},
+  {k:'volume_total',     lab:'Volume micromedido (total)',     unit:'m³', fmtv:v=>fmt(v)},
+  {k:'volume_medido',    lab:'Volume micromedido (lido)',      unit:'m³', fmtv:v=>fmt(v)},
+  {k:'volume_naomedido', lab:'Volume micromedido (estimado)',  unit:'m³', fmtv:v=>fmt(v)},
+  {k:'n_faturadas',      lab:'Ligações',                       fmtv:v=>fmt(v)}
+ ];
+ const pctDelta=(c,b)=>(b!=null&&+b!==0&&c!=null)?((+c-+b)/+b*100):null;
+ const card=cd=>{ const v=cur[cd.k];
+   const mom=pctDelta(v, prevM?prevM[cd.k]:null), yy=pctDelta(v, yoy?yoy[cd.k]:null);
+   const dl=(t,pc,tt)=>`<span title="${tt}"><span class="t">${t}</span><b style="color:${mmDelta(pc)}">${pc!=null?mmSig(pc)+'%':'—'}</b></span>`;
+   return `<div class="mmcard${cd.hd?' hd':''}"><span class="lab">${cd.lab}</span>`
+     +`<span class="val">${v!=null?cd.fmtv(v):'—'}${cd.unit?`<small> ${cd.unit}</small>`:''}</span>`
+     +`<div class="ft">${dl('MoM',mom,'vs mês anterior')}${dl('YoY',yy,yoy?'vs mesmo mês do ano anterior':'sem base do ano anterior')}</div></div>`;
+ };
  return `<div class="panel" id="mmKpi"><div class="phead"><h3>Indicador do mês</h3>
    <div style="display:flex;gap:8px;align-items:center;margin-left:auto"><select id="mmMesSel" class="mmsel">${opts}</select>${mmIB('lpd')}</div></div>
-  <div class="pbody"><div class="mmkpiwrap">
-   <div class="mmhero"><span class="mmhero-v">${br1(cur.lpd)}</span><span class="mmhero-u">L/lig·dia</span><span class="mmhero-s">consumo faturado por ligação — ${mmCmp(mmSel)} (base 30 dias)</span></div>
-   <div class="kpis mmkpismall">
-    ${kp('vs mês anterior', mom!=null?mmSig(mom)+'%':'—', 'MoM', mmDelta(mom))}
-    ${kp('vs ano anterior', yy!=null?mmSig(yy)+'%':'—', yy==null?'YoY (sem base)':'YoY', mmDelta(yy))}
-    ${kp('Volume faturado', fmt(Math.round(cur.volume_total||0))+'<small> m³</small>', 'no mês')}
-    ${kp('% não medido', br1(cur.pct_naomedido)+'%', 'estimado + mínimo')}
-    ${kp('Ligações faturadas', fmt(cur.n_faturadas||0), 'no mês')}
-    ${kp('Fraude potencial', fmt(nf), 'cortada c/ água', nf>0?'#d6336c':null)}
-   </div>
-  </div></div></div>`;
+  <div class="pbody">
+   <p class="note" style="margin:0 0 12px">Composição da <b>micromedição</b> em <b>${mmCmp(mmSel)}</b> (base 30 dias). MoM (mês anterior) e YoY (mesmo mês do ano anterior) no rodapé de cada card.</p>
+   <div class="mmcards">${CARDS.map(card).join('')}</div>
+  </div></div>`;
 }
 /* ---- painel 2: sazonalidade & tendência (heatmap + linha, sobre L/lig/dia) ---- */
 function mmSeasonPanel(){
@@ -1813,7 +1829,7 @@ function mmRenderAll(){
  $('#mmBody').querySelectorAll('.mminfo').forEach(b=>b.onclick=()=>{ const i=MM_INFO[b.dataset.info]; if(i)mmModal(i.t,i.h); });
  $('#mmBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ mmSeasMet=el.dataset.seas; mmRenderAll(); });
  $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{ mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls); mmLoadRank(); });
- $('#mmBody').querySelectorAll('.mmchip').forEach(el=>el.onclick=()=>{ mmClass=el.dataset.cls; mmLoadRank(); });
+ $('#mmBody').querySelectorAll('.mmchip[data-cls]').forEach(el=>el.onclick=()=>{ mmClass=el.dataset.cls; mmLoadRank(); });
  const bu=$('#mmBusca'); if(bu) bu.onkeydown=e=>{ if(e.key==='Enter'){ mmBusca=bu.value.trim(); mmLoadRank(); } };
  $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>mmDetailFill(tr.dataset.cons,tr.dataset.mat));
  const box=$('#mmDetail');

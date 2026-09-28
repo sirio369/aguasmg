@@ -1672,10 +1672,13 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie` (definer, admin **ou** `dev_acesso`; anon revogado). Recomputar =
   re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
   - **Reforma da tela (2026-09-24):** removidos os KPIs técnicos (score elevado/CV médio/score médio). Nova
-    disposição em 4 painéis: **(1) Indicador do mês** — headline **L/lig·dia** (litros por ligação por dia =
-    volume faturado ÷ nº ligações faturadas ÷ **30 dias** × 1000; assume 30 dias, sem componente diário) com
-    **seletor de competência** (default = **último mês**), **MoM** (vs mês anterior) e **YoY** (vs mesmo mês do ano
-    anterior), volume faturado, % não medido, ligações faturadas, fraude potencial; popup ⓘ explica o cálculo.
+    disposição em 4 painéis: **(1) Indicador do mês** — **só micromedição, o volume faturado não entra**
+    (redesenhado 2026-09-28). **Seletor de competência** (default = **último mês**) + **5 cards uniformes** (`.mmcard`),
+    cada um com o valor no topo e **MoM/YoY no rodapé em letras menores** (calculados sobre o próprio indicador do card):
+    **L/lig·dia** (= volume micromedido total ÷ nº ligações ÷ **30 dias** × 1000; destacado em accent), **Volume
+    micromedido (total)** = `volume_total`, **(lido)** = `volume_medido`, **(estimado)** = `volume_naomedido` e
+    **Ligações** = `n_faturadas`. Removidos o card "Volume faturado", o "% não medido", o "Fraude potencial" e os cards
+    isolados de MoM/YoY (agora embutidos). Tudo client-side sobre o `mmMensal`; popup ⓘ explica o cálculo.
     **(2) Sazonalidade & tendência** — default **sobre L/lig·dia** (empata as variáveis): **heatmap** ano×mês +
     linha "Sazonal" (desvio de cada mês-calendário vs média) e **gráfico** com o último ano em linha + faixa mín–máx
     dos anos anteriores como **sombra** (hover por mês corrigido — antes o tooltip não batia com a data).
@@ -1684,7 +1687,9 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     decompor ajuda a achar *o que* causa uma flutuação (caiu o lido? subiu o estimado? só entraram mais ligações?). Tudo
     client-side sobre o `mmMensal` já carregado (o `_mensal` já traz `volume_medido`/`volume_naomedido`, sem RPC nova).
     Estado `mmSeasMet` (`MM_SEAS_MET`/`MM_SEAS_ORDER`), `mmCompact` formata as células (k/M), `mmSeasFmt` os tooltips;
-    a linha "Sazonal" é sempre **desvio %** (dimensão-livre, vale p/ qualquer composição). **(3) DMCs
+    a linha "Sazonal" é sempre **desvio %** (dimensão-livre, vale p/ qualquer composição). **⚠️ Fix 2026-09-28:** os
+    chips de composição (classe `.mmchip` + `data-seas`) não clicavam porque o handler das chips de comportamento
+    (`.mmchip`) sobrescrevia o `onclick` de todas; agora ele é escopado a `.mmchip[data-cls]`. **(3) DMCs
     mais sensíveis** — L/lig·dia por DMC (último mês) + MoM/YoY + %não medido + fraude + score, ordenado por
     L/lig·dia. **(4) Análise por matrícula** — distribuição por comportamento (filtro) + ranking (Matrícula/
     Comportamento/Situação/Score, chips + busca) **lado a lado** com o detalhe *sticky* (auto-seleciona o topo);
