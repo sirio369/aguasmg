@@ -1768,11 +1768,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   (arv/locked/status). Salva (debounce 500 ms — `pjSave`/`pjSaveNow`, chave `kind|gid`) em **toda mutação**:
   toggle "No escopo?", quantidade (±), tipo de peça, registro, **cadeado** (liberar/reabrir) e **lançamento de
   avanço** no campo — o "Lançar avanço" agora é **real** (lê o input `.pjinp` e soma ao `%`/`exec` da folha) e
-  persiste. **Histórico fabricado removido (2026-09-25):** `pjLeafHist` foi zerado (`return {ents:[]}`) — o painel
-  de campo mostra só o **acumulado real** ("📊 Acumulado" / "Sem lançamentos ainda"), `hasAdv` da config usa
-  `pjHasAdv` (avanço real) e o **Resumo por período** fica vazio até haver lançamentos (não há mais datas/obs
-  inventadas). O estado inicial começa **sem avanços** (tabela `intervencao_estado` truncada). Histórico real por
-  lançamento (com datas/fotos/obs) seria a abordagem de **log** — não adotada nesta etapa (só snapshot).
+  persiste. `pjLeafHist` (histórico fabricado) foi zerado e `hasAdv` usa `pjHasAdv` (avanço real).
+- **⭐ Log de avanço REAL (2026-09-25):** cada "Lançar avanço" grava um registro **append-only** em
+  **`"13 - projetos_obra".intervencao_avanco`** (kind,gid, iv_cod/iv_local/consorcio/tipo denormalizados,
+  **caminho** "Atividade › … › Sub", atividade, sub, valor, unidade %/m, obs, **fotos[]** no bucket `fotos-campo`
+  prefixo `projetos/avanco/`, ts, autor/autor_nome, equipe). RPCs **`app_proj_avanco_registrar`** (devolve a linha),
+  **`app_proj_avancos_iv(kind,gid)`** (histórico de uma intervenção) e **`app_proj_avancos(de,ate)`** (feed do
+  Resumo) — definer, gated `dev_acesso`. Front: `pjAvancosLoad`/`pjAvancosCur` (por `caminho`), **`pjNodePath`**
+  (identidade do nó por referência → caminho único por folha, validado), `pjDDMM`. O **painel de campo** mostra os
+  **lançamentos reais** da etapa (data/valor/autor/obs + link da foto) + acumulado; o **Resumo por período**
+  (`pjRsFeed`/`pjResumoLoad`) e o **mini-Gantt** do relatório usam as **datas reais** do log. `pjOpen`/`pjRel`
+  viraram async (carregam avanços). Lançar = upload fotos → `registrar` → aplica no snapshot → atualiza histórico.
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
@@ -1811,7 +1817,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     editam com `pjLocked`. Árvore robusta (`pjNodeHtml()`): cada bloco nível-1 é card separado, grupos colapsáveis
     com **Detalhes** (`data-detbtn`→`.pjdetpanel`) e linha-resumo (`X/Y etapas ✓ · Z%`). Registros viram **inputs
     editáveis** no campo (`data-reg`→`node.v`); tipo de peça (`sel`) fica só-leitura. `＋ Lançar` → painel com
-    histórico (`pjLeafHist`) + acumulado + **2 fotos + observação**. **Nenhum controle de config aqui** (foi p/ Suporte).
+    **histórico real da etapa** (`pjAvancosCur`, do log) + acumulado + **2 fotos + observação**. **Nenhum controle de config aqui** (foi p/ Suporte).
     Botão **📄 Relatório e documentos** no fim da rolagem.
 - **Suporte (config + cadeado):**
   - `projeto_sup` (`pjSupEnter()`→`pjInit('sup')`) — **mesma visualização de mapa + filtros do campo** (SVG,
@@ -1841,13 +1847,13 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   - `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
     (atalhos Hoje/7 dias/Este mês/Tudo + `de`/`até` custom) + consórcio + tipo. **KPIs** (nº avanços, intervenções
     com movimento, subatividades, metros executados), **timeline por dia**, **por intervenção** e **por atividade**,
-    + **Exportar CSV**. Fonte de dados: **`pjAllAvancos()`** achata todos os avanços de `pjLeafHist` (mock) com a
-    atividade de nível 1 e metadados da intervenção; `pjRsRange()` resolve o período. ⚠️ **Prévia:** datas/valores
-    são os do mock `pjLeafHist` (derivado do % atual) — viram reais quando existir o **log de avanço** (ver abaixo).
+    + **Exportar CSV**. Fonte de dados: **`pjRsFeed`** (RPC `app_proj_avancos`, log **real**), carregado por
+    `pjResumoLoad`; `pjRsRange()` resolve o período (filtro cliente por consórcio/tipo/data). (O `pjAllAvancos()`
+    antigo, sobre `pjLeafHist`, ficou obsoleto.)
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
-    **só com botão Abrir** (`pjOpenPdf()` gera um PDF-blob mínimo válido e abre em nova aba) — **anexar/remover
-    saíram daqui e ficam na configuração** (`projeto_cfg`). **mini-Gantt** (`pjRel()`) — cada barra vai
-    do **1º ao último avanço** da atividade (datas reais de `pjLeafHist`; eixo min→méd→máx); atividade sem
+    **só com botão Abrir** (arquivo real do Storage) — **anexar/remover ficam na configuração** (`projeto_cfg`).
+    **mini-Gantt** (`pjRel()`) — cada barra vai do **1º ao último avanço** da atividade (**datas reais do log**,
+    `pjAvancosCur`; eixo min→méd→máx); atividade sem
     avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação, com toggle de
     ordenação (`#pjAdvSeg`): **Sequência lógica** (árvore atividade›subatividade) × **Ordem de envio** (feed
     cronológico de todos os lançamentos, mais recente primeiro, fora da sequência). **PDF consolidado**
@@ -1874,17 +1880,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   Back buttons das telas ligados uma vez no load.
 - **✅ Resolvido (2026-09-25):** reground nos dados reais; **persistência por snapshot** (`intervencao_estado`);
   **lançamento de avanço real** (grava no `%`/`exec`); **grant do Suporte no banco** (`proj_sup_acesso`/`ME.proj_sup`,
-  vale entre dispositivos); histórico fabricado **removido** (`pjLeafHist`→vazio; `pjHasAdv` já usa "% real");
-  **documentos reais**; schema `13 - projetos_obra` **criado**.
-- **⚠️ Ainda pendente:** (a) `status` (run/new/done) é **fixo**, não deriva do progresso; (b) datas só DD/MM com
-  ano fixo 2026 no parse; (c) avanço **sem autor/equipe/hora**, sem **planejado × realizado** (Gantt não detecta
-  atraso) e **fotos do avanço não são guardadas** → resolve com o **log de avanço** (não adotado; hoje é só
-  snapshot, então o **Resumo por período fica vazio** até haver log); (d) toggles são `<span>` (sem teclado).
-- **Schema `13 - projetos_obra` (CRIADO 2026-09-25):** já tem **`intervencao_estado`** (snapshot da árvore),
-  **`intervencao_documento`** (docs por tipo). Cadastro georref das intervenções vem de
-  **`7 - setorizacao.intervencoes_pontuais`/`intervencoes_lineares`** (importadas do gpkg CRONOGRAMA_MG).
-  **Ainda a criar** (se/quando adotar o log): tabela de **`avanco`** (lançamento diário: valor incremental +
-  autor/equipe/hora + observação + N fotos em `fotos-campo`) — que também torna o **Resumo por período** real.
+  vale entre dispositivos); histórico fabricado **removido**; **documentos reais**; **log de avanço real**
+  (`intervencao_avanco` — autor/equipe/hora/fotos/obs; Resumo e Gantt reais); schema `13 - projetos_obra` **criado**.
+- **⚠️ Ainda pendente:** (a) `status` (run/new/done) é **fixo**, não deriva do progresso; (b) **prazos/planejado ×
+  realizado** — o Gantt mostra a janela real mas **não detecta atraso** (falta o cronograma planejado); (c) toggles
+  são `<span>` (sem teclado). Datas do log são reais (ts); o parse legado DD/MM só aparece na exibição.
+- **Schema `13 - projetos_obra` (2026-09-25):** **`intervencao_estado`** (snapshot da árvore),
+  **`intervencao_documento`** (docs por tipo) e **`intervencao_avanco`** (log de lançamentos, append-only).
+  Cadastro georref das intervenções vem de **`7 - setorizacao.intervencoes_pontuais`/`intervencoes_lineares`**
+  (importadas do gpkg CRONOGRAMA_MG).
 - **Próximos passos sugeridos:** controle de atividades = **prazos & atraso** (planejado × realizado, farol) +
   **log de avanço real** (com fotos/equipe), depois impedimentos, painel e alertas.
 

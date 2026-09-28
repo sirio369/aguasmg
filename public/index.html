@@ -1466,6 +1466,11 @@ const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
 let pjSaveT={};
 async function pjSaveNow(iv){ if(!iv||iv.gid==null||!iv.kind) return; try{ await sb.rpc('app_proj_estado_set',{p_kind:iv.kind,p_gid:iv.gid,p_arv:iv.arv,p_locked:!!iv.locked,p_status:iv.status||null}); }catch(e){ if(window.toast)toast('Erro ao salvar: '+(e.message||e)); } }
 function pjSave(iv){ if(!iv||iv.gid==null) return; const k=iv.kind+'|'+iv.gid; clearTimeout(pjSaveT[k]); pjSaveT[k]=setTimeout(()=>pjSaveNow(iv),500); }
+// ---- log de avanço real ----
+let pjAvancosCur={};   // caminho -> [entradas] da intervenção corrente (para o histórico por etapa)
+function pjNodePath(nodes,target,trail){ trail=trail||[]; for(const n of (nodes||[])){ const t2=trail.concat(n.n); if(n===target) return t2; if(n.f&&n.f.length){ const r=pjNodePath(n.f,target,t2); if(r) return r; } } return null; }
+function pjDDMM(iso){ try{ const d=new Date(iso); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }catch(e){ return ''; } }
+async function pjAvancosLoad(iv){ pjAvancosCur={}; if(!iv||iv.gid==null) return pjAvancosCur; try{ const {data,error}=await sb.rpc('app_proj_avancos_iv',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(e=>{ const k=e.caminho||e.sub||''; (pjAvancosCur[k]=pjAvancosCur[k]||[]).push(e); }); }catch(e){} return pjAvancosCur; }
 function pjPct(node){
   if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
@@ -1581,7 +1586,17 @@ function pjSupAcessoRender(){
 }
 // ---- Suporte · Resumo por período (protótipo sobre o feed atual; datas/valores viram reais com o log de avanço) ----
 let pjRsQuick='tudo', pjRsDe='', pjRsAte='', pjRsCons='', pjRsTipo='';
-function pjResumoEnter(){ if(!pjPodeSup()){ toast('Acesso restrito à equipe de configuração'); irPara('projetos'); return; } pjResumo(); }
+let pjRsFeed=[];
+async function pjResumoLoad(){
+  try{ const {data,error}=await sb.rpc('app_proj_avancos',{p_de:null,p_ate:null}); if(error)throw error;
+    pjRsFeed=(data||[]).map(e=>{ const ts=new Date(e.ts).getTime(), d=new Date(ts);
+      return {ivId:e.kind+'|'+e.gid, ivLocal:e.iv_local||'—', cod:e.iv_cod||'—', cons:e.consorcio||'—', tipo:e.tipo||'',
+        equipe:e.equipe||e.autor_nome||'', ativ:e.atividade||'—', sub:e.sub||'—', isM:e.unidade==='m',
+        num:Math.abs(+e.valor||0), obs:e.obs||'', fotos:e.fotos||[],
+        d:String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'), ano:d.getFullYear(), ts:ts}; });
+  }catch(e){ pjRsFeed=[]; if(window.toast)toast('Erro no resumo: '+(e.message||e)); }
+}
+async function pjResumoEnter(){ if(!pjPodeSup()){ toast('Acesso restrito à equipe de configuração'); irPara('projetos'); return; } const b=$('#pjRsBody'); if(b) b.innerHTML='<p class="sub">Carregando…</p>'; await pjResumoLoad(); pjResumo(); }
 function pjFmtD(ts){ const d=new Date(ts); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
 // todos os avanços (mock pjLeafHist) achatados, com atividade de nível 1 + metadados da intervenção
 function pjAllAvancos(){
@@ -1627,7 +1642,7 @@ function pjResumo(){
 }
 function pjRsRender(){
   const [from,to]=pjRsRange();
-  const feed=pjAllAvancos().filter(e=>(from==null||e.ts>=from)&&(to==null||e.ts<=to)&&(!pjRsCons||e.cons===pjRsCons)&&(!pjRsTipo||e.tipo===pjRsTipo));
+  const feed=pjRsFeed.filter(e=>(from==null||e.ts>=from)&&(to==null||e.ts<=to)&&(!pjRsCons||e.cons===pjRsCons)&&(!pjRsTipo||e.tipo===pjRsTipo));
   feed.sort((a,b)=>b.ts-a.ts);
   const out=$('#pjRsOut'); if(!out)return;
   if(!feed.length){ out.innerHTML='<p class="sub" style="margin-top:14px">Nenhum avanço no período/filtros selecionados.</p>'; return; }
@@ -1636,7 +1651,7 @@ function pjRsRender(){
   const byDay={}; feed.forEach(e=>{ (byDay[e.d]=byDay[e.d]||[]).push(e); });
   const days=Object.keys(byDay).sort((a,b)=>byDay[b][0].ts-byDay[a][0].ts);
   const dayHtml=days.map(d=>{ const arr=byDay[d], dm=arr.filter(e=>e.isM).reduce((a,e)=>a+e.num,0);
-    return `<div class="pjrsday"><div class="h"><b>${d}/2026</b><span>${arr.length} avanço(s)${dm?` · ${Math.round(dm)} m`:''}</span></div>${arr.map(e=>`<div class="pjadv"><div class="pjthumb">📷</div><div class="ai"><div><b>+${e.num}${e.isM?' m':'%'}</b> · ${e.ativ} › ${e.sub}</div><div class="d">${e.ivLocal} · ${e.equipe}${e.obs?` · "${e.obs}"`:''}</div></div></div>`).join('')}</div>`;
+    return `<div class="pjrsday"><div class="h"><b>${d}/${arr[0].ano||''}</b><span>${arr.length} avanço(s)${dm?` · ${Math.round(dm)} m`:''}</span></div>${arr.map(e=>`<div class="pjadv"><div class="pjthumb">${(e.fotos&&e.fotos.length)?`<a href="${SBASE+e.fotos[0]}" target="_blank" rel="noopener">📷</a>`:'📷'}</div><div class="ai"><div><b>+${e.num}${e.isM?' m':'%'}</b> · ${e.ativ} › ${e.sub}</div><div class="d">${e.ivLocal} · ${e.equipe}${e.obs?` · "${e.obs}"`:''}</div></div></div>`).join('')}</div>`;
   }).join('');
   const byIv={}; feed.forEach(e=>{ const r=byIv[e.ivId]=byIv[e.ivId]||{local:e.ivLocal,cod:e.cod,n:0,m:0,last:0}; r.n++; if(e.isM)r.m+=e.num; r.last=Math.max(r.last,e.ts); });
   const ivRows=Object.values(byIv).sort((a,b)=>b.n-a.n).map(r=>`<tr><td>${r.local}<div class="pjmono">${r.cod}</div></td><td class="c">${r.n}</td><td class="c">${r.m?Math.round(r.m)+' m':'—'}</td><td class="c">${pjFmtD(r.last)}</td></tr>`).join('');
@@ -1659,7 +1674,7 @@ function pjRsRender(){
 }
 function pjResumoCsv(feed){
   const head=['Data','Intervencao','Codigo','Consorcio','Tipo','Atividade','Subatividade','Avanco','Unidade','Observacao','Equipe'];
-  const rows=feed.map(e=>[e.d+'/2026',e.ivLocal,e.cod,e.cons,PJ_TIPOS[e.tipo].n,e.ativ,e.sub,e.num,e.isM?'m':'%',e.obs||'',e.equipe]);
+  const rows=feed.map(e=>[e.d+'/'+(e.ano||''),e.ivLocal,e.cod,e.cons,(PJ_TIPOS[e.tipo]||{}).n||e.tipo||'',e.ativ,e.sub,e.num,e.isM?'m':'%',e.obs||'',e.equipe]);
   const csv=[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u; a.download='resumo_avancos_projetos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('CSV gerado'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
@@ -1783,11 +1798,14 @@ function pjNodeHtml(node){
   }
   if(pjMode==='campo'&&!isG&&(t==='%'||t==='m')&&!inact&&pjLocked){
     const cur=t==='m'?(node.exec||0):(node.p||0);
-    const hist=cur>0
-      ? `<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec||0}/${node.meta||0} ${node.un} · ${p}%`:`${node.p||0}%`}</b></div>`
+    const _iv=pjCurIv(), _pth=_iv?pjNodePath(_iv.arv,node):null, _cam=_pth?_pth.join(' › '):node.n;
+    const ents=pjAvancosCur[_cam]||[];
+    const rows=ents.length
+      ? ents.map(e=>`<div class="pjhrow"><span class="pjthumb sm">${(e.fotos&&e.fotos.length)?`<a href="${SBASE+e.fotos[0]}" target="_blank" rel="noopener">📷</a>`:'📷'}</span><span class="pjhd">${pjDDMM(e.ts)}</span><span class="pjhdelta">+${e.valor}${e.unidade==='m'?' m':'%'}</span><span class="pjhacc">${e.autor_nome||e.equipe||''}</span></div>${e.obs?`<div class="pjhobs">"${e.obs}"</div>`:''}`).join('')
       : `<div class="pjhrow" style="color:var(--mut)">Sem lançamentos ainda.</div>`;
+    const acc=cur>0?`<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec||0}/${node.meta||0} ${node.un} · ${p}%`:`${node.p||0}%`}</b></div>`:'';
     h+=`<div class="pjlaunch" id="${rid}L">
-      <div class="pjhistwrap"><div class="pjhisttit">📊 Acumulado</div>${hist}</div>
+      <div class="pjhistwrap"><div class="pjhisttit">📋 Lançamentos anteriores</div>${rows}${acc}</div>
       <div class="pjnewtit">➕ Novo avanço de hoje</div>
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
       <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label></div>
@@ -1798,7 +1816,7 @@ function pjNodeHtml(node){
   }
   return h+`</div>`;
 }
-function pjOpen(id){ pjCur=id; irPara('projeto_det'); pjRenderDet(); window.scrollTo(0,0); }
+async function pjOpen(id){ pjCur=id; irPara('projeto_det'); const el=$('#pjDet'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjAvancosLoad(iv); if(pjCur===id) pjRenderDet(); }
 function pjSnapOpen(d){ const s=new Set(); d.querySelectorAll('.pjdetpanel:not([hidden])').forEach(pnl=>{ const n=pjReg[pnl.id.slice(0,-1)]; if(n)s.add(n); }); return s; }
 function pjReopen(d,keep){ if(keep&&keep.size){ Object.keys(pjReg).forEach(rid=>{ if(keep.has(pjReg[rid])){ const pnl=document.getElementById(rid+'D'); if(pnl&&pnl.hidden){ pnl.hidden=false; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent='▾'; const b=row&&row.querySelector('[data-detbtn]'); if(b){b.textContent='Fechar';b.classList.add('open');} } } }); } }
 // wiring compartilhado da árvore (campo + config). rerender = função de re-render da tela (recebe o snapshot de painéis abertos).
@@ -1810,12 +1828,28 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
   d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
   d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
-  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.launch]; if(!n)return;
+  d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=async()=>{ const n=pjReg[b.dataset.launch]; if(!n)return;
     const wrap=b.closest('.pjlaunch'), inp=wrap&&wrap.querySelector('.pjinp');
     const val=parseFloat(((inp&&inp.value)||'').replace(',','.'));
     if(!(val>0)){ toast('Informe o avanço (número > 0)'); return; }
-    if(n.k==='m') n.exec=Math.max(0,(n.exec||0)+val); else n.p=Math.max(0,Math.min(100,(n.p||0)+val));
-    pjSave(pjCurIv()); toast('Avanço lançado'); const k=pjSnapOpen(d); rerender(k); });
+    const iv=pjCurIv(); if(!iv||iv.gid==null){ toast('Intervenção inválida'); return; }
+    b.disabled=true; toast('Registrando avanço…');
+    try{
+      // fotos do lançamento → fotos-campo (prefixo projetos/avanco/)
+      const files=[...wrap.querySelectorAll('.pjph2 input[type=file]')].map(i=>i.files&&i.files[0]).filter(Boolean);
+      const fotos=[];
+      for(const f of files){ const path='projetos/avanco/'+iv.kind+'/'+iv.gid+'/'+crypto.randomUUID()+'.jpg'; const up=await sb.storage.from('fotos-campo').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true}); if(!up.error) fotos.push(path); }
+      const obs=((wrap.querySelector('.pjobs')||{}).value||'').trim();
+      const pth=pjNodePath(iv.arv,n)||[n.n], caminho=pth.join(' › '), atividade=pth[0], sub=pth[pth.length-1];
+      const {data:row,error}=await sb.rpc('app_proj_avanco_registrar',{p_kind:iv.kind,p_gid:iv.gid,p_iv_cod:iv.cod,p_iv_local:iv.local,p_consorcio:iv.cons,p_tipo:iv.tipo,p_caminho:caminho,p_atividade:atividade,p_sub:sub,p_valor:val,p_unidade:(n.k==='m'?'m':'%'),p_obs:obs||null,p_fotos:fotos,p_equipe:iv.resp||null});
+      if(error) throw error;
+      // aplica no snapshot + histórico local (sem refetch)
+      if(n.k==='m') n.exec=Math.max(0,(n.exec||0)+val); else n.p=Math.max(0,Math.min(100,(n.p||0)+val));
+      (pjAvancosCur[caminho]=pjAvancosCur[caminho]||[]).push(row);
+      pjSave(iv); toast('Avanço lançado'); const k=pjSnapOpen(d); rerender(k);
+    }catch(e){ toast('Erro ao lançar: '+(e.message||e)); }
+    finally{ b.disabled=false; }
+  });
   d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n){ n.v=inp.value.trim()||'—'; pjSave(pjCurIv()); } });
   d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjSave(pjCurIv()); rerender(k); } });
   d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjSave(pjCurIv()); rerender(k); } });
@@ -1852,14 +1886,14 @@ function pjRenderDet(keep){
 async function pjRel(id){
   const iv=PJ_IVS.find(i=>i.id===id); if(!iv)return; pjCur=id;
   const t=PJ_TIPOS[iv.tipo],asbuilt=iv.status==='done';
-  await pjDocsLoad(iv);
+  await pjDocsLoad(iv); await pjAvancosLoad(iv);
   // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
   const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     return `<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`; }).join('');
-  // mini-gantt: janela = 1º avanço → último avanço, por atividade (nível 1 ativa)
-  const ddmm=s=>{const[d,m]=s.split('/').map(Number);return new Date(2026,m-1,d).getTime();};
+  // mini-gantt: janela = 1º avanço → último avanço, por atividade (nível 1 ativa) — datas reais do log
   const fmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
-  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ let ds=[]; pjLeaves(n).forEach(l=>pjLeafHist(l).ents.forEach(e=>ds.push(ddmm(e.d)))); return {n:n.n,p:pjPct(n),first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
+  const _allAv=Object.values(pjAvancosCur).flat();
+  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ const ds=_allAv.filter(e=>e.atividade===n.n).map(e=>new Date(e.ts).getTime()); return {n:n.n,p:pjPct(n),first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
   const wd=acts.filter(a=>a.first!=null), tmin=wd.length?Math.min(...wd.map(a=>a.first)):null, tmax=wd.length?Math.max(...wd.map(a=>a.last)):null, span=Math.max(1,(tmax-tmin)||1);
   const pos=ms=>tmin==null?0:Math.round((ms-tmin)/span*100);
   const gantHtml=acts.map(a=>{
