@@ -1686,14 +1686,20 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     **L/lig·dia · Vol. micromedido (total) · Vol. lido (medido) · Vol. estimado (não medido) · Ligações** —
     decompor ajuda a achar *o que* causa uma flutuação (caiu o lido? subiu o estimado? só entraram mais ligações?). Tudo
     client-side sobre o `mmMensal` já carregado (o `_mensal` já traz `volume_medido`/`volume_naomedido`, sem RPC nova).
-    Estado `mmSeasMet` (`MM_SEAS_MET`/`MM_SEAS_ORDER`), `mmCompact` formata as células (k/M), `mmSeasFmt` os tooltips;
-    a linha "Sazonal" é sempre **desvio %** (dimensão-livre, vale p/ qualquer composição). **⚠️ Fix 2026-09-28:** os
-    chips de composição (classe `.mmchip` + `data-seas`) não clicavam porque o handler das chips de comportamento
-    (`.mmchip`) sobrescrevia o `onclick` de todas; agora ele é escopado a `.mmchip[data-cls]`. **(3) DMCs
-    mais sensíveis** — L/lig·dia por DMC (último mês) + MoM/YoY + %não medido + fraude + score, ordenado por
-    L/lig·dia. **(4) Análise por matrícula** — distribuição por comportamento (filtro) + ranking (Matrícula/
-    Comportamento/Situação/Score, chips + busca) **lado a lado** com o detalhe *sticky* (auto-seleciona o topo);
-    popup ⓘ descreve todas as variáveis e o método. Detalhe da matrícula mantém série 18m + meses irregulares em
+    Estado `mmSeasMet` (`MM_SEAS_MET`/`MM_SEAS_ORDER`); `mmSeasNum` escreve os **volumes por extenso, sem k/M**
+    (2026-09-28, a pedido) e `mmSeasFmt` os tooltips; a linha "Sazonal" é sempre **desvio %** (dimensão-livre).
+    **Alinhamento do gráfico (fix 2026-09-28):** o eixo-Y saiu para uma coluna própria de **58px** (= largura do rótulo
+    do heatmap) e o plot ocupa exatamente a faixa dos 12 meses (`X(m)=((m-0.5)/12)·W`), então a linha inferior casa
+    coluna a coluna com o heatmap. **Fix 2026-09-28:** os chips de composição (`.mmchip`+`data-seas`) não clicavam
+    porque o handler das chips de comportamento (`.mmchip`) sobrescrevia o `onclick` de todas; escopado a
+    `.mmchip[data-cls]`. **(3) DMCs mais sensíveis** — L/lig·dia por DMC (último mês) + MoM/YoY + % estimado + suspeita
+    de fraude. **Ordenação livre por coluna (2026-09-28):** `MM_DMC_COLS` + estado `mmDmcSort{k,dir}`, clique no
+    cabeçalho ordena/inverte (▲▼). Removidos a **cor de fundo do L/lig·dia** e a coluna **Score**; renomeados
+    "Lig. fat."→**Ligações**, "% não med."→**% estimado**, "Fraude"→**Suspeita de fraude**. **(4) Análise por
+    matrícula** — **relayout 2026-09-28** em 3 blocos com borda (`.mmblock`, grid-areas `faixas`/`lista`/`detalhe`):
+    **faixas** no topo-esquerdo, **ranking** ocupando a coluna direita inteira, **detalhe** no rodapé-esquerdo (fluxo:
+    ver cards → escolher na lista → visualizar embaixo). Removido o parágrafo explicativo; detalhe com `.mmstats` em 2
+    colunas. Detalhe da matrícula mantém série 18m + meses irregulares em
     vermelho. RPCs novas **`app_nrw_mm_mensal`** (série mensal enriquecida) e **`app_nrw_mm_dmc`** (sensibilidade por
     DMC). `app_nrw_mm_sazonalidade` **aposentada** (sazonalidade agora sai do `_mensal`).
   - **Cruzamento matrícula→DMC (2026-09-24):** `"11 - perdas_nrw".mm_dmc_map` (spatial join `ligacoes.geom` ×
