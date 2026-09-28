@@ -834,6 +834,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <h1>Campo · Intervenções</h1>
     <p class="sub">Registro diário de avanços por intervenção liberada.</p>
     <div class="pjfilt">
+      <select id="pjCons">
+        <option value="">Ambos os consórcios</option>
+        <option value="ZA0200">Betim</option>
+        <option value="ZA1004">Contagem</option>
+      </select>
       <select id="pjTipo"></select>
       <select id="pjStatus">
         <option value="">Todos os status</option>
@@ -865,6 +870,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <p class="sub">Configure o escopo e as quantidades de cada intervenção e libere (cadeado) para o campo lançar avanços.</p>
     <div class="pjfilt">
+      <select id="pjSupCons">
+        <option value="">Ambos os consórcios</option>
+        <option value="ZA0200">Betim</option>
+        <option value="ZA1004">Contagem</option>
+      </select>
       <select id="pjSupTipo"></select>
       <select id="pjSupStatus">
         <option value="">Todos os status</option>
@@ -1432,6 +1442,13 @@ const PJ_ARV={
     pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
     pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
+    pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)],
+  // HDD = perfuração direcional (não destrutiva): sem vala/reaterro/pavimento; só valas de entrada/saída, furo piloto, alargamento e puxamento
+  rede_hdd:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
+    pjP('Mobilização e montagem do equipamento HDD',0),pjG('Valas de entrada e saída',pjOc(0,0,0,0)),
+    pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
+    pjM('Puxamento da tubulação (pullback)',ext||1,0),
+    pjPecas([pjPeca(1,'',0,0,0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)]
 };
 const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
@@ -1447,14 +1464,16 @@ async function pjLoad(force){
   const ivs=[];
   pts.forEach(f=>{ const p=f.properties,[lo,la]=f.geometry.coordinates,tp=pjMapTipo(p.tipo,false);
     ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),
-      local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
+      local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,
       ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
   lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
-    ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:'rede_vca',cod:p.codigo||p.layer_dwg||('#'+p.gid),
-      local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),
+    // diferencia HDD × VCA pela coluna `tipo` (fallback: nome do layer_dwg). HDD = perfuração direcional; resto = VCA (vala a céu aberto)
+    const tp=/HDD/i.test(String(p.tipo||'')+' '+String(p.layer_dwg||''))?'rede_hdd':'rede_vca';
+    ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:tp,cod:p.codigo||p.layer_dwg||('#'+p.gid),
+      local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,
-      lls,arv:PJ_ARV.rede_vca(p.extensao_m)}); });
+      lls,arv:(PJ_ARV[tp]||PJ_ARV.rede_vca)(p.extensao_m)}); });
   // sobrepõe o estado salvo (snapshot) nos templates
   let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
   const byKey={}; est.forEach(s=>byKey[s.kind+'|'+s.gid]=s);
@@ -1481,7 +1500,7 @@ function pjPct(node){
 const pjIvPct=iv=>{const vs=iv.arv.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;};
 // conta folhas mensuráveis ativas (para o resumo)
 function pjLeaves(node,acc){ acc=acc||[]; if(node.ativo===false)return acc; if(node.f&&node.f.length){node.f.forEach(c=>pjLeaves(c,acc));} else if(node.k==='%'||node.k==='m'){acc.push(node);} return acc; }
-let pjFtipo='',pjFst='',pjView='mapa',pjCur=null,pjReg={};
+let pjFtipo='',pjFst='',pjFcons='',pjView='mapa',pjCur=null,pjReg={};
 function pjZero(n){ if(n.k==='%')n.p=0; if(n.k==='m')n.exec=0; if(n.k==='reg')n.v='—'; if(n.k==='sel')n.v=''; if(n.f)n.f.forEach(pjZero); return n; }
 let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (configurar escopo/quantidade, só Suporte)
 let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o render da árvore
@@ -1498,20 +1517,21 @@ function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.leng
 
 // contexto de tela (campo × suporte): ids dos elementos + ação ao tocar num card/pino
 const PJ_CTX={
-  campo:{tipo:'pjTipo',status:'pjStatus',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',mapEl:'pjMapaL',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
-  sup:{tipo:'pjSupTipo',status:'pjSupStatus',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
+  campo:{tipo:'pjTipo',status:'pjStatus',cons:'pjCons',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',mapEl:'pjMapaL',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
+  sup:{tipo:'pjSupTipo',status:'pjSupStatus',cons:'pjSupCons',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
 };
 function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.tipo);
   if(st && !st.dataset.ready){ st.innerHTML='<option value="">Todos os tipos</option>'+Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}">${t.n}</option>`).join(''); st.dataset.ready='1';
     st.onchange=()=>{pjFtipo=st.value;pjRefresh(ctx);};
     $('#'+E.status).onchange=e=>{pjFst=e.target.value;pjRefresh(ctx);};
+    const sc=$('#'+E.cons); if(sc) sc.onchange=e=>{pjFcons=e.target.value;pjRefresh(ctx);};
     $('#'+E.seg).querySelectorAll('button').forEach(b=>b.onclick=()=>pjSetView(b.dataset.v,ctx));
     $('#'+E.leg).innerHTML=Object.entries(PJ_TIPOS).map(([k,t])=>`<span><i style="background:${t.c}"></i>${t.n.replace('Implantação de ','Impl. ').replace('Substituição de ','Subst. ')}</span>`).join('');
   }
-  if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst;   // sincroniza controles ao estado compartilhado
+  if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst; const sco=$('#'+E.cons); if(sco) sco.value=pjFcons;   // sincroniza controles ao estado compartilhado
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
-const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===iv.status);
+const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===iv.status)&&(!pjFcons||pjFcons===iv.za);
 function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
 function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(pjOk).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];

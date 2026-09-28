@@ -1781,7 +1781,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   **`pjLoad()`** (RPC **`app_proj_intervencoes`**, gated admin/`dev_acesso`) a partir das tabelas-base
   **`"7 - setorizacao".intervencoes_pontuais`** (21: VRP 16, Valvula 5) e **`intervencoes_lineares`** (1 rede),
   importadas do GeoPackage `CRONOGRAMA_MG`. `pjLoad` roda no dispatch de cada tela do módulo (`pjLoad().then(...)`),
-  mapeia o **`tipo`** real → tipo do módulo (`PJ_TIPO_MAP`: VRP→`vrp_impl`, Valvula→`valvula`; linha→`rede_vca`) e
+  mapeia o **`tipo`** real → tipo do módulo (`PJ_TIPO_MAP`: VRP→`vrp_impl`, Valvula→`valvula`) e
   instancia a **árvore-modelo** do tipo (`PJ_ARV[tipo]()`, zerada). As coords reais (GeoJSON 4326) são
   **normalizadas** no mapa esquemático (viewBox 100×62, bbox→[8..92]×[8..54], y invertido). Toda intervenção
   recém-importada entra **`locked=false`** (em configuração no Suporte). O mock antigo de 6 IVs vira só fallback
@@ -1811,6 +1811,16 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   **lançamentos reais** da etapa (data/valor/autor/obs + link da foto) + acumulado; o **Resumo por período**
   (`pjRsFeed`/`pjResumoLoad`) e o **mini-Gantt** do relatório usam as **datas reais** do log. `pjOpen`/`pjRel`
   viraram async (carregam avanços). Lançar = upload fotos → `registrar` → aplica no snapshot → atualiza histórico.
+- **Diferenciação HDD × VCA nas linhas (2026-09-28):** `intervencoes_lineares.tipo` já traz **`'HDD'`** (trechos AL13/AL14,
+  gid 2–16) ou nulo/`'VCA'` (rede a céu aberto, gid 1); a RPC `app_proj_intervencoes` **já devolve `tipo`** nas
+  properties das linhas. Antes o front **fixava toda linha em `rede_vca`** (`pjMapTipo(...,isLine)` hardcoded) — bug.
+  Agora `pjLoad` decide por regex `/HDD/i` sobre `tipo`+`layer_dwg` → **`rede_hdd`** (senão `rede_vca`), com árvore
+  própria **`PJ_ARV.rede_hdd`** (perfuração direcional trenchless: locação/sondagem → mobilização do equipamento HDD →
+  valas de entrada/saída → **furo piloto** (m) → alargamento → **puxamento/pullback** (m) → peças → interligação →
+  teste → as-built; sem escavação de vala longa/reaterro/pavimento). Cores `--t-rede_hdd` (verde) × `--t-rede_vca` (roxo).
+- **Filtro de consórcio (2026-09-28):** select **Ambos/Betim(ZA0200)/Contagem(ZA1004)** nas barras `pjfilt` de Campo
+  (`#pjCons`) e Suporte (`#pjSupCons`); estado compartilhado `pjFcons`, entra no `pjOk` (`iv.za` = `p.consorcio` gravado
+  em cada iv no `pjLoad`). Filtra mapa+lista+contador. (Consórcio derivado da cidade na RPC: Betim→ZA0200, Contagem→ZA1004.)
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
