@@ -1876,8 +1876,9 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   properties das linhas. Antes o front **fixava toda linha em `rede_vca`** (`pjMapTipo(...,isLine)` hardcoded) — bug.
   Agora `pjLoad` decide por regex `/HDD/i` sobre `tipo`+`layer_dwg` → **`rede_hdd`** (senão `rede_vca`), com árvore
   própria **`PJ_ARV.rede_hdd`** (perfuração direcional trenchless: locação/sondagem → mobilização do equipamento HDD →
-  valas de entrada/saída → **furo piloto** (m) → alargamento → **puxamento/pullback** (m) → peças → interligação →
-  teste → as-built; sem escavação de vala longa/reaterro/pavimento). Cores `--t-rede_hdd` (verde) × `--t-rede_vca` (roxo).
+  valas de entrada/saída → **furo piloto** (m) → alargamento → **puxamento/pullback** (m) → peças → **ramais**
+  (2026-09-28, igual à VCA) → interligação → teste → as-built; sem escavação de vala longa/reaterro/pavimento). Cores
+  `--t-rede_hdd` (verde) × `--t-rede_vca` (roxo).
 - **Filtro de consórcio (2026-09-28):** select **Ambos/Betim(ZA0200)/Contagem(ZA1004)** nas barras `pjfilt` de Campo
   (`#pjCons`) e Suporte (`#pjSupCons`); estado compartilhado `pjFcons`, entra no `pjOk` (`iv.za` = `p.consorcio` gravado
   em cada iv no `pjLoad`). Filtra mapa+lista+contador. (Consórcio derivado da cidade na RPC: Betim→ZA0200, Contagem→ZA1004.)
@@ -1885,8 +1886,11 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   **`pjStatusDe(iv)`** deriva do estado real: **`cfg` "Em configuração"** quando `!iv.locked` (travada no Suporte, campo
   bloqueado); depois de liberada, **`new` "Não iniciada"** (0%), **`run` "Em andamento"** (0–100%), **`done`
   "Finalizada"** (≥100%, via `pjIvPct`). Usado em `pjOk` (filtro), nas listas, no as-built e salvo em `p_status`
-  (`pjSaveNow`). Nova opção **"Em configuração"** nos selects de status + pill `.pjpill.cfg` (âmbar). Isso responde
-  "como o status é atribuído": antes não era — ficava tudo "Não iniciada".
+  (`pjSaveNow`). Pill `.pjpill.cfg` (âmbar). Isso responde "como o status é atribuído": antes não era — ficava tudo
+  "Não iniciada". **"Em configuração" só no Suporte (2026-09-28):** `pjStatusView(iv,ctx)` mapeia `cfg`→`new` fora do
+  Suporte, então o **Campo** (usuário final) só vê **Não iniciada/Em andamento/Finalizada**; a opção "Em configuração"
+  saiu do `#pjStatus` (fica só no `#pjSupStatus`) e o chip "⏳ Em config." agora aparece **só na lista do Suporte** (o
+  Campo mostra apenas a pill de status). `pjOk`/`pjInit` recebem `ctx`; `pjFst='cfg'` é limpo ao entrar no Campo.
 - **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
   `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
   anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
