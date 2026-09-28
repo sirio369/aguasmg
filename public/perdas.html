@@ -1592,9 +1592,25 @@ function mmSig(n){ return (n>=0?'+':'')+br1(n); }
 function mmHeat(t){ t=Math.max(0,Math.min(1,t)); return `rgba(75,159,224,${(0.10+t*0.72).toFixed(3)})`; }
 function mmDiv(pct,maxAbs){ const t=Math.min(1,Math.abs(pct)/(maxAbs||1)); return (pct>=0?`rgba(230,162,60,`:`rgba(75,159,224,`)+(0.12+t*0.72).toFixed(3)+')'; }
 function mmDelta(v){ return v==null?'inherit':(v>0?'#4b9fe0':(v<0?'#e6a23c':'inherit')); }
+/* composições selecionáveis na sazonalidade (decompor o L/lig/dia p/ achar a causa de flutuações) */
+const MM_SEAS_MET={
+ lpd:{l:'L/lig·dia',u:'L/lig·dia',g:p=>+p.lpd},
+ volume_total:{l:'Vol. micromedido',u:'m³',g:p=>+p.volume_total},
+ volume_medido:{l:'Vol. lido',u:'m³',g:p=>+p.volume_medido},
+ volume_naomedido:{l:'Vol. estimado',u:'m³',g:p=>+p.volume_naomedido},
+ n_faturadas:{l:'Ligações',u:'lig.',g:p=>+p.n_faturadas}
+};
+const MM_SEAS_ORDER=['lpd','volume_total','volume_medido','volume_naomedido','n_faturadas'];
+let mmSeasMet='lpd';
+function mmCompact(v){ v=Number(v)||0; const a=Math.abs(v);
+ if(a>=1e6) return (v/1e6).toFixed(a>=1e7?1:2).replace('.',',')+'M';
+ if(a>=1e4) return Math.round(v/1e3)+'k';
+ if(a>=1e3) return (v/1e3).toFixed(1).replace('.',',')+'k';
+ return a>=100?(''+Math.round(v)):br1(v); }
+function mmSeasFmt(v){ return (mmSeasMet==='lpd'?br1(v):fmt(v))+' '+MM_SEAS_MET[mmSeasMet].u; }
 const MM_INFO={
  lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume faturado do mês ÷ nº de ligações faturadas ÷ <b>30 dias</b> × 1000.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume faturado</b> = medido (leitura real) + não medido (estimado + faturado mínimo).</p>`},
- season:{t:'Sazonalidade & tendência',h:`<p>Tudo em <b>L/lig/dia</b> para "empatar" as variáveis e não distorcer a percepção.</p><p><b>Heatmap</b>: cada célula é o L/lig/dia daquele mês/ano (mais claro = maior). A linha <b>Sazonal</b> mostra o desvio médio de cada mês‑calendário vs a média geral (laranja acima / azul abaixo).</p><p><b>Gráfico</b>: linha = ano mais recente; a <b>sombra</b> é a faixa mín–máx dos anos anteriores. ⚠️ Base atual = 18 meses (2025‑03 a 2026‑08): a sombra hoje reflete só 2025 e alguns meses ainda não têm sobreposição ano a ano.</p>`},
+ season:{t:'Sazonalidade & tendência',h:`<p>Por padrão tudo em <b>L/lig/dia</b> para "empatar" as variáveis e não distorcer a percepção.</p><p><b>Chips de composição</b>: alternam a visualização entre <b>L/lig·dia</b>, <b>volume micromedido</b> (total faturado), <b>volume lido</b> (leitura real do hidrômetro), <b>volume estimado</b> (não medido = estimado + mínimo) e <b>ligações</b> faturadas. Decompor assim ajuda a achar <b>o que</b> causa uma flutuação: se o L/lig/dia oscilou, foi o volume lido que caiu, o estimado que subiu, ou só entraram mais ligações?</p><p><b>Heatmap</b>: cada célula é a composição escolhida naquele mês/ano (mais claro = maior). A linha <b>Sazonal</b> mostra o desvio médio de cada mês‑calendário vs a média geral (laranja acima / azul abaixo).</p><p><b>Gráfico</b>: linha = ano mais recente; a <b>sombra</b> é a faixa mín–máx dos anos anteriores. ⚠️ Base atual = 18 meses (2025‑03 a 2026‑08): a sombra hoje reflete só 2025 e alguns meses ainda não têm sobreposição ano a ano.</p>`},
  dmc:{t:'DMCs mais sensíveis',h:`<p>Cruzamento espacial <b>matrícula → DMC</b> (ponto da ligação dentro do limite vigente do DMC) × micromedição.</p><p><b>L/lig/dia</b> por DMC no último mês, com variação <b>MoM</b> (mês anterior) e <b>YoY</b> (mesmo mês do ano anterior), <b>% não medido</b>, nº de <b>fraudes potenciais</b> e <b>score médio</b> de anomalia. DMCs no topo (maior L/lig/dia ou piores deltas) são candidatos a priorização de campanha.</p>`},
  rank:{t:'Ranking de anomalia — variáveis e método',h:`<ul style="padding-left:18px;margin:0;line-height:1.65">
   <li><b>Comportamento</b>: classe derivada das métricas, na precedência fraude → nulo recorrente → pico isolado → queda contínua → crescimento contínuo → instável → estável.</li>
@@ -1714,34 +1730,38 @@ function mmKpiPanel(){
 /* ---- painel 2: sazonalidade & tendência (heatmap + linha, sobre L/lig/dia) ---- */
 function mmSeasonPanel(){
  const S=mmMensal; if(S.length<2) return '';
+ const M=MM_SEAS_MET[mmSeasMet]||MM_SEAS_MET.lpd, g=M.g;
  const byYM={}, years=[]; S.forEach(p=>{ const y=Math.floor(p.competencia/100), m=p.competencia%100; byYM[y+'-'+m]=p; if(!years.includes(y))years.push(y); }); years.sort();
- const lpds=S.map(p=>+p.lpd), lo=Math.min(...lpds), hi=Math.max(...lpds), overall=lpds.reduce((a,b)=>a+b,0)/lpds.length;
- // perfil sazonal por mês-calendário
- const seasDev={}; for(let m=1;m<=12;m++){ const arr=S.filter(p=>p.competencia%100===m).map(p=>+p.lpd); if(arr.length) seasDev[m]=((arr.reduce((a,b)=>a+b,0)/arr.length)/overall-1)*100; }
+ const vals=S.map(g), lo=Math.min(...vals), hi=Math.max(...vals), overall=vals.reduce((a,b)=>a+b,0)/vals.length;
+ // perfil sazonal por mês-calendário (desvio % vs média geral — dimensão-livre, vale p/ qualquer composição)
+ const seasDev={}; for(let m=1;m<=12;m++){ const arr=S.filter(p=>p.competencia%100===m).map(g); if(arr.length) seasDev[m]=((arr.reduce((a,b)=>a+b,0)/arr.length)/(overall||1)-1)*100; }
  const maxDev=Math.max(1,...Object.values(seasDev).map(Math.abs));
+ // chips de composição
+ const chips=MM_SEAS_ORDER.map(k=>`<button class="mmchip ${mmSeasMet===k?'on':''}" data-seas="${k}">${MM_SEAS_MET[k].l}</button>`).join('');
  // heatmap grid
  let grid='<div class="mmheat"><div class="mmhcell mmhlbl"></div>'+MM_MES.map(mn=>`<div class="mmhcell mmhhdr">${mn}</div>`).join('');
- years.forEach(y=>{ grid+=`<div class="mmhcell mmhlbl">${y}</div>`; for(let m=1;m<=12;m++){ const p=byYM[y+'-'+m]; if(!p){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const t=(+p.lpd-lo)/((hi-lo)||1), sel=p.competencia===mmSel; grid+=`<div class="mmhcell${sel?' mmhsel':''}" style="background:${mmHeat(t)}" title="${mmCmp(p.competencia)}: ${br1(p.lpd)} L/lig/dia">${Math.round(p.lpd)}</div>`; } });
+ years.forEach(y=>{ grid+=`<div class="mmhcell mmhlbl">${y}</div>`; for(let m=1;m<=12;m++){ const p=byYM[y+'-'+m]; if(!p){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const v=g(p), t=(v-lo)/((hi-lo)||1), sel=p.competencia===mmSel; grid+=`<div class="mmhcell${sel?' mmhsel':''}" style="background:${mmHeat(t)}" title="${mmCmp(p.competencia)}: ${mmSeasFmt(v)}">${mmCompact(v)}</div>`; } });
  grid+='<div class="mmhcell mmhlbl">Sazonal</div>'; for(let m=1;m<=12;m++){ if(seasDev[m]==null){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const d=seasDev[m]; grid+=`<div class="mmhcell mmhdev" style="background:${mmDiv(d,maxDev)}" title="${MM_MES[m-1]}: ${mmSig(d)}% vs média geral">${d>=0?'+':''}${Math.round(d)}%</div>`; }
  grid+='</div>';
  // gráfico: último ano em linha + sombra min/max dos anteriores
  const maxYear=years[years.length-1], W=900,H=190,pl=46,pr=14,pt=14,pb=26;
- const ylo=Math.min(...lpds)*0.9, yhi=Math.max(...lpds)*1.06;
+ const ylo=lo*0.9, yhi=hi*1.06;
  const X=m=>pl+((m-1)/11)*(W-pl-pr), Y=v=>pt+(1-(v-ylo)/((yhi-ylo)||1))*(H-pt-pb);
  const prior=years.filter(y=>y!==maxYear);
- const bTop=[],bBot=[]; for(let m=1;m<=12;m++){ const arr=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(p=>+p.lpd); if(arr.length){ bTop.push([m,Math.max(...arr)]); bBot.push([m,Math.min(...arr)]); } }
+ const bTop=[],bBot=[]; for(let m=1;m<=12;m++){ const arr=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(g); if(arr.length){ bTop.push([m,Math.max(...arr)]); bBot.push([m,Math.min(...arr)]); } }
  let band=''; if(bTop.length){ const up=bTop.map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)); const dn=bBot.slice().reverse().map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)); band=`<polygon points="${up.concat(dn).join(' ')}" fill="rgba(138,143,152,.20)" stroke="rgba(138,143,152,.35)" stroke-width=".6"/>`; }
- const lp=[]; for(let m=1;m<=12;m++){ const p=byYM[maxYear+'-'+m]; if(p)lp.push([m,+p.lpd]); }
+ const lp=[]; for(let m=1;m<=12;m++){ const p=byYM[maxYear+'-'+m]; if(p)lp.push([m,g(p)]); }
  const line=lp.length?`<polyline points="${lp.map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>`:'';
- const dots=lp.map(([m,v])=>{ const pri=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(p=>+p.lpd); const pv=pri.length?pri.reduce((a,b)=>a+b,0)/pri.length:null; return `<circle cx="${X(m).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="var(--accent)"><title>${MM_MES[m-1]}/${maxYear}: ${br1(v)} L/lig/dia${pv!=null?' · anos ant.: '+br1(pv):''}</title></circle>`; }).join('');
- const gl=[0,.5,1].map(f=>{ const v=ylo+(yhi-ylo)*f, yy=Y(v); return `<line x1="${pl}" y1="${yy.toFixed(1)}" x2="${W-pr}" y2="${yy.toFixed(1)}" stroke="#ffffff14"/><text x="${pl-6}" y="${(yy+3).toFixed(1)}" fill="#ffffff66" font-size="8.5" text-anchor="end">${Math.round(v)}</text>`; }).join('');
+ const dots=lp.map(([m,v])=>{ const pri=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(g); const pv=pri.length?pri.reduce((a,b)=>a+b,0)/pri.length:null; return `<circle cx="${X(m).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="var(--accent)"><title>${MM_MES[m-1]}/${maxYear}: ${mmSeasFmt(v)}${pv!=null?' · anos ant.: '+mmSeasFmt(pv):''}</title></circle>`; }).join('');
+ const gl=[0,.5,1].map(f=>{ const v=ylo+(yhi-ylo)*f, yy=Y(v); return `<line x1="${pl}" y1="${yy.toFixed(1)}" x2="${W-pr}" y2="${yy.toFixed(1)}" stroke="#ffffff14"/><text x="${pl-6}" y="${(yy+3).toFixed(1)}" fill="#ffffff66" font-size="8.5" text-anchor="end">${mmCompact(v)}</text>`; }).join('');
  const xlab=MM_MES.map((mn,i)=>`<text x="${X(i+1).toFixed(1)}" y="${H-8}" fill="#ffffff66" font-size="9" text-anchor="middle">${mn}</text>`).join('');
  return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Sazonalidade & tendência</h3>${mmIB('season')}<span class="chip real" style="margin-left:auto">real</span></div>
   <div class="pbody">
-   <p class="note" style="margin-top:0">Tudo em <b>L/lig/dia</b> para empatar as variáveis. Heatmap por mês/ano + perfil sazonal; abaixo, <b>${maxYear}</b> em linha e a faixa mín–máx dos anos anteriores como sombra.</p>
+   <div class="mmfilters" style="margin:0 0 10px">${chips}</div>
+   <p class="note" style="margin-top:0">Exibindo <b>${M.l}</b> <span style="opacity:.7">(${M.u})</span>. Alterne a composição acima para investigar o que causa as flutuações. Heatmap por mês/ano + perfil sazonal; abaixo, <b>${maxYear}</b> em linha e a faixa mín–máx dos anos anteriores como sombra.</p>
    ${grid}
    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin-top:12px">${gl}${band}${line}${dots}${xlab}</svg>
-   <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). Passe o mouse nos pontos para o valor exato.</p>
+   <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). A linha <b>Sazonal</b> é sempre o desvio % vs a média geral da composição. Passe o mouse nos pontos para o valor exato.</p>
   </div></div>`;
 }
 /* ---- painel 3: DMCs mais sensíveis ---- */
@@ -1791,6 +1811,7 @@ function mmRenderAll(){
  $('#mmBody').innerHTML = mmKpiPanel()+mmSeasonPanel()+mmDmcPanel()+mmAnalysisPanel();
  const sel=$('#mmMesSel'); if(sel) sel.onchange=()=>mmSetMes(sel.value);
  $('#mmBody').querySelectorAll('.mminfo').forEach(b=>b.onclick=()=>{ const i=MM_INFO[b.dataset.info]; if(i)mmModal(i.t,i.h); });
+ $('#mmBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ mmSeasMet=el.dataset.seas; mmRenderAll(); });
  $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{ mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls); mmLoadRank(); });
  $('#mmBody').querySelectorAll('.mmchip').forEach(el=>el.onclick=()=>{ mmClass=el.dataset.cls; mmLoadRank(); });
  const bu=$('#mmBusca'); if(bu) bu.onkeydown=e=>{ if(e.key==='Enter'){ mmBusca=bu.value.trim(); mmLoadRank(); } };
