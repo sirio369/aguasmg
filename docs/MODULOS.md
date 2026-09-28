@@ -1821,6 +1821,16 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
 - **Filtro de consórcio (2026-09-28):** select **Ambos/Betim(ZA0200)/Contagem(ZA1004)** nas barras `pjfilt` de Campo
   (`#pjCons`) e Suporte (`#pjSupCons`); estado compartilhado `pjFcons`, entra no `pjOk` (`iv.za` = `p.consorcio` gravado
   em cada iv no `pjLoad`). Filtra mapa+lista+contador. (Consórcio derivado da cidade na RPC: Betim→ZA0200, Contagem→ZA1004.)
+- **Status DERIVADO (2026-09-28):** o status deixou de ser campo fixo (todo import entrava `new`) — agora
+  **`pjStatusDe(iv)`** deriva do estado real: **`cfg` "Em configuração"** quando `!iv.locked` (travada no Suporte, campo
+  bloqueado); depois de liberada, **`new` "Não iniciada"** (0%), **`run` "Em andamento"** (0–100%), **`done`
+  "Finalizada"** (≥100%, via `pjIvPct`). Usado em `pjOk` (filtro), nas listas, no as-built e salvo em `p_status`
+  (`pjSaveNow`). Nova opção **"Em configuração"** nos selects de status + pill `.pjpill.cfg` (âmbar). Isso responde
+  "como o status é atribuído": antes não era — ficava tudo "Não iniciada".
+- **Mapa — início/fim do traçado (2026-09-28):** cada linha ganha 2 marcadores (`divIcon` `.pjenddot`): **início = "I"
+  verde**, **fim = "F" vermelho** (nas pontas `lls[0]`/`lls[-1]`), p/ deixar o sentido do traçado legível. **Removidos**
+  a legenda de cores (`#pjLeg`/`#pjSupLeg`) e os textos de dica sob os dois mapas ("Toque num pino…"/"Toque numa
+  intervenção…").
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.

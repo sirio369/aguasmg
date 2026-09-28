@@ -117,6 +117,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjleg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:11px;color:var(--mut)}
 .pjleg span{display:inline-flex;align-items:center;gap:5px}
 .pjleg i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.pjend{background:none!important;border:none!important}
+.pjenddot{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:2px solid #fff;color:#fff;font-size:9px;font-weight:800;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.45)}
 .pjcount{font-size:12px;color:var(--mut);margin:2px 0 10px}
 .pjcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--tc,var(--acc));border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .pjcard:active{transform:scale(.995)}
@@ -126,6 +128,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjpill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .pjpill.run{background:var(--warn-bg);color:var(--warn)}
 .pjpill.new{background:var(--line);color:var(--mut)}
+.pjpill.cfg{background:var(--warn-bg);color:var(--warn)}
 .pjpill.done{background:var(--ok-bg);color:var(--ok)}
 .pjbar{height:7px;border-radius:999px;background:var(--line);overflow:hidden;margin:8px 0 4px}
 .pjbar i{display:block;height:100%;background:var(--acc);border-radius:999px}
@@ -842,8 +845,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <select id="pjTipo"></select>
       <select id="pjStatus">
         <option value="">Todos os status</option>
-        <option value="run">Em andamento</option>
+        <option value="cfg">Em configuração</option>
         <option value="new">Não iniciada</option>
+        <option value="run">Em andamento</option>
         <option value="done">Finalizada</option>
       </select>
     </div>
@@ -851,8 +855,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="pjCount" class="pjcount"></div>
     <div id="pjMapaWrap">
       <div id="pjMapaL" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
-      <div class="pjleg" id="pjLeg" style="margin-top:8px"></div>
-      <p class="pjhint" style="margin-top:6px">Toque num pino ou traçado para abrir a intervenção.</p>
     </div>
     <div id="pjLista" hidden style="margin-top:6px"></div>
   </main>
@@ -878,8 +880,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <select id="pjSupTipo"></select>
       <select id="pjSupStatus">
         <option value="">Todos os status</option>
-        <option value="run">Em andamento</option>
+        <option value="cfg">Em configuração</option>
         <option value="new">Não iniciada</option>
+        <option value="run">Em andamento</option>
         <option value="done">Finalizada</option>
       </select>
     </div>
@@ -887,8 +890,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="pjSupCount" class="pjcount"></div>
     <div id="pjSupMapaWrap">
       <div id="pjSupMapaL" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
-      <div class="pjleg" id="pjSupLeg" style="margin-top:8px"></div>
-      <p class="pjhint" style="margin-top:8px">Toque numa intervenção para configurar o escopo e o cadeado.</p>
     </div>
     <div id="pjSupLista" hidden style="margin-top:6px"></div>
   </main>
@@ -1354,7 +1355,9 @@ const PJ_TIPOS={
 // cores reais (espelham as CSS vars --t-* acima) — Leaflet precisa de cor resolvida, não var()
 const PJ_TIPO_COR={macro_impl:'#0e639c',macro_subst:'#2a9d8f',vrp_impl:'#8a5a00',vrp_subst:'#b3261e',rede_vca:'#6a4bb3',rede_hdd:'#0a7d5e',valvula:'#c026a3'};
 const pjMaps={};   // ctx -> {map, layer}
-const PJ_ST={run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
+const PJ_ST={cfg:['Em configuração','cfg'],run:['Em andamento','run'],new:['Não iniciada','new'],done:['Finalizada','done']};
+// status DERIVADO do estado real: travada p/ config → 'cfg'; liberada e 0% → 'new'; 100%+ → 'done'; entre → 'run'
+function pjStatusDe(iv){ if(!iv||!iv.locked) return 'cfg'; const p=pjIvPct(iv); return p<=0?'new':(p>=100?'done':'run'); }
 // construtores de nó: P=%  M=metros(meta/exec)  R=registro  G=grupo
 const pjP=(n,p,o={})=>({n,k:'%',p,...o});
 const pjM=(n,meta,exec,o={})=>({n,k:'m',meta,exec,un:o.un||'m',...o});
@@ -1483,7 +1486,7 @@ async function pjLoad(force){
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
 const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
 let pjSaveT={};
-async function pjSaveNow(iv){ if(!iv||iv.gid==null||!iv.kind) return; try{ await sb.rpc('app_proj_estado_set',{p_kind:iv.kind,p_gid:iv.gid,p_arv:iv.arv,p_locked:!!iv.locked,p_status:iv.status||null}); }catch(e){ if(window.toast)toast('Erro ao salvar: '+(e.message||e)); } }
+async function pjSaveNow(iv){ if(!iv||iv.gid==null||!iv.kind) return; try{ await sb.rpc('app_proj_estado_set',{p_kind:iv.kind,p_gid:iv.gid,p_arv:iv.arv,p_locked:!!iv.locked,p_status:pjStatusDe(iv)}); }catch(e){ if(window.toast)toast('Erro ao salvar: '+(e.message||e)); } }
 function pjSave(iv){ if(!iv||iv.gid==null) return; const k=iv.kind+'|'+iv.gid; clearTimeout(pjSaveT[k]); pjSaveT[k]=setTimeout(()=>pjSaveNow(iv),500); }
 // ---- log de avanço real ----
 let pjAvancosCur={};   // caminho -> [entradas] da intervenção corrente (para o histórico por etapa)
@@ -1526,12 +1529,11 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
     $('#'+E.status).onchange=e=>{pjFst=e.target.value;pjRefresh(ctx);};
     const sc=$('#'+E.cons); if(sc) sc.onchange=e=>{pjFcons=e.target.value;pjRefresh(ctx);};
     $('#'+E.seg).querySelectorAll('button').forEach(b=>b.onclick=()=>pjSetView(b.dataset.v,ctx));
-    $('#'+E.leg).innerHTML=Object.entries(PJ_TIPOS).map(([k,t])=>`<span><i style="background:${t.c}"></i>${t.n.replace('Implantação de ','Impl. ').replace('Substituição de ','Subst. ')}</span>`).join('');
   }
   if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst; const sco=$('#'+E.cons); if(sco) sco.value=pjFcons;   // sincroniza controles ao estado compartilhado
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
-const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===iv.status)&&(!pjFcons||pjFcons===iv.za);
+const pjOk=iv=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusDe(iv))&&(!pjFcons||pjFcons===iv.za);
 function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
 function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(pjOk).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
@@ -1544,13 +1546,18 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
     if(iv.ll){ const m=L.circleMarker(iv.ll,{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
       m.on('click',()=>E.open(iv.id)); m.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); m.addTo(layer); bounds.push(iv.ll); }
     else if(iv.lls&&iv.lls.length){ const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.9});
-      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p)); }
+      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p));
+      // marcadores de início (verde) e fim (vermelho) p/ deixar o sentido do traçado visível no mapa
+      const a=iv.lls[0], b=iv.lls[iv.lls.length-1];
+      const endMk=(pt,fill,lbl,letra)=>L.marker(pt,{icon:L.divIcon({className:'pjend',iconSize:[16,16],iconAnchor:[8,8],html:`<span class="pjenddot" style="background:${fill}">${letra}</span>`})})
+        .on('click',()=>E.open(iv.id)).bindTooltip(lbl+' · '+iv.cod).addTo(layer);
+      endMk(a,'#1f9d55','Início','I'); endMk(b,'#e5484d','Fim','F'); }
   });
   setTimeout(()=>{ try{ map.invalidateSize(); if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:16}); }catch(e){} },80);
 }
 function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx==='sup';
   const arr=PJ_IVS.filter(pjOk);
-  $('#'+E.lista).innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status],cl=p>100?'over':(p>=100?'ok':'');
+  $('#'+E.lista).innerHTML=arr.map(iv=>{const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[pjStatusDe(iv)],cl=p>100?'over':(p>=100?'ok':'');
    const chip=`<span class="pjlockchip ${iv.locked?'lib':'cfg'}">${iv.locked?'🔓 Liberada':'⏳ Em config.'}</span>`;
    return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span style="display:flex;gap:6px;align-items:center">${chip}${sup?'':`<span class="pjpill ${sc}">${sl}</span>`}</span></div>
     <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
@@ -1878,7 +1885,7 @@ function pjWireTree(d,rerender){
 }
 function pjRenderDet(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv)return; pjReg={}; pjMode='campo'; pjLocked=!!iv.locked;
-  const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[iv.status];
+  const t=PJ_TIPOS[iv.tipo],p=pjIvPct(iv),[sl,sc]=PJ_ST[pjStatusDe(iv)];
   const leaves=iv.arv.flatMap(n=>pjLeaves(n)),done=leaves.filter(x=>pjPct(x)>=100).length,run=leaves.filter(x=>{const v=pjPct(x);return v>0&&v<100;}).length,zero=leaves.length-done-run;
   const ringc=p>100?'var(--warn)':(p>=100?'var(--ok)':'var(--acc)');
   const banner=iv.locked
@@ -1905,7 +1912,7 @@ function pjRenderDet(keep){
 }
 async function pjRel(id){
   const iv=PJ_IVS.find(i=>i.id===id); if(!iv)return; pjCur=id;
-  const t=PJ_TIPOS[iv.tipo],asbuilt=iv.status==='done';
+  const t=PJ_TIPOS[iv.tipo],asbuilt=pjStatusDe(iv)==='done';
   await pjDocsLoad(iv); await pjAvancosLoad(iv);
   // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
   const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
