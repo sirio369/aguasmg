@@ -1427,7 +1427,7 @@ let PJ_IVS=[
 // default: liberada, exceto as ainda não iniciadas (que seguem em configuração).
 PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 // ---- REGROUND: intervenções reais (app_proj_intervencoes) substituem o mock acima ----
-let pjLoaded=false;
+let pjLoaded=false, PJ_LIMITES=[];
 // árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
 const PJ_ARV={
   vrp_impl:()=>[pjP('Locação e cadastro de interferências',0),
@@ -1462,6 +1462,7 @@ async function pjLoad(force){
   let r; try{ r=await sb.rpc('app_proj_intervencoes',{}); if(r.error)throw r.error; }
   catch(e){ if(window.toast)toast('Erro ao carregar intervenções: '+(e.message||e)); return; }
   const d=r.data||{}, pts=(d.pontos&&d.pontos.features)||[], lns=(d.linhas&&d.linhas.features)||[];
+  PJ_LIMITES=(d.limites&&d.limites.features)||[];   // contorno das ZAs (Betim/Contagem) p/ contexto no mapa
   const cs=[]; pts.forEach(f=>cs.push(f.geometry.coordinates)); lns.forEach(f=>(f.geometry.coordinates||[]).forEach(c=>cs.push(c)));
   if(!cs.length){ PJ_IVS=[]; pjLoaded=true; return; }
   const ivs=[];
@@ -1541,9 +1542,13 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   let M=pjMaps[ctx];
   if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map)}; }
   const map=M.map, layer=M.layer; layer.clearLayers();
+  // contorno das ZAs (embaixo de tudo; respeita o filtro de consórcio; NÃO entra no fitBounds)
+  (PJ_LIMITES||[]).forEach(f=>{ const za=f.properties&&f.properties.consorcio; if(pjFcons && pjFcons!==za) return;
+    try{ L.geoJSON(f,{style:{color:za==='ZA0200'?'#b3261e':'#0e639c',weight:1.5,opacity:.8,fill:true,fillColor:za==='ZA0200'?'#b3261e':'#0e639c',fillOpacity:.04,dashArray:'6 4'}})
+      .bindTooltip((za==='ZA0200'?'Betim':'Contagem')+' · limite da ZA',{sticky:true}).addTo(layer); }catch(e){} });
   const arr=PJ_IVS.filter(pjOk), bounds=[];
   arr.forEach(iv=>{
-    if(iv.ll){ const col=PJ_TIPO_COR[iv.tipo]||'#888'; const m=L.circleMarker(iv.ll,{radius:8,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
+    if(iv.ll){ const col=PJ_TIPO_COR[iv.tipo]||'#888'; const m=L.circleMarker(iv.ll,{radius:6,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
       m.on('click',()=>E.open(iv.id)); m.bindTooltip(iv.cod+' · '+PJ_TIPOS[iv.tipo].n); m.addTo(layer); bounds.push(iv.ll); }
     else if(iv.lls&&iv.lls.length){
       // cada traçado recebe uma cor distinta (por gid) p/ separar linhas sobrepostas; o tipo (VCA/HDD) fica no tooltip
