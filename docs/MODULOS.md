@@ -1924,7 +1924,9 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
 - **Cadeado (1 por intervenção):** `iv.locked`. **Liberada** (`locked`) = configuração **congelada**, o campo
   lança avanços. **Em configuração** (`!locked`) = só o Suporte edita escopo/quantidade; **avanços bloqueados**
   (evita desativar atividade que já tem avanço). Default: liberada, exceto `status==='new'` (segue em config).
-  Chip de estado na lista/Suporte (`.pjlockchip` lib/cfg).
+  Chip de estado na lista/Suporte (`.pjlockchip` lib/cfg). **2026-09-28:** removidos os textos de ajuda da tela de
+  configuração — a descrição do card "Em configuração" (mantido só o rótulo + botão Liberar) e o parágrafo `.pjhint`
+  "Ative/desative atividades…" acima do escopo.
 - **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado **aberto**, um item que já tem **lançamento**
   (folha %/m com avanço >0, ou grupo com descendente lançado) **não pode sair do escopo** — o toggle vira 🔒
   e o `−` da Quantidade não remove um bloco com lançamento. "O que foi lançado não pode ser desativado."
@@ -1984,7 +1986,8 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   `pjPeca`/`pjPecas`. **Ramal** (`pjRamal`) traz, nesta ordem: **OS SIGOS** e **Nº do Hidrômetro** (primeiro),
   **Nº do imóvel**, as-built **A1/A2/A3/P1** (registros), depois execução **Escavação/Assentamento/Ligação à
   rede** (% ativáveis). **Peça** (`pjPeca`) traz **Especificação (tipo de componente)** primeiro (`pjSel`, opções
-  em `PJ_PECA_TIPOS`: válvula de manobra, ventosa, descarga, registro, redução, tê, cap, luva, outro; o tipo
+  em `PJ_PECA_TIPOS`: **válvula de manobra, ventosa, descarga** (2026-09-28 — reduzido a essas 3; saíram registro/
+  redução/tê/cap/luva/outro); o tipo
   escolhido aparece no cabeçalho do bloco), depois **Escavação/Escoramento/Montagem hidráulica/Reaterro/
   Recomposição de pavimento** (% ativáveis). `pjReg[rid]=node` mapeia elemento→nó p/ os handlers.
   `pjPct()` agrega: % = média das folhas ativas; `m` = exec/meta; grupo = média dos filhos. `ativo:false`,
