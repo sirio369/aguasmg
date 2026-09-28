@@ -1676,9 +1676,15 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     volume faturado ÷ nº ligações faturadas ÷ **30 dias** × 1000; assume 30 dias, sem componente diário) com
     **seletor de competência** (default = **último mês**), **MoM** (vs mês anterior) e **YoY** (vs mesmo mês do ano
     anterior), volume faturado, % não medido, ligações faturadas, fraude potencial; popup ⓘ explica o cálculo.
-    **(2) Sazonalidade & tendência** — reconstruída **sobre L/lig·dia** (empata as variáveis): **heatmap** ano×mês +
+    **(2) Sazonalidade & tendência** — default **sobre L/lig·dia** (empata as variáveis): **heatmap** ano×mês +
     linha "Sazonal" (desvio de cada mês-calendário vs média) e **gráfico** com o último ano em linha + faixa mín–máx
-    dos anos anteriores como **sombra** (hover por mês corrigido — antes o tooltip não batia com a data). **(3) DMCs
+    dos anos anteriores como **sombra** (hover por mês corrigido — antes o tooltip não batia com a data).
+    **Chips de composição (2026-09-28):** o painel inteiro (heatmap + célula + tooltip + gráfico + eixo) alterna entre
+    **L/lig·dia · Vol. micromedido (total) · Vol. lido (medido) · Vol. estimado (não medido) · Ligações** —
+    decompor ajuda a achar *o que* causa uma flutuação (caiu o lido? subiu o estimado? só entraram mais ligações?). Tudo
+    client-side sobre o `mmMensal` já carregado (o `_mensal` já traz `volume_medido`/`volume_naomedido`, sem RPC nova).
+    Estado `mmSeasMet` (`MM_SEAS_MET`/`MM_SEAS_ORDER`), `mmCompact` formata as células (k/M), `mmSeasFmt` os tooltips;
+    a linha "Sazonal" é sempre **desvio %** (dimensão-livre, vale p/ qualquer composição). **(3) DMCs
     mais sensíveis** — L/lig·dia por DMC (último mês) + MoM/YoY + %não medido + fraude + score, ordenado por
     L/lig·dia. **(4) Análise por matrícula** — distribuição por comportamento (filtro) + ranking (Matrícula/
     Comportamento/Situação/Score, chips + busca) **lado a lado** com o detalhe *sticky* (auto-seleciona o topo);
