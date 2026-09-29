@@ -326,6 +326,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="pesquisa"><div class="ic">🎧</div><div class="nm">Pesquisa</div></button>
       <button class="mod" data-go="entrevistadores"><div class="ic">🧑‍💼</div><div class="nm">Entrevistadores</div></button>
       <button class="mod" data-go="vrp"><div class="ic">🎛️</div><div class="nm">VRPs</div></button>
+      <button class="mod" data-go="projetos"><div class="ic">📐</div><div class="nm">Projetos</div></button>
     </div>
     <div class="sec" style="margin-top:20px">🧰 Suporte</div>
     <div class="grid" style="margin-top:10px">
@@ -335,9 +336,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
     </div>
-    <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">⚙️</button></div>
+    <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod soon" id="cardProj"><div class="ic">📐</div><div class="nm">Projetos 🔒</div></button>
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
       <button class="mod soon" id="cardPessoas"><div class="ic">👥</div><div class="nm">Gestão de Pessoas 🔒</div></button>
     </div>
@@ -841,6 +841,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
         <option value="ZA1004">Contagem</option>
       </select>
       <select id="pjTipo"></select>
+      <select id="pjDmc"></select>
       <select id="pjStatus">
         <option value="">Todos os status</option>
         <option value="new">Não iniciada</option>
@@ -875,6 +876,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
         <option value="ZA1004">Contagem</option>
       </select>
       <select id="pjSupTipo"></select>
+      <select id="pjSupDmc"></select>
       <select id="pjSupStatus">
         <option value="">Todos os status</option>
         <option value="cfg">Em configuração</option>
@@ -1305,7 +1307,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cj=document.getElementById('cardProj'); if(cj){ cj.classList.toggle('soon',!okDev); cj.querySelector('.nm').textContent=okDev?'Projetos':'Projetos 🔒'; cj.onclick=okDev?(()=>irPara('projetos')):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -1359,6 +1361,13 @@ const PJ_ST={cfg:['Em configuração','cfg'],run:['Em andamento','run'],new:['N�
 function pjStatusDe(iv){ if(!iv||!iv.locked) return 'cfg'; const p=pjIvPct(iv); return p<=0?'new':(p>=100?'done':'run'); }
 // status exibido ao usuário: no Campo o "Em configuração" (cfg) não aparece — vira "Não iniciada"; só o Suporte vê cfg
 function pjStatusView(iv,ctx){ const s=pjStatusDe(iv); return (ctx!=='sup' && s==='cfg')?'new':s; }
+// info-chave por tipo de intervenção p/ o cabeçalho (rede: extensão+DN; VRP/válvula: DN; etc.)
+function pjSpecs(iv){ if(!iv) return ''; const b=[]; const isRede=(iv.tipo==='rede_hdd'||iv.tipo==='rede_vca');
+  if(isRede && iv.ext!=null && iv.ext!=='') b.push('Extensão <b>'+(+iv.ext).toLocaleString('pt-BR',{maximumFractionDigits:1})+' m</b>');
+  if(iv.dn) b.push('DN <b>'+iv.dn+'</b>');
+  if(iv.tubulacao) b.push('<b>'+iv.tubulacao+'</b>');
+  if(iv.dmc) b.push('DMC <b>'+iv.dmc+'</b>');
+  return b.length?('<div class="pjspecs" style="display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 0 0;font-size:12.5px;color:var(--ink)">'+b.map(x=>'<span>'+x+'</span>').join('')+'</div>'):''; }
 // construtores de nó: P=%  M=metros(meta/exec)  R=registro  G=grupo
 const pjP=(n,p,o={})=>({n,k:'%',p,...o});
 const pjM=(n,meta,exec,o={})=>({n,k:'m',meta,exec,un:o.un||'m',...o});
@@ -1428,7 +1437,7 @@ let PJ_IVS=[
 // default: liberada, exceto as ainda não iniciadas (que seguem em configuração).
 PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 // ---- REGROUND: intervenções reais (app_proj_intervencoes) substituem o mock acima ----
-let pjLoaded=false, PJ_LIMITES=[];
+let pjLoaded=false, PJ_LIMITES=[], PJ_DMCS=[];
 // árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
 const PJ_ARV={
   vrp_impl:()=>[pjP('Locação e cadastro de interferências',0),
@@ -1464,6 +1473,7 @@ async function pjLoad(force){
   catch(e){ if(window.toast)toast('Erro ao carregar intervenções: '+(e.message||e)); return; }
   const d=r.data||{}, pts=(d.pontos&&d.pontos.features)||[], lns=(d.linhas&&d.linhas.features)||[];
   PJ_LIMITES=(d.limites&&d.limites.features)||[];   // contorno das ZAs (Betim/Contagem) p/ contexto no mapa
+  PJ_DMCS=(d.dmcs&&d.dmcs.features)||[];             // camada de DMCs (contexto no mapa)
   const cs=[]; pts.forEach(f=>cs.push(f.geometry.coordinates)); lns.forEach(f=>(f.geometry.coordinates||[]).forEach(c=>cs.push(c)));
   if(!cs.length){ PJ_IVS=[]; pjLoaded=true; return; }
   const ivs=[];
@@ -1477,7 +1487,7 @@ async function pjLoad(force){
     const tp=/HDD/i.test(String(p.tipo||'')+' '+String(p.layer_dwg||''))?'rede_hdd':'rede_vca';
     ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:tp,cod:p.codigo||p.layer_dwg||('#'+p.gid),
       local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
-      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,ext:p.extensao_m,tubulacao:p.tubulacao,
       lls,arv:(PJ_ARV[tp]||PJ_ARV.rede_vca)(p.extensao_m)}); });
   // sobrepõe o estado salvo (snapshot) nos templates
   let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
@@ -1510,7 +1520,7 @@ function pjPct(node){
 const pjIvPct=iv=>{const vs=iv.arv.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;};
 // conta folhas mensuráveis ativas (para o resumo)
 function pjLeaves(node,acc){ acc=acc||[]; if(node.ativo===false)return acc; if(node.f&&node.f.length){node.f.forEach(c=>pjLeaves(c,acc));} else if(node.k==='%'||node.k==='m'){acc.push(node);} return acc; }
-let pjFtipo='',pjFst='',pjFcons='',pjView='mapa',pjCur=null,pjReg={};
+let pjFtipo='',pjFst='',pjFcons='',pjFdmc='',pjView='mapa',pjCur=null,pjReg={};
 function pjZero(n){ if(n.k==='%')n.p=0; if(n.k==='m')n.exec=0; if(n.k==='reg')n.v='—'; if(n.k==='sel')n.v=''; if(n.f)n.f.forEach(pjZero); return n; }
 let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (configurar escopo/quantidade, só Suporte)
 let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o render da árvore
@@ -1527,8 +1537,8 @@ function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.leng
 
 // contexto de tela (campo × suporte): ids dos elementos + ação ao tocar num card/pino
 const PJ_CTX={
-  campo:{tipo:'pjTipo',status:'pjStatus',cons:'pjCons',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',mapEl:'pjMapaL',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
-  sup:{tipo:'pjSupTipo',status:'pjSupStatus',cons:'pjSupCons',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
+  campo:{tipo:'pjTipo',status:'pjStatus',cons:'pjCons',dmc:'pjDmc',seg:'pjSeg',count:'pjCount',mapWrap:'pjMapaWrap',mapEl:'pjMapaL',lista:'pjLista',leg:'pjLeg',open:id=>pjOpen(id)},
+  sup:{tipo:'pjSupTipo',status:'pjSupStatus',cons:'pjSupCons',dmc:'pjSupDmc',seg:'pjSupSeg',count:'pjSupCount',mapWrap:'pjSupMapaWrap',mapEl:'pjSupMapaL',lista:'pjSupLista',leg:'pjSupLeg',open:id=>pjOpenCfg(id)}
 };
 function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.tipo);
   if(ctx!=='sup' && pjFst==='cfg') pjFst='';   // "Em configuração" só existe no Suporte; não vaza filtro pro Campo
@@ -1539,10 +1549,14 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
     $('#'+E.seg).querySelectorAll('button').forEach(b=>b.onclick=()=>pjSetView(b.dataset.v,ctx));
   }
   if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst; const sco=$('#'+E.cons); if(sco) sco.value=pjFcons;   // sincroniza controles ao estado compartilhado
+  const dm=$('#'+E.dmc);   // filtro de DMC (opções derivadas das intervenções carregadas)
+  if(dm){ const dmcs=[...new Set(PJ_IVS.map(iv=>iv.dmc).filter(Boolean))].sort();
+    dm.innerHTML='<option value="">Todos os DMCs</option>'+dmcs.map(d=>`<option value="${d}">${d}</option>`).join('');
+    dm.value=pjFdmc; dm.onchange=e=>{pjFdmc=e.target.value;pjRefresh(ctx);}; }
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
 // Campo (usuário final) só enxerga intervenções liberadas; as "Em configuração" (cfg) aparecem só no Suporte
-const pjOk=(iv,ctx)=>(ctx==='sup'||pjStatusDe(iv)!=='cfg')&&(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusView(iv,ctx))&&(!pjFcons||pjFcons===iv.za);
+const pjOk=(iv,ctx)=>(ctx==='sup'||pjStatusDe(iv)!=='cfg')&&(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusView(iv,ctx))&&(!pjFcons||pjFcons===iv.za)&&(!pjFdmc||pjFdmc===iv.dmc);
 function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
 function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(iv=>pjOk(iv,ctx)).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
@@ -1550,9 +1564,14 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   let M=pjMaps[ctx];
   if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map)}; }
   const map=M.map, layer=M.layer; layer.clearLayers();
-  // contorno das ZAs (embaixo de tudo; respeita o filtro de consórcio; NÃO entra no fitBounds)
-  (PJ_LIMITES||[]).forEach(f=>{ const za=f.properties&&f.properties.consorcio; if(pjFcons && pjFcons!==za) return;
-    try{ L.geoJSON(f,{style:{color:za==='ZA0200'?'#b3261e':'#0e639c',weight:1.5,opacity:.8,fill:true,fillColor:za==='ZA0200'?'#b3261e':'#0e639c',fillOpacity:.04,dashArray:'6 4'}})
+  // camada de DMCs (contexto, embaixo; respeita consórcio; o DMC filtrado fica destacado). NÃO entra no fitBounds
+  (PJ_DMCS||[]).forEach(f=>{ const p=f.properties||{}, za=p.consorcio, cod=p.codigo; if(pjFcons && pjFcons!==za) return;
+    const sel=pjFdmc && pjFdmc===cod;
+    try{ L.geoJSON(f,{style:{color:'#5b6b78',weight:sel?2.4:1,opacity:sel?.95:.5,fill:true,fillColor:'#7a8794',fillOpacity:sel?.12:.03,dashArray:sel?null:'3 3'}})
+      .bindTooltip((cod||('DMC '+(p.numero||'')))+(za==='ZA0200'?' · Betim':' · Contagem'),{sticky:true}).addTo(layer); }catch(e){} });
+  // contorno das ZAs — borda DESTACADA (grossa, sólida), por cima dos DMCs. NÃO entra no fitBounds
+  (PJ_LIMITES||[]).forEach(f=>{ const za=f.properties&&f.properties.consorcio; if(pjFcons && pjFcons!==za) return; const col=za==='ZA0200'?'#b3261e':'#0e639c';
+    try{ L.geoJSON(f,{style:{color:col,weight:3.5,opacity:.95,fill:false}})
       .bindTooltip((za==='ZA0200'?'Betim':'Contagem')+' · limite da ZA',{sticky:true}).addTo(layer); }catch(e){} });
   const arr=PJ_IVS.filter(iv=>pjOk(iv,ctx)), bounds=[];
   arr.forEach(iv=>{
@@ -1750,6 +1769,7 @@ function pjRenderCfg(keep){
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b></div><button class="btn" id="pjLock">🔓 Liberar para execução</button></div>`;
   $('#pjCfg').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
    <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
+   ${pjSpecs(iv)}
    ${lockCard}
    <div class="sec">🧱 Escopo da intervenção</div>
    <div class="pjtree ${iv.locked?'frozen':''}">${iv.arv.map(pjNodeHtml).join('')}</div>
@@ -1904,6 +1924,7 @@ function pjRenderDet(keep){
     : `<div class="pjbanner warn">⏳ <b>Em configuração</b> — aguardando liberação pelo Suporte. Os avanços ficam bloqueados até o cadeado ser liberado.</div>`;
   $('#pjDet').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
    <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp} · início ${iv.ini}</p>
+   ${pjSpecs(iv)}
    <div class="pjsum">
      <div class="pjring" style="background:conic-gradient(${ringc} ${Math.min(p,100)*3.6}deg,var(--line) 0)"><span>${p}%</span></div>
      <div style="flex:1">

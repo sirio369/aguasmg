@@ -402,8 +402,12 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 `projeto_acesso`/`projeto_resumo`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes
 VCA/HDD). Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
 KPIs+timeline por dia/intervenção/atividade+CSV, sobre o feed `pjAllAvancos`). ⚠️ **Protótipo:** avanços não são
-gravados (`pjLeafHist` é mock) e nada persiste — ver fragilidades em `docs/MODULOS.md §8`. Card
-`#cardProj` (categoria **🚧 Em desenvolvimento**) gated em `homeGate()` por **`ME.dev_acesso`**, igual ao Perdas.
+gravados (`pjLeafHist` é mock) e nada persiste — ver fragilidades em `docs/MODULOS.md §8`. **Card em 🛠️ Execução
+(2026-09-29)** — Projetos **saiu de "Em desenvolvimento"**: `data-go="projetos"` **visível a todos**, sem gate de
+`dev_acesso`. As RPCs de leitura/campo (`app_proj_intervencoes`/`_estados`/`_avancos`/`_avancos_iv`/`_docs_listar`/
+`_avanco_registrar`/`_estado_set`) passaram a exigir **só autenticação**; as de config de documento (`app_proj_doc_set`/
+`_remover`) e de acesso (`app_proj_acesso_*`) seguem no gate **Suporte** = admin **ou** `proj_sup_acesso`. Ou seja, o
+campo vê/lança avanços; a **Configuração (Suporte)** continua restrita por `pjPodeSup()`.
 **Controle de acesso "Em desenvolvimento" (2026-09):** engrenagem ⚙️ na categoria (`#homeDevAcesso`, só admin,
 `homeGate` mostra) → tela `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`): lista usuários
 com toggle. Backend: coluna **`perfil.dev_acesso`** (admin sempre) + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set`
