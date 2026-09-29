@@ -1483,6 +1483,11 @@ async function pjLoad(force){
   let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
   const byKey={}; est.forEach(s=>byKey[s.kind+'|'+s.gid]=s);
   ivs.forEach(iv=>{ const s=byKey[iv.kind+'|'+iv.gid]; if(s){ if(s.arv) iv.arv=s.arv; iv.locked=!!s.locked; if(s.status) iv.status=s.status; } else iv.locked=false; });
+  // reconciliação: snapshots de rede salvos ANTES da adição do bloco "Ramais" (2026-09) não o têm — insere-o
+  // (preserva o resto da config; some sozinho quando o snapshot for regravado). Só p/ árvores de rede VCA/HDD.
+  ivs.forEach(iv=>{ if((iv.tipo==='rede_vca'||iv.tipo==='rede_hdd') && Array.isArray(iv.arv) && !iv.arv.some(n=>/^ramais$/i.test((n&&n.n)||''))){
+    try{ const ram=(PJ_ARV[iv.tipo]()||[]).find(n=>/^ramais$/i.test((n&&n.n)||'')); if(ram){ const pi=iv.arv.findIndex(n=>/peças/i.test((n&&n.n)||'')); iv.arv.splice(pi>=0?pi+1:iv.arv.length,0,ram); } }catch(_){}
+  } });
   PJ_IVS=ivs; pjLoaded=true;
 }
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
@@ -1536,7 +1541,8 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
   if(st) st.value=pjFtipo; const stt=$('#'+E.status); if(stt) stt.value=pjFst; const sco=$('#'+E.cons); if(sco) sco.value=pjFcons;   // sincroniza controles ao estado compartilhado
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
-const pjOk=(iv,ctx)=>(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusView(iv,ctx))&&(!pjFcons||pjFcons===iv.za);
+// Campo (usuário final) só enxerga intervenções liberadas; as "Em configuração" (cfg) aparecem só no Suporte
+const pjOk=(iv,ctx)=>(ctx==='sup'||pjStatusDe(iv)!=='cfg')&&(!pjFtipo||pjFtipo===iv.tipo)&&(!pjFst||pjFst===pjStatusView(iv,ctx))&&(!pjFcons||pjFcons===iv.za);
 function pjSetView(v,ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjView=v; const s=$('#'+E.seg); if(s)s.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v)); const mw=$('#'+E.mapWrap); if(mw)mw.hidden=v!=='mapa'; const l=$('#'+E.lista); if(l)l.hidden=v!=='lista'; if(v==='mapa'){ const M=pjMaps[ctx]; if(M) setTimeout(()=>{ try{M.map.invalidateSize();}catch(e){} },60); } }
 function pjRefresh(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; pjRenderMap(ctx); pjRenderList(ctx); const n=PJ_IVS.filter(iv=>pjOk(iv,ctx)).length; const c=$('#'+E.count); if(c)c.textContent=n+' intervenç'+(n!=1?'ões':'ão'); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];

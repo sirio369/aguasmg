@@ -1891,6 +1891,13 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   Suporte, então o **Campo** (usuário final) só vê **Não iniciada/Em andamento/Finalizada**; a opção "Em configuração"
   saiu do `#pjStatus` (fica só no `#pjSupStatus`) e o chip "⏳ Em config." agora aparece **só na lista do Suporte** (o
   Campo mostra apenas a pill de status). `pjOk`/`pjInit` recebem `ctx`; `pjFst='cfg'` é limpo ao entrar no Campo.
+  **2026-09-29 — Campo esconde de vez o cfg:** `pjOk` filtra `pjStatusDe(iv)!=='cfg'` fora do Suporte, então
+  intervenções em configuração **não aparecem no mapa/lista do Campo** (nem contam no total) — só surgem no Suporte
+  (configuração das intervenções). Ao liberar o cadeado, entram no Campo.
+- **Reconciliação de snapshot — bloco Ramais (2026-09-29):** snapshots de rede (`app_proj_estados`) salvos **antes** da
+  adição do bloco **Ramais** ao template não o tinham (ex.: a AL14/F05 tinha 11 nós, 0 ramais). O `pjLoad`, após
+  sobrepor o snapshot, **insere o bloco Ramais** (do `PJ_ARV[tipo]()`) logo após "Peças e acessórios" nas árvores
+  `rede_vca`/`rede_hdd` que não o tiverem — preserva o resto da config e some sozinho quando o snapshot for regravado.
 - **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
   `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
   anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
