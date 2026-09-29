@@ -1936,8 +1936,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
 - **Visão 3D nos documentos da config (2026-09-29):** em `projeto_cfg`, para intervenções de **VRP** (`vrp_impl`/
   `vrp_subst`), a seção Documentos ganha a linha **🧊 Visão 3D** → `pjOpen3d(iv)` abre um overlay (`#pj3d`) com
   `<iframe src="https://vrps-3d-aguas-mg.vercel.app/?embed=1" allow="fullscreen; xr-spatial-tracking">` (visor externo
-  das 16 VRPs, projeto Vercel independente). Hoje abre o visor geral; dá p/ evoluir com `?vrp=NN` (deep-link por peça) e
-  `postMessage({tipo:'abrirVRP',vrp})` quando houver mapeamento intervenção→nº da VRP.
+  das 16 VRPs, projeto Vercel independente). **Deep-link por peça (2026-09-29):** o `projeto`/`id` da intervenção de
+  VRP já traz o nº (`"VRP-07"`, `"BET-02-VRP-29"`) e essas **16 = exatamente as 16 do visor**, únicas por número — o
+  `pjLoad` extrai (`iv.vrp`, regex `/VRP-?(\d+)/i`, mantém o zero à esquerda) e o `pjOpen3d` abre direto em
+  `?embed=1&vrp=NN`. Consórcio/DMC não são necessários p/ desambiguar (números não se repetem entre ZAs).
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
