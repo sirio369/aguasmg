@@ -1909,6 +1909,21 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   **fora do `fitBounds`** (não afasta o zoom das intervenções). **Marcadores pontuais reduzidos** (`radius` 8→6).
 - **⚠️ `sw.js` ASSETS:** restaurados `logo-aguas-integradas.png`/`logo-eficiencia-hidrica.png` no precache (tinham
   caído da lista na resolução de conflito ao empilhar os PRs da Geovana; os arquivos sempre estiveram no repo).
+- **Projetos → 🛠️ Execução + política de acesso (2026-09-29):** o card saiu de "Em desenvolvimento" p/ **Execução**
+  (`data-go="projetos"`, sem gate). **Gate das RPCs revisto:** leitura/campo (`app_proj_intervencoes`/`_estados`/
+  `_avancos`/`_avancos_iv`/`_docs_listar`/`_avanco_registrar`/`_estado_set`) agora só exigem **autenticação** (saiu o
+  `dev_acesso`); config de documento (`_doc_set`/`_doc_remover`) e acesso (`app_proj_acesso_*`) migraram p/ o gate
+  **Suporte** (admin **ou** `proj_sup_acesso`). `homeGate` não gerencia mais `#cardProj`; a engrenagem ⚙️ de "Em
+  desenvolvimento" perdeu a borda (só Perdas/Pessoas seguem lá). E2E: usuário de campo comum lê tudo e **não** consegue
+  `doc_set`. **Filtro de DMC (2026-09-29):** `#pjDmc`/`#pjSupDmc` (estado `pjFdmc`, opções = DMCs distintos das
+  intervenções carregadas) entra no `pjOk` das duas telas. **Camada de DMCs no mapa:** `app_proj_intervencoes` ganhou
+  a chave **`dmcs`** (`"7 - setorizacao".dmc`, simplificada 15 m, `codigo`/`numero`/`consorcio`); `PJ_DMCS` desenhado
+  por baixo (tracejado fino, o DMC filtrado em destaque). **Borda da ZA mais forte** (`weight` 1.5→3.5, sólida, sem
+  fill). **Cabeçalho por tipo (`pjSpecs`):** nas telas de intervenção (`pjRenderDet`/`pjRenderCfg`) mostra info-chave —
+  rede VCA/HDD: **Extensão (m) + DN**; VRP/Válvula/macro: **DN**; + tubulação e DMC quando houver (`ext`/`tubulacao`
+  agora guardados no iv das linhas).
+- **Loggers `-3` (2026-09-29):** inseridos `J-4971-3`/`J-5048-3`/`J-6499-3`/`J-6635-3` em
+  `"8 - coleta_campo".instalacao_logger_calibracao` (ZA0200, pendentes, copiando ponto planejado + modelo dos `-2`).
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
