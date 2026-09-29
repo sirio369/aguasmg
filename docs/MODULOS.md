@@ -1924,6 +1924,12 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   agora guardados no iv das linhas).
 - **Loggers `-3` (2026-09-29):** inseridos `J-4971-3`/`J-5048-3`/`J-6499-3`/`J-6635-3` em
   `"8 - coleta_campo".instalacao_logger_calibracao` (ZA0200, pendentes, copiando ponto planejado + modelo dos `-2`).
+- **Atividade fora do escopo some no Campo (2026-09-29):** `pjNodeHtml` retorna `''` para nó `ativo===false` quando
+  `pjMode==='campo'` — o usuário do Campo não vê mais a atividade **opaca** (no Suporte/config ela continua visível com
+  o toggle "No escopo?"). Já era coerente com o %: `pjPct` retorna `null` e `pjLeaves` pula `ativo===false`.
+- **3 fotos por avanço (2026-09-29):** o painel de lançamento (`.pjlaunch`) passou de 2 para **3** `.pjph2` (Foto 1/2/3);
+  o handler `[data-launch]` já coletava todas via `.pjph2 input[type=file]` e o `app_proj_avanco_registrar.p_fotos text[]`
+  aceita qualquer nº — sem mudança de backend. `.pjfotos` ganhou `flex-wrap` + `min-width` p/ caber no celular.
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
