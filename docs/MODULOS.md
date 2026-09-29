@@ -1924,6 +1924,20 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   agora guardados no iv das linhas).
 - **Loggers `-3` (2026-09-29):** inseridos `J-4971-3`/`J-5048-3`/`J-6499-3`/`J-6635-3` em
   `"8 - coleta_campo".instalacao_logger_calibracao` (ZA0200, pendentes, copiando ponto planejado + modelo dos `-2`).
+- **Atividade fora do escopo some no Campo (2026-09-29):** `pjNodeHtml` retorna `''` para nó `ativo===false` quando
+  `pjMode==='campo'` — o usuário do Campo não vê mais a atividade **opaca** (no Suporte/config ela continua visível com
+  o toggle "No escopo?"). Já era coerente com o %: `pjPct` retorna `null` e `pjLeaves` pula `ativo===false`.
+- **3 fotos por avanço (2026-09-29):** o painel de lançamento (`.pjlaunch`) passou de 2 para **3** `.pjph2` (Foto 1/2/3);
+  o handler `[data-launch]` já coletava todas via `.pjph2 input[type=file]` e o `app_proj_avanco_registrar.p_fotos text[]`
+  aceita qualquer nº — sem mudança de backend. `.pjfotos` ganhou `flex-wrap` + `min-width` p/ caber no celular.
+- **Resumo por período → Campo (2026-09-29):** o card "Resumo por período" saiu da categoria **Suporte** para **Campo**
+  no `pjHub` e `pjResumoEnter` perdeu o gate `pjPodeSup()` (aberto a todos, como Intervenções). Título "Suporte ·
+  Resumo por período" → "Resumo por período". Só **Configuração de intervenções** segue no Suporte (pjPodeSup).
+- **Visão 3D nos documentos da config (2026-09-29):** em `projeto_cfg`, para intervenções de **VRP** (`vrp_impl`/
+  `vrp_subst`), a seção Documentos ganha a linha **🧊 Visão 3D** → `pjOpen3d(iv)` abre um overlay (`#pj3d`) com
+  `<iframe src="https://vrps-3d-aguas-mg.vercel.app/?embed=1" allow="fullscreen; xr-spatial-tracking">` (visor externo
+  das 16 VRPs, projeto Vercel independente). Hoje abre o visor geral; dá p/ evoluir com `?vrp=NN` (deep-link por peça) e
+  `postMessage({tipo:'abrirVRP',vrp})` quando houver mapeamento intervenção→nº da VRP.
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.

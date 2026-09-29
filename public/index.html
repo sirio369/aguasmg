@@ -207,8 +207,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjhobs{font-size:11px;color:var(--mut);margin:0 0 5px 34px;font-style:italic}
 .pjthumb.sm{width:26px;height:26px;font-size:13px;border-radius:6px}
 .pjaccum{font-size:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)} .pjaccum b{font-family:ui-monospace,monospace}
-.pjfotos{display:flex;gap:8px;margin:8px 0}
-.pjph2{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;color:var(--acc);border:1px dashed var(--acc);border-radius:9px;padding:11px;cursor:pointer;white-space:nowrap}
+.pjfotos{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.pjph2{flex:1;min-width:92px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;color:var(--acc);border:1px dashed var(--acc);border-radius:9px;padding:11px;cursor:pointer;white-space:nowrap}
 .pjph2.has{color:var(--ok);border-color:var(--ok);border-style:solid}
 .pjobs{width:100%;font-size:14px;padding:9px 10px;resize:vertical;margin-top:2px}
 .pjdocbtns{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
@@ -907,8 +907,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="projeto_resumo" class="hidden">
     <div class="bar"><button class="bk" id="pjRsBack">‹ Projetos</button></div>
-    <h1>Suporte · Resumo por período</h1>
-    <p class="sub">Avanços de todas as intervenções num período. <b>Prévia:</b> dados de exemplo até o registro real de avanços.</p>
+    <h1>Resumo por período</h1>
+    <p class="sub">Avanços de todas as intervenções num período.</p>
     <div id="pjRsBody"></div>
   </main>
 
@@ -1606,12 +1606,12 @@ function pjHub(){
    <p class="pjhint" style="margin:0 0 8px">Dia a dia de obra: registro de avanços por intervenção liberada.</p>
    <div class="grid">
      <button class="mod" data-pjgo="projeto_campo"><div class="ic">📋</div><div class="nm">Intervenções</div></button>
+     <button class="mod" data-pjgo="projeto_resumo"><div class="ic">📅</div><div class="nm">Resumo por período</div></button>
    </div>
    <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🧰 Suporte${setSup?'<button id="pjHubAcesso" title="Quem acessa o Suporte" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">🔐</button>':''}</div>
    <p class="pjhint" style="margin:0 0 8px">Retaguarda: configurar escopo/quantidades e liberar o cadeado. ${sup?'':'Acesso restrito.'}</p>
    <div class="grid">
      <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_sup':''}"><div class="ic">⚙️</div><div class="nm">Configuração de intervenções${sup?'':' 🔒'}</div></button>
-     <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_resumo':''}"><div class="ic">📅</div><div class="nm">Resumo por período${sup?'':' 🔒'}</div></button>
    </div>`;
   $('#pjHub').querySelectorAll('[data-pjgo]').forEach(b=>b.onclick=()=>{ const dst=b.dataset.pjgo; if(!dst){ toast('Acesso restrito à equipe de configuração'); return; } irPara(dst); });
   const ac=$('#pjHubAcesso'); if(ac) ac.onclick=e=>{ e.stopPropagation(); irPara('projeto_acesso'); };
@@ -1654,7 +1654,7 @@ async function pjResumoLoad(){
         d:String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'), ano:d.getFullYear(), ts:ts}; });
   }catch(e){ pjRsFeed=[]; if(window.toast)toast('Erro no resumo: '+(e.message||e)); }
 }
-async function pjResumoEnter(){ if(!pjPodeSup()){ toast('Acesso restrito à equipe de configuração'); irPara('projetos'); return; } const b=$('#pjRsBody'); if(b) b.innerHTML='<p class="sub">Carregando…</p>'; await pjResumoLoad(); pjResumo(); }
+async function pjResumoEnter(){ const b=$('#pjRsBody'); if(b) b.innerHTML='<p class="sub">Carregando…</p>'; await pjResumoLoad(); pjResumo(); }
 function pjFmtD(ts){ const d=new Date(ts); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
 // todos os avanços (mock pjLeafHist) achatados, com atividade de nível 1 + metadados da intervenção
 function pjAllAvancos(){
@@ -1757,6 +1757,18 @@ async function pjDocRemover(iv,tipo){ if(!iv) return;
   }catch(e){ toast('Erro ao remover: '+(e.message||e)); }
 }
 async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
+// Visão 3D — abre o visor externo das VRPs num overlay com iframe (?embed=1 tira cabeçalho/rodapé)
+function pjOpen3d(iv){
+  let ov=document.getElementById('pj3d');
+  if(!ov){ ov=document.createElement('div'); ov.id='pj3d'; ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#000;display:none;flex-direction:column'; document.body.appendChild(ov); }
+  const url='https://vrps-3d-aguas-mg.vercel.app/?embed=1';
+  ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f1720;color:#fff">
+      <b style="font-size:14px">🧊 Visão 3D — VRPs${iv&&iv.cod?(' · '+iv.cod):''}</b>
+      <button id="pj3dClose" style="all:unset;cursor:pointer;background:#374151;color:#fff;padding:7px 14px;border-radius:8px">Fechar</button></div>
+    <iframe src="${url}" allow="fullscreen; xr-spatial-tracking" style="flex:1;width:100%;border:0"></iframe>`;
+  ov.style.display='flex';
+  document.getElementById('pj3dClose').onclick=()=>{ ov.style.display='none'; ov.innerHTML=''; };
+}
 function pjRenderCfg(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo];
@@ -1764,6 +1776,9 @@ function pjRenderCfg(keep){
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
   const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     return `<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,28)}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="${dc.t}">📎 ${ok?'Substituir':'Anexar'}</button>${ok?`<button class="btn ghost pjmini bad" data-remove="${dc.t}">🗑 Remover</button>`:''}<input type="file" accept="application/pdf" hidden data-file="${dc.t}"></span></div>`; }).join('');
+  // Visão 3D — visor externo das VRPs (só p/ intervenções de VRP); embute via iframe
+  const is3d=(iv.tipo==='vrp_impl'||iv.tipo==='vrp_subst');
+  const vis3dHtml=is3d?`<div class="pjdocrow"><span style="flex:1;min-width:0">🧊 <b>Visão 3D</b> <span class="pjhint" style="margin:0">· visor 3D das VRPs</span></span><span class="pjdocbtns"><button class="btn ghost pjmini" id="pj3dOpen">🧊 Abrir visão 3D</button></span></div>`:'';
   const lockCard=iv.locked
     ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Intervenção liberada para execução</b><span>Configuração congelada — o campo já lança avanços. Reabra só se precisar mudar escopo/quantidade.</span></div><button class="btn ghost" id="pjUnlock">Reabrir configuração</button></div>`
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b></div><button class="btn" id="pjLock">🔓 Liberar para execução</button></div>`;
@@ -1775,13 +1790,14 @@ function pjRenderCfg(keep){
    <div class="pjtree ${iv.locked?'frozen':''}">${iv.arv.map(pjNodeHtml).join('')}</div>
    <div class="sec" style="margin-top:16px">📎 Documentos</div>
    <p class="pjhint" style="margin:2px 0 8px">Anexe, abra e remova aqui os documentos da intervenção. No <b>relatório</b> eles ficam só para <b>abrir</b>.</p>
-   ${docsHtml}`;
+   ${docsHtml}${vis3dHtml}`;
   const d=$('#pjCfg');
   const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; pjSave(iv); toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
   const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; pjSave(iv); toast('🔒 Configuração reaberta'); pjRenderCfg(); };
   d.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
   d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>{ const inp=d.querySelector('[data-file="'+b.dataset.attach+'"]'); if(inp)inp.click(); });
   d.querySelectorAll('[data-file]').forEach(inp=>inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) pjDocAnexar(iv,inp.dataset.file,f); });
+  const b3=$('#pj3dOpen'); if(b3) b3.onclick=()=>pjOpen3d(iv);
   d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>pjDocRemover(iv,b.dataset.remove));
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
@@ -1808,6 +1824,7 @@ function pjMakePdfUrl(title,sub){
 function pjOpenPdf(title){ try{ const u=pjMakePdfUrl(title); window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),60000); }catch(e){ toast('Não consegui abrir o PDF de exemplo'); } }
 function pjNodeHtml(node){
   const t=node.k,p=pjPct(node),isG=node.f&&node.f.length,inact=node.ativo===false;
+  if(pjMode==='campo' && inact) return '';   // no Campo, atividade fora do escopo não aparece (nem opaca)
   const cfg=pjMode==='cfg';                          // cfg = tela de configuração (Suporte); senão = campo (avanços)
   const rid='pn'+Math.random().toString(36).slice(2,8); pjReg[rid]=node;
   // cadeado congela a configuração: em cfg, só edita se a intervenção estiver DEStravada (!pjLocked)
@@ -1866,10 +1883,10 @@ function pjNodeHtml(node){
       <div class="pjhistwrap"><div class="pjhisttit">📋 Lançamentos anteriores</div>${rows}${acc}</div>
       <div class="pjnewtit">➕ Novo avanço de hoje</div>
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
-      <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label></div>
+      <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 3</span></label></div>
       <textarea class="pjobs" rows="2" placeholder="Observação (opcional)"></textarea>
       <button class="btn" data-launch="${rid}">Lançar avanço</button>
-      <span class="pjhint">Incremental — soma ao acumulado. 2 fotos + observação por lançamento.</span>
+      <span class="pjhint">Incremental — soma ao acumulado. Até 3 fotos + observação por lançamento.</span>
     </div>`;
   }
   return h+`</div>`;
