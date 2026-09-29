@@ -1478,9 +1478,10 @@ async function pjLoad(force){
   if(!cs.length){ PJ_IVS=[]; pjLoaded=true; return; }
   const ivs=[];
   pts.forEach(f=>{ const p=f.properties,[lo,la]=f.geometry.coordinates,tp=pjMapTipo(p.tipo,false);
+    const _vm=String(p.projeto||p.id||'').match(/VRP-?(\d+)/i);   // nº da VRP (ex.: "VRP-29" → "29") p/ deep-link no visor 3D
     ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),
       local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
-      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,vrp:_vm?_vm[1]:null,
       ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
   lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
     // diferencia HDD × VCA pela coluna `tipo` (fallback: nome do layer_dwg). HDD = perfuração direcional; resto = VCA (vala a céu aberto)
@@ -1761,9 +1762,10 @@ async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCf
 function pjOpen3d(iv){
   let ov=document.getElementById('pj3d');
   if(!ov){ ov=document.createElement('div'); ov.id='pj3d'; ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#000;display:none;flex-direction:column'; document.body.appendChild(ov); }
-  const url='https://vrps-3d-aguas-mg.vercel.app/?embed=1';
+  const nvrp=iv&&iv.vrp?String(iv.vrp):'';   // abre direto na peça (?vrp=NN) quando a intervenção tem nº de VRP
+  const url='https://vrps-3d-aguas-mg.vercel.app/?embed=1'+(nvrp?('&vrp='+encodeURIComponent(nvrp)):'');
   ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f1720;color:#fff">
-      <b style="font-size:14px">🧊 Visão 3D — VRPs${iv&&iv.cod?(' · '+iv.cod):''}</b>
+      <b style="font-size:14px">🧊 Visão 3D${nvrp?(' — VRP-'+nvrp):' — VRPs'}${iv&&iv.dmc?(' · '+iv.dmc):''}</b>
       <button id="pj3dClose" style="all:unset;cursor:pointer;background:#374151;color:#fff;padding:7px 14px;border-radius:8px">Fechar</button></div>
     <iframe src="${url}" allow="fullscreen; xr-spatial-tracking" style="flex:1;width:100%;border:0"></iframe>`;
   ov.style.display='flex';
