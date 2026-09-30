@@ -255,7 +255,8 @@ pwa/
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
   segmentação resiliente a reimportação da base de rede, em `docs/MODULOS.md §4.3`.
 - **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
-  **Solicitação de serviços** de campo (`abertura_servicos`) e, na subdivisão **🛟 Suporte**,
+  **Solicitação de serviços** de campo (`abertura_servicos`), **Registro de ocorrência**
+  (`ent_ocorrencia`; lista + export Excel em `ent_oc_gestao`, **só aprovador/admin**) e, na subdivisão **🛟 Suporte**,
   **Roteiro de leitura** (`roteiro`) — mapa por percurso/trecho sobre `vw_roteiro_leitura`(_linha),
   com filtro de percurso/trecho/matrícula e export TXT (só aprovador). RPCs `app_roteiro_*`.
 - **Auxiliar de Programação** (`auxiliar_programacao`, na Home › 🧰 Suporte; **só aprovador/admin**,
