@@ -2254,3 +2254,61 @@ vez, então os passos foram fundidos.
   modalidade/projeto/custo/headcount por mês — fonte é uma planilha de orçamento existente fora do
   app) + painel do gestor comparando contratados (via `perfil.ativo`+`area`) × orçado × em
   contratação (via `candidato.status`).
+
+## 15. Manutenção de VRPs (`vrpman`, schema `8 - coleta_campo`)
+
+Vertente de **gestão de serviços de manutenção** sobre as VRPs (separada do módulo `vrp`, que é só
+levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria **🚧 Em desenvolvimento** da home
+(gate `ME.dev_acesso` via `homeGate` — opaco `.mod soon` + 🔒 p/ quem não tem, como Perdas/Pessoas; quando
+maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmHub`) com 2 categorias: **🏗️ Campo**
+(executar OS — qualquer autenticado) e **🧰 Gestão** (backoffice, gate `ME.vrp_gestao`). Campo + Gestão entregues.
+
+**Modelo de dados (app-only, RLS on, acesso só via RPC definer):**
+- **`vrp_os`** — ordem de serviço de manutenção. `os_numero` interno `VRP-OS-AAAA-NNNN` (contador por
+  ano em `vrp_os_contador`) + **`os_sigos`** (OS da COPASA, opcional, preenchida no backoffice).
+  `origem` (preventiva/corretiva/programada/avulsa), `status`
+  (programada→em_execucao→concluida/concluida_pendencia/retorno/improdutiva), `atribuido_uuid` (quem
+  recebe — **só usuário, não há equipe**), `programada_para`, `dmc` (spatial VRP→DMC via `vrp_dmc_de`),
+  geom/gps, campos-ficha reaproveitados da última OS (`modelo`/`tem_controlador`/`controlador_modelo`/
+  `ponto_critico_ref`), pressões encontradas/finais, estabilizada/vazamento_pos/liberada, `respostas`/
+  `fotos` jsonb, **`pendencia_id`** (quando é uma corretiva que resolve uma pendência).
+- **`vrp_pendencia`** — pendência técnica gerada na OS (`os_id`). Ciclo: **aberta → em_andamento**
+  (quando o backoffice gera a corretiva, `os_correcao_id`) **→ resolvida** (ao concluir a corretiva,
+  `resolvida_os_id`). Regra do usuário: **toda pendência se resolve por uma OS corretiva derivada** —
+  nunca fecha manual nem "dentro" de outra visita.
+- **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
+  por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
+
+**RPCs (`public`, definer):** campo (authenticated) — `app_vrp_os_header`/`app_vrp_os_abrir` (gera nº;
+assume a programada da VRP se houver)/`app_vrp_os_concluir` (grava tudo, materializa pendências, e se
+a OS tem `pendencia_id` e foi concluída, **fecha a pendência**)/`app_vrp_os_minhas`/`app_vrp_os_ver`/
+`app_vrp_ficha` (cadastro+última OS+histórico+pendências+próxima preventiva)/`app_vrp_dmc_listar`.
+Gestão (admin **ou** `perfil.vrp_gestao_acesso`, via `vrp_pode_gestao`) — `app_vrp_os_listar`
+(filtros consórcio/DMC/status/origem/período + lat/lon p/ mapa)/`app_vrp_os_kpis`/`app_vrp_os_programar`
+(cria programada e notifica)/`app_vrp_os_set_sigos`/`app_vrp_pendencias_listar`/
+`app_vrp_pendencia_gerar_os` (corretiva derivada)/`app_vrp_pendencia_atualizar`/`app_vrp_prev_config_get`
+/`_set`/`app_vrp_prev_vrp_set`/`app_vrp_prev_farol`. **Trigger** `trg_vrp_os` → `sup_notificar` (programada
+→ o usuário atribuído; retorno/pendência → a gestão). `app_me` expõe `vrp_gestao`.
+
+**Frontend Campo (`index.html`, funções `vm*`):** hub `vmHub`; `vmCampoInit` (Minhas OS via
+`app_vrp_os_minhas` + "Nova OS corretiva" → `vmNovaPicker` reusa `app_vrp_listar`); wizard de 5 telas
+(`vmExecRender`/`vmScr1..5`: Chegada→Pressões→Condição→Serviço→Finalização) sobre o cabeçalho autofill,
+com botões OK/Intervir/Não verificado, campos condicionais, pendências automáticas e sugestão de status;
+fotos via `comprimir`+`vmUpload` (bucket `fotos-campo` prefixo `vrp-os/`), GPS global `gps`; conclusão
+`vmEnviar`→`app_vrp_os_concluir`. **Ficha da VRP** (`vmFichaOpen`, overlay `#vmFicha`) e **relatório PDF**
+(`vmReport`, reusa `#relatorio`+`REL_CSS`+`window.print`). Telas: `vrpman`/`vrpman_campo`/`vrpman_exec`.
+⚠️ **Cuidados:** funções `vm*` vivem no `<script type="module">` (não globais); a OS é criada no
+`app_vrp_os_abrir` (abandonar o wizard deixa uma OS `em_execucao` — o backoffice enxerga). Base de VRPs
+= `"2 - infra_agua".vrps` (148; `atuacao` é código, ex. "AL"; `pres_max`≈montante, `pres_saida`≈jusante).
+
+**Frontend Gestão (`index.html`, funções `vm*`, gate `ME.vrp_gestao`):** `vmGestaoInit`/`vmGRender` com 3
+subtabs + barra de filtros (consórcio + DMC): **Gestão de OS** (`vmGLoadOs`: KPIs + chips de status +
+alternador Lista/Mapa Leaflet colorido por status + `＋ Programar`), **detalhe da OS** (`vmOsView`, tela
+`vrpman_os`: 5 seções + pendências + **OS SIGOS** editável `vmSigos`→`app_vrp_os_set_sigos` + relatório +
+ficha), **Pendências** (`vmGLoadPend`: tabela + `＋ Gerar corretiva` `vmGerarCorr`→`app_vrp_pendencia_gerar_os`),
+**Preventivas** (`vmGLoadPrev`: farol Lista/Mapa colorido + config de intervalos `vmCfgSalvar` + `Programar`
+`vmProgramar`→`app_vrp_os_programar`). ⚙️ **Acesso** (`vrpman_cfg`, admin) concede `vrp_gestao_acesso`
+(`vmCfgInit`/`app_vrp_acesso_*`). Modais reaproveitáveis (`vmModal`). Colaboradores p/ atribuição via
+`app_vrp_colaboradores_listar`. Telas `vrpman_gestao`/`vrpman_os`/`vrpman_cfg`. Mapas via `mapAddCamadaBase`
+(tiles reais); marcadores `circleMarker` por status/farol. **Backend testado E2E** (abrir→concluir c/
+pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
