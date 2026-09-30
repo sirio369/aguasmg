@@ -2258,9 +2258,10 @@ vez, então os passos foram fundidos.
 ## 15. Manutenção de VRPs (`vrpman`, schema `8 - coleta_campo`)
 
 Vertente de **gestão de serviços de manutenção** sobre as VRPs (separada do módulo `vrp`, que é só
-levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria 🛠️ Execução da home, visível a
-todos. Hub (`vmHub`) com 2 categorias: **🏗️ Campo** (executar OS) e **🧰 Gestão** (backoffice, gate
-`ME.vrp_gestao`). **Fase 3 (entregue): Campo.** Fase 4 (Gestão) em construção.
+levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria **🚧 Em desenvolvimento** da home
+(gate `ME.dev_acesso` via `homeGate` — opaco `.mod soon` + 🔒 p/ quem não tem, como Perdas/Pessoas; quando
+maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmHub`) com 2 categorias: **🏗️ Campo**
+(executar OS — qualquer autenticado) e **🧰 Gestão** (backoffice, gate `ME.vrp_gestao`). Campo + Gestão entregues.
 
 **Modelo de dados (app-only, RLS on, acesso só via RPC definer):**
 - **`vrp_os`** — ordem de serviço de manutenção. `os_numero` interno `VRP-OS-AAAA-NNNN` (contador por
@@ -2300,6 +2301,14 @@ fotos via `comprimir`+`vmUpload` (bucket `fotos-campo` prefixo `vrp-os/`), GPS g
 `app_vrp_os_abrir` (abandonar o wizard deixa uma OS `em_execucao` — o backoffice enxerga). Base de VRPs
 = `"2 - infra_agua".vrps` (148; `atuacao` é código, ex. "AL"; `pres_max`≈montante, `pres_saida`≈jusante).
 
-**Fase 4 (pendente):** telas de Gestão no app (dashboard KPIs + lista/mapa + filtros consórcio/DMC,
-detalhe da OS com OS SIGOS + relatório, pendências → gerar corretiva, preventivas farol/config/programar,
-⚙️ acesso `vrp_gestao_acesso`). Backend já pronto e testado E2E.
+**Frontend Gestão (`index.html`, funções `vm*`, gate `ME.vrp_gestao`):** `vmGestaoInit`/`vmGRender` com 3
+subtabs + barra de filtros (consórcio + DMC): **Gestão de OS** (`vmGLoadOs`: KPIs + chips de status +
+alternador Lista/Mapa Leaflet colorido por status + `＋ Programar`), **detalhe da OS** (`vmOsView`, tela
+`vrpman_os`: 5 seções + pendências + **OS SIGOS** editável `vmSigos`→`app_vrp_os_set_sigos` + relatório +
+ficha), **Pendências** (`vmGLoadPend`: tabela + `＋ Gerar corretiva` `vmGerarCorr`→`app_vrp_pendencia_gerar_os`),
+**Preventivas** (`vmGLoadPrev`: farol Lista/Mapa colorido + config de intervalos `vmCfgSalvar` + `Programar`
+`vmProgramar`→`app_vrp_os_programar`). ⚙️ **Acesso** (`vrpman_cfg`, admin) concede `vrp_gestao_acesso`
+(`vmCfgInit`/`app_vrp_acesso_*`). Modais reaproveitáveis (`vmModal`). Colaboradores p/ atribuição via
+`app_vrp_colaboradores_listar`. Telas `vrpman_gestao`/`vrpman_os`/`vrpman_cfg`. Mapas via `mapAddCamadaBase`
+(tiles reais); marcadores `circleMarker` por status/farol. **Backend testado E2E** (abrir→concluir c/
+pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
