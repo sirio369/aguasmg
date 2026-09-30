@@ -2255,7 +2255,7 @@ vez, então os passos foram fundidos.
   app) + painel do gestor comparando contratados (via `perfil.ativo`+`area`) × orçado × em
   contratação (via `candidato.status`).
 
-## 15. Manutenção de VRPs (`vrpman`, schema `8 - coleta_campo`)
+## 15. Gestão de VRPs (`vrpman`, schema `8 - coleta_campo`)
 
 Vertente de **gestão de serviços de manutenção** sobre as VRPs (separada do módulo `vrp`, que é só
 levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria **🚧 Em desenvolvimento** da home
@@ -2312,3 +2312,20 @@ ficha), **Pendências** (`vmGLoadPend`: tabela + `＋ Gerar corretiva` `vmGerarC
 `app_vrp_colaboradores_listar`. Telas `vrpman_gestao`/`vrpman_os`/`vrpman_cfg`. Mapas via `mapAddCamadaBase`
 (tiles reais); marcadores `circleMarker` por status/farol. **Backend testado E2E** (abrir→concluir c/
 pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
+
+**Reorg (2026-09-30, "Gestão de VRPs"):** módulo renomeado de "Manutenção de VRPs" → **Gestão de VRPs**.
+- **Campo** ganhou o card **Visita primária** (`data-go="vrp"` — abre o módulo `vrp`/levantamento antigo), ao
+  lado de "Minhas OS / Executar".
+- **Gestão** virou um **hub de 3 áreas** (`vmGestaoInit` → cards): **1) Gestão de serviços** (`vrpman_serv`,
+  `vmServInit`/`vmServRender`: subtabs OS + Pendências); **2) Ficha cadastral** (`vrpman_fichas`,
+  `vmFichasInit`: **lista/mapa de TODAS as VRPs** via `app_vrp_ficha_listar`, por VRP abre o overlay `#vmFicha`);
+  **3) Cronograma preventivo** (`vrpman_prev`, `vmPrevInit`→`vmGLoadPrev`: farol + resumo de contadores).
+- **Gestão de serviços — OS:** filtro por **colaborador** (`p_atribuido`), cartão mostra **para quem está
+  programado** e botão **Desprogramar** (`app_vrp_os_desprogramar` — só `programada`; se era corretiva de
+  pendência, reabre a pendência).
+- **Ficha da VRP (`vmFichaOpen`, `app_vrp_ficha`):** histórico **mescla OS novas + visitas primárias antigas**
+  (`vrp_visita`) em ordem cronológica; cada item abre em popup — OS via `vmReport`, visita via `vmVisitaReport`
+  (reusa `vrpRespPairs`/`vrpFotoPairs`/`REL_CSS`). Mantém as duas fontes até desativar o módulo `vrp` antigo.
+- Novas RPCs: `app_vrp_os_desprogramar`, `app_vrp_ficha_listar`, `app_vrp_ficha` (+`visitas`),
+  `app_vrp_acesso_listar`/`_set` (admin concede `vrp_gestao_acesso`), `app_vrp_colaboradores_listar`.
+- Telas: +`vrpman_serv`/`vrpman_fichas`/`vrpman_prev`. sw `coleta-v197`→`v198`.
