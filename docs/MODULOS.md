@@ -1796,6 +1796,16 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     matrícula — a reforma de 2026-09-24 acima substituiu essa métrica). ⚠️ Base = 18 meses (2025‑03→2026‑08), então
     a sombra/YoY hoje refletem só 2025 e alguns meses ainda sem sobreposição. Recomputar = re-rodar o INSERT do
     `mm_mensal`.
+  - **⚠️ Semântica de volume — só micromedição, faturado FORA (2026-09-30):** `mm_mensal` e `mm_dmc_mensal` foram
+    repopuladas para refletir **apenas o micromedido** (o que foi de fato lido + o que foi estimado). O `qt_vol_fac`
+    (faturado mínimo — tarifa de consumo zero, aditivo quando `qt_volume_=0`) **saiu de tudo**:
+    `volume_total = Σ qt_volume_`; `volume_medido = Σ qt_volume_ where qt_vol_est=0` (leitura real);
+    `volume_naomedido = Σ qt_volume_ where qt_vol_est>0` (imputado) — agora `medido + estimado = total` exato.
+    `n_faturadas = count(distinct nu_matricu) where qt_volume_>0` (ligações com micromedição; deixa de contar as
+    só‑mínimo). As RPCs `app_nrw_mm_*` **não mudaram** (leem esses campos e derivam L/lig·dia e % na hora). O
+    `qt_vol_fac` continua **só** na `consumo_dmc` (balanço NRW, onde o faturado é o consumo autorizado). Repopular =
+    os dois `INSERT ... SELECT` diretos de `"5 - info_copasa".micromedicao_historico` (o do DMC via join `mm_dmc_map`),
+    sem termo de `qt_vol_fac`.
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
   auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
