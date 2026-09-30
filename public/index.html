@@ -651,23 +651,18 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   .vmsw.dis{opacity:.5;pointer-events:none}
   </style>
 
-  <main id="vrpman_gestao" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button><button id="vmCfgBtn" class="hidden" title="Acesso à gestão" style="all:unset;cursor:pointer;font-size:20px;margin-left:auto;padding:2px 6px">⚙️</button></div>
-    <h1>Gestão</h1>
-    <div id="vmGestao"></div>
-  </main>
   <main id="vrpman_serv" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman_gestao">‹ Gestão</button></div>
+    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
     <h1>Gestão de serviços</h1>
     <div id="vmServ"></div>
   </main>
   <main id="vrpman_fichas" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman_gestao">‹ Gestão</button></div>
+    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
     <h1>Ficha cadastral · VRPs</h1>
     <div id="vmFichas"></div>
   </main>
   <main id="vrpman_prev" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman_gestao">‹ Gestão</button></div>
+    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
     <h1>Cronograma preventivo</h1>
     <div id="vmPrev"></div>
   </main>
@@ -676,7 +671,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="vmOs"></div>
   </main>
   <main id="vrpman_cfg" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman_gestao">‹ Gestão</button></div>
+    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
     <h1>Acesso à Gestão de VRPs</h1>
     <div id="vmCfg"></div>
   </main>
@@ -1456,7 +1451,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_gestao','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','pessoas'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','pessoas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1492,7 +1487,6 @@ function irPara(id){
   if(id==='projeto_resumo') pjLoad().then(pjResumoEnter);
   if(id==='vrpman') vmHub();
   if(id==='vrpman_campo') vmCampoInit();
-  if(id==='vrpman_gestao') vmGestaoInit();
   if(id==='vrpman_serv') vmServInit();
   if(id==='vrpman_fichas') vmFichasInit();
   if(id==='vrpman_prev') vmPrevInit();
@@ -3472,16 +3466,25 @@ const VM_STCLR={concluida:'var(--ok)',concluida_pendencia:'var(--warn)',retorno:
 let vmVrpCache=[], vmExec=null, vmEnviando=false;
 
 function vmHub(){
-  const gestao=!!(ME&&ME.vrp_gestao);
+  const gestao=!!(ME&&ME.vrp_gestao), admin=!!(ME&&ME.is_admin);
   $('#vmHub').innerHTML=`
    <div class="sec" style="margin-top:8px">🏗️ Campo</div>
    <p class="sub" style="margin:0 0 8px">Execução de ordens de serviço de manutenção nas VRPs.</p>
-   <div class="grid"><button class="mod" data-go="vrpman_campo"><div class="ic">🧰</div><div class="nm">Minhas OS / Executar</div></button>
-     <button class="mod" data-go="vrp"><div class="ic">🎛️</div><div class="nm">Visita primária</div></button></div>
-   <div class="sec" style="margin-top:20px">🧰 Gestão</div>
-   <p class="sub" style="margin:0 0 8px">${gestao?'Backoffice: acompanhar OS, pendências e preventivas.':'Acesso restrito à equipe de gestão.'}</p>
-   <div class="grid"><button class="mod ${gestao?'':'soon'}" id="vmGestaoCard"><div class="ic">📊</div><div class="nm">Gestão de serviços${gestao?'':' 🔒'}</div></button></div>`;
-  const g=$('#vmGestaoCard'); if(g) g.onclick=gestao?(()=>irPara('vrpman_gestao')):(()=>toast('Acesso restrito à gestão'));
+   <div class="grid">
+     <button class="mod" data-go="vrpman_campo"><div class="ic">🧰</div><div class="nm">Minhas OS / Executar</div></button>
+     <button class="mod" data-go="vrp"><div class="ic">🎛️</div><div class="nm">Visita primária</div></button>
+   </div>
+   <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🧰 Gestão${(gestao&&admin)?'<button id="vmHubCfg" title="Acesso à gestão" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">⚙️</button>':''}</div>
+   <p class="sub" style="margin:0 0 8px">${gestao?'Backoffice de manutenção das VRPs.':'Acesso restrito à equipe de gestão.'}</p>
+   <div class="grid">
+     <button class="mod ${gestao?'':'soon'}" data-g="vrpman_serv"><div class="ic">🧾</div><div class="nm">Gestão de serviços${gestao?'':' 🔒'}</div></button>
+     <button class="mod ${gestao?'':'soon'}" data-g="vrpman_fichas"><div class="ic">📇</div><div class="nm">Ficha cadastral${gestao?'':' 🔒'}</div></button>
+     <button class="mod ${gestao?'':'soon'}" data-g="vrpman_prev"><div class="ic">🚦</div><div class="nm">Cronograma preventivo${gestao?'':' 🔒'}</div></button>
+   </div>`;
+  // cards dinâmicos: o handler global de [data-go] só liga o que existe no load, então ligamos aqui
+  $('#vmHub').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>irPara(b.dataset.go));
+  $('#vmHub').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ if(gestao) irPara(b.dataset.g); else toast('Acesso restrito à gestão'); });
+  const cf=$('#vmHubCfg'); if(cf) cf.onclick=()=>irPara('vrpman_cfg');
 }
 
 async function vmCampoInit(){
@@ -3796,18 +3799,6 @@ async function vmGShared(){
   if(!vmGDmcs.length){ try{ const r=await sb.rpc('app_vrp_dmc_listar',{p_consorcio:null}); vmGDmcs=r.data||[]; }catch(e){} }
   if(!vmGColab.length){ try{ const r=await sb.rpc('app_vrp_colaboradores_listar'); vmGColab=r.data||[]; }catch(e){} }
 }
-// Hub de Gestão: 3 áreas
-function vmGestaoInit(){
-  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito à gestão'); irPara('vrpman'); return; }
-  const cb=$('#vmCfgBtn'); if(cb){ cb.classList.toggle('hidden', !(ME&&ME.is_admin)); cb.onclick=()=>irPara('vrpman_cfg'); }
-  $('#vmGestao').innerHTML=`
-    <p class="sub" style="margin:0 0 10px">Backoffice de manutenção das VRPs.</p>
-    <div class="grid">
-      <button class="mod" data-go="vrpman_serv"><div class="ic">🧾</div><div class="nm">Gestão de serviços</div></button>
-      <button class="mod" data-go="vrpman_fichas"><div class="ic">📇</div><div class="nm">Ficha cadastral</div></button>
-      <button class="mod" data-go="vrpman_prev"><div class="ic">🚦</div><div class="nm">Cronograma preventivo</div></button>
-    </div>`;
-}
 function vmGFilterBar(opts){
   opts=opts||{};
   const cons=[['','Ambos'],['ZA0200','Betim'],['ZA1004','Contagem']];
@@ -4084,7 +4075,7 @@ async function vmGerarCorr(pendId){
     }catch(e){ toast('⚠ '+(e.message||e)); } };
 }
 async function vmCfgInit(){
-  if(!(ME&&ME.is_admin)){ toast('Só admin'); irPara('vrpman_gestao'); return; }
+  if(!(ME&&ME.is_admin)){ toast('Só admin'); irPara('vrpman'); return; }
   $('#vmCfg').innerHTML='<p class="sub">Carregando…</p>';
   try{ const r=await sb.rpc('app_vrp_acesso_listar'); if(r.error)throw r.error; vmCfgUsers=r.data||[]; }
   catch(e){ $('#vmCfg').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }

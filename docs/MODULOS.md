@@ -2316,10 +2316,13 @@ pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
 **Reorg (2026-09-30, "Gestão de VRPs"):** módulo renomeado de "Manutenção de VRPs" → **Gestão de VRPs**.
 - **Campo** ganhou o card **Visita primária** (`data-go="vrp"` — abre o módulo `vrp`/levantamento antigo), ao
   lado de "Minhas OS / Executar".
-- **Gestão** virou um **hub de 3 áreas** (`vmGestaoInit` → cards): **1) Gestão de serviços** (`vrpman_serv`,
-  `vmServInit`/`vmServRender`: subtabs OS + Pendências); **2) Ficha cadastral** (`vrpman_fichas`,
+- **Gestão** = **3 cards diretos no hub do módulo** (`vmHub`, sem tela intermediária): **1) Gestão de serviços**
+  (`vrpman_serv`, `vmServInit`/`vmServRender`: subtabs OS + Pendências); **2) Ficha cadastral** (`vrpman_fichas`,
   `vmFichasInit`: **lista/mapa de TODAS as VRPs** via `app_vrp_ficha_listar`, por VRP abre o overlay `#vmFicha`);
-  **3) Cronograma preventivo** (`vrpman_prev`, `vmPrevInit`→`vmGLoadPrev`: farol + resumo de contadores).
+  **3) Cronograma preventivo** (`vrpman_prev`, `vmPrevInit`→`vmGLoadPrev`: farol + resumo de contadores). A ⚙️ de
+  acesso (`vrpman_cfg`, admin) fica no cabeçalho da seção **Gestão** do hub. ⚠️ **Cards do hub são renderizados
+  dinamicamente** → o handler global de `[data-go]` (ligado no load) NÃO os cobre; `vmHub` liga cada card
+  explicitamente (`data-go` p/ Campo, `data-g` gateado p/ Gestão).
 - **Gestão de serviços — OS:** filtro por **colaborador** (`p_atribuido`), cartão mostra **para quem está
   programado** e botão **Desprogramar** (`app_vrp_os_desprogramar` — só `programada`; se era corretiva de
   pendência, reabre a pendência).

@@ -404,7 +404,7 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 autenticado) e 🧰 Gestão (gate `ME.vrp_gestao`). **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
 corretiva → wizard de 5 telas sobre cabeçalho autofill, fotos (`vmUpload`→`fotos-campo/vrp-os/`), GPS, conclusão
 `app_vrp_os_concluir`; + card **Visita primária** (abre o módulo `vrp` antigo). Ficha+histórico (`app_vrp_ficha`,
-`#vmFicha`) e relatório PDF (`vmReport`). **Gestão = 3 áreas** (`vmGestaoInit` hub): **Gestão de serviços**
+`#vmFicha`) e relatório PDF (`vmReport`). **Gestão = 3 cards diretos no hub** (`vmHub`, sem tela intermediária; ⚙️ acesso na seção Gestão): **Gestão de serviços**
 (`vrpman_serv`: OS + Pendências; filtro por **colaborador**, mostra "programado para" + **Desprogramar**
 `app_vrp_os_desprogramar`), **Ficha cadastral** (`vrpman_fichas`: lista/mapa de **todas** as VRPs via
 `app_vrp_ficha_listar` → ficha por VRP com histórico que **mescla OS novas + visitas primárias antigas**, cada uma em
