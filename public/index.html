@@ -786,6 +786,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="captacao"><div class="ic">🤝</div><div class="nm">Captação de clientes</div></button>
       <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Solicitação de serviços</div></button>
+      <button class="mod" data-go="ent_ocorrencia"><div class="ic">⚠️</div><div class="nm">Registro de ocorrência</div></button>
+    </div>
+    <div id="entOcGest" class="hidden">
+      <div class="sec" style="margin-top:20px">📋 Gestores</div>
+      <div class="grid" style="margin-top:10px">
+        <button class="mod" data-go="ent_oc_gestao"><div class="ic">📋</div><div class="nm">Ocorrências registradas</div></button>
+      </div>
     </div>
     <div class="sec" style="margin-top:20px">🛟 Suporte</div>
     <div class="grid" style="margin-top:10px">
@@ -899,6 +906,44 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="paMapa" style="height:48vh;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
     <div class="sec" style="margin-top:20px">Resumo por colaborador</div>
     <div id="paResumo" style="overflow-x:auto;margin-top:8px"></div>
+  </main>
+
+  <main id="ent_ocorrencia" class="hidden">
+    <div class="bar"><button class="bk" id="eoBack">‹ Entrevistadores</button></div>
+    <h1>Registro de ocorrência</h1>
+    <p class="sub">Registre o que impediu ou dificultou a entrevista no imóvel.</p>
+    <div id="eoGps" class="banner warn">Obtendo GPS…</div>
+    <label for="eo_matricula">Matrícula do imóvel *</label><input id="eo_matricula" autocomplete="off"/>
+    <label for="eo_tipo">Ocorrência *</label>
+    <select id="eo_tipo">
+      <option value="">Selecione…</option>
+      <option value="cliente_nao_informado">1) Cliente não informado</option>
+      <option value="resistencia">2) Resistência do cliente em passar informações</option>
+      <option value="ligou_copasa">3) Cliente ligou para a COPASA?</option>
+      <option value="policia">4) Polícia acionada</option>
+    </select>
+    <div id="eoCopasa" class="hidden">
+      <label>O cliente ligou para a COPASA? *</label>
+      <div class="seg"><button type="button" data-eosn="S">Sim</button><button type="button" data-eosn="N">Não</button></div>
+      <div id="eoOrientWrap" class="hidden"><label for="eo_orientacao">O que a COPASA orientou? *</label><textarea id="eo_orientacao" rows="3"></textarea></div>
+    </div>
+    <label for="eo_det">Detalhamento da ocorrência</label><textarea id="eo_det" rows="4"></textarea>
+    <button id="eoSalvar" class="btn" disabled>Registrar ocorrência</button>
+  </main>
+
+  <main id="ent_oc_gestao" class="hidden">
+    <div class="bar"><button class="bk" id="egBack">‹ Entrevistadores</button></div>
+    <h1>Ocorrências registradas</h1>
+    <p class="sub">Ocorrências abertas pelos entrevistadores (visível só para gestores).</p>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      <span class="sub">De</span><input id="egDe" type="date" style="flex:1;min-width:0;font-size:13px"/>
+      <span class="sub">até</span><input id="egAte" type="date" style="flex:1;min-width:0;font-size:13px"/>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <select id="egCons" style="flex:1;min-width:0"><option value="todos">Ambos os consórcios</option><option value="ZA1004">Contagem (ZA1004)</option><option value="ZA0200">Betim (ZA0200)</option></select>
+      <button id="egXlsx" class="btn ghost" style="margin:0;width:auto;padding:0 14px;white-space:nowrap">⬇ Excel</button>
+    </div>
+    <div id="egOut" style="margin-top:10px"></div>
   </main>
 
   <main id="abertura_servicos" class="hidden">
@@ -1219,7 +1264,7 @@ function iniciarGPS(){
     const a=Math.round(gps.acc);
     if(gps.acc<=PRECISAO_MAX) banner('ok',`GPS ${a} m · dentro da tolerância`);
     else banner('warn',`GPS ${a} m · aguardando ≤ ${PRECISAO_MAX} m`);
-    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof cadOnGps==='function') cadOnGps();
+    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps();
   },err=>{ banner('bad','Sem sinal de GPS — ative a localização'); },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 function banner(cls,txt){const b=$('#gpsBanner');b.className='banner '+cls;b.textContent=txt;}
@@ -1455,7 +1500,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','pessoas'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','pessoas'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1477,6 +1522,8 @@ function irPara(id){
   if(id==='frotas') frotasInit();
   if(id==='abertura_servicos') asInit();
   if(id==='entrevistadores') entInit();
+  if(id==='ent_ocorrencia') eoInit();
+  if(id==='ent_oc_gestao') egInit();
   if(id==='programacao_servicos') pgInit();
   if(id==='programacao_pesquisa') ppInit();
   if(id==='pp_acomp') paInit();
@@ -1498,7 +1545,7 @@ function irPara(id){
   if(id==='pessoas') pessoasInit();
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
-function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } const cvm=document.getElementById('cardVrpMan'); if(cvm){ cvm.classList.toggle('soon',!okDev); cvm.querySelector('.nm').textContent=okDev?'Gestão de VRPs':'Gestão de VRPs 🔒'; cvm.onclick=okDev?(()=>irPara('vrpman')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
@@ -2992,6 +3039,84 @@ if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
       p_dispositivo:navigator.userAgent.slice(0,60),p_observacao:$('#as_obs').value||null}};
   enviarOuEnfileirar(item,'✓ Serviço solicitado');
   asReset(); irPara('entrevistadores');
+});
+// ---------- REGISTRO DE OCORRÊNCIA (Entrevistadores) ----------
+// Entrevistador registra; só gestores (pode_aprovar) listam e exportam. GPS é gravado se houver, mas não bloqueia.
+let eoLigou=null;
+const eoH=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function eoOnGps(){ const b=document.getElementById('eoGps'); if(!b) return;
+  b.className='banner '+(gps?'ok':'warn'); b.textContent=gps?('GPS '+Math.round(gps.acc)+' m · localização será registrada'):'Obtendo GPS… (não obrigatório)'; }
+function eoValidar(){ const btn=document.getElementById('eoSalvar'); if(!btn) return; const t=$('#eo_tipo').value;
+  const okCop = t!=='ligou_copasa' || eoLigou===false || (eoLigou===true && !!$('#eo_orientacao').value.trim());
+  btn.disabled=!($('#eo_matricula').value.trim() && t && okCop); }
+function eoRenderCopasa(){ const w=document.getElementById('eoCopasa'); if(!w) return;
+  w.classList.toggle('hidden', $('#eo_tipo').value!=='ligou_copasa');
+  w.querySelectorAll('[data-eosn]').forEach(b=>b.classList.toggle('sel', eoLigou!==null && (b.dataset.eosn==='S')===eoLigou));
+  $('#eoOrientWrap').classList.toggle('hidden', eoLigou!==true); eoValidar(); }
+function eoReset(){ ['eo_matricula','eo_tipo','eo_orientacao','eo_det'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';}); eoLigou=null; eoRenderCopasa(); }
+function eoInit(){ eoOnGps(); eoRenderCopasa(); }
+['eo_matricula','eo_orientacao'].forEach(id=>{ const e=document.getElementById(id); if(e) e.addEventListener('input',eoValidar); });
+if($('#eo_tipo')) $('#eo_tipo').addEventListener('change',eoRenderCopasa);
+document.querySelectorAll('#eoCopasa [data-eosn]').forEach(b=>b.addEventListener('click',()=>{ eoLigou=(b.dataset.eosn==='S'); eoRenderCopasa(); }));
+if($('#eoBack')) $('#eoBack').addEventListener('click',()=>irPara('entrevistadores'));
+if($('#egBack')) $('#egBack').addEventListener('click',()=>irPara('entrevistadores'));
+if($('#eoSalvar')) $('#eoSalvar').addEventListener('click',()=>{
+  const t=$('#eo_tipo').value, mat=$('#eo_matricula').value.trim();
+  if(!mat) return toast('Informe a matrícula do imóvel');
+  if(!t) return toast('Escolha a ocorrência');
+  if(t==='ligou_copasa'&&eoLigou===null) return toast('Informe se o cliente ligou para a COPASA');
+  if(t==='ligou_copasa'&&eoLigou&&!$('#eo_orientacao').value.trim()) return toast('Descreva o que a COPASA orientou');
+  const uid=crypto.randomUUID();
+  const item={id:uid,tipo:'entrevista_ocorrencia',rpc:'app_entrevista_ocorrencia_registrar',
+    fields:{p_id:uid,p_matricula:mat,p_tipo:t,
+      p_ligou_copasa:t==='ligou_copasa'?eoLigou:null,
+      p_orientacao_copasa:(t==='ligou_copasa'&&eoLigou)?$('#eo_orientacao').value:null,
+      p_detalhamento:$('#eo_det').value||null,
+      p_lat:gps?gps.lat:null,p_lon:gps?gps.lon:null,p_precisao:gps?Math.round(gps.acc*10)/10:null,
+      p_consorcio:localStorage.getItem('consorcio')||null,p_dispositivo:navigator.userAgent.slice(0,60)}};
+  enviarOuEnfileirar(item,'✓ Ocorrência registrada');
+  eoReset(); irPara('entrevistadores');
+});
+// --- Gestão (pode_aprovar): lista por período + export Excel ---
+let egUltimo=[];
+function egInit(){
+  if(!(ME&&ME.pode_aprovar)){ toast('Acesso restrito a gestores'); irPara('entrevistadores'); return; }
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!$('#egDe').value){ const h=new Date(); $('#egDe').value=iso(new Date(h.getFullYear(),h.getMonth(),1)); $('#egAte').value=iso(h); }
+  egCarregar();
+}
+function egFiltrados(){ const c=$('#egCons').value; return c==='todos'?egUltimo:egUltimo.filter(o=>o.consorcio===c); }
+function egCopasaTxt(o){ return o.tipo_codigo!=='ligou_copasa'?'':(o.ligou_copasa?'Sim':'Não'); }
+function egRender(){
+  const c=document.getElementById('egOut'); if(!c) return; const arr=egFiltrados();
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência no período.</p>'; return; }
+  c.innerHTML='<p class="sub" style="margin:0 0 8px">'+arr.length+' ocorrência(s)</p>'+arr.map(o=>{
+    const dt=o.data_hora?new Date(o.data_hora).toLocaleString('pt-BR'):'';
+    const mapa=(o.lat&&o.lon)?` · <a href="https://www.google.com/maps?q=${o.lat},${o.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+    const cop=o.tipo_codigo==='ligou_copasa'?`<div class="sub" style="margin-top:3px">Ligou para a COPASA: <b>${egCopasaTxt(o)}</b>${o.orientacao_copasa?(' — orientação: '+eoH(o.orientacao_copasa)):''}</div>`:'';
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
+      <div style="display:flex;gap:8px;align-items:center"><b>${eoH(o.tipo)}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
+      <div class="sub" style="margin-top:3px">Matrícula ${eoH(o.matricula)}${o.consorcio?(' · '+eoH(o.consorcio)):''}</div>
+      <div class="sub" style="margin-top:2px">Por ${eoH(o.entrevistador||o.email||'—')}${mapa}</div>
+      ${cop}
+      ${o.detalhamento?('<div class="sub" style="margin-top:3px">Detalhamento: '+eoH(o.detalhamento)+'</div>'):''}
+    </div>`;
+  }).join('');
+}
+async function egCarregar(){
+  const c=document.getElementById('egOut'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_entrevista_ocorrencia_listar',{p_de:$('#egDe').value||null,p_ate:$('#egAte').value||null});
+    if(error) throw error; egUltimo=data||[]; egRender();
+  }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar as ocorrências.</p>'; }
+}
+['egDe','egAte'].forEach(id=>{ const e=document.getElementById(id); if(e) e.addEventListener('change',egCarregar); });
+if($('#egCons')) $('#egCons').addEventListener('change',egRender);
+if($('#egXlsx')) $('#egXlsx').addEventListener('click',()=>{
+  const arr=egFiltrados(); if(!arr.length) return toast('Nada para exportar.');
+  const aoa=[['Data/hora','Consórcio','Entrevistador','E-mail','Matrícula do imóvel','Ocorrência','Cliente ligou para a COPASA?','Orientação da COPASA','Detalhamento','Latitude','Longitude','Precisão GPS (m)']];
+  arr.forEach(o=>aoa.push([o.data_hora?new Date(o.data_hora).toLocaleString('pt-BR'):'',o.consorcio||'',o.entrevistador||'',o.email||'',o.matricula||'',o.tipo||'',
+    egCopasaTxt(o),o.orientacao_copasa||'',o.detalhamento||'',o.lat??'',o.lon??'',o.gps_precisao??'']));
+  exportarXlsx('ocorrencias_entrevistadores_'+($('#egDe').value||'')+'_a_'+($('#egAte').value||'')+'.xlsx','Ocorrências',aoa);
 });
 // ---------- PROGRAMAÇÃO DE SERVIÇOS (aprovador/admin) ----------
 let pgFiltro='pendente';

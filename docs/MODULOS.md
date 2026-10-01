@@ -374,6 +374,25 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   matrículas filtradas — **só `pode_aprovar`** (`rlExportarTxt`).
 - **Estado:** `rlMap, rlPercursos, rlPerc, rlTrecho, rlData, rlOn, rlDestaque`.
 
+### 3.4 Registro de ocorrência — `// REGISTRO DE OCORRÊNCIA (Entrevistadores)` · telas `ent_ocorrencia` / `ent_oc_gestao`
+- **Registro (qualquer entrevistador):** matrícula do imóvel (digitada) + **uma** ocorrência:
+  `cliente_nao_informado` (1) Cliente não informado · `resistencia` (2) Resistência do cliente em passar
+  informações · `ligou_copasa` (3) Cliente ligou para a COPASA? → **Sim/Não**; se **Sim**, "O que a COPASA
+  orientou?" é obrigatório · `policia` (4) Polícia acionada. + **Detalhamento** (texto livre, opcional).
+  GPS é gravado **se houver**, mas **não bloqueia** o envio (diferente da Solicitação de serviços).
+  Sem foto. Vai pela fila offline (`enviarOuEnfileirar`, sem `pasta`). O entrevistador **não** vê lista.
+- **Gestão (`ent_oc_gestao`, só `pode_aprovar`):** botão no bloco **📋 Gestores** da tela
+  Entrevistadores (`#entOcGest`, liberado em `entInit()`); filtro De/Até (padrão: mês corrente) +
+  consórcio (client-side) + **⬇ Excel** (`exportarXlsx`).
+- **RPCs:** `app_entrevista_ocorrencia_registrar(p_id,p_matricula,p_tipo,p_ligou_copasa,p_orientacao_copasa,
+  p_detalhamento,p_lat,p_lon,p_precisao,p_consorcio,p_dispositivo)` (valida tipo e a regra do item 3) e
+  `app_entrevista_ocorrencia_listar(p_de,p_ate)` (datas inclusivas no fuso de SP; devolve `[]` se não for
+  aprovador/admin).
+- **Tabela:** `"12 - retaguarda".entrevista_ocorrencia` (*app-only*: matrícula + relato do cliente;
+  RLS ligada sem policy, acesso só via RPC). `check` garante que `ligou_copasa`/`orientacao_copasa` só
+  existem no tipo 3. Migração: `docs/migracao_entrevista_ocorrencia.sql`.
+- **Estado:** `eoLigou` (null/true/false), `egUltimo` (última lista carregada, base do export).
+
 ---
 
 ## 4. Auxiliar de Programação — tela `auxiliar_programacao`
@@ -1656,7 +1675,8 @@ equipamento + abastecimento, sem `CHECK` de `tipo_combustivel` — texto livre, 
 **Roteiro:** `app_roteiro_percursos/pontos/linhas/matricula`.
 **Entrevistadores/Retaguarda:** `app_abertura_fila`, `app_abertura_os`,
 `app_abertura_servico_minhas`, `app_captacao_fila`, `app_captacao_matricula`
-(registro via `app_abertura_servico_registrar`, `app_captacao_registrar`).
+(registro via `app_abertura_servico_registrar`, `app_captacao_registrar`),
+`app_entrevista_ocorrencia_registrar`, `app_entrevista_ocorrencia_listar`.
 **Suprimentos:** prefixo `sup_*` (ver §5).
 **Condutor/Frotas (ver §6, reformulado 2026-09 — self-service de vínculo substitui empréstimo):**
 `app_condutor_meu/atualizar_cnh/cnh_historico`,
