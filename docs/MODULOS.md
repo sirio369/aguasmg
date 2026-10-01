@@ -2332,3 +2332,19 @@ pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
 - Novas RPCs: `app_vrp_os_desprogramar`, `app_vrp_ficha_listar`, `app_vrp_ficha` (+`visitas`),
   `app_vrp_acesso_listar`/`_set` (admin concede `vrp_gestao_acesso`), `app_vrp_colaboradores_listar`.
 - Telas: +`vrpman_serv`/`vrpman_fichas`/`vrpman_prev`. sw `coleta-v197`→`v198`.
+
+**Ajustes de UX (2026-10-01, sw v199→v200):**
+- **Campo não abre mais OS avulsa** — removido "Nova OS corretiva"; o colaborador só executa o que o backoffice
+  programou (`vmNovaPicker` removido). **Minhas OS** ganhou **Lista/Mapa** (`vmCampoMapRender`, marcadores dos
+  serviços programados; popup com **Navegar** no Google Maps + **Preencher OS** `vmAbrir`). `app_vrp_os_minhas`
+  passou a devolver `lat/lon`.
+- **Wizard — Condição → Serviço:** marcar **"Intervir"** em Filtro/Piloto/Vazamento **pré-seleciona** o serviço
+  correspondente na Tela 4 (`VM_INT_SERV`); corrosão/ruído/geral seguem só como anotação.
+- **Wizard — "Resolveu agora?"**: tomada (Tela 2) e adequação civil / acesso (Tela 4) só geram pendência se o
+  operador responder **Não**; **Sim = executado em campo, sem pendência** (`vmPendencias` passou a exigir
+  `tomres_*`/`res_*` = Não). Atende "ele mesmo executa ao invés de gerar pendência".
+- **Wizard — múltiplas fotos de serviço** (`vmPhotoMulti`, chaves `servico_N`); validação e relatório ajustados.
+- **Filtros compactos** (`.vmfbar2`/`.vmff`): Consórcio virou **dropdown**, Consórcio + DMC **lado a lado**,
+  Colaborador abaixo (ocupa menos espaço horizontal).
+- **Tooltip de etapa** nos cards de OS (`title`, `VM_STAGE` + selo ⓘ): explica o status e em que etapa do
+  processo a OS vive.
