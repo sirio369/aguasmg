@@ -399,18 +399,20 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` na categoria **🚧 Em dese
 para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
 
-**Manutenção de VRPs** (`vrpman` hub → `vrpman_campo`/`vrpman_exec`; funções `vm*`, schema `8 - coleta_campo`) —
-gestão de serviços de manutenção nas VRPs, **separado do módulo `vrp`** (que é só levantamento). Card 🔧 em **🚧 Em
-desenvolvimento** (gate `ME.dev_acesso` no `homeGate`, como Perdas/Pessoas — promover p/ Execução quando maduro); hub
-com 🏗️ Campo (qualquer autenticado) e 🧰 Gestão (gate `ME.vrp_gestao`). **Campo:** Minhas OS (`app_vrp_os_minhas`) +
-Nova OS corretiva → wizard de 5 telas (chegada/pressões/condição/serviço/finalização) sobre cabeçalho autofill, fotos
-(`vmUpload`→`fotos-campo/vrp-os/`), GPS, conclusão `app_vrp_os_concluir`; ficha+histórico (`app_vrp_ficha`, `#vmFicha`) e
-relatório PDF (`vmReport`, reusa `#relatorio`/`REL_CSS`). **Gestão:** dashboard (KPIs + lista/mapa + filtros consórcio/DMC),
-detalhe da OS + OS SIGOS + relatório, pendências → gerar corretiva, preventivas (farol/config/programar), ⚙️ acesso
-`vrp_gestao_acesso`. Telas `vrpman`/`vrpman_campo`/`vrpman_exec`/`vrpman_gestao`/`vrpman_os`/`vrpman_cfg`.
-OS interna `VRP-OS-AAAA-NNNN` + `os_sigos` (OS COPASA). Tabelas `vrp_os`/`vrp_pendencia`/`vrp_prev_config`/`vrp_prev_vrp`
-(schema 8, app-only) + RPCs `app_vrp_*` (definer; gestão gateada por `vrp_pode_gestao`). **Pendência = OS corretiva
-derivada** (gerada no backoffice, fecha ao concluir). Detalhe em `docs/MODULOS.md §15`.
+**Gestão de VRPs** (`vrpman` hub; funções `vm*`, schema `8 - coleta_campo`) — gestão de serviços de manutenção nas VRPs,
+**separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 em **🚧 Em desenvolvimento** (gate
+`ME.dev_acesso` no `homeGate`, como Perdas/Pessoas — promover p/ Execução quando maduro); hub com 🏗️ Campo (qualquer
+autenticado) e 🧰 Gestão (gate `ME.vrp_gestao`). **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
+corretiva → wizard de 5 telas sobre cabeçalho autofill, fotos (`vmUpload`→`fotos-campo/vrp-os/`), GPS, conclusão
+`app_vrp_os_concluir`; + card **Visita primária** (abre o módulo `vrp` antigo). Ficha+histórico (`app_vrp_ficha`,
+`#vmFicha`) e relatório PDF (`vmReport`). **Gestão = 3 cards diretos no hub** (`vmHub`, sem tela intermediária; ⚙️ acesso na seção Gestão): **Gestão de serviços**
+(`vrpman_serv`: OS + Pendências; filtro por **colaborador**, mostra "programado para" + **Desprogramar**
+`app_vrp_os_desprogramar`), **Ficha cadastral** (`vrpman_fichas`: lista/mapa de **todas** as VRPs via
+`app_vrp_ficha_listar` → ficha por VRP com histórico que **mescla OS novas + visitas primárias antigas**, cada uma em
+popup), **Cronograma preventivo** (`vrpman_prev`: farol + resumo). OS SIGOS editável, pendência → gerar corretiva,
+⚙️ acesso `vrp_gestao_acesso` (`app_vrp_acesso_*`). OS interna `VRP-OS-AAAA-NNNN`. Tabelas
+`vrp_os`/`vrp_pendencia`/`vrp_prev_config`/`vrp_prev_vrp` (schema 8, app-only) + RPCs `app_vrp_*` (definer; gestão por
+`vrp_pode_gestao`). **Pendência = OS corretiva derivada**. Detalhe em `docs/MODULOS.md §15`.
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
 `projeto_acesso`/`projeto_resumo`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes
