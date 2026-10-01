@@ -400,8 +400,8 @@ para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
 
 **Gestão de VRPs** (`vrpman` hub; funções `vm*`, schema `8 - coleta_campo`) — gestão de serviços de manutenção nas VRPs,
-**separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 em **🚧 Em desenvolvimento** (gate
-`ME.dev_acesso` no `homeGate`, como Perdas/Pessoas — promover p/ Execução quando maduro); hub com 🏗️ Campo (qualquer
+**separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 **"Execução"** em **🚧 Em desenvolvimento** (gate
+`ME.dev_acesso` no `homeGate`, como Perdas/Pessoas; o card antigo "VRPs" da seção 🛠️ Execução foi removido — o módulo `vrp` vive em Campo como "Visita primária"); hub com 🏗️ Campo (qualquer
 autenticado) e 🧰 Gestão (gate `ME.vrp_gestao`). **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
 corretiva → wizard de 5 telas sobre cabeçalho autofill, fotos (`vmUpload`→`fotos-campo/vrp-os/`), GPS, conclusão
 `app_vrp_os_concluir`; + card **Visita primária** (abre o módulo `vrp` antigo). Ficha+histórico (`app_vrp_ficha`,

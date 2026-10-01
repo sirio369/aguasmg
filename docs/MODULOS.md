@@ -1970,6 +1970,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   VRP já traz o nº (`"VRP-07"`, `"BET-02-VRP-29"`) e essas **16 = exatamente as 16 do visor**, únicas por número — o
   `pjLoad` extrai (`iv.vrp`, regex `/VRP-?(\d+)/i`, mantém o zero à esquerda) e o `pjOpen3d` abre direto em
   `?embed=1&vrp=NN`. Consórcio/DMC não são necessários p/ desambiguar (números não se repetem entre ZAs).
+- **"Projeto 3D" na lista de documentos (2026-10-01):** a linha **🧊 Visão 3D** virou **🧊 Projeto 3D** e foi
+  **reposicionada para logo após "Projeto executivo"** (antes de "Licença ambiental"); além da `pjRenderCfg`, agora
+  aparece também no **relatório** (`pjRel`) para o usuário. Helpers `pj3dIsVrp(iv)`/`pj3dRow()` (botão `data-open3d`
+  → `pjOpen3d(iv)`); só intervenções de VRP (`vrp_impl`/`vrp_subst`). Overlay `#pj3d` inalterado.
 - **Árvore de Válvula (`PJ_ARV.valvula`, nova):** Locação → Obra civil (vala/caixa) → Retirada (se substituição,
   off) → Instalação da válvula + acessórios → Interligação/religação → Teste/manobra → Cadastro. As demais árvores
   (vrp_impl, rede_vca) seguem o padrão do protótipo. Cor `--t-valvula`.
@@ -2343,6 +2347,10 @@ pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
   acesso (`vrpman_cfg`, admin) fica no cabeçalho da seção **Gestão** do hub. ⚠️ **Cards do hub são renderizados
   dinamicamente** → o handler global de `[data-go]` (ligado no load) NÃO os cobre; `vmHub` liga cada card
   explicitamente (`data-go` p/ Campo, `data-g` gateado p/ Gestão).
+
+**Home (2026-10-01):** o card do módulo na tela inicial (🚧 Em desenvolvimento) foi renomeado **"Gestão de VRPs" →
+"Execução"** (`#cardVrpMan`: HTML estático + texto dinâmico no `homeGate`). O card **"VRPs"** (`data-go="vrp"`) da
+seção 🛠️ Execução foi **removido** — o módulo antigo já está dentro de Campo como **Visita primária**.
 - **Gestão de serviços — OS:** filtro por **colaborador** (`p_atribuido`), cartão mostra **para quem está
   programado** e botão **Desprogramar** (`app_vrp_os_desprogramar` — só `programada`; se era corretiva de
   pendência, reabre a pendência).
