@@ -2348,9 +2348,10 @@ pendência→gerar corretiva→resolver; listar/kpis/farol/programar).
   dinamicamente** → o handler global de `[data-go]` (ligado no load) NÃO os cobre; `vmHub` liga cada card
   explicitamente (`data-go` p/ Campo, `data-g` gateado p/ Gestão).
 
-**Home (2026-10-01):** o card do módulo na tela inicial (🚧 Em desenvolvimento) foi renomeado **"Gestão de VRPs" →
-"Execução"** (`#cardVrpMan`: HTML estático + texto dinâmico no `homeGate`). O card **"VRPs"** (`data-go="vrp"`) da
-seção 🛠️ Execução foi **removido** — o módulo antigo já está dentro de Campo como **Visita primária**.
+**Home (2026-10-01):** o card **"Gestão de VRPs"** foi **promovido** de 🚧 Em desenvolvimento para a seção **🛠️ Execução**
+(mantém o nome; virou card simples `data-go="vrpman"` **sem gate `dev_acesso`** — removidos o `#cardVrpMan` e sua lógica no
+`homeGate`; Campo p/ qualquer autenticado, Gestão por `vrp_gestao`). O card **"VRPs"** (`data-go="vrp"`) da seção Execução
+foi **removido** — o módulo antigo já está dentro de Campo como **Visita primária**.
 - **Gestão de serviços — OS:** filtro por **colaborador** (`p_atribuido`), cartão mostra **para quem está
   programado** e botão **Desprogramar** (`app_vrp_os_desprogramar` — só `programada`; se era corretiva de
   pendência, reabre a pendência).
