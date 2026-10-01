@@ -325,8 +325,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="loggers"><div class="ic">📟</div><div class="nm">Loggers temporários</div></button>
       <button class="mod" data-go="pesquisa"><div class="ic">🎧</div><div class="nm">Pesquisa</div></button>
       <button class="mod" data-go="entrevistadores"><div class="ic">🧑‍💼</div><div class="nm">Entrevistadores</div></button>
-      <button class="mod" data-go="vrp"><div class="ic">🎛️</div><div class="nm">VRPs</div></button>
       <button class="mod" data-go="projetos"><div class="ic">📐</div><div class="nm">Projetos</div></button>
+      <button class="mod" data-go="vrpman"><div class="ic">🔧</div><div class="nm">Gestão de VRPs</div></button>
     </div>
     <div class="sec" style="margin-top:20px">🧰 Suporte</div>
     <div class="grid" style="margin-top:10px">
@@ -340,7 +340,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
       <button class="mod soon" id="cardPessoas"><div class="ic">👥</div><div class="nm">Gestão de Pessoas 🔒</div></button>
-      <button class="mod soon" id="cardVrpMan"><div class="ic">🔧</div><div class="nm">Gestão de VRPs 🔒</div></button>
     </div>
   </main>
 
@@ -1546,7 +1545,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } const cvm=document.getElementById('cardVrpMan'); if(cvm){ cvm.classList.toggle('soon',!okDev); cvm.querySelector('.nm').textContent=okDev?'Gestão de VRPs':'Gestão de VRPs 🔒'; cvm.onclick=okDev?(()=>irPara('vrpman')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const cpe=document.getElementById('cardPessoas'); if(cpe){ cpe.classList.toggle('soon',!okDev); cpe.querySelector('.nm').textContent=okDev?'Gestão de Pessoas':'Gestão de Pessoas 🔒'; cpe.onclick=okDev?(()=>irPara('pessoas')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -2004,22 +2003,24 @@ function pjOpen3d(iv){
   const nvrp=iv&&iv.vrp?String(iv.vrp):'';   // abre direto na peça (?vrp=NN) quando a intervenção tem nº de VRP
   const url='https://vrps-3d-aguas-mg.vercel.app/?embed=1'+(nvrp?('&vrp='+encodeURIComponent(nvrp)):'');
   ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f1720;color:#fff">
-      <b style="font-size:14px">🧊 Visão 3D${nvrp?(' — VRP-'+nvrp):' — VRPs'}${iv&&iv.dmc?(' · '+iv.dmc):''}</b>
+      <b style="font-size:14px">🧊 Projeto 3D${nvrp?(' — VRP-'+nvrp):' — VRPs'}${iv&&iv.dmc?(' · '+iv.dmc):''}</b>
       <button id="pj3dClose" style="all:unset;cursor:pointer;background:#374151;color:#fff;padding:7px 14px;border-radius:8px">Fechar</button></div>
     <iframe src="${url}" allow="fullscreen; xr-spatial-tracking" style="flex:1;width:100%;border:0"></iframe>`;
   ov.style.display='flex';
   document.getElementById('pj3dClose').onclick=()=>{ ov.style.display='none'; ov.innerHTML=''; };
 }
+// "Projeto 3D" nos documentos — só intervenções de VRP; abre o visor 3D (botão data-open3d)
+function pj3dIsVrp(iv){ return !!iv && (iv.tipo==='vrp_impl'||iv.tipo==='vrp_subst'); }
+function pj3dRow(){ return `<div class="pjdocrow"><span style="flex:1;min-width:0">🧊 <b>Projeto 3D</b> <span class="pjhint" style="margin:0">· visualização 3D da VRP</span></span><span class="pjdocbtns"><button class="btn ghost pjmini" data-open3d="1">🧊 Abrir projeto 3D</button></span></div>`; }
 function pjRenderCfg(keep){
   const iv=PJ_IVS.find(i=>i.id===pjCur); if(!iv){ irPara('projeto_sup'); return; } pjReg={}; pjMode='cfg'; pjLocked=!!iv.locked;
   const t=PJ_TIPOS[iv.tipo];
   const hasAdv=iv.arv.some(pjHasAdv);
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
+  // Projeto 3D aparece logo após o "Projeto executivo" (só intervenções de VRP)
   const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
-    return `<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,28)}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="${dc.t}">📎 ${ok?'Substituir':'Anexar'}</button>${ok?`<button class="btn ghost pjmini bad" data-remove="${dc.t}">🗑 Remover</button>`:''}<input type="file" accept="application/pdf" hidden data-file="${dc.t}"></span></div>`; }).join('');
-  // Visão 3D — visor externo das VRPs (só p/ intervenções de VRP); embute via iframe
-  const is3d=(iv.tipo==='vrp_impl'||iv.tipo==='vrp_subst');
-  const vis3dHtml=is3d?`<div class="pjdocrow"><span style="flex:1;min-width:0">🧊 <b>Visão 3D</b> <span class="pjhint" style="margin:0">· visor 3D das VRPs</span></span><span class="pjdocbtns"><button class="btn ghost pjmini" id="pj3dOpen">🧊 Abrir visão 3D</button></span></div>`:'';
+    const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,28)}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="${dc.t}">📎 ${ok?'Substituir':'Anexar'}</button>${ok?`<button class="btn ghost pjmini bad" data-remove="${dc.t}">🗑 Remover</button>`:''}<input type="file" accept="application/pdf" hidden data-file="${dc.t}"></span></div>`;
+    return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   const lockCard=iv.locked
     ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Intervenção liberada para execução</b><span>Configuração congelada — o campo já lança avanços. Reabra só se precisar mudar escopo/quantidade.</span></div><button class="btn ghost" id="pjUnlock">Reabrir configuração</button></div>`
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b></div><button class="btn" id="pjLock">🔓 Liberar para execução</button></div>`;
@@ -2031,14 +2032,14 @@ function pjRenderCfg(keep){
    <div class="pjtree ${iv.locked?'frozen':''}">${iv.arv.map(pjNodeHtml).join('')}</div>
    <div class="sec" style="margin-top:16px">📎 Documentos</div>
    <p class="pjhint" style="margin:2px 0 8px">Anexe, abra e remova aqui os documentos da intervenção. No <b>relatório</b> eles ficam só para <b>abrir</b>.</p>
-   ${docsHtml}${vis3dHtml}`;
+   ${docsHtml}`;
   const d=$('#pjCfg');
   const lk=$('#pjLock'); if(lk) lk.onclick=()=>{ iv.locked=true; pjSave(iv); toast('🔓 Intervenção liberada para o campo'); pjRenderCfg(); };
   const ul=$('#pjUnlock'); if(ul) ul.onclick=()=>{ if(hasAdv&&ul.dataset.armed!=='1'){ ul.dataset.armed='1'; ul.textContent='⚠️ Confirmar (há avanços lançados)'; ul.classList.add('bad'); return; } iv.locked=false; pjSave(iv); toast('🔒 Configuração reaberta'); pjRenderCfg(); };
   d.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
   d.querySelectorAll('[data-attach]').forEach(b=>b.onclick=()=>{ const inp=d.querySelector('[data-file="'+b.dataset.attach+'"]'); if(inp)inp.click(); });
   d.querySelectorAll('[data-file]').forEach(inp=>inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) pjDocAnexar(iv,inp.dataset.file,f); });
-  const b3=$('#pj3dOpen'); if(b3) b3.onclick=()=>pjOpen3d(iv);
+  d.querySelectorAll('[data-open3d]').forEach(b=>b.onclick=()=>pjOpen3d(iv));
   d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>pjDocRemover(iv,b.dataset.remove));
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
@@ -2206,7 +2207,8 @@ async function pjRel(id){
   await pjDocsLoad(iv); await pjAvancosLoad(iv);
   // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
   const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
-    return `<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`; }).join('');
+    const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`;
+    return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   // mini-gantt: janela = 1º avanço → último avanço, por atividade (nível 1 ativa) — datas reais do log
   const fmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
   const _allAv=Object.values(pjAvancosCur).flat();
@@ -2247,6 +2249,7 @@ async function pjRel(id){
    <button class="btn" onclick="toast('Gerar PDF — na versão integrada monta o documento completo')">🖨️ Gerar PDF consolidado</button>`;
   const rr=$('#pjRel');
   rr.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
+  rr.querySelectorAll('[data-open3d]').forEach(b=>b.onclick=()=>pjOpen3d(iv));
   rr.querySelectorAll('#pjAdvSeg button').forEach(b=>b.onclick=()=>{ const v=b.dataset.adv; rr.querySelectorAll('#pjAdvSeg button').forEach(x=>x.classList.toggle('sel',x===b)); document.getElementById('pjAdvLogica').hidden=v!=='logica'; document.getElementById('pjAdvEnvio').hidden=v!=='envio'; document.getElementById('pjAdvHint').textContent=v==='logica'?'Ordem prevista de execução (atividade › subatividade), com os lançamentos diários de cada uma.':'Todos os avanços na ordem em que foram enviados (mais recente primeiro), independente da sequência lógica.'; });
   irPara('projeto_rel'); window.scrollTo(0,0);
 }
