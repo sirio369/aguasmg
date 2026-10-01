@@ -834,6 +834,11 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   2026-10-01 achou aprovações cruzadas entre áreas. **Admin não tem bypass** (vê só quem o tem como
   Aprovador 1/2, como qualquer aprovador). `sup_epi_gestor` continua existindo só para **liberar o menu**
   de EPI no front (`ME.epi_gestor`); não dá mais poder de aprovação.
+- **Autoaprovação bloqueada (aplicado em produção 2026-10-01, `docs/migracao_bloqueia_autoaprovacao.sql`):**
+  ninguém aprova o próprio pedido — nem admin — em `sup_aprovar`, `sup_epi_aprovar`, `sup_epi_troca_aprovar`,
+  `app_frota_manutencao_aprovar` (reportado_por) e `app_condutor_aprovar` (própria CNH); as 4 filas de aprovação
+  não listam o próprio pedido. `sup_e_aprovador_de` também exige `aprovador <> solicitante`. Auditoria que
+  motivou: 7 autoaprovações (EPI #22/#32/#37/#99, Insumos #1061/#1158, Manutenção de frota #1).
 - ⚠️ **Cuidado:** fila/aprovação nova em Suprimentos → use `sup_e_aprovador_de`, nunca
   `sup_pode_aprovar`/`sup_epi_gestor` (esses só dizem "é aprovador de alguém", não "de quem").
 
