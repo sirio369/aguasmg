@@ -603,6 +603,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   .vmsubt{all:unset;cursor:pointer;padding:8px 13px;border-radius:10px;font-size:13px;font-weight:600;color:var(--mut);border:1px solid transparent}
   .vmsubt.on{background:var(--card);color:var(--ink);border-color:var(--line)}
   .vmfbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:12px}
+  .vmfbar2{display:flex;flex-wrap:wrap;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:12px}
+  .vmff{flex:1 1 0;min-width:110px;display:flex;flex-direction:column;gap:3px}
+  .vmff label{font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);font-weight:700}
+  .vmff .vmsel{width:100%}
   .vmfbl{font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);font-weight:600}
   .vmseg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px}
   .vmseg button{all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:600;color:var(--mut)}
@@ -3460,8 +3464,10 @@ function vmBool(b){ return b==null?'—':(b?'Sim':'Não'); }
 function vmFmtDate(s){ if(!s)return''; try{ return new Date(String(s).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}); }catch(e){ return s; } }
 const VM_COND=[['filtro','Filtro'],['piloto','Piloto / circuito piloto'],['vaz','Vazamento'],['corr','Corrosão'],['ruido','Ruído / vibração'],['geral','Condição geral']];
 const VM_SERV=['Limpeza de filtro','Limpeza de piloto','Desobstrução','Reaperto','Regulagem','Troca de peça','Correção de vazamento','Adequação civil','Acesso / entorno','Outro'];
+const VM_INT_SERV={filtro:'Limpeza de filtro',piloto:'Limpeza de piloto',vaz:'Correção de vazamento'};
 const VM_PENDLBL={tomada_mont:'Tomada de pressão a montante',tomada_jus:'Tomada de pressão a jusante',civil:'Adequação civil na caixa da VRP',acesso:'Acesso externo / entorno'};
 const VM_STLBL={concluida:'Concluído',concluida_pendencia:'Concluído c/ pendência',retorno:'Necessita retorno',improdutiva:'Improdutivo',programada:'Programada',em_execucao:'Em execução'};
+const VM_STAGE={programada:'Etapa 1 — Agendada e atribuída a um colaborador; aguardando execução em campo.',em_execucao:'Etapa 2 — Em execução pelo colaborador em campo (ainda não concluída).',concluida:'Etapa 3 — Serviço concluído, VRP liberada e sem pendências.',concluida_pendencia:'Etapa 3 — Serviço concluído, mas com pendência técnica aberta (gera uma OS corretiva).',retorno:'Etapa 3 — Precisa de novo atendimento: VRP não liberada ou vazamento após o serviço.',improdutiva:'Etapa 3 — Visita improdutiva: VRP não localizada ou caixa inacessível.'};
 const VM_STCLR={concluida:'var(--ok)',concluida_pendencia:'var(--warn)',retorno:'var(--bad)',improdutiva:'var(--mut)',programada:'var(--mut)',em_execucao:'var(--warn)'};
 let vmVrpCache=[], vmExec=null, vmEnviando=false;
 
@@ -3487,17 +3493,20 @@ function vmHub(){
   const cf=$('#vmHubCfg'); if(cf) cf.onclick=()=>irPara('vrpman_cfg');
 }
 
+let vmCampoView='lista', vmCampoMap=null, vmCampoLayer=null;
 async function vmCampoInit(){
-  $('#vmCampo').innerHTML='<h1>Minhas OS</h1><p class="sub">Carregando…</p>';
+  $('#vmCampo').innerHTML='<h1 style="margin-bottom:2px">Minhas OS</h1><p class="sub" style="margin-top:0">Carregando…</p>';
   let minhas=[];
   try{ const {data,error}=await sb.rpc('app_vrp_os_minhas'); if(error)throw error; minhas=data||[]; }
   catch(e){ $('#vmCampo').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
-  let h=`<h1 style="margin-bottom:2px">Minhas OS</h1><p class="sub" style="margin-top:0">Programadas para você + em execução.</p>`;
-  h+= minhas.length ? minhas.map(vmOsRowCampo).join('') : '<p class="sub">Nenhuma OS atribuída no momento.</p>';
-  h+=`<button class="vmbtn" id="vmNova" style="margin-top:16px">＋ Nova OS corretiva (avulsa)</button>`;
-  $('#vmCampo').innerHTML=h;
-  $('#vmCampo').querySelectorAll('[data-abrir]').forEach(b=>b.onclick=()=>vmAbrir(+b.dataset.abrir, b.dataset.origem||'corretiva'));
-  $('#vmNova').onclick=vmNovaPicker;
+  const seg=`<div style="display:flex;align-items:center;gap:8px;margin:6px 0 8px"><b style="font-size:13px">${minhas.length} OS</b><span style="flex:1"></span><div class="vmseg" id="vmCampoSeg"><button data-cv="lista" class="${vmCampoView==='lista'?'on':''}">☰ Lista</button><button data-cv="mapa" class="${vmCampoView==='mapa'?'on':''}">🗺️ Mapa</button></div></div>`;
+  const body = vmCampoView==='mapa' ? '<div class="vmmap" id="vmCampoMap"></div>'
+    : (minhas.length ? minhas.map(vmOsRowCampo).join('') : '<p class="sub">Nenhuma OS programada para você no momento.</p>');
+  $('#vmCampo').innerHTML='<h1 style="margin-bottom:2px">Minhas OS</h1><p class="sub" style="margin-top:0">Serviços programados para você + em execução.</p>'+seg+body;
+  const el=$('#vmCampo');
+  el.querySelectorAll('[data-cv]').forEach(b=>b.onclick=()=>{vmCampoView=b.dataset.cv;vmCampoInit();});
+  el.querySelectorAll('[data-abrir]').forEach(b=>b.onclick=()=>vmAbrir(+b.dataset.abrir, b.dataset.origem||'corretiva'));
+  if(vmCampoView==='mapa') vmCampoMapRender(minhas);
 }
 function vmOsRowCampo(o){
   const prog=o.programada_para?(' · '+vmFmtDate(o.programada_para)):'';
@@ -3505,23 +3514,19 @@ function vmOsRowCampo(o){
     <div class="vt"><span class="vn">${o.os_numero}</span><span class="vv">${vEsc(o.num_vrp||'VRP')}</span><span class="vmst ${o.status}" style="margin-left:auto">${VM_STLBL[o.status]||o.status}</span></div>
     <div class="vl">${vmConsLbl(o.consorcio)}${o.dmc?(' · DMC '+o.dmc):''} · ${o.origem}${prog}</div></button>`;
 }
-
-async function vmNovaPicker(){
-  $('#vmCampo').innerHTML=`<h1>Nova OS — escolher VRP</h1>
-    <input id="vmPick" class="vmin" placeholder="Buscar VRP por código ou nó…" autocomplete="off" style="margin-bottom:10px">
-    <div id="vmPickList"><p class="sub">Carregando VRPs…</p></div>
-    <button class="vmbtn sec" id="vmPickBack" style="margin-top:12px">‹ Voltar</button>`;
-  if(!vmVrpCache.length){ try{ const {data}=await sb.rpc('app_vrp_listar'); vmVrpCache=data||[]; }catch(e){} }
-  vmPickRender('');
-  $('#vmPick').oninput=()=>vmPickRender($('#vmPick').value);
-  $('#vmPickBack').onclick=vmCampoInit;
-}
-function vmPickRender(term){
-  const t=(term||'').toLowerCase().trim();
-  const arr=vmVrpCache.filter(v=>!t||((v.num_vrp||'').toLowerCase().includes(t))||((v.cd_no_agua||'').toLowerCase().includes(t))||((v.label||'').toLowerCase().includes(t))).slice(0,40);
-  const box=$('#vmPickList'); if(!box)return;
-  box.innerHTML=arr.length?arr.map(v=>`<button class="vmrow" data-vrp="${v.id}"><div class="vt"><span class="vv">${vEsc(v.num_vrp||v.label||('VRP '+v.id))}</span></div><div class="vl">${vmConsLbl(v.consorcio)}${v.cd_no_agua?(' · nó '+vEsc(v.cd_no_agua)):''}${v.diametro?(' · DN '+v.diametro):''}</div></button>`).join(''):'<p class="sub">Nada encontrado.</p>';
-  box.querySelectorAll('[data-vrp]').forEach(b=>b.onclick=()=>vmAbrir(+b.dataset.vrp,'corretiva'));
+function vmCampoMapRender(minhas){
+  const el=document.getElementById('vmCampoMap'); if(!el||!window.L) return;
+  setTimeout(()=>{
+    if(vmCampoMap){ try{vmCampoMap.remove();}catch(e){} vmCampoMap=null; }
+    vmCampoMap=L.map(el); mapAddCamadaBase(vmCampoMap); vmCampoLayer=L.layerGroup().addTo(vmCampoMap); const b=[];
+    const clr={programada:'#3a9bde',em_execucao:'#e6b352'};
+    minhas.filter(o=>o.lat!=null&&o.lon!=null).forEach(o=>{ const m=L.circleMarker([o.lat,o.lon],{radius:8,color:'#fff',weight:2,fillColor:clr[o.status]||'#3a9bde',fillOpacity:.95}).addTo(vmCampoLayer);
+      m.bindPopup(`<b>${vEsc(o.num_vrp||'VRP')}</b><br>${o.os_numero} · ${VM_STLBL[o.status]||o.status}${o.programada_para?('<br>'+vmFmtDate(o.programada_para)):''}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vmcop" data-vrp="${o.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher OS ›</a>`);
+      m.on('popupopen',()=>{ const a=document.querySelector('.vmcop[data-vrp="'+o.vrp_id+'"]'); if(a)a.onclick=()=>vmAbrir(o.vrp_id,o.origem); });
+      b.push([o.lat,o.lon]); });
+    if(b.length) vmCampoMap.fitBounds(b,{padding:[40,40],maxZoom:16}); else vmCampoMap.setView([-19.94,-44.1],11);
+    vmCampoMap.invalidateSize();
+  },160);
 }
 
 async function vmAbrir(vrpId, origem){
@@ -3589,7 +3594,13 @@ function vmLado(lado,label,proj,ult){
     <div class="vmref"><div class="p"><span>Projeto</span><b>${vmN(proj)}</b></div><div class="p"><span>Últ. ajustada</span><b>${vmN(ult)}</b></div></div>
     <div class="vmq" style="margin-bottom:8px"><label>Consegue conectar o manômetro?</label>${vmOptRow(kc,['Sim','Não'])}</div>`;
   if(conn==='Sim') h+=`<div class="vmq" style="margin-bottom:0"><label>Pressão encontrada (mca)</label><input class="vmin" inputmode="decimal" data-in="${kv}" value="${vEsc(S.ans[kv]||'')}"></div>`;
-  else if(conn==='Não'){ h+=`<div class="vmq" style="margin-bottom:0"><label>Tomada de pressão:</label>${vmOptRow(kt,['Inexistente','Obstruída','Outro'])}`; if(S.ans[kt]) h+=`<div class="vmpb">🔧 Pendência automática: ${VM_PENDLBL['tomada_'+lado]} — ${S.ans[kt].toLowerCase()}</div>`; h+=`</div>`; }
+  else if(conn==='Não'){ h+=`<div class="vmq" style="margin-bottom:0"><label>Tomada de pressão:</label>${vmOptRow(kt,['Inexistente','Obstruída','Outro'])}</div>`;
+    if(S.ans[kt]){ const kr='tomres_'+lado;
+      h+=`<div class="vmq" style="margin:8px 0 0"><label>Resolveu agora (instalou / desobstruiu)?</label>${vmOptRow(kr,['Sim','Não'])}</div>`;
+      if(S.ans[kr]==='Não') h+=`<div class="vmpb">🔧 Gera pendência: ${VM_PENDLBL['tomada_'+lado]} — ${S.ans[kt].toLowerCase()}</div>`;
+      else if(S.ans[kr]==='Sim') h+=`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">✓ Resolvido em campo — sem pendência</div>`;
+    }
+  }
   return h+`</div>`;
 }
 function vmScr2(){ const H=vmExec.hdr; return `<h3 style="margin:2px 0">2 · Pressões</h3>`+vmLado('mont','Montante',H.proj_mont,H.ult_mont)+vmLado('jus','Jusante',H.proj_jus,H.ult_jus); }
@@ -3601,15 +3612,25 @@ function vmScr3(){
     h+=`</div>`; });
   return h;
 }
+function vmPhotoMulti(prefix,label){
+  const S=vmExec; const keys=Object.keys(S.fotos).filter(k=>(k===prefix||k.indexOf(prefix+'_')===0)&&S.fotos[k]);
+  let h=keys.map(k=>`<label class="vmphoto has"><span class="cam">✓</span>${label}<input type="file" accept="image/*" capture="environment" data-photo="${k}"></label>`).join('');
+  h+=`<label class="vmphoto"><span class="cam">📷</span>+ ${label}<input type="file" accept="image/*" capture="environment" data-photo="${prefix}_${keys.length}"></label>`;
+  return h;
+}
 function vmScr4(){
-  const S=vmExec; let h=`<h3 style="margin:2px 0">4 · Serviço executado</h3><div class="vmchips">`;
+  const S=vmExec; let h=`<h3 style="margin:2px 0">4 · Serviço executado</h3><p class="sub" style="margin:-2px 0 8px">Marque o que você executou. Achou um problema que não conseguiu resolver? Responda “Resolveu agora? Não” para gerar pendência.</p><div class="vmchips">`;
   VM_SERV.forEach(s=>{const on=S.serv.has(s);h+=`<button class="vmchip ${on?'on':''}" data-serv="${vEsc(s)}"><span class="bx">${on?'✓':''}</span>${s}</button>`;});
   h+=`</div>`;
   if(S.serv.has('Troca de peça')) h+=`<div class="vmq" style="margin-top:14px"><label>Peça trocada <span class="vmreq">*</span></label><input class="vmin" data-in="peca" value="${vEsc(S.ans.peca||'')}"></div>`;
   if(S.serv.has('Outro')) h+=`<div class="vmq" style="margin-top:14px"><label>Descreva "Outro"</label><input class="vmin" data-in="serv_outro" value="${vEsc(S.ans.serv_outro||'')}"></div>`;
-  const g=[]; if(S.serv.has('Adequação civil'))g.push('civil'); if(S.serv.has('Acesso / entorno'))g.push('acesso');
-  if(g.length) h+=`<div class="vmpb">🔧 Pendências geradas: ${g.map(x=>VM_PENDLBL[x]).join(', ')}</div>`;
-  h+=`<div class="vmq" style="margin-top:16px"><label>Foto do serviço executado <span class="vmreq">*</span></label><div class="vmphotos">${vmPhoto('servico','Serviço executado')}</div></div>`;
+  [['Adequação civil','civil'],['Acesso / entorno','acesso']].forEach(([item,tp])=>{ if(S.serv.has(item)){ const kr='res_'+tp;
+    h+=`<div class="vmq" style="margin-top:12px"><label>${item} — resolveu agora?</label>${vmOptRow(kr,['Sim','Não'])}`;
+    if(S.ans[kr]==='Não') h+=`<div class="vmpb">🔧 Gera pendência: ${VM_PENDLBL[tp]}</div>`;
+    else if(S.ans[kr]==='Sim') h+=`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">✓ Resolvido em campo — sem pendência</div>`;
+    h+=`</div>`;
+  }});
+  h+=`<div class="vmq" style="margin-top:16px"><label>Fotos do serviço executado <span class="vmreq">*</span> <span class="sub">(pode adicionar várias)</span></label><div class="vmphotos">${vmPhotoMulti('servico','Serviço')}</div></div>`;
   return h;
 }
 function vmScr5(){
@@ -3628,10 +3649,10 @@ function vmScr5(){
 }
 function vmPendencias(){
   const S=vmExec, p=[];
-  if(S.ans.conn_mont==='Não'&&S.ans.tom_mont) p.push({tipo:'tomada_mont',lado:'montante',descricao:VM_PENDLBL.tomada_mont+' — '+S.ans.tom_mont.toLowerCase()});
-  if(S.ans.conn_jus==='Não'&&S.ans.tom_jus) p.push({tipo:'tomada_jus',lado:'jusante',descricao:VM_PENDLBL.tomada_jus+' — '+S.ans.tom_jus.toLowerCase()});
-  if(S.serv.has('Adequação civil')) p.push({tipo:'civil',lado:null,descricao:VM_PENDLBL.civil});
-  if(S.serv.has('Acesso / entorno')) p.push({tipo:'acesso',lado:null,descricao:VM_PENDLBL.acesso});
+  if(S.ans.conn_mont==='Não'&&S.ans.tom_mont&&S.ans.tomres_mont==='Não') p.push({tipo:'tomada_mont',lado:'montante',descricao:VM_PENDLBL.tomada_mont+' — '+S.ans.tom_mont.toLowerCase()});
+  if(S.ans.conn_jus==='Não'&&S.ans.tom_jus&&S.ans.tomres_jus==='Não') p.push({tipo:'tomada_jus',lado:'jusante',descricao:VM_PENDLBL.tomada_jus+' — '+S.ans.tom_jus.toLowerCase()});
+  if(S.serv.has('Adequação civil')&&S.ans.res_civil==='Não') p.push({tipo:'civil',lado:null,descricao:VM_PENDLBL.civil});
+  if(S.serv.has('Acesso / entorno')&&S.ans.res_acesso==='Não') p.push({tipo:'acesso',lado:null,descricao:VM_PENDLBL.acesso});
   return p;
 }
 function vmSugere(){
@@ -3660,7 +3681,7 @@ function vmScrResult(){
 function vmWireExec(){
   const el=$('#vmExec');
   el.querySelectorAll('[data-opt]').forEach(b=>b.onclick=()=>{const k=b.dataset.opt;vmExec.ans[k]=vmExec.ans[k]===b.dataset.val?undefined:b.dataset.val;vmExecRender();});
-  el.querySelectorAll('[data-cond]').forEach(b=>b.onclick=()=>{const k=b.dataset.cond;vmExec.cond[k]=vmExec.cond[k]===b.dataset.val?undefined:b.dataset.val;vmExecRender();});
+  el.querySelectorAll('[data-cond]').forEach(b=>b.onclick=()=>{const k=b.dataset.cond;const nv=vmExec.cond[k]===b.dataset.val?undefined:b.dataset.val;vmExec.cond[k]=nv; if(nv==='Intervir'&&VM_INT_SERV[k])vmExec.serv.add(VM_INT_SERV[k]); vmExecRender();});
   el.querySelectorAll('[data-serv]').forEach(b=>b.onclick=()=>{const s=b.dataset.serv;vmExec.serv.has(s)?vmExec.serv.delete(s):vmExec.serv.add(s);vmExecRender();});
   el.querySelectorAll('[data-in]').forEach(i=>i.oninput=()=>{vmExec.ans[i.dataset.in]=i.value;});
   el.querySelectorAll('[data-condd]').forEach(i=>i.oninput=()=>{vmExec.cond['d_'+i.dataset.condd]=i.value;});
@@ -3676,7 +3697,7 @@ function vmWireExec(){
 function vmValid(){
   const S=vmExec;
   if(S.step===1){ if(!S.ans.localizada||!S.ans.acessivel){toast('Responda localizada e acesso');return false;} if(!S.fotos.geral_antes_ext&&!S.fotos.geral_antes_int){toast('Tire ao menos 1 foto geral');return false;} return true; }
-  if(S.step===4){ if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} if(S.serv.size&&!S.fotos.servico){toast('Foto do serviço executado');return false;} return true; }
+  if(S.step===4){ if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} const temFotoServ=Object.keys(S.fotos).some(k=>(k==='servico'||k.indexOf('servico_')===0)&&S.fotos[k]); if(S.serv.size&&!temFotoServ){toast('Adicione ao menos 1 foto do serviço');return false;} return true; }
   if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} return true; }
   return true;
 }
@@ -3781,7 +3802,8 @@ function vmReportHtml(d){
   const pend=(d.pendencias||[]);
   if(pend.length){ h+='<div class="relSec">Pendências técnicas</div>'+pend.map(function(p){return '<div class="relPend">🔧 '+vEsc(p.descricao||p.tipo)+' — '+p.status+'</div>';}).join(''); }
   const fotos=d.fotos||{};
-  const fArr=[['Geral antes — externo',fotos.geral_antes_ext],['Geral antes — interno',fotos.geral_antes_int],['Serviço',fotos.servico],['Geral depois — interno',fotos.geral_depois_int],['Geral depois — externo',fotos.geral_depois_ext],['Ponto visitado',fotos.ponto_visitado]];
+  const servKeys=Object.keys(fotos).filter(k=>(k==='servico'||k.indexOf('servico_')===0)&&fotos[k]);
+  const fArr=[['Geral antes — externo',fotos.geral_antes_ext],['Geral antes — interno',fotos.geral_antes_int]].concat(servKeys.map((k,i)=>['Serviço'+(servKeys.length>1?(' '+(i+1)):''),fotos[k]])).concat([['Geral depois — interno',fotos.geral_depois_int],['Geral depois — externo',fotos.geral_depois_ext],['Ponto visitado',fotos.ponto_visitado]]);
   h+='<div class="relSec">Fotos</div>'+relFotos(fArr);
   h+='</div><div class="relFoot"><span>AcquaHub · relatório gerado do banco</span><span>'+(d.os_numero||'')+(d.os_sigos?(' · SIGOS '+d.os_sigos):'')+'</span></div>';
   return h;
@@ -3801,19 +3823,20 @@ async function vmGShared(){
 }
 function vmGFilterBar(opts){
   opts=opts||{};
-  const cons=[['','Ambos'],['ZA0200','Betim'],['ZA1004','Contagem']];
+  const consOpts=[['','Ambos'],['ZA0200','Betim'],['ZA1004','Contagem']].map(c=>`<option value="${c[0]}" ${vmG.cons===c[0]?'selected':''}>${c[1]}</option>`).join('');
   const dmcs=vmGDmcs.filter(d=>!vmG.cons||d.consorcio===vmG.cons);
   const dopts=['<option value="">Todos os DMC</option>'].concat(dmcs.map(d=>`<option value="${d.numero_dmc}" ${vmG.dmc===d.numero_dmc?'selected':''}>DMC ${d.numero_dmc}${!vmG.cons?(' · '+vmConsLbl(d.consorcio)):''}</option>`)).join('');
-  let h=`<div class="vmfbar"><span class="vmfbl">Consórcio</span><div class="vmseg" id="vmConsSeg">${cons.map(c=>`<button data-cons="${c[0]}" class="${vmG.cons===c[0]?'on':''}">${c[1]}</button>`).join('')}</div>
-    <span class="vmfbl">DMC</span><select class="vmsel" id="vmDmcSel">${dopts}</select>`;
+  let h=`<div class="vmfbar2">
+    <div class="vmff"><label>Consórcio</label><select class="vmsel" id="vmConsSel">${consOpts}</select></div>
+    <div class="vmff"><label>DMC</label><select class="vmsel" id="vmDmcSel">${dopts}</select></div>`;
   if(opts.colab){ const copts=['<option value="">Todos</option>'].concat(vmGColab.map(c=>`<option value="${c.id}" ${vmG.colab===c.id?'selected':''}>${vEsc(c.nome)}</option>`)).join('');
-    h+=`<span class="vmfbl">Colaborador</span><select class="vmsel" id="vmColabSel">${copts}</select>`; }
+    h+=`<div class="vmff" style="flex-basis:100%"><label>Colaborador</label><select class="vmsel" id="vmColabSel">${copts}</select></div>`; }
   return h+`</div>`;
 }
 function vmGWireFilters(el, reload){
-  el.querySelectorAll('[data-cons]').forEach(b=>b.onclick=()=>{vmG.cons=b.dataset.cons;vmG.dmc='';reload();});
+  const cs=el.querySelector('#vmConsSel'); if(cs)cs.onchange=()=>{vmG.cons=cs.value;vmG.dmc='';reload();};
   const ds=el.querySelector('#vmDmcSel'); if(ds)ds.onchange=()=>{vmG.dmc=ds.value;reload();};
-  const cs=el.querySelector('#vmColabSel'); if(cs)cs.onchange=()=>{vmG.colab=cs.value;reload();};
+  const col=el.querySelector('#vmColabSel'); if(col)col.onchange=()=>{vmG.colab=col.value;reload();};
 }
 // Área 1 — Gestão de serviços (OS + Pendências)
 async function vmServInit(){
@@ -3905,9 +3928,10 @@ async function vmGLoadOs(){
 function vmGOsCard(o){
   const prog=o.status==='programada';
   const quem = prog ? (o.atribuido?vEsc(o.atribuido):'não atribuído') : (o.executor?vEsc(o.executor):'—');
+  const stage=vEsc(VM_STAGE[o.status]||'');
   return `<div style="border:1px solid var(--line);border-radius:12px;margin-bottom:7px;background:var(--card);overflow:hidden">
-    <div class="vmosmain" data-os="${o.os_id}" style="cursor:pointer;padding:10px 12px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)">${o.os_numero}</span><b style="font-size:15px">${vEsc(o.num_vrp||'VRP')}</b><span class="vmst ${o.status}" style="margin-left:auto">${VM_STLBL[o.status]||o.status}</span></div>
+    <div class="vmosmain" data-os="${o.os_id}" title="${stage}" style="cursor:pointer;padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)">${o.os_numero}</span><b style="font-size:15px">${vEsc(o.num_vrp||'VRP')}</b><span class="vmst ${o.status}" title="${stage}" style="margin-left:auto">${VM_STLBL[o.status]||o.status} ⓘ</span></div>
       <div style="font-size:11.5px;color:var(--mut);margin-top:3px">${vmConsLbl(o.consorcio)}${o.dmc?(' · DMC '+o.dmc):''} · ${o.origem}${o.os_sigos?(' · SIGOS '+o.os_sigos):''}</div>
       <div style="font-size:11.5px;color:var(--mut);margin-top:2px">${prog?'Programado para':'Executado por'}: <b>${quem}</b>${prog&&o.programada_para?(' · '+vmFmtFullDate(o.programada_para)):''}</div>
     </div>
