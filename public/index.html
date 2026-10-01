@@ -505,11 +505,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   .vmrow .vl{font-size:11.5px;color:var(--mut);margin-top:3px}
   .vmst{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block}
   .vmst.programada{background:var(--card);border:1px solid var(--line);color:var(--mut)}
-  .vmst.em_execucao{background:var(--warn-bg);color:var(--warn)}
   .vmst.concluida{background:var(--ok-bg);color:var(--ok)}
   .vmst.concluida_pendencia{background:var(--warn-bg);color:var(--warn)}
-  .vmst.retorno{background:var(--bad-bg);color:var(--bad)}
   .vmst.improdutiva{background:var(--card);border:1px solid var(--line);color:var(--mut)}
+  .vmoslink{color:var(--acc);cursor:pointer;font-weight:600;font-size:12px;text-decoration:none;white-space:nowrap}
   .vmbtn{all:unset;cursor:pointer;text-align:center;padding:12px;border-radius:12px;font-weight:600;font-size:14px;background:var(--acc);color:var(--acc-ink);display:block;box-sizing:border-box}
   .vmbtn.sec{background:var(--card);border:1px solid var(--line);color:var(--ink)}
   .vmbtn.dngr{background:var(--bad);color:#fff}
@@ -3593,10 +3592,10 @@ function vmFmtDate(s){ if(!s)return''; try{ return new Date(String(s).slice(0,10
 const VM_COND=[['filtro','Filtro'],['piloto','Piloto / circuito piloto'],['vaz','Vazamento'],['corr','Corrosão'],['ruido','Ruído / vibração'],['geral','Condição geral']];
 const VM_SERV=['Limpeza de filtro','Limpeza de piloto','Desobstrução','Reaperto','Regulagem','Troca de peça','Correção de vazamento','Adequação civil','Acesso / entorno','Outro'];
 const VM_INT_SERV={filtro:'Limpeza de filtro',piloto:'Limpeza de piloto',vaz:'Correção de vazamento'};
-const VM_PENDLBL={tomada_mont:'Tomada de pressão a montante',tomada_jus:'Tomada de pressão a jusante',civil:'Adequação civil na caixa da VRP',acesso:'Acesso externo / entorno'};
-const VM_STLBL={concluida:'Concluído',concluida_pendencia:'Concluído c/ pendência',retorno:'Necessita retorno',improdutiva:'Improdutivo',programada:'Programada',em_execucao:'Em execução'};
-const VM_STAGE={programada:'Etapa 1 — Agendada e atribuída a um colaborador; aguardando execução em campo.',em_execucao:'Etapa 2 — Em execução pelo colaborador em campo (ainda não concluída).',concluida:'Etapa 3 — Serviço concluído, VRP liberada e sem pendências.',concluida_pendencia:'Etapa 3 — Serviço concluído, mas com pendência técnica aberta (gera uma OS corretiva).',retorno:'Etapa 3 — Precisa de novo atendimento: VRP não liberada ou vazamento após o serviço.',improdutiva:'Etapa 3 — Visita improdutiva: VRP não localizada ou caixa inacessível.'};
-const VM_STCLR={concluida:'var(--ok)',concluida_pendencia:'var(--warn)',retorno:'var(--bad)',improdutiva:'var(--mut)',programada:'var(--mut)',em_execucao:'var(--warn)'};
+const VM_PENDLBL={tomada_mont:'Tomada de pressão a montante',tomada_jus:'Tomada de pressão a jusante',civil:'Adequação civil na caixa da VRP',acesso:'Acesso externo / entorno',vazamento:'Vazamento após o serviço',nao_liberada:'VRP não liberada — necessita nova visita'};
+const VM_STLBL={concluida:'Concluído',concluida_pendencia:'Concluído c/ pendência',improdutiva:'Improdutivo',programada:'Programada'};
+const VM_STAGE={programada:'Início — Aberta e atribuída a um colaborador; aguardando execução em campo.',concluida:'Fim — Serviço concluído, VRP liberada e sem pendências.',concluida_pendencia:'Fim — Serviço concluído, mas com pendência técnica aberta (gera uma OS corretiva).',improdutiva:'Fim — Visita improdutiva: VRP não localizada ou caixa inacessível.'};
+const VM_STCLR={concluida:'var(--ok)',concluida_pendencia:'var(--warn)',improdutiva:'var(--mut)',programada:'var(--mut)'};
 let vmVrpCache=[], vmExec=null, vmEnviando=false;
 
 function vmHub(){
@@ -3647,7 +3646,7 @@ function vmCampoMapRender(minhas){
   setTimeout(()=>{
     if(vmCampoMap){ try{vmCampoMap.remove();}catch(e){} vmCampoMap=null; }
     vmCampoMap=L.map(el); mapAddCamadaBase(vmCampoMap); vmCampoLayer=L.layerGroup().addTo(vmCampoMap); const b=[];
-    const clr={programada:'#3a9bde',em_execucao:'#e6b352'};
+    const clr={programada:'#3a9bde'};
     minhas.filter(o=>o.lat!=null&&o.lon!=null).forEach(o=>{ const m=L.circleMarker([o.lat,o.lon],{radius:8,color:'#fff',weight:2,fillColor:clr[o.status]||'#3a9bde',fillOpacity:.95}).addTo(vmCampoLayer);
       m.bindPopup(`<b>${vEsc(o.num_vrp||'VRP')}</b><br>${o.os_numero} · ${VM_STLBL[o.status]||o.status}${o.programada_para?('<br>'+vmFmtDate(o.programada_para)):''}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vmcop" data-vrp="${o.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher OS ›</a>`);
       m.on('popupopen',()=>{ const a=document.querySelector('.vmcop[data-vrp="'+o.vrp_id+'"]'); if(a)a.onclick=()=>vmAbrir(o.vrp_id,o.origem); });
@@ -3781,23 +3780,24 @@ function vmPendencias(){
   if(S.ans.conn_jus==='Não'&&S.ans.tom_jus&&S.ans.tomres_jus==='Não') p.push({tipo:'tomada_jus',lado:'jusante',descricao:VM_PENDLBL.tomada_jus+' — '+S.ans.tom_jus.toLowerCase()});
   if(S.serv.has('Adequação civil')&&S.ans.res_civil==='Não') p.push({tipo:'civil',lado:null,descricao:VM_PENDLBL.civil});
   if(S.serv.has('Acesso / entorno')&&S.ans.res_acesso==='Não') p.push({tipo:'acesso',lado:null,descricao:VM_PENDLBL.acesso});
+  if(S.ans.vaz_pos==='Sim') p.push({tipo:'vazamento',lado:null,descricao:VM_PENDLBL.vazamento});
+  if(S.ans.liberada==='Não') p.push({tipo:'nao_liberada',lado:null,descricao:VM_PENDLBL.nao_liberada});
   return p;
 }
 function vmSugere(){
   const S=vmExec;
   if(S.improd) return 'improdutiva';
-  if(S.ans.liberada==='Não'||S.ans.vaz_pos==='Sim') return 'retorno';
   if(vmPendencias().length) return 'concluida_pendencia';
   return 'concluida';
 }
 function vmScrResult(){
   const S=vmExec, sug=vmSugere(); if(!S.status) S.status=sug; const pend=vmPendencias();
-  let h=`<div class="vmresult"><div style="font-size:30px">${sug==='improdutiva'?'🚫':(sug==='concluida'?'✅':(sug==='retorno'?'↩️':'⚠️'))}</div>
+  let h=`<div class="vmresult"><div style="font-size:30px">${sug==='improdutiva'?'🚫':(sug==='concluida'?'✅':'⚠️')}</div>
     <div class="sub" style="margin:4px 0 0">${S.hdr.os_numero}</div>
     <div class="big" style="color:${VM_STCLR[sug]}">${VM_STLBL[sug]}</div>
     <div class="sub">status sugerido — confirme ou ajuste</div>
     <div class="vmstatuspick">`;
-  ['concluida','concluida_pendencia','retorno','improdutiva'].forEach(k=>{
+  ['concluida','concluida_pendencia','improdutiva'].forEach(k=>{
     h+=`<button class="vmstbtn ${S.status===k?'on':''}" style="color:${VM_STCLR[k]}" data-status="${k}"><span class="vmstdot" style="background:${VM_STCLR[k]}"></span><span style="color:var(--ink)">${VM_STLBL[k]}</span>${k===sug?'<span class="vmsug">sugerido</span>':''}</button>`;
   });
   h+=`</div><div class="vmsumm"><div class="r"><span>Serviços</span><b style="text-align:right">${S.serv.size?vEsc([...S.serv].join(', ')):'—'}</b></div>
@@ -4038,13 +4038,12 @@ async function vmGLoadOs(){
       sb.rpc('app_vrp_os_kpis',{p_consorcio:vmG.cons||null,p_de:null,p_ate:null})]);
     if(a.error)throw a.error; os=a.data||[]; kpi=(b.data)||{};
   }catch(e){ $(vmBodySel).innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
-  const K=(n,l,c)=>`<div class="vmkpi" style="--k:${c}"><div class="n">${n||0}</div><div class="l">${l}</div></div>`;
-  const kpis=`<div class="vmkpis">${K(kpi.programada,'Programadas','var(--mut)')}${K(kpi.em_execucao,'Em execução','var(--warn)')}${K((kpi.concluida||0)+(kpi.concluida_pendencia||0),'Concluídas','var(--ok)')}${K(kpi.pend_abertas,'Pend. abertas','var(--warn)')}${K(kpi.retorno,'Retornos','var(--bad)')}${K(kpi.improdutiva,'Improdutivas','var(--mut)')}</div>`;
-  const STs=[['','Todas'],['programada','Programadas'],['em_execucao','Em execução'],['concluida','Concluídas'],['concluida_pendencia','C/ pendência'],['retorno','Retornos'],['improdutiva','Improdutivas']];
-  const fchips=`<div class="vmfchips">${STs.map(s=>`<button class="vmfchip ${vmG.status===s[0]?'on':''}" data-st="${s[0]}">${s[1]}</button>`).join('')}</div>`;
+  const cnt={'':(kpi.total||0),programada:((kpi.programada||0)+(kpi.em_execucao||0)),concluida:(kpi.concluida||0),concluida_pendencia:(kpi.concluida_pendencia||0),improdutiva:(kpi.improdutiva||0)};
+  const STs=[['','Todas'],['programada','Programadas'],['concluida','Concluídas'],['concluida_pendencia','C/ pendência'],['improdutiva','Improdutivas']];
+  const fchips=`<div class="vmfchips">${STs.map(s=>`<button class="vmfchip ${vmG.status===s[0]?'on':''}" data-st="${s[0]}">${s[1]} (${cnt[s[0]]||0})</button>`).join('')}</div>`;
   const view=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:13px">${os.length} OS</b><span style="flex:1"></span><button class="vmtbtn" id="vmProgNew">＋ Programar</button><div class="vmseg" id="vmViewSeg" style="margin-left:6px"><button data-v="lista" class="${vmG.view==='lista'?'on':''}">☰ Lista</button><button data-v="mapa" class="${vmG.view==='mapa'?'on':''}">🗺️ Mapa</button></div></div>`;
   let body = vmG.view==='mapa' ? '<div class="vmmap" id="vmGMap"></div><div class="vmleg" id="vmGLeg"></div>' : (os.length? os.map(vmGOsCard).join('') : '<p class="sub">Nenhuma OS no filtro.</p>');
-  $(vmBodySel).innerHTML=kpis+fchips+view+body;
+  $(vmBodySel).innerHTML=fchips+view+body;
   const el=$(vmBodySel);
   el.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{vmG.status=b.dataset.st;vmGLoadOs();});
   el.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{vmG.view=b.dataset.v;vmGLoadOs();});
@@ -4075,14 +4074,14 @@ function vmGOsMap(os){
   setTimeout(()=>{
     if(vmGMap){ try{vmGMap.remove();}catch(e){} vmGMap=null; }
     vmGMap=L.map(el); mapAddCamadaBase(vmGMap); vmGLayer=L.layerGroup().addTo(vmGMap);
-    const clr={programada:'#9aa4b2',em_execucao:'#e6b352',concluida:'#57d08c',concluida_pendencia:'#e6b352',retorno:'#f2887f',improdutiva:'#9aa4b2'}; const b=[];
+    const clr={programada:'#9aa4b2',concluida:'#57d08c',concluida_pendencia:'#e6b352',improdutiva:'#9aa4b2'}; const b=[];
     os.filter(o=>o.lat!=null&&o.lon!=null).forEach(o=>{ const m=L.circleMarker([o.lat,o.lon],{radius:7,color:'#fff',weight:1.5,fillColor:clr[o.status]||'#888',fillOpacity:.9}).addTo(vmGLayer);
       m.bindPopup(`<b>${vEsc(o.num_vrp||'VRP')}</b><br>${o.os_numero}<br>${VM_STLBL[o.status]||o.status}<br><a class="vmpop" data-os="${o.os_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Abrir OS ›</a>`);
       m.on('popupopen',()=>{ const a=document.querySelector('.vmpop[data-os="'+o.os_id+'"]'); if(a)a.onclick=()=>vmOsView(o.os_id); });
       b.push([o.lat,o.lon]); });
     if(b.length) vmGMap.fitBounds(b,{padding:[30,30],maxZoom:15}); else vmGMap.setView([-19.94,-44.1],11);
     vmGMap.invalidateSize();
-    const lg=$('#vmGLeg'); if(lg) lg.innerHTML=Object.entries({em_execucao:'Em execução',programada:'Programada',concluida:'Concluída',concluida_pendencia:'C/ pendência',retorno:'Retorno',improdutiva:'Improdutivo'}).map(([k,l])=>`<span><span class="vmdot" style="background:${clr[k]}"></span>${l}</span>`).join('');
+    const lg=$('#vmGLeg'); if(lg) lg.innerHTML=Object.entries({programada:'Programada',concluida:'Concluída',concluida_pendencia:'C/ pendência',improdutiva:'Improdutivo'}).map(([k,l])=>`<span><span class="vmdot" style="background:${clr[k]}"></span>${l}</span>`).join('');
   },160);
 }
 async function vmOsView(osId){
@@ -4095,15 +4094,20 @@ async function vmOsView(osId){
    <span class="vmst ${d.status}">${VM_STLBL[d.status]||d.status}</span>
    <div class="vmsigrow"><span class="k">OS SIGOS</span><b>${d.os_sigos||'—'}</b><button class="vmtbtn" id="vmSigBtn" style="margin-left:auto">${d.os_sigos?'Editar':'＋ Adicionar'}</button></div>
    <button class="vmtbtn" id="vmFichaBtn2" style="margin-bottom:6px">📋 Ver ficha da VRP</button>`;
+  if(d.corrige){ h+=`<div style="margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:12.5px">🔧 Esta é uma OS corretiva de: <b>${vEsc(d.corrige.descricao||d.corrige.tipo||'pendência')}</b>${d.corrige.os_pai_id?` · <a class="vmoslink" data-os="${d.corrige.os_pai_id}">abrir OS pai ${vEsc(d.corrige.os_pai_numero||'')} ›</a>`:''}</div>`; }
   h+=vmDsec('1','Chegada')+kv('VRP localizada',r.localizada)+kv('Caixa acessível',r.acessivel)+kv('Água / alagamento',r.agua);
   h+=vmDsec('2','Pressões')+kv('Montante — manômetro',r.conn_mont)+kv('Montante encontrada',d.press_mont_enc!=null?(d.press_mont_enc+' mca'):(r.tom_mont?('tomada '+r.tom_mont):'—'))+kv('Jusante — manômetro',r.conn_jus)+kv('Jusante encontrada',d.press_jus_enc!=null?(d.press_jus_enc+' mca'):(r.tom_jus?('tomada '+r.tom_jus):'—'));
   h+=vmDsec('3','Condição')+VM_COND.map(x=>kv(x[1],cond[x[0]]||'—')).join('');
   h+=vmDsec('4','Serviço')+kv('Ações',serv.length?serv.join(', '):'—')+(r.peca?kv('Peça trocada',r.peca):'');
   h+=vmDsec('5','Finalização')+kv('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+kv('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+kv('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+kv('Estabilizada',vmBool(d.estabilizada))+kv('Vazamento após',vmBool(d.vazamento_pos))+kv('Liberada',vmBool(d.liberada));
   const pend=(d.pendencias||[]);
-  if(pend.length){ h+=vmDsec('!','Pendências',true)+pend.map(p=>`<div class="vmdkv"><span>🔧 ${vEsc(p.descricao||p.tipo)}</span><b style="color:var(--warn)">${p.status}</b></div>`).join(''); }
+  if(pend.length){ h+=vmDsec('!','Pendências',true)+pend.map(p=>{
+     const lk=p.os_correcao_id?` · <a class="vmoslink" data-os="${p.os_correcao_id}">abrir corretiva ${vEsc(p.os_correcao_numero||'')} ›</a>`:(p.status==='aberta'?' · <span class="sub">sem corretiva ainda</span>':'');
+     return `<div class="vmdkv"><span>🔧 ${vEsc(p.descricao||p.tipo)}${lk}</span><b style="color:var(--warn)">${vEsc(p.status)}</b></div>`;
+   }).join(''); }
   h+=`<button class="vmbtn" id="vmRepBtn" style="margin-top:16px">📄 Gerar relatório (PDF)</button>`;
   $('#vmOs').innerHTML=h;
+  $('#vmOs').querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmOsView(b.dataset.os));
   $('#vmSigBtn').onclick=()=>vmSigos(d.id,d.os_sigos);
   $('#vmFichaBtn2').onclick=()=>vmFichaOpen(d.vrp_id);
   $('#vmRepBtn').onclick=()=>vmReport(d.id);
@@ -4117,15 +4121,20 @@ async function vmGLoadPend(){
   const rows=pend.length?pend.map(p=>{ const st=VM_PST[p.status]||[p.status,'var(--mut)'];
     const corr=p.status==='resolvida'&&p.resolvida_em?('<div class="sub">'+relFmtData(p.resolvida_em)+'</div>'):'';
     const acao=p.status==='aberta'?`<button class="vmtbtn" data-gerar="${p.id}">＋ Gerar corretiva</button>`:(p.status==='em_andamento'?'<span class="sub">aguardando exec.</span>':'—');
+    const lkPai=p.os_id?`<a class="vmoslink" data-os="${p.os_id}" title="OS que originou a pendência">⬆ ${vEsc(p.os_numero||'OS pai')}</a>`:'<span class="sub">—</span>';
+    const lkCorr=p.os_correcao_id?`<a class="vmoslink" data-os="${p.os_correcao_id}" title="OS corretiva em andamento">🔧 ${vEsc(p.os_correcao_numero||'corretiva')}</a>`
+      :(p.resolvida_os_id?`<a class="vmoslink" data-os="${p.resolvida_os_id}" title="OS corretiva que resolveu">✅ ${vEsc(p.resolvida_numero||'resolvida')}</a>`:'<span class="sub">sem corretiva</span>');
     return `<tr><td><b class="vmvlink" data-ficha="${p.vrp_id}">${vEsc(p.num_vrp||'VRP')}</b><div class="sub">${vmConsLbl(p.consorcio)}${p.dmc?(' · DMC '+p.dmc):''}</div></td>
       <td>${vEsc(p.tipo)}${p.lado?(' <span class="sub">('+p.lado+')</span>'):''}<div class="sub">${vEsc(p.descricao||'')}</div></td>
+      <td style="white-space:nowrap">${lkPai}<br>${lkCorr}</td>
       <td><span class="vmfarol" style="color:${st[1]}"><span class="vmdot" style="background:${st[1]}"></span>${st[0]}</span>${corr}</td>
-      <td style="text-align:right">${acao}</td></tr>`; }).join('') : '<tr><td colspan="4" class="sub" style="padding:14px">Nenhuma pendência no filtro.</td></tr>';
-  $(vmBodySel).innerHTML=`<div style="overflow-x:auto"><table class="vmtbl"><thead><tr><th>VRP</th><th>Pendência</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="sub" style="margin-top:10px">Cada pendência vira uma <b>OS corretiva</b> vinculada — fecha ao concluir a corretiva.</p>`;
+      <td style="text-align:right">${acao}</td></tr>`; }).join('') : '<tr><td colspan="5" class="sub" style="padding:14px">Nenhuma pendência no filtro.</td></tr>';
+  $(vmBodySel).innerHTML=`<div style="overflow-x:auto"><table class="vmtbl"><thead><tr><th>VRP</th><th>Pendência</th><th>Vínculo (OS)</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="sub" style="margin-top:10px">Cada pendência gera uma <b>OS corretiva</b> vinculada à <b>OS pai</b> (clique para abrir) — fecha ao concluir a corretiva.</p>`;
   const el=$(vmBodySel);
   el.querySelectorAll('[data-gerar]').forEach(b=>b.onclick=()=>vmGerarCorr(b.dataset.gerar));
   el.querySelectorAll('[data-ficha]').forEach(b=>b.onclick=()=>vmFichaOpen(+b.dataset.ficha));
+  el.querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmOsView(b.dataset.os));
 }
 async function vmGLoadPrev(){
   let farol=[], cfg={config:[],overrides:[]};
@@ -4187,8 +4196,11 @@ function vmColabOpts(sel){ return vmGColab.map(c=>`<option value="${c.id}" ${sel
 async function vmProgramar(vrpId, vrpNum){
   let vrpField;
   if(vrpId){ vrpField=`<div><label>VRP</label><input class="vmin" value="${vEsc(vrpNum||('VRP '+vrpId))}" readonly></div>`; }
-  else { const list=vmGFarolCache.map(f=>`<option value="${f.vrp_id}">${vEsc(f.num_vrp||('VRP '+f.vrp_id))} · ${vmConsLbl(f.consorcio)}</option>`).join('');
-    vrpField=`<div><label>VRP</label><select class="vmsel" id="vmPgVrp" style="width:100%">${list||'<option value="">— abra a aba Preventivas primeiro —</option>'}</select></div>`; }
+  else {
+    let elig=[];
+    try{ const r=await sb.rpc('app_vrp_os_programaveis',{p_consorcio:vmG.cons||null,p_dmc:vmG.dmc||null}); if(!r.error) elig=r.data||[]; }catch(e){}
+    const list=elig.map(f=>`<option value="${f.vrp_id}">${vEsc(f.num_vrp||('VRP '+f.vrp_id))} · ${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</option>`).join('');
+    vrpField=`<div><label>VRP</label><select class="vmsel" id="vmPgVrp" style="width:100%">${list||'<option value="">— nenhuma VRP disponível (todas com serviço em aberto) —</option>'}</select></div>`; }
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🗓️ Programar OS</div>
     <div class="vmmb">${vrpField}
       <div><label>Usuário de campo (recebe a OS)</label><select class="vmsel" id="vmPgColab" style="width:100%">${vmColabOpts()}</select></div>

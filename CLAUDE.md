@@ -412,7 +412,7 @@ corretiva → wizard de 5 telas sobre cabeçalho autofill, fotos (`vmUpload`→`
 popup), **Cronograma preventivo** (`vrpman_prev`: farol + resumo). OS SIGOS editável, pendência → gerar corretiva,
 ⚙️ acesso `vrp_gestao_acesso` (`app_vrp_acesso_*`). OS interna `VRP-OS-AAAA-NNNN`. Tabelas
 `vrp_os`/`vrp_pendencia`/`vrp_prev_config`/`vrp_prev_vrp` (schema 8, app-only) + RPCs `app_vrp_*` (definer; gestão por
-`vrp_pode_gestao`). **Pendência = OS corretiva derivada**. Detalhe em `docs/MODULOS.md §15`.
+`vrp_pode_gestao`). **Status início→fim** (2026-10-02): `programada`→`concluida`/`concluida_pendencia`/`improdutiva` (sem `em_execucao`/`retorno`; "não liberada"/"vazou" geram pendência→`concluida_pendencia`). **Pendência = OS corretiva derivada**, com vínculo pai↔corretiva exposto em `app_vrp_pendencias_listar`/`_os_ver` (coluna "Vínculo", link "abrir corretiva"). **Programar** só VRP sem serviço aberto (`app_vrp_os_programaveis` + bloqueio em `app_vrp_os_programar`); OS na Gestão são chips com contagem (sem cards). Detalhe em `docs/MODULOS.md §15`.
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
 `projeto_acesso`/`projeto_resumo`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes

@@ -2360,6 +2360,22 @@ foi **removido** — o módulo antigo já está dentro de Campo como **Visita pr
   (reusa `vrpRespPairs`/`vrpFotoPairs`/`REL_CSS`). Mantém as duas fontes até desativar o módulo `vrp` antigo.
 - Novas RPCs: `app_vrp_os_desprogramar`, `app_vrp_ficha_listar`, `app_vrp_ficha` (+`visitas`),
   `app_vrp_acesso_listar`/`_set` (admin concede `vrp_gestao_acesso`), `app_vrp_colaboradores_listar`.
+
+**Fluxo de serviços revisado (2026-10-02):**
+- **Status = início→fim:** removidos `em_execucao` e `retorno`. Estados: `programada` (aberta) → `concluida` /
+  `concluida_pendencia` / `improdutiva`. `app_vrp_os_abrir` não cria mais `em_execucao` (OS fica `programada` até
+  concluir); `app_vrp_os_concluir` aceita só os 3 finais (coage `retorno`→`concluida_pendencia` p/ cliente antigo).
+  Migração de dados aplicada (`em_execucao`→`programada`, `retorno`→`concluida_pendencia`).
+- **"Não liberada" / "vazou após"** agora **geram pendência** (`vmPendencias`: tipos `nao_liberada`/`vazamento`) → a
+  conclusão vira `concluida_pendencia` (antes era `retorno`), rastreável por OS corretiva.
+- **Gestão de serviços — OS:** sem cards de KPI; só os **chips** com quantitativo entre parênteses —
+  Todas/Programadas/Concluídas/C-pendência/Improdutivas (contagem via `app_vrp_os_kpis`).
+- **Programar OS:** o dropdown carrega `app_vrp_os_programaveis` (VRPs **sem OS aberta e sem pendência aberta**).
+  **Bloqueio** no `app_vrp_os_programar`: recusa VRP com OS `programada`/`em_execucao` ou pendência `aberta`/`em_andamento`.
+- **Pendências ↔ OS:** `app_vrp_pendencias_listar` e `app_vrp_os_ver` expõem **OS pai** (`os_id`/`os_numero`),
+  **corretiva** (`os_correcao_id`/`_numero`) e **resolvida** (`resolvida_os_id`). A tabela de pendências ganhou a coluna
+  **Vínculo (OS)** clicável; na OS concluída c/ pendência cada pendência tem link **"abrir corretiva"**; a OS corretiva
+  mostra o banner **"é corretiva de"** → OS pai. Nova RPC: `app_vrp_os_programaveis` (gestão; definer).
 - Telas: +`vrpman_serv`/`vrpman_fichas`/`vrpman_prev`. sw `coleta-v197`→`v198`.
 
 **Ajustes de UX (2026-10-01, sw v199→v200):**
