@@ -13,7 +13,8 @@ create or replace function "9 - suprimentos".sup_e_aprovador_de(p_aprovador uuid
 returns boolean language sql stable security definer set search_path to 'public' as $$
   select p_aprovador is not null and p_solicitante is not null
      and p_aprovador <> p_solicitante   -- nunca autoaprovação (ver migracao_bloqueia_autoaprovacao.sql)
-     and p_aprovador = any("9 - suprimentos".sup_aprovadores_de(p_solicitante));
+     and (p_aprovador = any("9 - suprimentos".sup_aprovadores_de(p_solicitante))
+          or coalesce("9 - suprimentos".sup_funcao(p_aprovador),'') = 'admin');   -- admin vê/aprova todos, menos o próprio
 $$;
 revoke all on function "9 - suprimentos".sup_e_aprovador_de(uuid,uuid) from public, anon;
 grant execute on function "9 - suprimentos".sup_e_aprovador_de(uuid,uuid) to authenticated;

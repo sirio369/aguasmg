@@ -824,15 +824,14 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   **aprovar/rejeitar** só aceitam — pedidos de quem tem o usuário logado como Aprovador 1 ou 2.
   Regra única no banco: **`"9 - suprimentos".sup_e_aprovador_de(aprovador, solicitante)`**
   (= `aprovador = any(sup_aprovadores_de(solicitante))`, então herda o **fallback**: solicitante sem
-  aprovador configurado → qualquer `aprovador`/`admin` ativo).
+  aprovador configurado → qualquer `aprovador`/`admin` ativo). **Admin** (são 2) vê e aprova pedidos de **todos, menos os próprios** — os admins se aprovam entre si.
 - RPCs que usam a regra: `sup_fila_aprovacao`, `sup_aprovar`, `sup_rejeitar`,
   `sup_ferramenta_fila_aprovacao` (ferramenta aprova/rejeita pelas mesmas `sup_aprovar`/`sup_rejeitar`),
   `sup_epi_fila_aprovacao`, `sup_epi_aprovar`, `sup_epi_rejeitar`, `sup_epi_troca_fila_aprovacao`,
   `sup_epi_troca_aprovar`, `sup_epi_troca_rejeitar`. Migração: `docs/migracao_aprovacao_por_aprovador.sql`.
 - **Antes** qualquer aprovador/admin (e, no EPI, qualquer `sup_epi_gestor`, que inclui Téc. Segurança/
   Téc. Qualidade/Coord. QSMSS por cargo) via e aprovava pedido de qualquer pessoa — auditoria de
-  2026-10-01 achou aprovações cruzadas entre áreas. **Admin não tem bypass** (vê só quem o tem como
-  Aprovador 1/2, como qualquer aprovador). `sup_epi_gestor` continua existindo só para **liberar o menu**
+  2026-10-01 achou aprovações cruzadas entre áreas. **Admin vê/aprova todos, menos o próprio pedido**. `sup_epi_gestor` continua existindo só para **liberar o menu**
   de EPI no front (`ME.epi_gestor`); não dá mais poder de aprovação.
 - **Autoaprovação bloqueada (aplicado em produção 2026-10-01, `docs/migracao_bloqueia_autoaprovacao.sql`):**
   ninguém aprova o próprio pedido — nem admin — em `sup_aprovar`, `sup_epi_aprovar`, `sup_epi_troca_aprovar`,
