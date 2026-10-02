@@ -2047,6 +2047,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     + **Exportar CSV**. Fonte de dados: **`pjRsFeed`** (RPC `app_proj_avancos`, log **real**), carregado por
     `pjResumoLoad`; `pjRsRange()` resolve o período (filtro cliente por consórcio/tipo/data). (O `pjAllAvancos()`
     antigo, sobre `pjLeafHist`, ficou obsoleto.)
+    - **Metros = rede instalada (2026-10-02):** todo total de metros (KPI "metros exec.", Por dia, Por intervenção,
+      Por atividade) soma **só Puxamento** (`rede_hdd`) e **Assentamento de tubulação** (`rede_vca`) via
+      `pjRsEhMetroRede`/`mNum` — evita dupla contagem (piloto, escavação etc. não entram). O **Por dia** passou a
+      agrupar **dia → intervenção → avanços**; cada avanço individual segue mostrando seu valor real (+N m/%).
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
     **só com botão Abrir** (arquivo real do Storage) — **anexar/remover ficam na configuração** (`projeto_cfg`).
     **mini-Gantt** (`pjRel()`) — cada barra vai do **1º ao último avanço** da atividade (**datas reais do log**,

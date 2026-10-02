@@ -287,6 +287,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjrsday{border:1px solid var(--line);border-radius:11px;padding:8px 11px;margin-bottom:9px;background:var(--card)}
 .pjrsday>.h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid var(--line)}
 .pjrsday>.h span{font-size:11px;color:var(--mut)}
+.pjrsiv{margin:5px 0 2px;padding:2px 0 2px 8px;border-left:2px solid var(--line)}
+.pjrsiv>.h2{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-size:12.5px;font-weight:600;padding:2px 0}
+.pjrsiv>.h2 .pjmono{font-weight:400;color:var(--mut);font-size:11px}
+.pjrsiv>.h2 .m{margin-left:auto;font-weight:400;font-size:11px;color:var(--mut)}
 .pjrstb{width:100%;border-collapse:collapse;font-size:13px}
 .pjrstb th,.pjrstb td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 .pjrstb th{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;font-weight:700}
@@ -1936,22 +1940,35 @@ function pjResumo(){
   b.querySelector('#pjRsTipo').onchange=e=>{ pjRsTipo=e.target.value; pjRsRender(); };
   pjRsRender();
 }
+// "metro de rede instalada" (evita dupla contagem): só Puxamento (HDD) e Assentamento de tubulação (VCA)
+function pjRsEhMetroRede(e){
+  if(!e.isM) return false;
+  const nm=((e.ativ||'')+' '+(e.sub||'')).toLowerCase();
+  if(e.tipo==='rede_hdd') return nm.includes('puxamento');
+  if(e.tipo==='rede_vca') return nm.includes('assentamento');
+  return false;
+}
 function pjRsRender(){
   const [from,to]=pjRsRange();
   const feed=pjRsFeed.filter(e=>(from==null||e.ts>=from)&&(to==null||e.ts<=to)&&(!pjRsCons||e.cons===pjRsCons)&&(!pjRsTipo||e.tipo===pjRsTipo));
   feed.sort((a,b)=>b.ts-a.ts);
   const out=$('#pjRsOut'); if(!out)return;
   if(!feed.length){ out.innerHTML='<p class="sub" style="margin-top:14px">Nenhum avanço no período/filtros selecionados.</p>'; return; }
+  const mNum=e=>pjRsEhMetroRede(e)?e.num:0;   // metros que entram no total (rede instalada, sem dupla contagem)
   const nAv=feed.length, nIv=new Set(feed.map(e=>e.ivId)).size, nSub=new Set(feed.map(e=>e.ivId+'|'+e.ativ+'|'+e.sub)).size;
-  const metros=Math.round(feed.filter(e=>e.isM).reduce((a,e)=>a+e.num,0));
+  const metros=Math.round(feed.reduce((a,e)=>a+mNum(e),0));
+  const avHtml=e=>`<div class="pjadv"><div class="pjthumb">${(e.fotos&&e.fotos.length)?`<a href="${SBASE+e.fotos[0]}" target="_blank" rel="noopener">📷</a>`:'📷'}</div><div class="ai"><div><b>+${e.num}${e.isM?' m':'%'}</b> · ${e.ativ}${e.sub&&e.sub!==e.ativ?(' › '+e.sub):''}</div><div class="d">${e.equipe||''}${e.obs?` · "${e.obs}"`:''}</div></div></div>`;
   const byDay={}; feed.forEach(e=>{ (byDay[e.d]=byDay[e.d]||[]).push(e); });
   const days=Object.keys(byDay).sort((a,b)=>byDay[b][0].ts-byDay[a][0].ts);
-  const dayHtml=days.map(d=>{ const arr=byDay[d], dm=arr.filter(e=>e.isM).reduce((a,e)=>a+e.num,0);
-    return `<div class="pjrsday"><div class="h"><b>${d}/${arr[0].ano||''}</b><span>${arr.length} avanço(s)${dm?` · ${Math.round(dm)} m`:''}</span></div>${arr.map(e=>`<div class="pjadv"><div class="pjthumb">${(e.fotos&&e.fotos.length)?`<a href="${SBASE+e.fotos[0]}" target="_blank" rel="noopener">📷</a>`:'📷'}</div><div class="ai"><div><b>+${e.num}${e.isM?' m':'%'}</b> · ${e.ativ} › ${e.sub}</div><div class="d">${e.ivLocal} · ${e.equipe}${e.obs?` · "${e.obs}"`:''}</div></div></div>`).join('')}</div>`;
+  const dayHtml=days.map(d=>{ const arr=byDay[d], dm=arr.reduce((a,e)=>a+mNum(e),0);
+    const byIvDay={}; arr.forEach(e=>{ (byIvDay[e.ivId]=byIvDay[e.ivId]||{local:e.ivLocal,cod:e.cod,avs:[]}).avs.push(e); });
+    const ivBlocks=Object.values(byIvDay).map(g=>{ const gm=g.avs.reduce((a,e)=>a+mNum(e),0);
+      return `<div class="pjrsiv"><div class="h2"><b>${g.local}</b> <span class="pjmono">${g.cod}</span><span class="m">${g.avs.length} avanço(s)${gm?` · ${Math.round(gm)} m`:''}</span></div>${g.avs.map(avHtml).join('')}</div>`; }).join('');
+    return `<div class="pjrsday"><div class="h"><b>${d}/${arr[0].ano||''}</b><span>${arr.length} avanço(s)${dm?` · ${Math.round(dm)} m`:''}</span></div>${ivBlocks}</div>`;
   }).join('');
-  const byIv={}; feed.forEach(e=>{ const r=byIv[e.ivId]=byIv[e.ivId]||{local:e.ivLocal,cod:e.cod,n:0,m:0,last:0}; r.n++; if(e.isM)r.m+=e.num; r.last=Math.max(r.last,e.ts); });
+  const byIv={}; feed.forEach(e=>{ const r=byIv[e.ivId]=byIv[e.ivId]||{local:e.ivLocal,cod:e.cod,n:0,m:0,last:0}; r.n++; r.m+=mNum(e); r.last=Math.max(r.last,e.ts); });
   const ivRows=Object.values(byIv).sort((a,b)=>b.n-a.n).map(r=>`<tr><td>${r.local}<div class="pjmono">${r.cod}</div></td><td class="c">${r.n}</td><td class="c">${r.m?Math.round(r.m)+' m':'—'}</td><td class="c">${pjFmtD(r.last)}</td></tr>`).join('');
-  const byAt={}; feed.forEach(e=>{ const r=byAt[e.ativ]=byAt[e.ativ]||{n:0,m:0,ivs:new Set()}; r.n++; if(e.isM)r.m+=e.num; r.ivs.add(e.ivId); });
+  const byAt={}; feed.forEach(e=>{ const r=byAt[e.ativ]=byAt[e.ativ]||{n:0,m:0,ivs:new Set()}; r.n++; r.m+=mNum(e); r.ivs.add(e.ivId); });
   const atRows=Object.entries(byAt).sort((a,b)=>b[1].n-a[1].n).map(([nm,r])=>`<tr><td>${nm}</td><td class="c">${r.n}</td><td class="c">${r.m?Math.round(r.m)+' m':'—'}</td><td class="c">${r.ivs.size}</td></tr>`).join('');
   out.innerHTML=`
    <div class="pjrskpis">
