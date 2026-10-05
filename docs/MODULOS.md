@@ -1851,7 +1851,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     ZA0200) — estão em `macro_fechamento`/`macro_mensal` mas não aparecem na camada até serem inseridos em
     `unidades_operacionais`. No QGIS, recarregar a fonte da camada para ver os campos novos.
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
-  têm dados ao vivo via RPC. As outras **32 telas** do cockpit ficam **opacas + selo "exemplo"** no menu
+  têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
   sinalizado/rastreável**. Controle num só ponto: `const NRW_REAL=new Set(['mm','macro'])` + `nrwMarkMocks()`
   (marca o menu no load) + `nrwMockBanner(s)` (injeta o banner por tela dentro do `go()`). **Para promover uma
@@ -1863,11 +1863,15 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   cadastro DMC) e `"11 - perdas_nrw"` (`parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc`).
   Reorg de 2026-09: `dmc` foi de `"6 - analises"` (aposentado) → `"7 - setorizacao"`; as tabelas de
   cálculo/config → `"11 - perdas_nrw"` (*app-only*, sem `USAGE` pra GIS).
-- **Estrutura (32 itens de navegação em 6 fases):** 1 Visão (Painel, DMCs, Ficha) · 2 Dados & diagnóstico
-  (Medições, Consumo, Balanço, MNF, Eventos) · 3 Ação (Plano por DMC, Componentes IWA, HD, Fraude,
-  Auditoria, Rede, Ramais, Pressão) · 4 Execução (OS, Renovação, VRPs, Reservatórios, Setorização;
-  Parque, Fiscalização, Recuperação, Leitura, Grandes) · 5 Gestão & decisão (Simulador, ELL, Contrato,
-  Indicadores) · 6 Configuração (Parâmetros, Governança).
+- **Estrutura (2026-10-05, enxugada p/ 13 itens):** 1 Visão (Painel) · 2 Dados & diagnóstico (Análise do
+  micromedido, Análise de macromedição, Balanço) · 3 Ação (Componentes IWA, Fraude) · 4 Execução (OS;
+  Parque, Fiscalização, Recuperação, Grandes) · 5 Gestão & decisão (Contrato) · 6 Configuração (Parâmetros).
+  **21 telas removidas de vez** (não só opacas): DMCs, Ficha, Medições, Consumo, Vazão mínima noturna,
+  Eventos, Plano por DMC, HD, Auditoria, Rede, Ramais, Pressão, Renovação, VRPs, Reservatórios, Setorização,
+  Leitura, Simulador, ELL, Indicadores, Governança — botões + seções + dispatch do `go()` + entradas de
+  `TITLES`/`COMPET` apagados; `go()` ganhou guarda `if(!document.getElementById('s-'+s))return` p/ links órfãos;
+  limpos o wiring top-level do simulador (`sp/sh/sk`) e as refs à `dmcs` em `indToggles`/`renderMaps`. As
+  **funções de render** das telas removidas ficaram como código morto (não referenciado) — poda futura.
   (removido o subgrupo "Execução — campo & suporte": Pesquisa ativa, Campanhas & step test, Frota de
   loggers, Modelo hidráulico, Balanço energético, Programação de equipes — esses temas já são cobertos
   pelos módulos de campo do próprio AcquaHub, fora do cockpit.)
