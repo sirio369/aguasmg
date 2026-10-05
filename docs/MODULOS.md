@@ -1850,6 +1850,12 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
     ZA0200) — estão em `macro_fechamento`/`macro_mensal` mas não aparecem na camada até serem inseridos em
     `unidades_operacionais`. No QGIS, recarregar a fonte da camada para ver os campos novos.
+- **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
+  têm dados ao vivo via RPC. As outras **32 telas** do cockpit ficam **opacas + selo "exemplo"** no menu
+  (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
+  sinalizado/rastreável**. Controle num só ponto: `const NRW_REAL=new Set(['mm','macro'])` + `nrwMarkMocks()`
+  (marca o menu no load) + `nrwMockBanner(s)` (injeta o banner por tela dentro do `go()`). **Para promover uma
+  tela a "real", adicione o `data-s` dela ao `NRW_REAL`** (sai da opacidade e perde o banner automaticamente).
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
   auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
