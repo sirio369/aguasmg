@@ -1832,6 +1832,24 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     `qt_vol_fac` continua **só** na `consumo_dmc` (balanço NRW, onde o faturado é o consumo autorizado). Repopular =
     os dois `INSERT ... SELECT` diretos de `"5 - info_copasa".micromedicao_historico` (o do DMC via join `mm_dmc_map`),
     sem termo de `qt_vol_fac`.
+- **Análise de macromedição (2026-10-05, tela REAL — `s-macro`/nav "Análise de macromedição"):** espelha a
+  do micromedido, sobre os volumes mensais dos macromedidores do **fechamento de volume da ZA** (fonte **GMOA**,
+  planilhas por ZA). Carga em **`"11 - perdas_nrw".macro_mensal`** (493 linhas = 27 macros × 17 meses, abr/2025–
+  ago/2026; por `competencia` YYYYMM, `funcao` entrada/saída, `sentido` N/I, vazão média + volume medido/estimado/
+  total m³; único por consórcio+cd_no_agua+competência+sentido). Cadastro dos macros em **`"2 - infra_agua".macro_fechamento`**
+  (cd_no_agua pk, consorcio, funcao, sistema — ex. ELDORADO CONTAGEM/CENTRO BETIM). RPCs `app_nrw_macro_mensal`
+  (série por ZA: entrada/saída/**disponibilizado**=entrada−saída + L/lig·dia) / `app_nrw_macro_macros` (abertura por
+  medidor no mês, MoM/YoY) / `app_nrw_macro_serie` (série+stats de 1 medidor) — definer, admin **ou** `dev_acesso`.
+  **L/lig·dia = disponibilizado ÷ ligações ÷ 30 × 1000, MESMA premissa do micromedido** (reusa o denominador
+  `"11 - perdas_nrw".mm_mensal.n_faturadas` por consórcio×competência) → disponibilizado − consumido(micro) ≈ perda
+  por ligação. 4 painéis (Indicador do mês · Sazonalidade/tendência heatmap+linha · Abertura por macromedidor ·
+  Detalhe do medidor), reaproveitando CSS/helpers do `mm` (`mmcard`/`mmheat`/`mmHeat`/`mmDiv`/`br1`/`mmCmp`...).
+  Recarregar = refazer o INSERT em `macro_mensal` a partir das planilhas GMOA.
+  - **Camada `unidades_macromedicao` (view, schema 2):** ganhou 3 colunas via left join com `macro_fechamento` —
+    **`fechamento_za`** (bool), **`funcao_medicao`** (entrada/saída) e **`sistema_macro`**. Marca 24 dos 37 macros
+    da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
+    ZA0200) — estão em `macro_fechamento`/`macro_mensal` mas não aparecem na camada até serem inseridos em
+    `unidades_operacionais`. No QGIS, recarregar a fonte da camada para ver os campos novos.
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
   auditoria cadastral, reincidência de ramais — extraídos de `"7 - setorizacao".dmc`).
   Indicadores de perda (IPD/%NRW/ILI/MNF) ficam "aguardando Qin/faturamento".
