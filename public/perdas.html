@@ -262,6 +262,7 @@ tbody tr:hover{background:var(--surface-2)}
       <button class="navi" data-s="medicoes"><span class="ic">〜</span>Medições / Entrada</button>
       <button class="navi" data-s="consumo"><span class="ic">₪</span>Consumo / Faturamento</button>
       <button class="navi" data-s="mm"><span class="ic">📈</span>Análise do micromedido</button>
+      <button class="navi" data-s="macro"><span class="ic">🚰</span>Análise de macromedição</button>
       <button class="navi" data-s="nrw_balanco"><span class="ic">∑</span>Balanço hídrico</button>
       <button class="navi" data-s="nrw_mnf"><span class="ic">☾</span>Vazão mínima noturna</button>
       <button class="navi" data-s="nrw_eventos"><span class="ic">◉</span>Eventos & alertas</button>
@@ -1061,6 +1062,8 @@ tbody tr:hover{background:var(--surface-2)}
       </section>
 
       <section class="screen" id="s-mm"><div id="mmBody"></div></section>
+
+      <section class="screen" id="s-macro"><div id="macroBody"></div></section>
 
       <!-- CONFIG -->
       <section class="screen" id="s-config">
@@ -1911,8 +1914,179 @@ function mmDetailRender(data,cons,mat){
   ${(st.meses_irregular||nIrr)>0?`<p class="note" style="margin-top:10px;color:#d6336c"><b>⚠ Indício de fraude:</b> ${st.meses_irregular!=null?st.meses_irregular:nIrr} mês(es) com a ligação inativa/cortada (I/F/P) porém faturando volume — pontos em <b>vermelho</b>.</p>`:''}
   <p class="note" style="margin-top:10px"><b>Ação sugerida:</b> ${m.acao}</p>`;
 }
+/* ---------- Análise de macromedição (dados REAIS via RPC — espelha a análise do micromedido) ---------- */
+let macroMensal=[], macroMacros=[], macroSel=null, macroDetSel=null, macroDetCache={}, macroSeasMet='vol_disponibilizado', macroSort={k:'vol',dir:-1};
+const MACRO_SEAS_MET={
+ vol_disponibilizado:{l:'Disponibilizado',u:'m³',g:p=>+p.vol_disponibilizado},
+ lpd:{l:'L/lig·dia',u:'L/lig·dia',g:p=>+p.lpd},
+ vol_entrada:{l:'Entrada',u:'m³',g:p=>+p.vol_entrada},
+ vol_saida:{l:'Saída',u:'m³',g:p=>+p.vol_saida},
+ n_faturadas:{l:'Ligações',u:'lig.',g:p=>+p.n_faturadas}
+};
+const MACRO_SEAS_ORDER=['vol_disponibilizado','lpd','vol_entrada','vol_saida','n_faturadas'];
+const MACRO_COLS=[
+ {k:'macro',lab:'Macromedidor',num:false,r:false,get:x=>x.cd_no_agua,cell:x=>`<b>${x.cd_no_agua}</b>`},
+ {k:'func', lab:'Função',      num:false,r:false,get:x=>x.funcao,cell:x=>`<span class="mmtag" style="--cc:${x.funcao==='entrada'?'#4b9fe0':'#e6a23c'}">${x.funcao}</span>`},
+ {k:'vol',  lab:'Volume (m³)', num:true, r:true, get:x=>+x.volume_total||0,cell:x=>fmt(x.volume_total||0)},
+ {k:'vaz',  lab:'Vazão (l/s)', num:true, r:true, get:x=>+x.vazao_media_ls||0,cell:x=>br1(x.vazao_media_ls||0)},
+ {k:'mom',  lab:'MoM',         num:true, r:true, get:x=>x.mom==null?null:+x.mom,cell:x=>`<span style="color:${mmDelta(x.mom)}">${x.mom!=null?mmSig(x.mom)+'%':'—'}</span>`},
+ {k:'yoy',  lab:'YoY',         num:true, r:true, get:x=>x.yoy==null?null:+x.yoy,cell:x=>`<span style="color:${mmDelta(x.yoy)}">${x.yoy!=null?mmSig(x.yoy)+'%':'—'}</span>`}
+];
+const MACRO_INFO={
+ kpi:{t:'Indicador de volume da ZA',h:`<p>O <b>volume disponibilizado</b> da ZA = soma dos macros de <b>entrada</b> − soma dos macros de <b>saída</b> (fonte GMOA). É a água que ficou para consumo/perda na região.</p><p><b>L/lig·dia</b> = volume disponibilizado ÷ nº de ligações ÷ 30 dias × 1000 — <b>mesma premissa do micromedido</b> (mesmo denominador de ligações), então os dois são diretamente comparáveis: disponibilizado − consumido (micromedido) ≈ <b>perda por ligação</b>.</p><p>MoM = vs mês anterior · YoY = mesmo mês do ano anterior.</p>`},
+ season:{t:'Sazonalidade & tendência',h:`<p>Heatmap mês×ano da composição escolhida (mais claro = maior). A linha <b>Sazonal</b> é o desvio % de cada mês-calendário vs a média geral (laranja acima / azul abaixo). Gráfico: linha = ano mais recente, sombra = faixa mín–máx dos anos anteriores.</p><p>Troque a composição (disponibilizado / L/lig·dia / entrada / saída / ligações) para achar a origem das flutuações. ⚠️ Base = 17 meses (abr/2025–ago/2026); a sombra ano-a-ano ainda é parcial.</p>`},
+ macros:{t:'Abertura por macromedidor',h:`<p>Cada macromedidor do fechamento da ZA no mês selecionado, com volume total, vazão média, função (entrada/saída) e variação <b>MoM</b>/<b>YoY</b>. Toque numa linha para a série histórica e as estatísticas do medidor.</p>`}
+};
+function macroCons(){ return za==='all'?null:za; }
+function macroIB(key){ return `<button class="mminfo" data-minfo="${key}" title="Sobre este bloco">ⓘ</button>`; }
+function macroSeasNum(v){ return macroSeasMet==='lpd'?br1(v):fmt(v); }
+function macroSeasFmt(v){ return macroSeasNum(v)+' '+MACRO_SEAS_MET[macroSeasMet].u; }
+function macroInit(){ mmCss();
+ if(!document.getElementById('macrocss')){ const st=document.createElement('style'); st.id='macrocss'; st.textContent='#s-macro td.r,#s-macro th.r{text-align:right;font-variant-numeric:tabular-nums}'; document.head.appendChild(st); }
+ const body=$('#macroBody');
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise de macromedição…</p></div></div>';
+ const fc=macroCons();
+ Promise.all([ sbg.rpc('app_nrw_macro_mensal',{p_consorcio:fc}), sbg.rpc('app_nrw_macro_macros',{p_consorcio:fc,p_competencia:null}) ])
+  .then(([mn,mc])=>{
+    if(mn.error)throw mn.error; if(mc.error)throw mc.error;
+    macroMensal=mn.data||[]; macroMacros=mc.data||[];
+    if(macroSel==null || !macroMensal.some(p=>p.competencia===macroSel)) macroSel=macroMensal.length?macroMensal[macroMensal.length-1].competencia:null;
+    macroDetSel=null; macroDetCache={}; macroRenderAll();
+  }).catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
+}
+async function macroSetMes(c){ macroSel=+c; try{ const mc=await sbg.rpc('app_nrw_macro_macros',{p_consorcio:macroCons(),p_competencia:macroSel}); if(!mc.error)macroMacros=mc.data||[]; }catch(e){} macroDetSel=null; macroRenderAll(); }
+/* ---- painel 1: indicador do mês ---- */
+function macroKpiPanel(){
+ if(!macroMensal.length) return '<div class="panel"><div class="pbody"><p class="note" style="margin:0">Sem dados de macromedição para esta ZA.</p></div></div>';
+ const byC={}; macroMensal.forEach(p=>byC[p.competencia]=p);
+ const cur=byC[macroSel]||macroMensal[macroMensal.length-1]||{};
+ const i=macroMensal.findIndex(p=>p.competencia===macroSel), prevM=i>0?macroMensal[i-1]:null, yoy=byC[macroSel-100]||null;
+ const CARDS=[
+  {k:'vol_disponibilizado',lab:'Disponibilizado (entrada − saída)',hd:true,unit:'m³',fmtv:v=>fmt(v)},
+  {k:'lpd',               lab:'L/lig·dia',               fmtv:v=>br1(v)},
+  {k:'vol_entrada',       lab:'Volume entrada',          unit:'m³', fmtv:v=>fmt(v)},
+  {k:'vol_saida',         lab:'Volume saída',            unit:'m³', fmtv:v=>fmt(v)},
+  {k:'n_faturadas',       lab:'Ligações',                fmtv:v=>fmt(v)}
+ ];
+ const pctDelta=(c,b)=>(b!=null&&+b!==0&&c!=null)?((+c-+b)/+b*100):null;
+ const card=cd=>{ const v=cur[cd.k];
+  const mom=pctDelta(v, prevM?prevM[cd.k]:null), yy=pctDelta(v, yoy?yoy[cd.k]:null);
+  const dl=(t,pc,tt)=>`<span title="${tt}"><span class="t">${t}</span><b style="color:${mmDelta(pc)}">${pc!=null?mmSig(pc)+'%':'—'}</b></span>`;
+  return `<div class="mmcard${cd.hd?' hd':''}"><span class="lab">${cd.lab}</span><span class="val">${v!=null?cd.fmtv(v):'—'}${cd.unit?`<small> ${cd.unit}</small>`:''}</span><div class="ft">${dl('MoM',mom,'vs mês anterior')}${dl('YoY',yy,yoy?'vs mesmo mês do ano anterior':'sem base do ano anterior')}</div></div>`;
+ };
+ return `<div class="panel" id="macroKpi"><div class="phead"><h3>Indicador do mês</h3><span class="hint" style="margin-left:6px">${mmCmp(macroSel)}</span>${macroIB('kpi')}<span class="chip real" style="margin-left:auto">real</span></div><div class="pbody"><div class="mmcards">${CARDS.map(card).join('')}</div></div></div>`;
+}
+/* ---- painel 2: sazonalidade & tendência ---- */
+function macroSeasonPanel(){
+ const S=macroMensal; if(S.length<2) return '';
+ const M=MACRO_SEAS_MET[macroSeasMet]||MACRO_SEAS_MET.vol_disponibilizado, g=M.g;
+ const byYM={}, years=[]; S.forEach(p=>{ const y=Math.floor(p.competencia/100), m=p.competencia%100; byYM[y+'-'+m]=p; if(!years.includes(y))years.push(y); }); years.sort();
+ const vals=S.map(g), lo=Math.min(...vals), hi=Math.max(...vals), overall=vals.reduce((a,b)=>a+b,0)/vals.length;
+ const seasDev={}; for(let m=1;m<=12;m++){ const arr=S.filter(p=>p.competencia%100===m).map(g); if(arr.length) seasDev[m]=((arr.reduce((a,b)=>a+b,0)/arr.length)/(overall||1)-1)*100; }
+ const maxDev=Math.max(1,...Object.values(seasDev).map(Math.abs));
+ const chips=MACRO_SEAS_ORDER.map(k=>`<button class="mmchip ${macroSeasMet===k?'on':''}" data-seas="${k}">${MACRO_SEAS_MET[k].l}</button>`).join('');
+ let grid='<div class="mmheat"><div class="mmhcell mmhlbl"></div>'+MM_MES.map(mn=>`<div class="mmhcell mmhhdr">${mn}</div>`).join('');
+ years.forEach(y=>{ grid+=`<div class="mmhcell mmhlbl">${y}</div>`; for(let m=1;m<=12;m++){ const p=byYM[y+'-'+m]; if(!p){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const v=g(p), t=(v-lo)/((hi-lo)||1), sel=p.competencia===macroSel; grid+=`<div class="mmhcell${sel?' mmhsel':''}" style="background:${mmHeat(t)}" title="${mmCmp(p.competencia)}: ${macroSeasFmt(v)}">${macroSeasNum(v)}</div>`; } });
+ grid+='<div class="mmhcell mmhlbl">Sazonal</div>'; for(let m=1;m<=12;m++){ if(seasDev[m]==null){ grid+='<div class="mmhcell mmhna"></div>'; continue; } const d=seasDev[m]; grid+=`<div class="mmhcell mmhdev" style="background:${mmDiv(d,maxDev)}" title="${MM_MES[m-1]}: ${mmSig(d)}% vs média geral">${d>=0?'+':''}${Math.round(d)}%</div>`; }
+ grid+='</div>';
+ const maxYear=years[years.length-1], W=720,H=190,pt=14,pb=26;
+ const ylo=lo*0.9, yhi=hi*1.06;
+ const X=m=>((m-0.5)/12)*W, Y=v=>pt+(1-(v-ylo)/((yhi-ylo)||1))*(H-pt-pb);
+ const prior=years.filter(y=>y!==maxYear);
+ const bTop=[],bBot=[]; for(let m=1;m<=12;m++){ const arr=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(g); if(arr.length){ bTop.push([m,Math.max(...arr)]); bBot.push([m,Math.min(...arr)]); } }
+ let band=''; if(bTop.length){ const up=bTop.map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)); const dn=bBot.slice().reverse().map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)); band=`<polygon points="${up.concat(dn).join(' ')}" fill="rgba(138,143,152,.20)" stroke="rgba(138,143,152,.35)" stroke-width=".6"/>`; }
+ const lp=[]; for(let m=1;m<=12;m++){ const p=byYM[maxYear+'-'+m]; if(p)lp.push([m,g(p)]); }
+ const line=lp.length?`<polyline points="${lp.map(([m,v])=>X(m).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>`:'';
+ const dots=lp.map(([m,v])=>{ const pri=prior.map(y=>byYM[y+'-'+m]).filter(Boolean).map(g); const pv=pri.length?pri.reduce((a,b)=>a+b,0)/pri.length:null; return `<circle cx="${X(m).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="var(--accent)"><title>${MM_MES[m-1]}/${maxYear}: ${macroSeasFmt(v)}${pv!=null?' · anos ant.: '+macroSeasFmt(pv):''}</title></circle>`; }).join('');
+ const gl=[0,.5,1].map(f=>{ const yy=Y(ylo+(yhi-ylo)*f); return `<line x1="0" y1="${yy.toFixed(1)}" x2="${W}" y2="${yy.toFixed(1)}" stroke="#ffffff14"/>`; }).join('');
+ const ylab=[0,.5,1].map(f=>{ const v=ylo+(yhi-ylo)*f, yy=Y(v); return `<text x="54" y="${(yy+3).toFixed(1)}" fill="#ffffff77" font-size="9" text-anchor="end">${macroSeasNum(v)}</text>`; }).join('');
+ const xlab=MM_MES.map((mn,i)=>`<text x="${X(i+1).toFixed(1)}" y="${H-8}" fill="#ffffff66" font-size="9" text-anchor="middle">${mn}</text>`).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Sazonalidade & tendência</h3>${macroIB('season')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">
+   <div class="mmfilters" style="margin:0 0 10px">${chips}</div>
+   ${grid}
+   <div style="display:grid;grid-template-columns:58px 1fr;gap:3px;margin-top:12px;align-items:stretch">
+    <svg viewBox="0 0 56 ${H}" preserveAspectRatio="none" style="width:100%;height:100%">${ylab}</svg>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px">${gl}${band}${line}${dots}${xlab}</svg>
+   </div>
+   <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). Base: ${S.length} meses (abr/2025–ago/2026). Composição: <b>${M.l}</b>.</p>
+  </div></div>`;
+}
+/* ---- painel 3: abertura por macromedidor (lista + detalhe) ---- */
+function macroMacrosPanel(){
+ if(!macroMacros.length) return '';
+ const col=MACRO_COLS.find(c=>c.k===macroSort.k)||MACRO_COLS.find(c=>c.k==='vol'), dir=macroSort.dir;
+ const arr=macroMacros.slice().sort((a,b)=>{ let va=col.get(a),vb=col.get(b); if(col.num){ va=(va==null?-Infinity:va); vb=(vb==null?-Infinity:vb); return (va-vb)*dir; } return (''+va).localeCompare(''+vb,'pt-BR')*dir; });
+ const th=MACRO_COLS.map(c=>`<th class="${c.r?'r':''}" data-k="${c.k}">${c.lab}${macroSort.k===c.k?`<span class="ar">${dir<0?'▼':'▲'}</span>`:''}</th>`).join('');
+ const rows=arr.map(x=>`<tr data-cd="${x.cd_no_agua}" data-cons="${x.consorcio}" style="cursor:pointer">`+MACRO_COLS.map(c=>`<td class="${c.r?'r':''}">${c.cell(x)}</td>`).join('')+'</tr>').join('');
+ const te=arr.filter(x=>x.funcao==='entrada').reduce((a,x)=>a+(+x.volume_total||0),0), ts=arr.filter(x=>x.funcao==='saida').reduce((a,x)=>a+(+x.volume_total||0),0);
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Abertura por macromedidor</h3><span class="hint" style="margin-left:6px">${mmCmp(macroSel)}</span>${macroIB('macros')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">
+   <div class="mmanalgrid">
+    <div class="mmblock">
+     <div class="mmblock-h">Macromedidores <span class="hint">entrada ${fmt(Math.round(te))} m³ · saída ${fmt(Math.round(ts))} m³</span></div>
+     <div style="overflow:auto;max-height:520px"><table class="mmdmc" id="macrotbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div class="mmblock mmdetail-sticky">
+     <div class="mmblock-h">Detalhe do macromedidor <span class="hint">${macroMensal.length} meses</span></div>
+     <div id="macroDetail"><p class="note" style="margin:0">Selecione um macromedidor na lista.</p></div>
+    </div>
+   </div>
+  </div></div>`;
+}
+async function macroDetailFill(cons,cd){
+ const box=$('#macroDetail'); if(!box)return; macroDetSel={cons:cons,cd:cd};
+ $('#macroBody').querySelectorAll('#macrotbl tbody tr[data-cd]').forEach(tr=>tr.classList.toggle('rowsel', tr.dataset.cd===cd&&tr.dataset.cons===cons));
+ const key=cons+'|'+cd;
+ if(macroDetCache[key]){ macroDetailRender(macroDetCache[key]); return; }
+ box.innerHTML='<p class="note" style="margin:0">Carregando série…</p>';
+ let d; try{ d=await sbg.rpc('app_nrw_macro_serie',{p_consorcio:cons,p_cd_no_agua:cd}); if(d.error)throw d.error; }catch(e){ box.innerHTML='<p class="note" style="color:#e05d5d">Erro: '+(e.message||e)+'</p>'; return; }
+ macroDetCache[key]=d.data; macroDetailRender(d.data);
+}
+function macroDetailRender(data){
+ const box=$('#macroDetail'); if(!box)return;
+ const info=(data&&data.info)||{}, st=(data&&data.stats)||{}, serie=(data&&data.serie)||[];
+ const col=info.funcao==='entrada'?'#4b9fe0':'#e6a23c';
+ const W=520,H=150,pl=44,pr=10,pt=12,pb=22, vals=serie.map(p=>Number(p.volume_total)||0), maxv=Math.max(1,...vals);
+ const X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
+ const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
+ const dots=serie.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="2.8" fill="${col}"><title>${mmCmp(p.competencia)}: ${fmt(p.volume_total)} m³ · vazão ${br1(p.vazao_media_ls)} l/s</title></circle>`).join('');
+ const medY=Y(Number(st.media)||0);
+ box.innerHTML=`<div class="mmdhead"><div><b style="font-size:15px">${info.cd_no_agua||'—'}</b> <span class="mmtag" style="--cc:${col}">${info.funcao||''}</span> <span class="note">${info.sistema||''}</span></div><div class="note">${info.consorcio==='ZA0200'?'Betim':'Contagem'}</div></div>
+  <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin:8px 0">
+   <line x1="${pl}" y1="${medY.toFixed(1)}" x2="${W-pr}" y2="${medY.toFixed(1)}" stroke="#ffffff30" stroke-dasharray="4 4"/>
+   <text x="${pl-3}" y="${(medY-3).toFixed(1)}" fill="#ffffff66" font-size="9" text-anchor="end">média</text>
+   <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8"/>${dots}
+   <text x="${pl}" y="${H-6}" fill="#ffffff66" font-size="9">${serie.length?mmCmp(serie[0].competencia):''}</text>
+   <text x="${W-pr}" y="${H-6}" fill="#ffffff66" font-size="9" text-anchor="end">${serie.length?mmCmp(serie[serie.length-1].competencia):''}</text></svg>
+  <div class="mmstats">
+   <div><span class="k">Média</span><span class="v">${fmt(Math.round(Number(st.media)||0))} m³</span></div>
+   <div><span class="k">Mín–Máx</span><span class="v">${fmt(st.minimo)}–${fmt(st.maximo)}</span></div>
+   <div><span class="k">Desvio</span><span class="v">${fmt(Math.round(Number(st.desvio)||0))}</span></div>
+   <div><span class="k">CV</span><span class="v">${st.cv!=null?Math.round(st.cv*100)+'%':'—'}</span></div>
+   <div><span class="k">Total (período)</span><span class="v">${fmt(st.total)} m³</span></div>
+   <div><span class="k">Meses</span><span class="v">${st.n_meses}</span></div>
+  </div>`;
+}
+function macroSyncHeader(){
+ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes) return;
+ mes.disabled=false; mes.title='';
+ mes.innerHTML=macroMensal.map(p=>`<option value="${p.competencia}"${p.competencia===macroSel?' selected':''}>${mmCmp(p.competencia)}</option>`).join('')||'<option>—</option>';
+ mes.onchange=()=>macroSetMes(mes.value);
+ if(dmc){ dmc.hidden=true; dmc.onchange=null; }
+}
+function macroRenderAll(){
+ $('#macroBody').innerHTML = macroKpiPanel()+macroSeasonPanel()+macroMacrosPanel();
+ macroSyncHeader();
+ $('#macroBody').querySelectorAll('[data-minfo]').forEach(b=>b.onclick=()=>{ const i=MACRO_INFO[b.dataset.minfo]; if(i)mmModal(i.t,i.h); });
+ $('#macroBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ macroSeasMet=el.dataset.seas; macroRenderAll(); });
+ $('#macroBody').querySelectorAll('#macrotbl th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(macroSort.k===k) macroSort.dir*=-1; else macroSort={k:k,dir:(MACRO_COLS.find(c=>c.k===k)||{}).num!==false?-1:1}; macroRenderAll(); });
+ $('#macroBody').querySelectorAll('#macrotbl tbody tr[data-cd]').forEach(tr=>tr.onclick=()=>macroDetailFill(tr.dataset.cons,tr.dataset.cd));
+ const box=$('#macroDetail');
+ if(box){ if(macroDetSel) macroDetailFill(macroDetSel.cons,macroDetSel.cd); else if(macroMacros.length) macroDetailFill(macroMacros[0].consorcio,macroMacros[0].cd_no_agua); }
+}
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",dmcs:"DMCs (mapa)",ficha:"Ficha do DMC",nrw_balanco:"Balanço hídrico",nrw_mnf:"Vazão mínima noturna",nrw_eventos:"Eventos & alertas",nrw_plano:"Plano de ação por DMC",nrw_simulador:"Simulador de cenários",nrw_ell:"Nível econômico & ROI",nrw_contrato:"Performance contratual",nrw_indicadores:"Indicadores & benchmarking",nrw_os:"Gestão de OS / reparos",nrw_renovacao:"Renovação de rede",nrw_vrp_gestao:"Gestão de VRPs",nrw_reservatorios:"Reservatórios",nrw_setorizacao:"Integridade de setorização",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_leitura:"Gestão de leitura",nrw_grandes:"Grandes consumidores",nrw_governanca:"Governança do dado",componentes:"Componentes IWA",troca_hd:"Substituição de HD",fraude:"Indicativo de fraude",rede:"Substituição de rede",ramais:"Substituição de ramais",pressao_vrp:"Gestão de pressão",auditoria:"Auditoria cadastral",medicoes:"Medições / Entrada",consumo:"Consumo / Faturamento",mm:"Análise do micromedido",config:"Parâmetros & Metas"};
+const TITLES={painel:"Painel de Perdas",dmcs:"DMCs (mapa)",ficha:"Ficha do DMC",nrw_balanco:"Balanço hídrico",nrw_mnf:"Vazão mínima noturna",nrw_eventos:"Eventos & alertas",nrw_plano:"Plano de ação por DMC",nrw_simulador:"Simulador de cenários",nrw_ell:"Nível econômico & ROI",nrw_contrato:"Performance contratual",nrw_indicadores:"Indicadores & benchmarking",nrw_os:"Gestão de OS / reparos",nrw_renovacao:"Renovação de rede",nrw_vrp_gestao:"Gestão de VRPs",nrw_reservatorios:"Reservatórios",nrw_setorizacao:"Integridade de setorização",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_leitura:"Gestão de leitura",nrw_grandes:"Grandes consumidores",nrw_governanca:"Governança do dado",componentes:"Componentes IWA",troca_hd:"Substituição de HD",fraude:"Indicativo de fraude",rede:"Substituição de rede",ramais:"Substituição de ramais",pressao_vrp:"Gestão de pressão",auditoria:"Auditoria cadastral",medicoes:"Medições / Entrada",consumo:"Consumo / Faturamento",mm:"Análise do micromedido",macro:"Análise de macromedição",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_balanco','nrw_mnf','nrw_eventos','nrw_contrato','nrw_indicadores','consumo']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
@@ -1940,7 +2114,7 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
- if(s!=='mm') mmHeaderReset();   // fora do micromedido, restaura o #mes mock e esconde o filtro de DMC
+ if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
  $('#side').classList.remove('open');
  if(s==='painel'){kpis();consolidado();rank();renderMaps();}
  if(s==='dmcs')renderMaps();
@@ -1968,6 +2142,7 @@ function go(s,dmc){
  if(s==='auditoria')auditoria();
  if(s==='consumo')consumo();
  if(s==='mm')mmInit();
+ if(s==='macro')macroInit();
  applyFocus(s);
 }
 document.querySelectorAll('.navi[data-s]').forEach(n=>n.onclick=()=>go(n.dataset.s));
