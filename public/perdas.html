@@ -2143,7 +2143,28 @@ function go(s,dmc){
  if(s==='consumo')consumo();
  if(s==='mm')mmInit();
  if(s==='macro')macroInit();
+ nrwMockBanner(s);
  applyFocus(s);
+}
+/* ---------- limpeza/desativação: telas não-reais ficam opacas (rastreável, nada apagado) ---------- */
+const NRW_REAL=new Set(['mm','macro']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
+ .navi.mock{opacity:.5}
+ .navi.mock:hover{opacity:.82}
+ .navi .mocktag{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 6px;flex:0 0 auto}
+ .mockbanner{display:flex;gap:7px;align-items:center;background:rgba(230,162,60,.12);border:1px solid rgba(230,162,60,.38);border-radius:8px;padding:8px 12px;margin:0 0 12px;font-size:12.5px;color:var(--ink-2,#cdd7db)}`; document.head.appendChild(st); }
+function nrwMarkMocks(){ nrwMockCss();
+ document.querySelectorAll('.navi[data-s]').forEach(n=>{ const real=NRW_REAL.has(n.dataset.s);
+  n.classList.toggle('mock',!real);
+  if(!real && !n.querySelector('.mocktag')){ const t=document.createElement('span'); t.className='mocktag'; t.textContent='exemplo'; n.appendChild(t); }
+ });
+}
+function nrwMockBanner(s){ const scr=document.getElementById('s-'+s); if(!scr)return;
+ const old=scr.querySelector(':scope > .mockbanner'); if(old)old.remove();
+ if(NRW_REAL.has(s))return;
+ const b=document.createElement('div'); b.className='mockbanner';
+ b.innerHTML='🚧 <span><b>Em construção</b> — dados de exemplo, não refletem medição real.</span>';
+ scr.insertBefore(b, scr.firstChild);
 }
 document.querySelectorAll('.navi[data-s]').forEach(n=>n.onclick=()=>go(n.dataset.s));
 document.querySelectorAll('#zaseg button').forEach(b=>b.onclick=()=>{
@@ -2153,6 +2174,7 @@ document.querySelectorAll('#zaseg button').forEach(b=>b.onclick=()=>{
  go(cur);
 });
 $('#menubtn').onclick=()=>$('#side').classList.toggle('open');
+nrwMarkMocks();
 
 kpis();consolidado();rank();renderMaps();
 </script>
