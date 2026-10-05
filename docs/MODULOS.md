@@ -305,11 +305,17 @@
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
 - Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
-  **VRPs**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
+  **VRPs**, **Hidrantes**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
   `step` (célula de cache).
   - **Rede de gás (2026-09, `CAD_VER v5→v6`):** camada **`rede_gas`** (GASMIG, `"4 - redes_terceiros".rede_gas`,
     1.271 linhas MULTILINESTRING, âmbar `#f9a825`, `whole:true`, começa desligada). Só leitura/visualização;
     branch `rede_gas` na RPC `app_cadastro_geojson` (props id/material/diametro/municipio) — popup genérico.
+  - **Hidrantes (2026-10-05):** camada **`hidrantes`** — view **`"2 - infra_agua".unidades_hidrantes`**
+    (hidrantes = `nos_agua` com `cd_no_agua LIKE 'HDT%'`, 80 pts, indigo `#3949ab`, `whole:true`, começa ligada).
+    Espelha o padrão de `unidades_macromedicao` (view no schema `"2 - infra_agua"`, carregável direto no QGIS como
+    camada PostGIS key=`id`/srid 31983). Branch `hidrantes` na RPC `app_cadastro_geojson`
+    (props cd_no_agua/nome/funcao/cota/referencia) — popup genérico. `CAD_VER` inalterado (a chave de cache da
+    camada nova já é distinta; camadas existentes não mudaram de dado).
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
