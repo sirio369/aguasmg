@@ -1863,6 +1863,12 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   ≥50%/≥75%) · VP × baseline × meta (gráfico com corredor baseline→VP alvo) · tabela mês a mês. ⚠️ **bruto, sem
   fator sazonal** (FS é pleito, não aplicado — ver [[copasa-irvp-metodo]]). Está em `NRW_REAL` (destaque, não opaca).
   Recarregar baseline = re-rodar o INSERT em `linha_base` (prévia recalcula de `macro_mensal` − `mm_mensal`).
+  - **Refino (2026-10-06):** RPC devolve `janela_de`/`janela_ate` nas baselines. Linha de base enxugada (3 cards:
+    VPBL/Meta/VP alvo, com subtítulo explicativo; **removidos IP_BL e VD_BL**) + **colapsável `<details>`**
+    (estado `resDerivOpen`) que mostra os 12 meses da janela (VD/VC/VP) → média = VPBL → VP alvo, para contratual e
+    prévia. **Toggle contratual↔prévia replicado nos 3 blocos** (`resToggle`). Tabela: colunas Competência · VD · VC ·
+    VP · **VP meta · Δ (VP−meta)** · IRVP (removidos IP%/L·lig·dia/Status). **Sem seletor de mês** (`#mes` escondido
+    na tela; KPI usa o último mês). Popups (`RES_INFO`) robustos (siglas VD/VC/VP/VPBL + fórmula + gatilhos ≥50%/≥75%).
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
   têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
