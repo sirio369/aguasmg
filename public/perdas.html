@@ -256,6 +256,7 @@ tbody tr:hover{background:var(--surface-2)}
     <nav id="nav">
       <div class="navlab">1 · Visão</div>
       <button class="navi on" data-s="painel"><span class="ic">◧</span>Painel de Perdas</button>
+      <button class="navi" data-s="resultado"><span class="ic">🎯</span>Acompanhamento do resultado</button>
       <div class="navlab">2 · Dados & diagnóstico</div>
       <button class="navi" data-s="mm"><span class="ic">📈</span>Análise do micromedido</button>
       <button class="navi" data-s="macro"><span class="ic">🚰</span>Análise de macromedição</button>
@@ -554,6 +555,8 @@ tbody tr:hover{background:var(--surface-2)}
       <!-- MEDIÇÕES -->
 
       <!-- CONSUMO -->
+
+      <section class="screen" id="s-resultado"><div id="resBody"></div></section>
 
       <section class="screen" id="s-mm"><div id="mmBody"></div></section>
 
@@ -1580,7 +1583,7 @@ function macroRenderAll(){
  if(box){ if(macroDetSel) macroDetailFill(macroDetSel.cons,macroDetSel.cd); else if(macroMacros.length) macroDetailFill(macroMacros[0].consorcio,macroMacros[0].cd_no_agua); }
 }
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",nrw_balanco:"Balanço hídrico",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",config:"Parâmetros & Metas"};
+const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_balanco','nrw_contrato']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
@@ -1609,7 +1612,7 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
- if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
+ if(s!=='mm' && s!=='macro' && s!=='resultado') mmHeaderReset();   // fora do micromedido/macromedição/resultado, restaura o #mes mock e esconde o filtro de DMC
  $('#side').classList.remove('open');
  if(s==='painel'){kpis();consolidado();rank();renderMaps();}
  if(s==='nrw_balanco')balancoSheet();
@@ -1623,11 +1626,125 @@ function go(s,dmc){
  if(s==='fraude')fraude();
  if(s==='mm')mmInit();
  if(s==='macro')macroInit();
+ if(s==='resultado')resInit();
  nrwMockBanner(s);
  applyFocus(s);
 }
+/* ---------- Acompanhamento do resultado (IRVP) — dados REAIS via RPC ---------- */
+let resMensal=[], resBaselines={}, resAnchor='contratual', resSel=null;
+function resCons(){ return za==='all'?null:za; }
+function resB(){ return resBaselines[resAnchor]||{}; }
+function resIRVP(vp){ const b=resB(); return (b.meta_m3>0 && vp!=null)?((b.vpbl - vp)/b.meta_m3*100):null; }
+function resDelta(pc){ return pc==null?'inherit':(pc<0?'#3fb27f':(pc>0?'#e05d5d':'inherit')); }
+function resStatus(irvp){ if(irvp==null) return {l:'—',c:'var(--muted)'};
+ if(irvp>=100) return {l:'Meta atingida',c:'#3fb27f'};
+ if(irvp>=75)  return {l:'≥75% · gatilho Fase 2',c:'#4b9fe0'};
+ if(irvp>=50)  return {l:'≥50% · gatilho Fase 1',c:'#e6a23c'};
+ if(irvp>=0)   return {l:'Abaixo do gatilho',c:'#e05d5d'};
+ return {l:'Pior que a baseline',c:'#d6336c'};
+}
+function resIB(k){ return `<button class="mminfo" data-rinfo="${k}" title="Sobre este bloco">ⓘ</button>`; }
+const RES_INFO={
+ base:{t:'Linha de base & âncora',h:`<p><b>VP = Volume macromedido (disponibilizado = entrada − saída) − Volume micromedido (consumido).</b> A linha de base (VPBL) é a média de VP nos <b>12 meses antes da assinatura</b> (ZA1004 abr/25–mar/26; ZA0200 mai/25–abr/26).</p><p><b>Contratual (TR)</b> = baseline/meta oficiais do Termo de Referência (o que a COPASA paga). <b>Prévia</b> = baseline calculada dos nossos dados (macro−micro), ~2–6% da contratual — serve de validação. O botão troca a âncora do IRVP.</p>`},
+ irvp:{t:'IRVP — como é calculado',h:`<p><b>IRVP = (VPBL − VP do mês) ÷ meta</b> — % de atingimento da meta de redução (só volume; o IP% não entra no pagamento). 100% = meta cumprida. O <b>VP alvo</b> = VPBL − meta é o volume de perda que zera a meta.</p><p>Gatilhos de remuneração mínima: <b>≥50%</b> (Fase 1) / <b>≥75%</b> (Fase 2). ⚠️ <b>bruto, sem fator sazonal</b> ainda — a sazonalidade da ZA1004 é forte e pode distorcer meses isolados; FS é um ajuste proposto (pleito), não aplicado aqui.</p>`},
+ trend:{t:'VP × baseline × meta',h:`<p>VP real por mês vs a <b>baseline</b> (VPBL, cinza) e o <b>VP alvo</b> (VPBL − meta, verde). Quanto mais perto/abaixo da linha verde, melhor. Ponto verde = mês que atingiu/superou a meta.</p>`},
+ tabela:{t:'Mês a mês',h:`<p>VD (macromedido), VC (micromedido), VP (perda), IP% (VP/VD), L/lig·dia de perda e IRVP% por competência, na âncora selecionada.</p>`}
+};
+function resInit(){ mmCss();
+ if(!document.getElementById('rescss')){ const st=document.createElement('style'); st.id='rescss'; st.textContent='#s-resultado td.r,#s-resultado th.r{text-align:right;font-variant-numeric:tabular-nums}'; document.head.appendChild(st); }
+ const body=$('#resBody');
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando acompanhamento do resultado…</p></div></div>';
+ sbg.rpc('app_nrw_resultado',{p_consorcio:resCons()}).then(r=>{
+   if(r.error)throw r.error;
+   const d=r.data||{}; resMensal=d.serie||[]; resBaselines=d.baselines||{};
+   if(!resBaselines[resAnchor]) resAnchor = resBaselines.contratual?'contratual':(Object.keys(resBaselines)[0]||'contratual');
+   if(resSel==null || !resMensal.some(p=>p.competencia===resSel)) resSel=resMensal.length?resMensal[resMensal.length-1].competencia:null;
+   resRenderAll();
+ }).catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
+}
+function resSetMes(c){ resSel=+c; resRenderAll(); }
+function resSetAnchor(a){ if(resBaselines[a]){ resAnchor=a; resRenderAll(); } }
+/* painel 1: linha de base & âncora */
+function resBasePanel(){
+ const b=resB(); if(!b.vpbl) return '<div class="panel"><div class="pbody"><p class="note" style="margin:0">Linha de base não configurada para esta ZA.</p></div></div>';
+ const other=resAnchor==='contratual'?resBaselines.previa:resBaselines.contratual, vpMeta=b.vpbl-b.meta_m3;
+ const toggle=`<div class="mmfilters" style="margin:0"><button class="mmchip ${resAnchor==='contratual'?'on':''}" data-anchor="contratual">Contratual (TR)</button><button class="mmchip ${resAnchor==='previa'?'on':''}" data-anchor="previa">Prévia (nossos dados)</button></div>`;
+ const cmp=(other&&other.vpbl)?`<p class="note" style="margin-top:8px;font-size:11px">Âncora atual: <b>${resAnchor==='contratual'?'Contratual (TR)':'Prévia'}</b>. Outra base (${resAnchor==='contratual'?'prévia':'contratual'}): VPBL <b>${fmt(other.vpbl)}</b> m³/mês · meta <b>${fmt(other.meta_m3)}</b> m³/mês.</p>`:'';
+ const cards=[
+  {lab:'VPBL · linha de base',v:fmt(b.vpbl),u:'m³/mês',hd:true},
+  {lab:'Meta de redução',v:fmt(b.meta_m3),u:'m³/mês · '+br1(b.meta_pct)+'%'},
+  {lab:'VP alvo (VPBL − meta)',v:fmt(vpMeta),u:'m³/mês'},
+  {lab:'IP baseline',v:br1(b.ip_bl),u:'%'},
+  {lab:'VD baseline',v:fmt(b.vd_bl),u:'m³/mês'}
+ ];
+ return `<div class="panel"><div class="phead"><h3>Linha de base (IRVP)</h3><span class="hint" style="margin-left:6px">${b.janela||''}</span>${resIB('base')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">${toggle}<div class="mmcards" style="margin-top:12px">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span></div>`).join('')}</div>${cmp}</div></div>`;
+}
+/* painel 2: indicador do mês (IRVP) */
+function resKpiPanel(){
+ if(!resMensal.length) return '';
+ const byC={}; resMensal.forEach(p=>byC[p.competencia]=p);
+ const cur=byC[resSel]||resMensal[resMensal.length-1]||{};
+ const i=resMensal.findIndex(p=>p.competencia===resSel), prevM=i>0?resMensal[i-1]:null, yoy=byC[resSel-100]||null;
+ const b=resB(), vpMeta=b.vpbl-b.meta_m3, irvp=resIRVP(+cur.vp), st=resStatus(irvp);
+ const reducao=(b.vpbl!=null&&cur.vp!=null)?b.vpbl-cur.vp:null;
+ const pctDelta=(c,bb)=>(bb!=null&&+bb!==0&&c!=null)?((+c-+bb)/+bb*100):null;
+ const dl=(t,pc,tt)=>`<span title="${tt}"><span class="t">${t}</span> <b style="color:${resDelta(pc)}">${pc!=null?mmSig(pc)+'%':'—'}</b></span>`;
+ const cards=[
+  {lab:'VP do mês',v:fmt(cur.vp),u:'m³'},
+  {lab:'VP alvo (meta)',v:fmt(vpMeta),u:'m³'},
+  {lab:'Redução vs baseline',v:reducao!=null?fmt(reducao):'—',u:'m³'},
+  {lab:'IP do mês',v:cur.ip_pct!=null?br1(cur.ip_pct):'—',u:'%'},
+  {lab:'VD / VC',v:fmt(cur.vd)+' / '+fmt(cur.vc),u:'m³'}
+ ];
+ const momVp=pctDelta(+cur.vp, prevM?+prevM.vp:null), yoyVp=pctDelta(+cur.vp, yoy?+yoy.vp:null);
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Indicador do mês</h3><span class="hint" style="margin-left:6px">${mmCmp(resSel)} · âncora ${resAnchor}</span>${resIB('irvp')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody"><div class="mmkpiwrap">
+   <div class="mmhero"><div class="mmhero-v" style="color:${st.c}">${irvp!=null?br1(irvp)+'%':'—'}</div><div class="mmhero-u">IRVP · atingimento da meta</div><div class="mmhero-s"><span class="mmtag" style="--cc:${st.c}">${st.l}</span></div></div>
+   <div class="mmkpismall"><div class="mmcards">${cards.map(c=>`<div class="mmcard"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span></div>`).join('')}</div>
+    <p class="note" style="margin-top:8px;font-size:11px">VP mês: ${dl('MoM',momVp,'VP vs mês anterior')} · ${dl('YoY',yoyVp,'VP vs mesmo mês do ano anterior')} — <b style="color:#3fb27f">verde = VP caiu</b> (perda menor = melhor).</p>
+   </div></div></div></div>`;
+}
+/* painel 3: VP × baseline × meta */
+function resTrendPanel(){
+ const S=resMensal; if(S.length<2) return '';
+ const b=resB(); if(!b.vpbl) return ''; const vpMeta=b.vpbl-b.meta_m3;
+ const W=760,H=240,pl=56,pr=14,pt=16,pb=28, vps=S.map(p=>+p.vp);
+ const ymax=Math.max(b.vpbl,...vps)*1.05, ymin=Math.min(vpMeta,...vps)*0.9;
+ const X=i=>pl+(S.length<=1?0:i/(S.length-1))*(W-pl-pr), Y=v=>pt+(1-(v-ymin)/((ymax-ymin)||1))*(H-pt-pb);
+ const blY=Y(b.vpbl), mtY=Y(vpMeta);
+ const corridor=`<rect x="${pl}" y="${Math.min(blY,mtY).toFixed(1)}" width="${(W-pl-pr).toFixed(1)}" height="${Math.abs(blY-mtY).toFixed(1)}" fill="rgba(63,178,127,.08)"/>`;
+ const grid=[0,.25,.5,.75,1].map(f=>{ const v=ymin+(ymax-ymin)*f, yy=Y(v); return `<line x1="${pl}" y1="${yy.toFixed(1)}" x2="${(W-pr).toFixed(1)}" y2="${yy.toFixed(1)}" stroke="#ffffff10"/><text x="${(pl-5).toFixed(1)}" y="${(yy+3).toFixed(1)}" fill="#ffffff66" font-size="9" text-anchor="end">${Math.round(v/1000)}k</text>`; }).join('');
+ const refs=`<line x1="${pl}" y1="${blY.toFixed(1)}" x2="${(W-pr).toFixed(1)}" y2="${blY.toFixed(1)}" stroke="#8a8f98" stroke-dasharray="5 4" stroke-width="1.2"/><text x="${(W-pr).toFixed(1)}" y="${(blY-4).toFixed(1)}" fill="#8a8f98" font-size="10" text-anchor="end">VPBL ${fmt(b.vpbl)}</text><line x1="${pl}" y1="${mtY.toFixed(1)}" x2="${(W-pr).toFixed(1)}" y2="${mtY.toFixed(1)}" stroke="#3fb27f" stroke-dasharray="5 4" stroke-width="1.2"/><text x="${(W-pr).toFixed(1)}" y="${(mtY-4).toFixed(1)}" fill="#3fb27f" font-size="10" text-anchor="end">VP alvo ${fmt(vpMeta)}</text>`;
+ const line=`<polyline points="${S.map((p,i)=>X(i).toFixed(1)+','+Y(+p.vp).toFixed(1)).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+ const dots=S.map((p,i)=>{ const below=+p.vp<=vpMeta, irvp=resIRVP(+p.vp); return `<circle cx="${X(i).toFixed(1)}" cy="${Y(+p.vp).toFixed(1)}" r="3.2" fill="${below?'#3fb27f':'var(--accent)'}"><title>${mmCmp(p.competencia)}: VP ${fmt(p.vp)} m³ · IRVP ${irvp!=null?br1(irvp)+'%':'—'}</title></circle>`; }).join('');
+ const xlab=S.map((p,i)=>(i%2===0||i===S.length-1)?`<text x="${X(i).toFixed(1)}" y="${H-8}" fill="#ffffff66" font-size="8.5" text-anchor="middle">${mmCmp(p.competencia)}</text>`:'').join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>VP × baseline × meta</h3>${resIB('trend')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px">${corridor}${grid}${refs}${line}${dots}${xlab}</svg>
+  <p class="note" style="margin-top:6px;font-size:11px">Linha = VP real (macro − micro). Faixa verde = corredor entre a <b>baseline</b> (VPBL) e o <b>VP alvo</b> (VPBL − meta). Ponto <b style="color:#3fb27f">verde</b> = atingiu a meta. Âncora: <b>${resAnchor}</b>.</p></div></div>`;
+}
+/* painel 4: mês a mês */
+function resTablePanel(){
+ if(!resMensal.length) return '';
+ const rows=resMensal.slice().reverse().map(p=>{ const irvp=resIRVP(+p.vp), st=resStatus(irvp);
+  return `<tr${p.competencia===resSel?' class="rowsel"':''}><td><b>${mmCmp(p.competencia)}</b></td><td class="r">${fmt(p.vd)}</td><td class="r">${fmt(p.vc)}</td><td class="r"><b>${fmt(p.vp)}</b></td><td class="r">${br1(p.ip_pct)}%</td><td class="r">${p.vp_lpd!=null?br1(p.vp_lpd):'—'}</td><td class="r" style="color:${st.c};font-weight:600">${irvp!=null?br1(irvp)+'%':'—'}</td><td><span class="mmtag" style="--cc:${st.c}">${st.l}</span></td></tr>`; }).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Mês a mês</h3>${resIB('tabela')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody"><div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP</th><th class="r">IP%</th><th class="r">L/lig·dia</th><th class="r">IRVP%</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
+}
+function resSyncHeader(){ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes)return;
+ mes.disabled=false; mes.title='';
+ mes.innerHTML=resMensal.map(p=>`<option value="${p.competencia}"${p.competencia===resSel?' selected':''}>${mmCmp(p.competencia)}</option>`).join('')||'<option>—</option>';
+ mes.onchange=()=>resSetMes(mes.value);
+ if(dmc){ dmc.hidden=true; dmc.onchange=null; }
+}
+function resRenderAll(){
+ $('#resBody').innerHTML = resBasePanel()+resKpiPanel()+resTrendPanel()+resTablePanel();
+ resSyncHeader();
+ $('#resBody').querySelectorAll('[data-anchor]').forEach(b=>b.onclick=()=>resSetAnchor(b.dataset.anchor));
+ $('#resBody').querySelectorAll('[data-rinfo]').forEach(b=>b.onclick=()=>{ const i=RES_INFO[b.dataset.rinfo]; if(i)mmModal(i.t,i.h); });
+}
 /* ---------- limpeza/desativação: telas não-reais ficam opacas (rastreável, nada apagado) ---------- */
-const NRW_REAL=new Set(['mm','macro']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+const NRW_REAL=new Set(['mm','macro','resultado']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
 function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
  .navi.mock{opacity:.5}
  .navi.mock:hover{opacity:.82}

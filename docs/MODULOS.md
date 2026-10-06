@@ -1850,6 +1850,19 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
     ZA0200) — estão em `macro_fechamento`/`macro_mensal` mas não aparecem na camada até serem inseridos em
     `unidades_operacionais`. No QGIS, recarregar a fonte da camada para ver os campos novos.
+- **Acompanhamento do resultado / IRVP (2026-10-06, tela REAL — `s-resultado`/nav "Acompanhamento do resultado"):**
+  fecha a conta de perdas com macro+micro. **VP = VD (macromedido disponibilizado = entrada − saída) − VC
+  (micromedido)**; **IRVP = (VPBL − VP) ÷ meta** (% de atingimento; só volume). Baselines **congeladas** em
+  `"11 - perdas_nrw".linha_base` (`indicador='VP_BL'`, 4 linhas = 2 ZAs × fonte): **contratual** (TR 8.3 — ZA1004
+  VPBL 977.337 / meta 236.516 · 24,2%; ZA0200 829.385 / 203.199 · 24,5%) e **prévia** (média de VP nos 12 meses
+  pré-assinatura dos nossos dados: ZA1004 1.036.251; ZA0200 849.493 — ~2–6% da contratual, validação). Janelas:
+  ZA1004 abr/25–mar/26, ZA0200 mai/25–abr/26. RPC **`app_nrw_resultado(p_consorcio)`** (definer, admin|dev_acesso):
+  devolve `baselines{contratual,previa}` + `serie` mensal (VD/VC/VP/IP%/L·lig·dia); "Ambos" (p_consorcio null)
+  soma as 2 ZAs. **O IRVP por âncora é calculado no front** (`resIRVP`), então o **toggle contratual↔prévia** é
+  instantâneo (sem refetch). 4 painéis: linha de base + toggle · indicador do mês (hero IRVP + status gatilho
+  ≥50%/≥75%) · VP × baseline × meta (gráfico com corredor baseline→VP alvo) · tabela mês a mês. ⚠️ **bruto, sem
+  fator sazonal** (FS é pleito, não aplicado — ver [[copasa-irvp-metodo]]). Está em `NRW_REAL` (destaque, não opaca).
+  Recarregar baseline = re-rodar o INSERT em `linha_base` (prévia recalcula de `macro_mensal` − `mm_mensal`).
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
   têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
@@ -1863,7 +1876,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   cadastro DMC) e `"11 - perdas_nrw"` (`parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc`).
   Reorg de 2026-09: `dmc` foi de `"6 - analises"` (aposentado) → `"7 - setorizacao"`; as tabelas de
   cálculo/config → `"11 - perdas_nrw"` (*app-only*, sem `USAGE` pra GIS).
-- **Estrutura (2026-10-05, enxugada p/ 13 itens):** 1 Visão (Painel) · 2 Dados & diagnóstico (Análise do
+- **Estrutura (2026-10-05, enxugada p/ 13 itens; +Acompanhamento do resultado em 2026-10-06 = 14):** 1 Visão (Painel, **Acompanhamento do resultado**) · 2 Dados & diagnóstico (Análise do
   micromedido, Análise de macromedição, Balanço) · 3 Ação (Componentes IWA, Fraude) · 4 Execução (OS;
   Parque, Fiscalização, Recuperação, Grandes) · 5 Gestão & decisão (Contrato) · 6 Configuração (Parâmetros).
   **21 telas removidas de vez** (não só opacas): DMCs, Ficha, Medições, Consumo, Vazão mínima noturna,
