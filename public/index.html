@@ -1635,7 +1635,7 @@ const pjPeca=(i,tipo,esc,esco,mont,rea,rec)=>pjG('Peça/acessório '+i,[
 const pjPecas=(kids)=>({...pjG('Peças e acessórios',kids),rep:kids.length,ativo:true});
 // valas de entrada/saída (HDD): bloco replicável, mínimo 2 (entrada + saída, podendo haver mais). Cada vala = tipo (entrada/saída) + obra civil.
 const pjVala=(i,tipo)=>pjG('Vala '+i,[pjSel('Tipo (entrada/saída)',tipo,['Entrada','Saída']),...pjOc(0,0,0,0)]);
-const pjValas=(kids)=>({...pjG('Valas de entrada e saída',kids),rep:kids.length,min:2,ativo:true});
+const pjValas=(kids)=>({...pjG('Valas de perfuração',kids),rep:kids.length,min:2,ativo:true});
 let PJ_IVS=[
  {id:'iv1',tipo:'macro_impl',cod:'PRJ-2026-014',local:'DMC Contagem — Bairro Cincão',cons:'Águas Integradas',resp:'Equipe A · João R.',ini:'12/09/2026',status:'run',pt:[26,22],
   arv:[pjP('Locação e cadastro de interferências',100),
@@ -1745,12 +1745,12 @@ async function pjLoad(force){
   } });
   // reconciliação valas HDD (2026-10): snapshots antigos têm "Valas de entrada e saída" com subs planas (Escavação…) → converte p/ o bloco replicável (Vala 1 = subs antigas, preserva % lançado; Vala 2 Saída nova vazia). Só HDD; some ao regravar.
   ivs.forEach(iv=>{ if(iv.tipo==='rede_hdd' && Array.isArray(iv.arv)){
-    const vi=iv.arv.findIndex(n=>/^valas de entrada/i.test((n&&n.n)||''));
+    const vi=iv.arv.findIndex(n=>/^valas de (entrada|perfura)/i.test((n&&n.n)||''));
     if(vi>=0){ const v=iv.arv[vi];
-      if(v.f && v.f.length && !v.f.some(c=>c.k==='g')){   // formato antigo (filhos planos, sem "Vala N")
+      if(v.f && v.f.length && !v.f.some(c=>c.k==='g')){   // formato antigo (filhos planos, sem "Vala N") → empacota em Vala 1 + Vala 2 (Saída)
         const vala1={...pjG('Vala 1',[pjSel('Tipo (entrada/saída)','Entrada',['Entrada','Saída']),...v.f])};
         iv.arv[vi]=pjValas([vala1,pjVala(2,'Saída')]);
-      }
+      } else if(/entrada/i.test(v.n||'')) v.n='Valas de perfuração';   // já replicável mas com nome antigo → só renomeia
     }
   } });
   PJ_IVS=ivs; pjLoaded=true;
@@ -1764,7 +1764,7 @@ function pjSave(iv){ if(!iv||iv.gid==null) return; const k=iv.kind+'|'+iv.gid; c
 let pjAvancosCur={};   // caminho -> [entradas] da intervenção corrente (para o histórico por etapa)
 function pjNodePath(nodes,target,trail){ trail=trail||[]; for(const n of (nodes||[])){ const t2=trail.concat(n.n); if(n===target) return t2; if(n.f&&n.f.length){ const r=pjNodePath(n.f,target,t2); if(r) return r; } } return null; }
 function pjDDMM(iso){ try{ const d=new Date(iso); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }catch(e){ return ''; } }
-async function pjAvancosLoad(iv){ pjAvancosCur={}; if(!iv||iv.gid==null) return pjAvancosCur; try{ const {data,error}=await sb.rpc('app_proj_avancos_iv',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(e=>{ const k=e.caminho||e.sub||''; (pjAvancosCur[k]=pjAvancosCur[k]||[]).push(e); const mv=/^Valas de entrada e saída › ([^›]+)$/.exec(k); if(mv){ const k2='Valas de entrada e saída › Vala 1 › '+mv[1].trim(); (pjAvancosCur[k2]=pjAvancosCur[k2]||[]).push(e); } }); }catch(e){} return pjAvancosCur; }
+async function pjAvancosLoad(iv){ pjAvancosCur={}; if(!iv||iv.gid==null) return pjAvancosCur; try{ const {data,error}=await sb.rpc('app_proj_avancos_iv',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(e=>{ if(e.atividade==='Valas de entrada e saída'){ const mv=/^Valas de entrada e saída › ([^›]+)$/.exec(e.caminho||''); e.atividade='Valas de perfuração'; if(mv) e.caminho='Valas de perfuração › Vala 1 › '+mv[1].trim(); }  /* normaliza avanços legados de valas (nome/caminho antigos → novos) p/ casar com a árvore renomeada */ const k=e.caminho||e.sub||''; (pjAvancosCur[k]=pjAvancosCur[k]||[]).push(e); }); }catch(e){} return pjAvancosCur; }
 function pjPct(node){
   if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
@@ -2238,48 +2238,40 @@ async function pjRel(id){
   const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`;
     return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
-  // mini-gantt: janela = 1º avanço → último avanço, por atividade (nível 1 ativa) — datas reais do log
-  const fmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
+  // "Gantt" de progresso por atividade. AUDITORIA: o antigo plotava por ts (data de REGISTRO do avanço), não por data de obra; sem cronograma planejado e com lançamento em lote (ex. F02 = 6 avanços em 8 min, 02/10) a linha do tempo colapsava e o eixo repetia a mesma data. Trocado por barra de PROGRESSO (0–100%) + janela de registro como rótulo honesto.
   const _allAv=Object.values(pjAvancosCur).flat();
-  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ const ds=_allAv.filter(e=>e.atividade===n.n).map(e=>new Date(e.ts).getTime()); return {n:n.n,p:pjPct(n),first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
-  const wd=acts.filter(a=>a.first!=null), tmin=wd.length?Math.min(...wd.map(a=>a.first)):null, tmax=wd.length?Math.max(...wd.map(a=>a.last)):null, span=Math.max(1,(tmax-tmin)||1);
-  const pos=ms=>tmin==null?0:Math.round((ms-tmin)/span*100);
-  const gantHtml=acts.map(a=>{
-    if(a.first==null)return `<div class="pjgrow"><div class="pjglabel" title="${a.n}">${a.n}</div><div class="pjgtrack"><span style="position:absolute;left:4px;top:0;font-size:9px;color:var(--mut)">não iniciada</span></div></div>`;
-    const l=pos(a.first),r=pos(a.last),w=Math.max(4,r-l),fill=Math.round(w*Math.min(a.p||0,100)/100),cls=(a.p||0)>100?'over':((a.p||0)>=100?'ok':'');
-    return `<div class="pjgrow"><div class="pjglabel" title="${a.n}">${a.n}</div><div class="pjgtrack" title="${fmt(a.first)} → ${fmt(a.last)} · ${a.p}%"><div class="pjgwin" style="left:${l}%;width:${w}%"></div><div class="pjgbar ${cls}" style="left:${l}%;width:${fill}%"></div></div></div>`;
-  }).join('');
-  const axis=tmin==null?`<span>—</span><span>sem avanços</span><span>—</span>`:`<span>${fmt(tmin)}</span><span>${fmt((tmin+tmax)/2)}</span><span>${fmt(tmax)}</span>`;
-  // avanços por subatividade mensurável (mesmo histórico do detalhe)
-  const measLeaves=iv.arv.flatMap(n=>pjLeaves(n));
-  const advHtml=measLeaves.map(l=>{const H=pjLeafHist(l),pp=pjPct(l),isM=l.k==='m';
-    return `<div class="pjadvg"><div class="h"><span>${l.n}</span><span class="pjnp ${pp>100?'ov':(pp>=100?'dn':'')}" style="width:auto">${pp}%${isM?` · ${l.exec}/${l.meta} ${l.un}`:''}</span></div>${H.ents.length?H.ents.map(e=>`<div class="pjadv"><div class="pjthumb">📷</div><div class="ai"><div><b>${e.d}</b> <span class="delta">${e.delta}</span></div><div class="d">acumulado ${e.acc}${e.obs?` · "${e.obs}"`:''}</div></div></div>`).join(''):'<div class="pjhint" style="margin-top:5px">Sem lançamentos ainda.</div>'}</div>`;}).join('');
-  // ordem de envio: feed cronológico de todos os avanços (mais recente primeiro), independente da sequência lógica
-  const feed=[]; measLeaves.forEach(l=>pjLeafHist(l).ents.forEach(e=>feed.push({nome:l.n,e})));
-  feed.sort((a,b)=>ddmm(b.e.d)-ddmm(a.e.d));
-  const feedHtml=feed.length
-    ? `<div class="pjadvg">${feed.map(f=>`<div class="pjadv"><div class="pjthumb">📷</div><div class="ai"><div><b>${f.e.d}</b> <span class="delta">${f.e.delta}</span> · <span style="color:var(--mut)">${f.nome}</span></div><div class="d">acumulado ${f.e.acc}${f.e.obs?` · "${f.e.obs}"`:''}</div></div></div>`).join('')}</div>`
-    : '<div class="pjadvg"><div class="pjhint">Sem lançamentos ainda.</div></div>';
+  const gfmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
+  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime()); return {n:n.n,p:pjPct(n),nav:es.length,first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
+  const gantHtml=acts.map(a=>{ const pc=Math.max(0,Math.min(a.p||0,100)), cls=(a.p||0)>100?'over':((a.p||0)>=100?'ok':''), w=a.first==null?0:Math.max(2,pc);
+    const info=a.first==null?'não iniciada':(a.nav+' avanço(s) · registro '+(a.first===a.last?gfmt(a.first):(gfmt(a.first)+'–'+gfmt(a.last))));
+    return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:11.5px;margin-bottom:4px"><span style="color:var(--ink);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.n}">${a.n}</span><span style="color:var(--mut);flex:0 0 auto">${info}</span></div><div class="pjgtrack" style="height:13px"><div class="pjgbar ${cls}" style="left:0;width:${w}%"></div><span style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:9.5px;font-weight:700;color:${pc>58?'#fff':'var(--ink)'}">${a.p}%</span></div></div>`;
+  }).join('')||'<div class="pjhint" style="margin:0">Sem atividades no escopo.</div>';
+  // avanços por atividade → subatividade (SÓ o que tem lançamento de fato); subatividade aberta por avanço, em ordem de envio, com obs + fotos reais
+  const grupos=pjRelGrupos(iv);
+  const advHtml=grupos.length?grupos.map(g=>{
+    const subs=g.subs.map(s=>{ const multi=s.sub!==g.atividade, sp=pjPct(s.node);
+      const sh=multi?`<div style="font-size:12px;font-weight:600;color:var(--ink);margin:9px 0 1px">${s.sub} <span class="pjnp ${sp>100?'ov':(sp>=100?'dn':'')}" style="width:auto">${sp}%${s.isM?` · ${s.node.exec}/${s.node.meta} ${s.un}`:''}</span></div>`:'';
+      return sh+s.avs.map(pjRelAvRow).join(''); }).join('');
+    const gp=pjPct(g.node);
+    return `<div class="pjadvg"><div class="h"><span>${g.atividade}</span><span class="pjnp ${gp>100?'ov':(gp>=100?'dn':'')}" style="width:auto">${gp}%</span></div>${subs}</div>`;
+  }).join(''):'<div class="pjadvg"><div class="pjhint" style="margin:0">Nenhum avanço lançado nesta intervenção ainda.</div></div>';
   $('#pjRel').innerHTML=`<div class="pjreltop"><div class="k">Relatório consolidado da intervenção</div><h2>${iv.local}</h2><div class="s">${iv.cod} · ${t.n} · ${iv.cons} · ${iv.resp}</div><div class="s">início ${iv.ini}${iv.fim?` · concluído ${iv.fim}`:' · em andamento'}</div></div>
    <div class="sec">📎 Documentos</div>
    ${docsHtml}
    <p class="pjhint" style="margin-top:2px">Anexar/remover documentos é feito na <b>configuração da intervenção</b> (Suporte).</p>
-   <div class="sec">📅 Linha do tempo (mini-Gantt)</div>
-   <p class="pjhint" style="margin:2px 0 8px">Cada barra vai do <b>1º avanço</b> ao <b>último avanço</b> da atividade.</p>
+   <div class="sec">📊 Progresso por atividade</div>
+   <p class="pjhint" style="margin:2px 0 9px">Barra = <b>% concluído</b> de cada atividade (0–100%). As datas são do <b>registro</b> do avanço — não há cronograma de obra planejado.</p>
    <div class="pjgantt">${gantHtml}</div>
-   <div class="pjgaxis">${axis}</div>
    <div class="sec">📈 Avanços por atividade · subatividade</div>
-   <div class="pjseg" id="pjAdvSeg" style="margin:4px 0 8px"><button data-adv="logica" class="sel">🧭 Sequência lógica</button><button data-adv="envio">🕑 Ordem de envio</button></div>
-   <p class="pjhint" id="pjAdvHint" style="margin:0 0 8px">Ordem prevista de execução (atividade › subatividade), com os lançamentos diários de cada uma.</p>
-   <div id="pjAdvLogica">${advHtml}</div>
-   <div id="pjAdvEnvio" hidden>${feedHtml}</div>
-   <div class="sec">📎 Anexos no PDF final</div>
-   <p class="pjhint">O PDF sai como <b>documento único</b>: capa + mini-Gantt + avanços com fotos diárias + <b>projeto executivo, licença, alvará</b> e <b>as-built</b> anexados no final.</p>
-   <button class="btn" onclick="toast('Gerar PDF — na versão integrada monta o documento completo')">🖨️ Gerar PDF consolidado</button>`;
+   <p class="pjhint" style="margin:2px 0 9px">Só atividades <b>com lançamento</b>. Cada subatividade abre por avanço (ordem de envio), com observação e fotos.</p>
+   ${advHtml}
+   <div class="sec">🖨️ Relatório consolidado (PDF)</div>
+   <p class="pjhint" style="margin:2px 0 9px">Documento único: capa + progresso + avanços com fotos + documentos (projeto executivo, licença, alvará, as-built). <b>Anexos ainda não anexados entram com nota explicativa.</b></p>
+   <button class="btn" id="pjRelPdfBtn">🖨️ Gerar PDF consolidado</button>`;
   const rr=$('#pjRel');
   rr.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
   rr.querySelectorAll('[data-open3d]').forEach(b=>b.onclick=()=>pjOpen3d(iv));
-  rr.querySelectorAll('#pjAdvSeg button').forEach(b=>b.onclick=()=>{ const v=b.dataset.adv; rr.querySelectorAll('#pjAdvSeg button').forEach(x=>x.classList.toggle('sel',x===b)); document.getElementById('pjAdvLogica').hidden=v!=='logica'; document.getElementById('pjAdvEnvio').hidden=v!=='envio'; document.getElementById('pjAdvHint').textContent=v==='logica'?'Ordem prevista de execução (atividade › subatividade), com os lançamentos diários de cada uma.':'Todos os avanços na ordem em que foram enviados (mais recente primeiro), independente da sequência lógica.'; });
+  const pdfb=document.getElementById('pjRelPdfBtn'); if(pdfb) pdfb.onclick=()=>pjRelPdf(iv);
   irPara('projeto_rel'); window.scrollTo(0,0);
 }
 
@@ -2296,6 +2288,57 @@ const LG_SIT={
 };
 const SBASE='https://lwttadkctfznidzvmury.supabase.co/storage/v1/object/public/fotos-campo/';
 function fotoURL(p){return p?SBASE+p:'';}
+// ----- Relatório consolidado da intervenção (Projetos) -----
+// agrupa avanços por atividade (nível 1) → subatividade, SÓ o que tem lançamento de fato, em ordem de execução; cada sub em ordem de envio (ts asc)
+function pjRelGrupos(iv){ const grupos=[], byAtiv={};
+  ((iv&&iv.arv)||[]).filter(n=>n.ativo!==false).forEach(top=>{
+    pjLeaves(top).forEach(lf=>{ const pth=pjNodePath(iv.arv,lf)||[lf.n], caminho=pth.join(' › ');
+      const avs=(pjAvancosCur[caminho]||[]).slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+      if(!avs.length) return;
+      let g=byAtiv[top.n]; if(!g){ g={atividade:top.n,node:top,subs:[]}; byAtiv[top.n]=g; grupos.push(g); }
+      g.subs.push({sub:pth.length>1?pth.slice(1).join(' › '):top.n, node:lf, isM:lf.k==='m', un:(lf.k==='m'?lf.un:'%'), avs});
+    });
+  });
+  return grupos;
+}
+// linha de avanço na tela: data + delta + obs + miniaturas de fotos reais (clicáveis)
+function pjRelAvRow(e){ const dt=relFmtData(e.ts), d='+'+e.valor+(e.unidade==='m'?' m':'%'), fs=(e.fotos||[]).filter(Boolean);
+  const th=fs.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+fs.map(p=>'<a href="'+fotoURL(p)+'" target="_blank" rel="noopener"><img src="'+fotoURL(p)+'" loading="lazy" style="width:62px;height:62px;object-fit:cover;border-radius:7px;border:1px solid var(--line);display:block" onerror="this.style.display=\'none\'"></a>').join('')+'</div>':'';
+  return '<div class="pjadv" style="align-items:flex-start;border-top:1px dashed var(--line)"><div class="ai" style="flex:1;min-width:0"><div><b>'+dt+'</b> · <span class="delta">'+d+'</span>'+(e.equipe?' · <span class="d">'+e.equipe+'</span>':'')+(e.obs?' · <span class="d">"'+e.obs+'"</span>':'')+'</div>'+th+'</div></div>';
+}
+// abre o overlay #relatorio com o PDF consolidado
+function pjRelPdf(iv){ if(!iv)return;
+  if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pjRelDocHtml(iv)+'</div>';
+  ov.style.display='block';
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print();
+}
+// HTML do documento (usa REL_CSS). Anexo ainda não anexado entra com nota explicativa (.relPend)
+function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv);
+  let h='<div class="relTop"><div><h1>Relatório consolidado da intervenção</h1><div class="sub">'+(iv.local||'')+'</div></div><div class="relBadge">'+p+'% concluído</div></div><div class="relBody">';
+  h+='<div class="relSec"><span class="relNum">1</span> Dados da intervenção</div>';
+  h+='<div class="relGrid">'+relField('Código',iv.cod)+relField('Tipo',t.n)+relField('Consórcio',iv.cons)+relField('Responsável',iv.resp)+relField('Início',iv.ini)+relField(iv.fim?'Conclusão':'Situação',iv.fim||'Em andamento')+(iv.ext?relField('Extensão',(+iv.ext).toLocaleString('pt-BR')+' m'):'')+(iv.dn?relField('DN',iv.dn):'')+(iv.dmc?relField('DMC',iv.dmc):'')+relField('Progresso total',p+'%')+'</div>';
+  h+='<div class="relSec"><span class="relNum">2</span> Progresso por atividade</div>';
+  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>({n:n.n,p:pjPct(n)}));
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">'+acts.map(a=>{const w=Math.max(0,Math.min(a.p||0,100));return '<tr><td style="padding:5px 6px;border-bottom:1px solid #eee">'+a.n+'</td><td style="width:150px;border-bottom:1px solid #eee"><div style="background:#eef2f7;border-radius:5px;height:10px"><div style="background:#0a7d5e;height:100%;border-radius:5px;width:'+w+'%"></div></div></td><td style="width:48px;text-align:right;padding:5px 6px;border-bottom:1px solid #eee;font-weight:700">'+a.p+'%</td></tr>';}).join('')+'</table>';
+  h+='<div class="relSec"><span class="relNum">3</span> Avanços por atividade · subatividade</div>';
+  const grupos=pjRelGrupos(iv);
+  if(!grupos.length) h+='<div class="relPend">Nenhum avanço lançado nesta intervenção ainda.</div>';
+  else grupos.forEach(g=>{ h+='<div style="margin-top:12px;font-weight:700;color:#0a7d5e;border-bottom:1px solid #d7e5df;padding-bottom:3px">'+g.atividade+' <span style="color:#777;font-weight:400">· '+pjPct(g.node)+'%</span></div>';
+    g.subs.forEach(s=>{ if(s.sub!==g.atividade) h+='<div style="font-weight:600;font-size:12px;margin-top:7px;color:#111">'+s.sub+(s.isM?' · '+s.node.exec+'/'+s.node.meta+' '+s.un:'')+'</div>';
+      s.avs.forEach(e=>{ h+='<div style="font-size:11.5px;margin:5px 0 0;color:#333"><b>'+relFmtData(e.ts)+'</b> · +'+e.valor+(e.unidade==='m'?' m':'%')+(e.equipe?' · '+e.equipe:'')+(e.obs?' — "'+e.obs+'"':'')+'</div>'+relFotos((e.fotos||[]).map((pp,i)=>['Foto '+(i+1),pp])); });
+    }); });
+  h+='<div class="relSec"><span class="relNum">4</span> Documentos e anexos</div>';
+  PJ_DOCS.forEach(dc=>{ const doc=pjDocsCur[dc.t];
+    if(doc) h+='<div style="font-size:12px;margin-top:7px">'+dc.ic+' <b>'+dc.n+'</b> — <span style="color:#0a7d5e;font-weight:700">anexado</span> <span style="color:#777">('+((doc.path||'').split('/').pop()||'documento')+')</span></div>';
+    else h+='<div style="margin-top:7px"><div style="font-size:12px">'+dc.ic+' <b>'+dc.n+'</b></div><div class="relPend">Ainda não anexado no sistema — pendente de anexo na configuração da intervenção (Suporte). Deve ser anexado antes da emissão final.</div></div>';
+  });
+  h+='<p class="relPend" style="margin-top:12px">Os documentos anexados (projeto executivo, licença, alvará, as-built) são arquivos separados (PDF/imagem) — na montagem do documento único eles entram ao final deste relatório.</p>';
+  h+='</div><div class="relFoot"><span>AcquaHub · relatório consolidado · '+(iv.cod||'')+'</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  return h;
+}
 function distKm(lat,lon){if(!gps||lat==null)return null;const R=6371,dLat=(lat-gps.lat)*Math.PI/180,dLon=(lon-gps.lon)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(gps.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 function distTxt(d){if(d==null)return '';return d<1?Math.round(d*1000)+' m':d.toFixed(1)+' km';}
 function contar(s){return loggersData.filter(p=>(s==='todos'||p.situacao===s)&&lgMatchC(p)).length;}
