@@ -1069,6 +1069,7 @@ function grandesTool(){
 /* ---------- Análise do micromedido (dados REAIS via RPC) ---------- */
 const MM_CLASS={
  fraude_potencial:{l:'Fraude potencial',c:'#d6336c',acao:'Ligação inativa/cortada (I/F/P) faturando volume — prioridade máxima de fiscalização (possível religação clandestina / by-pass).'},
+ factivel:{l:'Factível (fraude)',c:'#b5179e',acao:'Imóvel SEM situação ativa (inativo/cortado), mas com consumo de água via leitura (coluna factível) — forte indício de fraude/religação clandestina. Priorizar fiscalização.'},
  estavel:{l:'Estável',c:'#3fb27f',acao:'Consumo típico — sem ação.'},
  nulo_recorrente:{l:'Nulo recorrente',c:'#8a8f98',acao:'Verificar hidrômetro parado / imóvel desocupado / cadastro.'},
  pico_isolado:{l:'Pico isolado',c:'#e6a23c',acao:'Inspeção de vazamento interno ou erro de leitura.'},
@@ -1097,19 +1098,21 @@ const MM_SEAS_MET={
  volume_total:{l:'Vol. micromedido',u:'m³',g:p=>+p.volume_total},
  volume_medido:{l:'Vol. lido',u:'m³',g:p=>+p.volume_medido},
  volume_naomedido:{l:'Vol. estimado',u:'m³',g:p=>+p.volume_naomedido},
+ volume_factivel:{l:'Vol. factível',u:'m³',g:p=>+p.volume_factivel},
  n_faturadas:{l:'Ligações',u:'lig.',g:p=>+p.n_faturadas}
 };
-const MM_SEAS_ORDER=['lpd','volume_total','volume_medido','volume_naomedido','n_faturadas'];
+const MM_SEAS_ORDER=['lpd','volume_total','volume_medido','volume_naomedido','volume_factivel','n_faturadas'];
 let mmSeasMet='lpd';
 let mmDmcSort={k:'lpd',dir:-1}; // ordenação livre da tabela de DMCs
 function mmSeasNum(v){ return mmSeasMet==='lpd'?br1(v):fmt(v); }               // valor por extenso (sem k/M)
 function mmSeasFmt(v){ return mmSeasNum(v)+' '+MM_SEAS_MET[mmSeasMet].u; }      // com unidade (tooltips)
 const MM_INFO={
- lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume <b>micromedido total</b> do mês ÷ nº de ligações ÷ <b>30 dias</b> × 1000. Esta análise olha <b>só a micromedição</b> — o volume faturado não entra.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume micromedido (total)</b> = <b>lido</b> (leitura real do hidrômetro) + <b>estimado</b> (consumo imputado quando não houve leitura). O faturado mínimo (tarifa de consumo zero) <b>não entra</b>. Os cards decompõem justamente essas parcelas para achar a origem de cada oscilação.</p>`},
+ lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume <b>micromedido total</b> do mês ÷ nº de ligações ÷ <b>30 dias</b> × 1000. Esta análise olha <b>só a micromedição</b> — o volume faturado não entra.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume micromedido (total)</b> = <b>lido</b> (leitura real do hidrômetro) + <b>estimado</b> (consumo imputado quando não houve leitura) + <b>factível</b> (consumo lido em imóvel <b>sem situação ativa</b> — inativo/cortado — indício de fraude). O faturado mínimo (tarifa de consumo zero) <b>não entra</b>. Os cards decompõem justamente essas três parcelas para achar a origem de cada oscilação.</p>`},
  season:{t:'Sazonalidade & tendência',h:`<p>Por padrão tudo em <b>L/lig/dia</b> para "empatar" as variáveis e não distorcer a percepção.</p><p><b>Chips de composição</b>: alternam a visualização entre <b>L/lig·dia</b>, <b>volume micromedido</b> (total = lido + estimado), <b>volume lido</b> (leitura real do hidrômetro), <b>volume estimado</b> (consumo imputado, sem faturado mínimo) e <b>ligações</b> com micromedição. Decompor assim ajuda a achar <b>o que</b> causa uma flutuação: se o L/lig/dia oscilou, foi o volume lido que caiu, o estimado que subiu, ou só entraram mais ligações?</p><p><b>Heatmap</b>: cada célula é a composição escolhida naquele mês/ano (mais claro = maior). A linha <b>Sazonal</b> mostra o desvio médio de cada mês‑calendário vs a média geral (laranja acima / azul abaixo).</p><p><b>Gráfico</b>: linha = ano mais recente; a <b>sombra</b> é a faixa mín–máx dos anos anteriores. ⚠️ Base atual = 18 meses (2025‑03 a 2026‑08): a sombra hoje reflete só 2025 e alguns meses ainda não têm sobreposição ano a ano.</p>`},
  dmc:{t:'DMCs mais sensíveis',h:`<p>Cruzamento espacial <b>matrícula → DMC</b> (ponto da ligação dentro do limite vigente do DMC) × micromedição.</p><p><b>L/lig/dia</b> por DMC no último mês, com variação <b>MoM</b> (mês anterior) e <b>YoY</b> (mesmo mês do ano anterior), <b>% não medido</b>, nº de <b>fraudes potenciais</b> e <b>score médio</b> de anomalia. DMCs no topo (maior L/lig/dia ou piores deltas) são candidatos a priorização de campanha.</p>`},
  rank:{t:'Ranking de anomalia — variáveis e método',h:`<ul style="padding-left:18px;margin:0;line-height:1.65">
-  <li><b>Comportamento</b>: classe derivada das métricas, na precedência fraude → nulo recorrente → pico isolado → queda contínua → crescimento contínuo → instável → estável.</li>
+  <li><b>Comportamento</b>: classe derivada das métricas, na precedência fraude → factível → nulo recorrente → pico isolado → queda contínua → crescimento contínuo → instável → estável.</li>
+  <li><b>Factível</b>: imóvel <b>sem situação ativa</b> (inativo/cortado) com <b>consumo de água lido</b> (coluna factível, qt_vol_fac) — indício de fraude/religação clandestina. Diferente de "fraude potencial": aqui o volume medido é zero (a ligação está fora), mas há leitura no campo factível. O selo <b>N× factível</b> conta esses meses.</li>
   <li><b>Situação</b>: situação da ligação (cd_situaca) na última competência — Ativa (R), Inativa/cortada (I), Factível (F), Potencial (P). O selo <b>N× c/água</b> conta os meses com a ligação I/F/P faturando volume (indício de fraude).</li>
   <li><b>Média m³</b>: média mensal do volume micromedido (consumido) nos 18 meses.</li>
   <li><b>CV</b>: coeficiente de variação = desvio‑padrão ÷ média. Alto = consumo instável.</li>
@@ -1238,6 +1241,7 @@ function mmKpiPanel(){
   {k:'volume_total',     lab:'Vol. micromedido (total)',    unit:'m³', fmtv:v=>fmt(v)},
   {k:'volume_medido',    lab:'Vol. micromedido (lido)',     unit:'m³', fmtv:v=>fmt(v)},
   {k:'volume_naomedido', lab:'Vol. micromedido (estimado)', unit:'m³', fmtv:v=>fmt(v)},
+  {k:'volume_factivel',  lab:'Vol. micromedido (factível)', unit:'m³', fmtv:v=>fmt(v)},
   {k:'n_faturadas',      lab:'Ligações',               fmtv:v=>fmt(v)}
  ];
  const pctDelta=(c,b)=>(b!=null&&+b!==0&&c!=null)?((+c-+b)/+b*100):null;
@@ -1250,7 +1254,7 @@ function mmKpiPanel(){
  };
  return `<div class="panel" id="mmKpi"><div class="phead"><h3>Indicador do mês</h3><span class="hint" style="margin-left:6px">${mmCmp(mmSel)}${mmDmcSel?' · '+(mmDmcSel.num):''}</span>${mmIB('lpd')}<span class="chip real" style="margin-left:auto">real</span></div>
   <div class="pbody">
-   <div class="mmcards">${CARDS.map(card).join('')}</div>
+   <div class="mmcards" style="grid-template-columns:repeat(6,1fr)">${CARDS.map(card).join('')}</div>
   </div></div>`;
 }
 /* ---- painel 2: sazonalidade & tendência (heatmap + linha, sobre L/lig/dia) ---- */
@@ -1321,14 +1325,15 @@ function mmDmcPanel(){
 /* ---- painel 4: análise por matrícula (distribuição + ranking + detalhe lado a lado) ---- */
 function mmAnalysisPanel(){
  const R=mmResumo||{}, tot=R.n_matriculas||1, pc=R.por_classificacao||{};
- const order=['fraude_potencial','instavel','pico_isolado','queda_continua','crescimento_continuo','nulo_recorrente','estavel'];
+ const order=['fraude_potencial','factivel','instavel','pico_isolado','queda_continua','crescimento_continuo','nulo_recorrente','estavel'];
  const distBars=order.filter(k=>pc[k]!=null).map(k=>{ const m=MM_CLASS[k],n=pc[k],w=Math.round(n/tot*100);
   return `<div class="mmdist ${mmClass===k?'sel':''}" data-cls="${k}"><span class="mmdlab"><i style="background:${m.c}"></i>${m.l}</span><div class="mmdbar"><span style="width:${w}%;background:${m.c}"></span></div><span class="mmdval">${fmt(n)} · ${w}%</span></div>`;
  }).join('');
  const chips='<button class="mmchip '+(mmClass===''?'on':'')+'" data-cls="">Todas</button>'+order.map(k=>`<button class="mmchip ${mmClass===k?'on':''}" data-cls="${k}">${MM_CLASS[k].l}</button>`).join('');
  const rows=mmRank.map(x=>{ const m=MM_CLASS[x.classificacao]||{l:x.classificacao,c:'#888'}, si=MM_SIT[x.situacao_atual]||{l:x.situacao_atual||'—',c:'#8a8f98'};
   const irr=(x.meses_irregular||0)>0?` <span class="mmtag" style="--cc:#d6336c" title="meses inativa/cortada com volume faturado">${x.meses_irregular}× c/água</span>`:'';
-  return `<tr data-mat="${x.matricula}" data-cons="${x.consorcio}" style="cursor:pointer"><td>${x.matricula}</td><td><span class="mmtag" style="--cc:${m.c}">${m.l}</span></td><td><span style="color:${si.c}">${si.l}</span>${irr}</td><td class="r"><b>${x.score_anomalia}</b></td></tr>`;
+  const fac=(x.meses_factivel||0)>0?` <span class="mmtag" style="--cc:#b5179e" title="meses sem situação ativa com consumo lido (factível) — indício de fraude">${x.meses_factivel}× factível</span>`:'';
+  return `<tr data-mat="${x.matricula}" data-cons="${x.consorcio}" style="cursor:pointer"><td>${x.matricula}</td><td><span class="mmtag" style="--cc:${m.c}">${m.l}</span></td><td><span style="color:${si.c}">${si.l}</span>${irr}${fac}</td><td class="r"><b>${x.score_anomalia}</b></td></tr>`;
  }).join('')||'<tr><td colspan="4" class="note">Nenhuma matrícula nesse filtro.</td></tr>';
  return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Análise por matrícula</h3>${mmIB('rank')}<span class="chip real" style="margin-left:auto">real</span></div>
   <div class="pbody">
@@ -1387,10 +1392,11 @@ function mmDetailRender(data,cons,mat){
  const W=520,H=150,pl=34,pr=10,pt=12,pb=22, vals=serie.map(p=>Number(p.volume)||0), maxv=Math.max(1,...vals);
  const X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
  const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
- const dots=serie.map((p,i)=>p.irregular
-  ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="4.2" fill="#d6336c" stroke="#fff" stroke-width="1"><title>${mmCmp(p.competencia)}: ${vals[i]} m³ — ligação ${mmSitLabel(p.sit_lig)} com faturamento (irregular)</title></circle>`
-  : `<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="${p.estimado?'2.3':'3'}" fill="${p.estimado?'#8a8f98':m.c}"><title>${mmCmp(p.competencia)}: ${vals[i]} m³${p.estimado?' (estimado)':''} · ${mmSitLabel(p.sit_lig)}</title></circle>`).join('');
- const nIrr=serie.filter(p=>p.irregular).length, medY=Y(Number(st.media)||0);
+ const dots=serie.map((p,i)=>{ const cx=X(i).toFixed(1), cy=Y(vals[i]).toFixed(1);
+  if(p.irregular) return `<circle cx="${cx}" cy="${cy}" r="4.2" fill="#d6336c" stroke="#fff" stroke-width="1"><title>${mmCmp(p.competencia)}: ${vals[i]} m³ — ligação ${mmSitLabel(p.sit_lig)} com faturamento (irregular)</title></circle>`;
+  if(p.is_factivel) return `<circle cx="${cx}" cy="${cy}" r="4.2" fill="#b5179e" stroke="#fff" stroke-width="1"><title>${mmCmp(p.competencia)}: factível ${p.factivel} m³ — ligação ${mmSitLabel(p.sit_lig)} (sem situação ativa) com consumo lido</title></circle>`;
+  return `<circle cx="${cx}" cy="${cy}" r="${p.estimado?'2.3':'3'}" fill="${p.estimado?'#8a8f98':m.c}"><title>${mmCmp(p.competencia)}: ${vals[i]} m³${p.estimado?' (estimado)':''} · ${mmSitLabel(p.sit_lig)}</title></circle>`; }).join('');
+ const nIrr=serie.filter(p=>p.irregular).length, nFac=serie.filter(p=>p.is_factivel).length, medY=Y(Number(st.media)||0);
  box.innerHTML=`<div class="mmdhead"><div><b style="font-size:16px">Matrícula ${st.matricula}</b> <span class="mmtag" style="--cc:${m.c}">${m.l}</span> <span class="note">${cons==='ZA0200'?'Betim':'Contagem'}</span></div><div class="note">score <b style="color:${m.c}">${st.score_anomalia}</b></div></div>
   <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin:8px 0">
    <line x1="${pl}" y1="${medY.toFixed(1)}" x2="${W-pr}" y2="${medY.toFixed(1)}" stroke="#ffffff30" stroke-dasharray="4 4"/>
@@ -1407,8 +1413,10 @@ function mmDetailRender(data,cons,mat){
    <div><span class="k">Meses zerados</span><span class="v">${st.n_zeros}/${st.n_meses}</span></div>
    <div><span class="k">Situação atual</span><span class="v" style="color:${(MM_SIT[st.situacao_atual]||{}).c||'inherit'}">${mmSitLabel(st.situacao_atual)}</span></div>
    <div><span class="k">Meses cortada c/ água</span><span class="v" style="color:${(st.meses_irregular||nIrr)>0?'#d6336c':'inherit'}">${st.meses_irregular!=null?st.meses_irregular:nIrr}</span></div>
+   <div><span class="k">Meses factível</span><span class="v" style="color:${(st.meses_factivel||nFac)>0?'#b5179e':'inherit'}">${st.meses_factivel!=null?st.meses_factivel:nFac}</span></div>
   </div>
   ${(st.meses_irregular||nIrr)>0?`<p class="note" style="margin-top:10px;color:#d6336c"><b>⚠ Indício de fraude:</b> ${st.meses_irregular!=null?st.meses_irregular:nIrr} mês(es) com a ligação inativa/cortada (I/F/P) porém faturando volume — pontos em <b>vermelho</b>.</p>`:''}
+  ${(st.meses_factivel||nFac)>0?`<p class="note" style="margin-top:8px;color:#b5179e"><b>⚠ Factível (indício de fraude):</b> ${st.meses_factivel!=null?st.meses_factivel:nFac} mês(es) com o imóvel <b>sem situação ativa</b> mas com <b>consumo de água lido</b> (coluna factível) — pontos em <b>magenta</b>. O volume medido é zero nesses meses; a leitura aparece só no campo factível.</p>`:''}
   <p class="note" style="margin-top:10px"><b>Ação sugerida:</b> ${m.acao}</p>`;
 }
 /* ---------- Análise de macromedição (dados REAIS via RPC — espelha a análise do micromedido) ---------- */

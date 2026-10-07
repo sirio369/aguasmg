@@ -1782,17 +1782,18 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
   - **Reforma da tela (2026-09-24):** removidos os KPIs técnicos (score elevado/CV médio/score médio). Nova
     disposição em 4 painéis: **(1) Indicador do mês** — **só micromedição, o volume faturado não entra**
-    (redesenhado 2026-09-28). **Seletor de competência** (default = **último mês**) + **5 cards uniformes** (`.mmcard`),
+    (redesenhado 2026-09-28). **Seletor de competência** (default = **último mês**) + **6 cards uniformes** (`.mmcard`; o 6º, **Factível**, desde 2026-10-07 — ver nota abaixo),
     cada um com o valor no topo e **MoM/YoY no rodapé em letras menores** (calculados sobre o próprio indicador do card):
     **L/lig·dia** (= volume micromedido total ÷ nº ligações ÷ **30 dias** × 1000; destacado em accent), **Volume
-    micromedido (total)** = `volume_total`, **(lido)** = `volume_medido`, **(estimado)** = `volume_naomedido` e
-    **Ligações** = `n_faturadas`. Removidos o card "Volume faturado", o "% não medido", o "Fraude potencial" e os cards
+    micromedido (total)** = `volume_total`, **(lido)** = `volume_medido`, **(estimado)** = `volume_naomedido`,
+    **(factível)** = `volume_factivel` (2026-10-07) e **Ligações** = `n_faturadas`. Removidos o card "Volume faturado",
+    o "% não medido", o "Fraude potencial" e os cards
     isolados de MoM/YoY (agora embutidos). Tudo client-side sobre o `mmMensal`; popup ⓘ explica o cálculo.
     **(2) Sazonalidade & tendência** — default **sobre L/lig·dia** (empata as variáveis): **heatmap** ano×mês +
     linha "Sazonal" (desvio de cada mês-calendário vs média) e **gráfico** com o último ano em linha + faixa mín–máx
     dos anos anteriores como **sombra** (hover por mês corrigido — antes o tooltip não batia com a data).
     **Chips de composição (2026-09-28):** o painel inteiro (heatmap + célula + tooltip + gráfico + eixo) alterna entre
-    **L/lig·dia · Vol. micromedido (total) · Vol. lido (medido) · Vol. estimado (não medido) · Ligações** —
+    **L/lig·dia · Vol. micromedido (total) · Vol. lido (medido) · Vol. estimado (não medido) · Vol. factível (2026-10-07) · Ligações** —
     decompor ajuda a achar *o que* causa uma flutuação (caiu o lido? subiu o estimado? só entraram mais ligações?). Tudo
     client-side sobre o `mmMensal` já carregado (o `_mensal` já traz `volume_medido`/`volume_naomedido`, sem RPC nova).
     Estado `mmSeasMet` (`MM_SEAS_MET`/`MM_SEAS_ORDER`); `mmSeasNum` escreve os **volumes por extenso, sem k/M**
@@ -1857,6 +1858,28 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     `qt_vol_fac` continua **só** na `consumo_dmc` (balanço NRW, onde o faturado é o consumo autorizado). Repopular =
     os dois `INSERT ... SELECT` diretos de `"5 - info_copasa".micromedicao_historico` (o do DMC via join `mm_dmc_map`),
     sem termo de `qt_vol_fac`.
+  - **⚠️ FACTÍVEL — `qt_vol_fac` reinterpretado e REINCLUÍDO (2026-10-07, SUPERA a nota 2026-09-30 acima):** a coluna
+    `qt_vol_fac` **não é** "faturado mínimo / tarifa de consumo zero" (interpretação anterior, errada) — é o **volume
+    FACTÍVEL**: consumo de água **lido** em imóvel **sem situação ativa** (`cd_situaca <> 'R'` — inativo/cortado),
+    forte **indício de fraude/religação clandestina**. Por decisão do usuário, o **micromedido total passa a ser
+    `lido + estimado + factível`**. Repopulação de `mm_mensal` e `mm_dmc_mensal`: nova coluna **`volume_factivel =
+    Σ qt_vol_fac`**; `volume_total = volume_medido + volume_naomedido + volume_factivel`; `n_faturadas =
+    count(distinct nu_matricu) where qt_volume_>0 OR qt_vol_fac>0`. RPCs atualizadas (migração
+    `app_nrw_mm_rpcs_factivel`): `app_nrw_mm_mensal` devolve `volume_factivel`; `app_nrw_mm_serie` devolve
+    `factivel`(=qt_vol_fac) + `is_factivel`(=`cd_situaca<>'R' and qt_vol_fac>0`) por mês; `app_nrw_mm_resumo` ganha
+    `n_factivel`. **Impacto no resultado/IRVP:** `app_nrw_resultado` lê `VC = Σ volume_total`, então o factível já
+    entra como consumo e **baixa o VP em ~20–25 mil m³/mês** (ZA1004 202608: VP 759.976→**736.037**); as baselines
+    **prévia** foram recalculadas (ZA1004 VPBL **1.008.719**/meta 244.110; ZA0200 **830.781**/meta 203.541 —
+    contratual intacta). O `qt_vol_fac` **continua fora da `consumo_dmc`** (lá o consumo autorizado é só o faturado).
+  - **Classe `factivel` na análise por matrícula (2026-10-07):** coluna **`meses_factivel`** em `mm_matricula_stats`
+    (`count(*) filter (where qt_vol_fac>0 and cd_situaca<>'R')`) + classe **`factivel`** (precedência logo após
+    `fraude_potencial`: `UPDATE classificacao='factivel' where meses_factivel>0 and classificacao<>'fraude_potencial'`,
+    com bump de `score_anomalia`). **5.458** matrículas `factivel` / 1.219 mantidas `fraude_potencial`. Diferença:
+    `fraude_potencial` usa o **volume medido** (ligação I/F/P faturando `qt_volume_>0`); `factivel` pega o caso em que
+    o volume medido é **zero** mas há leitura no **campo factível** (`qt_vol_fac`). `app_nrw_mm_ranking` devolve
+    `meses_factivel` (selo "N× factível" roxo `#b5179e`); `mmDetailRender` marca os meses factíveis em magenta +
+    stat "Meses factível" + nota. `MM_CLASS.factivel` / `MM_SEAS_MET.volume_factivel`. Recomputar = re-rodar o UPDATE
+    de `meses_factivel` (filtrando `qt_vol_fac>0 and cd_situaca<>'R'` p/ não estourar timeout) + o UPDATE de classe.
 - **Análise de macromedição (2026-10-05, tela REAL — `s-macro`/nav "Análise de macromedição"):** espelha a
   do micromedido, sobre os volumes mensais dos macromedidores do **fechamento de volume da ZA** (fonte **GMOA**,
   planilhas por ZA). Carga em **`"11 - perdas_nrw".macro_mensal`** (493 linhas = 27 macros × 17 meses, abr/2025–
@@ -1880,7 +1903,8 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   (micromedido)**; **IRVP = (VPBL − VP) ÷ meta** (% de atingimento; só volume). Baselines **congeladas** em
   `"11 - perdas_nrw".linha_base` (`indicador='VP_BL'`, 4 linhas = 2 ZAs × fonte): **contratual** (TR 8.3 — ZA1004
   VPBL 977.337 / meta 236.516 · 24,2%; ZA0200 829.385 / 203.199 · 24,5%) e **prévia** (média de VP nos 12 meses
-  pré-assinatura dos nossos dados: ZA1004 1.036.251; ZA0200 849.493 — ~2–6% da contratual, validação). Janelas:
+  pré-assinatura dos nossos dados, **já com factível no VC desde 2026-10-07**: ZA1004 1.008.719; ZA0200 830.781 —
+  ~0–3% da contratual, validação). Janelas:
   ZA1004 abr/25–mar/26, ZA0200 mai/25–abr/26. RPC **`app_nrw_resultado(p_consorcio)`** (definer, admin|dev_acesso):
   devolve `baselines{contratual,previa}` + `serie` mensal (VD/VC/VP/IP%/L·lig·dia); "Ambos" (p_consorcio null)
   soma as 2 ZAs. **O IRVP por âncora é calculado no front** (`resIRVP`), então o **toggle contratual↔prévia** é
