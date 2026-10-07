@@ -2177,12 +2177,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     Trocado por **barra de progresso (0–100%)** por atividade + a janela de registro como rótulo honesto (`gfmt`).
     **Avanços por atividade·subatividade (reescrito):** `pjRelGrupos(iv)` agrupa por atividade (nível 1) →
     subatividade, **só o que tem lançamento de fato** (`pjAvancosCur`), em ordem de execução (árvore); cada sub
-    abre por avanço em **ordem de envio** (`ts` asc), com observação + **fotos reais** (miniaturas, `pjRelAvRow`).
-    **Removidos** o toggle `#pjAdvSeg` (Sequência lógica × Ordem de envio) e o uso do stub `pjLeafHist` (que
-    deixava o bloco sempre vazio). **PDF consolidado (real):** o botão chama `pjRelPdf(iv)` → overlay `#relatorio`
-    com `pjRelDocHtml(iv)` (REL_CSS): dados + progresso + avanços com fotos + **documentos** — anexo ainda **não
-    anexado entra com nota explicativa** (`.relPend`); os anexados (executivo/licença/alvará/as-built) são
-    arquivos separados, juntados ao fim na montagem do documento único.
+    abre por avanço em **ordem de envio** (`ts` asc), com **observação + nome de quem enviou** (`autor_nome`, cai
+    p/ `equipe`) + **fotos reais** (miniaturas, `pjRelAvRow`). **Removidos** o toggle `#pjAdvSeg` e o uso do stub
+    `pjLeafHist` (deixava o bloco sempre vazio). **PDF consolidado (2026-10-07, merge real):** `pjRelPdf(iv)`
+    (async) → overlay `#relatorio` com `pjRelDocHtml(iv)` (REL_CSS): dados + progresso + avanços (c/ autor/obs/
+    fotos) + documentos. Os anexos (PDFs do executivo etc.) são **renderizados página a página** via **PDF.js**
+    (`pjLoadPdfJs`/`pjRelRenderAnexos`, cdnjs 3.11.174, igual ao Leaflet) como imagens embutidas ao fim (`#relAnexos`,
+    cada página `break-before:page`), então o "Salvar PDF" (window.print) sai como **um único documento mesclado** —
+    não mais só a nota de "anexado". O botão de imprimir fica **desabilitado até os anexos renderizarem**; anexo que
+    falhar (CORS/sem internet) cai numa nota `.relPend` com link p/ abrir. Anexo não anexado segue com nota explicativa.
+- **Fotos obrigatórias no avanço (2026-10-07):** o `app_proj_avanco_registrar` só é chamado se houver **≥1 foto**
+  (`if(!files.length){ toast(...); return; }` no handler de lançar); antes dava pra lançar sem nenhuma foto.
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
   `pjR` (registro), `pjSel` (**seleção de tipo**, `k:'sel'` — não mensurável), `pjG` (grupo); helpers `pjOc`
   (obra civil), `pjIL` (interligação), `pjILrep` (container replicável), `pjRamal`/`pjRamais` e

@@ -2183,6 +2183,7 @@ function pjWireTree(d,rerender){
     try{
       // fotos do lançamento → fotos-campo (prefixo projetos/avanco/)
       const files=[...wrap.querySelectorAll('.pjph2 input[type=file]')].map(i=>i.files&&i.files[0]).filter(Boolean);
+      if(!files.length){ toast('Anexe pelo menos uma foto do avanço'); b.disabled=false; return; }
       const fotos=[];
       for(const f of files){ const path='projetos/avanco/'+iv.kind+'/'+iv.gid+'/'+crypto.randomUUID()+'.jpg'; const up=await sb.storage.from('fotos-campo').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true}); if(!up.error) fotos.push(path); }
       const obs=((wrap.querySelector('.pjobs')||{}).value||'').trim();
@@ -2303,17 +2304,55 @@ function pjRelGrupos(iv){ const grupos=[], byAtiv={};
 }
 // linha de avanço na tela: data + delta + obs + miniaturas de fotos reais (clicáveis)
 function pjRelAvRow(e){ const dt=relFmtData(e.ts), d='+'+e.valor+(e.unidade==='m'?' m':'%'), fs=(e.fotos||[]).filter(Boolean);
+  const quem=e.autor_nome||e.equipe||'—', eq=(e.autor_nome&&e.equipe)?(' · '+e.equipe):'';
   const th=fs.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+fs.map(p=>'<a href="'+fotoURL(p)+'" target="_blank" rel="noopener"><img src="'+fotoURL(p)+'" loading="lazy" style="width:62px;height:62px;object-fit:cover;border-radius:7px;border:1px solid var(--line);display:block" onerror="this.style.display=\'none\'"></a>').join('')+'</div>':'';
-  return '<div class="pjadv" style="align-items:flex-start;border-top:1px dashed var(--line)"><div class="ai" style="flex:1;min-width:0"><div><b>'+dt+'</b> · <span class="delta">'+d+'</span>'+(e.equipe?' · <span class="d">'+e.equipe+'</span>':'')+(e.obs?' · <span class="d">"'+e.obs+'"</span>':'')+'</div>'+th+'</div></div>';
+  return '<div class="pjadv" style="align-items:flex-start;border-top:1px dashed var(--line)"><div class="ai" style="flex:1;min-width:0"><div><b>'+dt+'</b> · <span class="delta">'+d+'</span> · <span class="d">👤 '+quem+eq+'</span></div>'+(e.obs?'<div class="d" style="margin-top:3px">"'+e.obs+'"</div>':'')+th+'</div></div>';
 }
 // abre o overlay #relatorio com o PDF consolidado
-function pjRelPdf(iv){ if(!iv)return;
+const PJ_PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+function pjLoadPdfJs(){ return new Promise((res,rej)=>{ if(window.pdfjsLib){res(window.pdfjsLib);return;} const s=document.createElement('script'); s.src=PJ_PDFJS+'pdf.min.js'; s.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=PJ_PDFJS+'pdf.worker.min.js'; res(window.pdfjsLib); }catch(e){ rej(e); } }; s.onerror=()=>rej(new Error('CDN indisponível')); document.head.appendChild(s); }); }
+async function pjRelPdf(iv){ if(!iv)return;
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pjRelDocHtml(iv)+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pjRelDocHtml(iv)+'</div>';
   ov.style.display='block';
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
-  document.getElementById('relPrint').onclick=()=>window.print();
+  const pb=document.getElementById('relPrint'); if(pb) pb.onclick=()=>window.print();
+  try{ await pjRelRenderAnexos(iv); }catch(e){ const bx=document.getElementById('relAnexos'); if(bx) bx.innerHTML='<p class="relPend">Falha ao preparar anexos: '+((e&&e.message)||e)+'</p>'; }
+  if(pb) pb.disabled=false;
+}
+// renderiza os anexos (PDFs do executivo/licença/alvará/as-built) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
+async function pjRelRenderAnexos(iv){
+  const box=document.getElementById('relAnexos'); if(!box) return;
+  const docs=PJ_DOCS.map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
+  if(!docs.length){ box.innerHTML='<p class="relPend">Nenhum documento anexado para incluir ao final. Anexe na configuração (Suporte) antes da emissão.</p>'; return; }
+  box.innerHTML='<p class="relPend" id="relAnexProg">⏳ Renderizando anexos (0/'+docs.length+')… aguarde antes de salvar o PDF.</p>';
+  const prog=document.getElementById('relAnexProg');
+  let lib=null; try{ lib=await pjLoadPdfJs(); }catch(e){ lib=null; }
+  let done=0;
+  for(const {dc,doc} of docs){
+    let seg='<div class="relSec" style="break-before:page;page-break-before:always"><span class="relNum">📎</span> Anexo — '+dc.n+'</div>'+(doc.nome?'<div style="font-size:11px;color:#777;margin:4px 0 8px">'+doc.nome+'</div>':'');
+    const url=fotoURL(doc.path), isPdf=/\.pdf(\?|$)/i.test(doc.path||'');
+    try{
+      if(isPdf && lib){
+        const pdf=await lib.getDocument(url).promise;
+        for(let pg=1; pg<=pdf.numPages; pg++){
+          const page=await pdf.getPage(pg), v1=page.getViewport({scale:1}), scale=Math.min(2,1600/(v1.width||1600)), vp=page.getViewport({scale});
+          const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+          await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+          seg+='<div style="margin-top:'+(pg>1?10:0)+'px"><img src="'+cv.toDataURL('image/jpeg',0.82)+'" style="width:100%;display:block;border:1px solid #ccc"></div>';
+          cv.width=cv.height=0;
+        }
+      } else if(!isPdf){
+        seg+='<div><img src="'+url+'" style="width:100%;display:block;border:1px solid #ccc" onerror="this.style.display=\'none\'"></div>';
+      } else {
+        seg+='<p class="relPend">Renderizador de PDF indisponível (sem internet?). <a href="'+url+'" target="_blank" rel="noopener">Abrir documento</a>.</p>';
+      }
+    }catch(err){ seg+='<p class="relPend">Não foi possível renderizar este anexo automaticamente ('+((err&&err.message)||err)+'). <a href="'+url+'" target="_blank" rel="noopener">Abrir documento</a>.</p>'; }
+    if(prog) prog.insertAdjacentHTML('beforebegin', seg); else box.insertAdjacentHTML('beforeend', seg);
+    done++; if(prog) prog.textContent='⏳ Renderizando anexos ('+done+'/'+docs.length+')…';
+  }
+  if(prog) prog.remove();
 }
 // HTML do documento (usa REL_CSS). Anexo ainda não anexado entra com nota explicativa (.relPend)
 function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv);
@@ -2328,14 +2367,15 @@ function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv)
   if(!grupos.length) h+='<div class="relPend">Nenhum avanço lançado nesta intervenção ainda.</div>';
   else grupos.forEach(g=>{ h+='<div style="margin-top:12px;font-weight:700;color:#0a7d5e;border-bottom:1px solid #d7e5df;padding-bottom:3px">'+g.atividade+' <span style="color:#777;font-weight:400">· '+pjPct(g.node)+'%</span></div>';
     g.subs.forEach(s=>{ if(s.sub!==g.atividade) h+='<div style="font-weight:600;font-size:12px;margin-top:7px;color:#111">'+s.sub+(s.isM?' · '+s.node.exec+'/'+s.node.meta+' '+s.un:'')+'</div>';
-      s.avs.forEach(e=>{ h+='<div style="font-size:11.5px;margin:5px 0 0;color:#333"><b>'+relFmtData(e.ts)+'</b> · +'+e.valor+(e.unidade==='m'?' m':'%')+(e.equipe?' · '+e.equipe:'')+(e.obs?' — "'+e.obs+'"':'')+'</div>'+relFotos((e.fotos||[]).map((pp,i)=>['Foto '+(i+1),pp])); });
+      s.avs.forEach(e=>{ const quem=e.autor_nome||e.equipe||'—', eq=(e.autor_nome&&e.equipe)?(' · '+e.equipe):''; h+='<div style="font-size:11.5px;margin:7px 0 0;color:#333"><b>'+relFmtData(e.ts)+'</b> · +'+e.valor+(e.unidade==='m'?' m':'%')+' · <span style="color:#555">👤 '+quem+eq+'</span>'+(e.obs?'<div style="color:#444;font-style:italic;margin-top:1px">"'+e.obs+'"</div>':'')+'</div>'+relFotos((e.fotos||[]).map((pp,i)=>['Foto '+(i+1),pp])); });
     }); });
   h+='<div class="relSec"><span class="relNum">4</span> Documentos e anexos</div>';
   PJ_DOCS.forEach(dc=>{ const doc=pjDocsCur[dc.t];
-    if(doc) h+='<div style="font-size:12px;margin-top:7px">'+dc.ic+' <b>'+dc.n+'</b> — <span style="color:#0a7d5e;font-weight:700">anexado</span> <span style="color:#777">('+((doc.path||'').split('/').pop()||'documento')+')</span></div>';
+    if(doc) h+='<div style="font-size:12px;margin-top:7px">'+dc.ic+' <b>'+dc.n+'</b> — <span style="color:#0a7d5e;font-weight:700">anexado</span> <span style="color:#777">('+(doc.nome||(doc.path||'').split('/').pop()||'documento')+')</span></div>';
     else h+='<div style="margin-top:7px"><div style="font-size:12px">'+dc.ic+' <b>'+dc.n+'</b></div><div class="relPend">Ainda não anexado no sistema — pendente de anexo na configuração da intervenção (Suporte). Deve ser anexado antes da emissão final.</div></div>';
   });
-  h+='<p class="relPend" style="margin-top:12px">Os documentos anexados (projeto executivo, licença, alvará, as-built) são arquivos separados (PDF/imagem) — na montagem do documento único eles entram ao final deste relatório.</p>';
+  h+='<p class="relPend" style="margin-top:12px">Os anexos (PDF/imagem) são incluídos <b>na íntegra ao final deste documento</b>, cada um começando em nova página.</p>';
+  h+='<div id="relAnexos"><p class="relPend">⏳ Preparando anexos…</p></div>';
   h+='</div><div class="relFoot"><span>AcquaHub · relatório consolidado · '+(iv.cod||'')+'</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
 }
