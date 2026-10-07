@@ -28,7 +28,8 @@
    Distância em metros direto com `ST_Distance` (não converta para `geography`).
 9. **Aprovação/notificação: um único mecanismo para o app inteiro.** `perfil.aprovador_uuid` /
    `aprovador2_uuid` (configurados no ⚙️ Usuários — home ou Suprimentos, §5.6) + `"9 - suprimentos".sup_aprovadores_de(uid)`
-   (fallback: todo `aprovador`/`admin` ativo) + `"9 - suprimentos".sup_notificar(...)` **disparado por
+   (fallback: todo `aprovador`/`admin` ativo) — que define **quem é avisado E quem pode aprovar** (fila/aprovar/rejeitar
+   checam `"9 - suprimentos".sup_e_aprovador_de(aprovador, solicitante)`, §5.0) + `"9 - suprimentos".sup_notificar(...)` **disparado por
    trigger** `AFTER INSERT/UPDATE` na tabela de negócio — nunca inline na RPC. Regra de ouro:
    notificação **pessoal** (ao próprio interessado) nunca leva `p_exceto`; notificação de **grupo**
    sempre leva `p_exceto = auth.uid()` (ator). **Módulo novo que precisa de aprovação/notificação →
@@ -823,6 +824,29 @@ que já gateavam por ele destravam automaticamente pra quem for concedido, **sem
 concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade fina é no front, por
 área). Trava dura por área no backend fica pra uma 2ª rodada se necessário.
 
+### 5.0 Aprovação = Aprovador 1/2 do solicitante (2026-10)
+- **Insumos, Ferramentas, EPI e Troca de EPI** seguem a engrenagem **Aprovador 1/2** do perfil
+  (`perfil.aprovador_uuid`/`aprovador2_uuid`, ⚙️ Usuários §5.6): a **fila** só mostra — e
+  **aprovar/rejeitar** só aceitam — pedidos de quem tem o usuário logado como Aprovador 1 ou 2.
+  Regra única no banco: **`"9 - suprimentos".sup_e_aprovador_de(aprovador, solicitante)`**
+  (= `aprovador = any(sup_aprovadores_de(solicitante))`, então herda o **fallback**: solicitante sem
+  aprovador configurado → qualquer `aprovador`/`admin` ativo). **Admin** (são 2) vê e aprova pedidos de **todos, menos os próprios** — os admins se aprovam entre si.
+- RPCs que usam a regra: `sup_fila_aprovacao`, `sup_aprovar`, `sup_rejeitar`,
+  `sup_ferramenta_fila_aprovacao` (ferramenta aprova/rejeita pelas mesmas `sup_aprovar`/`sup_rejeitar`),
+  `sup_epi_fila_aprovacao`, `sup_epi_aprovar`, `sup_epi_rejeitar`, `sup_epi_troca_fila_aprovacao`,
+  `sup_epi_troca_aprovar`, `sup_epi_troca_rejeitar`. Migração: `docs/migracao_aprovacao_por_aprovador.sql`.
+- **Antes** qualquer aprovador/admin (e, no EPI, qualquer `sup_epi_gestor`, que inclui Téc. Segurança/
+  Téc. Qualidade/Coord. QSMSS por cargo) via e aprovava pedido de qualquer pessoa — auditoria de
+  2026-10-01 achou aprovações cruzadas entre áreas. **Admin vê/aprova todos, menos o próprio pedido**. `sup_epi_gestor` continua existindo só para **liberar o menu**
+  de EPI no front (`ME.epi_gestor`); não dá mais poder de aprovação.
+- **Autoaprovação bloqueada (aplicado em produção 2026-10-01, `docs/migracao_bloqueia_autoaprovacao.sql`):**
+  ninguém aprova o próprio pedido — nem admin — em `sup_aprovar`, `sup_epi_aprovar`, `sup_epi_troca_aprovar`,
+  `app_frota_manutencao_aprovar` (reportado_por) e `app_condutor_aprovar` (própria CNH); as 4 filas de aprovação
+  não listam o próprio pedido. `sup_e_aprovador_de` também exige `aprovador <> solicitante`. Auditoria que
+  motivou: 7 autoaprovações (EPI #22/#32/#37/#99, Insumos #1061/#1158, Manutenção de frota #1).
+- ⚠️ **Cuidado:** fila/aprovação nova em Suprimentos → use `sup_e_aprovador_de`, nunca
+  `sup_pode_aprovar`/`sup_epi_gestor` (esses só dizem "é aprovador de alguém", não "de quem").
+
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
   existe/parcial/falta, gera código) → retirar (código) → consumir na OS**.
@@ -976,7 +1000,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   cada render de `cfgUsers`) — não a lista inteira de usuários.
 - **Cargos e cesta de EPI:** cestas por cargo (`sup_cesta_*`, `sup_cargos_*`).
 - Equipes (`sup_admin_equipe_*`, `sup_admin_membro_*`) seguem como **código morto** (ver §4 abaixo).
-- Notificações de aprovação vão só aos aprovadores diretos (`sup_aprovadores_de`).
+- Notificações de aprovação vão só aos aprovadores diretos (`sup_aprovadores_de`) — e, desde 2026-10,
+  **só eles aprovam** (fila + aprovar/rejeitar, §5.0).
 
 ---
 
