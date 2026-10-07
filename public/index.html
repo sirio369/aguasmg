@@ -1633,6 +1633,9 @@ const pjPeca=(i,tipo,esc,esco,mont,rea,rec)=>pjG('Peça/acessório '+i,[
   pjP('Escavação',esc||0),pjP('Escoramento',esco||0),pjP('Montagem hidráulica',mont||0),
   pjP('Reaterro',rea||0),pjP('Recomposição de pavimento',rec||0)]);
 const pjPecas=(kids)=>({...pjG('Peças e acessórios',kids),rep:kids.length,ativo:true});
+// valas de entrada/saída (HDD): bloco replicável, mínimo 2 (entrada + saída, podendo haver mais). Cada vala = tipo (entrada/saída) + obra civil.
+const pjVala=(i,tipo)=>pjG('Vala '+i,[pjSel('Tipo (entrada/saída)',tipo,['Entrada','Saída']),...pjOc(0,0,0,0)]);
+const pjValas=(kids)=>({...pjG('Valas de entrada e saída',kids),rep:kids.length,min:2,ativo:true});
 let PJ_IVS=[
  {id:'iv1',tipo:'macro_impl',cod:'PRJ-2026-014',local:'DMC Contagem — Bairro Cincão',cons:'Águas Integradas',resp:'Equipe A · João R.',ini:'12/09/2026',status:'run',pt:[26,22],
   arv:[pjP('Locação e cadastro de interferências',100),
@@ -1699,7 +1702,7 @@ const PJ_ARV={
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),pjP('Cadastro / as-built',0)],
   // HDD = perfuração direcional (não destrutiva): sem vala/reaterro/pavimento; só valas de entrada/saída, furo piloto, alargamento e puxamento
   rede_hdd:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
-    pjP('Mobilização e montagem do equipamento HDD',0),pjG('Valas de entrada e saída',pjOc(0,0,0,0)),
+    pjP('Mobilização e montagem do equipamento HDD',0),pjValas([pjVala(1,'Entrada'),pjVala(2,'Saída')]),
     pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
     pjM('Puxamento da tubulação (pullback)',ext||1,0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
@@ -1740,6 +1743,16 @@ async function pjLoad(force){
   ivs.forEach(iv=>{ if((iv.tipo==='rede_vca'||iv.tipo==='rede_hdd') && Array.isArray(iv.arv) && !iv.arv.some(n=>/^ramais$/i.test((n&&n.n)||''))){
     try{ const ram=(PJ_ARV[iv.tipo]()||[]).find(n=>/^ramais$/i.test((n&&n.n)||'')); if(ram){ const pi=iv.arv.findIndex(n=>/peças/i.test((n&&n.n)||'')); iv.arv.splice(pi>=0?pi+1:iv.arv.length,0,ram); } }catch(_){}
   } });
+  // reconciliação valas HDD (2026-10): snapshots antigos têm "Valas de entrada e saída" com subs planas (Escavação…) → converte p/ o bloco replicável (Vala 1 = subs antigas, preserva % lançado; Vala 2 Saída nova vazia). Só HDD; some ao regravar.
+  ivs.forEach(iv=>{ if(iv.tipo==='rede_hdd' && Array.isArray(iv.arv)){
+    const vi=iv.arv.findIndex(n=>/^valas de entrada/i.test((n&&n.n)||''));
+    if(vi>=0){ const v=iv.arv[vi];
+      if(v.f && v.f.length && !v.f.some(c=>c.k==='g')){   // formato antigo (filhos planos, sem "Vala N")
+        const vala1={...pjG('Vala 1',[pjSel('Tipo (entrada/saída)','Entrada',['Entrada','Saída']),...v.f])};
+        iv.arv[vi]=pjValas([vala1,pjVala(2,'Saída')]);
+      }
+    }
+  } });
   PJ_IVS=ivs; pjLoaded=true;
 }
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
@@ -1751,7 +1764,7 @@ function pjSave(iv){ if(!iv||iv.gid==null) return; const k=iv.kind+'|'+iv.gid; c
 let pjAvancosCur={};   // caminho -> [entradas] da intervenção corrente (para o histórico por etapa)
 function pjNodePath(nodes,target,trail){ trail=trail||[]; for(const n of (nodes||[])){ const t2=trail.concat(n.n); if(n===target) return t2; if(n.f&&n.f.length){ const r=pjNodePath(n.f,target,t2); if(r) return r; } } return null; }
 function pjDDMM(iso){ try{ const d=new Date(iso); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }catch(e){ return ''; } }
-async function pjAvancosLoad(iv){ pjAvancosCur={}; if(!iv||iv.gid==null) return pjAvancosCur; try{ const {data,error}=await sb.rpc('app_proj_avancos_iv',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(e=>{ const k=e.caminho||e.sub||''; (pjAvancosCur[k]=pjAvancosCur[k]||[]).push(e); }); }catch(e){} return pjAvancosCur; }
+async function pjAvancosLoad(iv){ pjAvancosCur={}; if(!iv||iv.gid==null) return pjAvancosCur; try{ const {data,error}=await sb.rpc('app_proj_avancos_iv',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(e=>{ const k=e.caminho||e.sub||''; (pjAvancosCur[k]=pjAvancosCur[k]||[]).push(e); const mv=/^Valas de entrada e saída › ([^›]+)$/.exec(k); if(mv){ const k2='Valas de entrada e saída › Vala 1 › '+mv[1].trim(); (pjAvancosCur[k2]=pjAvancosCur[k2]||[]).push(e); } }); }catch(e){} return pjAvancosCur; }
 function pjPct(node){
   if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
   if(node.k==='%')return node.p;
@@ -1775,7 +1788,7 @@ const pjPodeSetSup=()=>!!(ME&&ME.is_admin);   // só admin define quem acessa o 
 // back buttons das telas do módulo (uma vez, no load — as telas já existem no DOM)
 ['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjDetBack:projeto_campo','pjRelBack:projeto_det','pjAcessoBack:projeto_sup','pjRsBack:projetos'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
 function pjRepAdd(node){ const last=node.f[node.f.length-1]; const c=pjZero(JSON.parse(JSON.stringify(last))); const m=last.n.match(/^(.*?)(\d+)\s*$/); c.n=m?(m[1]+(node.f.length+1)):(last.n+' '+(node.f.length+1)); node.f.push(c); node.rep=node.f.length; }
-function pjRepDel(node){ if(node.f.length>1){ node.f.pop(); node.rep=node.f.length; } }
+function pjRepDel(node){ if(node.f.length>(node.min||1)){ node.f.pop(); node.rep=node.f.length; } }
 
 // contexto de tela (campo × suporte): ids dos elementos + ação ao tocar num card/pino
 const PJ_CTX={
@@ -2123,8 +2136,8 @@ function pjNodeHtml(node){
   if(isG){
     let ctl='';
     if(cfg){
-      if(node.rep){ const lastAdv=pjHasAdv(node.f[node.f.length-1]); const delDis=!editar||node.f.length<=1||lastAdv;
-        ctl += `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button ${delDis?'disabled':`data-repdel="${rid}"`}>−</button><b>${node.rep}</b><button ${editar?`data-repadd="${rid}"`:'disabled'}>+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)${lastAdv?' · último bloco tem lançamento (não remove)':''}</span></div>`; }
+      if(node.rep){ const lastAdv=pjHasAdv(node.f[node.f.length-1]); const delDis=!editar||node.f.length<=(node.min||1)||lastAdv;
+        ctl += `<div class="pjctl"><span class="lbl">Quantidade</span><div class="pjstep"><button ${delDis?'disabled':`data-repdel="${rid}"`}>−</button><b>${node.rep}</b><button ${editar?`data-repadd="${rid}"`:'disabled'}>+</button></div><span class="val">gera ${node.f.length} bloco(s) numerado(s)${lastAdv?' · último bloco tem lançamento (não remove)':''}${node.min?(' · mínimo '+node.min):''}</span></div>`; }
       if(inact) ctl += `<div class="pjctl"><span class="lbl">⚠️ Fora do escopo — não entra na execução desta intervenção</span></div>`;
     }
     h+=`<div class="pjdetpanel" id="${rid}D" hidden>${ctl}<div class="pjchildren">${node.f.map(pjNodeHtml).join('')}</div></div>`;
