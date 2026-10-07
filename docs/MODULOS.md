@@ -2011,6 +2011,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   adição do bloco **Ramais** ao template não o tinham (ex.: a AL14/F05 tinha 11 nós, 0 ramais). O `pjLoad`, após
   sobrepor o snapshot, **insere o bloco Ramais** (do `PJ_ARV[tipo]()`) logo após "Peças e acessórios" nas árvores
   `rede_vca`/`rede_hdd` que não o tiverem — preserva o resto da config e some sozinho quando o snapshot for regravado.
+- **Valas HDD configuráveis (2026-10-06):** a atividade **"Valas de entrada e saída"** do `PJ_ARV.rede_hdd` virou
+  **bloco replicável** (`pjValas`/`pjVala`, espelha `pjPecas`/`pjPeca`): quantidade setável no Suporte (stepper `rep`),
+  **mínimo 2** (`min:2` — vala de entrada + saída, podendo haver mais); cada vala = `pjSel` (Tipo entrada/saída) +
+  obra civil (`pjOc`). `pjRepDel` e o stepper (`delDis`) passam a respeitar `node.min`. **Avanços já lançados** (caminho
+  antigo de 2 níveis, ex. `Valas de entrada e saída › Escavação`) são preservados por **2 mecanismos, sem mexer no
+  banco**: (1) `pjLoad` reconcilia snapshots antigos — envolve as subs planas em **Vala 1** (preserva o % lançado) e
+  cria **Vala 2 (Saída)** vazia (só HDD; `jaNovo` = algum filho `k==='g'`; some ao regravar, igual ao bloco Ramais);
+  (2) `pjAvancosLoad` **remapeia** o caminho antigo p/ `Valas de entrada e saída › Vala 1 › …`, para o histórico
+  aparecer sob Vala 1. Forward-compatible com uma migração futura do `caminho` no banco (o remap só casa 2 níveis).
 - **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
   `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
   anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
