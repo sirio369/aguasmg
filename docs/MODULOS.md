@@ -1869,6 +1869,11 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     prévia. **Toggle contratual↔prévia replicado nos 3 blocos** (`resToggle`). Tabela: colunas Competência · VD · VC ·
     VP · **VP meta · Δ (VP−meta)** · IRVP (removidos IP%/L·lig·dia/Status). **Sem seletor de mês** (`#mes` escondido
     na tela; KPI usa o último mês). Popups (`RES_INFO`) robustos (siglas VD/VC/VP/VPBL + fórmula + gatilhos ≥50%/≥75%).
+  - **Refino 2 (2026-10-06):** **"Indicador do mês" removido** (redundante com o mês a mês — `resKpiPanel` apagado).
+    **VP alvo segregado em 100% e 120%** (VPBL − meta / VPBL − 1,2×meta, o teto do IRVP pois VC = RB×1,2): 4º card na
+    linha de base, 2 linhas de referência no gráfico (verde 100% / azul 120%) e 2 colunas na tabela (VP meta 100%/120%,
+    substituindo o Δ; célula pinta quando o VP do mês atinge o alvo). **Detalhamento colapsável agora é anchor-aware**
+    (`resDerivHtml` usa `resB()`) — reage ao toggle (antes mostrava os dois fixos). `resStatus` ganhou faixa **≥120% (teto)**.
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
   têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
