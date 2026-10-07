@@ -2035,15 +2035,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   adição do bloco **Ramais** ao template não o tinham (ex.: a AL14/F05 tinha 11 nós, 0 ramais). O `pjLoad`, após
   sobrepor o snapshot, **insere o bloco Ramais** (do `PJ_ARV[tipo]()`) logo após "Peças e acessórios" nas árvores
   `rede_vca`/`rede_hdd` que não o tiverem — preserva o resto da config e some sozinho quando o snapshot for regravado.
-- **Valas HDD configuráveis (2026-10-06):** a atividade **"Valas de entrada e saída"** do `PJ_ARV.rede_hdd` virou
-  **bloco replicável** (`pjValas`/`pjVala`, espelha `pjPecas`/`pjPeca`): quantidade setável no Suporte (stepper `rep`),
-  **mínimo 2** (`min:2` — vala de entrada + saída, podendo haver mais); cada vala = `pjSel` (Tipo entrada/saída) +
-  obra civil (`pjOc`). `pjRepDel` e o stepper (`delDis`) passam a respeitar `node.min`. **Avanços já lançados** (caminho
-  antigo de 2 níveis, ex. `Valas de entrada e saída › Escavação`) são preservados por **2 mecanismos, sem mexer no
-  banco**: (1) `pjLoad` reconcilia snapshots antigos — envolve as subs planas em **Vala 1** (preserva o % lançado) e
-  cria **Vala 2 (Saída)** vazia (só HDD; `jaNovo` = algum filho `k==='g'`; some ao regravar, igual ao bloco Ramais);
-  (2) `pjAvancosLoad` **remapeia** o caminho antigo p/ `Valas de entrada e saída › Vala 1 › …`, para o histórico
-  aparecer sob Vala 1. Forward-compatible com uma migração futura do `caminho` no banco (o remap só casa 2 níveis).
+- **Valas HDD configuráveis + rename (2026-10-06):** a atividade do `PJ_ARV.rede_hdd` **"Valas de entrada e saída" →
+  "Valas de perfuração"** (o nome antigo dava a entender que eram exatamente 2) virou **bloco replicável**
+  (`pjValas`/`pjVala`, espelha `pjPecas`/`pjPeca`): quantidade setável no Suporte (stepper `rep`), **mínimo 2**
+  (`min:2` — entrada + saída, podendo haver mais); cada vala = `pjSel` (Tipo entrada/saída) + obra civil (`pjOc`).
+  `pjRepDel` e o stepper (`delDis`) respeitam `node.min`. **Avanços já lançados** (nome/caminho antigos, 2 níveis,
+  ex. `Valas de entrada e saída › Escavação`) são preservados **sem mexer no banco** por: (1) `pjLoad` reconcilia
+  snapshots antigos — regex `/^valas de (entrada|perfura)/i`, envolve as subs planas em **Vala 1** (preserva o %
+  lançado) + **Vala 2 (Saída)** vazia (só HDD, `jaNovo`=algum filho `k==='g'`; já-replicável com nome antigo é só
+  renomeado; some ao regravar, igual ao bloco Ramais); (2) `pjAvancosLoad` **normaliza** o avanço legado em memória
+  (`atividade`/`caminho` antigos → `Valas de perfuração › Vala 1 › …`) — faz o histórico, o bloco de avanços e o
+  **Gantt** (que casa por `atividade`) baterem com a árvore renomeada. Forward-compatible com migração futura do banco.
 - **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
   `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
   anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
@@ -2169,13 +2171,18 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       agrupar **dia → intervenção → avanços**; cada avanço individual segue mostrando seu valor real (+N m/%).
   - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
     **só com botão Abrir** (arquivo real do Storage) — **anexar/remover ficam na configuração** (`projeto_cfg`).
-    **mini-Gantt** (`pjRel()`) — cada barra vai do **1º ao último avanço** da atividade (**datas reais do log**,
-    `pjAvancosCur`; eixo min→méd→máx); atividade sem
-    avanço = "não iniciada". **Avanços por atividade·subatividade** com fotos + observação, com toggle de
-    ordenação (`#pjAdvSeg`): **Sequência lógica** (árvore atividade›subatividade) × **Ordem de envio** (feed
-    cronológico de todos os lançamentos, mais recente primeiro, fora da sequência). **PDF consolidado**
-    = documento único (capa + Gantt + avanços + projeto/licença/alvará/as-built no fim).
-    (Sem gradientes nos cards de atividade — removidos a pedido.)
+    **Progresso por atividade (2026-10-06, era "mini-Gantt"):** AUDITORIA — o Gantt antigo plotava a barra por
+    `ts` (data de **registro** do avanço), não por data de obra; sem cronograma planejado e com lançamento em
+    lote (ex. AL13/F02 = 6 avanços em 8 min, 02/10) a linha do tempo colapsava e o eixo repetia a mesma data.
+    Trocado por **barra de progresso (0–100%)** por atividade + a janela de registro como rótulo honesto (`gfmt`).
+    **Avanços por atividade·subatividade (reescrito):** `pjRelGrupos(iv)` agrupa por atividade (nível 1) →
+    subatividade, **só o que tem lançamento de fato** (`pjAvancosCur`), em ordem de execução (árvore); cada sub
+    abre por avanço em **ordem de envio** (`ts` asc), com observação + **fotos reais** (miniaturas, `pjRelAvRow`).
+    **Removidos** o toggle `#pjAdvSeg` (Sequência lógica × Ordem de envio) e o uso do stub `pjLeafHist` (que
+    deixava o bloco sempre vazio). **PDF consolidado (real):** o botão chama `pjRelPdf(iv)` → overlay `#relatorio`
+    com `pjRelDocHtml(iv)` (REL_CSS): dados + progresso + avanços com fotos + **documentos** — anexo ainda **não
+    anexado entra com nota explicativa** (`.relPend`); os anexados (executivo/licença/alvará/as-built) são
+    arquivos separados, juntados ao fim na montagem do documento único.
 - **Modelo de dados (nós da árvore):** construtores `pjP` (%), `pjM` (metros meta/exec, % automático),
   `pjR` (registro), `pjSel` (**seleção de tipo**, `k:'sel'` — não mensurável), `pjG` (grupo); helpers `pjOc`
   (obra civil), `pjIL` (interligação), `pjILrep` (container replicável), `pjRamal`/`pjRamais` e
