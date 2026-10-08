@@ -301,6 +301,12 @@ tbody tr:hover{background:var(--surface-2)}
         <option>set/2026</option><option>ago/2026</option><option>jul/2026</option>
       </select>
       <select class="sel" id="mesDmc" aria-label="DMC" hidden></select>
+      <select class="sel hdhf" id="hdfCat" aria-label="categoria" hidden></select>
+      <select class="sel hdhf" id="hdfCap" aria-label="calibre" hidden></select>
+      <select class="sel hdhf" id="hdfSit" aria-label="situação da ligação" hidden></select>
+      <select class="sel hdhf" id="hdfInt" aria-label="posição do padrão" hidden></select>
+      <select class="sel hdhf" id="hdfMot" aria-label="motivo" hidden></select>
+      <input class="sel hdhf" id="hdfBusca" type="search" placeholder="matrícula…" aria-label="busca matrícula" hidden>
     </div>
     <div class="wrap">
       <!-- PAINEL -->
@@ -1632,6 +1638,7 @@ function go(s,dmc){
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
  if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='hdpri')?'none':'';   // resultado/HD não usam seletor de mês
  if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
+ if(s!=='hdpri' && typeof hdHeaderReset==='function') hdHeaderReset();   // esconde os filtros de HD no cabeçalho
  $('#side').classList.remove('open');
  if(s==='painel'){kpis();consolidado();rank();renderMaps();}
  if(s==='nrw_balanco')balancoSheet();
@@ -1782,38 +1789,35 @@ function resRenderAll(){
 }
 /* ---------- limpeza/desativação: telas não-reais ficam opacas (rastreável, nada apagado) ---------- */
 /* ========== Priorização de troca de HD (dados REAIS via RPC app_nrw_hd_*) ========== */
-let hdResumo=null, hdRows=[], hdTotal=0, hdSel=null, hdDetCache={}, hdMap=null, hdClusterLayer=null;
+let hdResumo=null, hdRows=[], hdTotal=0, hdSel=null, hdDetCache={}, hdMap=null, hdClusterLayer=null, hdTab='detalhe';
 let hdF={cat:'',motivo:'',cap:'',situacao:'ativa',interno:'',busca:''};
 let hdSort={k:'ips',dir:-1};
-const HD_CAT={
- P1:{l:'P1 · Substituição prioritária',s:'Priorizar',c:'#d6336c'},
- P2:{l:'P2 · Alta prioridade',s:'Programar próximo ciclo',c:'#e05d5d'},
- P3:{l:'P3 · Avaliação',s:'Avaliar',c:'#e6a23c'},
- P4:{l:'P4 · Monitoramento',s:'Acompanhar',c:'#4b9fe0'},
- P5:{l:'P5 · Sem prioridade',s:'Manter',c:'#8a8f98'}
-};
-const HD_ADEQ={adequado:{l:'Adequado',c:'#3fb27f'},subdimensionado:{l:'Possível subdimensionamento',c:'#e05d5d'},superdimensionado:{l:'Possível superdimensionamento',c:'#e6a23c'},mudanca:{l:'Mudança de faixa',c:'#c678dd'},indeterminado:{l:'Indeterminado',c:'#8a8f98'}};
+const HD_CAT={P1:{l:'P1 · Substituição prioritária',s:'Priorizar',c:'#d6336c'},P2:{l:'P2 · Alta prioridade',s:'Programar próximo ciclo',c:'#e05d5d'},P3:{l:'P3 · Avaliação',s:'Avaliar',c:'#e6a23c'},P4:{l:'P4 · Monitoramento',s:'Acompanhar',c:'#4b9fe0'},P5:{l:'P5 · Sem prioridade',s:'Manter',c:'#8a8f98'}};
+const HD_ADEQ={adequado:{l:'Adequado',c:'#3fb27f'},subdimensionado:{l:'Subdimensionado',c:'#e05d5d'},superdimensionado:{l:'Superdimensionado',c:'#e6a23c'},mudanca:{l:'Mudança de faixa',c:'#c678dd'},indeterminado:{l:'Indeterminado',c:'#8a8f98'}};
 const HD_SIT={R:'Ativa',I:'Inativa/cortada',F:'Factível',P:'Potencial'};
+const HD_CAL={X:0.6,Y:0.75,Z:1,A:1.5,B:2.5,C:3.5,D:5,E:6,F:10,G:15,J:25,K:40,L:60,M:100};
+const HD_COD2CAL={'117 79 00':'Y','117 78 00':'A','117 48 00':'B','117 49 00':'C','117 58 00':'D','117 59 00':'E','117 68 00':'F','117 69 00':'G'};
+function hdNv(v){ return (v==null||isNaN(+v))?'—':(''+(+v)).replace('.',','); }
+function hdQ3(c){ return hdNv(HD_CAL[c]); }
 function hdCons(){ return za==='all'?null:za; }
 function hdRankArgs(extra){ return Object.assign({p_consorcio:hdCons(),p_categoria:hdF.cat||null,p_motivo:hdF.motivo||null,p_cap:hdF.cap||null,p_situacao:hdF.situacao,p_interno:hdF.interno||null,p_busca:hdF.busca||null}, extra||{}); }
-function hdIB(k){ return `<button class="mminfo" data-hdinfo="${k}" title="Sobre este bloco">ⓘ</button>`; }
+function hdIB(k){ return `<button class="mminfo" data-hdinfo="${k}" title="Sobre">ⓘ</button>`; }
 const HD_INFO={
- resumo:{t:'Resumo da priorização',h:`<p>Lista operacional de troca de hidrômetros. Cada matrícula recebe um <b>IPS</b> (Índice de Prioridade de Substituição, 0–100) e cai numa categoria <b>P1</b> (prioritária) a <b>P5</b> (sem prioridade). A metodologia <b>não</b> parte de "medidor velho = troca": busca evidência de <b>inadequação, risco de perda de medição e potencial de recuperação de faturamento</b>.</p><p>Os cards contam matrículas por categoria; as barras mostram os <b>motivos</b> mais frequentes e os <b>códigos de serviço SIENGE</b> a abrir. <b>Remanejamento</b> = imóvel interno + ligação ativa (avaliar mover o padrão para fora, além da troca).</p>`},
- ips:{t:'IPS — como é calculado',h:`<p><b>IPS</b> = média ponderada de sub-scores (0–100) por dimensão:</p><ul style="padding-left:18px;margin:6px 0;line-height:1.6"><li><b>Anomalia de consumo</b> (~26%) — score de anomalia da micromedição (CV, picos, zeros, fraude).</li><li><b>Idade</b> (~21%).</li><li><b>Mudança de comportamento</b> (~16%) — média dos primeiros × últimos meses + migração de faixa.</li><li><b>Intensidade de utilização</b> (~16%) — "rodagem" vs capacidade do calibre.</li><li><b>Adequação de dimensionamento</b> (~16%) — perfil de consumo vs vazão nominal do calibre.</li><li><b>Modelo</b> (~5%) — reservado (exige histórico de trocas).</li></ul><p>Pesos calibráveis; dimensões indeterminadas têm o peso redistribuído. <b>Interno/externo e situação da ligação são filtros — não entram no score.</b> Categorias por faixa de IPS (P1≥70 … P5&lt;25, ajustável).</p>`},
- cal:{t:'Calibre → vazão → código de serviço',h:`<p>O <b>1º caractere do nº do hidrômetro</b> é o calibre (CAP), que define a <b>vazão nominal</b> e o <b>código de serviço SIENGE</b> da substituição:</p><p style="font-variant-numeric:tabular-nums;line-height:1.7">Y=0,75 → <b>117 79 00</b> · A=1,5 → <b>117 78 00</b> · B=2,5 → <b>117 48 00</b> · C=3,5 → <b>117 49 00</b> · D=5 → <b>117 58 00</b> · E=6 → <b>117 59 00</b> · F=10 → <b>117 68 00</b> · G=15 → <b>117 69 00</b> m³/h.</p><p>Calibres J–M (25–100 m³/h, macro/industrial) ficam <b>fora do contrato de troca</b>.</p>`},
- adeq:{t:'Adequação de dimensionamento',h:`<p>Compara o perfil de consumo com a faixa típica do calibre:</p><ul style="padding-left:18px;margin:6px 0;line-height:1.6"><li><b>Superdimensionado</b> — consumo persistentemente baixo para a capacidade (medidor grande demais → subregistra vazões baixas = perda).</li><li><b>Subdimensionado</b> — consumo alto para o calibre (medidor pequeno → desgaste/subregistro em vazão alta).</li><li><b>Mudança de faixa</b> — o perfil migrou de faixa de consumo.</li><li><b>Indeterminado</b> — sem nº/dados suficientes.</li></ul><p>⚠️ É <b>indício</b> (classe metrológica assumida padrão), não confirmação de erro de dimensionamento.</p>`}
+ resumo:{t:'Priorização de troca de HD',h:`<p>Lista operacional priorizada de substituição de hidrômetros. Cada matrícula recebe um <b>IPS</b> (Índice de Prioridade de Substituição, 0–100) e cai em <b>P1</b> (prioritária) a <b>P5</b> (sem prioridade). A metodologia <b>não</b> parte de "medidor velho = troca": busca <b>inadequação, risco de perda de medição e potencial de recuperação</b>. <b>Remanejamento</b> = imóvel interno + ligação ativa (avaliar mover o padrão para fora).</p>`},
+ ips:{t:'IPS — como é calculado',h:`<p><b>IPS</b> = média ponderada (0–100): <b>anomalia</b> ~26% · <b>idade</b> ~21% · <b>mudança de comportamento</b> ~16% · <b>intensidade de uso</b> ~16% · <b>dimensionamento</b> ~16% · <b>modelo</b> ~5% (reservado). Pesos calibráveis; dimensões indeterminadas redistribuem o peso. <b>Interno/externo e situação da ligação são filtros, não entram no score.</b> Categorias por faixa de IPS (P1≥70 … P5&lt;25).</p>`},
+ cal:{t:'Calibre atual × recomendado',h:`<p>O <b>calibre atual</b> é o que o hidrômetro tem hoje (1º char do nº → vazão nominal). O <b>recomendado</b> é o calibre adequado ao <b>consumo real</b> da ligação — é o que deve ser <b>instalado</b> na troca, e define o <b>código de serviço SIENGE</b> a abrir.</p><p>Ex.: um medidor <b>E (6 m³/h)</b> num imóvel que consome pouco está <b>superdimensionado</b> → recomenda-se <b>Y (0,75 m³/h)</b> (117 79 00). O consumo médio aparece em <b>m³/mês</b> e <b>m³/h</b> para comparar com a vazão do calibre.</p>`},
+ adeq:{t:'Adequação de dimensionamento',h:`<p><b>Superdimensionado</b>: consumo baixo para a capacidade (medidor grande subregistra vazões baixas = perda) → recomenda calibre <b>menor</b>. <b>Subdimensionado</b>: consumo alto para o calibre → recomenda calibre <b>maior</b>. <b>Mudança de faixa</b>: perfil migrou. ⚠️ É <b>indício</b> (classe metrológica assumida padrão).</p>`}
 };
 function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.createElement('style'); st.id='hdcss'; st.textContent=`
- #s-hdpri .hdcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
- #s-hdpri .hdcat{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
- #s-hdpri .hdcat[data-fcat]{cursor:pointer}
- #s-hdpri .hdcat[data-fcat]:hover{background:var(--surface-2)}
- #s-hdpri .hdcat b{font-size:22px;font-variant-numeric:tabular-nums;line-height:1.1}
- #s-hdpri .hdcat .cl{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
- #s-hdpri .hdfilters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 6px}
- #s-hdpri .hdfilters select,#s-hdpri .hdfilters input{font:inherit;font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
- #s-hdpri .hdgrid{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;align-items:start}
- @media(max-width:900px){#s-hdpri .hdgrid{grid-template-columns:1fr}}
+ #s-hdpri .hdkpi{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+ #s-hdpri .hdk{display:flex;flex-direction:column;gap:1px;padding:8px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);min-width:92px}
+ #s-hdpri button.hdk{cursor:pointer;text-align:left;font:inherit}
+ #s-hdpri button.hdk:hover{background:var(--surface-2)}
+ #s-hdpri button.hdk.on{outline:2px solid currentColor}
+ #s-hdpri .hdk b{font-size:19px;font-variant-numeric:tabular-nums;line-height:1.1}
+ #s-hdpri .hdk span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+ #s-hdpri .hdmain{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;align-items:start}
+ @media(max-width:1000px){#s-hdpri .hdmain{grid-template-columns:1fr}}
  #s-hdpri table.hdt{width:100%;border-collapse:collapse;font-size:12px}
  #s-hdpri table.hdt th,#s-hdpri table.hdt td{padding:5px 7px;border-bottom:1px solid var(--line-2);text-align:left;white-space:nowrap}
  #s-hdpri table.hdt th{cursor:pointer;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);z-index:1}
@@ -1821,16 +1825,44 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
  #s-hdpri table.hdt tbody tr{cursor:pointer}
  #s-hdpri table.hdt tbody tr:hover{background:var(--surface-2)}
  #s-hdpri table.hdt tbody tr.sel{background:rgba(var(--accent-rgb),.14)}
- #s-hdpri .hdtwrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+ #s-hdpri .hdtwrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
  #s-hdpri .hdpill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;color:#fff}
- #s-hdpri #hdMapDiv{height:460px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+ #s-hdpri .hdtroca{display:inline-flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+ #s-hdpri .hdtroca .ar{color:var(--muted)}
+ #s-hdpri .hdtabs{display:flex;gap:4px;margin-bottom:10px}
+ #s-hdpri .hdtabs button{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+ #s-hdpri .hdtabs button.on{background:rgba(var(--accent-rgb),.12);color:var(--accent);border-color:var(--accent)}
+ #s-hdpri #hdMapDiv{height:520px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
  #s-hdpri #hdMapDiv .leaflet-container{background:var(--surface-2)}
- #s-hdpri .hdstats{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:12.5px;margin:9px 0}
+ #s-hdpri .hdtrocabox{display:flex;align-items:stretch;gap:8px;margin:10px 0;flex-wrap:wrap}
+ #s-hdpri .hdtrocabox>div{flex:1 1 90px;min-width:90px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);display:flex;flex-direction:column;gap:2px}
+ #s-hdpri .hdtrocabox .lb{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+ #s-hdpri .hdtrocabox .vv{font-size:15px;font-weight:700}
+ #s-hdpri .hdtrocabox .ar{flex:0 0 14px;align-self:center;color:var(--muted);font-size:17px;min-width:0;border:0;background:none;padding:0}
+ #s-hdpri .hdstats{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;font-size:12.5px;margin:9px 0}
  #s-hdpri .hdstats>div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line-2);padding:3px 0}
  #s-hdpri .hdstats .k{color:var(--muted)}
  #s-hdpri .hdbtn{font:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:var(--on-accent);cursor:pointer}
  #s-hdpri .hdbtn:disabled{opacity:.6;cursor:default}
+ #s-hdpri .hdcodrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
+ #s-hdpri .hdcodrow .cc{font-variant-numeric:tabular-nums;color:var(--muted);min-width:66px}
+ #s-hdpri .hdcodrow .bar{flex:1;height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
+ #s-hdpri .hdcodrow .bar>span{display:block;height:100%;background:#4b9fe0}
+ #s-hdpri .hdcodrow .vv{font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
 `; document.head.appendChild(st); }
+
+/* ---- filtros no cabeçalho ---- */
+function hdSyncHeader(){
+ const set=(id,opts,cur,prop)=>{ const el=$('#'+id); if(!el)return; el.hidden=false; el.innerHTML=opts.map(o=>`<option value="${o[0]}"${o[0]===cur?' selected':''}>${o[1]}</option>`).join(''); el.onchange=()=>{ hdF[prop]=el.value; hdReload(true); }; };
+ set('hdfCat',[['','Todas categorias'],['P1','P1 · Prioritária'],['P2','P2 · Alta'],['P3','P3 · Avaliação'],['P4','P4 · Monitorar'],['P5','P5 · Sem prior.']],hdF.cat,'cat');
+ set('hdfCap',[['','Todos calibres']].concat(['Y','A','B','C','D','E','F','G'].map(c=>[c,'CAP '+c])),hdF.cap,'cap');
+ set('hdfSit',[['ativa','Só ligação ativa'],['todas','Todas as situações'],['inativa','Só inativas']],hdF.situacao,'situacao');
+ set('hdfInt',[['','Interno + externo'],['INTERNO','Só interno'],['EXTERNO','Só externo']],hdF.interno,'interno');
+ const motL=Object.keys((hdResumo&&hdResumo.por_motivo)||{});
+ set('hdfMot',[['','Todos motivos']].concat(motL.map(m=>[m,m])),hdF.motivo,'motivo');
+ const bs=$('#hdfBusca'); if(bs){ bs.hidden=false; bs.value=hdF.busca||''; bs.onchange=()=>{ hdF.busca=bs.value.trim(); hdReload(true); }; }
+}
+function hdHeaderReset(){ ['hdfCat','hdfMot','hdfCap','hdfSit','hdfInt','hdfBusca'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
 
 function hdInit(){ mmCss(); hdCss();
  const body=$('#hdBody'); if(!body)return;
@@ -1847,112 +1879,127 @@ function hdInit(){ mmCss(); hdCss();
  });
 }
 function hdRenderAll(){ const body=$('#hdBody');
- body.innerHTML = `<div id="hdTop">${hdTopHtml()}</div>` + hdMapPanelHtml();
- hdWire(); hdInitMap();
+ body.innerHTML = `<div id="hdKpi">${hdKpiStrip()}</div>`
+  + `<div class="hdmain">`
+    + `<div class="panel" style="margin:0"><div class="phead"><h3>Lista operacional de troca</h3>${hdIB('ips')}<button class="hdbtn" id="hdExport" style="margin-left:auto">⭳ Exportar .xlsx</button></div><div class="pbody" style="padding-top:8px"><div id="hdRankWrap">${hdRankTable()}</div></div></div>`
+    + `<div class="panel" style="margin:0"><div class="pbody"><div class="hdtabs">`
+        + `<button data-tab="detalhe" class="${hdTab==='detalhe'?'on':''}">📋 Detalhe</button>`
+        + `<button data-tab="mapa" class="${hdTab==='mapa'?'on':''}">🗺️ Mapa logístico</button>`
+        + `<button data-tab="geral" class="${hdTab==='geral'?'on':''}">📊 Visão geral</button>`
+      + `</div>`
+      + `<div class="hdtabpane" id="hdPaneDetalhe" ${hdTab==='detalhe'?'':'hidden'}>${hdDetailHtml()}</div>`
+      + `<div class="hdtabpane" id="hdPaneMapa" ${hdTab==='mapa'?'':'hidden'}><div id="hdMapDiv"></div><p class="note" id="hdMapNote" style="margin:8px 0 0"></p></div>`
+      + `<div class="hdtabpane" id="hdPaneGeral" ${hdTab==='geral'?'':'hidden'}>${hdGeralHtml()}</div>`
+    + `</div></div>`
+  + `</div>`;
+ hdSyncHeader(); hdWire();
+ if(hdTab==='mapa') hdInitMap();
 }
-function hdTopHtml(){
- return hdResumoPanel()
-  + `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Lista operacional de troca</h3>${hdIB('ips')}<span class="chip real" style="margin-left:auto">real</span></div><div class="pbody">`
-    + hdFiltersBar()
-    + `<div class="hdgrid"><div><div id="hdRankWrap">${hdRankTable()}</div></div><div id="hdDetWrap">${hdDetailHtml()}</div></div>`
-  + `</div></div>`;
-}
-function hdMapPanelHtml(){ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Mapa logístico — candidatos por prioridade</h3><span class="hint">respeita os filtros · agrupado por densidade</span><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody"><div id="hdMapDiv"></div><p class="note" id="hdMapNote" style="margin:8px 0 0"></p></div></div>`; }
-function hdResumoPanel(){ const R=hdResumo||{}, pc=R.por_categoria||{}, pm=R.por_motivo||{}, pcod=R.por_codigo||{};
- const cards=['P1','P2','P3','P4','P5'].map(k=>{ const m=HD_CAT[k], n=pc[k]||0; const on=hdF.cat===k;
-   return `<div class="hdcat" data-fcat="${k}" style="border-left:3px solid ${m.c}${on?';outline:2px solid '+m.c:''}"><b style="color:${m.c}">${fmt(n)}</b><span class="cl"><span class="hdpill" style="background:${m.c}">${k}</span>${(m.l.split('· ')[1]||'')}</span></div>`; }).join('');
- const extra=`<div class="hdcat"><b>${fmt(R.n_total||0)}</b><span class="cl">matrículas</span></div><div class="hdcat"><b style="color:var(--accent)">${fmt(R.n_remanejamento||0)}</b><span class="cl">remanejamentos</span></div><div class="hdcat"><b>${R.ips_medio!=null?br1(R.ips_medio):'—'}</b><span class="cl">IPS médio</span></div>`;
- const bars=(obj,color,clickable)=>{ const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]); const mx=Math.max(1,...e.map(x=>x[1]));
-   return e.map(([k,n])=>`<div class="mmdist${clickable&&hdF.motivo===k?' sel':''}"${clickable?` data-fmot="${k}" style="cursor:pointer"`:''}><span class="mmdlab"${color==='#4b9fe0'?' style="font-variant-numeric:tabular-nums"':''}>${k}</span><div class="mmdbar"><span style="width:${Math.round(n/mx*100)}%;background:${color}"></span></div><span class="mmdval">${fmt(n)}</span></div>`).join('')||'<p class="note" style="margin:0">—</p>'; };
- return `<div class="panel"><div class="phead"><h3>Resumo da priorização</h3>${hdIB('resumo')}<span class="chip real" style="margin-left:auto">real</span></div><div class="pbody">
-   <div class="hdcards">${cards}${extra}</div>
-   <div class="hdgrid" style="margin-top:12px">
-     <div class="mmblock"><div class="mmblock-h">Motivos de priorização ${hdIB('ips')}</div><div class="mmdistwrap">${bars(pm,'var(--accent)',true)}</div></div>
-     <div class="mmblock"><div class="mmblock-h">Código de serviço (SIENGE) ${hdIB('cal')}</div><div class="mmdistwrap">${bars(pcod,'#4b9fe0',false)}</div></div>
-   </div></div></div>`;
-}
-function hdFiltersBar(){
- const opt=(v,cur,lab)=>`<option value="${v}"${v===cur?' selected':''}>${lab}</option>`;
- const motList=Object.keys((hdResumo&&hdResumo.por_motivo)||{});
- return `<div class="hdfilters">
-  <select id="hdfCat">${['','P1','P2','P3','P4','P5'].map(c=>opt(c,hdF.cat,c===''?'Todas categorias':HD_CAT[c].l)).join('')}</select>
-  <select id="hdfMot"><option value="">Todos motivos</option>${motList.map(m=>`<option value="${m}"${m===hdF.motivo?' selected':''}>${m}</option>`).join('')}</select>
-  <select id="hdfCap">${['','Y','A','B','C','D','E','F','G'].map(c=>opt(c,hdF.cap,c===''?'Todos calibres':('CAP '+c))).join('')}</select>
-  <select id="hdfSit">${[['ativa','Só ligação ativa'],['todas','Todas as situações'],['inativa','Só inativas']].map(a=>opt(a[0],hdF.situacao,a[1])).join('')}</select>
-  <select id="hdfInt">${[['','Interno + externo'],['INTERNO','Só interno'],['EXTERNO','Só externo']].map(a=>opt(a[0],hdF.interno,a[1])).join('')}</select>
-  <input id="hdfBusca" type="search" placeholder="matrícula…" value="${hdF.busca||''}" style="width:118px">
-  <span style="flex:1 1 auto"></span>
-  <button class="hdbtn" id="hdExport">⭳ Exportar .xlsx</button>
- </div>`;
+function hdKpiStrip(){ const R=hdResumo||{}, pc=R.por_categoria||{};
+ const chips=['P1','P2','P3','P4','P5'].map(k=>{ const m=HD_CAT[k], on=hdF.cat===k;
+   return `<button class="hdk ${on?'on':''}" data-fcat="${k}" style="color:${m.c};border-left:3px solid ${m.c}"><b>${fmt(pc[k]||0)}</b><span>${k} · ${(m.l.split('· ')[1]||'')}</span></button>`; }).join('');
+ const stats=`<div class="hdk"><b>${fmt(R.n_total||0)}</b><span>matrículas</span></div><div class="hdk"><b style="color:var(--accent)">${fmt(R.n_remanejamento||0)}</b><span>remanejam.</span></div><div class="hdk"><b>${R.ips_medio!=null?br1(R.ips_medio):'—'}</b><span>IPS médio</span></div>`;
+ return `<div class="hdkpi">${chips}${stats}</div>`;
 }
 function hdCmp(a,b){ const k=hdSort.k,d=hdSort.dir; let va=a[k],vb=b[k]; if(va==null)va=(typeof vb==='string'?'':-Infinity); if(vb==null)vb=(typeof va==='string'?'':-Infinity); if(typeof va==='string'||typeof vb==='string')return d*String(va).localeCompare(String(vb)); return d*(va-vb); }
+function hdTrocaCell(x){ const rec=x.cal_recomendado; if(!rec||rec===x.cap) return (x.cap||'—'); const up=(HD_CAL[rec]||0)>(HD_CAL[x.cap]||0); return `<span class="hdtroca">${x.cap||'—'}<span class="ar">→</span><b style="color:${up?'#e05d5d':'#2f8b6c'}">${rec}</b></span>`; }
 function hdRankTable(){
- const cols=[['categoria','Prior.'],['matricula','Matrícula'],['cap','CAP'],['idade_medidor','Idade'],['media','Cons.méd'],['faixa_predominante','Faixa'],['adequacao','Adequação'],['ips','IPS'],['codigo_servico','Cód. serviço']];
- const rows=hdRows.slice().sort(hdCmp);
- const rnum={idade_medidor:1,media:1,ips:1};
+ const cols=[['categoria','Prior.'],['matricula','Matrícula'],['cap','Troca'],['idade_medidor','Idade'],['media','m³/mês'],['adequacao','Adequação'],['ips','IPS'],['codigo_servico','Abrir OS']];
+ const rows=hdRows.slice().sort(hdCmp), rnum={idade_medidor:1,media:1,ips:1};
  const th=cols.map(c=>`<th class="${rnum[c[0]]?'r':''}" data-k="${c[0]}">${c[1]}${hdSort.k===c[0]?(hdSort.dir<0?' ▾':' ▴'):''}</th>`).join('');
  const body=rows.map(x=>{ const m=HD_CAT[x.categoria]||{c:'#888'}, ad=HD_ADEQ[x.adequacao]||{l:x.adequacao||'—',c:'inherit'};
-   const rem=x.remanejamento_sugerido?' <span class="mmtag" style="--cc:#0e7c86" title="interno + ativa: avaliar remanejamento">rem</span>':'';
-   return `<tr data-mat="${x.matricula}" class="${hdSel===x.matricula?'sel':''}"><td><span class="hdpill" style="background:${m.c}">${x.categoria}</span></td><td>${x.matricula}${rem}</td><td>${x.cap||'—'}</td><td class="r">${x.idade_medidor!=null?x.idade_medidor:'—'}</td><td class="r">${x.media!=null?br1(x.media):'—'}</td><td>${x.faixa_predominante||'—'}</td><td><span style="color:${ad.c}">${ad.l}</span></td><td class="r"><b>${x.ips!=null?br1(x.ips):'—'}</b></td><td style="font-variant-numeric:tabular-nums">${x.codigo_servico||'—'}</td></tr>`;
- }).join('')||'<tr><td colspan="9" class="note" style="padding:14px">Nenhuma matrícula nesse filtro.</td></tr>';
+   const rem=x.remanejamento_sugerido?' <span class="mmtag" style="--cc:#0e7c86" title="interno + ativa">rem</span>':'';
+   return `<tr data-mat="${x.matricula}" class="${hdSel===x.matricula?'sel':''}"><td><span class="hdpill" style="background:${m.c}">${x.categoria}</span></td><td>${x.matricula}${rem}</td><td>${hdTrocaCell(x)}</td><td class="r">${x.idade_medidor!=null?x.idade_medidor:'—'}</td><td class="r">${x.media!=null?br1(x.media):'—'}</td><td><span style="color:${ad.c}">${ad.l}</span></td><td class="r"><b>${x.ips!=null?br1(x.ips):'—'}</b></td><td style="font-variant-numeric:tabular-nums">${x.codigo_servico||'<span class="note">fora</span>'}</td></tr>`;
+ }).join('')||'<tr><td colspan="8" class="note" style="padding:14px">Nenhuma matrícula nesse filtro.</td></tr>';
  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span class="note">${fmt(hdTotal)} candidato(s) · exibindo ${rows.length} (top por IPS)</span></div><div class="hdtwrap"><table class="hdt"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 function hdDetailHtml(){
- if(!hdSel) return `<div class="panel" style="margin:0"><div class="pbody"><p class="note" style="margin:0">Selecione uma matrícula (na lista ou no mapa) para ver o detalhamento, a série de consumo e a justificativa da priorização.</p></div></div>`;
- const d=hdDetCache[hdSel]; if(!d) return `<div class="panel" style="margin:0"><div class="pbody"><p class="note" style="margin:0">Carregando detalhe…</p></div></div>`;
- const m=HD_CAT[d.categoria]||{c:'#888',l:d.categoria,s:''}, ad=HD_ADEQ[d.adequacao]||{l:d.adequacao,c:'inherit'}, cal=d.calibre||{};
+ if(!hdSel) return `<p class="note" style="margin:0">Selecione uma matrícula (na lista ou no mapa) para ver o detalhamento: calibre atual × recomendado, consumo, série de 18 meses, justificativa e o serviço a abrir.</p>`;
+ const d=hdDetCache[hdSel]; if(!d) return `<p class="note" style="margin:0">Carregando detalhe…</p>`;
+ const m=HD_CAT[d.categoria]||{c:'#888',s:''}, ad=HD_ADEQ[d.adequacao]||{l:d.adequacao,c:'inherit'};
  const serie=d.serie||[], vals=serie.map(p=>+p.vol||0), maxv=Math.max(1,...vals);
- const W=320,H=92,pl=4,pr=4,pt=8,pb=12;
- const X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
+ const W=320,H=92,pl=4,pr=4,pt=8,pb=12, X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
  const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
  const chart=serie.length?`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;margin-top:4px"><polyline points="${pts}" fill="none" stroke="${m.c}" stroke-width="1.6"/><text x="${pl}" y="${H-2}" fill="#8899a0" font-size="8">${mmCmp(serie[0].competencia)}</text><text x="${W-pr}" y="${H-2}" fill="#8899a0" font-size="8" text-anchor="end">${mmCmp(serie[serie.length-1].competencia)}</text></svg>`:'';
- return `<div class="panel" style="margin:0"><div class="pbody">
-  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px">Matrícula ${d.matricula}</b> <span class="hdpill" style="background:${m.c}">${d.categoria}</span> <span class="note">IPS <b style="color:${m.c}">${d.ips!=null?br1(d.ips):'—'}</b></span>${d.remanejamento_sugerido?' <span class="mmtag" style="--cc:#0e7c86">remanejamento</span>':''}</div>
+ const rec=d.cal_recomendado, recQ3=d.q3_recomendado, showRec=rec&&rec!==d.cap;
+ const m3h=d.media_m3h!=null?(d.media_m3h<1?d.media_m3h.toFixed(3):br1(d.media_m3h)).toString().replace('.',','):'—';
+ const troca=`<div class="hdtrocabox">
+   <div><span class="lb">Calibre atual</span><span class="vv">${d.cap||'—'}</span><span class="note" style="font-size:10px">${d.q3!=null?hdNv(d.q3)+' m³/h':''}</span></div>
+   <span class="ar">→</span>
+   <div><span class="lb">Consumo médio</span><span class="vv">${d.media!=null?br1(d.media):'—'} <small style="font-size:11px;font-weight:500">m³/mês</small></span><span class="note" style="font-size:10px">${m3h} m³/h</span></div>
+   <span class="ar">→</span>
+   <div style="border-color:${showRec?m.c:'var(--line)'}"><span class="lb">Calibre recomendado</span><span class="vv" style="color:${showRec?'var(--accent)':'inherit'}">${rec||d.cap||'—'}</span><span class="note" style="font-size:10px">${recQ3!=null?hdNv(recQ3)+' m³/h':''}${showRec?'':' (manter)'}</span></div>
+ </div>`;
+ const acao = d.in_contrato
+   ? `<b>Abrir OS:</b> <b style="font-variant-numeric:tabular-nums">${d.codigo_servico||'—'}</b><br><span class="note" style="font-size:11px">${d.desc_recomendado||d.descricao_servico||''}</span>`
+   : `<b>Calibre ${rec||''} fora do contrato de troca</b> (macro/industrial) — tratar à parte.`;
+ return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px">Matrícula ${d.matricula}</b> <span class="hdpill" style="background:${m.c}">${d.categoria}</span> <span class="note">IPS <b style="color:${m.c}">${d.ips!=null?br1(d.ips):'—'}</b></span>${d.remanejamento_sugerido?' <span class="mmtag" style="--cc:#0e7c86">remanejamento</span>':''}</div>
+  ${troca}
   <div class="hdstats">
    <div><span class="k">Nº hidrômetro</span><span style="font-variant-numeric:tabular-nums">${d.num_hidr||'—'}</span></div>
-   <div><span class="k">Calibre</span><span>${d.cap||'—'}${cal.q3!=null?' · '+cal.q3+' m³/h':''}</span></div>
    <div><span class="k">Idade</span><span>${d.idade_medidor!=null?d.idade_medidor+' anos':'—'}</span></div>
-   <div><span class="k">Interno/externo</span><span>${d.interno_externo||'—'}</span></div>
-   <div><span class="k">Consumo médio</span><span>${d.media!=null?br1(d.media)+' m³/mês':'—'}</span></div>
    <div><span class="k">Faixa predom.</span><span>${d.faixa_predominante||'—'}</span></div>
    <div><span class="k">Tendência</span><span>${d.tendencia||'—'}</span></div>
-   <div><span class="k">Vol. no período</span><span>${d.volume_periodo!=null?fmt(Math.round(d.volume_periodo))+' m³':'—'}</span></div>
    <div><span class="k">Adequação ${hdIB('adeq')}</span><span style="color:${ad.c}">${ad.l}</span></div>
+   <div><span class="k">Vol. no período</span><span>${d.volume_periodo!=null?fmt(Math.round(d.volume_periodo))+' m³':'—'}</span></div>
+   <div><span class="k">Interno/externo</span><span>${d.interno_externo||'—'}</span></div>
    <div><span class="k">Situação ligação</span><span>${HD_SIT[d.situacao_lig]||d.situacao_lig||'—'}</span></div>
   </div>
   ${chart}
-  <p class="note" style="margin:9px 0 2px"><b>Justificativa:</b> ${d.justificativa||'—'}</p>
-  <p class="note" style="margin:5px 0 0"><b>Motivos:</b> ${(d.motivos||[]).join(' · ')||'—'}</p>
-  <div style="margin-top:10px;padding:9px 11px;border-radius:8px;background:rgba(var(--accent-rgb),.08);font-size:12.5px"><b>Ação (${m.s}):</b> ${d.in_contrato?('abrir OS de substituição <b style="font-variant-numeric:tabular-nums">'+(d.codigo_servico||'—')+'</b>'+(cal.aplicacao?' · '+cal.aplicacao:'')):'calibre fora do contrato de troca (macro/industrial)'}.${d.remanejamento_sugerido?' <b>Avaliar remanejamento</b> do padrão para fora (imóvel interno + ativo).':''}</div>
- </div></div>`;
+  <p class="note" style="margin:9px 0 2px"><b>Por que priorizar:</b> ${d.justificativa||'—'}</p>
+  <p class="note" style="margin:4px 0 0"><b>Fatores:</b> ${(d.motivos||[]).map(x=>'<span class="mmtag" style="--cc:#8a8f98">'+x+'</span>').join(' ')||'—'}</p>
+  <div style="margin-top:10px;padding:9px 11px;border-radius:8px;background:rgba(var(--accent-rgb),.08);font-size:12.5px">${acao}${d.remanejamento_sugerido?'<br><b>Avaliar remanejamento</b> do padrão para fora (imóvel interno + ativo).':''}</div>`;
 }
-function hdSelect(mat){ hdSel=mat;
+function hdGeralHtml(){ const R=hdResumo||{}, pm=R.por_motivo||{}, pcod=R.por_codigo||{}, pad=R.por_adequacao||{};
+ const motE=Object.entries(pm).sort((a,b)=>b[1]-a[1]), motMx=Math.max(1,...motE.map(x=>x[1]));
+ const motBars=motE.map(([k,n])=>`<div class="mmdist${hdF.motivo===k?' sel':''}" data-fmot="${k}" style="cursor:pointer"><span class="mmdlab">${k}</span><div class="mmdbar"><span style="width:${Math.round(n/motMx*100)}%;background:var(--accent)"></span></div><span class="mmdval">${fmt(n)}</span></div>`).join('')||'<p class="note" style="margin:0">—</p>';
+ const codE=Object.entries(pcod).sort((a,b)=>b[1]-a[1]), codMx=Math.max(1,...codE.map(x=>x[1]));
+ const codRows=codE.map(([code,n])=>{ const cap=HD_COD2CAL[code]; const lbl=cap?('CAP '+cap+' · '+hdQ3(cap)+' m³/h'):'Fora do contrato'; const sub=cap?code:'';
+   return `<div class="hdcodrow"><div style="flex:1"><b>${lbl}</b> <span class="cc">${sub}</span></div><div class="bar"><span style="width:${Math.round(n/codMx*100)}%"></span></div><div class="vv">${fmt(n)}</div></div>`; }).join('')||'<p class="note" style="margin:0">—</p>';
+ const adL={superdimensionado:'Superdimensionado',subdimensionado:'Subdimensionado',adequado:'Adequado',mudanca:'Mudança de faixa',indeterminado:'Indeterminado'};
+ const adE=Object.entries(pad).sort((a,b)=>b[1]-a[1]), adMx=Math.max(1,...adE.map(x=>x[1]));
+ const adBars=adE.map(([k,n])=>`<div class="mmdist"><span class="mmdlab" style="color:${(HD_ADEQ[k]||{}).c||'inherit'}">${adL[k]||k}</span><div class="mmdbar"><span style="width:${Math.round(n/adMx*100)}%;background:${(HD_ADEQ[k]||{}).c||'#888'}"></span></div><span class="mmdval">${fmt(n)}</span></div>`).join('')||'<p class="note" style="margin:0">—</p>';
+ return `<div class="mmblock-h">Serviço a abrir (por calibre recomendado) ${hdIB('cal')}</div><div style="margin-bottom:12px">${codRows}</div>
+  <div class="mmblock-h">Motivos de priorização ${hdIB('ips')}</div><div class="mmdistwrap" style="margin-bottom:12px">${motBars}</div>
+  <div class="mmblock-h">Adequação de dimensionamento ${hdIB('adeq')}</div><div class="mmdistwrap">${adBars}</div>`;
+}
+function hdSetTab(t){ hdTab=t;
+ document.querySelectorAll('#s-hdpri .hdtabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+ ['detalhe','mapa','geral'].forEach(x=>{ const p=$('#hdPane'+x.charAt(0).toUpperCase()+x.slice(1)); if(p)p.hidden=(x!==t); });
+ if(t==='mapa') hdInitMap();
+ if(t==='geral') hdWireGeral();
+}
+function hdSelect(mat){ hdSel=mat; if(hdTab!=='detalhe')hdSetTab('detalhe');
  document.querySelectorAll('#hdRankWrap table.hdt tbody tr').forEach(tr=>tr.classList.toggle('sel',+tr.dataset.mat===mat));
- $('#hdDetWrap').innerHTML=hdDetailHtml();
- document.querySelectorAll('#hdDetWrap [data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);});
+ const paint=()=>{ const p=$('#hdPaneDetalhe'); if(p){p.innerHTML=hdDetailHtml(); p.querySelectorAll('[data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);});} };
+ paint();
  if(hdDetCache[mat])return;
- sbg.rpc('app_nrw_hd_detalhe',{p_matricula:mat}).then(r=>{ if(r.error)return; hdDetCache[mat]=r.data; if(hdSel===mat){ $('#hdDetWrap').innerHTML=hdDetailHtml(); document.querySelectorAll('#hdDetWrap [data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);}); }});
+ sbg.rpc('app_nrw_hd_detalhe',{p_matricula:mat}).then(r=>{ if(r.error)return; hdDetCache[mat]=r.data; if(hdSel===mat)paint(); });
 }
 function hdWire(){
  document.querySelectorAll('#s-hdpri [data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);});
  hdWireRank();
- document.querySelectorAll('#s-hdpri .hdcat[data-fcat]').forEach(c=>c.onclick=()=>{ hdF.cat=(hdF.cat===c.dataset.fcat?'':c.dataset.fcat); hdReload(true); });
- document.querySelectorAll('#s-hdpri .mmdist[data-fmot]').forEach(c=>c.onclick=()=>{ hdF.motivo=(hdF.motivo===c.dataset.fmot?'':c.dataset.fmot); hdReload(true); });
- const f=(id,prop)=>{ const el=$('#'+id); if(el)el.onchange=()=>{ hdF[prop]=el.value; hdReload(true); }; };
- f('hdfCat','cat'); f('hdfMot','motivo'); f('hdfCap','cap'); f('hdfSit','situacao'); f('hdfInt','interno');
- const bs=$('#hdfBusca'); if(bs)bs.onchange=()=>{ hdF.busca=bs.value.trim(); hdReload(true); };
+ document.querySelectorAll('#s-hdpri .hdk[data-fcat]').forEach(c=>c.onclick=()=>{ hdF.cat=(hdF.cat===c.dataset.fcat?'':c.dataset.fcat); hdReload(true); });
+ document.querySelectorAll('#s-hdpri .hdtabs button').forEach(b=>b.onclick=()=>hdSetTab(b.dataset.tab));
  const ex=$('#hdExport'); if(ex)ex.onclick=hdExport;
+ if(hdTab==='geral')hdWireGeral();
 }
 function hdWireRank(){
  document.querySelectorAll('#hdRankWrap table.hdt th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(hdSort.k===k)hdSort.dir*=-1; else {hdSort.k=k;hdSort.dir=({idade_medidor:-1,media:-1,ips:-1})[k]||1;} $('#hdRankWrap').innerHTML=hdRankTable(); hdWireRank(); });
  document.querySelectorAll('#hdRankWrap table.hdt tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>hdSelect(+tr.dataset.mat));
 }
+function hdWireGeral(){ document.querySelectorAll('#hdPaneGeral .mmdist[data-fmot]').forEach(c=>c.onclick=()=>{ hdF.motivo=(hdF.motivo===c.dataset.fmot?'':c.dataset.fmot); hdReload(true); }); }
 function hdReload(resetSel){ if(resetSel)hdSel=null;
  Promise.all([
   sbg.rpc('app_nrw_hd_resumo',{p_consorcio:hdCons(),p_situacao:hdF.situacao,p_interno:hdF.interno||null}),
   sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:200,p_offset:0}))
  ]).then(([r1,r2])=>{ if(r1.error||r2.error)return; hdResumo=r1.data||{}; const rk=r2.data||{}; hdRows=rk.rows||[]; hdTotal=rk.total||0;
-  $('#hdTop').innerHTML=hdTopHtml(); hdWire(); hdLoadMap();
+  $('#hdKpi').innerHTML=hdKpiStrip();
+  $('#hdRankWrap').innerHTML=hdRankTable();
+  const pd=$('#hdPaneDetalhe'); if(pd)pd.innerHTML=hdDetailHtml();
+  const pg=$('#hdPaneGeral'); if(pg)pg.innerHTML=hdGeralHtml();
+  hdSyncHeader(); hdWire();
+  if(hdTab==='mapa') hdLoadMap();
  });
 }
 function hdInitMap(){ const div=$('#hdMapDiv'); if(!div)return;
@@ -1970,21 +2017,21 @@ function hdLoadMap(){ if(!hdMap||!hdClusterLayer)return; const note=$('#hdMapNot
   const pts=r.data||[]; hdClusterLayer.clearLayers(); const bounds=[];
   pts.forEach(p=>{ if(p.lat==null||p.lon==null)return; const m=HD_CAT[p.categoria]||{c:'#888'};
    const mk=L.circleMarker([+p.lat,+p.lon],{radius:5,color:'#fff',weight:1,fillColor:m.c,fillOpacity:.9});
-   mk.bindPopup(`<b>Matrícula ${p.matricula}</b><br>${p.categoria} · IPS ${p.ips!=null?br1(p.ips):'—'} · CAP ${p.cap||'—'}<br>Cód: <b>${p.codigo_servico||'(fora do contrato)'}</b>${p.remanejamento_sugerido?'<br><i>remanejamento sugerido</i>':''}<br><span style="color:#778">${p.justificativa||''}</span>`);
+   mk.bindPopup(`<b>Matrícula ${p.matricula}</b><br>${p.categoria} · IPS ${p.ips!=null?br1(p.ips):'—'} · CAP ${p.cap||'—'}<br>Abrir OS: <b>${p.codigo_servico||'(fora do contrato)'}</b>${p.remanejamento_sugerido?'<br><i>remanejamento sugerido</i>':''}`);
    mk.on('click',()=>hdSelect(p.matricula));
    hdClusterLayer.addLayer(mk); bounds.push([+p.lat,+p.lon]);
   });
-  if(note)note.textContent=fmt(pts.length)+' ponto(s) no mapa (maior IPS primeiro, máx 5.000). Clique num ponto para ver o detalhe.';
+  if(note)note.textContent=fmt(pts.length)+' ponto(s) (maior IPS primeiro, máx 5.000). Clique num ponto para o detalhe.';
   if(bounds.length){ try{ hdMap.fitBounds(bounds,{padding:[20,20],maxZoom:14}); }catch(e){} }
  });
 }
-function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if(btn){btn.textContent='lib .xlsx indisponível';} return; }
+function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if(btn)btn.textContent='lib .xlsx indisponível'; return; }
  if(btn){btn.disabled=true;btn.textContent='Gerando…';}
  const all=[]; const pageN=1000;
- function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); return; }); }
+ function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Nº Hidrômetro','Calibre','Vazão Q3 (m³/h)','Código serviço','Prioridade','IPS','Idade (anos)','Consumo médio (m³)','Faixa predominante','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Remanejamento','Justificativa'];
-  const data=all.map(x=>[x.matricula,x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.codigo_servico||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.media!=null?+x.media:'',x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
+  const head=['Matrícula','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Remanejamento','Justificativa'];
+  const data=all.map(x=>[x.matricula,x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Priorizacao HD');
   XLSX.writeFile(wb,`priorizacao_troca_HD_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
