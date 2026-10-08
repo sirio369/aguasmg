@@ -1923,10 +1923,42 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     linha de base, 2 linhas de referência no gráfico (verde 100% / azul 120%) e 2 colunas na tabela (VP meta 100%/120%,
     substituindo o Δ; célula pinta quando o VP do mês atinge o alvo). **Detalhamento colapsável agora é anchor-aware**
     (`resDerivHtml` usa `resB()`) — reage ao toggle (antes mostrava os dois fixos). `resStatus` ganhou faixa **≥120% (teto)**.
+- **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
+  ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
+  NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
+  - **Schema `"11 - perdas_nrw"` (app-only, RLS deny-all, acesso só via RPC definer):** `hd_calibre` (dimensão CAP→Q3/Q4/DN/
+    aplicação/**código_servico SIENGE**/in_contrato/faixa típica de consumo), `hd_cadastro` (medidor por matrícula: num_hidr,
+    cap, modelo_fam, ano_cod, idade_medidor, interno_externo — ETL dos xlsx), `hd_modelo` (dimensão fabricante/classe, preenchível),
+    `hd_config` (singleton: pesos IPS, classe default, limiares idade/faixas P1–P5), `hd_priorizacao` (saída 1/matrícula, padrão
+    `mm_matricula_stats`).
+  - **Decodificação do nº do hidrômetro (validada em 247.749 nºs):** 1º char = **CAP = calibre** → vazão nominal + **código de
+    serviço SIENGE** (Y=0,75→117 79 00 · A=1,5→117 78 00 · B=2,5→117 48 00 · C=3,5→117 49 00 · D=5→117 58 00 · E=6→117 59 00 ·
+    F=10→117 68 00 · G=15→117 69 00; J–M macro/industrial = fora do contrato). 2 dígitos = ano fab; letras seguintes = família modelo.
+  - **Motor `app_nrw_hd_rebuild()`** (definer, admin|dev; TRUNCATE+INSERT, reusa `mm_matricula_stats` + `micromedicao_historico`):
+    Bloco A perfil (percentis P10–P90, faixa predominante, meses zero/baixo/alto), B mudança (média 1ºs×últimos 6m + migração de
+    faixa + slope), C idade×utilização (volume registrado no período vs capacidade do calibre), D dimensionamento (perfil vs Q3/faixa
+    típica → adequado/sub/super/mudança/indeterminado). **IPS** = média ponderada de sub-scores (anomalia 26 · idade 21 · mudança 16 ·
+    utilização 16 · dimensionamento 16 · modelo 5 — pesos em `hd_config`, dimensões indeterminadas redistribuem o peso). Categoria
+    **P1–P5** por faixa de IPS; `motivos[]` + `justificativa`; `codigo_servico` do calibre; **`remanejamento_sugerido`** = interno + ativa.
+    **Interno/externo e situação da ligação são FILTROS, não entram no score** (decisão do usuário).
+  - **RPCs de leitura** (definer, gate admin|dev_acesso): `app_nrw_hd_resumo(p_consorcio,p_situacao,p_interno)` ·
+    `app_nrw_hd_ranking(...filtros...,p_limit,p_offset)` · `app_nrw_hd_mapa(...)` (GeoJSON lon/lat 4326 via join `ligacoes.geom`, top por IPS) ·
+    `app_nrw_hd_detalhe(p_matricula)` (blocos + série 18m + calibre). Filtro de situação default **só ativa (R)**.
+  - **Frontend:** 4 painéis — **Resumo** (cards P1–P5 + remanejamentos + IPS médio + barras de motivos e de códigos SIENGE),
+    **Lista operacional** (filtros categoria/motivo/calibre/situação/interno/busca + tabela ordenável + **export .xlsx**), **Mapa
+    logístico** (Leaflet + markercluster, pontos coloridos por prioridade) e **Detalhe** por matrícula (stats + mini-gráfico + justificativa +
+    ação/código). Novas libs via cdnjs `<script>`/`<link>` no `<head>`: **Leaflet 1.9.4 + Leaflet.markercluster 1.5.3 + SheetJS (xlsx) 0.18.5**.
+  - **⚠️ Carga de dados:** o `hd_cadastro` foi populado só com uma **AMOSTRA (~700 matrículas)** para validar o motor/tela
+    (carga completa via MCP é inviável — limite de leitura; e a rota via service key foi bloqueada pelo classificador). A **carga
+    completa (132k)** é feita por um **script Python local** (`importar_hd_cadastro.py`, psycopg2 + `DATABASE_URL`) que o usuário
+    roda com a credencial de banco → UPSERT em `hd_cadastro` + `app_nrw_hd_rebuild()`.
+  - **⚠️ Calibrar:** faixas típicas de consumo por calibre (`hd_calibre.cons_tip_*`), classe metrológica default (`hd_config.classe_default='B'`)
+    e pesos/limiares são **defaults iniciais** — refinar com ensaios/histórico de trocas. Tabela de vazão E/F adotada = a completa do usuário
+    (E=6, F=10, G=15; divergia da 1ª tabela de designação em E=10/F=15). Bloco E (modelo) fica neutro até haver histórico de substituições.
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
   têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
-  sinalizado/rastreável**. Controle num só ponto: `const NRW_REAL=new Set(['mm','macro'])` + `nrwMarkMocks()`
+  sinalizado/rastreável**. Controle num só ponto: `const NRW_REAL=new Set(['mm','macro','resultado','hdpri'])` + `nrwMarkMocks()`
   (marca o menu no load) + `nrwMockBanner(s)` (injeta o banner por tela dentro do `go()`). **Para promover uma
   tela a "real", adicione o `data-s` dela ao `NRW_REAL`** (sai da opacidade e perde o banner automaticamente).
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
