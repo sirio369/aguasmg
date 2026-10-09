@@ -21,19 +21,19 @@
   --accent:#0e7c86; --accent-rgb:14,124,134; --accent-2:#0a5a62; --on-accent:#ffffff;
   --good:#2f8b6c; --good-bg:#e2f1ea; --warn:#b9821a; --warn-bg:#f6ecd6; --crit:#bd4438; --crit-bg:#f7e2df;
   --shadow:0 1px 2px rgba(16,33,41,.06),0 6px 18px rgba(16,33,41,.06);
-  --r:12px; --r-sm:8px;
+  --r:12px; --r-sm:8px; --card:#ffffff;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0b1418; --surface:#12242b; --surface-2:#0f1e24; --panel:#152a31;
   --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41; --line-2:#1c313800;
   --accent:#37b1bc; --accent-rgb:55,177,188; --accent-2:#5cc7d0; --on-accent:#04222;
   --good:#4bb389; --good-bg:#123329; --warn:#d6a03f; --warn-bg:#33280f; --crit:#df6a5d; --crit-bg:#37201d;
-  --line-2:#1c3138; --on-accent:#062028;
+  --line-2:#1c3138; --on-accent:#062028; --card:#152a31;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35);
 }}
 :root[data-theme="dark"]{
   --bg:#0b1418; --surface:#12242b; --surface-2:#0f1e24; --panel:#152a31;
-  --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41; --line-2:#1c3138; --panel:#152a31;
+  --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41; --line-2:#1c3138; --panel:#152a31; --card:#152a31;
   --accent:#37b1bc; --accent-rgb:55,177,188; --accent-2:#5cc7d0; --on-accent:#062028;
   --good:#4bb389; --good-bg:#123329; --warn:#d6a03f; --warn-bg:#33280f; --crit:#df6a5d; --crit-bg:#37201d;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35);
@@ -1811,9 +1811,11 @@ const HD_INFO={
  adeq:{t:'Adequação de dimensionamento',h:`<p><b>Superdimensionado</b>: consumo baixo p/ a capacidade (medidor grande subregistra vazões baixas) → trocar por calibre <b>menor</b>. <b>Subdimensionado</b>: consumo alto p/ o calibre → trocar por <b>maior</b>. O critério é a <b>faixa de consumo mensal (m³/mês)</b> típica de cada calibre (não a vazão média em m³/h). ⚠️ indício calibrável.</p>`}
 };
 function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.createElement('style'); st.id='hdcss'; st.textContent=`
- #s-hdpri .hdtop3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
- @media(max-width:1000px){#s-hdpri .hdtop3{grid-template-columns:1fr}}
- #s-hdpri .hdbottom{display:grid;grid-template-columns:1fr 1.15fr;gap:14px;align-items:start}
+ body:has(#s-hdpri.on) .wrap{max-width:none}
+ #s-hdpri .hdtop3{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+ @media(max-width:1200px){#s-hdpri .hdtop3{grid-template-columns:repeat(2,1fr)}}
+ @media(max-width:700px){#s-hdpri .hdtop3{grid-template-columns:1fr}}
+ #s-hdpri .hdbottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
  @media(max-width:1000px){#s-hdpri .hdbottom{grid-template-columns:1fr}}
  #s-hdpri .hddist{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line-2);cursor:pointer;font-size:12px}
  #s-hdpri .hddist:hover{background:var(--surface-2)}
@@ -1822,7 +1824,7 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
  #s-hdpri .hddist .bar{flex:0 0 70px;height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
  #s-hdpri .hddist .bar>span{display:block;height:100%}
  #s-hdpri .hddist .vv{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted);min-width:46px;text-align:right}
- #s-hdpri .hddistwrap{max-height:230px;overflow:auto}
+ #s-hdpri .hddistwrap{max-height:340px;overflow:auto}
  #s-hdpri table.hdt{width:100%;border-collapse:collapse;font-size:12px}
  #s-hdpri table.hdt th,#s-hdpri table.hdt td{padding:5px 7px;border-bottom:1px solid var(--line-2);text-align:left;white-space:nowrap}
  #s-hdpri table.hdt th{cursor:pointer;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);z-index:1}
@@ -1879,6 +1881,7 @@ function hdRenderAll(){ const body=$('#hdBody');
  body.innerHTML =
   `<div class="hdtop3">
      <div class="panel" style="margin:0"><div class="phead"><h3>Serviço a abrir</h3>${hdIB('serv')}</div><div class="pbody"><div class="hddistwrap" id="hdDistServ">${hdDistServ()}</div></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Prioridades</h3>${hdIB('ips')}</div><div class="pbody"><div class="hddistwrap" id="hdDistCat">${hdDistCat()}</div></div></div>
      <div class="panel" style="margin:0"><div class="phead"><h3>Motivos de priorização</h3>${hdIB('ips')}</div><div class="pbody"><div class="hddistwrap" id="hdDistMot">${hdDistMot()}</div></div></div>
      <div class="panel" style="margin:0"><div class="phead"><h3>Adequação de dimensionamento</h3>${hdIB('adeq')}</div><div class="pbody"><div class="hddistwrap" id="hdDistAdeq">${hdDistAdeq()}</div></div></div>
    </div>
@@ -1890,13 +1893,14 @@ function hdRenderAll(){ const body=$('#hdBody');
    </div>`;
  hdSyncHeader(); hdWire(); hdInitMap();
 }
-function hdBars(obj, fmtLab, activeKey, filterProp, color){
- const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]), mx=Math.max(1,...e.map(x=>x[1]));
+function hdBars(obj, fmtLab, activeKey, filterProp, color, keepOrder){
+ let e=Object.entries(obj); if(!keepOrder)e=e.sort((a,b)=>b[1]-a[1]); const mx=Math.max(1,...e.map(x=>x[1]));
  return e.map(([k,n])=>{ const f=fmtLab(k); const on=hdF[filterProp]===k;
    return `<div class="hddist ${on?'on':''}" data-fk="${encodeURIComponent(k)}" data-fp="${filterProp}"><span class="lab">${f.lab}</span><div class="bar"><span style="width:${Math.round(n/mx*100)}%;background:${f.c||color}"></span></div><span class="vv">${fmt(n)}</span></div>`;
  }).join('')||'<p class="note" style="margin:0">—</p>';
 }
 function hdDistServ(){ return hdBars((hdResumo||{}).por_codigo||{}, code=>{ const cap=HD_COD2CAL[code]; return {lab: cap?(`<b>CAP ${cap}</b> · ${hdQ3(cap)} m³/h · ${code}`):'Fora do contrato', c:'#4b9fe0'}; }, hdF.codigo, 'codigo'); }
+function hdDistCat(){ const pc=(hdResumo||{}).por_categoria||{}, obj={}; ['P1','P2','P3','P4','P5'].forEach(k=>{ if(pc[k]!=null)obj[k]=pc[k]; }); return hdBars(obj, k=>({lab:`<span style="color:${(HD_CAT[k]||{}).c}"><b>${k}</b> · ${((HD_CAT[k]||{}).l||'').split('· ')[1]||''}</span>`, c:(HD_CAT[k]||{}).c||'#888'}), hdF.cat, 'cat', null, true); }
 function hdDistMot(){ return hdBars((hdResumo||{}).por_motivo||{}, m=>({lab:m}), hdF.motivo, 'motivo', 'var(--accent)'); }
 function hdDistAdeq(){ const adL={superdimensionado:'Superdimensionado',subdimensionado:'Subdimensionado',adequado:'Adequado',mudanca:'Mudança de faixa',indeterminado:'Indeterminado'}; return hdBars((hdResumo||{}).por_adequacao||{}, k=>({lab:`<span style="color:${(HD_ADEQ[k]||{}).c||'inherit'}">${adL[k]||k}</span>`, c:(HD_ADEQ[k]||{}).c||'#888'}), hdF.adequacao, 'adequacao'); }
 function hdCmp(a,b){ const k=hdSort.k,d=hdSort.dir; let va=a[k],vb=b[k]; if(va==null)va=(typeof vb==='string'?'':-Infinity); if(vb==null)vb=(typeof va==='string'?'':-Infinity); if(typeof va==='string'||typeof vb==='string')return d*String(va).localeCompare(String(vb)); return d*(va-vb); }
@@ -1985,7 +1989,7 @@ function hdReload(){
  Promise.all([ sbg.rpc('app_nrw_hd_resumo',hdFilterArgs()), sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:300,p_offset:0})) ])
  .then(([r1,r2])=>{ if(r1.error||r2.error)return; hdResumo=r1.data||{}; const rk=r2.data||{}; hdRows=rk.rows||[]; hdTotal=rk.total||0;
   const u=(id,html)=>{ const e=$('#'+id); if(e)e.innerHTML=html; };
-  u('hdDistServ',hdDistServ()); u('hdDistMot',hdDistMot()); u('hdDistAdeq',hdDistAdeq()); u('hdRankWrap',hdRankTable());
+  u('hdDistServ',hdDistServ()); u('hdDistCat',hdDistCat()); u('hdDistMot',hdDistMot()); u('hdDistAdeq',hdDistAdeq()); u('hdRankWrap',hdRankTable());
   hdSyncHeader(); hdWire(); hdLoadMap();
  });
 }
