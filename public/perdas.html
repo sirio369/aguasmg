@@ -297,6 +297,7 @@ tbody tr:hover{background:var(--surface-2)}
         <button data-za="ZA0200">Betim</button>
         <button data-za="ZA1004">Contagem</button>
       </div>
+      <button class="sel hdhf" id="hdPrem" title="Premissas de priorização (pesos, cortes e faixas)" aria-label="premissas" hidden>⚙️ Premissas</button>
       <select class="sel" id="mes" aria-label="competência">
         <option>set/2026</option><option>ago/2026</option><option>jul/2026</option>
       </select>
@@ -1807,7 +1808,7 @@ function hdMapaArgs(){ const a=hdFilterArgs(); delete a.p_motivo; a.p_limit=8000
 function hdIB(k){ return `<button class="mminfo" data-hdinfo="${k}" title="Sobre">ⓘ</button>`; }
 const HD_INFO={
  serv:{t:'Serviço a abrir (por calibre recomendado)',h:`<p>Distribuição dos <b>códigos de serviço SIENGE</b> a abrir, agrupados pelo <b>calibre recomendado</b> (o que será instalado). Clique numa barra para <b>filtrar</b> a tela inteira por aquele serviço. Y→117 79 00 · A→117 78 00 · B→117 48 00 · C→117 49 00 · D→117 58 00 · E→117 59 00 · F→117 68 00 · G→117 69 00.</p>`},
- ips:{t:'Motivos & IPS',h:`<p>O <b>IPS</b> (0–100) pondera anomalia (~26%), idade (~21%), mudança (~16%), utilização (~16%), dimensionamento (~16%) e modelo (~5%). <b>Motivos</b> são os fatores que dispararam a priorização; clique num motivo para filtrar a tela. Categorias P1≥70 … P5&lt;25.</p>`},
+ ips:{t:'Motivos & IPS',h:`<p>O <b>IPS</b> (0–100) pondera anomalia (15), idade (21), mudança (21), utilização (22), dimensionamento (21) e modelo (0) — pesos ajustáveis em <b>⚙️ Premissas</b> (cabeçalho). <b>Motivos</b> são os fatores que dispararam a priorização; clique num motivo para filtrar a tela. Categorias P1≥70 … P5&lt;25 (cortes também em Premissas).</p>`},
  adeq:{t:'Adequação de dimensionamento',h:`<p><b>Superdimensionado</b>: consumo baixo p/ a capacidade (medidor grande subregistra vazões baixas) → trocar por calibre <b>menor</b>. <b>Subdimensionado</b>: consumo alto p/ o calibre → trocar por <b>maior</b>. O critério é a <b>faixa de consumo mensal (m³/mês)</b> típica de cada calibre (não a vazão média em m³/h). ⚠️ indício calibrável.</p>`}
 };
 function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.createElement('style'); st.id='hdcss'; st.textContent=`
@@ -1850,6 +1851,24 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
  .hddetwrap .hdstats{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;font-size:12.5px;margin:9px 0}
  .hddetwrap .hdstats>div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line-2);padding:3px 0}
  .hddetwrap .hdstats .k{color:var(--muted)}
+ .hdprem .hdpsec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);margin:14px 0 6px;border-bottom:1px solid var(--line-2);padding-bottom:3px}
+ .hdprem .hdprow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;padding:7px 0;border-bottom:1px dashed var(--line-2)}
+ .hdprem .hdprow .nm{font-weight:600;font-size:12.5px}
+ .hdprem .hdprow .ds{grid-column:1/2;font-size:11px;color:var(--muted);line-height:1.4}
+ .hdprem .hdprow .vl{grid-row:1/2;grid-column:2/3;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .hdprem .hdpnum{width:74px;background:var(--surface-2);border:1px solid var(--line);color:inherit;border-radius:7px;padding:4px 7px;font-size:13px;font-family:inherit;text-align:right}
+ .hdprem .hdpnum.sm{width:58px}
+ .hdprem input.hdptxt{width:58px;background:var(--surface-2);border:1px solid var(--line);color:inherit;border-radius:7px;padding:4px 7px;font-size:13px;font-family:inherit;text-align:center}
+ .hdprem .hdpsum{font-size:11.5px;color:var(--muted);margin:4px 0 0;text-align:right}
+ .hdprem .hdpsum b.bad{color:var(--crit)} .hdprem .hdpsum b.ok{color:var(--good)}
+ .hdprem table.hdpc{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:2px}
+ .hdprem table.hdpc th,.hdprem table.hdpc td{padding:4px 5px;border-bottom:1px solid var(--line-2);text-align:right;white-space:nowrap}
+ .hdprem table.hdpc th{color:var(--muted);font-weight:600}
+ .hdprem table.hdpc td.l,.hdprem table.hdpc th.l{text-align:left}
+ .hdprem table.hdpc tr.foc{background:rgba(var(--accent-rgb),.09)}
+ .hdprem .hdpbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+ .hdprem .hdpmsg{margin-right:auto;font-size:12px}
+ .hdprem .hdpmsg-ok{color:var(--good)} .hdprem .hdpmsg-bad{color:var(--crit)}
 `; document.head.appendChild(st); }
 
 /* ---- filtros no cabeçalho ---- */
@@ -1862,8 +1881,103 @@ function hdSyncHeader(){
  const motL=Object.keys((hdResumo&&hdResumo.por_motivo)||{});
  set('hdfMot',[['','Todos motivos']].concat(motL.map(m=>[m,m])),hdF.motivo,'motivo');
  const bs=$('#hdfBusca'); if(bs){ bs.hidden=false; bs.value=hdF.busca||''; bs.onchange=()=>{ hdF.busca=bs.value.trim(); hdReload(); }; }
+ const pb=$('#hdPrem'); if(pb){ pb.hidden=false; pb.onclick=hdPremissas; }
 }
-function hdHeaderReset(){ ['hdfCat','hdfMot','hdfCap','hdfSit','hdfInt','hdfBusca'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
+function hdHeaderReset(){ ['hdfCat','hdfMot','hdfCap','hdfSit','hdfInt','hdfBusca','hdPrem'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
+
+/* ---- premissas internas (popup escondido no cabeçalho) ---- */
+let hdPremData=null, hdPremEdit=false;
+const HD_WDESC=[
+ ['w_anomalia','Anomalia de consumo','Score de anomalia da análise por matrícula (fraude, sub-registro, factível). Entra no IPS como <b>sc_anomalia</b> (0–100).'],
+ ['w_idade','Idade do medidor','<b>sc_idade</b> = idade (anos) × 5, teto 100. Captura desgaste/erro metrológico acumulado.'],
+ ['w_mudanca','Mudança de perfil','<b>sc_mudança</b>: compara a média dos 6 primeiros × 6 últimos meses + migração de faixa de consumo (+20). Perfil que mudou tende a ter medidor inadequado.'],
+ ['w_utilizacao','Utilização','<b>sc_utilização</b>: consumo no topo da faixa do calibre = 85, no piso = 20, no meio = 45 (sem faixa = 30). Mede o quanto o medidor é exigido.'],
+ ['w_dimensionamento','Dimensionamento','<b>sc_dimensionamento</b>: adequado 10 · mudança 45 · subdimensionado 80 · superdimensionado 85. É o eixo que decide a <b>troca de calibre</b>.'],
+ ['w_modelo','Modelo','Reservado. Neutro (não pontua) até existir histórico de substituições por família de modelo.']
+];
+const HD_PDESC=[
+ ['p1_min','P1 · Substituição prioritária','IPS ≥ este valor → topo da lista operacional de troca.'],
+ ['p2_min','P2 · Alta prioridade','IPS ≥ este valor (e abaixo de P1) → programar no próximo ciclo.'],
+ ['p3_min','P3 · Avaliação','IPS ≥ este valor (e abaixo de P2) → avaliar caso a caso.'],
+ ['p4_min','P4 · Monitoramento','IPS ≥ este valor (e abaixo de P3). Abaixo deste corte = P5 · sem prioridade.']
+];
+function hdPremissas(){
+ mmCss(); hdCss();
+ mmModal('Premissas de priorização', '<p class="note" style="margin:0">Carregando premissas…</p>');
+ sbg.rpc('app_nrw_hd_premissas').then(r=>{
+  if(r.error){ mmModal('Premissas de priorização','<p class="note" style="color:var(--crit)">Sem acesso ou erro ao carregar: '+(r.error.message||'')+'</p>'); return; }
+  hdPremData=r.data||{}; hdPremEdit=false; hdPremRender();
+ });
+}
+function hdPremRender(){
+ const d=hdPremData||{}, c=d.config||{}, cal=(d.calibre||[]), ed=hdPremEdit;
+ const val=(id,v,cls)=> ed?`<input class="hdpnum ${cls||''}" data-k="${id}" type="number" step="any" value="${v!=null?(''+v).replace(',','.'):''}">`:`<b>${v!=null?hdNv(v):'—'}</b>`;
+ const row=(nm,ds,vl)=>`<div class="hdprow"><div class="nm">${nm}</div><div class="vl">${vl}</div><div class="ds">${ds}</div></div>`;
+ // pesos
+ const pesos=HD_WDESC.map(([k,nm,ds])=>row(nm,ds,val(k,c[k]))).join('');
+ // cortes
+ const cortes=HD_PDESC.map(([k,nm,ds])=>row(nm,ds,val(k,c[k],'sm'))).join('');
+ // outros
+ const outros=
+   row('Idade "alta" (anos)','A partir deste limite o medidor ganha o motivo <b>"Idade elevada"</b> e nível de idade = alta.', val('idade_alta',c.idade_alta,'sm'))
+ + row('Classe metrológica padrão','Classe assumida quando o cadastro não traz a informação. Usada no perfil do medidor.',
+     ed?`<input class="hdptxt" data-k="classe_default" value="${c.classe_default||''}" maxlength="2">`:`<b>${c.classe_default||'—'}</b>`);
+ // calibre
+ const calRows=cal.map(x=>{
+   const inc=x.in_contrato;
+   const mn= ed?`<input class="hdpnum sm" data-cap="${x.cap}" data-k="cons_tip_min" type="number" step="any" value="${x.cons_tip_min!=null?x.cons_tip_min:''}">`:hdNv(x.cons_tip_min);
+   const mx= ed?`<input class="hdpnum sm" data-cap="${x.cap}" data-k="cons_tip_max" type="number" step="any" value="${x.cons_tip_max!=null?x.cons_tip_max:''}">`:hdNv(x.cons_tip_max);
+   return `<tr class="${inc?'foc':''}"><td class="l"><b>${x.cap}</b></td><td>${hdNv(x.q3)}</td><td class="l">${x.aplicacao||''}</td><td>${mn}</td><td>${mx}</td><td class="l">${inc?(x.codigo_servico||'✓'):'<span class="note">fora</span>'}</td></tr>`;
+ }).join('');
+ const sumHtml = ed?`<p class="hdpsum" id="hdPsum"></p>`:'';
+ const html = `<div class="hdprem">
+   <p class="note" style="margin:0 0 4px">Estes são os <b>parâmetros internos</b> que nós definimos como premissa da priorização — não vêm de regra oficial da COPASA, são calibráveis. Cada um indica <b>onde entra no cálculo</b> da substituição. <i>${c.observacao?('Última nota: '+c.observacao):''}</i></p>
+
+   <div class="hdpsec">Pesos do IPS <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— o IPS (0–100) é a média ponderada dos scores abaixo; fator sem dado redistribui o peso</span></div>
+   ${pesos}${sumHtml}
+
+   <div class="hdpsec">Cortes de categoria (pelo IPS)</div>
+   ${cortes}
+
+   <div class="hdpsec">Outros limiares</div>
+   ${outros}
+
+   <div class="hdpsec">Faixas de consumo por calibre (m³/mês) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— a régua do dimensionamento e da recomendação de troca</span></div>
+   <p class="note" style="margin:0 0 4px;font-size:11px">Define o <b>recomendado</b> (menor calibre do contrato cuja faixa cobre o consumo), <b>superdimensionado</b> (consumo &lt; mínimo) e <b>subdimensionado</b> (consumo &gt; máximo × 1,5). Linhas destacadas = dentro do contrato de troca (editáveis min/máx).</p>
+   <table class="hdpc"><thead><tr><th class="l">CAP</th><th>q3 (m³/h)</th><th class="l">Aplicação típica</th><th>mín</th><th>máx</th><th class="l">Código / contrato</th></tr></thead><tbody>${calRows}</tbody></table>
+
+   <div class="hdpbar">
+     <span class="hdpmsg" id="hdPmsg"></span>
+     ${ed? `<button class="hdbtn sec" id="hdPcancel">Cancelar</button><button class="hdbtn" id="hdPsave">💾 Salvar e recalcular</button>`
+         : `<button class="hdbtn sec" id="hdPedit">✎ Editar premissas</button>`}
+   </div>
+ </div>`;
+ mmModal('Premissas de priorização', html);
+ const sum=()=>{ const el=document.getElementById('hdPsum'); if(!el)return; let s=0; HD_WDESC.forEach(([k])=>{ const i=document.querySelector('#mmModal .hdpnum[data-k="'+k+'"]'); if(i)s+=(+i.value||0); }); const ok=Math.round(s)===100; el.innerHTML=`Soma dos pesos: <b class="${ok?'ok':'bad'}">${br1(s)}</b> ${ok?'(100 ✓)':'(o IPS normaliza de qualquer forma, mas 100 facilita a leitura)'}`; };
+ if(ed){ document.querySelectorAll('#mmModal .hdprem .hdpnum[data-k^="w_"]').forEach(i=>i.oninput=sum); sum();
+   const cc=document.getElementById('hdPcancel'); if(cc)cc.onclick=()=>{ hdPremEdit=false; hdPremRender(); };
+   const sv=document.getElementById('hdPsave'); if(sv)sv.onclick=hdPremSave;
+ } else { const eb=document.getElementById('hdPedit'); if(eb)eb.onclick=()=>{ hdPremEdit=true; hdPremRender(); }; }
+}
+function hdPremSave(){
+ const cfg={};
+ const grab=k=>{ const i=document.querySelector('#mmModal .hdprem .hdpnum[data-k="'+k+'"]'); return i&&i.value!==''?(+i.value):null; };
+ ['w_anomalia','w_idade','w_mudanca','w_utilizacao','w_dimensionamento','w_modelo','p1_min','p2_min','p3_min','p4_min','idade_alta'].forEach(k=>cfg[k]=grab(k));
+ const ct=document.querySelector('#mmModal .hdprem input.hdptxt[data-k="classe_default"]'); if(ct)cfg.classe_default=ct.value.trim()||null;
+ const cal=[]; document.querySelectorAll('#mmModal .hdpc input.hdpnum[data-cap]').forEach(i=>{
+   let r=cal.find(x=>x.cap===i.dataset.cap); if(!r){ r={cap:i.dataset.cap}; cal.push(r); } r[i.dataset.k]=i.value!==''?(+i.value):null;
+ });
+ const msg=document.getElementById('hdPmsg'), sv=document.getElementById('hdPsave');
+ if(msg){ msg.className='hdpmsg'; msg.textContent='Salvando e recalculando o ranking…'; } if(sv)sv.disabled=true;
+ sbg.rpc('app_nrw_hd_premissas_salvar',{p_config:cfg,p_calibre:cal}).then(r=>{
+  if(r.error){ if(msg){ msg.className='hdpmsg hdpmsg-bad'; msg.textContent='Erro: '+(r.error.message||'sem permissão'); } if(sv)sv.disabled=false; return; }
+  if(msg){ msg.className='hdpmsg hdpmsg-ok'; msg.textContent='Premissas salvas · '+fmt(r.data||0)+' matrículas recalculadas.'; }
+  hdDetCache={}; // invalida detalhes em cache (faixas mudaram)
+  // recarrega premissas (nota/observação) e a tela inteira
+  sbg.rpc('app_nrw_hd_premissas').then(rr=>{ if(!rr.error){ hdPremData=rr.data||{}; } hdPremEdit=false; setTimeout(hdPremRender,650); });
+  hdReload();
+ });
+}
 
 function hdInit(){ mmCss(); hdCss();
  const body=$('#hdBody'); if(!body)return;
