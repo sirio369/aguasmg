@@ -292,21 +292,19 @@ tbody tr:hover{background:var(--surface-2)}
       <button class="menubtn" id="menubtn" aria-label="menu">☰</button>
       <h2 id="scr-title">Painel de Perdas</h2>
       <div class="spacer"></div>
+      <button class="sel hdhf" id="hdMetodo" title="Metodologia — como a nota (IPS) de troca é calculada" aria-label="metodologia" hidden>📘 Metodologia</button>
+      <button class="sel hdhf" id="hdPrem" title="Premissas de priorização (pesos, cortes e faixas)" aria-label="premissas" hidden>⚙️ Premissas</button>
       <div class="seg" id="zaseg" role="group" aria-label="consórcio">
         <button data-za="all" class="on">Ambos</button>
         <button data-za="ZA0200">Betim</button>
         <button data-za="ZA1004">Contagem</button>
       </div>
-      <button class="sel hdhf" id="hdPrem" title="Premissas de priorização (pesos, cortes e faixas)" aria-label="premissas" hidden>⚙️ Premissas</button>
       <select class="sel" id="mes" aria-label="competência">
         <option>set/2026</option><option>ago/2026</option><option>jul/2026</option>
       </select>
       <select class="sel" id="mesDmc" aria-label="DMC" hidden></select>
-      <select class="sel hdhf" id="hdfCat" aria-label="categoria" hidden></select>
-      <select class="sel hdhf" id="hdfCap" aria-label="calibre" hidden></select>
       <select class="sel hdhf" id="hdfSit" aria-label="situação da ligação" hidden></select>
-      <select class="sel hdhf" id="hdfInt" aria-label="posição do padrão" hidden></select>
-      <select class="sel hdhf" id="hdfMot" aria-label="motivo" hidden></select>
+      <select class="sel hdhf" id="hdfInt" aria-label="situação do padrão" hidden></select>
       <input class="sel hdhf" id="hdfBusca" type="search" placeholder="matrícula…" aria-label="busca matrícula" hidden>
     </div>
     <div class="wrap">
@@ -1870,6 +1868,11 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
  .hdprem input.hdpdesc{width:100%;min-width:150px;background:var(--surface-2);border:1px solid var(--line);color:inherit;border-radius:7px;padding:4px 7px;font-size:11px;font-family:inherit}
  .hdprem table.hdpc td:last-child{width:100%}
  .mmmodal-bx:has(.hdprem){max-width:720px}
+ .mmmodal-bx:has(.hdmetodo){max-width:680px}
+ .hdmetodo .hdmc{margin:8px 0;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
+ .hdmetodo .hdmc>b{font-size:13px}
+ .hdmetodo .hdmc .d{font-size:11.5px;color:var(--ink-2);margin-top:3px;line-height:1.45}
+ .hdmetodo code{background:rgba(var(--accent-rgb),.1);padding:0 4px;border-radius:4px;font-size:11px}
  .hdprem .hdpbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
  .hdprem .hdpmsg{margin-right:auto;font-size:12px}
  .hdprem .hdpmsg-ok{color:var(--good)} .hdprem .hdpmsg-bad{color:var(--crit)}
@@ -1878,16 +1881,71 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
 /* ---- filtros no cabeçalho ---- */
 function hdSyncHeader(){
  const set=(id,opts,cur,prop)=>{ const el=$('#'+id); if(!el)return; el.hidden=false; el.innerHTML=opts.map(o=>`<option value="${o[0]}"${o[0]===cur?' selected':''}>${o[1]}</option>`).join(''); el.onchange=()=>{ hdF[prop]=el.value; hdReload(); }; };
- set('hdfCat',[['','Todas categorias'],['P1','P1 · Prioritária'],['P2','P2 · Alta'],['P3','P3 · Avaliação'],['P4','P4 · Monitorar'],['P5','P5 · Sem prior.']],hdF.cat,'cat');
- set('hdfCap',[['','Todos calibres']].concat(['Y','A','B','C','D','E','F','G'].map(c=>[c,'CAP '+c])),hdF.cap,'cap');
  set('hdfSit',[['ativa','Só ligação ativa'],['todas','Todas as situações'],['inativa','Só inativas']],hdF.situacao,'situacao');
- set('hdfInt',[['','Interno + externo'],['INTERNO','Só interno'],['EXTERNO','Só externo']],hdF.interno,'interno');
- const motL=Object.keys((hdResumo&&hdResumo.por_motivo)||{});
- set('hdfMot',[['','Todos motivos']].concat(motL.map(m=>[m,m])),hdF.motivo,'motivo');
+ set('hdfInt',[['','Padrão interno + externo'],['INTERNO','Padrão interno'],['EXTERNO','Padrão externo']],hdF.interno,'interno');
  const bs=$('#hdfBusca'); if(bs){ bs.hidden=false; bs.value=hdF.busca||''; bs.onchange=()=>{ hdF.busca=bs.value.trim(); hdReload(); }; }
+ const mb=$('#hdMetodo'); if(mb){ mb.hidden=false; mb.onclick=hdMetodologia; }
  const pb=$('#hdPrem'); if(pb){ pb.hidden=false; pb.onclick=hdPremissas; }
 }
-function hdHeaderReset(){ ['hdfCat','hdfMot','hdfCap','hdfSit','hdfInt','hdfBusca','hdPrem'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
+function hdHeaderReset(){ ['hdfSit','hdfInt','hdfBusca','hdPrem','hdMetodo'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
+
+/* ---- metodologia (popup: como a nota de troca é calculada) ---- */
+function hdMetodologia(){ mmCss(); hdCss();
+ const chip=(t,c)=>`<span style="display:inline-block;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;color:#fff;background:${c}">${t}</span>`;
+ const H=`<div class="hdprem hdmetodo">
+  <p class="note" style="margin:0 0 6px">A nota de troca é o <b>IPS</b> (índice 0–100). <b>Não</b> é "medidor velho = troca": o IPS combina <b>5 evidências</b>, cada uma virando uma nota 0–100, e o resultado define a prioridade <b>P1–P5</b>. O calibre recomendado e o código SIGOS saem <b>em paralelo</b> (não entram na nota).</p>
+
+  <div class="hdpsec">Passo a passo</div>
+  <p style="margin:2px 0"><b>0 · Entrar na conta.</b> A matrícula precisa de cadastro de hidrômetro + histórico de micromedição (18 meses). Sem isso → "dados insuficientes".</p>
+  <p style="margin:2px 0"><b>1 · Montar o perfil de consumo.</b> Dos 18 meses: média, mediana, percentis, faixa predominante, meses zerados e a média dos <b>6 primeiros × 6 últimos</b> meses. A referência de consumo usada nos cálculos é <b>ref = mediana</b> (se 0, cai p/ média, depois p/ p50).</p>
+  <p style="margin:2px 0"><b>2 · Converter em 5 notas-componente (0–100).</b> Detalhe de cada uma abaixo.</p>
+  <p style="margin:2px 0"><b>3 · Média ponderada pelos pesos → IPS.</b> Componente sem dado sai do numerador <i>e</i> do denominador (o peso é redistribuído).</p>
+  <p style="margin:2px 0"><b>4 · Classificar pela nota.</b> P1 ≥ 70 · P2 ≥ 55 · P3 ≥ 40 · P4 ≥ 25 · P5 abaixo.</p>
+  <p style="margin:2px 0 0"><b>5 · Em paralelo (não pontua):</b> calibre recomendado + código SIGOS, motivos (tags), justificativa, remanejamento (interno+ativa) e os filtros situação/padrão.</p>
+
+  <div class="hdpsec">Passo 2 em detalhe — os componentes</div>
+
+  <div class="hdmc">${chip('peso 15','#8a8f98')} <b>① Anomalia de consumo</b>
+   <div class="d"><b>Mede:</b> consumo suspeito — fraude, sub-registro, factível. Não é dimensionamento, é comportamento.</div>
+   <div class="d"><b>Pontua:</b> reusa o <b>score de anomalia (0–100)</b> já calculado na <i>análise por matrícula</i> (micromedido). O motor de HD não recalcula, só aproveita.</div></div>
+
+  <div class="hdmc">${chip('peso 21','#8a8f98')} <b>② Idade do medidor</b>
+   <div class="d"><b>Mede:</b> desgaste metrológico — hidrômetro mecânico sub-registra com o tempo. Proxy de erro acumulado, independente do consumo.</div>
+   <div class="d"><b>Pontua:</b> <b>idade × 5</b>, saturando em 100 (10 anos = 50; 20+ anos = 100). Acima do limiar de "idade alta" (10 anos) também gera o motivo "Idade elevada".</div></div>
+
+  <div class="hdmc">${chip('peso 21','#8a8f98')} <b>③ Mudança de perfil</b>
+   <div class="d"><b>Mede:</b> o consumo mudou de patamar nos 18 meses — quase sempre o medidor deixou de ser adequado (ampliação, vazamento, desocupação).</div>
+   <div class="d"><b>Pontua:</b> variação % entre a média dos <b>6 primeiros × 6 últimos</b> meses, <b>+20</b> se mudou de faixa de consumo, saturando em 100.</div></div>
+
+  <div class="hdmc">${chip('peso 22','#0e7c86')} <b>④ Utilização</b> <span class="note">(maior peso)</span>
+   <div class="d"><b>Mede:</b> o quanto o medidor é exigido frente à faixa nominal do seu calibre.</div>
+   <div class="d"><b>Pontua</b> (ref × faixa do calibre atual): ref ≥ máximo → <b>alta = 85</b> · ref ≤ mínimo → <b>baixa = 20</b> · entre os dois → <b>média = 45</b> · sem faixa → 30.</div></div>
+
+  <div class="hdmc">${chip('peso 21','#0e7c86')} <b>⑤ Dimensionamento</b> <span class="note">— eixo que dispara a troca de calibre</span>
+   <div class="d"><b>Mede:</b> se o calibre está certo para o consumo. É aqui que nasce "trocar por maior/menor".</div>
+   <div class="d"><b>Pontua</b> (ref × faixa): ref &gt; máximo × 1,5 → <b>subdimensionado = 80</b> · ref &lt; mínimo → <b>superdimensionado = 85</b> · mudou de faixa sem estourar → <b>mudança = 45</b> · dentro da faixa → <b>adequado = 10</b> · sem dados → não pontua.</div>
+   <div class="d"><b>Por que super (85) &gt; sub (80):</b> medidor grande demais sub-registra vazões baixas de forma sistemática = perda aparente garantida.</div></div>
+
+  <div class="hdmc">${chip('peso 0','#c7ccd1')} <b>⑥ Modelo</b> <span class="note">(hoje neutro)</span>
+   <div class="d"><b>Mede:</b> falha por família de modelo. Reservado — enquanto não houver histórico de trocas, fica sem nota e o peso é redistribuído.</div></div>
+
+  <p class="note" style="margin:8px 0 0"><b>Amarra importante:</b> ④ Utilização e ⑤ Dimensionamento leem a <b>mesma régua</b> (as faixas <code>cons_tip</code> por calibre) — calibrar uma faixa move os dois.</p>
+
+  <div class="hdpsec">Exemplo real — matrícula 2212803 (CAP B, 13 anos)</div>
+  <p class="note" style="margin:0 0 4px">Consumo foi de 74 → 170 m³/mês (mediana 157). Faixa do B = 15–60 m³/mês.</p>
+  <table class="hdpc"><thead><tr><th class="l">Componente</th><th>peso</th><th>score</th><th>peso × score</th></tr></thead><tbody>
+   <tr><td class="l">① Anomalia</td><td>15</td><td>34,7</td><td>520,5</td></tr>
+   <tr><td class="l">② Idade (13×5)</td><td>21</td><td>65,0</td><td>1.365</td></tr>
+   <tr><td class="l">③ Mudança (+130% e mudou de faixa → teto)</td><td>21</td><td>100,0</td><td>2.100</td></tr>
+   <tr><td class="l">④ Utilização (157 &gt; 60 → alta)</td><td>22</td><td>85,0</td><td>1.870</td></tr>
+   <tr><td class="l">⑤ Dimensionamento (157 &gt; 60×1,5 → subdim.)</td><td>21</td><td>80,0</td><td>1.680</td></tr>
+   <tr class="foc"><td class="l"><b>IPS = 7.535,5 ÷ 100</b></td><td colspan="2"></td><td><b>75,4 → P1</b></td></tr>
+  </tbody></table>
+  <p class="note" style="margin:6px 0 0">O que puxou p/ P1 foi a convergência <b>mudança (100) + utilização (85) + dimensionamento (80)</b>: um CAP B de 13 anos virou pequeno para um consumo que dobrou. Recomendado <b>B → D</b> (faixa 80–250 cobre 157) → código 117 58 00.</p>
+  <p class="note" style="margin:6px 0 0;font-size:11px">Todos os <b>pesos, cortes e faixas</b> deste cálculo são ajustáveis em <b>⚙️ Premissas</b> — ao salvar, o IPS e as categorias recalculam na hora.</p>
+ </div>`;
+ mmModal('Metodologia — como a nota de troca é calculada', H);
+}
 
 /* ---- premissas internas (popup escondido no cabeçalho) ---- */
 let hdPremData=null, hdPremEdit=false;
