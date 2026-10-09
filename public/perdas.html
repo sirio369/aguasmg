@@ -1890,8 +1890,36 @@ function hdSyncHeader(){
 function hdHeaderReset(){ ['hdfSit','hdfInt','hdfBusca','hdPrem','hdMetodo'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
 
 /* ---- metodologia (popup: como a nota de troca é calculada) ---- */
+/* EXEMPLO CONGELADO — snapshot fixo, NÃO dinâmico. Não muda se as premissas forem alteradas. */
+const HD_EXEMPLO={
+ titulo:'Matrícula 2212803 (CAP B, 13 anos)',
+ contexto:'Consumo foi de 74 → 170 m³/mês (mediana 157). Faixa do B = 15–60 m³/mês.',
+ pesosRef:'15 / 21 / 21 / 22 / 21',
+ comp:[
+  ['① Anomalia','15','34,7','520,5'],
+  ['② Idade (13×5)','21','65,0','1.365'],
+  ['③ Mudança (+130% e mudou de faixa → teto)','21','100,0','2.100'],
+  ['④ Utilização (157 &gt; 60 → alta)','22','85,0','1.870'],
+  ['⑤ Dimensionamento (157 &gt; 60×1,5 → subdim.)','21','80,0','1.680']
+ ],
+ soma:'7.535,5', denom:'100', ips:'75,4', cat:'P1',
+ fecho:'O que puxou p/ P1 foi a convergência <b>mudança (100) + utilização (85) + dimensionamento (80)</b>: um CAP B de 13 anos virou pequeno para um consumo que dobrou. Recomendado <b>B → D</b> (faixa 80–250 cobre 157) → código 117 58 00.'
+};
 function hdMetodologia(){ mmCss(); hdCss();
- const chip=(t,c)=>`<span style="display:inline-block;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;color:#fff;background:${c}">${t}</span>`;
+ if(!hdPremData||!hdPremData.config){ sbg.rpc('app_nrw_hd_premissas').then(r=>{ if(r&&!r.error&&r.data){ hdPremData=r.data; hdCodMap=hdBuildCodMap(r.data.calibre); } hdRenderMetodologia(); }); return; }
+ hdRenderMetodologia();
+}
+function hdRenderMetodologia(){
+ const c=(hdPremData&&hdPremData.config)||{};
+ const W={anomalia:c.w_anomalia,idade:c.w_idade,mudanca:c.w_mudanca,utilizacao:c.w_utilizacao,dimensionamento:c.w_dimensionamento,modelo:c.w_modelo};
+ const wn=[['anomalia',W.anomalia],['idade',W.idade],['mudanca',W.mudanca],['utilizacao',W.utilizacao],['dimensionamento',W.dimensionamento]].filter(x=>x[1]!=null).map(x=>[x[0],+x[1]]);
+ const maxKey=wn.length?wn.reduce((a,b)=>b[1]>a[1]?b:a)[0]:null;
+ const chip=(key,color)=>`<span style="display:inline-block;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;color:#fff;background:${color}">${W[key]!=null?('peso '+hdNv(W[key])):'peso —'}</span>`;
+ const maior=key=>key===maxKey?' <span class="note">(maior peso)</span>':'';
+ const cut=(v,d)=>v!=null?hdNv(v):d;
+ const p1=cut(c.p1_min,'70'), p2=cut(c.p2_min,'55'), p3=cut(c.p3_min,'40'), p4=cut(c.p4_min,'25');
+ const idA=c.idade_alta!=null?c.idade_alta:10;
+ const exRows=HD_EXEMPLO.comp.map(r=>`<tr><td class="l">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('');
  const H=`<div class="hdprem hdmetodo">
   <p class="note" style="margin:0 0 6px">A nota de troca é o <b>IPS</b> (índice 0–100). <b>Não</b> é "medidor velho = troca": o IPS combina <b>5 evidências</b>, cada uma virando uma nota 0–100, e o resultado define a prioridade <b>P1–P5</b>. O calibre recomendado e o código SIGOS saem <b>em paralelo</b> (não entram na nota).</p>
 
@@ -1900,49 +1928,45 @@ function hdMetodologia(){ mmCss(); hdCss();
   <p style="margin:2px 0"><b>1 · Montar o perfil de consumo.</b> Dos 18 meses: média, mediana, percentis, faixa predominante, meses zerados e a média dos <b>6 primeiros × 6 últimos</b> meses. A referência de consumo usada nos cálculos é <b>ref = mediana</b> (se 0, cai p/ média, depois p/ p50).</p>
   <p style="margin:2px 0"><b>2 · Converter em 5 notas-componente (0–100).</b> Detalhe de cada uma abaixo.</p>
   <p style="margin:2px 0"><b>3 · Média ponderada pelos pesos → IPS.</b> Componente sem dado sai do numerador <i>e</i> do denominador (o peso é redistribuído).</p>
-  <p style="margin:2px 0"><b>4 · Classificar pela nota.</b> P1 ≥ 70 · P2 ≥ 55 · P3 ≥ 40 · P4 ≥ 25 · P5 abaixo.</p>
+  <p style="margin:2px 0"><b>4 · Classificar pela nota.</b> P1 ≥ ${p1} · P2 ≥ ${p2} · P3 ≥ ${p3} · P4 ≥ ${p4} · P5 abaixo.</p>
   <p style="margin:2px 0 0"><b>5 · Em paralelo (não pontua):</b> calibre recomendado + código SIGOS, motivos (tags), justificativa, remanejamento (interno+ativa) e os filtros situação/padrão.</p>
 
   <div class="hdpsec">Passo 2 em detalhe — os componentes</div>
 
-  <div class="hdmc">${chip('peso 15','#8a8f98')} <b>① Anomalia de consumo</b>
+  <div class="hdmc">${chip('anomalia','#8a8f98')} <b>① Anomalia de consumo</b>${maior('anomalia')}
    <div class="d"><b>Mede:</b> consumo suspeito — fraude, sub-registro, factível. Não é dimensionamento, é comportamento.</div>
    <div class="d"><b>Pontua:</b> reusa o <b>score de anomalia (0–100)</b> já calculado na <i>análise por matrícula</i> (micromedido). O motor de HD não recalcula, só aproveita.</div></div>
 
-  <div class="hdmc">${chip('peso 21','#8a8f98')} <b>② Idade do medidor</b>
+  <div class="hdmc">${chip('idade','#8a8f98')} <b>② Idade do medidor</b>${maior('idade')}
    <div class="d"><b>Mede:</b> desgaste metrológico — hidrômetro mecânico sub-registra com o tempo. Proxy de erro acumulado, independente do consumo.</div>
-   <div class="d"><b>Pontua:</b> <b>idade × 5</b>, saturando em 100 (10 anos = 50; 20+ anos = 100). Acima do limiar de "idade alta" (10 anos) também gera o motivo "Idade elevada".</div></div>
+   <div class="d"><b>Pontua:</b> <b>idade × 5</b>, saturando em 100 (10 anos = 50; 20+ anos = 100). Acima do limiar de "idade alta" (${idA} anos) também gera o motivo "Idade elevada".</div></div>
 
-  <div class="hdmc">${chip('peso 21','#8a8f98')} <b>③ Mudança de perfil</b>
+  <div class="hdmc">${chip('mudanca','#8a8f98')} <b>③ Mudança de perfil</b>${maior('mudanca')}
    <div class="d"><b>Mede:</b> o consumo mudou de patamar nos 18 meses — quase sempre o medidor deixou de ser adequado (ampliação, vazamento, desocupação).</div>
    <div class="d"><b>Pontua:</b> variação % entre a média dos <b>6 primeiros × 6 últimos</b> meses, <b>+20</b> se mudou de faixa de consumo, saturando em 100.</div></div>
 
-  <div class="hdmc">${chip('peso 22','#0e7c86')} <b>④ Utilização</b> <span class="note">(maior peso)</span>
+  <div class="hdmc">${chip('utilizacao','#0e7c86')} <b>④ Utilização</b>${maior('utilizacao')}
    <div class="d"><b>Mede:</b> o quanto o medidor é exigido frente à faixa nominal do seu calibre.</div>
    <div class="d"><b>Pontua</b> (ref × faixa do calibre atual): ref ≥ máximo → <b>alta = 85</b> · ref ≤ mínimo → <b>baixa = 20</b> · entre os dois → <b>média = 45</b> · sem faixa → 30.</div></div>
 
-  <div class="hdmc">${chip('peso 21','#0e7c86')} <b>⑤ Dimensionamento</b> <span class="note">— eixo que dispara a troca de calibre</span>
+  <div class="hdmc">${chip('dimensionamento','#0e7c86')} <b>⑤ Dimensionamento</b>${maior('dimensionamento')} <span class="note">— eixo que dispara a troca de calibre</span>
    <div class="d"><b>Mede:</b> se o calibre está certo para o consumo. É aqui que nasce "trocar por maior/menor".</div>
    <div class="d"><b>Pontua</b> (ref × faixa): ref &gt; máximo × 1,5 → <b>subdimensionado = 80</b> · ref &lt; mínimo → <b>superdimensionado = 85</b> · mudou de faixa sem estourar → <b>mudança = 45</b> · dentro da faixa → <b>adequado = 10</b> · sem dados → não pontua.</div>
    <div class="d"><b>Por que super (85) &gt; sub (80):</b> medidor grande demais sub-registra vazões baixas de forma sistemática = perda aparente garantida.</div></div>
 
-  <div class="hdmc">${chip('peso 0','#c7ccd1')} <b>⑥ Modelo</b> <span class="note">(hoje neutro)</span>
+  <div class="hdmc">${chip('modelo','#c7ccd1')} <b>⑥ Modelo</b> <span class="note">(hoje neutro — sem nota, independe do peso)</span>
    <div class="d"><b>Mede:</b> falha por família de modelo. Reservado — enquanto não houver histórico de trocas, fica sem nota e o peso é redistribuído.</div></div>
 
   <p class="note" style="margin:8px 0 0"><b>Amarra importante:</b> ④ Utilização e ⑤ Dimensionamento leem a <b>mesma régua</b> (as faixas <code>cons_tip</code> por calibre) — calibrar uma faixa move os dois.</p>
 
-  <div class="hdpsec">Exemplo real — matrícula 2212803 (CAP B, 13 anos)</div>
-  <p class="note" style="margin:0 0 4px">Consumo foi de 74 → 170 m³/mês (mediana 157). Faixa do B = 15–60 m³/mês.</p>
+  <div class="hdpsec">Exemplo (caso congelado) — ${HD_EXEMPLO.titulo}</div>
+  <p class="note" style="margin:0 0 4px"><b>❄ Snapshot fixo:</b> calculado com os <b>pesos de referência (${HD_EXEMPLO.pesosRef})</b> — é uma ilustração do método e <b>não muda</b> se você alterar as premissas (por isso pode diferir dos pesos ao vivo acima). ${HD_EXEMPLO.contexto}</p>
   <table class="hdpc"><thead><tr><th class="l">Componente</th><th>peso</th><th>score</th><th>peso × score</th></tr></thead><tbody>
-   <tr><td class="l">① Anomalia</td><td>15</td><td>34,7</td><td>520,5</td></tr>
-   <tr><td class="l">② Idade (13×5)</td><td>21</td><td>65,0</td><td>1.365</td></tr>
-   <tr><td class="l">③ Mudança (+130% e mudou de faixa → teto)</td><td>21</td><td>100,0</td><td>2.100</td></tr>
-   <tr><td class="l">④ Utilização (157 &gt; 60 → alta)</td><td>22</td><td>85,0</td><td>1.870</td></tr>
-   <tr><td class="l">⑤ Dimensionamento (157 &gt; 60×1,5 → subdim.)</td><td>21</td><td>80,0</td><td>1.680</td></tr>
-   <tr class="foc"><td class="l"><b>IPS = 7.535,5 ÷ 100</b></td><td colspan="2"></td><td><b>75,4 → P1</b></td></tr>
+   ${exRows}
+   <tr class="foc"><td class="l"><b>IPS = ${HD_EXEMPLO.soma} ÷ ${HD_EXEMPLO.denom}</b></td><td colspan="2"></td><td><b>${HD_EXEMPLO.ips} → ${HD_EXEMPLO.cat}</b></td></tr>
   </tbody></table>
-  <p class="note" style="margin:6px 0 0">O que puxou p/ P1 foi a convergência <b>mudança (100) + utilização (85) + dimensionamento (80)</b>: um CAP B de 13 anos virou pequeno para um consumo que dobrou. Recomendado <b>B → D</b> (faixa 80–250 cobre 157) → código 117 58 00.</p>
-  <p class="note" style="margin:6px 0 0;font-size:11px">Todos os <b>pesos, cortes e faixas</b> deste cálculo são ajustáveis em <b>⚙️ Premissas</b> — ao salvar, o IPS e as categorias recalculam na hora.</p>
+  <p class="note" style="margin:6px 0 0">${HD_EXEMPLO.fecho}</p>
+  <p class="note" style="margin:6px 0 0;font-size:11px">Os <b>pesos</b> nos componentes e os <b>cortes</b> do passo 4 refletem a aba <b>⚙️ Premissas</b> ao vivo; ao salvar lá, o IPS e as categorias recalculam na hora. O exemplo acima é fixo.</p>
  </div>`;
  mmModal('Metodologia — como a nota de troca é calculada', H);
 }
