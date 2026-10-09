@@ -1866,6 +1866,10 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
  .hdprem table.hdpc th{color:var(--muted);font-weight:600}
  .hdprem table.hdpc td.l,.hdprem table.hdpc th.l{text-align:left}
  .hdprem table.hdpc tr.foc{background:rgba(var(--accent-rgb),.09)}
+ .hdprem input.hdpcod{width:88px;background:var(--surface-2);border:1px solid var(--line);color:inherit;border-radius:7px;padding:4px 6px;font-size:12px;font-family:inherit;text-align:center;font-variant-numeric:tabular-nums}
+ .hdprem input.hdpdesc{width:100%;min-width:150px;background:var(--surface-2);border:1px solid var(--line);color:inherit;border-radius:7px;padding:4px 7px;font-size:11px;font-family:inherit}
+ .hdprem table.hdpc td:last-child{width:100%}
+ .mmmodal-bx:has(.hdprem){max-width:720px}
  .hdprem .hdpbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
  .hdprem .hdpmsg{margin-right:auto;font-size:12px}
  .hdprem .hdpmsg-ok{color:var(--good)} .hdprem .hdpmsg-bad{color:var(--crit)}
@@ -1906,7 +1910,7 @@ function hdPremissas(){
  mmModal('Premissas de priorização', '<p class="note" style="margin:0">Carregando premissas…</p>');
  sbg.rpc('app_nrw_hd_premissas').then(r=>{
   if(r.error){ mmModal('Premissas de priorização','<p class="note" style="color:var(--crit)">Sem acesso ou erro ao carregar: '+(r.error.message||'')+'</p>'); return; }
-  hdPremData=r.data||{}; hdPremEdit=false; hdPremRender();
+  hdPremData=r.data||{}; hdCodMap=hdBuildCodMap(hdPremData.calibre); hdPremEdit=false; hdPremRender();
  });
 }
 function hdPremRender(){
@@ -1923,11 +1927,24 @@ function hdPremRender(){
  + row('Classe metrológica padrão','Classe assumida quando o cadastro não traz a informação. Usada no perfil do medidor.',
      ed?`<input class="hdptxt" data-k="classe_default" value="${c.classe_default||''}" maxlength="2">`:`<b>${c.classe_default||'—'}</b>`);
  // calibre
+ const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+ const calHead = ed
+   ? `<tr><th class="l">CAP</th><th>q3</th><th>mín</th><th>máx</th><th>contr.</th><th class="l">Cód. SIGOS</th><th class="l">Descrição do serviço (SIGOS)</th></tr>`
+   : `<tr><th class="l">CAP</th><th>q3 (m³/h)</th><th class="l">Aplicação típica</th><th>mín</th><th>máx</th><th class="l">Código / contrato</th></tr>`;
  const calRows=cal.map(x=>{
    const inc=x.in_contrato;
-   const mn= ed?`<input class="hdpnum sm" data-cap="${x.cap}" data-k="cons_tip_min" type="number" step="any" value="${x.cons_tip_min!=null?x.cons_tip_min:''}">`:hdNv(x.cons_tip_min);
-   const mx= ed?`<input class="hdpnum sm" data-cap="${x.cap}" data-k="cons_tip_max" type="number" step="any" value="${x.cons_tip_max!=null?x.cons_tip_max:''}">`:hdNv(x.cons_tip_max);
-   return `<tr class="${inc?'foc':''}"><td class="l"><b>${x.cap}</b></td><td>${hdNv(x.q3)}</td><td class="l">${x.aplicacao||''}</td><td>${mn}</td><td>${mx}</td><td class="l">${inc?(x.codigo_servico||'✓'):'<span class="note">fora</span>'}</td></tr>`;
+   if(ed){
+     const mn=`<input class="hdpnum sm" data-cap="${x.cap}" data-k="cons_tip_min" type="number" step="any" value="${x.cons_tip_min!=null?x.cons_tip_min:''}">`;
+     const mx=`<input class="hdpnum sm" data-cap="${x.cap}" data-k="cons_tip_max" type="number" step="any" value="${x.cons_tip_max!=null?x.cons_tip_max:''}">`;
+     const ck=`<input type="checkbox" data-cap="${x.cap}" data-k="in_contrato" ${inc?'checked':''} title="Dentro do contrato de troca (entra na recomendação)">`;
+     const cd=`<input class="hdpcod" data-cap="${x.cap}" data-k="codigo_servico" value="${esc(x.codigo_servico)}" placeholder="117 00 00">`;
+     const ds=`<input class="hdpdesc" data-cap="${x.cap}" data-k="descricao_servico" value="${esc(x.descricao_servico)}" placeholder="descrição do serviço no SIGOS">`;
+     return `<tr class="${inc?'foc':''}"><td class="l"><b>${x.cap}</b></td><td>${hdNv(x.q3)}</td><td>${mn}</td><td>${mx}</td><td style="text-align:center">${ck}</td><td class="l">${cd}</td><td class="l">${ds}</td></tr>`;
+   }
+   const codcell = inc
+     ? `<b style="font-variant-numeric:tabular-nums">${x.codigo_servico||'✓'}</b>${x.descricao_servico?` <span class="note" title="${esc(x.descricao_servico)}" style="cursor:help">ⓘ</span>`:''}`
+     : '<span class="note">fora</span>';
+   return `<tr class="${inc?'foc':''}"><td class="l"><b>${x.cap}</b></td><td>${hdNv(x.q3)}</td><td class="l">${x.aplicacao||''}</td><td>${hdNv(x.cons_tip_min)}</td><td>${hdNv(x.cons_tip_max)}</td><td class="l">${codcell}</td></tr>`;
  }).join('');
  const sumHtml = ed?`<p class="hdpsum" id="hdPsum"></p>`:'';
  const html = `<div class="hdprem">
@@ -1943,8 +1960,8 @@ function hdPremRender(){
    ${outros}
 
    <div class="hdpsec">Faixas de consumo por calibre (m³/mês) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">— a régua do dimensionamento e da recomendação de troca</span></div>
-   <p class="note" style="margin:0 0 4px;font-size:11px">Define o <b>recomendado</b> (menor calibre do contrato cuja faixa cobre o consumo), <b>superdimensionado</b> (consumo &lt; mínimo) e <b>subdimensionado</b> (consumo &gt; máximo × 1,5). Linhas destacadas = dentro do contrato de troca (editáveis min/máx).</p>
-   <table class="hdpc"><thead><tr><th class="l">CAP</th><th>q3 (m³/h)</th><th class="l">Aplicação típica</th><th>mín</th><th>máx</th><th class="l">Código / contrato</th></tr></thead><tbody>${calRows}</tbody></table>
+   <p class="note" style="margin:0 0 4px;font-size:11px">Define o <b>recomendado</b> (menor calibre do contrato cuja faixa cobre o consumo), <b>superdimensionado</b> (consumo &lt; mínimo) e <b>subdimensionado</b> (consumo &gt; máximo × 1,5). Linhas destacadas = dentro do contrato de troca. ${ed?'Edite faixas, <b>código e descrição do serviço SIGOS</b> e a marca de <b>contrato</b> (o código aberto numa troca é o do calibre recomendado).':'Em <b>Editar</b> dá para alterar as faixas e os <b>códigos SIGOS</b>.'}</p>
+   <table class="hdpc"><thead>${calHead}</thead><tbody>${calRows}</tbody></table>
 
    <div class="hdpbar">
      <span class="hdpmsg" id="hdPmsg"></span>
@@ -1964,8 +1981,11 @@ function hdPremSave(){
  const grab=k=>{ const i=document.querySelector('#mmModal .hdprem .hdpnum[data-k="'+k+'"]'); return i&&i.value!==''?(+i.value):null; };
  ['w_anomalia','w_idade','w_mudanca','w_utilizacao','w_dimensionamento','w_modelo','p1_min','p2_min','p3_min','p4_min','idade_alta'].forEach(k=>cfg[k]=grab(k));
  const ct=document.querySelector('#mmModal .hdprem input.hdptxt[data-k="classe_default"]'); if(ct)cfg.classe_default=ct.value.trim()||null;
- const cal=[]; document.querySelectorAll('#mmModal .hdpc input.hdpnum[data-cap]').forEach(i=>{
-   let r=cal.find(x=>x.cap===i.dataset.cap); if(!r){ r={cap:i.dataset.cap}; cal.push(r); } r[i.dataset.k]=i.value!==''?(+i.value):null;
+ const cal=[]; const calRow=cap=>{ let r=cal.find(x=>x.cap===cap); if(!r){ r={cap}; cal.push(r); } return r; };
+ document.querySelectorAll('#mmModal .hdpc [data-cap]').forEach(i=>{ const r=calRow(i.dataset.cap), k=i.dataset.k;
+   if(i.type==='checkbox') r[k]=i.checked;
+   else if(k==='cons_tip_min'||k==='cons_tip_max') r[k]= i.value!==''?(+i.value):null;
+   else r[k]= i.value; // codigo_servico / descricao_servico (string; '' limpa)
  });
  const msg=document.getElementById('hdPmsg'), sv=document.getElementById('hdPsave');
  if(msg){ msg.className='hdpmsg'; msg.textContent='Salvando e recalculando o ranking…'; } if(sv)sv.disabled=true;
@@ -1974,7 +1994,7 @@ function hdPremSave(){
   if(msg){ msg.className='hdpmsg hdpmsg-ok'; msg.textContent='Premissas salvas · '+fmt(r.data||0)+' matrículas recalculadas.'; }
   hdDetCache={}; // invalida detalhes em cache (faixas mudaram)
   // recarrega premissas (nota/observação) e a tela inteira
-  sbg.rpc('app_nrw_hd_premissas').then(rr=>{ if(!rr.error){ hdPremData=rr.data||{}; } hdPremEdit=false; setTimeout(hdPremRender,650); });
+  sbg.rpc('app_nrw_hd_premissas').then(rr=>{ if(!rr.error){ hdPremData=rr.data||{}; hdCodMap=hdBuildCodMap(hdPremData.calibre); const e=$('#hdDistServ'); if(e){ e.innerHTML=hdDistServ(); hdWireCharts(); } } hdPremEdit=false; setTimeout(hdPremRender,650); });
   hdReload();
  });
 }
@@ -1988,7 +2008,7 @@ function hdInit(){ mmCss(); hdCss();
   const err=r1.error||r2.error;
   if(err){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0;color:var(--crit)">Erro ao carregar: '+(err.message||err)+'</p></div></div>'; return; }
   hdResumo=r1.data||{}; const rk=r2.data||{}; hdRows=rk.rows||[]; hdTotal=rk.total||0;
-  hdRenderAll();
+  hdRenderAll(); hdLoadCodMap();
  });
 }
 function hdRenderAll(){ const body=$('#hdBody');
@@ -2013,7 +2033,10 @@ function hdBars(obj, fmtLab, activeKey, filterProp, color, keepOrder){
    return `<div class="hddist ${on?'on':''}" data-fk="${encodeURIComponent(k)}" data-fp="${filterProp}"><span class="lab">${f.lab}</span><div class="bar"><span style="width:${Math.round(n/mx*100)}%;background:${f.c||color}"></span></div><span class="vv">${fmt(n)}</span></div>`;
  }).join('')||'<p class="note" style="margin:0">—</p>';
 }
-function hdDistServ(){ return hdBars((hdResumo||{}).por_codigo||{}, code=>{ const cap=HD_COD2CAL[code]; return {lab: cap?(`<b>CAP ${cap}</b> · ${hdQ3(cap)} m³/h · ${code}`):'Fora do contrato', c:'#4b9fe0'}; }, hdF.codigo, 'codigo'); }
+let hdCodMap=null;
+function hdBuildCodMap(cal){ const m={}; (cal||[]).forEach(x=>{ if(x.codigo_servico) m[x.codigo_servico]=x.cap; }); return m; }
+function hdLoadCodMap(){ sbg.rpc('app_nrw_hd_premissas').then(r=>{ if(r&&!r.error&&r.data){ hdPremData=r.data; hdCodMap=hdBuildCodMap(r.data.calibre); const e=$('#hdDistServ'); if(e){ e.innerHTML=hdDistServ(); hdWireCharts(); } } }); }
+function hdDistServ(){ return hdBars((hdResumo||{}).por_codigo||{}, code=>{ const cap=(hdCodMap&&hdCodMap[code])||HD_COD2CAL[code]; return {lab: cap?(`<b>CAP ${cap}</b> · ${hdQ3(cap)} m³/h · ${code}`):('<b>'+code+'</b>'), c:'#4b9fe0'}; }, hdF.codigo, 'codigo'); }
 function hdDistCat(){ const pc=(hdResumo||{}).por_categoria||{}, obj={}; ['P1','P2','P3','P4','P5'].forEach(k=>{ if(pc[k]!=null)obj[k]=pc[k]; }); return hdBars(obj, k=>({lab:`<span style="color:${(HD_CAT[k]||{}).c}"><b>${k}</b> · ${((HD_CAT[k]||{}).l||'').split('· ')[1]||''}</span>`, c:(HD_CAT[k]||{}).c||'#888'}), hdF.cat, 'cat', null, true); }
 function hdDistMot(){ return hdBars((hdResumo||{}).por_motivo||{}, m=>({lab:m}), hdF.motivo, 'motivo', 'var(--accent)'); }
 function hdDistAdeq(){ const adL={superdimensionado:'Superdimensionado',subdimensionado:'Subdimensionado',adequado:'Adequado',mudanca:'Mudança de faixa',indeterminado:'Indeterminado'}; return hdBars((hdResumo||{}).por_adequacao||{}, k=>({lab:`<span style="color:${(HD_ADEQ[k]||{}).c||'inherit'}">${adL[k]||k}</span>`, c:(HD_ADEQ[k]||{}).c||'#888'}), hdF.adequacao, 'adequacao'); }
