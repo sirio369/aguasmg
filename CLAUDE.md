@@ -148,7 +148,7 @@ pwa/
 | `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
-| `14 - pessoas` | Gestão de Pessoas: candidatos em contratação (PII: CPF/endereço), admissão, checklist de setup do novo funcionário — *app-only* (`13 - projetos_obra` está reservado no roteiro do módulo Projetos, §8 do MODULOS.md, ainda não criado) |
+| `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -355,35 +355,10 @@ Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão
 Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
 direto do hub deve ser `irPara('frota')`, nunca `='home'`.
 
-**Gestão de Pessoas** (`pessoas`, schema `14 - pessoas`) — Fase 1: fluxo de candidato em
-contratação até a ativação, com aprovação de vaga restrita a uma lista fechada de gestores por
-área (`"14 - pessoas".area_aprovador`, ~18 áreas → 6 pessoas, mantida por SQL direto). RH cadastra
-o candidato escolhendo o gestor da área na lista fechada (`app_pessoas_candidato_cadastrar`,
-`p_gestor_uuid` validado contra `area_aprovador`) → **só esse gestor mapeado** (ou `funcao='admin'`
-como override) aprova/reprova **e** confirma área/empresa/projeto numa única RPC
-(`app_pessoas_candidato_aprovar`, gate `candidato.gestor_uuid=auth.uid() or funcao='admin'`) — área
-não é mais texto livre nem escolha manual pra quem cobre 1 área só (5 dos 6 gestores):
-`app_pessoas_minhas_areas()` devolve as áreas do próprio chamador, o frontend auto-preenche quando
-é 1 linha só e só mostra `<select>` pra quem cobre várias (Raulmar); `custo_direto_indireto`
-**deixou de ser escolhido** (2026-09-24) — a RPC deriva sozinha: `projeto='Ambos'`→`Indireto`,
-projeto específico→`Direto` → RH gera a carta proposta e depois anexa o PDF assinado fora do sistema
-(`app_pessoas_carta_gerar`/`app_pessoas_carta_anexar`/`app_pessoas_candidato_marcar_assinado`) → RH
-ativa no primeiro dia, vinculando a um `perfil` já existente (dropdown restrito a quem ainda não
-tem `codigo_area` preenchido — `app_pessoas_usuarios_listar(p_apenas_ativos,p_somente_novos)`, o
-módulo **não cria conta nova**) e gravando CPF/matrícula/admissão/tamanhos de uniforme
-(`app_pessoas_candidato_ativar` —
-também atualiza `public.perfil`, fonte única de verdade dessas colunas pro resto do app; um
-`perfil` só liga a um `candidato` por vez, índice único parcial). Dados confidenciais do candidato
-(CPF/endereço/formação/salário/motivo de reprovação) só aparecem pro gestor mapeado da vaga +
-RH/admin, nunca pro par genérico `aprovador_uuid`/`aprovador2_uuid` de `perfil` — esse par só entra
-depois que o colaborador já está `ativo`, e só vê campos simples (nome/área/empresa/admissão) via
-`app_pessoas_meus_colaboradores`. Notificação/trigger segue o invariante §0.9: trigger
-`"14 - pessoas".trg_candidato()` (nunca chamado inline), cobrindo INSERT (avisa só o gestor
-mapeado) e as transições de UPDATE pra `proposta_pendente` (avisa RH) e `ativo` (avisa o gestor **e**
-o aprovador1/2 do `perfil` ativado, "novo colaborador"). RH também **desliga** colaboradores pela
-tela Colaboradores (`app_pessoas_colaborador_desligar` — zera `perfil.ativo`, grava `demissao` +
-histórico em `"14 - pessoas".desligamento`) — a gestão de pessoas do dia a dia (admissão e
-desligamento) passa a ser sempre por este módulo, não mais só por edição direta de planilha/banco.
+**Meus colaboradores** (`meus_colab`, home › Suporte, só aprovador/admin) — substitui a antiga Gestão de
+Pessoas (removida em 2026-10). Aprovador vê os colaboradores **ativos** que o têm como Aprovador 1/2 (admin vê todos):
+quantitativos por área/consórcio/projeto/cargo/modalidade + ficha com e-mail etc. RPC `app_meus_colaboradores`;
+aviso "novo colaborador" por trigger em `public.perfil` quando o aprovador é vinculado. Ver docs/MODULOS.md §12.
 Acesso de RH é concedido pela engrenagem ⚙️ do próprio hub (admin-only), igual Frotas. RH configura
 os valores de referência dos benefícios (`"14 - pessoas".beneficio_premissa`, tela "Premissas de
 benefícios") e marca sim/não por candidato (substituiu o texto livre `beneficios`) — a RPC soma o
