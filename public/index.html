@@ -490,6 +490,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="vrpFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="vrpCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="vrpJoaoRow" style="padding-bottom:8px;font-size:12px;"></div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button id="vrpXls" class="btn ghost hidden" style="margin:0;width:auto;padding:6px 14px;font-size:13px" title="Exporta a lista filtrada com as respostas da última vistoria">⬇ Excel</button></div>
     <div id="vrpLista"></div>
     <div id="vrpMapa" style="display:none;height:62vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
   </main>
@@ -3484,7 +3485,7 @@ const VRP_FOTO_KEYS=VRP_FORM.filter(f=>f.t==='foto').map(f=>f.k);
 
 function vrpBuscaReset(){ vrpBuscaTermo=''; const bx=$('#vrpBusca'); if(bx) bx.value=''; const br=$('#vrpBuscaRes'); if(br) br.innerHTML=''; }
 async function vrpCarregar(){
-  vrpBuscaReset();
+  vrpBuscaReset(); vrpXlsGate();
   $('#vrpLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_vrp_listar'); if(error)throw error;
     vrpData=data||[]; localStorage.setItem('vrp_cache',JSON.stringify(vrpData));
@@ -3590,6 +3591,34 @@ function vrpRelHtml(p,u){
   h+='<div class="relFoot"><span>AcquaHub · relatório gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
 }
+// --- Export Excel do cadastro (só aprovador/admin): lista filtrada + respostas da última vistoria ---
+const VRP_XLS_EXTRA=[['cota','Cota'],['cota_max','Cota máx.'],['cota_min','Cota mín.'],['pres_max','Pressão máx.'],['pres_min','Pressão mín.'],['pres_saida','Pressão saída'],['atuacao','Atuação'],['responsavel','Responsável']];
+function vrpXlsGate(){ const b=$('#vrpXls'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+async function vrpExportarXlsx(){
+  if(!(ME&&ME.pode_aprovar)) return toast('Apenas aprovadores podem exportar.');
+  if(!navigator.onLine) return toast('Conecte-se para exportar');
+  const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&vrpMatchJ(p));
+  if(!arr.length) return toast('Nada para exportar.');
+  const btn=$('#vrpXls'), lbl=btn.textContent; btn.disabled=true;
+  try{
+    // respostas da última vistoria: app_vrp_visita_ver por VRP visitada, 6 em paralelo
+    const vis={}, fila=arr.filter(p=>p.situacao!=='pendente'); let feitos=0;
+    const worker=async()=>{ while(fila.length){ const p=fila.shift();
+      try{ const {data}=await sb.rpc('app_vrp_visita_ver',{p_vrp_id:p.id}); if(data) vis[p.id]=data; }catch(e){}
+      btn.textContent='⏳ '+(++feitos); } };
+    await Promise.all(Array.from({length:6},worker));
+    const extras=VRP_XLS_EXTRA.filter(([k])=>arr.some(p=>p[k]!=null&&p[k]!==''));
+    const perg=VRP_FORM.filter(f=>f.t!=='foto');
+    const aoa=[['Consórcio','VRP','Código do nó','Diâmetro (cadastro)',...extras.map(e=>e[1]),'Observação (cadastro)','Latitude','Longitude',
+      'Situação','Vistoriado por','Data da vistoria',...perg.map(f=>f.q),'Fotos (qtd)']];
+    arr.forEach(p=>{ const u=vis[p.id]||{}, r=u.respostas||{}, fo=u.fotos||{}, quando=u.visitado_em||p.visitado_em;
+      aoa.push([vrpConsLbl(p.consorcio), p.label||p.num_vrp||'', p.cd_no_agua||'', p.diametro??'', ...extras.map(([k])=>p[k]??''),
+        p.observacao||'', p.lat??'', p.lon??'', (VRP_SIT[p.situacao]||{}).lbl||p.situacao||'', u.visitado_por||p.visitado_por||'',
+        quando?new Date(quando).toLocaleString('pt-BR'):'', ...perg.map(f=>r[f.k]??''), VRP_FOTO_KEYS.filter(k=>fo[k]).length||'']); });
+    await exportarXlsx('vrps_cadastro_'+new Date().toISOString().slice(0,10)+'.xlsx','VRPs',aoa);
+  } finally { btn.disabled=false; btn.textContent=lbl; }
+}
+if($('#vrpXls')) $('#vrpXls').addEventListener('click',vrpExportarXlsx);
 function vrpRelatorio(p,u){
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
