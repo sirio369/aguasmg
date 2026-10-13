@@ -850,6 +850,14 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
   existe/parcial/falta, gera código) → retirar (código) → consumir na OS**.
+- **Cabeçalho das telas de separação do almoxarife (2026-10-13):** todos os cards de separação
+  (Insumos/Ferramentas via `supAlmoxCard`, EPI via `supEpiSegCard`) mostram agora, via o helper
+  compartilhado **`supSolicHead(s)`**: **nº · badge do consórcio de origem** (`supConsBadge` →
+  `CONSORCIO_NOME`: ZA1004 "Águas Integradas" teal / ZA0200 "Eficiência Hídrica" roxo) + **👤
+  solicitante** + **🗓️ data/hora da solicitação** (`supData(criado_em)`). Assim o almoxarife sabe
+  de qual almoxarifado segregar. As RPCs `sup_fila_almoxarife` / `sup_ferramenta_fila_almoxarife` /
+  `sup_epi_fila_segregar` passaram a retornar **`consorcio`** (= `perfil.consorcio` do solicitante).
+  (De passagem, removido o `${s.equipe}` do head antigo do `supAlmoxCard`, que vinha `undefined`.)
 - RPCs: `sup_materiais_listar` (catálogo, **exclui** categoria EPI/EPC **e itens `ferramenta`**),
   `sup_minhas_solicitacoes`, `sup_fila_aprovacao`, `sup_fila_almoxarife`, `sup_segregar`,
   `sup_meu_estoque`, `sup_meus_equipamentos`(equip), `sup_painel_multi` (Painel das equipes:
