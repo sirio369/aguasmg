@@ -865,6 +865,13 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   de qual almoxarifado segregar. As RPCs `sup_fila_almoxarife` / `sup_ferramenta_fila_almoxarife` /
   `sup_epi_fila_segregar` passaram a retornar **`consorcio`** (= `perfil.consorcio` do solicitante).
   (De passagem, removido o `${s.equipe}` do head antigo do `supAlmoxCard`, que vinha `undefined`.)
+- **Aprovador + entrega de EPI (2026-10-13):** o `supSolicHead` passou a mostrar também **✅ aprovado
+  por X** (quem aprovou a solicitação). As 4 RPCs de fila do almoxarife (`sup_fila_almoxarife`,
+  `sup_ferramenta_fila_almoxarife`, `sup_epi_fila_segregar`, `sup_epi_fila_entrega`) agora devolvem
+  **`aprovador`** (= `perfil.nome` por `aprovador_uuid`) — ver `docs/migracao_almox_aprovador_consorcio.sql`.
+  Além disso, a **entrega de EPI** (lista `epiEntregaLista` + detalhe `epiEntregaDetalhe`) passou a
+  exibir **consórcio + data da solicitação + aprovador** (a `sup_epi_fila_entrega` ganhou `consorcio`);
+  o detalhe usa o próprio `supSolicHead`. Mudança só aditiva nas RPCs.
 - RPCs: `sup_materiais_listar` (catálogo, **exclui** categoria EPI/EPC **e itens `ferramenta`**),
   `sup_minhas_solicitacoes`, `sup_fila_aprovacao`, `sup_fila_almoxarife`, `sup_segregar`,
   `sup_meu_estoque`, `sup_meus_equipamentos`(equip), `sup_painel_multi` (Painel das equipes:
