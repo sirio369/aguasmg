@@ -6975,10 +6975,11 @@ function epiSigInit(cv){
   const pos=ev=>{ const r=cv.getBoundingClientRect(); const t=ev.touches?ev.touches[0]:ev; return {x:(t.clientX-r.left)*(cv.width/r.width), y:(t.clientY-r.top)*(cv.height/r.height)}; };
   const start=ev=>{ ev.preventDefault(); drawing=true; const p=pos(ev); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
   const move=ev=>{ if(!drawing) return; ev.preventDefault(); const p=pos(ev); ctx.lineTo(p.x,p.y); ctx.stroke(); drawn=true; };
-  const end=()=>{ drawing=false; };
+  const end=()=>{ drawing=false; if(cv._onend) cv._onend(); };
   cv.addEventListener('mousedown',start); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
   cv.addEventListener('touchstart',start,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',end);
   cv._clear=()=>{ ctx.clearRect(0,0,cv.width,cv.height); drawn=false; }; cv._drawn=()=>drawn;
+  cv._restore=(url)=>{ const im=new Image(); im.onload=()=>{ try{ ctx.drawImage(im,0,0,cv.width,cv.height); }catch(e){} drawn=true; }; im.src=url; };
 }
 // --- assinatura em tela cheia (gira o celular p/ assinar por extenso) ---
 function epiSigResize(cv,w,h,snap){
@@ -7028,6 +7029,8 @@ function epiCapturaWire(){
     const id=inp.dataset.cap, f=ev.target.files[0]; if(!f) return;
     epiFotoBlob[id]=await comprimir(f);
     const img=$('#supView').querySelector('.epiFotoPrev-'+id); if(img){ img.src=URL.createObjectURL(epiFotoBlob[id]); img.classList.remove('hidden'); }
+    // rascunho anti-reload: guarda a foto da entrega (best-effort) caso o Android recarregue a webview
+    if(epiEntregaDraft && id==='e'+epiEntregaDraft.id){ try{ const fr=new FileReader(); fr.onload=()=>{ if(epiEntregaDraft&&id==='e'+epiEntregaDraft.id){ epiEntregaDraft.foto=fr.result; epiDraftWrite(); } }; fr.readAsDataURL(epiFotoBlob[id]); }catch(e){} }
   }));
   $('#supView').querySelectorAll('.epiSig').forEach(cv=>{ if(!cv._init){ epiSigInit(cv); cv._init=true; } });
   $('#supView').querySelectorAll('.epiSigClear').forEach(b=>b.addEventListener('click',()=>{ const cv=$('#supView').querySelector('.epiSig[data-cap="'+b.dataset.cap+'"]'); if(cv&&cv._clear) cv._clear(); }));
@@ -7043,7 +7046,7 @@ async function epiConfirmar(id,rpc,params,okMsg,after){
     const fp=await epiUpload(foto,'foto.jpg');
     const ap=await epiUpload(await epiCanvasBlob(cv),'assinatura.png');
     const {error}=await sb.rpc(rpc, Object.assign({},extra,{p_foto:fp,p_assinatura:ap})); if(error) throw error;
-    delete epiFotoBlob[id]; toast('✓ '+okMsg); if(after) after();
+    delete epiFotoBlob[id]; if(epiEntregaDraft && id==='e'+epiEntregaDraft.id) epiDraftClear(); toast('✓ '+okMsg); if(after) after();
   }catch(e){ toast('⚠ '+(e.message||e)); if(btn) btn.disabled=false; }
 }
 // --- captura de foto avulsa (rótulo customizável), guarda em epiFotoBlob[cap] ---
@@ -7125,6 +7128,46 @@ async function supVEpiSegregar(){
 
 // --- Entregar/Retirar EPI (almox): resumo → detalhe (código + foto do colaborador + assinatura) ---
 let epiEntregaFila=[];
+// Rascunho anti-reload: no Android o app da câmera pode descarregar a webview; ao voltar, o PWA
+// recarrega do zero e perderia tudo. Salvamos o preenchimento da entrega em localStorage e, no boot,
+// reabrimos a tela já preenchida. Ver docs/MODULOS.md §5.3.
+let epiEntregaDraft=null; const EPI_DRAFT_KEY='epi_entrega_rascunho', EPI_DRAFT_TTL=30*60*1000;
+function epiDraftWrite(){ try{ if(epiEntregaDraft){ epiEntregaDraft.ts=Date.now(); localStorage.setItem(EPI_DRAFT_KEY, JSON.stringify(epiEntregaDraft)); } }catch(e){} }
+function epiDraftClear(){ epiEntregaDraft=null; try{ localStorage.removeItem(EPI_DRAFT_KEY); }catch(e){} }
+function epiDraftColetar(id){ // captura os campos atuais da tela de detalhe no rascunho (antes de abrir a câmera / a cada digitação)
+  if(!epiEntregaDraft || String(epiEntregaDraft.id)!==String(id)) return;
+  const cod=$('#epEcod-'+id); if(cod) epiEntregaDraft.codigo=cod.value||'';
+  const cas={}; $('#supView').querySelectorAll('.epiCA[data-sol="'+id+'"]').forEach(inp=>{ cas[inp.dataset.epi]=inp.value||''; }); epiEntregaDraft.cas=cas;
+  epiDraftWrite();
+}
+async function epiEntregaRestaurar(d){
+  try{ await supGetMe(); }catch(e){}
+  if(!supAreaAcesso('epi')){ epiDraftClear(); return; }
+  SCREENS.forEach(x=>{ const el=$('#'+x); if(el) el.classList.toggle('hidden', x!=='suprimentos'); });
+  supAreaId='epi'; supCurrent='area';
+  $('#supView').innerHTML='<p class="sub">Restaurando entrega em andamento…</p>';
+  let data; try{ ({data}=await sb.rpc('sup_epi_fila_entrega')); }catch(e){ return; }
+  epiEntregaFila=data||[];
+  if(!epiEntregaFila.find(x=>String(x.id)===String(d.id))){ epiDraftClear(); epiEntregaLista(); return; } // já entregue/sumiu
+  epiEntregaDraft=d;
+  epiEntregaDetalhe(d.id);
+  const cod=$('#epEcod-'+d.id); if(cod && d.codigo) cod.value=d.codigo;
+  if(d.cas) $('#supView').querySelectorAll('.epiCA[data-sol="'+d.id+'"]').forEach(inp=>{ if(d.cas[inp.dataset.epi]!=null) inp.value=d.cas[inp.dataset.epi]; });
+  if(d.foto){ try{ const b=await (await fetch(d.foto)).blob(); epiFotoBlob['e'+d.id]=b; const img=$('#supView').querySelector('.epiFotoPrev-e'+d.id); if(img){ img.src=d.foto; img.classList.remove('hidden'); } }catch(e){} }
+  if(d.assinatura){ const sig=$('#supView').querySelector('.epiSig[data-cap="e'+d.id+'"]'); if(sig&&sig._restore) sig._restore(d.assinatura); }
+  toast('↩️ Rascunho da entrega restaurado');
+}
+let epiRestoreTentado=false;
+function epiEntregaTentarRestaurar(){ // chamado no boot, após ME carregar — só 1x por carregamento (mostrar roda em refresh de token)
+  try{
+    if(epiRestoreTentado) return; epiRestoreTentado=true;
+    if(new URLSearchParams(location.search).has('ntf')) return; // deep-link de notificação tem prioridade
+    const d=JSON.parse(localStorage.getItem(EPI_DRAFT_KEY)||'null');
+    if(!d || !d.id) return;
+    if(Date.now()-(d.ts||0) > EPI_DRAFT_TTL){ epiDraftClear(); return; } // rascunho velho: descarta
+    epiEntregaRestaurar(d);
+  }catch(e){}
+}
 async function supVEpiEntregar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('sup_epi_fila_entrega'); if(error)throw error;
@@ -7143,10 +7186,16 @@ function epiEntregaLista(){
 }
 function epiEntregaDetalhe(id){
   const s=epiEntregaFila.find(x=>String(x.id)===String(id)); if(!s) return; const cid='e'+s.id;
+  if(!epiEntregaDraft || String(epiEntregaDraft.id)!==String(id)) epiEntregaDraft={id:String(id), codigo:'', cas:{}, foto:null, assinatura:null};
   const itens=(s.itens||[]).map(i=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${i.epi}${i.tamanho?(' <b>['+i.tamanho+']</b>'):''} <span class="sub">(troca ${i.validade_dias}d)</span></span><b>×${supNum(i.qt)}</b></div><input class="epiCA" data-sol="${s.id}" data-epi="${i.epi_id}" value="${i.ca||''}" placeholder="Nº do CA (Certificado de Aprovação)" style="margin-top:5px;font-size:13px;padding:7px 9px"/></div>`).join('');
   $('#supView').innerHTML=`<button class="btn ghost" id="epEntBack" style="margin-bottom:10px">‹ Voltar</button><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px">${supSolicHead(s)}${s.obs?('<div class="sub" style="margin-top:4px">Obs: '+s.obs+'</div>'):''}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div>${epiCapturaHtml(cid)}<label style="margin-top:10px">Código de validação (o colaborador mostra no app) *</label><input id="epEcod-${s.id}" inputmode="numeric" maxlength="4" placeholder="4 dígitos" style="letter-spacing:4px;font-size:16px;text-align:center"/><button class="btn" data-confirm="${cid}" data-econf="${s.id}" style="margin-top:10px">Confirmar retirada</button></div>`;
   epiCapturaWire();
-  $('#epEntBack').addEventListener('click',()=>epiEntregaLista());
+  // persistência do rascunho (anti-reload da câmera): salva código/CAs a cada digitação e ANTES de abrir a câmera
+  const _cod=$('#epEcod-'+s.id); if(_cod) _cod.addEventListener('input',()=>epiDraftColetar(s.id));
+  $('#supView').querySelectorAll('.epiCA[data-sol="'+s.id+'"]').forEach(inp=>inp.addEventListener('input',()=>epiDraftColetar(s.id)));
+  $('#supView').querySelectorAll('.epiFoto[data-cap="'+cid+'"]').forEach(inp=>inp.addEventListener('click',()=>epiDraftColetar(s.id)));
+  const _sig=$('#supView').querySelector('.epiSig[data-cap="'+cid+'"]'); if(_sig){ _sig._onend=()=>{ if(epiEntregaDraft&&String(epiEntregaDraft.id)===String(s.id)){ try{ epiEntregaDraft.assinatura=_sig.toDataURL(); epiDraftWrite(); }catch(e){} } }; }
+  $('#epEntBack').addEventListener('click',()=>{ epiDraftClear(); epiEntregaLista(); });
   $('#supView').querySelector('[data-econf]').addEventListener('click',()=>{ const sid=+s.id;
     epiConfirmar('e'+sid,'sup_epi_entregar',()=>{ const cod=($('#epEcod-'+sid).value||'').trim(); if(!cod){ toast('Informe o código do colaborador'); return false; } const cas=[]; $('#supView').querySelectorAll('.epiCA[data-sol="'+sid+'"]').forEach(inp=>cas.push({epi_id:+inp.dataset.epi,ca:(inp.value||'').trim()})); return {p_solicitacao_id:sid,p_cas:cas,p_codigo:cod}; },'Retirada registrada',supVEpiEntregar);
   });
@@ -7791,7 +7840,7 @@ function mostrar(sess){
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
     iniciarGPS(); atualizarFila(); ntfBadge(); pushAutoSync();
-    ME=null; sb.rpc('app_me').then(({data})=>{ if(data){ ME=data; homeGate(); } }).catch(()=>{});
+    ME=null; sb.rpc('app_me').then(({data})=>{ if(data){ ME=data; homeGate(); epiEntregaTentarRestaurar(); } }).catch(()=>{});
     if(navigator.onLine) sincronizar();
   }else{
     ME=null;
