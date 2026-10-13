@@ -300,6 +300,13 @@
   conjunto fixo de 57 códigos; `vrpMatchJ`).
 - **Estado:** `vrpData, vrpFiltro, vrpCons, vrpView, vrpMap, vrpMarkers, vrpAtual, vrpAns, vrpFotos,
   vrpUltima, vrpEnviando, vrpBuscaTermo, vrpJoao`.
+- **Export Excel (2026-10, só `pode_aprovar`):** botão **⬇ Excel** (`#vrpXls`, revelado por `vrpXlsGate()` em
+  `vrpCarregar`) → `vrpExportarXlsx()` exporta a **lista filtrada** (situação/consórcio/busca/Filtro João): cadastro
+  (consórcio, VRP, nó, diâmetro + colunas extras de `VRP_XLS_EXTRA` que vierem preenchidas em `app_vrp_listar`,
+  observação, lat/lon), situação, quem/quando vistoriou e **todas as respostas da última vistoria** (`VRP_FORM`
+  sem fotos; fotos só a contagem). As respostas vêm de `app_vrp_visita_ver` (1 chamada por VRP não pendente,
+  6 em paralelo) — **sem RPC nova nem mudança de banco**. Gate só no front (como o export TXT do Roteiro):
+  as RPCs usadas já são abertas a `authenticated`.
 - **`cd_no_agua` visível para o usuário** (não só na busca): na lista (`vrpRenderLista`) aparece ao
   lado do nome da VRP; no mapa (`vrpRenderMapa`) entra no `bindTooltip` (hover). Já vem de
   `app_vrp_listar` — não precisou mudar RPC.
