@@ -5417,6 +5417,17 @@ let ferCat=[], ferCartS=[], ferEstoqueAtual=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+// badge do consórcio (almoxarifado de origem): ZA1004 = Águas Integradas · ZA0200 = Eficiência Hídrica
+function supConsBadge(c){
+  const nome=(typeof CONSORCIO_NOME!=='undefined' && CONSORCIO_NOME[c]) || c || 'sem consórcio';
+  const col=c==='ZA1004'?'#0e7c86':(c==='ZA0200'?'#7a4fd0':'#8a8f98');
+  return `<span title="Almoxarifado de origem" style="font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:999px;background:${col};color:#fff;white-space:nowrap">🏭 ${nome}</span>`;
+}
+// cabeçalho padrão dos cards de separação: nº · consórcio (origem) + data/hora + solicitante
+function supSolicHead(s){
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>#${s.id}</b> ${supConsBadge(s.consorcio)}<span class="sub" style="margin-left:auto;white-space:nowrap">👤 ${s.solicitante||'—'}</span></div>`
+    + `<div class="sub" style="font-size:11.5px;margin-top:3px">🗓️ Solicitado em ${supData(s.criado_em)||'—'}</div>`;
+}
 function supSitTag(sit){
   if(sit==='falta')   return ' <span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--bad-bg);color:var(--bad);white-space:nowrap">em falta</span>';
   if(sit==='parcial') return ' <span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn);white-space:nowrap">parcial</span>';
@@ -5840,7 +5851,7 @@ async function supVAlmox(){
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 function supAlmoxCard(s){
-  const head=`<div style="display:flex;gap:8px;align-items:center"><b>#${s.id}</b> · ${s.equipe}<span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div>`;
+  const head=supSolicHead(s);
   if(s.status==='segregada'){
     const itens=(s.itens||[]).map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:2px 0"><span>${i.material}${supSitTag(i.situacao)}</span><b style="white-space:nowrap${i.situacao==='falta'?';color:var(--bad)':''}">${supNum(i.qt_segregada||0)} ${i.unidade}</b></div>`).join('');
     return `<div class="supcard" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${head}<div style="margin:8px 0;border-top:1px solid var(--line);padding-top:6px">${itens}</div><div style="display:flex;gap:6px;margin-top:8px"><input class="supEntCod" data-id="${s.id}" inputmode="numeric" maxlength="4" placeholder="Código do colaborador" style="flex:1;min-width:0"/><button class="btn" data-ent="${s.id}" style="margin:0;width:auto;padding:12px 16px">Entregar</button></div></div>`;
@@ -7035,7 +7046,7 @@ function supEpiSegCard(s){
       <div class="epiSegMsg" style="font-size:11px;margin-top:5px;font-weight:600"></div>
     </div>`;
   }).join('');
-  return `<div class="epiSegCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||'—'}</span></div><div style="margin-top:6px">${itens}</div>${s.obs?('<div class="sub" style="margin-top:6px">Obs: '+s.obs+'</div>'):''}<div class="epiSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Nada disponível — ao separar, o pedido fica <b>EM FALTA</b> e o colaborador é avisado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Separar e gerar código</button></div>`;
+  return `<div class="epiSegCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">${supSolicHead(s)}<div style="margin-top:6px">${itens}</div>${s.obs?('<div class="sub" style="margin-top:6px">Obs: '+s.obs+'</div>'):''}<div class="epiSegBlock banner bad" style="display:none;margin-top:8px;font-size:12px">Nada disponível — ao separar, o pedido fica <b>EM FALTA</b> e o colaborador é avisado.</div><button class="btn" data-seg="${s.id}" style="margin-top:10px">Separar e gerar código</button></div>`;
 }
 function epiSegRefresh(card){
   if(!card) return; let disp=0;
