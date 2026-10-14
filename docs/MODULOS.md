@@ -918,6 +918,15 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   retirar (código + foto do colaborador com os EPIs + assinatura)**. Devolução/troca por código, com
   fotos. **Tamanho** por escala: `letra` (P/M/G/GG/EXG) ou `numero` (33–48). EPIs saem do catálogo de
   insumos.
+- **Rascunho anti-reload na retirada (2026-10-13):** no Android, abrir a câmera (`capture`) pode fazer
+  o SO descartar a Activity da webview; ao voltar, o PWA recarrega do zero e perdia foto/código/CAs/
+  assinatura. Correção: `epiEntregaDetalhe` mantém um **rascunho em `localStorage`** (`epi_entrega_rascunho`,
+  helpers `epiDraftWrite`/`epiDraftClear`/`epiDraftColetar`) — salvo a cada digitação, **antes de abrir a
+  câmera** (click no input) e quando a foto/assinatura chegam. No boot (`mostrar`→`app_me`→
+  `epiEntregaTentarRestaurar`, 1×/carregamento, janela de 30 min, ignorado se há deep-link `?ntf=`),
+  `epiEntregaRestaurar` reabre a entrega já preenchida (gate `supAreaAcesso('epi')`; se a solicitação já
+  saiu da fila, descarta e mostra a lista). O canvas de assinatura ganhou `cv._restore(dataURL)` e um
+  hook `cv._onend`. Rascunho é limpo ao **confirmar** a retirada ou tocar **‹ Voltar**.
 - RPCs: `sup_epi_catalogo`, `sup_epi_minhas_solicitacoes`, `sup_epi_fila_aprovacao`,
   `sup_epi_troca_fila_aprovacao`, `sup_epi_fila_segregar`, `sup_epi_segregar`, `sup_epi_fila_entrega`,
   `sup_epi_meus`, `sup_epi_devolver`, `sup_epi_substituir`, `sup_epi_gestao_colaborador(es)`,
