@@ -865,6 +865,13 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   de qual almoxarifado segregar. As RPCs `sup_fila_almoxarife` / `sup_ferramenta_fila_almoxarife` /
   `sup_epi_fila_segregar` passaram a retornar **`consorcio`** (= `perfil.consorcio` do solicitante).
   (De passagem, removido o `${s.equipe}` do head antigo do `supAlmoxCard`, que vinha `undefined`.)
+- **Aprovador + entrega de EPI (2026-10-13):** o `supSolicHead` passou a mostrar também **✅ aprovado
+  por X** (quem aprovou a solicitação). As 4 RPCs de fila do almoxarife (`sup_fila_almoxarife`,
+  `sup_ferramenta_fila_almoxarife`, `sup_epi_fila_segregar`, `sup_epi_fila_entrega`) agora devolvem
+  **`aprovador`** (= `perfil.nome` por `aprovador_uuid`) — ver `docs/migracao_almox_aprovador_consorcio.sql`.
+  Além disso, a **entrega de EPI** (lista `epiEntregaLista` + detalhe `epiEntregaDetalhe`) passou a
+  exibir **consórcio + data da solicitação + aprovador** (a `sup_epi_fila_entrega` ganhou `consorcio`);
+  o detalhe usa o próprio `supSolicHead`. Mudança só aditiva nas RPCs.
 - RPCs: `sup_materiais_listar` (catálogo, **exclui** categoria EPI/EPC **e itens `ferramenta`**),
   `sup_minhas_solicitacoes`, `sup_fila_aprovacao`, `sup_fila_almoxarife`, `sup_segregar`,
   `sup_meu_estoque`, `sup_meus_equipamentos`(equip), `sup_painel_multi` (Painel das equipes:
@@ -911,6 +918,15 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   retirar (código + foto do colaborador com os EPIs + assinatura)**. Devolução/troca por código, com
   fotos. **Tamanho** por escala: `letra` (P/M/G/GG/EXG) ou `numero` (33–48). EPIs saem do catálogo de
   insumos.
+- **Rascunho anti-reload na retirada (2026-10-13):** no Android, abrir a câmera (`capture`) pode fazer
+  o SO descartar a Activity da webview; ao voltar, o PWA recarrega do zero e perdia foto/código/CAs/
+  assinatura. Correção: `epiEntregaDetalhe` mantém um **rascunho em `localStorage`** (`epi_entrega_rascunho`,
+  helpers `epiDraftWrite`/`epiDraftClear`/`epiDraftColetar`) — salvo a cada digitação, **antes de abrir a
+  câmera** (click no input) e quando a foto/assinatura chegam. No boot (`mostrar`→`app_me`→
+  `epiEntregaTentarRestaurar`, 1×/carregamento, janela de 30 min, ignorado se há deep-link `?ntf=`),
+  `epiEntregaRestaurar` reabre a entrega já preenchida (gate `supAreaAcesso('epi')`; se a solicitação já
+  saiu da fila, descarta e mostra a lista). O canvas de assinatura ganhou `cv._restore(dataURL)` e um
+  hook `cv._onend`. Rascunho é limpo ao **confirmar** a retirada ou tocar **‹ Voltar**.
 - RPCs: `sup_epi_catalogo`, `sup_epi_minhas_solicitacoes`, `sup_epi_fila_aprovacao`,
   `sup_epi_troca_fila_aprovacao`, `sup_epi_fila_segregar`, `sup_epi_segregar`, `sup_epi_fila_entrega`,
   `sup_epi_meus`, `sup_epi_devolver`, `sup_epi_substituir`, `sup_epi_gestao_colaborador(es)`,
@@ -1789,12 +1805,25 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   é **server-side** nas RPCs (checam `dev_acesso`/admin).
 - **Análise do micromedido (2026-09, tela REAL — `s-mm`/nav "Análise do micromedido"):** dados de verdade da
   `"5 - info_copasa".micromedicao_historico`. Motor: tabela **`"11 - perdas_nrw".mm_matricula_stats`** (1 linha
-  por matrícula, 134.868, computada em buckets `mod(nu_matricu,4)` p/ não estourar o statement timeout do MCP):
+  por matrícula, 134.879, recomputada pela função `app_nrw_mm_stats_rebuild` — ver "Recompor" abaixo):
   média/mediana/mín/máx/desvio/**CV**, **slope** (regr sobre índice de mês uniforme), n_zeros, **classificação**
   (fraude_potencial/estável/nulo_recorrente/pico_isolado/queda_continua/crescimento_continuo/instável) e
   **`score_anomalia` 0–100** (Índice de Anomalia = 3·pico + 2·tendência + 2·CV + 1·zeros + **3·fraude**; denom 11).
-  RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie` (definer, admin **ou** `dev_acesso`; anon revogado). Recomputar =
-  re-rodar os INSERTs por bucket + o UPDATE de classificação/score.
+  RPCs `app_nrw_mm_resumo`/`_ranking`/`_serie` (definer, admin **ou** `dev_acesso`; anon revogado).
+  - **Recompor (dinâmico, 2026-10-13):** função **`public.app_nrw_mm_stats_rebuild(p_consorcio text default null)`**
+    (definer; gate admin/dev p/ chamador autenticado — serviço/cron com `auth.uid()` nulo passa) recomputa **do
+    zero** `mm_mensal` + `mm_matricula_stats` a partir do histórico — rodar **todo mês após inserir micromedição**.
+    Como o motor ad-hoc original (buckets `mod(nu_matricu,4)`) **se perdeu** (não havia função/migração que
+    populasse), o Índice de Anomalia foi **canonizado** aqui, validado contra o ZA0200 (inalterado): determinísticas
+    **idênticas** (100%), `fraude_potencial` **idêntica** (regra `meses_irregular≥2`), classificação **~93%** e
+    `score_anomalia` **Pearson ~0,77** (motor antigo não reproduzível exatamente). Fórmula canônica:
+    `score = max(5,5 ; min(100 ; (3·pico + 2·tend + 2·CV + 1·zeros + 3·fraude)/11))` com sub-scores 0–100
+    (pico = nº meses > média+3σ ×25 · tend = |slope|·n_meses/média·100 · CV = CV·100 · zeros = % meses zerados ·
+    fraude = meses_irregular×50); classes por precedência fraude→factível→nulo_recorrente(zeros≥40%)→
+    crescimento/queda(slope_rel ≷ ±0,05)→pico_isolado(≥1 pico 3σ)→instável(CV≥0,6)→estável. `ultimo_vol`/`n_picos`
+    seguem **nulos** (como no original). ⚠️ Pesada (~2,4M linhas, ~15 min) — o `statement_timeout` do pooler/MCP a
+    mata; rodar por **`pg_cron`** (background, sem timeout) ou fatiando por consórcio/faixa de matrícula. Carga
+    histórica completada 2026-10-13: **ZA1004 202503** (74.715) que faltava no banco.
   - **Reforma da tela (2026-09-24):** removidos os KPIs técnicos (score elevado/CV médio/score médio). Nova
     disposição em 4 painéis: **(1) Indicador do mês** — **só micromedição, o volume faturado não entra**
     (redesenhado 2026-09-28). **Seletor de competência** (default = **último mês**) + **6 cards uniformes** (`.mmcard`; o 6º, **Factível**, desde 2026-10-07 — ver nota abaixo),
@@ -1938,6 +1967,17 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     linha de base, 2 linhas de referência no gráfico (verde 100% / azul 120%) e 2 colunas na tabela (VP meta 100%/120%,
     substituindo o Δ; célula pinta quando o VP do mês atinge o alvo). **Detalhamento colapsável agora é anchor-aware**
     (`resDerivHtml` usa `resB()`) — reage ao toggle (antes mostrava os dois fixos). `resStatus` ganhou faixa **≥120% (teto)**.
+  - **Janela da VPBL ajustável + rebuild dinâmico (2026-10-13):** a **prévia** VP_BL passou a excluir **202505** e
+    estender 1 mês pra trás, por consórcio (**ZA0200** abr/25–abr/26; **ZA1004** mar/25–mar/26) — guardado em
+    `premissas` (`janela_de/ate` + **`excluir:[202505]`**). Função dinâmica **`public.app_nrw_baseline_rebuild(p_consorcio?)`**
+    (definer, admin/dev; serviço/cron passa) recomputa a prévia (VP_BL/VD_BL/nlig/meta_m3/ip_bl) sobre a janela menos os
+    excluídos, usando só meses com macro, e marca **`incompleto`/`meses_faltando`/`meses_no_calculo`** quando falta macro.
+    **ZA1004 está provisória** (VP_BL 995.858, 11/12 — falta o **macro 202503**); re-rodar quando o dado entrar fecha os
+    12 sozinho. **Contratual intocada** (número do TR). `app_nrw_resultado` agora expõe `excluir`/`incompleto`/
+    `meses_faltando`/`meses_no_calculo`/`meses_esperados` (união correta no modo "Ambos"). **Front:** `resDerivHtml`
+    tira os meses excluídos da **média** (bate com a VPBL do backend), pinta o 202505 e os meses sem macro de **vermelho**
+    com selo "não entra"/"sem macro", e o painel da linha de base mostra **aviso de VPBL provisória** quando incompleto.
+    A exclusão do 202505 é **só na VPBL** — a série ao vivo e o IRVP seguem mostrando o mês.
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
@@ -1955,6 +1995,15 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     típica → adequado/sub/super/mudança/indeterminado). **IPS** = média ponderada de sub-scores (pesos em `hd_config`, **editáveis na tela ⚙️ Premissas** — atuais: anomalia 15 · idade 21 · mudança 21 · utilização 22 · dimensionamento 21 · modelo 0; dimensões indeterminadas redistribuem o peso). Categoria
     **P1–P5** por faixa de IPS; `motivos[]` + `justificativa`; `codigo_servico` do calibre; **`remanejamento_sugerido`** = interno + ativa.
     **Interno/externo e situação da ligação são FILTROS, não entram no score** (decisão do usuário).
+  - **⚠️ Rebuild mensal (teto de 120s do ambiente, 2026-10-13):** `app_nrw_hd_rebuild()` é **monolítico (~15 min / 132k)** e
+    **NÃO passa** no `statement_timeout` de **120s** imposto pelo pooler/MCP **e também pelo pg_cron** deste ambiente (nem
+    `SET` na sessão nem `SET statement_timeout=0` no corpo da função levantam — testado; o cron fica relançando e falhando a
+    cada 2 min). **Para rodar o rebuild completo use o chunking:** função **`app_nrw_hd_rebuild_chunk(p_mod int, p_k int)`**
+    (mesma lógica, **sem truncate**, filtra `matricula % p_mod = p_k`). Receita: `truncate "11 - perdas_nrw".hd_priorizacao;`
+    e então rodar **`select app_nrw_hd_rebuild_chunk(20, k)`** para `k = 0..19` (chunks de ~6k matrículas cabem bem em 120s;
+    2 chunks por chamada no MCP é seguro, 3 estoura). Alternativa definitiva (não feita): reescrever como **procedure** com
+    `COMMIT` entre chunks pra rodar via cron. O gate permite `auth.uid()` nulo (serviço/cron). Reusa `mm_matricula_stats` +
+    `micromedicao_historico` — então **rode o `app_nrw_mm_stats_rebuild` ANTES** (ver §micromedido) para o HD refletir o mês novo.
   - **RPCs de leitura** (definer, gate admin|dev_acesso): `app_nrw_hd_resumo(p_consorcio,p_situacao,p_interno)` ·
     `app_nrw_hd_ranking(...filtros...,p_limit,p_offset)` · `app_nrw_hd_mapa(...)` (GeoJSON lon/lat 4326 via join `ligacoes.geom`, top por IPS) ·
     `app_nrw_hd_detalhe(p_matricula)` (blocos + série 18m + calibre). Filtro de situação default **só ativa (R)**.
