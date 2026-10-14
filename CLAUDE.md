@@ -145,7 +145,7 @@ pwa/
 | `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
 | `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`), **programação de pesquisa** (`programacao_pesquisa`, `rede_pp_segmento`/`_fonte`, `pp_config` — app-only mesmo estando neste schema geo, sem policy pra `gis_*`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
-| `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09) |
+| `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09; **abastecimento removido** em 2026-10-14) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
@@ -304,11 +304,15 @@ um "Ver detalhes" por veículo que abre Editar/Vínculo(admin)/Histórico/Relat�
 só, em vez de 5 botões no card. **Colaborador**, no seu módulo: CNH (só dados de CNH, não lista mais
 veículo nenhum), **Veículos** (self-service acima), **checklist diário** (layout em cartão, lembrete
 automático 7:30 da manhã pra quem tem vínculo ativo + CNH ativa, `pg_cron` +
-`frota_checklist_lembrete_diario`), abastecimento (combustível agora é só Etanol/Diesel/Arla, sem
-campo "posto"), **Manutenção** e **Lavagem** — cada uma é uma tela de **histórico + ação**, não só
+`frota_checklist_lembrete_diario`), **Manutenção** e **Lavagem** — cada uma é uma tela de
+**histórico + ação**, não só
 um formulário avulso (**renomeadas na 5ª rodada**, eram "Registrar problema (manutenção)"/"Solicitar
-lavagem", iam direto pro formulário sem mostrar nada do que já existia). Estes 4 últimos ficam
-**desabilitados no hub** enquanto o colaborador não tiver veículo vinculado. Checklist agora começa
+lavagem", iam direto pro formulário sem mostrar nada do que já existia). Estes 3 últimos ficam
+**desabilitados no hub** enquanto o colaborador não tiver veículo vinculado. **Abastecimento removido
+por completo (2026-10-14):** o controle de combustível (veículo + equipamento) e todos os relatórios
+de abastecimento saíram do módulo — tabelas `frota_checklist_abastecimento`/`frota_equipamento_abastecimento`
+e as 5 RPCs `app_frota_%abastec%` foram dropadas (backup em `"_bkp_frota_abastec_20261013"`); `custo_total`
+de `app_frota_custos_por_veiculo`/`app_frota_veiculo_relatorio` não soma mais combustível. Checklist agora começa
 com os itens **desmarcados por padrão** (5ª rodada — antes vinham todos pré-marcados, então "tudo OK"
 era o estado inicial mesmo sem checar nada). **Lavagem** tem ciclo próprio: colaborador solicita
 (bloqueado se já houver uma pendente) → Frotas agenda (data/horário/local, notifica) → colaborador
@@ -324,7 +328,7 @@ existia, mas nenhuma RPC escrevia até agora) e voltar a `em_uso`/`disponivel` a
 (por veículo ou por colaborador, com filtro de período) junta vínculos/checklists/manutenções (+
 empréstimos históricos, se houver) numa timeline só — é a tela de investigação de sinistro; é um item
 **dentro de** Relatório (abaixo). **Relatório** ("Painel e custos" antigo, na categoria **Gestor**)
-tem 4 submódulos com filtro de veículo/colaborador/data (abastecimentos/lavagens/manutenções/
+tem 3 submódulos com filtro de veículo/colaborador/data (lavagens/manutenções/
 histórico) + custos por veículo sem filtro (soma manutenção **só `status='concluido'`** agora, não
 mais `agendado` também — nunca tinha valor real nesse estágio). Aprovação/notificação **reaproveita**
 o mecanismo de Suprimentos (não é hierarquia própria) — ver docs/MODULOS.md §6 (detalhe completo) e
