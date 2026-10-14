@@ -1691,7 +1691,10 @@ function resInit(){ mmCss();
  #s-resultado .resderiv-body table{width:100%;margin:8px 0}
  #s-resultado .resderiv-sum td{border-top:1px solid var(--line);font-weight:600}
  #s-resultado .resderiv-calc{margin-top:10px;display:flex;flex-direction:column;gap:7px;padding:11px 13px;border-radius:8px;background:rgba(var(--accent-rgb),.07)}
- #s-resultado .resderiv-calc small{color:var(--muted)}`; document.head.appendChild(st); }
+ #s-resultado .resderiv-calc small{color:var(--muted)}
+ #s-resultado tr.resexcl td,#s-resultado tr.resfalt td{color:#e0675d !important;background:rgba(224,103,93,.08)}
+ #s-resultado tr.resfalt td{font-style:italic;opacity:.85}
+ #s-resultado .resexclb{font-size:8.5px;font-weight:700;color:#fff;background:#c0392b;border-radius:4px;padding:1px 5px;margin-left:5px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}`; document.head.appendChild(st); }
  const body=$('#resBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando acompanhamento do resultado…</p></div></div>';
  sbg.rpc('app_nrw_resultado',{p_consorcio:resCons()}).then(r=>{
@@ -1715,7 +1718,7 @@ function resBasePanel(){
   {lab:'VP alvo 120%',v:fmt(a120),u:'m³/mês',sub:'VPBL − 1,2×meta · teto do IRVP (bônus máximo)'}
  ];
  return `<div class="panel"><div class="phead"><h3>Linha de base (IRVP)</h3><span class="hint" style="margin-left:6px">${b.janela||''}</span>${resIB('base')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">${resToggle()}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
+  <div class="pbody">${resToggle()}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
    <details class="resderiv" ${resDerivOpen?'open':''}><summary>Como o VP alvo é calculado (mês a mês, na âncora selecionada)</summary>${resDerivHtml()}</details>
   </div></div>`;
 }
@@ -1727,19 +1730,26 @@ function resDerivHtml(){
    <div><b>VP alvo 100%</b> = VPBL − meta = ${fmt(b.vpbl)} − ${fmt(b.meta_m3)} = <b>${fmt(a100)}</b> m³/mês</div>
    <div><b>VP alvo 120%</b> = VPBL − 1,2×meta = ${fmt(b.vpbl)} − ${fmt(Math.round(b.meta_m3*1.2))} = <b>${fmt(a120)}</b> m³/mês</div></div>`;
  if(za==='all'){
-   return `<div class="resderiv-body"><p>No modo <b>Ambos</b>, a linha de base é a <b>soma das 2 ZAs</b> (janelas distintas — ZA1004 abr/25–mar/26, ZA0200 mai/25–abr/26). Selecione <b>uma</b> ZA no topo para ver o detalhamento mês a mês.</p>${calc}</div>`;
+   return `<div class="resderiv-body"><p>No modo <b>Ambos</b>, a linha de base é a <b>soma das 2 ZAs</b> (janelas distintas: ${b.janela||''}). Selecione <b>uma</b> ZA no topo para ver o detalhamento mês a mês.</p>${b.incompleto?`<p class="note" style="color:#e0675d;font-size:11px">⚠️ VPBL provisória — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')}.</p>`:''}${calc}</div>`;
  }
  const jd=b.janela_de, ja=b.janela_ate;
+ const excl=new Set((b.excluir||[]).map(Number)), falt=(b.meses_faltando||[]).map(Number);
  const mm=resMensal.filter(p=>p.competencia>=jd && p.competencia<=ja);
- const n=mm.length||1, sVd=mm.reduce((a,p)=>a+(+p.vd),0), sVc=mm.reduce((a,p)=>a+(+p.vc),0), sVp=mm.reduce((a,p)=>a+(+p.vp),0), avgVp=Math.round(sVp/n);
- const rows=mm.map(p=>`<tr><td>${mmCmp(p.competencia)}</td><td class="r">${fmt(p.vd)}</td><td class="r">${fmt(p.vc)}</td><td class="r"><b>${fmt(p.vp)}</b></td></tr>`).join('');
+ const cmes=mm.filter(p=>!excl.has(+p.competencia));                 // meses que realmente entram na VPBL
+ const n=cmes.length||1, sVd=cmes.reduce((a,p)=>a+(+p.vd),0), sVc=cmes.reduce((a,p)=>a+(+p.vc),0), sVp=cmes.reduce((a,p)=>a+(+p.vp),0), avgVp=Math.round(sVp/n);
+ const rows=mm.map(p=>{ const ex=excl.has(+p.competencia);
+   return `<tr${ex?' class="resexcl"':''}><td>${mmCmp(p.competencia)}${ex?' <span class="resexclb">não entra</span>':''}</td><td class="r">${fmt(p.vd)}</td><td class="r">${fmt(p.vc)}</td><td class="r"><b>${fmt(p.vp)}</b></td></tr>`; }).join('')
+  + falt.map(c=>`<tr class="resfalt"><td>${mmCmp(c)} <span class="resexclb">sem macro</span></td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`).join('');
+ const avp=[]; if(excl.size) avp.push([...excl].map(mmCmp).join(', ')+' <b>excluído(s)</b> da VPBL'); if(falt.length) avp.push(falt.map(mmCmp).join(', ')+' <b>sem macromedição</b> (aguardando dado)');
+ const avisoExcl = avp.length ? `<p class="note" style="font-size:11px;margin-top:6px;color:#e0675d">⛔ Em vermelho: ${avp.join(' · ')}.${b.incompleto?` <b>VPBL provisória</b> (${b.meses_no_calculo||n}/${b.meses_esperados||n} meses).`:''}</p>` : '';
  const vpblNote = resAnchor==='previa'
-  ? `A <b>prévia</b> usa a média do VP acima (${fmt(avgVp)}) como VPBL — por isso o VPBL muda ao trocar a âncora.`
+  ? `A <b>prévia</b> usa a média do VP dos meses que entram (${fmt(avgVp)}) como VPBL — por isso o VPBL muda ao trocar a âncora.`
   : `A <b>contratual</b> usa o VPBL oficial do TR (${fmt(b.vpbl)}); a nossa média da janela é ${fmt(avgVp)} (~${b.vpbl?Math.round((avgVp/b.vpbl-1)*100):0}%) — validação. Os meses (VD/VC/VP) são a medição real, iguais nas duas âncoras; o que muda é o VPBL e os alvos.`;
  return `<div class="resderiv-body">
-  <p>Âncora: <b>${anchorLabel}</b> · janela <b>${b.janela||''}</b> (${n} meses). VP = VD macro − VC micro. <b>VPBL</b> = base; <b>VP alvo 100%</b> = VPBL − meta; <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto).</p>
+  <p>Âncora: <b>${anchorLabel}</b> · janela <b>${b.janela||''}</b> (${n} meses no cálculo). VP = VD macro − VC micro. <b>VPBL</b> = base; <b>VP alvo 100%</b> = VPBL − meta; <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto).</p>
   <div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP = VD − VC</th></tr></thead><tbody>${rows}
    <tr class="resderiv-sum"><td><b>Média (${n}m)</b></td><td class="r">${fmt(Math.round(sVd/n))}</td><td class="r">${fmt(Math.round(sVc/n))}</td><td class="r"><b>${fmt(avgVp)}</b>${resAnchor==='previa'?' → VPBL':''}</td></tr></tbody></table></div>
+  ${avisoExcl}
   ${calc}
   <p class="note" style="font-size:11px;margin-top:8px">${vpblNote}</p>
  </div>`;
