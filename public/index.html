@@ -7894,7 +7894,6 @@ async function pushRenderBtn(){
 }
 // ---------- CONDUTOR / FROTAS ----------
 const CNH_CATS=['A','B','AB','C','D','E','AC','AD','AE'];
-const COMBUSTIVEIS=[['etanol','Etanol'],['diesel','Diesel'],['arla','Arla']];
 const STATUS_VEICULO_LABEL={disponivel:{l:'Disponível',bg:'--ok-bg',fg:'--ok'},em_uso:{l:'Em uso',bg:'--warn-bg',fg:'--warn'},manutencao:{l:'Em manutenção',bg:'--bad-bg',fg:'--bad'},baixado:{l:'Baixado',bg:'--line',fg:'--mut'}};
 const TIPOS_VEICULO=[
   ['administrativo','Veículo administrativo'],
@@ -8031,7 +8030,6 @@ function frotaBlocks(){
       {id:'cnh',ic:'🪪',lbl:'Minha CNH'},
       {id:'veiculos_meu',ic:'🚗',lbl:'Veículos'},
       {id:'situacao',ic:'✅',lbl:'Checklist diário',precisaVeic:true,bloqueiaManutencao:true},
-      {id:'abastecimento',ic:'⛽',lbl:'Abastecimento',precisaVeic:true,bloqueiaManutencao:true},
       {id:'manutencao',ic:'🔧',lbl:'Manutenção',precisaVeic:true},
       {id:'lavagem',ic:'🧼',lbl:'Lavagem',precisaVeic:true}]},
     {t:'Gestor',ic:'🖊️',on:gestor,papel:'Aprovador',acts:[
@@ -8097,7 +8095,7 @@ function frotaAdmRender(){
   }));
 }
 function frotaOpen(id){
-  const CONDACTS={cnh:'home',veiculos_meu:'veiculos',situacao:'situacao',abastecimento:'abastecimento',manutencao:'manutencao',lavagem:'lavagem'};
+  const CONDACTS={cnh:'home',veiculos_meu:'veiculos',situacao:'situacao',manutencao:'manutencao',lavagem:'lavagem'};
   if(id in CONDACTS){ condTarget={sub:CONDACTS[id],act:id}; irPara('condutor'); return; }
   if(id==='veiculos'){ frotasTarget='home'; irPara('frotas'); return; }
   if(id==='ap_manutencao'){ frotasTarget='manutencao_aprovar'; irPara('frotas'); return; }
@@ -8130,7 +8128,6 @@ async function condRender(){
   if(condSub==='cadastro') return condRenderCadastro();
   if(condSub==='veiculos') return condRenderVeiculos();
   if(condSub==='situacao') return condRenderSituacao();
-  if(condSub==='abastecimento') return condRenderAbastecimento();
   if(condSub==='ocorrencia') return condRenderOcorrencia();
   if(condSub==='lavagem') return condRenderLavagem();
   if(condSub==='lavagem_realizar') return condRenderLavagemRealizar();
@@ -8262,38 +8259,6 @@ async function condSalvarSituacao(){
       p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null, p_consorcio:v.consorcio||null
     }};
   enviarOuEnfileirar(item,'✓ Situação registrada');
-  condSub='home'; condRender();
-}
-function condRenderAbastecimento(){
-  const v=condMeuVeiculo||{};
-  const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
-  <div class="sec">⛽ Abastecimento — ${v.placa||''}</div>
-  <label>Km atual</label><input id="abafKm" inputmode="numeric" value="${v.km_atual||''}"/>
-  <label>Tipo de combustível</label><select id="abafTipo">${COMBUSTIVEIS.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join('')}</select>
-  <label>Litros</label><input id="abafLitros" inputmode="decimal"/>
-  <label>Valor total (R$)</label><input id="abafValor" inputmode="decimal"/>
-  ${fotoPickHtml('abafFoto','Foto da nota fiscal')}
-  <button class="btn" id="abafSalvar" style="margin-top:14px">Salvar abastecimento</button>`;
-  $('#condView').innerHTML=h; wireFotoPick($('#condView'));
-  $('#condVoltar').addEventListener('click',()=>irPara('frota'));
-  $('#abafSalvar').addEventListener('click',condSalvarAbastecimento);
-}
-async function condSalvarAbastecimento(){
-  const v=condMeuVeiculo;
-  if(!v) return toast('Você não tem veículo vinculado');
-  const litros=parseFloat(($('#abafLitros').value||'').replace(',','.'));
-  const valor=parseFloat(($('#abafValor').value||'').replace(',','.'));
-  if(isNaN(litros)||isNaN(valor)) return toast('Informe litros e valor');
-  const uid=crypto.randomUUID();
-  const item={id:uid,tipo:'frota_abastecimento',rpc:'app_frota_abastecimento_salvar',pasta:'frota',
-    fotos:{p_foto_cupom:FOTO2_BLOBS['abafFoto']||null},
-    fields:{
-      p_veiculo_id:+v.id, p_km:$('#abafKm').value?+$('#abafKm').value:null, p_tipo_combustivel:$('#abafTipo').value,
-      p_litros:litros, p_valor_litro: litros?Math.round((valor/litros)*1000)/1000:null, p_valor_total:valor,
-      p_posto:null, p_foto_cupom:null, p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null,
-      p_observacoes:null, p_consorcio:v.consorcio||null
-    }};
-  enviarOuEnfileirar(item,'✓ Abastecimento registrado');
   condSub='home'; condRender();
 }
 function condRenderOcorrencia(){
@@ -8458,14 +8423,12 @@ async function frotasRender(){
   if(frotasSub==='manutencao_fila') return frotasRenderManutencaoFila();
   if(frotasSub==='manutencao_agendar') return frotasRenderManutencaoAgendar();
   if(frotasSub==='painel') return frotasRenderPainel();
-  if(frotasSub==='painel_abastecimentos') return frotasRenderPainelLista('abastecimentos');
   if(frotasSub==='painel_lavagens') return frotasRenderPainelLista('lavagens');
   if(frotasSub==='painel_manutencoes') return frotasRenderPainelLista('manutencoes');
   if(frotasSub==='painel_custos') return frotasRenderPainelLista('custos');
   if(frotasSub==='equipamentos') return frotasRenderEquipamentos();
   if(frotasSub==='equipamento_edit') return frotasRenderEquipamentoEdit();
   if(frotasSub==='equipamento_detalhe') return frotasRenderEquipamentoDetalhe();
-  if(frotasSub==='equipamento_abastecimento') return frotasRenderEquipamentoAbastecimento();
   frotasRenderHome();
 }
 function frotasRenderHome(){
@@ -8689,7 +8652,7 @@ async function frotasRenderVinculo(){
   });
 }
 
-// --- Equipamentos da frota (cadastro + abastecimento) ---
+// --- Equipamentos da frota (cadastro) ---
 let frotasEquipamentos=[], frotasEquipamentoSel=null;
 async function frotasCarregarEquipamentos(){
   try{ const {data,error}=await sb.rpc('app_frota_equipamentos_listar'); if(error) throw error; frotasEquipamentos=data||[]; }
@@ -8703,7 +8666,7 @@ async function frotasRenderEquipamentos(){
   h+=frotasEquipamentos.length ? frotasEquipamentos.map(e=>
     `<div class="peRow" data-id="${e.id}" style="cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px${e.ativo?'':';opacity:.55'}">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${e.nome}</b><span class="sub">${e.ativo?e.status:'Inativo'}</span></div>
-      <div class="sub" style="margin-top:2px">${e.tipo||'—'}${e.identificacao?(' · '+e.identificacao):''} · ${e.abastecimentos_total} abastecimento(s)</div>
+      <div class="sub" style="margin-top:2px">${e.tipo||'—'}${e.identificacao?(' · '+e.identificacao):''}</div>
     </div>`
   ).join('') : '<p class="sub" style="margin-top:10px">Nenhum equipamento cadastrado.</p>';
   $('#frotasView').innerHTML=h;
@@ -8753,55 +8716,10 @@ async function frotasRenderEquipamentoDetalhe(){
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>';
   h+='<div class="sec">🔧 '+e.nome+'</div><p class="sub" style="margin-top:2px">'+(e.tipo||'—')+(e.identificacao?(' · '+e.identificacao):'')+' · '+(e.ativo?e.status:'Inativo')+'</p>';
   if(e.fotos&&e.fotos.length) h+='<div class="sub" style="margin-top:6px">'+e.fotos.map(f=>`<a href="${SBASE+f}" target="_blank" rel="noopener" style="margin-right:8px">Ver foto</a>`).join('')+'</div>';
-  h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost" id="feqEditar" style="flex:1">✏️ Editar</button><button class="btn" id="feqAbastecer" style="flex:1">⛽ Registrar abastecimento</button></div>';
-  h+='<div class="sec" style="margin-top:16px">Histórico de abastecimentos</div><div id="feqAbList" class="sub" style="margin-top:8px">Carregando…</div>';
+  h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost" id="feqEditar" style="flex:1">✏️ Editar</button></div>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>{ frotasSub='equipamentos'; frotasRender(); });
   $('#feqEditar').addEventListener('click',()=>{ frotasSub='equipamento_edit'; frotasRender(); });
-  $('#feqAbastecer').addEventListener('click',()=>{ frotasSub='equipamento_abastecimento'; frotasRender(); });
-  try{
-    const {data,error}=await sb.rpc('app_frota_equipamento_abastecimentos_listar',{p_equipamento_id:+e.id}); if(error) throw error;
-    const arr=data||[];
-    $('#feqAbList').outerHTML = arr.length ? '<div id="feqAbList">'+arr.map(a=>
-      `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px">
-        <div class="sub">${fmtData(a.data)} · ${a.litros||'—'} L · ${fmtDinheiro(a.valor_total)}${a.leitura!=null?(' · Leitura '+a.leitura):''}</div>
-        <div class="sub" style="margin-top:2px">${a.reportado_por_nome||'—'}${a.foto_cupom?(' · <a href="'+fotoURL(a.foto_cupom)+'" target="_blank" rel="noopener">ver cupom</a>'):''}</div>
-      </div>`
-    ).join('')+'</div>' : '<div id="feqAbList" class="sub" style="margin-top:8px">Nenhum abastecimento registrado ainda.</div>';
-  }catch(err){ $('#feqAbList').outerHTML='<div id="feqAbList" class="banner bad">Erro: '+(err.message||err)+'</div>'; }
-}
-function frotasRenderEquipamentoAbastecimento(){
-  const e=frotasEquipamentos.find(x=>String(x.id)===String(frotasEquipamentoSel));
-  if(!e){ frotasSub='equipamentos'; return frotasRenderEquipamentos(); }
-  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">⛽ Abastecimento — '+e.nome+'</div>';
-  h+=`<label>Leitura (horímetro/km, opcional)</label><input id="feqAbLeitura" inputmode="decimal"/>
-  <label>Combustível</label><select id="feqAbComb"><option value="">—</option>${COMBUSTIVEIS_VEICULO.map(c=>`<option value="${c[0]}"${e.tipo_combustivel===c[0]?' selected':''}>${c[1]}</option>`).join('')}</select>
-  <label>Litros</label><input id="feqAbLitros" inputmode="decimal"/>
-  <label>Valor total (R$)</label><input id="feqAbValor" inputmode="decimal"/>
-  <label>Posto</label><input id="feqAbPosto"/>`;
-  h+=fotoPickHtml('feqAbFoto','Foto da nota fiscal');
-  h+='<label>Observações</label><textarea id="feqAbObs" rows="2"></textarea>';
-  h+='<button class="btn" id="feqAbSalvar" style="margin-top:14px">Salvar</button>';
-  $('#frotasView').innerHTML=h; wireFotoPick($('#frotasView'));
-  $('#frVoltar').addEventListener('click',()=>{ frotasSub='equipamento_detalhe'; frotasRender(); });
-  $('#feqAbSalvar').addEventListener('click',async(ev)=>{
-    const litros=parseFloat(($('#feqAbLitros').value||'').replace(',','.'));
-    const valorTotal=parseFloat(($('#feqAbValor').value||'').replace(',','.'));
-    if(isNaN(litros)||isNaN(valorTotal)) return toast('Preencha litros e valor total');
-    ev.target.disabled=true;
-    try{
-      const foto=await uploadFoto2('feqAbFoto','frota').catch(()=>null);
-      const leitura=$('#feqAbLeitura').value?parseFloat($('#feqAbLeitura').value.replace(',','.')):null;
-      const valorLitro=litros>0?Math.round((valorTotal/litros)*1000)/1000:null;
-      const {error}=await sb.rpc('app_frota_equipamento_abastecimento_salvar',{
-        p_equipamento_id:+e.id,p_leitura:leitura,p_tipo_combustivel:$('#feqAbComb').value||null,
-        p_litros:litros,p_valor_litro:valorLitro,p_valor_total:valorTotal,p_posto:$('#feqAbPosto').value||null,
-        p_foto_cupom:foto,p_gps_lat:gps?gps.lat:null,p_gps_lon:gps?gps.lon:null,
-        p_observacoes:$('#feqAbObs').value||null,p_consorcio:e.consorcio||null});
-      if(error) throw error;
-      toast('✓ Abastecimento registrado'); frotasSub='equipamento_detalhe'; frotasRender();
-    }catch(e2){ toast('Erro: '+(e2.message||e2)); ev.target.disabled=false; }
-  });
 }
 
 // --- Histórico (linha do tempo de um veículo ou colaborador) ---
@@ -8921,8 +8839,8 @@ function frotasRenderManutencaoAgendar(){
 }
 
 function frotasRenderPainel(){
-  const ITENS=[['abastecimentos','⛽','Abastecimentos'],['lavagens','🧼','Lavagens'],['manutencoes','🔧','Manutenções'],['custos','💰','Custos por veículo'],['historico','📜','Histórico (veículo/colaborador)']];
-  const h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📊 Relatório</div><p class="sub" style="margin-top:2px">Abastecimentos, lavagens, manutenções, custos e histórico de toda a frota — com filtro de veículo, colaborador e período.</p>'
+  const ITENS=[['lavagens','🧼','Lavagens'],['manutencoes','🔧','Manutenções'],['custos','💰','Custos por veículo'],['historico','📜','Histórico (veículo/colaborador)']];
+  const h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📊 Relatório</div><p class="sub" style="margin-top:2px">Lavagens, manutenções, custos e histórico de toda a frota — com filtro de veículo, colaborador e período.</p>'
     +'<div class="grid" style="margin-top:12px">'+ITENS.map(([k,ic,lbl])=>`<button class="mod" data-painelgo="${k}"><div class="ic">${ic}</div><div class="nm">${lbl}</div></button>`).join('')+'</div>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>irPara('frota'));
@@ -8932,64 +8850,31 @@ function frotasRenderPainel(){
     frotasSub='painel_'+k; frotasRender();
   }));
 }
-let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''}, frManutCluirSel=null, frAbMode='lista';
-function frAbConsolRow(c){
-  const cc=c.centro_custo?labelOf(CENTROS_CUSTO_FROTA,c.centro_custo):'(sem centro de custo)';
-  const gr=c.consorcio?(CONSORCIO_NOME[c.consorcio]||c.consorcio):'';
-  const litros=(+c.litros_total||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
-  return `<div style="display:flex;justify-content:space-between;gap:8px"><b>${cc}</b><b>${fmtDinheiro(c.valor_total)}</b></div>`
-    +`<div class="sub" style="margin-top:2px">${c.centro_custo||''}${gr?(' · '+gr):''}</div>`
-    +`<div class="sub" style="margin-top:4px">${c.n_abastecimentos} abastecimento(s) · ${c.n_veiculos} veículo(s) · ${litros} L</div>`;
-}
+let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''}, frManutCluirSel=null;
 const PAINEL_CFG={
-  abastecimentos:{rpc:'app_frota_abastecimentos_listar',titulo:'⛽ Abastecimentos',row:a=>{
-    const cc=a.centro_custo?labelOf(CENTROS_CUSTO_FROTA,a.centro_custo):'';
-    const gr=a.consorcio?(CONSORCIO_NOME[a.consorcio]||a.consorcio):'';
-    const nota=a.foto_cupom?` · <a href="${fotoURL(a.foto_cupom)}" target="_blank" rel="noopener">🧾 Nota</a>`:'';
-    return `<div style="display:flex;justify-content:space-between;gap:8px"><b>${a.placa}</b>${a.modelo?('<span class="sub">'+a.modelo+'</span>'):''}</div>`
-      +`<div class="sub" style="margin-top:2px">${a.condutor_nome||''} · ${fmtData(a.data)} · ${a.litros||0} L · ${fmtDinheiro(a.valor_total)}</div>`
-      +`<div class="sub" style="margin-top:2px">${cc?('CC '+cc):'sem centro de custo'}${gr?(' · '+gr):''}${nota}</div>`;
-  }},
   lavagens:{rpc:'app_frota_lavagens_listar',titulo:'🧼 Lavagens',row:l=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${l.placa}</b>${statusBadge(LAVAGEM_STATUS_LABEL,l.status)}</div><div class="sub" style="margin-top:2px">${l.condutor_nome||''}${l.data?(' · '+fmtData(l.data)):''}${l.valor!=null?(' · '+fmtDinheiro(l.valor)):''}${l.consorcio?(' · '+l.consorcio):''}</div>`},
   manutencoes:{rpc:'app_frota_manutencoes_listar',titulo:'🔧 Manutenções',row:m=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">solicitado por ${m.reportado_por_nome||''} em ${fmtData(m.reportado_em)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>${m.aprovado_por_nome?`<div class="sub" style="margin-top:2px">${m.status==='reprovado'?'Reprovado':'Aprovado'} por ${m.aprovado_por_nome}${m.motivo_reprovacao?(' — '+m.motivo_reprovacao):''}</div>`:''}${m.status==='agendado'?`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button data-mancluir="${m.id}" class="btn ghost" style="margin-top:8px;padding:8px;font-size:13px">Marcar como concluída</button>`:''}${m.status==='concluido'?`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}</div>`:''}`},
-  custos:{rpc:'app_frota_custos_por_veiculo',titulo:'💰 Custos por veículo',row:c=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${c.placa}</b><b>${fmtDinheiro(c.custo_total)}</b></div><div class="sub" style="margin-top:2px">${c.modelo||''}</div><div class="sub" style="margin-top:6px">Abastecimento: ${fmtDinheiro(c.abastecimentos_total)} · Lavagem: ${fmtDinheiro(c.lavagens_total)} · Manutenção: ${fmtDinheiro(c.manutencoes_total)}${c.valor_devolucao!=null?(' · Devolução: '+fmtDinheiro(c.valor_devolucao)):''}</div>`}
+  custos:{rpc:'app_frota_custos_por_veiculo',titulo:'💰 Custos por veículo',row:c=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${c.placa}</b><b>${fmtDinheiro(c.custo_total)}</b></div><div class="sub" style="margin-top:2px">${c.modelo||''}</div><div class="sub" style="margin-top:6px">Lavagem: ${fmtDinheiro(c.lavagens_total)} · Manutenção: ${fmtDinheiro(c.manutencoes_total)}${c.valor_devolucao!=null?(' · Devolução: '+fmtDinheiro(c.valor_devolucao)):''}</div>`}
 };
 async function frotasRenderPainelLista(tipo){
   const CFG=PAINEL_CFG[tipo];
   const semFiltro=(tipo==='custos');
-  const isAbast=(tipo==='abastecimentos');
-  const consol=isAbast && frAbMode==='consolidado';
   if(!semFiltro) await frotasCarregarColaboradores();
   const colaboradores=semFiltro?[]:frotasColaboradoresOrdenados();
   let h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">${CFG.titulo}</div>`;
-  if(isAbast) h+='<div id="frAbTabs" style="display:flex;gap:6px;margin:10px 0"></div>';
   if(!semFiltro){
-    if(!consol) h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><select id="pnlVeic" style="flex:1;min-width:140px"><option value="">Todos os veículos</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${frPnlFiltro.veiculo===String(v.id)?' selected':''}>${v.placa}</option>`).join('')+'</select><select id="pnlCondSel" style="flex:1;min-width:160px"><option value="">Todos os colaboradores</option>'+colaboradores.map(c=>`<option value="${c.id}"${frPnlFiltro.condutorId===String(c.id)?' selected':''}>${c.nome||c.email}</option>`).join('')+'</select></div>';
-    h+='<div style="display:flex;gap:8px'+(consol?';margin-top:10px':'')+'"><input id="pnlDe" type="date" value="'+(frPnlFiltro.de||'')+'"/><input id="pnlAte" type="date" value="'+(frPnlFiltro.ate||'')+'"/><button id="pnlBuscar" class="btn" style="margin:0;width:auto;padding:0 16px">Filtrar</button></div>';
-    if(consol) h+='<p class="sub" style="margin-top:6px">Uma linha por centro de custo do veículo — total de litros e valor no período.</p>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><select id="pnlVeic" style="flex:1;min-width:140px"><option value="">Todos os veículos</option>'+frotasVeiculos.map(v=>`<option value="${v.id}"${frPnlFiltro.veiculo===String(v.id)?' selected':''}>${v.placa}</option>`).join('')+'</select><select id="pnlCondSel" style="flex:1;min-width:160px"><option value="">Todos os colaboradores</option>'+colaboradores.map(c=>`<option value="${c.id}"${frPnlFiltro.condutorId===String(c.id)?' selected':''}>${c.nome||c.email}</option>`).join('')+'</select></div>';
+    h+='<div style="display:flex;gap:8px"><input id="pnlDe" type="date" value="'+(frPnlFiltro.de||'')+'"/><input id="pnlAte" type="date" value="'+(frPnlFiltro.ate||'')+'"/><button id="pnlBuscar" class="btn" style="margin:0;width:auto;padding:0 16px">Filtrar</button></div>';
   }
   h+='<div id="pnlLista" style="margin-top:12px"></div>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>{frotasSub='painel';frotasRender();});
-  if(isAbast){
-    const tabs=$('#frAbTabs');
-    const opts=[['lista','📋 Lista'],['consolidado','📊 Por centro de custo']];
-    tabs.innerHTML=opts.map(o=>`<button class="btn ghost" data-abmode="${o[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${frAbMode===o[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${o[1]}</button>`).join('');
-    tabs.querySelectorAll('[data-abmode]').forEach(b=>b.addEventListener('click',()=>{ if(frAbMode===b.dataset.abmode)return; frAbMode=b.dataset.abmode; frotasRenderPainelLista('abastecimentos'); }));
-  }
   const carregar=async()=>{
     $('#pnlLista').innerHTML='<p class="sub">Carregando…</p>';
     try{
       if(!semFiltro){
         const vid=$('#pnlVeic')?$('#pnlVeic').value:''; const condId=$('#pnlCondSel')?$('#pnlCondSel').value:'';
         frPnlFiltro={veiculo:vid,condutorId:condId,de:$('#pnlDe')?$('#pnlDe').value:'',ate:$('#pnlAte')?$('#pnlAte').value:''};
-      }
-      if(consol){
-        const {data,error}=await sb.rpc('app_frota_abastecimentos_consolidado',{p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null});
-        if(error) throw error;
-        const lista=data||[];
-        $('#pnlLista').innerHTML = lista.length ? lista.map(x=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px">${frAbConsolRow(x)}</div>`).join('') : '<p class="sub">Nada encontrado.</p>';
-        return;
       }
       let params={};
       if(!semFiltro) params={p_veiculo_id:frPnlFiltro.veiculo?+frPnlFiltro.veiculo:null,p_condutor_id:frPnlFiltro.condutorId||null,p_data_ini:frPnlFiltro.de||null,p_data_fim:frPnlFiltro.ate||null};
@@ -9082,7 +8967,7 @@ function frotasRelatorioHtml(r){
   h+='<div class="relGrid">'+relField('Km inicial do cadastro',r.km_inicial!=null?r.km_inicial:'—')+relField('Km atual',r.km_atual!=null?r.km_atual:'—')+'</div>';
   h+='<div class="relGrid" style="margin-top:10px">'+relField('Colaboradores vinculados',(r.vinculados&&r.vinculados.length)?r.vinculados.map(m=>m.nome).join(', '):'—')+'</div>';
   h+='<div class="relSec"><span class="relNum">4</span> Gastos</div>';
-  h+='<div class="relGrid">'+relField('Abastecimento',fmtDinheiro(r.abastecimentos_total))+relField('Lavagem',fmtDinheiro(r.lavagens_total))+relField('Manutenção',fmtDinheiro(r.manutencoes_total))+'</div>';
+  h+='<div class="relGrid">'+relField('Lavagem',fmtDinheiro(r.lavagens_total))+relField('Manutenção',fmtDinheiro(r.manutencoes_total))+'</div>';
   h+='<div class="relGrid" style="margin-top:10px">'+relField('Custo total',fmtDinheiro(r.custo_total))+'</div>';
   if(r.fotos&&r.fotos.length){
     h+='<div class="relSec"><span class="relNum">5</span> Fotos do cadastro</div><div class="relPhotos">'+r.fotos.map(f=>'<figure><img src="'+SBASE+f+'"/></figure>').join('')+'</div>';
@@ -9143,13 +9028,6 @@ function frotasRelatorioCondutorHtml(r){
     r.checklists.filter(c=>c.fotos&&c.fotos.length).forEach(c=>{
       h+='<p class="sub" style="margin-top:8px">'+(c.placa||'')+' · '+relFmtData(c.data)+' · Km '+(c.km!=null?c.km:'—')+' · '+(c.status==='ok'?'OK':'Com pendência')+'</p>';
       h+='<div class="relPhotos">'+c.fotos.map(f=>'<figure><img src="'+SBASE+f+'"/></figure>').join('')+'</div>';
-    });
-  }
-  if(r.abastecimentos&&r.abastecimentos.length){
-    h+='<div class="relSec"><span class="relNum">5</span> Abastecimentos ('+r.abastecimentos.length+')</div>';
-    r.abastecimentos.filter(a=>a.foto_cupom).forEach(a=>{
-      h+='<p class="sub" style="margin-top:8px">'+(a.placa||'')+' · '+relFmtData(a.data)+' · '+(a.litros||'—')+' L · '+fmtDinheiro(a.valor_total)+'</p>';
-      h+='<div class="relPhotos"><figure><img src="'+SBASE+a.foto_cupom+'"/></figure></div>';
     });
   }
   h+='</div>';
