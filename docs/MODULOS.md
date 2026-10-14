@@ -1957,6 +1957,13 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     tira os meses excluídos da **média** (bate com a VPBL do backend), pinta o 202505 e os meses sem macro de **vermelho**
     com selo "não entra"/"sem macro", e o painel da linha de base mostra **aviso de VPBL provisória** quando incompleto.
     A exclusão do 202505 é **só na VPBL** — a série ao vivo e o IRVP seguem mostrando o mês.
+  - **Visibilidade do mês excluído (2026-10-14):** o vermelho só aparecia dentro do accordion "Como o VP alvo é
+    calculado", que nascia **fechado**, na âncora **prévia** e com **uma** ZA — por isso passava despercebido na
+    visão que abre por padrão (Ambos + Contratual + fechado). Agora o accordion **abre por padrão** (`resDerivOpen=true`)
+    e o **painel da Linha de base exibe um aviso vermelho no topo** (`⛔ <meses> não entra(m) no cálculo da VPBL`)
+    sempre que a âncora atual tiver meses em `excluir` (ou seja, na prévia) — fora do accordion, sem precisar expandir.
+    A marcação segue sendo conceito da **prévia**; na **contratual** (VPBL = número do TR) nenhum mês é excluído, então
+    o aviso não aparece (comportamento correto).
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
