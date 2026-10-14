@@ -1995,6 +1995,15 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     típica → adequado/sub/super/mudança/indeterminado). **IPS** = média ponderada de sub-scores (pesos em `hd_config`, **editáveis na tela ⚙️ Premissas** — atuais: anomalia 15 · idade 21 · mudança 21 · utilização 22 · dimensionamento 21 · modelo 0; dimensões indeterminadas redistribuem o peso). Categoria
     **P1–P5** por faixa de IPS; `motivos[]` + `justificativa`; `codigo_servico` do calibre; **`remanejamento_sugerido`** = interno + ativa.
     **Interno/externo e situação da ligação são FILTROS, não entram no score** (decisão do usuário).
+  - **⚠️ Rebuild mensal (teto de 120s do ambiente, 2026-10-13):** `app_nrw_hd_rebuild()` é **monolítico (~15 min / 132k)** e
+    **NÃO passa** no `statement_timeout` de **120s** imposto pelo pooler/MCP **e também pelo pg_cron** deste ambiente (nem
+    `SET` na sessão nem `SET statement_timeout=0` no corpo da função levantam — testado; o cron fica relançando e falhando a
+    cada 2 min). **Para rodar o rebuild completo use o chunking:** função **`app_nrw_hd_rebuild_chunk(p_mod int, p_k int)`**
+    (mesma lógica, **sem truncate**, filtra `matricula % p_mod = p_k`). Receita: `truncate "11 - perdas_nrw".hd_priorizacao;`
+    e então rodar **`select app_nrw_hd_rebuild_chunk(20, k)`** para `k = 0..19` (chunks de ~6k matrículas cabem bem em 120s;
+    2 chunks por chamada no MCP é seguro, 3 estoura). Alternativa definitiva (não feita): reescrever como **procedure** com
+    `COMMIT` entre chunks pra rodar via cron. O gate permite `auth.uid()` nulo (serviço/cron). Reusa `mm_matricula_stats` +
+    `micromedicao_historico` — então **rode o `app_nrw_mm_stats_rebuild` ANTES** (ver §micromedido) para o HD refletir o mês novo.
   - **RPCs de leitura** (definer, gate admin|dev_acesso): `app_nrw_hd_resumo(p_consorcio,p_situacao,p_interno)` ·
     `app_nrw_hd_ranking(...filtros...,p_limit,p_offset)` · `app_nrw_hd_mapa(...)` (GeoJSON lon/lat 4326 via join `ligacoes.geom`, top por IPS) ·
     `app_nrw_hd_detalhe(p_matricula)` (blocos + série 18m + calibre). Filtro de situação default **só ativa (R)**.
