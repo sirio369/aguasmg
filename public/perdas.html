@@ -1657,7 +1657,7 @@ function go(s,dmc){
  applyFocus(s);
 }
 /* ---------- Acompanhamento do resultado (IRVP) — dados REAIS via RPC ---------- */
-let resMensal=[], resBaselines={}, resAnchor='contratual', resSel=null, resDerivOpen=false;
+let resMensal=[], resBaselines={}, resAnchor='contratual', resSel=null, resDerivOpen=true;
 function resCons(){ return za==='all'?null:za; }
 function resB(){ return resBaselines[resAnchor]||{}; }
 function resIRVP(vp){ const b=resB(); return (b.meta_m3>0 && vp!=null)?((b.vpbl - vp)/b.meta_m3*100):null; }
@@ -1718,7 +1718,7 @@ function resBasePanel(){
   {lab:'VP alvo 120%',v:fmt(a120),u:'m³/mês',sub:'VPBL − 1,2×meta · teto do IRVP (bônus máximo)'}
  ];
  return `<div class="panel"><div class="phead"><h3>Linha de base (IRVP)</h3><span class="hint" style="margin-left:6px">${b.janela||''}</span>${resIB('base')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">${resToggle()}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
+  <div class="pbody">${resToggle()}${(b.excluir&&b.excluir.length)?`<p class="note" style="margin:0 0 8px;color:#c0392b">⛔ <b>${b.excluir.map(mmCmp).join(', ')} não entra${b.excluir.length>1?'m':''} no cálculo da VPBL</b> — marcado em vermelho no detalhamento mês a mês abaixo.</p>`:''}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
    <details class="resderiv" ${resDerivOpen?'open':''}><summary>Como o VP alvo é calculado (mês a mês, na âncora selecionada)</summary>${resDerivHtml()}</details>
   </div></div>`;
 }
