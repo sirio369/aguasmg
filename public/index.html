@@ -8170,8 +8170,9 @@ function frotaBlocks(){
       {id:'situacao',ic:'✅',lbl:'Checklist diário',precisaVeic:true,bloqueiaManutencao:true},
       {id:'manutencao',ic:'🔧',lbl:'Manutenção',precisaVeic:true},
       {id:'lavagem',ic:'🧼',lbl:'Lavagem',precisaVeic:true}]},
-    {t:'Gestor',ic:'🖊️',on:gestor,papel:'Aprovador',acts:[
-      {id:'ap_manutencao',ic:'🔧',lbl:'Aprovar manutenções'}]},
+    {t:'Gestor',ic:'🖊️',on:gestor||adm,papel:'Aprovador / Frotas',acts:[
+      {id:'ap_manutencao',ic:'🔧',lbl:'Aprovar manutenções',on:gestor},
+      {id:'chk_equipe',ic:'📋',lbl:'Checklists da equipe'}]},
     {t:'Equipe administrativa',ic:'🏢',on:adm,papel:'Frotas / Admin',acts:[
       {id:'veiculos',ic:'🚗',lbl:'Veículos'},
       {id:'condutores',ic:'🪪',lbl:'Condutores'},
@@ -8192,7 +8193,7 @@ function frotaHome(){
   const blocks=frotaBlocks();
   $('#frotaView').innerHTML='<h1 style="margin-bottom:2px">Frota</h1><p class="sub">Escolha uma ação</p>'+
     blocks.filter(b=>b.on).map(b=>`<div class="sec" style="margin-top:16px;display:flex;align-items:center">${b.ic} ${b.t}${(b.t==='Equipe administrativa'&&ME&&ME.is_admin)?'<button id="frotaAdmGear" title="Definir quem vê a Equipe administrativa" style="all:unset;cursor:pointer;font-size:18px;margin-left:auto;padding:0 4px">⚙️</button>':''}</div><div class="grid" style="margin-top:10px">`+
-      b.acts.map(a=>{
+      b.acts.filter(a=>a.on!==false).map(a=>{
         if(a.precisaVeic && !frotaMeuVeiculo) return `<button class="mod" disabled style="opacity:.4;cursor:not-allowed" title="Vincule-se a um veículo primeiro em Veículos"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
         if(a.bloqueiaManutencao && frotaMeuVeiculo && frotaMeuVeiculo.status==='manutencao') return `<button class="mod" disabled style="opacity:.4;cursor:not-allowed" title="Veículo em manutenção no momento"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
         return `<button class="mod" data-fract="${a.id}"><div class="ic">${a.ic}</div><div class="nm">${a.lbl}</div></button>`;
@@ -8237,6 +8238,7 @@ function frotaOpen(id){
   if(id in CONDACTS){ condTarget={sub:CONDACTS[id],act:id}; irPara('condutor'); return; }
   if(id==='veiculos'){ frotasTarget='home'; irPara('frotas'); return; }
   if(id==='ap_manutencao'){ frotasTarget='manutencao_aprovar'; irPara('frotas'); return; }
+  if(id==='chk_equipe'){ frotasTarget='chk_equipe'; irPara('frotas'); return; }
   if(id==='relatorio'){ frotasTarget='painel'; irPara('frotas'); return; }
   if(id==='condutores'||id==='lavagem_fila'||id==='manutencao_fila'||id==='equipamentos'){ frotasTarget=id; irPara('frotas'); return; }
 }
@@ -8358,46 +8360,66 @@ async function condSalvarCnh(){
     toast('✓ CNH atualizada — assine o novo termo'); condSub='home'; condRender();
   }catch(e){ toast('Erro: '+(e.message||e)); }
 }
+// faces do veículo no checklist (foto obrigatória em cada + ocorrência/descrição) — gera manutenção ao final se houver ocorrência
+const FR_FACES=[['capo','Capô'],['dianteira','Dianteira (para-choque/grade)'],['lat_esq_diant','Lateral esquerda — dianteira'],['lat_dir_diant','Lateral direita — dianteira'],['lat_esq_tras','Lateral esquerda — traseira'],['lat_dir_tras','Lateral direita — traseira'],['teto','Teto'],['traseira','Traseira'],['motor','Motor (compartimento / ruídos)']];
 function condRenderSituacao(){
   const v=condMeuVeiculo||{};
   const ITENS=[['pneus_ok','Pneus'],['freios_ok','Freios'],['oleo_ok','Óleo'],['luzes_ok','Luzes'],['extintor_ok','Extintor'],['triangulo_macaco_estepe_ok','Triângulo/macaco/estepe']];
+  const faceCard=([key,lbl])=>`<div class="frfacecard" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px">
+     <div style="font-weight:600;margin-bottom:8px">${lbl}</div>
+     ${fotoPickHtml('face_'+key,'📷 Foto — '+lbl)}
+     <label style="display:flex;align-items:center;gap:10px;justify-content:space-between;margin-top:8px"><span>Tem ocorrência?</span><input type="checkbox" class="faceocc" data-k="${key}" style="width:20px;height:20px;flex:none"/></label>
+     <textarea class="facedesc" data-k="${key}" rows="2" placeholder="Descreva a ocorrência (o que há de errado)" hidden style="margin-top:8px"></textarea>
+   </div>`;
   const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
   <div class="sec">✅ Checklist diário — ${v.placa||''}</div>
   <label>Km atual</label><input id="sitfKm" inputmode="numeric" value="${v.km_atual||''}"/>
-  <div class="sec" style="margin-top:14px">Checklist</div>
+  <div class="sec" style="margin-top:14px">Itens de segurança</div>
   <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;margin-top:8px">
   ${ITENS.map(([id,lbl],i)=>`<label style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;${i?'border-top:1px solid var(--line)':''}"><span>${lbl}</span><input type="checkbox" id="sitf_${id}" style="width:20px;height:20px;flex:none"/></label>`).join('')}
   </div>
-  <label style="margin-top:12px">Observações</label><textarea id="sitfAvarias" rows="2" placeholder="Algo a registrar? (opcional)"></textarea>
-  <div class="sec" style="margin-top:14px">Fotos (opcional, até 6)</div>
-  ${[1,2,3,4,5,6].map(n=>fotoPickHtml('sitfFoto'+n,'Foto '+n)).join('')}
+  <div class="sec" style="margin-top:16px">Faces do veículo <span class="sub" style="font-weight:400">· foto obrigatória em cada</span></div>
+  ${FR_FACES.map(faceCard).join('')}
+  <label style="margin-top:14px">Observações gerais</label><textarea id="sitfAvarias" rows="2" placeholder="Algo mais a registrar? (opcional)"></textarea>
   <button class="btn" id="sitfSalvar" style="margin-top:14px">Salvar checklist</button>
-  <button class="btn ghost" id="sitfProblema" style="margin-top:8px">🔧 Encontrou um problema? Registrar</button>`;
+  <p class="sub" style="margin-top:8px">Faces marcadas com <b>ocorrência</b> geram automaticamente uma solicitação de manutenção para a equipe de frotas.</p>`;
   $('#condView').innerHTML=h; wireFotoPick($('#condView'));
   $('#condVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#condView').querySelectorAll('.faceocc').forEach(ck=>ck.addEventListener('change',()=>{ const ta=$('#condView').querySelector('.facedesc[data-k="'+ck.dataset.k+'"]'); if(ta) ta.hidden=!ck.checked; }));
   $('#sitfSalvar').addEventListener('click',condSalvarSituacao);
-  $('#sitfProblema').addEventListener('click',()=>{condOcorrenciaBackTo='situacao';condSub='ocorrencia';condRender();});
 }
 async function condSalvarSituacao(){
   const v=condMeuVeiculo;
   if(!v) return toast('Você não tem veículo vinculado');
   const chk=id=>$('#sitf_'+id).checked;
-  const temPend=['pneus_ok','freios_ok','oleo_ok','luzes_ok','extintor_ok','triangulo_macaco_estepe_ok'].some(id=>!chk(id));
-  const uid=crypto.randomUUID();
-  const item={id:uid,tipo:'frota_situacao',rpc:'app_frota_situacao_salvar',pasta:'frota',
-    fotos:{p_fotos:FOTO2_BLOBS['sitfFoto1']||null, p_foto2:FOTO2_BLOBS['sitfFoto2']||null, p_foto3:FOTO2_BLOBS['sitfFoto3']||null,
-      p_foto4:FOTO2_BLOBS['sitfFoto4']||null, p_foto5:FOTO2_BLOBS['sitfFoto5']||null, p_foto6:FOTO2_BLOBS['sitfFoto6']||null},
-    fotosArray:['p_fotos'],
-    fields:{
+  const q=sel=>$('#condView').querySelector(sel);
+  // foto obrigatória em todas as faces; descrição obrigatória quando houver ocorrência
+  for(const [key,lbl] of FR_FACES){
+    if(!FOTO2_BLOBS['face_'+key]) return toast('Foto obrigatória: '+lbl);
+    const occ=q('.faceocc[data-k="'+key+'"]').checked;
+    if(occ && !((q('.facedesc[data-k="'+key+'"]').value||'').trim())) return toast('Descreva a ocorrência: '+lbl);
+  }
+  const btn=$('#sitfSalvar'), txt=btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    const faces=[];
+    for(const [key,lbl] of FR_FACES){
+      const foto=await uploadFoto2('face_'+key,'frota');
+      const occ=q('.faceocc[data-k="'+key+'"]').checked;
+      faces.push({face:key,label:lbl,foto:foto,ocorrencia:occ,descricao:occ?((q('.facedesc[data-k="'+key+'"]').value||'').trim()):null});
+    }
+    const temPend=['pneus_ok','freios_ok','oleo_ok','luzes_ok','extintor_ok','triangulo_macaco_estepe_ok'].some(id=>!chk(id)) || faces.some(f=>f.ocorrencia);
+    const {error}=await sb.rpc('app_frota_situacao_salvar',{
       p_veiculo_id:+v.id, p_km:$('#sitfKm').value?+$('#sitfKm').value:null, p_status:temPend?'com_pendencia':'ok',
       p_pneus_ok:chk('pneus_ok'), p_freios_ok:chk('freios_ok'), p_oleo_ok:chk('oleo_ok'), p_luzes_ok:chk('luzes_ok'),
       p_extintor_ok:chk('extintor_ok'), p_triangulo_macaco_estepe_ok:chk('triangulo_macaco_estepe_ok'),
       p_avarias:$('#sitfAvarias').value||null, p_observacoes:null, p_fotos:null,
-      p_foto2:null, p_foto3:null, p_foto4:null, p_foto5:null, p_foto6:null,
-      p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null, p_consorcio:v.consorcio||null
-    }};
-  enviarOuEnfileirar(item,'✓ Situação registrada');
-  condSub='home'; condRender();
+      p_gps_lat:gps?gps.lat:null, p_gps_lon:gps?gps.lon:null, p_consorcio:v.consorcio||null, p_faces:faces
+    });
+    if(error) throw error;
+    const nocc=faces.filter(f=>f.ocorrencia).length;
+    toast('✓ Checklist registrado'+(nocc?(' · '+nocc+' ocorrência(s) → manutenção gerada'):''));
+    condSub='home'; condRender();
+  }catch(e){ toast('Erro ao salvar: '+(e.message||e)+' — precisa de conexão'); btn.disabled=false; btn.textContent=txt; }
 }
 function condRenderOcorrencia(){
   const v=condMeuVeiculo||{};
@@ -8540,7 +8562,55 @@ async function condRenderCnhHistorico(){
 }
 
 let frotasVeiculos=[], frotasSub='home', frotasVeiculoSel=null, frVeicFiltroTipo='', frVeicFiltroCond='';
-async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar','equipamentos'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
+async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar','equipamentos','chk_equipe'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
+// ---- Supervisão de checklists da equipe (aprovador vê sua equipe; admin/frotas veem tudo) ----
+let frChkDias=7, frChkSel=null, _frChk=null;
+async function frotasRenderChkEquipe(){
+  $('#frotasView').innerHTML='<button class="btn ghost" id="frChkV0" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📋 Checklists da equipe</div><p class="sub">Carregando…</p>';
+  $('#frChkV0').addEventListener('click',()=>irPara('frota'));
+  try{ const {data,error}=await sb.rpc('app_frota_checklist_supervisao',{p_dias:frChkDias}); if(error)throw error; _frChk=data||{dias:[],rows:[]}; }
+  catch(e){ $('#frotasView').innerHTML='<button class="btn ghost" id="frChkV1" style="margin:0 0 12px">‹ Voltar</button><div class="banner bad">Erro: '+(e.message||e)+'</div>'; $('#frChkV1').addEventListener('click',()=>irPara('frota')); return; }
+  const d=_frChk||{dias:[],rows:[]}, dias=d.dias||[], rows=d.rows||[];
+  const dLbl=s=>{ const p=String(s).split('-'); return p[2]+'/'+p[1]; };
+  const head='<th style="text-align:left;position:sticky;left:0;background:var(--card);padding:6px 8px">Veículo / condutor</th>'+dias.map(x=>`<th style="padding:4px 6px;font-size:11px;white-space:nowrap">${dLbl(x)}</th>`).join('');
+  const body=rows.length?rows.map(r=>{
+    const cells=(r.dias||[]).map(c=>{
+      if(!c.checklist_id) return '<td style="text-align:center;color:#c62828">✕</td>';
+      const alerta=c.ocorrencia||c.status==='com_pendencia';
+      return `<td style="text-align:center"><button data-chk="${c.checklist_id}" style="all:unset;cursor:pointer;color:${alerta?'#e07a00':'#2e7d32'};font-size:16px" title="Ver checklist">${alerta?'⚠':'✓'}</button></td>`;
+    }).join('');
+    return `<tr><td style="position:sticky;left:0;background:var(--card);padding:6px 8px"><div style="font-weight:600">${r.placa||'—'}</div><div class="sub" style="font-size:11px">${r.modelo||''} · ${r.condutor_nome||'sem condutor'}</div></td>${cells}</tr>`;
+  }).join(''):`<tr><td colspan="${dias.length+1}" class="sub" style="padding:14px">Nenhum veículo vinculado à sua equipe neste período.</td></tr>`;
+  const selDias=[7,15,30].map(n=>`<option value="${n}"${frChkDias===n?' selected':''}>${n} dias</option>`).join('');
+  $('#frotasView').innerHTML=`<button class="btn ghost" id="frChkVoltar" style="margin:0 0 12px">‹ Voltar</button>
+   <div class="sec" style="display:flex;align-items:center;gap:10px">📋 Checklists da equipe <select id="frChkDias" style="margin-left:auto;width:auto;padding:4px 8px">${selDias}</select></div>
+   <p class="sub" style="margin:2px 0 10px">✓ feito · ⚠ feito com ocorrência · ✕ não fez. Toque num dia para abrir o checklist.</p>
+   <div style="overflow:auto;border:1px solid var(--line);border-radius:12px"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+  $('#frChkVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#frChkDias').addEventListener('change',e=>{ frChkDias=+e.target.value; frotasRenderChkEquipe(); });
+  $('#frotasView').querySelectorAll('[data-chk]').forEach(b=>b.addEventListener('click',()=>{ frChkSel=b.dataset.chk; frotasSub='chk_detalhe'; frotasRender(); }));
+}
+async function frotasRenderChkDetalhe(){
+  $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
+  let c; try{ const {data,error}=await sb.rpc('app_frota_checklist_detalhe',{p_id:+frChkSel}); if(error)throw error; c=data; }
+  catch(e){ $('#frotasView').innerHTML='<button class="btn ghost" id="frCd0" style="margin:0 0 12px">‹ Voltar</button><div class="banner bad">Erro: '+(e.message||e)+'</div>'; $('#frCd0').addEventListener('click',()=>{frotasSub='chk_equipe';frotasRender();}); return; }
+  const items=[['pneus_ok','Pneus'],['freios_ok','Freios'],['oleo_ok','Óleo'],['luzes_ok','Luzes'],['extintor_ok','Extintor'],['triangulo_macaco_estepe_ok','Triângulo/macaco/estepe']];
+  const itensH=items.map(([k,l])=>`<span style="display:inline-block;margin:2px 10px 2px 0">${c[k]?'✅':'❌'} ${l}</span>`).join('');
+  const faces=(c.faces||[]);
+  const facesH=faces.map(f=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px">
+     <div style="font-weight:600">${f.label||f.face} ${f.ocorrencia?'<span style="color:#e07a00">⚠ ocorrência</span>':'<span style="color:#2e7d32">OK</span>'}</div>
+     ${f.descricao?`<div class="sub" style="margin:4px 0">${f.descricao}</div>`:''}
+     ${f.foto?`<a href="${SBASE+f.foto}" target="_blank" rel="noopener"><img src="${SBASE+f.foto}" style="width:100%;max-height:240px;object-fit:cover;border-radius:8px;margin-top:6px"/></a>`:''}
+   </div>`).join('')||'<p class="sub">Sem faces registradas (checklist antigo).</p>';
+  const dt=c.criado_em?new Date(c.criado_em).toLocaleString('pt-BR'):'';
+  $('#frotasView').innerHTML=`<button class="btn ghost" id="frCdVoltar" style="margin:0 0 12px">‹ Voltar</button>
+   <div class="sec">📋 Checklist — ${c.placa||''}</div>
+   <p class="sub" style="margin:2px 0">${c.modelo||''} · ${c.reportado_por||''} · ${dt}${c.km?(' · km '+c.km):''}</p>
+   <div class="sec" style="margin-top:12px">Itens de segurança</div><div style="margin-top:6px">${itensH}</div>
+   ${c.avarias?`<div class="sec" style="margin-top:12px">Observações</div><p class="sub">${c.avarias}</p>`:''}
+   <div class="sec" style="margin-top:12px">Faces do veículo</div>${facesH}`;
+  $('#frCdVoltar').addEventListener('click',()=>{frotasSub='chk_equipe';frotasRender();});
+}
 async function frotasRender(){
   frotasSetBar();
   $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
@@ -8550,6 +8620,8 @@ async function frotasRender(){
   if(frotasSub==='veiculo_detalhe') return frotasRenderVeiculoDetalhe();
   if(frotasSub==='veiculo_devolver') return frotasRenderVeiculoDevolver();
   if(frotasSub==='manutencao_aprovar') return frotasRenderManutencaoAprovar();
+  if(frotasSub==='chk_equipe') return frotasRenderChkEquipe();
+  if(frotasSub==='chk_detalhe') return frotasRenderChkDetalhe();
   if(frotasSub==='manutencao_reprovar') return frotasRenderManutencaoReprovar();
   if(frotasSub==='manutencao_concluir_admin') return frotasRenderManutencaoConcluirAdmin();
   if(frotasSub==='condutores') return frotasRenderCondutores();

@@ -1210,6 +1210,27 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
     verdade), foi preciso **dropar explicitamente a assinatura antiga de 14 parâmetros** depois de
     criar a nova de 19 — confirmado ao vivo que não sobrou overload ambíguo e que chamadas no
     formato antigo (14 params) continuam resolvendo normal contra a função nova.
+  - **Checklist por faces + supervisão + manutenção automática (2026-10-15, sw v250):** o checklist ganhou
+    robustez. Mantém os **itens de segurança** (6 toggles) e acrescenta uma seção **"Faces do veículo"** com
+    **9 faces** (`FR_FACES`: capô, dianteira, lat. esq./dir. dianteira, lat. esq./dir. traseira, teto, traseira,
+    **motor**) — cada face com **foto obrigatória** + toggle **"Tem ocorrência?"** + descrição (obrigatória quando há
+    ocorrência). Nova coluna **`frota_checklist_situacao.faces jsonb`** (array `{face,label,foto,ocorrencia,descricao}`).
+    `app_frota_situacao_salvar` recriado (⚠️ §0.6: assinatura de 20 params **dropada**; nova com **`p_faces jsonb`**)
+    e agora, se houver ≥1 face com ocorrência, **insere UMA `frota_manutencao`** (status `pendente`, `tipo_problema='checklist'`
+    — valor **adicionado ao CHECK** `frota_manutencao_tipo_problema_check`) com `servico_solicitado` juntando as faces +
+    descrições e `fotos_antes` = fotos das ocorrências → cai na fila do responsável de frotas. ⚠️ **O checklist deixou de ser
+    offline-first** (`condSalvarSituacao` agora é **online**: sobe as 9 fotos, monta `p_faces` com os paths e chama a RPC;
+    falha pede conexão) — o peso de 9 fotos + tecer paths no jsonb não cabia na fila offline. O botão/atalho "Registrar
+    problema" de dentro do checklist saiu (as ocorrências por face o substituem). As 6 fotos genéricas também saíram (as faces
+    cobrem).
+  - **Supervisão de checklists da equipe (2026-10-15):** novo card **📋 "Checklists da equipe"** no hub (bloco **Gestor**,
+    visível a **aprovador OU admin OU responsável de frotas** — `frotaBlocks` ganhou `on` por ação + bloco `on=gestor||adm`;
+    `frotaOpen`→`frotasTarget='chk_equipe'`). Tela `chk_equipe` (`frotasRenderChkEquipe`): **matriz veículo × últimos N dias**
+    (7/15/30) com ✓ feito · ⚠ feito com ocorrência · ✕ não fez; toque numa célula abre o **detalhe** (`chk_detalhe`/
+    `frotasRenderChkDetalhe` — itens, observações e faces com foto/descrição). **Escopo:** RPC `app_frota_checklist_supervisao(p_dias)`
+    — admin/`frota_admin` veem **todos** os veículos com vínculo ativo; o **aprovador** vê só os veículos cujo condutor atual o
+    tem como `aprovador_uuid`/`aprovador2_uuid`. Detalhe por `app_frota_checklist_detalhe(p_id)` (gated: admin/frotas, aprovador
+    do autor, ou o próprio). Ambas definer, `authenticated`. Validado E2E (admin 11 linhas, aprovador 2, detalhe ok).
   - **Manutenção** (`condRenderManutencao`, `condSub='manutencao'`, **tela própria desde a 5ª
     rodada** — antes o botão do hub ia direto pro formulário de reportar problema, sem nenhum
     histórico visível): lista tudo que o colaborador já reportou (`app_frota_minhas_manutencoes()`,
@@ -1247,11 +1268,10 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   - **Abastecimento removido (2026-10-14):** a tela de abastecimento do colaborador (`condRenderAbastecimento`/
     `condSalvarAbastecimento`), a lista fixa `COMBUSTIVEIS` (Etanol/Diesel/Arla) e a tabela/RPC do
     banco saíram por completo (ver §6.5). `situacao` segue como ação offline que precisa de veículo.
-  - **Offline-first** (igual ao resto da coleta de campo, §1) só em checklist/situação —
-    `condSalvarSituacao` monta um `item` e chama `enviarOuEnfileirar`;
-    `p_fotos` do checklist é **array** (`text[]`), por isso o `item` leva `fotosArray:['p_fotos']`
-    (convenção nova em `enviar()`, ver §1). **Problema/manutenção e lavagem são online-only**
-    (chamam a RPC direto, sem fila).
+  - **Online-only (2026-10-15):** checklist/situação **deixou de ser offline-first** quando ganhou as faces
+    (9 fotos + `p_faces` jsonb com os paths — não cabia na fila). `condSalvarSituacao` agora sobe as fotos e chama a
+    RPC direto. **Problema/manutenção e lavagem** sempre foram online-only. (Histórico: antes `condSalvarSituacao` usava
+    `enviarOuEnfileirar` com `fotosArray:['p_fotos']`.)
   - **Alerta de lavagem atrasada** (`v.lavagem_atrasada`, banner no card do veículo): calculado **na
     leitura**, sem job/cron — última lavagem `realizada` (ou a data de início do vínculo, se nunca
     lavou) ≤ hoje − 30 dias. Mesmo padrão de `cnh_vencendo` em `app_condutor_meu`.
