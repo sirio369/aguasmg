@@ -1775,6 +1775,7 @@ async function pjLoad(force){
       if(i<0) iv.arv.push(pjDoc(nm,dc)); else iv.arv.push(iv.arv.splice(i,1)[0]);
     });
   });
+  await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca As-Built/RTQ já anexados (100%) em todas as intervenções
   PJ_IVS=ivs; pjLoaded=true;
 }
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
@@ -1788,7 +1789,8 @@ function pjNodePath(nodes,target,trail){ trail=trail||[]; for(const n of (nodes|
 function pjDDMM(iso){ try{ const d=new Date(iso); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }catch(e){ return ''; } }
 async function pjAvancosLoad(iv){ pjAvancosCur={}; if(!iv||iv.gid==null) return pjAvancosCur; try{ const {data,error}=await sb.rpc('app_proj_avancos_iv',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(e=>{ if(e.atividade==='Valas de entrada e saída'){ const mv=/^Valas de entrada e saída › ([^›]+)$/.exec(e.caminho||''); e.atividade='Valas de perfuração'; if(mv) e.caminho='Valas de perfuração › Vala 1 › '+mv[1].trim(); }  /* normaliza avanços legados de valas (nome/caminho antigos → novos) p/ casar com a árvore renomeada */ const k=e.caminho||e.sub||''; (pjAvancosCur[k]=pjAvancosCur[k]||[]).push(e); }); }catch(e){} return pjAvancosCur; }
 function pjPct(node){
-  if(node.ativo===false||node.k==='reg'||node.k==='sel'||node.k==='doc')return null;
+  if(node.ativo===false||node.k==='reg'||node.k==='sel')return null;
+  if(node.k==='doc')return node.done?100:0;   // atividade de encerramento: 100% quando o PDF está anexado
   if(node.k==='%')return node.p;
   if(node.k==='m')return node.meta?Math.round(node.exec/node.meta*100):0;
   if(node.f&&node.f.length){const vs=node.f.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;}
@@ -1796,7 +1798,7 @@ function pjPct(node){
 }
 const pjIvPct=iv=>{const vs=iv.arv.map(pjPct).filter(v=>v!=null);return vs.length?Math.round(vs.reduce((a,b)=>a+b,0)/vs.length):0;};
 // conta folhas mensuráveis ativas (para o resumo)
-function pjLeaves(node,acc){ acc=acc||[]; if(node.ativo===false)return acc; if(node.f&&node.f.length){node.f.forEach(c=>pjLeaves(c,acc));} else if(node.k==='%'||node.k==='m'){acc.push(node);} return acc; }
+function pjLeaves(node,acc){ acc=acc||[]; if(node.ativo===false)return acc; if(node.f&&node.f.length){node.f.forEach(c=>pjLeaves(c,acc));} else if(node.k==='%'||node.k==='m'||node.k==='doc'){acc.push(node);} return acc; }
 let pjFtipo='',pjFst='',pjFcons='',pjFdmc='',pjView='mapa',pjCur=null,pjReg={};
 function pjZero(n){ if(n.k==='%')n.p=0; if(n.k==='m')n.exec=0; if(n.k==='reg')n.v='—'; if(n.k==='sel')n.v=''; if(n.f)n.f.forEach(pjZero); return n; }
 let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (configurar escopo/quantidade, só Suporte)
@@ -2029,7 +2031,15 @@ function pjResumoCsv(feed){
 // ---------- documentos da intervenção (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por tipo ----------
 const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
 let pjDocsCur={};   // tipo -> {tipo,nome,path} da intervenção corrente
-async function pjDocsLoad(iv){ pjDocsCur={}; if(!iv||iv.gid==null) return pjDocsCur; try{ const {data,error}=await sb.rpc('app_proj_docs_listar',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(dd=>{ pjDocsCur[dd.tipo]=dd; }); }catch(e){} return pjDocsCur; }
+// presença dos documentos de ENCERRAMENTO (as_built/rtq) por intervenção — marca node.done nos cards da lista sem abrir cada uma
+let pjDocsPres={};   // 'kind|gid' -> Set(tipos)
+async function pjDocsPresLoad(){ try{ const {data,error}=await sb.rpc('app_proj_docs_presenca'); if(error)throw error; pjDocsPres={}; (data||[]).forEach(d=>{ const k=d.kind+'|'+d.gid; (pjDocsPres[k]=pjDocsPres[k]||new Set()).add(d.tipo); }); }catch(e){ pjDocsPres={}; } }
+function pjStampDoc(iv){ if(!iv||!Array.isArray(iv.arv))return; const set=pjDocsPres[iv.kind+'|'+iv.gid]; iv.arv.forEach(n=>{ if(n&&n.k==='doc') n.done=!!(set&&set.has(n.doc)); }); }
+function pjSetDocDone(iv,tipo,val){ if(!iv)return; const key=iv.kind+'|'+iv.gid; if(val){ (pjDocsPres[key]=pjDocsPres[key]||new Set()).add(tipo); } else if(pjDocsPres[key]){ pjDocsPres[key].delete(tipo); } (iv.arv||[]).forEach(n=>{ if(n&&n.k==='doc'&&n.doc===tipo) n.done=!!val; }); }
+async function pjDocsLoad(iv){ pjDocsCur={}; if(!iv||iv.gid==null) return pjDocsCur; try{ const {data,error}=await sb.rpc('app_proj_docs_listar',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(dd=>{ pjDocsCur[dd.tipo]=dd; }); }catch(e){}
+  // marca as atividades de encerramento (as_built/rtq) desta intervenção como 100% quando o PDF existe
+  if(Array.isArray(iv.arv)){ const set=new Set(); iv.arv.forEach(n=>{ if(n&&n.k==='doc'){ n.done=!!pjDocsCur[n.doc]; if(n.done)set.add(n.doc); } }); pjDocsPres[iv.kind+'|'+iv.gid]=set; }
+  return pjDocsCur; }
 function pjRerender(){ if(pjMode==='campo') pjRenderDet(); else pjRenderCfg(); }   // re-render da tela corrente (campo × config)
 async function pjDocAnexar(iv,tipo,file){ if(!iv||!file) return;
   if(file.type&&file.type!=='application/pdf'){ toast('Envie um arquivo PDF'); return; }
@@ -2038,13 +2048,13 @@ async function pjDocAnexar(iv,tipo,file){ if(!iv||!file) return;
   try{ const up=await sb.storage.from('fotos-campo').upload(path,file,{contentType:'application/pdf',upsert:true}); if(up.error) throw up.error;
     const {data:old,error}=await sb.rpc('app_proj_doc_set',{p_kind:iv.kind,p_gid:iv.gid,p_tipo:tipo,p_nome:file.name,p_path:path}); if(error) throw error;
     if(old){ try{ await sb.storage.from('fotos-campo').remove([old]); }catch(_){} }   // apaga o arquivo anterior
-    pjDocsCur[tipo]={tipo,nome:file.name,path}; toast('Documento anexado'); pjRerender();
+    pjDocsCur[tipo]={tipo,nome:file.name,path}; pjSetDocDone(iv,tipo,true); toast('Documento anexado'); pjRerender();
   }catch(e){ toast('Erro ao anexar: '+(e.message||e)); }
 }
 async function pjDocRemover(iv,tipo){ if(!iv) return;
   try{ const {data:path,error}=await sb.rpc('app_proj_doc_remover',{p_kind:iv.kind,p_gid:iv.gid,p_tipo:tipo}); if(error) throw error;
     if(path){ try{ await sb.storage.from('fotos-campo').remove([path]); }catch(_){} }
-    delete pjDocsCur[tipo]; toast('Documento removido'); pjRerender();
+    delete pjDocsCur[tipo]; pjSetDocDone(iv,tipo,false); toast('Documento removido'); pjRerender();
   }catch(e){ toast('Erro ao remover: '+(e.message||e)); }
 }
 async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
@@ -2125,7 +2135,7 @@ function pjNodeHtml(node){
   if(t==='doc'){ const doc=pjDocsCur[node.doc], ok=!!doc, canAttach=(pjMode==='campo'&&pjLocked);
     let btns=ok?`<button class="pjgo" data-docopen="${doc.path}">👁 Abrir</button>`:'';
     if(canAttach) btns+=`<button class="pjgo" data-docattach="${rid}">📎 ${ok?'Substituir':'Anexar PDF'}</button><input type="file" accept="application/pdf" hidden data-docfile="${rid}">`;
-    return `<div class="pjnode doc"><div class="pjnrow"><span class="tw">📄</span><div class="pjnn">${node.n} <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,24)}</span>`:''}</div><span class="pjdocbtns" style="margin-left:auto;display:flex;gap:6px">${btns}</span></div></div>`; }
+    return `<div class="pjnode doc"><div class="pjnrow"><span class="tw">📄</span><div class="pjnn">${node.n} <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado · 100%':'pendente · 0%'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,24)}</span>`:''}</div><span class="pjdocbtns" style="margin-left:auto;display:flex;gap:6px">${btns}</span></div></div>`; }
   // cadeado congela a configuração: em cfg, só edita se a intervenção estiver DEStravada (!pjLocked)
   const editar=cfg&&!pjLocked;
   // item com lançamento não pode sair do escopo, mesmo com o cadeado aberto (congela individualmente)
@@ -2273,9 +2283,11 @@ async function pjRel(id){
   // "Gantt" de progresso por atividade. AUDITORIA: o antigo plotava por ts (data de REGISTRO do avanço), não por data de obra; sem cronograma planejado e com lançamento em lote (ex. F02 = 6 avanços em 8 min, 02/10) a linha do tempo colapsava e o eixo repetia a mesma data. Trocado por barra de PROGRESSO (0–100%) + janela de registro como rótulo honesto.
   const _allAv=Object.values(pjAvancosCur).flat();
   const gfmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
-  const acts=iv.arv.filter(n=>n.ativo!==false&&n.k!=='doc').map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime()); return {n:n.n,p:pjPct(n),nav:es.length,first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
-  const gantHtml=acts.map(a=>{ const pc=Math.max(0,Math.min(a.p||0,100)), cls=(a.p||0)>100?'over':((a.p||0)>=100?'ok':''), w=a.first==null?0:Math.max(2,pc);
-    const info=a.first==null?'não iniciada':(a.nav+' avanço(s) · registro '+(a.first===a.last?gfmt(a.first):(gfmt(a.first)+'–'+gfmt(a.last))));
+  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime());
+    if(n.k==='doc') return {n:n.n,p:n.done?100:0,nav:0,first:null,last:null,doc:true,done:!!n.done};
+    return {n:n.n,p:pjPct(n),nav:es.length,first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
+  const gantHtml=acts.map(a=>{ const pc=Math.max(0,Math.min(a.p||0,100)), cls=(a.p||0)>100?'over':((a.p||0)>=100?'ok':''), w=a.doc?(a.done?100:0):(a.first==null?0:Math.max(2,pc));
+    const info=a.doc?(a.done?'documento anexado':'documento pendente'):(a.first==null?'não iniciada':(a.nav+' avanço(s) · registro '+(a.first===a.last?gfmt(a.first):(gfmt(a.first)+'–'+gfmt(a.last)))));
     return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:11.5px;margin-bottom:4px"><span style="color:var(--ink);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.n}">${a.n}</span><span style="color:var(--mut);flex:0 0 auto">${info}</span></div><div class="pjgtrack" style="height:13px"><div class="pjgbar ${cls}" style="left:0;width:${w}%"></div><span style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:9.5px;font-weight:700;color:${pc>58?'#fff':'var(--ink)'}">${a.p}%</span></div></div>`;
   }).join('')||'<div class="pjhint" style="margin:0">Sem atividades no escopo.</div>';
   // avanços por atividade → subatividade (SÓ o que tem lançamento de fato); subatividade aberta por avanço, em ordem de envio, com obs + fotos reais
