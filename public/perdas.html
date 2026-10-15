@@ -579,35 +579,7 @@ tbody tr:hover{background:var(--surface-2)}
 
       <!-- CONFIG -->
       <section class="screen" id="s-config">
-        <div class="cols">
-          <div class="panel">
-            <div class="phead"><h3>Premissas (parâmetros NRW)</h3><span class="hint">versionado por ZA/DMC</span></div>
-            <div class="pbody">
-              <div class="formrow"><span>Submedição de hidrômetro (f_sub)</span><input value="4,0%"></div>
-              <div class="formrow"><span>Consumo não-autorizado</span><input value="2,0%"></div>
-              <div class="formrow"><span>Erros de dados/cadastro</span><input value="1,0%"></div>
-              <div class="formrow"><span>Expoente pressão-vazamento (N1)</span><input value="1,00"></div>
-              <div class="formrow"><span>Fator noite-dia (NDF)</span><input value="24"></div>
-              <div class="formrow" style="border:0"><span>Consumo noturno legítimo (L/h·lig)</span><input value="1,7"></div>
-              <div class="actions" style="margin-top:14px"><button class="btn pri">Salvar versão</button><button class="btn">Histórico</button></div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="phead"><h3>Linha de base & meta contratual</h3></div>
-            <div class="pbody">
-              <div class="metagrid" style="grid-template-columns:1fr 1fr">
-                <div class="m"><span class="k">Meta ZA0200 (Betim)</span><span class="v">−24,2<small>%</small></span></div>
-                <div class="m"><span class="k">Meta ZA1004 (Contagem)</span><span class="v">−24,5<small>%</small></span></div>
-                <div class="m"><span class="k">Índice-âncora</span><span class="v" style="font-size:15px">a confirmar<br><small>IPD? IPL?</small></span></div>
-                <div class="m"><span class="k">Baseline registrado</span><span class="v" style="font-size:15px;color:var(--warn)">pendente</span></div>
-              </div>
-              <div class="waitbox" style="margin-top:14px">
-                <span style="font-size:20px">📉</span>
-                A linha de base por DMC é registrada aqui após o primeiro balanço fechado. O acompanhamento mostra a curva <b>indicador × baseline × meta</b> ao longo dos meses.
-              </div>
-            </div>
-          </div>
-        </div>
+        <div id="cfgBody"></div>
       </section>
     </div>
   </main>
@@ -1645,6 +1617,59 @@ function macroRenderAll(){
  const box=$('#macroDetail');
  if(box){ if(macroDetSel) macroDetailFill(macroDetSel.cons,macroDetSel.cd); else if(macroMacros.length) macroDetailFill(macroMacros[0].consorcio,macroMacros[0].cd_no_agua); }
 }
+/* ---------- Parâmetros & Metas: Valor do Contrato mês a mês ---------- */
+let cfgData=null, cfgVig=null, cfgEdit={};
+function cfgVigList(){ const out=[]; let y=2026,m=6; for(let i=0;i<60;i++){ out.push(y*100+m); m++; if(m>12){m=1;y++;} } return out; } // 60 meses do contrato (OS 06/2026)
+function cfgVigAtual(){ const comps=(cfgData&&cfgData.competencias)||[]; return cfgVig||(comps.length?comps[comps.length-1]:202606); }
+function cfgVcEff(cons,vig){ const L=(cfgData&&cfgData.lancamentos)||[]; let best=null; L.forEach(l=>{ if(l.consorcio===cons&&l.competencia_vigencia<=vig&&(!best||l.competencia_vigencia>best.competencia_vigencia)) best=l; }); return best?+best.valor_contrato:((cfgData&&cfgData.default_vc&&cfgData.default_vc[cons])||0); }
+function cfgVcExact(cons,vig){ const L=(cfgData&&cfgData.lancamentos)||[]; const m=L.find(l=>l.consorcio===cons&&l.competencia_vigencia===vig); return m?+m.valor_contrato:null; }
+function cfgInit(){ mmCss();
+ const body=$('#cfgBody'); if(!body) return;
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando premissas…</p></div></div>';
+ sbg.rpc('app_nrw_premissas').then(r=>{ if(r.error)throw r.error; cfgData=r.data||{}; cfgEdit={}; cfgRender(); })
+  .catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
+}
+function cfgRender(){
+ const d=cfgData||{}, pode=!!d.pode_editar, vig=cfgVigAtual();
+ const vigOpts=cfgVigList().map(c=>`<option value="${c}"${c===vig?' selected':''}>${mmCmp(c)}</option>`).join('');
+ const money=v=>'R$ '+fmt(Math.round(v));
+ const zaRow=(cons,nome)=>{ const eff=cfgVcEff(cons,vig), exact=cfgVcExact(cons,vig), val=(cons in cfgEdit)?cfgEdit[cons]:(exact!=null?String(Math.round(exact)):'');
+   return `<div class="formrow"><span>${nome} <small class="note">(efetivo: ${money(eff)})</small></span><input data-cfgvc="${cons}" value="${val}" placeholder="${exact==null?Math.round(eff)+' (herda)':''}" ${pode?'':'disabled'} inputmode="numeric" style="width:160px;text-align:right"></div>`; };
+ const lanc=(d.lancamentos||[]).slice().sort((a,b)=>a.competencia_vigencia-b.competencia_vigencia||(''+a.consorcio).localeCompare(b.consorcio));
+ const lancRows=lanc.length?lanc.map(l=>`<tr><td>${mmCmp(l.competencia_vigencia)}</td><td>${l.consorcio==='ZA0200'?'Betim':'Contagem'}</td><td class="r">${money(+l.valor_contrato)}</td></tr>`).join(''):'<tr><td colspan="3" class="note">Nenhum lançamento — usando o VC assinado padrão.</td></tr>';
+ $('#cfgBody').innerHTML=`
+  <div class="panel"><div class="phead"><h3>Valor do Contrato (mês a mês)</h3><span class="chip real" style="margin-left:auto">real</span></div>
+   <div class="pbody">
+    <p class="note" style="margin:0 0 10px;font-size:11.5px">Valor do Contrato usado na <b>Remuneração por Performance</b> (Acompanhamento do resultado). Lance o valor numa <b>vigência</b> (mês) e ele <b>vale dali em diante</b> até o próximo reajuste (carry-forward). Em branco = herda o anterior; sem nenhum lançamento = VC assinado.</p>
+    <div class="formrow" style="border:0;margin-bottom:6px"><span>Vigência (mês a partir do qual vale)</span><select id="cfgVigSel">${vigOpts}</select></div>
+    ${zaRow('ZA0200','ZA0200 · Betim')}
+    ${zaRow('ZA1004','ZA1004 · Contagem')}
+    ${pode?`<div class="actions" style="margin-top:12px"><button class="btn pri" id="cfgSalvar">Salvar VC</button><span id="cfgMsg" class="note" style="margin-left:10px"></span></div>`:`<p class="note" style="margin-top:10px;color:var(--muted)">Somente admin edita; você pode visualizar.</p>`}
+    <h4 style="margin:16px 0 6px;font-size:12.5px">Lançamentos (linha do tempo dos reajustes)</h4>
+    <div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Vigência</th><th>Consórcio</th><th class="r">Valor do Contrato</th></tr></thead><tbody>${lancRows}</tbody></table></div>
+   </div></div>
+  <div class="panel" style="margin-top:14px"><div class="phead"><h3>Outras premissas (referência)</h3></div>
+   <div class="pbody"><div class="metagrid" style="grid-template-columns:repeat(2,1fr)">
+     <div class="m"><span class="k">Meta de redução ZA0200</span><span class="v">24,5<small>%</small></span></div>
+     <div class="m"><span class="k">Meta de redução ZA1004</span><span class="v">24,2<small>%</small></span></div>
+     <div class="m"><span class="k">Gatilho Fase 1 (18m)</span><span class="v">≥50<small>%</small></span></div>
+     <div class="m"><span class="k">Gatilho Fase 2 (42m)</span><span class="v">≥75<small>%</small></span></div>
+   </div><p class="note" style="margin-top:10px;font-size:11px">Metas e gatilhos vêm do TR (fixos). O <b>fator de correção</b> por macromedidor fica na <b>Análise do macromedido</b>.</p></div></div>`;
+ const vsel=$('#cfgVigSel'); if(vsel) vsel.onchange=()=>{ cfgVig=+vsel.value; cfgEdit={}; cfgRender(); };
+ $('#cfgBody').querySelectorAll('[data-cfgvc]').forEach(inp=>inp.oninput=()=>{ cfgEdit[inp.dataset.cfgvc]=inp.value; });
+ const sv=$('#cfgSalvar'); if(sv) sv.onclick=cfgSalvar;
+}
+function cfgSalvar(){
+ const vig=cfgVigAtual(); if(!vig) return; const rows=[];
+ ['ZA0200','ZA1004'].forEach(cons=>{ const raw=(cfgEdit[cons]||'').trim(); if(!raw)return; const v=parseFloat(raw.replace(/\./g,'').replace(',','.')); if(!isFinite(v)||v<=0)return; rows.push({consorcio:cons,competencia_vigencia:vig,valor_contrato:v}); });
+ const msg=$('#cfgMsg');
+ if(!rows.length){ if(msg)msg.textContent='Nada para salvar (preencha ao menos um valor).'; return; }
+ if(msg){ msg.style.color=''; msg.textContent='Salvando…'; }
+ sbg.rpc('app_nrw_premissa_vc_salvar',{p_rows:rows}).then(r=>{
+   if(r.error){ if(msg){ msg.style.color='#e05d5d'; msg.textContent='Erro: '+(r.error.message||r.error); } return; }
+   cfgInit();
+ });
+}
 /* ---------- nav ---------- */
 const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_balanco','nrw_contrato']);
@@ -1693,6 +1718,7 @@ function go(s,dmc){
  if(s==='macro')macroInit();
  if(s==='resultado')resInit();
  if(s==='hdpri')hdInit();
+ if(s==='config')cfgInit();
  nrwMockBanner(s);
  applyFocus(s);
 }
@@ -1717,7 +1743,7 @@ const RES_VC={ZA0200:101044138.17, ZA1004:101248033.52}; // Valor do Contrato (a
 const RES_CONTRATO_INI=202606; // OS assinadas 19/06/2026 (ZA1004 e ZA0200) — antes disso não há remuneração
 function resVCtot(){ return za==='all' ? (RES_VC.ZA0200+RES_VC.ZA1004) : (RES_VC[za]||0); }
 function resGatilho(comp){ const idx=(Math.floor(comp/100)-2026)*12+(comp%100-6)+1; return idx<=18?50:75; } // OS 06/2026 = mês 1; Fase 1 (18m) ≥50%, Fase 2 ≥75%
-function resRemun(irvp,comp){ if(irvp==null || comp<RES_CONTRATO_INI) return null; const g=resGatilho(comp); return { g, v: irvp<g ? 0 : (Math.min(irvp,120)/120)*(0.54/42)*resVCtot() }; } // vazio antes do início do contrato
+function resRemun(irvp,comp,vc){ if(irvp==null || comp<RES_CONTRATO_INI) return null; const g=resGatilho(comp); const V=(vc!=null&&+vc>0)?+vc:resVCtot(); return { g, v: irvp<g ? 0 : (Math.min(irvp,120)/120)*(0.54/42)*V }; } // vazio antes do início do contrato; VC do mês (premissa) com fallback na constante
 function resIB(k){ return `<button class="mminfo" data-rinfo="${k}" title="Sobre este bloco">ⓘ</button>`; }
 function resFatorToggle(){ return `<div class="mmfilters" style="margin:0 0 10px"><button class="mmchip ${!resComFator?'on':''}" data-fator="0">Sem fator de correção</button><button class="mmchip ${resComFator?'on':''}" data-fator="1">Com fator de correção</button></div>`; }
 function resAferNote(){ return resComFator
@@ -1827,10 +1853,10 @@ function resTrendPanel(){
 function resTablePanel(){
  if(!resMensal.length) return '';
  const b=resB(), a100=b.vpbl-b.meta_m3, a120=b.vpbl-b.meta_m3*1.2;
- const rows=resMensal.slice().reverse().map(p=>{ const vp=+p.vp, irvp=resIRVP(vp), st=resStatus(irvp), rem=resRemun(irvp,p.competencia);
+ const rows=resMensal.slice().reverse().map(p=>{ const vp=+p.vp, irvp=resIRVP(vp), st=resStatus(irvp), rem=resRemun(irvp,p.competencia,p.vcontrato);
   return `<tr><td><b>${mmCmp(p.competencia)}</b></td><td class="r">${fmt(p.vd)}</td><td class="r">${fmt(p.vc)}</td><td class="r"><b>${fmt(vp)}</b></td><td class="r"${vp<=a100?' style="color:#3fb27f;font-weight:600"':''}>${fmt(Math.round(a100))}</td><td class="r"${vp<=a120?' style="color:#2f80ed;font-weight:600"':''}>${fmt(Math.round(a120))}</td><td class="r" style="color:${st.c};font-weight:600">${irvp!=null?br1(irvp)+'%':'—'}</td><td class="r"${rem&&rem.v===0?' style="color:#e05d5d"':' style="font-weight:600"'} title="${rem?('gatilho da fase '+rem.g+'% · teto 120%'):''}">${rem==null?'—':(rem.v===0?'R$ 0':'R$ '+fmt(Math.round(rem.v)))}</td></tr>`; }).join('');
  return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Mês a mês</h3>${resIB('tabela')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody"><div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP</th><th class="r">VP meta 100%</th><th class="r">VP meta 120%</th><th class="r">IRVP%</th><th class="r">Remuneração</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note" style="font-size:11px;margin-top:6px">VP em <b style="color:#3fb27f">verde</b> na coluna 100%/<b style="color:#2f80ed">azul</b> na 120% = mês que atingiu aquele alvo. VP meta 100%/120% são constantes.<br><b>Remuneração por Performance (RP)</b> = (IRVP÷120) × (1÷42) × (54% × Valor do Contrato) — fórmula do TR §8.5. Só é paga com IRVP ≥ <b>gatilho da fase</b> (≥50% nos 18 meses de implantação, ≥75% nos 42 de apuração — contados da OS 06/2026; abaixo = <b style="color:#e05d5d">R$ 0</b>); IRVP limitado a <b>120%</b>. Os outros 46% do contrato são a Remuneração Mínima do Ativo (paga por obra executada, não pelo IRVP). VC: ZA0200 R$ 101,0 mi · ZA1004 R$ 101,2 mi. A coluna começa no <b>início do contrato (06/2026)</b>; meses anteriores ficam vazios.</p></div></div>`;
+  <div class="pbody"><div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP</th><th class="r">VP meta 100%</th><th class="r">VP meta 120%</th><th class="r">IRVP%</th><th class="r">Remuneração</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note" style="font-size:11px;margin-top:6px">VP em <b style="color:#3fb27f">verde</b> na coluna 100%/<b style="color:#2f80ed">azul</b> na 120% = mês que atingiu aquele alvo. VP meta 100%/120% são constantes.<br><b>Remuneração por Performance (RP)</b> = (IRVP÷120) × (1÷42) × (54% × Valor do Contrato) — fórmula do TR §8.5. Só é paga com IRVP ≥ <b>gatilho da fase</b> (≥50% nos 18 meses de implantação, ≥75% nos 42 de apuração — contados da OS 06/2026; abaixo = <b style="color:#e05d5d">R$ 0</b>); IRVP limitado a <b>120%</b>. Os outros 46% do contrato são a Remuneração Mínima do Ativo (paga por obra executada, não pelo IRVP). O <b>Valor do Contrato é por mês</b> (acompanha reajustes) — editável em <b>Parâmetros &amp; Metas → Valor do Contrato</b>. A coluna começa no <b>início do contrato (06/2026)</b>; meses anteriores ficam vazios.</p></div></div>`;
 }
 function resSyncHeader(){ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes)return;
  mes.disabled=false; mes.title='';
