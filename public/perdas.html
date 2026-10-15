@@ -1657,7 +1657,7 @@ function go(s,dmc){
  applyFocus(s);
 }
 /* ---------- Acompanhamento do resultado (IRVP) — dados REAIS via RPC ---------- */
-let resMensal=[], resBaselines={}, resAnchor='contratual', resSel=null, resDerivOpen=true;
+let resMensal=[], resBaselines={}, resAnchor='previa', resSel=null, resDerivOpen=true;
 function resCons(){ return za==='all'?null:za; }
 function resB(){ return resBaselines[resAnchor]||{}; }
 function resIRVP(vp){ const b=resB(); return (b.meta_m3>0 && vp!=null)?((b.vpbl - vp)/b.meta_m3*100):null; }
@@ -1671,12 +1671,12 @@ function resStatus(irvp){ if(irvp==null) return {l:'—',c:'var(--muted)'};
  return {l:'Pior que a baseline',c:'#d6336c'};
 }
 function resIB(k){ return `<button class="mminfo" data-rinfo="${k}" title="Sobre este bloco">ⓘ</button>`; }
-function resToggle(){ const btn=(a,l)=>`<button class="mmchip ${resAnchor===a?'on':''}" data-anchor="${a}">${l}</button>`; return `<div class="mmfilters" style="margin:0 0 10px">${btn('contratual','Contratual (TR)')}${btn('previa','Prévia (nossos dados)')}</div>`; }
+function resAferNote(){ return `<p class="note" style="margin:0 0 10px;color:#e6a23c;background:rgba(230,162,60,.08);border:1px solid rgba(230,162,60,.25);border-radius:8px;padding:8px 11px;font-size:11.5px">⚙️ <b>VPBL preliminar.</b> Calculada com a macromedição bruta (GMOA). Ainda é necessário realizar a <b>aferição dos macromedidores</b> para encontrar o <b>fator de correção</b> a ser aplicado em cada macro — só então se chega ao <b>VPBL final</b>.</p>`; }
 const RES_INFO={
- base:{t:'Linha de base & siglas',h:`<p><b>VD</b> (Volume Disponibilizado) = volume <b>macromedido</b> que entra no sistema = macros de <b>entrada</b> − de <b>saída</b>.<br><b>VC</b> (Volume Consumido) = volume <b>micromedido</b> (lido + estimado nos hidrômetros).<br><b>VP</b> (Volume de Perdas) = <b>VD − VC</b> — água que entrou e não foi medida no consumo (perdas reais + aparentes).</p><p><b>VPBL</b> = VP da <b>linha de base</b> = média do VP nos <b>12 meses antes da assinatura</b> (ZA1004 abr/25–mar/26; ZA0200 mai/25–abr/26).<br><b>Meta</b> = redução de VP contratada (ZA1004 236.516 m³/mês = 24,2%; ZA0200 203.199 = 24,5%).<br><b>VP alvo 100%</b> = VPBL − meta (cumpre 100% da meta); <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto do IRVP = bônus máximo, pois VC = Remuneração Básica × 1,2).</p><p><b>Contratual (TR)</b> = baseline/meta oficiais do Termo de Referência (base do pagamento). <b>Prévia</b> = baseline recalculada com os nossos dados (macro−micro), ~2–6% da contratual — validação. O botão troca a âncora de todos os cálculos.</p>`},
+ base:{t:'Linha de base & siglas',h:`<p><b>VD</b> (Volume Disponibilizado) = volume <b>macromedido</b> que entra no sistema = macros de <b>entrada</b> − de <b>saída</b>.<br><b>VC</b> (Volume Consumido) = volume <b>micromedido</b> (lido + estimado nos hidrômetros).<br><b>VP</b> (Volume de Perdas) = <b>VD − VC</b> — água que entrou e não foi medida no consumo (perdas reais + aparentes).</p><p><b>VPBL</b> = VP da <b>linha de base</b> = média do VP nos <b>12 meses antes da assinatura</b> (ZA1004 mar/25–mar/26; ZA0200 abr/25–abr/26; <b>mai/25 não entra</b>).<br><b>Meta</b> = redução de VP contratada: <b>24,2%</b> (ZA1004) e <b>24,5%</b> (ZA0200), aplicada sobre a VPBL.<br><b>VP alvo 100%</b> = VPBL − meta (cumpre 100% da meta); <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto do IRVP = bônus máximo, pois VC = Remuneração Básica × 1,2).</p><p>⚙️ <b>VPBL preliminar.</b> Calculada com a macromedição bruta (GMOA); ainda falta a <b>aferição dos macromedidores</b> para definir o <b>fator de correção</b> de cada macro e chegar ao <b>VPBL final</b>.</p>`},
  irvp:{t:'IRVP — fórmula e gatilhos',h:`<p><b>IRVP</b> (Índice de Redução de Volume de Perdas) = <b>(VPBL − VP do mês) ÷ meta</b>, em %. É o <b>atingimento da meta de redução</b> — só volume; o IP% (percentual de perda) <b>não entra</b> no pagamento.</p><p>100% = meta cumprida (VP = VP alvo). Acima de 100% = superou a meta. Abaixo de 0 = VP acima da baseline (piorou).</p><p><b>Gatilhos de remuneração mínima:</b> <b>≥50%</b> na <b>Fase 1</b> (implantação, 18 meses) e <b>≥75%</b> na <b>Fase 2</b> — abaixo não dispara a parcela mínima de performance.</p><p><b>Redução vs baseline</b> = VPBL − VP (quanto a perda caiu no mês). <b>Δ (VP − VP alvo)</b> = distância até o alvo (negativo = já abaixo do alvo = meta batida).</p><p>⚠️ <b>Bruto, sem fator sazonal (FS).</b> A ZA1004 tem sazonalidade forte; o FS congelado na validação da linha de base é um <b>ajuste proposto (pleito)</b>, ainda não aplicado.</p>`},
- trend:{t:'VP × baseline × meta',h:`<p>Linha = <b>VP real</b> por mês (VD macro − VC micro). Tracejado cinza = <b>VPBL</b> (baseline); verde = <b>VP alvo 100%</b> (VPBL − meta); azul = <b>VP alvo 120%</b> (VPBL − 1,2×meta, teto/bônus).</p><p>Quanto mais baixo o VP, melhor. <b style="color:#3fb27f">Ponto verde</b> = atingiu 100% (IRVP ≥ 100%); <b style="color:#2f80ed">ponto azul</b> = atingiu 120% (IRVP ≥ 120%, teto). O botão troca a âncora (contratual/prévia).</p>`},
- tabela:{t:'Tabela mês a mês',h:`<p><b>VD macro</b> = disponibilizado. <b>VC micro</b> = consumido. <b>VP</b> = VD − VC. <b>VP meta 100%</b> = VPBL − meta (IRVP 100%). <b>VP meta 120%</b> = VPBL − 1,2×meta (teto do IRVP). Os dois são constantes na âncora; a célula fica <b style="color:#3fb27f">verde</b>/<b style="color:#2f80ed">azul</b> quando o VP do mês atinge aquele alvo. <b>IRVP%</b> = (VPBL − VP) ÷ meta.</p>`}
+ trend:{t:'VP × baseline × meta',h:`<p>Linha = <b>VP real</b> por mês (VD macro − VC micro). Tracejado cinza = <b>VPBL</b> (baseline); verde = <b>VP alvo 100%</b> (VPBL − meta); azul = <b>VP alvo 120%</b> (VPBL − 1,2×meta, teto/bônus).</p><p>Quanto mais baixo o VP, melhor. <b style="color:#3fb27f">Ponto verde</b> = atingiu 100% (IRVP ≥ 100%); <b style="color:#2f80ed">ponto azul</b> = atingiu 120% (IRVP ≥ 120%, teto).</p>`},
+ tabela:{t:'Tabela mês a mês',h:`<p><b>VD macro</b> = disponibilizado. <b>VC micro</b> = consumido. <b>VP</b> = VD − VC. <b>VP meta 100%</b> = VPBL − meta (IRVP 100%). <b>VP meta 120%</b> = VPBL − 1,2×meta (teto do IRVP). Os dois são constantes; a célula fica <b style="color:#3fb27f">verde</b>/<b style="color:#2f80ed">azul</b> quando o VP do mês atinge aquele alvo. <b>IRVP%</b> = (VPBL − VP) ÷ meta.</p>`}
 };
 function resInit(){ mmCss();
  if(!document.getElementById('rescss')){ const st=document.createElement('style'); st.id='rescss'; st.textContent=`
@@ -1700,14 +1700,13 @@ function resInit(){ mmCss();
  sbg.rpc('app_nrw_resultado',{p_consorcio:resCons()}).then(r=>{
    if(r.error)throw r.error;
    const d=r.data||{}; resMensal=d.serie||[]; resBaselines=d.baselines||{};
-   if(!resBaselines[resAnchor]) resAnchor = resBaselines.contratual?'contratual':(Object.keys(resBaselines)[0]||'contratual');
+   resAnchor = resBaselines.previa?'previa':(Object.keys(resBaselines)[0]||'previa');
    if(resSel==null || !resMensal.some(p=>p.competencia===resSel)) resSel=resMensal.length?resMensal[resMensal.length-1].competencia:null;
    resRenderAll();
  }).catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
 }
 function resSetMes(c){ resSel=+c; resRenderAll(); }
-function resSetAnchor(a){ if(resBaselines[a]){ resAnchor=a; resRenderAll(); } }
-/* painel 1: linha de base & âncora */
+/* painel 1: linha de base */
 function resBasePanel(){
  const b=resB(); if(!b.vpbl) return '<div class="panel"><div class="pbody"><p class="note" style="margin:0">Linha de base não configurada para esta ZA.</p></div></div>';
  const a100=b.vpbl-b.meta_m3, a120=b.vpbl-b.meta_m3*1.2;
@@ -1718,15 +1717,15 @@ function resBasePanel(){
   {lab:'VP alvo 120%',v:fmt(a120),u:'m³/mês',sub:'VPBL − 1,2×meta · teto do IRVP (bônus máximo)'}
  ];
  return `<div class="panel"><div class="phead"><h3>Linha de base (IRVP)</h3><span class="hint" style="margin-left:6px">${b.janela||''}</span>${resIB('base')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">${resToggle()}${(b.excluir&&b.excluir.length)?`<p class="note" style="margin:0 0 8px;color:#c0392b">⛔ <b>${b.excluir.map(mmCmp).join(', ')} não entra${b.excluir.length>1?'m':''} no cálculo da VPBL</b> — marcado em vermelho no detalhamento mês a mês abaixo.</p>`:''}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
-   <details class="resderiv" ${resDerivOpen?'open':''}><summary>Como o VP alvo é calculado (mês a mês, na âncora selecionada)</summary>${resDerivHtml()}</details>
+  <div class="pbody">${resAferNote()}${(b.excluir&&b.excluir.length)?`<p class="note" style="margin:0 0 8px;color:#c0392b">⛔ <b>${b.excluir.map(mmCmp).join(', ')} não entra${b.excluir.length>1?'m':''} no cálculo da VPBL</b> — marcado em vermelho no detalhamento mês a mês abaixo.</p>`:''}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
+   <details class="resderiv" ${resDerivOpen?'open':''}><summary>Como o VP alvo é calculado (mês a mês)</summary>${resDerivHtml()}</details>
   </div></div>`;
 }
 function resDerivHtml(){
- const b=resB(), anchorLabel=resAnchor==='contratual'?'Contratual (TR)':'Prévia (nossos dados)';
+ const b=resB();
  const a100=(b.vpbl||0)-(b.meta_m3||0), a120=(b.vpbl||0)-(b.meta_m3||0)*1.2;
  const calc=`<div class="resderiv-calc">
-   <div>VPBL (<b>${anchorLabel}</b>) = <b>${fmt(b.vpbl)}</b> m³/mês${resAnchor==='contratual'?' (valor oficial do TR)':' (média do VP da janela)'}</div>
+   <div><b>VPBL</b> = <b>${fmt(b.vpbl)}</b> m³/mês (média do VP da janela)</div>
    <div><b>VP alvo 100%</b> = VPBL − meta = ${fmt(b.vpbl)} − ${fmt(b.meta_m3)} = <b>${fmt(a100)}</b> m³/mês</div>
    <div><b>VP alvo 120%</b> = VPBL − 1,2×meta = ${fmt(b.vpbl)} − ${fmt(Math.round(b.meta_m3*1.2))} = <b>${fmt(a120)}</b> m³/mês</div></div>`;
  if(za==='all'){
@@ -1742,13 +1741,11 @@ function resDerivHtml(){
   + falt.map(c=>`<tr class="resfalt"><td>${mmCmp(c)} <span class="resexclb">sem macro</span></td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`).join('');
  const avp=[]; if(excl.size) avp.push([...excl].map(mmCmp).join(', ')+' <b>excluído(s)</b> da VPBL'); if(falt.length) avp.push(falt.map(mmCmp).join(', ')+' <b>sem macromedição</b> (aguardando dado)');
  const avisoExcl = avp.length ? `<p class="note" style="font-size:11px;margin-top:6px;color:#e0675d">⛔ Em vermelho: ${avp.join(' · ')}.${b.incompleto?` <b>VPBL provisória</b> (${b.meses_no_calculo||n}/${b.meses_esperados||n} meses).`:''}</p>` : '';
- const vpblNote = resAnchor==='previa'
-  ? `A <b>prévia</b> usa a média do VP dos meses que entram (${fmt(avgVp)}) como VPBL — por isso o VPBL muda ao trocar a âncora.`
-  : `A <b>contratual</b> usa o VPBL oficial do TR (${fmt(b.vpbl)}); a nossa média da janela é ${fmt(avgVp)} (~${b.vpbl?Math.round((avgVp/b.vpbl-1)*100):0}%) — validação. Os meses (VD/VC/VP) são a medição real, iguais nas duas âncoras; o que muda é o VPBL e os alvos.`;
+ const vpblNote = `A <b>VPBL</b> é a <b>média do VP</b> dos meses que entram na janela (${fmt(avgVp)} m³/mês); sobre ela se aplicam a meta e os alvos.`;
  return `<div class="resderiv-body">
-  <p>Âncora: <b>${anchorLabel}</b> · janela <b>${b.janela||''}</b> (${n} meses no cálculo). VP = VD macro − VC micro. <b>VPBL</b> = base; <b>VP alvo 100%</b> = VPBL − meta; <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto).</p>
+  <p>Janela <b>${b.janela||''}</b> (${n} meses no cálculo). VP = VD macro − VC micro. <b>VPBL</b> = base; <b>VP alvo 100%</b> = VPBL − meta; <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto).</p>
   <div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP = VD − VC</th></tr></thead><tbody>${rows}
-   <tr class="resderiv-sum"><td><b>Média (${n}m)</b></td><td class="r">${fmt(Math.round(sVd/n))}</td><td class="r">${fmt(Math.round(sVc/n))}</td><td class="r"><b>${fmt(avgVp)}</b>${resAnchor==='previa'?' → VPBL':''}</td></tr></tbody></table></div>
+   <tr class="resderiv-sum"><td><b>Média (${n}m)</b></td><td class="r">${fmt(Math.round(sVd/n))}</td><td class="r">${fmt(Math.round(sVc/n))}</td><td class="r"><b>${fmt(avgVp)}</b> → VPBL</td></tr></tbody></table></div>
   ${avisoExcl}
   ${calc}
   <p class="note" style="font-size:11px;margin-top:8px">${vpblNote}</p>
@@ -1772,8 +1769,8 @@ function resTrendPanel(){
  const dots=S.map((p,i)=>{ const vp=+p.vp, col=vp<=a120?'#2f80ed':(vp<=a100?'#3fb27f':'var(--accent)'), irvp=resIRVP(vp); return `<circle cx="${X(i).toFixed(1)}" cy="${Y(vp).toFixed(1)}" r="3.2" fill="${col}"><title>${mmCmp(p.competencia)}: VP ${fmt(vp)} m³ · IRVP ${irvp!=null?br1(irvp)+'%':'—'}</title></circle>`; }).join('');
  const xlab=S.map((p,i)=>(i%2===0||i===S.length-1)?`<text x="${X(i).toFixed(1)}" y="${H-8}" fill="#ffffff66" font-size="8.5" text-anchor="middle">${mmCmp(p.competencia)}</text>`:'').join('');
  return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>VP × baseline × meta</h3>${resIB('trend')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">${resToggle()}<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px">${corridor}${grid}${refs}${line}${dots}${xlab}</svg>
-  <p class="note" style="margin-top:6px;font-size:11px">Linha = VP real (macro − micro). <b style="color:#8a8f98">VPBL</b> = baseline · <b style="color:#3fb27f">alvo 100%</b> (VPBL − meta) · <b style="color:#2f80ed">alvo 120%</b> (VPBL − 1,2×meta, teto). Ponto <b style="color:#3fb27f">verde</b> = atingiu 100%, <b style="color:#2f80ed">azul</b> = atingiu 120%. Âncora: <b>${resAnchor}</b>.</p></div></div>`;
+  <div class="pbody"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px">${corridor}${grid}${refs}${line}${dots}${xlab}</svg>
+  <p class="note" style="margin-top:6px;font-size:11px">Linha = VP real (macro − micro). <b style="color:#8a8f98">VPBL</b> = baseline · <b style="color:#3fb27f">alvo 100%</b> (VPBL − meta) · <b style="color:#2f80ed">alvo 120%</b> (VPBL − 1,2×meta, teto). Ponto <b style="color:#3fb27f">verde</b> = atingiu 100%, <b style="color:#2f80ed">azul</b> = atingiu 120%.</p></div></div>`;
 }
 /* painel 4: mês a mês */
 function resTablePanel(){
@@ -1782,7 +1779,7 @@ function resTablePanel(){
  const rows=resMensal.slice().reverse().map(p=>{ const vp=+p.vp, irvp=resIRVP(vp), st=resStatus(irvp);
   return `<tr><td><b>${mmCmp(p.competencia)}</b></td><td class="r">${fmt(p.vd)}</td><td class="r">${fmt(p.vc)}</td><td class="r"><b>${fmt(vp)}</b></td><td class="r"${vp<=a100?' style="color:#3fb27f;font-weight:600"':''}>${fmt(Math.round(a100))}</td><td class="r"${vp<=a120?' style="color:#2f80ed;font-weight:600"':''}>${fmt(Math.round(a120))}</td><td class="r" style="color:${st.c};font-weight:600">${irvp!=null?br1(irvp)+'%':'—'}</td></tr>`; }).join('');
  return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Mês a mês</h3>${resIB('tabela')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">${resToggle()}<div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP</th><th class="r">VP meta 100%</th><th class="r">VP meta 120%</th><th class="r">IRVP%</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note" style="font-size:11px;margin-top:6px">VP em <b style="color:#3fb27f">verde</b> na coluna 100%/<b style="color:#2f80ed">azul</b> na 120% = mês que atingiu aquele alvo. VP meta 100%/120% são constantes na âncora.</p></div></div>`;
+  <div class="pbody"><div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Competência</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP</th><th class="r">VP meta 100%</th><th class="r">VP meta 120%</th><th class="r">IRVP%</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note" style="font-size:11px;margin-top:6px">VP em <b style="color:#3fb27f">verde</b> na coluna 100%/<b style="color:#2f80ed">azul</b> na 120% = mês que atingiu aquele alvo. VP meta 100%/120% são constantes.</p></div></div>`;
 }
 function resSyncHeader(){ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes)return;
  mes.disabled=false; mes.title='';
@@ -1792,7 +1789,6 @@ function resSyncHeader(){ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes)return;
 }
 function resRenderAll(){
  $('#resBody').innerHTML = resBasePanel()+resTrendPanel()+resTablePanel();
- $('#resBody').querySelectorAll('[data-anchor]').forEach(b=>b.onclick=()=>resSetAnchor(b.dataset.anchor));
  $('#resBody').querySelectorAll('[data-rinfo]').forEach(b=>b.onclick=()=>{ const i=RES_INFO[b.dataset.rinfo]; if(i)mmModal(i.t,i.h); });
  const dt=$('#resBody details.resderiv'); if(dt) dt.addEventListener('toggle',()=>{ resDerivOpen=dt.open; });
 }
