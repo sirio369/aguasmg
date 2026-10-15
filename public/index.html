@@ -3740,6 +3740,7 @@ function vmFmtDate(s){ if(!s)return''; try{ return new Date(String(s).slice(0,10
 const VM_COND=[['filtro','Filtro'],['piloto','Piloto / circuito piloto'],['vaz','Vazamento'],['corr','Corrosão'],['ruido','Ruído / vibração'],['geral','Condição geral']];
 const VM_SERV=['Limpeza de filtro','Limpeza de piloto','Desobstrução','Reaperto','Regulagem','Troca de peça','Correção de vazamento','Adequação civil','Acesso / entorno','Outro'];
 const VM_INT_SERV={filtro:'Limpeza de filtro',piloto:'Limpeza de piloto',vaz:'Correção de vazamento'};
+function vmSlug(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
 const VM_PENDLBL={tomada_mont:'Tomada de pressão a montante',tomada_jus:'Tomada de pressão a jusante',civil:'Adequação civil na caixa da VRP',acesso:'Acesso externo / entorno',vazamento:'Vazamento após o serviço',nao_liberada:'VRP não liberada — necessita nova visita'};
 const VM_STLBL={concluida:'Concluído',concluida_pendencia:'Concluído c/ pendência',improdutiva:'Improdutivo',programada:'Programada'};
 const VM_STAGE={programada:'Início — Aberta e atribuída a um colaborador; aguardando execução em campo.',concluida:'Fim — Serviço concluído, VRP liberada e sem pendências.',concluida_pendencia:'Fim — Serviço concluído, mas com pendência técnica aberta (gera uma OS corretiva).',improdutiva:'Fim — Visita improdutiva: VRP não localizada ou caixa inacessível.'};
@@ -3868,7 +3869,7 @@ function vmLado(lado,label,proj,ult){
   let h=`<div class="vmcard"><div class="h">${lado==='mont'?'⬆️ Montante':'⬇️ Jusante'}</div>
     <div class="vmref"><div class="p"><span>Projeto</span><b>${vmN(proj)}</b></div><div class="p"><span>Últ. ajustada</span><b>${vmN(ult)}</b></div></div>
     <div class="vmq" style="margin-bottom:8px"><label>Consegue conectar o manômetro?</label>${vmOptRow(kc,['Sim','Não'])}</div>`;
-  if(conn==='Sim') h+=`<div class="vmq" style="margin-bottom:0"><label>Pressão encontrada (mca)</label><input class="vmin" inputmode="decimal" data-in="${kv}" value="${vEsc(S.ans[kv]||'')}"></div>`;
+  if(conn==='Sim') h+=`<div class="vmq" style="margin-bottom:0"><label>Pressão encontrada (mca) <span class="vmreq">*</span></label><input class="vmin" inputmode="decimal" data-in="${kv}" value="${vEsc(S.ans[kv]||'')}"></div>`;
   else if(conn==='Não'){ h+=`<div class="vmq" style="margin-bottom:0"><label>Tomada de pressão:</label>${vmOptRow(kt,['Inexistente','Obstruída','Outro'])}</div>`;
     if(S.ans[kt]){ const kr='tomres_'+lado;
       h+=`<div class="vmq" style="margin:8px 0 0"><label>Resolveu agora (instalou / desobstruiu)?</label>${vmOptRow(kr,['Sim','Não'])}</div>`;
@@ -3883,7 +3884,7 @@ function vmScr3(){
   let h=`<h3 style="margin:2px 0">3 · Condição da VRP</h3>`;
   VM_COND.forEach(([k,l])=>{ const cur=vmExec.cond[k];
     h+=`<div class="vmq"><label>${l}</label><div class="vmopts">`+['OK','Intervir','Não verificado'].map(o=>{const ex=o==='OK'?'ok':(o==='Intervir'?'int':'nv');return `<button class="vmopt ${ex} ${cur===o?'on':''}" data-cond="${k}" data-val="${o}">${o}</button>`;}).join('')+`</div>`;
-    if(cur==='Intervir') h+=`<textarea class="vmin" data-condd="${k}" placeholder="O que intervir em ${l.toLowerCase()}?">${vEsc(vmExec.cond['d_'+k]||'')}</textarea>`;
+    if(cur==='Intervir') h+=`<label class="vmq" style="margin:4px 0 0"><span class="sub">O que intervir em ${l.toLowerCase()} <span class="vmreq">*</span></span></label><textarea class="vmin" data-condd="${k}" placeholder="Descreva a intervenção (obrigatório)">${vEsc(vmExec.cond['d_'+k]||'')}</textarea>`;
     h+=`</div>`; });
   return h;
 }
@@ -3898,14 +3899,23 @@ function vmScr4(){
   VM_SERV.forEach(s=>{const on=S.serv.has(s);h+=`<button class="vmchip ${on?'on':''}" data-serv="${vEsc(s)}"><span class="bx">${on?'✓':''}</span>${s}</button>`;});
   h+=`</div>`;
   if(S.serv.has('Troca de peça')) h+=`<div class="vmq" style="margin-top:14px"><label>Peça trocada <span class="vmreq">*</span></label><input class="vmin" data-in="peca" value="${vEsc(S.ans.peca||'')}"></div>`;
-  if(S.serv.has('Outro')) h+=`<div class="vmq" style="margin-top:14px"><label>Descreva "Outro"</label><input class="vmin" data-in="serv_outro" value="${vEsc(S.ans.serv_outro||'')}"></div>`;
+  if(S.serv.has('Outro')) h+=`<div class="vmq" style="margin-top:14px"><label>Descreva "Outro" <span class="vmreq">*</span></label><input class="vmin" data-in="serv_outro" value="${vEsc(S.ans.serv_outro||'')}"></div>`;
   [['Adequação civil','civil'],['Acesso / entorno','acesso']].forEach(([item,tp])=>{ if(S.serv.has(item)){ const kr='res_'+tp;
     h+=`<div class="vmq" style="margin-top:12px"><label>${item} — resolveu agora?</label>${vmOptRow(kr,['Sim','Não'])}`;
     if(S.ans[kr]==='Não') h+=`<div class="vmpb">🔧 Gera pendência: ${VM_PENDLBL[tp]}</div>`;
     else if(S.ans[kr]==='Sim') h+=`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">✓ Resolvido em campo — sem pendência</div>`;
     h+=`</div>`;
   }});
-  h+=`<div class="vmq" style="margin-top:16px"><label>Fotos do serviço executado <span class="vmreq">*</span> <span class="sub">(pode adicionar várias)</span></label><div class="vmphotos">${vmPhotoMulti('servico','Serviço')}</div></div>`;
+  const servArr=[...S.serv];
+  if(servArr.length){
+    h+=`<div class="vmq" style="margin-top:16px;margin-bottom:4px"><label>Detalhe por serviço executado <span class="vmreq">*</span> <span class="sub">(descrição + foto de cada um)</span></label></div>`;
+    servArr.forEach(s=>{ const sl=vmSlug(s);
+      h+=`<div class="vmcard"><div class="h">${vEsc(s)}</div>
+        <div class="vmq"><label>O que foi feito <span class="vmreq">*</span></label><textarea class="vmin" data-in="servd_${sl}" placeholder="Descreva a atividade executada">${vEsc(S.ans['servd_'+sl]||'')}</textarea></div>
+        <div class="vmq" style="margin-bottom:0"><label>Fotos <span class="vmreq">*</span> <span class="sub">(pode adicionar várias)</span></label><div class="vmphotos">${vmPhotoMulti('serv_'+sl,'Foto')}</div></div>
+      </div>`;
+    });
+  } else { h+=`<p class="sub" style="margin-top:14px">Marque ao menos um serviço executado acima.</p>`; }
   return h;
 }
 function vmScr5(){
@@ -3973,7 +3983,9 @@ function vmWireExec(){
 function vmValid(){
   const S=vmExec;
   if(S.step===1){ if(!S.ans.localizada||!S.ans.acessivel){toast('Responda localizada e acesso');return false;} if(!S.fotos.geral_antes_ext&&!S.fotos.geral_antes_int){toast('Tire ao menos 1 foto geral');return false;} return true; }
-  if(S.step===4){ if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} const temFotoServ=Object.keys(S.fotos).some(k=>(k==='servico'||k.indexOf('servico_')===0)&&S.fotos[k]); if(S.serv.size&&!temFotoServ){toast('Adicione ao menos 1 foto do serviço');return false;} return true; }
+  if(S.step===2){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){ toast('Informe a pressão encontrada ('+(lado==='mont'?'montante':'jusante')+')'); return false; } } return true; }
+  if(S.step===3){ for(const [k,l] of VM_COND){ if(S.cond[k]==='Intervir' && !String(S.cond['d_'+k]||'').trim()){ toast('Descreva o que intervir em '+l.toLowerCase()); return false; } } return true; }
+  if(S.step===4){ if(!S.serv.size){toast('Marque ao menos um serviço executado');return false;} if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} if(S.serv.has('Outro')&&!String(S.ans.serv_outro||'').trim()){toast('Descreva o serviço "Outro"');return false;} for(const s of S.serv){ const sl=vmSlug(s); if(!String(S.ans['servd_'+sl]||'').trim()){toast('Descreva o serviço: '+s);return false;} const temFoto=Object.keys(S.fotos).some(k=>(k==='serv_'+sl||k.indexOf('serv_'+sl+'_')===0)&&S.fotos[k]); if(!temFoto){toast('Adicione foto do serviço: '+s);return false;} } return true; }
   if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} return true; }
   return true;
 }
@@ -4079,12 +4091,16 @@ function vmReportHtml(d){
   h+='<div class="relSec"><span class="relNum">2</span>Pressões</div><div class="relGrid">'+relField('Montante — manômetro',r.conn_mont)+relField('Montante encontrada',d.press_mont_enc!=null?(d.press_mont_enc+' mca'):(r.tom_mont?('tomada '+r.tom_mont):'—'))+relField('Jusante — manômetro',r.conn_jus)+relField('Jusante encontrada',d.press_jus_enc!=null?(d.press_jus_enc+' mca'):(r.tom_jus?('tomada '+r.tom_jus):'—'))+'</div>';
   h+='<div class="relSec"><span class="relNum">3</span>Condição</div><div class="relGrid">'+VM_COND.map(function(x){return relField(x[1],cond[x[0]]||'—');}).join('')+'</div>';
   h+='<div class="relSec"><span class="relNum">4</span>Serviço executado</div><div class="relGrid">'+relWide('Ações',serv.length?serv.join(', '):'—')+(r.peca?relField('Peça trocada',r.peca):'')+'</div>';
+  serv.forEach(function(s){ const dd=r['servd_'+vmSlug(s)]; if(dd) h+='<div class="relGrid">'+relWide(s,dd)+'</div>'; });
   h+='<div class="relSec"><span class="relNum">5</span>Finalização</div><div class="relGrid">'+relField('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+relField('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+relField('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+relField('Estabilizada',vmBool(d.estabilizada))+relField('Vazamento após',vmBool(d.vazamento_pos))+relField('Liberada',vmBool(d.liberada))+'</div>';
   const pend=(d.pendencias||[]);
   if(pend.length){ h+='<div class="relSec">Pendências técnicas</div>'+pend.map(function(p){return '<div class="relPend">🔧 '+vEsc(p.descricao||p.tipo)+' — '+p.status+'</div>';}).join(''); }
   const fotos=d.fotos||{};
-  const servKeys=Object.keys(fotos).filter(k=>(k==='servico'||k.indexOf('servico_')===0)&&fotos[k]);
-  const fArr=[['Geral antes — externo',fotos.geral_antes_ext],['Geral antes — interno',fotos.geral_antes_int]].concat(servKeys.map((k,i)=>['Serviço'+(servKeys.length>1?(' '+(i+1)):''),fotos[k]])).concat([['Geral depois — interno',fotos.geral_depois_int],['Geral depois — externo',fotos.geral_depois_ext],['Ponto visitado',fotos.ponto_visitado]]);
+  const servFotos=[];
+  serv.forEach(function(s){ const sl=vmSlug(s); const ks=Object.keys(fotos).filter(k=>(k==='serv_'+sl||k.indexOf('serv_'+sl+'_')===0)&&fotos[k]); ks.forEach(function(k,i){ servFotos.push([s+(ks.length>1?(' '+(i+1)):''),fotos[k]]); }); });
+  const legKeys=Object.keys(fotos).filter(k=>(k==='servico'||k.indexOf('servico_')===0)&&fotos[k]);  // compat. OSs antigas
+  legKeys.forEach(function(k,i){ servFotos.push(['Serviço'+(legKeys.length>1?(' '+(i+1)):''),fotos[k]]); });
+  const fArr=[['Geral antes — externo',fotos.geral_antes_ext],['Geral antes — interno',fotos.geral_antes_int]].concat(servFotos).concat([['Geral depois — interno',fotos.geral_depois_int],['Geral depois — externo',fotos.geral_depois_ext],['Ponto visitado',fotos.ponto_visitado]]);
   h+='<div class="relSec">Fotos</div>'+relFotos(fArr);
   h+='</div><div class="relFoot"><span>AcquaHub · relatório gerado do banco</span><span>'+(d.os_numero||'')+(d.os_sigos?(' · SIGOS '+d.os_sigos):'')+'</span></div>';
   return h;
