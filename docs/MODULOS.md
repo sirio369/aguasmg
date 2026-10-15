@@ -2427,8 +2427,15 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   essa pendência **NÃO é consolidada** com as demais (fica separada e evidente); `app_vrp_pendencia_gerar_os` **recusa** gerar
   corretiva para ela e a **exclui** da cobertura (uma substituição não se resolve por corretiva). `app_vrp_os_programar` permite
   **programar substituição mesmo com pendência aberta** e vincula/resolve a pendência de substituição. Displays (ficha, OS, lista de
-  pendências) mostram badge **⚠ SUBSTITUIÇÃO** em vermelho. **Falta (parte 2):** o **form específico de substituição** (VRP anterior +
-  VRP nova, dados cadastrais/técnicos + configuração completa) e o **recadastro** de `"2 - infra_agua".vrps` na conclusão.
+  pendências) mostram badge **⚠ SUBSTITUIÇÃO** em vermelho.
+  **Substituição — parte 2 (2026-10-15, form próprio):** quando a OS é `substituicao`, o wizard usa um **fluxo próprio**
+  (`vmExecRender`/`vmStepbar`/`vmValid` ramificam por `hdr.origem`): **Chegada → VRP anterior → VRP nova → Pressões →
+  Finalização**. `vmScrSubAnt` mostra o cadastro atual (read-only) + foto da VRP removida + motivo; `vmScrSubNova` captura os
+  **dados cadastrais/técnicos da nova VRP** (diâmetro, modelo, atuação, controlador, pressões de projeto, ponto crítico, obs) +
+  foto da nova. `app_vrp_os_header` agora devolve `origem` e `atuacao`. Na conclusão, `app_vrp_os_concluir` **recadastra
+  `"2 - infra_agua".vrps`** (diametro/pres_max/pres_saida/pres_min/atuacao/observacao) a partir de `p_campos.cad_*`; o **nó de
+  água é mantido**. `respostas.vrp_anterior`/`vrp_nova` guardam o antes×depois, exibido no **relatório PDF** e na **tela da OS**
+  ("🔁 Substituição — anterior → nova"). `nec_subst` fica oculto no fluxo de substituição. Validado E2E: DN 50→200, 58→55 mca.
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 
