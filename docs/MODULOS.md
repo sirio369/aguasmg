@@ -2400,7 +2400,10 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   obs lista todas) — uma visita resolve tudo, evita ir ao local mais de uma vez. **Front:** na tela da OS
   (gestão, `vmOsView`), quando há pendência aberta sem corretiva, botão **"Programar correção (OS única)"**
   → abre o diálogo e gera a OS; `vmGerarCorr(pendId, after)` ganhou callback e texto novo. As 2 pendências
-  legadas da VRP-OS-2026-0009 foram **mescladas em 1**.
+  legadas da VRP-OS-2026-0009 foram **mescladas em 1**. **Na ficha da VRP (`vmFichaOpen`, 2026-10-15):** a
+  seção "Pendências abertas" ficou **clicável** — uma pendência `aberta` (só p/ gestão `vrp_gestao`/admin) vira
+  botão "programar ›" que chama `vmGerarCorr` e gera a OS corretiva única; `#vmModal` subiu p/ z-index 10001
+  (abre sobre a ficha).
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 

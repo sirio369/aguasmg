@@ -645,7 +645,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   .vmcfgrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
   .vmcfgrow:last-child{border-bottom:0}
   .vmnum{width:72px;font-family:ui-monospace,monospace;font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink)}
-  #vmModal{position:fixed;inset:0;background:rgba(8,14,20,.55);display:none;align-items:center;justify-content:center;z-index:9998;padding:16px}
+  #vmModal{position:fixed;inset:0;background:rgba(8,14,20,.55);display:none;align-items:center;justify-content:center;z-index:10001;padding:16px}
   #vmModal.on{display:flex}
   .vmmcard{background:var(--card);border:1px solid var(--line);border-radius:16px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.45);overflow:hidden}
   .vmmh{padding:14px 16px;border-bottom:1px solid var(--line);font-size:17px;font-weight:700}
@@ -4020,7 +4020,11 @@ async function vmFichaOpen(vrpId){
     const x=it.x; const sl=(typeof VRP_SIT!=='undefined'&&VRP_SIT[x.situacao])?VRP_SIT[x.situacao].lbl:(x.situacao||'visita');
     return `<button class="vmfhist" data-vis="${x.id}"><div style="min-width:0"><span class="vmst" style="background:var(--acc);color:var(--acc-ink)">Visita primária</span><div class="vl">${x.visitado_em?relFmtData(x.visitado_em):''}${x.visitado_por?(' · '+vEsc(x.visitado_por)):''} · ${vEsc(sl)}</div></div><span class="sub">ver ›</span></button>`;
   }).join(''):'<p class="sub">Sem serviços registrados.</p>';
-  const pendHtml=pend.length?pend.map(p=>`<div class="vmfkv"><span>🔧 ${vEsc(p.tipo)}${p.lado?(' ('+p.lado+')'):''}</span><b style="color:var(--warn)">${p.status}</b></div>`).join(''):'<p class="sub">Nenhuma pendência aberta.</p>';
+  const vmGest=!!(ME&&(ME.vrp_gestao||ME.is_admin));
+  const pendHtml=pend.length?pend.map(p=>{ const txt=`🔧 ${vEsc(p.descricao||p.tipo)}${p.lado?(' ('+p.lado+')'):''}`;
+    if(p.status==='aberta'&&vmGest) return `<button class="vmfhist" data-progpend="${p.id}"><div style="min-width:0"><span>${txt}</span><div class="vl" style="color:var(--warn)">aberta · toque para programar a correção</div></div><span class="sub">programar ›</span></button>`;
+    return `<div class="vmfkv"><span>${txt}</span><b style="color:var(--warn)">${vEsc(p.status)}</b></div>`;
+  }).join(''):'<p class="sub">Nenhuma pendência aberta.</p>';
   const prox=prev.proxima?('Próxima: '+vmFmtDate(prev.proxima)):'sem histórico';
   f.innerHTML=`<div class="vmfcard">
     <div class="vmfhd"><div><h2>${vEsc(c.num_vrp||'VRP')}</h2><div class="s">${vmConsLbl(c.consorcio)}${c.dmc?(' · DMC '+c.dmc):''}${c.cd_no_agua?(' · nó '+vEsc(c.cd_no_agua)):''}</div></div><button class="vmfclose" id="vmfX">Fechar</button></div>
@@ -4033,6 +4037,7 @@ async function vmFichaOpen(vrpId){
   f.querySelector('#vmfX').onclick=()=>f.classList.remove('on');
   f.onclick=e=>{ if(e.target===f) f.classList.remove('on'); };
   f.querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmReport(b.dataset.os));
+  f.querySelectorAll('[data-progpend]').forEach(b=>b.onclick=()=>vmGerarCorr(b.dataset.progpend, ()=>vmFichaOpen(vrpId)));
   f.querySelectorAll('[data-vis]').forEach(b=>b.onclick=()=>{ const x=(vmFichaData.visitas||[]).find(v=>String(v.id)===b.dataset.vis); if(x) vmVisitaReport(x, vmFichaData.cadastro||{}); });
 }
 let vmFichaData=null;
