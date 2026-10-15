@@ -2413,6 +2413,14 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   "VRP localizada? Não" ou "Caixa acessível? Não" (botão "Encerrar como improdutivo" + foto do ponto);
   **concluida_pendencia** = `vmPendencias()` ≥1 (tomada mont/jus não resolvida, adequação civil/acesso não
   resolvidos, vazamento após=Sim, liberada=Não); senão **concluida**.
+  **Status 100% automático (2026-10-15):** o executor **não escolhe mais** o status — removido o seletor da tela
+  de resultado (`vmScrResult`/`vmstatuspick` e o handler `[data-status]`); `S.status=vmSugere()` sempre. Logo,
+  **improdutiva só ocorre pelo caminho da Chegada** (não localizada/inacessível); com visita completa nunca é
+  forçável. **Nova regra de pendência:** condição **"Intervir" sem serviço executável mapeado** (corrosão,
+  ruído, **condição geral** — fora de `VM_INT_SERV`) **gera pendência** com a descrição (ex.: "precisa trocar a
+  VRP"). **"O que aconteceu" visível:** as descrições (`d_<cond>`, `servd_<serviço>`, `serv_outro`) agora
+  aparecem na **tela de resultado** (bloco "O que aconteceu"), no **relatório PDF** (`vmReport` §3/§4) e na
+  **tela da OS da gestão** (`vmOsView` §3/§4) — antes só os rótulos "Intervir/OK" iam pro PDF.
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 

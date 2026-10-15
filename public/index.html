@@ -3940,6 +3940,8 @@ function vmPendencias(){
   if(S.serv.has('Acesso / entorno')&&S.ans.res_acesso==='Não') p.push({tipo:'acesso',lado:null,descricao:VM_PENDLBL.acesso});
   if(S.ans.vaz_pos==='Sim') p.push({tipo:'vazamento',lado:null,descricao:VM_PENDLBL.vazamento});
   if(S.ans.liberada==='Não') p.push({tipo:'nao_liberada',lado:null,descricao:VM_PENDLBL.nao_liberada});
+  // condição "Intervir" sem serviço executável mapeado (corrosão, ruído, condição geral) → pendência (ex.: troca de VRP)
+  VM_COND.forEach(([k,l])=>{ if(!VM_INT_SERV[k] && S.cond[k]==='Intervir') p.push({tipo:'cond_'+k,lado:null,descricao:l+(String(S.cond['d_'+k]||'').trim()?(': '+S.cond['d_'+k]):' — requer intervenção')}); });
   return p;
 }
 function vmSugere(){
@@ -3949,19 +3951,21 @@ function vmSugere(){
   return 'concluida';
 }
 function vmScrResult(){
-  const S=vmExec, sug=vmSugere(); if(!S.status) S.status=sug; const pend=vmPendencias();
+  const S=vmExec, sug=vmSugere(); S.status=sug; const pend=vmPendencias();  // status 100% automático pelas respostas
+  const det=[];
+  VM_COND.forEach(([k,l])=>{ if(S.cond[k]==='Intervir'&&String(S.cond['d_'+k]||'').trim()) det.push(['Condição · '+l, S.cond['d_'+k]]); });
+  [...S.serv].forEach(s=>{ const sl=vmSlug(s); if(String(S.ans['servd_'+sl]||'').trim()) det.push(['Serviço · '+s, S.ans['servd_'+sl]]); });
+  if(S.serv.has('Outro')&&String(S.ans.serv_outro||'').trim()) det.push(['Serviço · Outro (o quê)', S.ans.serv_outro]);
+  const detHtml=det.length?`<div class="vmsumm" style="margin-top:10px;text-align:left"><div style="color:var(--mut);font-weight:600;margin-bottom:2px">O que aconteceu</div>${det.map(d=>`<div style="margin-top:6px"><b>${vEsc(d[0])}:</b> ${vEsc(d[1])}</div>`).join('')}</div>`:'';
   let h=`<div class="vmresult"><div style="font-size:30px">${sug==='improdutiva'?'🚫':(sug==='concluida'?'✅':'⚠️')}</div>
     <div class="sub" style="margin:4px 0 0">${S.hdr.os_numero}</div>
     <div class="big" style="color:${VM_STCLR[sug]}">${VM_STLBL[sug]}</div>
-    <div class="sub">status sugerido — confirme ou ajuste</div>
-    <div class="vmstatuspick">`;
-  ['concluida','concluida_pendencia','improdutiva'].forEach(k=>{
-    h+=`<button class="vmstbtn ${S.status===k?'on':''}" style="color:${VM_STCLR[k]}" data-status="${k}"><span class="vmstdot" style="background:${VM_STCLR[k]}"></span><span style="color:var(--ink)">${VM_STLBL[k]}</span>${k===sug?'<span class="vmsug">sugerido</span>':''}</button>`;
-  });
-  h+=`</div><div class="vmsumm"><div class="r"><span>Serviços</span><b style="text-align:right">${S.serv.size?vEsc([...S.serv].join(', ')):'—'}</b></div>
+    <div class="sub">status definido automaticamente pelas respostas do formulário</div>
+    <div class="vmsumm"><div class="r"><span>Serviços</span><b style="text-align:right">${S.serv.size?vEsc([...S.serv].join(', ')):'—'}</b></div>
     <div class="r"><span>Mont/jus final</span><b>${vmN(S.ans.fim_mont)} / ${vmN(S.ans.fim_jus)} mca</b></div>
     <div class="r"><span>Liberada / vaz. após</span><b>${S.ans.liberada||'—'} / ${S.ans.vaz_pos||'—'}</b></div>
-    <div style="margin-top:6px"><span style="color:var(--mut)">Pendências geradas:</span>${pend.length?('<ul style="margin:4px 0 0;padding-left:18px">'+pend.map(p=>'<li>'+p.descricao+'</li>').join('')+'</ul>'):' <b>nenhuma</b>'}</div></div></div>`;
+    <div style="margin-top:6px"><span style="color:var(--mut)">Pendências geradas:</span>${pend.length?('<ul style="margin:4px 0 0;padding-left:18px">'+pend.map(p=>'<li>'+vEsc(p.descricao)+'</li>').join('')+'</ul>'):' <b>nenhuma</b>'}</div></div>
+    ${detHtml}</div>`;
   return h;
 }
 function vmWireExec(){
@@ -3972,7 +3976,6 @@ function vmWireExec(){
   el.querySelectorAll('[data-in]').forEach(i=>i.oninput=()=>{vmExec.ans[i.dataset.in]=i.value;});
   el.querySelectorAll('[data-condd]').forEach(i=>i.oninput=()=>{vmExec.cond['d_'+i.dataset.condd]=i.value;});
   el.querySelectorAll('[data-photo]').forEach(inp=>inp.onchange=async ev=>{const k=inp.dataset.photo,f=ev.target.files[0];if(!f)return;try{vmExec.fotos[k]=await comprimir(f);}catch(e){vmExec.fotos[k]=f;}vmExecRender();});
-  el.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{vmExec.status=b.dataset.status;vmExecRender();});
   const q=id=>el.querySelector(id);
   if(q('#vmNext'))q('#vmNext').onclick=()=>{ if(!vmValid())return; vmExec.step++; window.scrollTo({top:0,behavior:'smooth'}); vmExecRender(); };
   if(q('#vmBack'))q('#vmBack').onclick=()=>{ vmExec.step--; window.scrollTo({top:0,behavior:'smooth'}); vmExecRender(); };
@@ -4089,9 +4092,10 @@ function vmReportHtml(d){
   h+='<div class="relGrid">'+relField('OS interna',d.os_numero)+relField('OS SIGOS',d.os_sigos||'—')+relField('VRP',d.num_vrp||'—')+relField('Origem',d.origem)+relField('Executado por',d.executor||'—')+relField('Executado em',relFmtData(d.executado_em))+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span>Chegada</div><div class="relGrid">'+relField('VRP localizada',r.localizada)+relField('Caixa acessível',r.acessivel)+relField('Água / alagamento',r.agua)+'</div>';
   h+='<div class="relSec"><span class="relNum">2</span>Pressões</div><div class="relGrid">'+relField('Montante — manômetro',r.conn_mont)+relField('Montante encontrada',d.press_mont_enc!=null?(d.press_mont_enc+' mca'):(r.tom_mont?('tomada '+r.tom_mont):'—'))+relField('Jusante — manômetro',r.conn_jus)+relField('Jusante encontrada',d.press_jus_enc!=null?(d.press_jus_enc+' mca'):(r.tom_jus?('tomada '+r.tom_jus):'—'))+'</div>';
-  h+='<div class="relSec"><span class="relNum">3</span>Condição</div><div class="relGrid">'+VM_COND.map(function(x){return relField(x[1],cond[x[0]]||'—');}).join('')+'</div>';
+  h+='<div class="relSec"><span class="relNum">3</span>Condição</div><div class="relGrid">'+VM_COND.map(function(x){var vv=cond[x[0]]||'—';var dd=cond['d_'+x[0]];return relField(x[1], dd?(vv+' — '+dd):vv);}).join('')+'</div>';
   h+='<div class="relSec"><span class="relNum">4</span>Serviço executado</div><div class="relGrid">'+relWide('Ações',serv.length?serv.join(', '):'—')+(r.peca?relField('Peça trocada',r.peca):'')+'</div>';
   serv.forEach(function(s){ const dd=r['servd_'+vmSlug(s)]; if(dd) h+='<div class="relGrid">'+relWide(s,dd)+'</div>'; });
+  if(r.serv_outro&&serv.indexOf('Outro')>=0) h+='<div class="relGrid">'+relWide('Outro (o quê)',r.serv_outro)+'</div>';
   h+='<div class="relSec"><span class="relNum">5</span>Finalização</div><div class="relGrid">'+relField('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+relField('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+relField('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+relField('Estabilizada',vmBool(d.estabilizada))+relField('Vazamento após',vmBool(d.vazamento_pos))+relField('Liberada',vmBool(d.liberada))+'</div>';
   const pend=(d.pendencias||[]);
   if(pend.length){ h+='<div class="relSec">Pendências técnicas</div>'+pend.map(function(p){return '<div class="relPend">🔧 '+vEsc(p.descricao||p.tipo)+' — '+p.status+'</div>';}).join(''); }
@@ -4266,8 +4270,10 @@ async function vmOsView(osId){
   if(d.corrige){ h+=`<div style="margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:12.5px">🔧 Esta é uma OS corretiva de: <b>${vEsc(d.corrige.descricao||d.corrige.tipo||'pendência')}</b>${d.corrige.os_pai_id?` · <a class="vmoslink" data-os="${d.corrige.os_pai_id}">abrir OS pai ${vEsc(d.corrige.os_pai_numero||'')} ›</a>`:''}</div>`; }
   h+=vmDsec('1','Chegada')+kv('VRP localizada',r.localizada)+kv('Caixa acessível',r.acessivel)+kv('Água / alagamento',r.agua);
   h+=vmDsec('2','Pressões')+kv('Montante — manômetro',r.conn_mont)+kv('Montante encontrada',d.press_mont_enc!=null?(d.press_mont_enc+' mca'):(r.tom_mont?('tomada '+r.tom_mont):'—'))+kv('Jusante — manômetro',r.conn_jus)+kv('Jusante encontrada',d.press_jus_enc!=null?(d.press_jus_enc+' mca'):(r.tom_jus?('tomada '+r.tom_jus):'—'));
-  h+=vmDsec('3','Condição')+VM_COND.map(x=>kv(x[1],cond[x[0]]||'—')).join('');
+  h+=vmDsec('3','Condição')+VM_COND.map(x=>{ const vv=cond[x[0]]||'—'; const dd=cond['d_'+x[0]]; return kv(x[1], dd?(vv+' — '+dd):vv); }).join('');
   h+=vmDsec('4','Serviço')+kv('Ações',serv.length?serv.join(', '):'—')+(r.peca?kv('Peça trocada',r.peca):'');
+  serv.forEach(s=>{ const dd=r['servd_'+vmSlug(s)]; if(dd) h+=kv(s,dd); });
+  if(r.serv_outro&&serv.indexOf('Outro')>=0) h+=kv('Outro (o quê)',r.serv_outro);
   h+=vmDsec('5','Finalização')+kv('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+kv('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+kv('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+kv('Estabilizada',vmBool(d.estabilizada))+kv('Vazamento após',vmBool(d.vazamento_pos))+kv('Liberada',vmBool(d.liberada));
   const pend=(d.pendencias||[]);
   const pendAbertas=pend.filter(p=>p.status==='aberta'&&!p.os_correcao_id);
