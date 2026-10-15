@@ -1981,6 +1981,16 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     (por obra executada, fora do IRVP). Helpers `RES_VC`/`resVCtot`/`resGatilho`/`resRemun`; VC assinado ZA0200
     R$ 101.044.138 / ZA1004 R$ 101.248.034. Fica **vazio** (—) nos meses anteriores ao início do contrato (OS 06/2026, `RES_CONTRATO_INI`). Fonte da
     fórmula: `_extracted/TR ZA1004.txt` §8.5 (idem ZA0200). Meta de redução confirmada: **24,5% (ZA0200) / 24,2% (ZA1004)**.
+  - **Fator de correção por macromedidor + toggle com/sem fator (2026-10-15):** multiplicador por macro (aferição) que corrige a
+    volumetria. Tabela **`"11 - perdas_nrw".fator_correcao_macro`** (consorcio, cd_no_agua, **competencia_vigencia**, fator) — versionada
+    por vigência com **carry-forward** (o fator vale do mês lançado em diante até o próximo lançamento). Função `"11 - perdas_nrw".nrw_fator(cons,cd,comp)`
+    = LOCF (último lançamento ≤ comp, senão 1,0). **Todos os RPCs de macro e o resultado ganharam `p_com_fator`** (default false):
+    `app_nrw_resultado(text,bool)` recomputa **a prévia inteira** (VD → VPBL → meta → IRVP → remuneração) com o fator; `app_nrw_macro_mensal/_macros/_serie(...,bool)`
+    aplicam na volumetria (⚠️ **foram dropados os overloads antigos** sem o bool — §0.6). Novos RPCs **`app_nrw_fatores(text)`** (ler: macros `distinct on (cd)`,
+    competências, lançamentos, `pode_editar`=admin) e **`app_nrw_fatores_salvar(jsonb)`** (upsert em lote, admin-only). **Front:** toggle **Sem/Com fator**
+    no painel da Linha de base (resultado, `resComFator`→refetch) com nota que troca de cor; e na *Análise do macromedido* um toggle **Volume sem/com fator**
+    + painel **editor "Fator de correção (aferição)"** (`macroFatorPanel`): seletor de vigência + tabela de macros com fator efetivo e input por macro,
+    "Salvar fatores" (admin). `sem fator` = idêntico ao anterior (validado: ZA1004 1.003.269 / ZA0200 836.312). Sistema do 202503 normalizado (rtrim).
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).

@@ -1436,6 +1436,7 @@ function mmDetailRender(data,cons,mat){
 }
 /* ---------- Análise de macromedição (dados REAIS via RPC — espelha a análise do micromedido) ---------- */
 let macroMensal=[], macroMacros=[], macroSel=null, macroDetSel=null, macroDetCache={}, macroSeasMet='vol_disponibilizado', macroSort={k:'vol',dir:-1};
+let macroComFator=false, macroFatData=null, macroFatVig=null, macroFatEdit={};
 const MACRO_SEAS_MET={
  vol_disponibilizado:{l:'Disponibilizado',u:'m³',g:p=>+p.vol_disponibilizado},
  lpd:{l:'L/lig·dia',u:'L/lig·dia',g:p=>+p.lpd},
@@ -1466,15 +1467,15 @@ function macroInit(){ mmCss();
  const body=$('#macroBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise de macromedição…</p></div></div>';
  const fc=macroCons();
- Promise.all([ sbg.rpc('app_nrw_macro_mensal',{p_consorcio:fc}), sbg.rpc('app_nrw_macro_macros',{p_consorcio:fc,p_competencia:null}) ])
-  .then(([mn,mc])=>{
+ Promise.all([ sbg.rpc('app_nrw_macro_mensal',{p_consorcio:fc,p_com_fator:macroComFator}), sbg.rpc('app_nrw_macro_macros',{p_consorcio:fc,p_competencia:null,p_com_fator:macroComFator}), sbg.rpc('app_nrw_fatores',{p_consorcio:null}) ])
+  .then(([mn,mc,fa])=>{
     if(mn.error)throw mn.error; if(mc.error)throw mc.error;
-    macroMensal=mn.data||[]; macroMacros=mc.data||[];
+    macroMensal=mn.data||[]; macroMacros=mc.data||[]; if(fa&&!fa.error) macroFatData=fa.data;
     if(macroSel==null || !macroMensal.some(p=>p.competencia===macroSel)) macroSel=macroMensal.length?macroMensal[macroMensal.length-1].competencia:null;
     macroDetSel=null; macroDetCache={}; macroRenderAll();
   }).catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
 }
-async function macroSetMes(c){ macroSel=+c; try{ const mc=await sbg.rpc('app_nrw_macro_macros',{p_consorcio:macroCons(),p_competencia:macroSel}); if(!mc.error)macroMacros=mc.data||[]; }catch(e){} macroDetSel=null; macroRenderAll(); }
+async function macroSetMes(c){ macroSel=+c; try{ const mc=await sbg.rpc('app_nrw_macro_macros',{p_consorcio:macroCons(),p_competencia:macroSel,p_com_fator:macroComFator}); if(!mc.error)macroMacros=mc.data||[]; }catch(e){} macroDetSel=null; macroRenderAll(); }
 /* ---- painel 1: indicador do mês ---- */
 function macroKpiPanel(){
  if(!macroMensal.length) return '<div class="panel"><div class="pbody"><p class="note" style="margin:0">Sem dados de macromedição para esta ZA.</p></div></div>';
@@ -1595,9 +1596,48 @@ function macroSyncHeader(){
  mes.onchange=()=>macroSetMes(mes.value);
  if(dmc){ dmc.hidden=true; dmc.onchange=null; }
 }
+/* ---- toggle + editor do fator de correção (aferição) ---- */
+function macroFatToggle(){ return `<div class="mmfilters" style="margin:0 0 12px"><button class="mmchip ${!macroComFator?'on':''}" data-mfator="0">Volume sem fator</button><button class="mmchip ${macroComFator?'on':''}" data-mfator="1">Volume com fator de correção</button></div>`; }
+function macroFatEff(cons,cd,vig){ const L=(macroFatData&&macroFatData.lancamentos)||[]; let best=null; L.forEach(l=>{ if(l.consorcio===cons&&l.cd_no_agua===cd&&l.competencia_vigencia<=vig&&(!best||l.competencia_vigencia>best.competencia_vigencia)) best=l; }); return best?+best.fator:1; }
+function macroFatExact(cons,cd,vig){ const L=(macroFatData&&macroFatData.lancamentos)||[]; const m=L.find(l=>l.consorcio===cons&&l.cd_no_agua===cd&&l.competencia_vigencia===vig); return m?+m.fator:null; }
+function macroFatVigAtual(){ const comps=(macroFatData&&macroFatData.competencias)||[]; return macroFatVig||(comps.length?comps[comps.length-1]:null); }
+function macroFatorPanel(){
+ const d=macroFatData; if(!d) return '';
+ const pode=!!d.pode_editar, vig=macroFatVigAtual(), cons=macroCons();
+ const comps=(d.competencias||[]), macros=(d.macros||[]).filter(m=>!cons||m.consorcio===cons);
+ const vigOpts=comps.map(c=>`<option value="${c}"${c===vig?' selected':''}>${mmCmp(c)}</option>`).join('');
+ const fmtF=v=>(+v).toFixed(3).replace('.',',');
+ const rows=macros.map(m=>{ const eff=macroFatEff(m.consorcio,m.cd_no_agua,vig), exact=macroFatExact(m.consorcio,m.cd_no_agua,vig), key=m.consorcio+'|'+m.cd_no_agua;
+   const val=(key in macroFatEdit)?macroFatEdit[key]:(exact!=null?fmtF(exact):'');
+   return `<tr><td>${m.cd_no_agua}</td><td><span class="mmtag" style="--cc:${m.funcao==='entrada'?'#4b9fe0':'#e6a23c'}">${m.funcao}</span></td><td class="note" style="font-size:11px">${cons?'':(m.consorcio==='ZA0200'?'Betim':'Contagem')}</td><td class="r">${fmtF(eff)}</td><td class="r"><input data-mfat="${key}" value="${val}" placeholder="${exact==null?fmtF(eff)+' (herda)':''}" ${pode?'':'disabled'} inputmode="decimal" style="width:88px;text-align:right"></td></tr>`;
+ }).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Fator de correção (aferição)</h3><span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">
+   <p class="note" style="margin:0 0 10px;font-size:11.5px">Multiplicador por macromedidor que corrige a volumetria. O valor lançado numa vigência <b>vale para os meses seguintes</b> até você lançar outro (carry-forward). Em branco = herda o anterior. Afeta a Análise do macromedido e o Acompanhamento do resultado quando <b>com fator</b> está ativo.</p>
+   <div class="formrow" style="border:0;margin-bottom:8px"><span>Vigência (mês a partir do qual vale)</span><select id="macroFatVigSel">${vigOpts}</select></div>
+   <div style="overflow:auto"><table class="mmdmc"><thead><tr><th>Macromedidor</th><th>Função</th><th></th><th class="r">Fator efetivo</th><th class="r">Lançar p/ ${vig?mmCmp(vig):'—'}</th></tr></thead><tbody>${rows}</tbody></table></div>
+   ${pode?`<div class="actions" style="margin-top:12px"><button class="btn pri" id="macroFatSalvar">Salvar fatores</button><span id="macroFatMsg" class="note" style="margin-left:10px"></span></div>`:`<p class="note" style="margin-top:10px;color:var(--muted)">Somente admin edita os fatores; você pode visualizar.</p>`}
+  </div></div>`;
+}
+function macroFatSalvar(){
+ const vig=macroFatVigAtual(); if(!vig) return;
+ const rows=[]; Object.keys(macroFatEdit).forEach(key=>{ const raw=(macroFatEdit[key]||'').trim(); if(!raw)return; const f=parseFloat(raw.replace(',','.')); if(!isFinite(f)||f<=0)return; const i=key.indexOf('|'); rows.push({consorcio:key.slice(0,i),cd_no_agua:key.slice(i+1),competencia_vigencia:vig,fator:f}); });
+ const msg=$('#macroFatMsg');
+ if(!rows.length){ if(msg)msg.textContent='Nada para salvar (preencha ao menos um fator).'; return; }
+ if(msg){ msg.style.color=''; msg.textContent='Salvando…'; }
+ sbg.rpc('app_nrw_fatores_salvar',{p_rows:rows}).then(r=>{
+   if(r.error){ if(msg){ msg.style.color='#e05d5d'; msg.textContent='Erro: '+(r.error.message||r.error); } return; }
+   macroFatEdit={};
+   sbg.rpc('app_nrw_fatores',{p_consorcio:null}).then(rr=>{ if(!rr.error)macroFatData=rr.data; macroInit(); });
+ });
+}
 function macroRenderAll(){
- $('#macroBody').innerHTML = macroKpiPanel()+macroSeasonPanel()+macroMacrosPanel();
+ $('#macroBody').innerHTML = macroFatToggle()+macroKpiPanel()+macroSeasonPanel()+macroMacrosPanel()+macroFatorPanel();
  macroSyncHeader();
+ $('#macroBody').querySelectorAll('[data-mfator]').forEach(b=>b.onclick=()=>{ const nv=b.dataset.mfator==='1'; if(nv!==macroComFator){ macroComFator=nv; macroInit(); } });
+ { const vsel=$('#macroFatVigSel'); if(vsel) vsel.onchange=()=>{ macroFatVig=+vsel.value; macroFatEdit={}; macroRenderAll(); }; }
+ $('#macroBody').querySelectorAll('[data-mfat]').forEach(inp=>inp.oninput=()=>{ macroFatEdit[inp.dataset.mfat]=inp.value; });
+ { const sbv=$('#macroFatSalvar'); if(sbv) sbv.onclick=macroFatSalvar; }
  $('#macroBody').querySelectorAll('[data-minfo]').forEach(b=>b.onclick=()=>{ const i=MACRO_INFO[b.dataset.minfo]; if(i)mmModal(i.t,i.h); });
  $('#macroBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ macroSeasMet=el.dataset.seas; macroRenderAll(); });
  $('#macroBody').querySelectorAll('#macrotbl th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(macroSort.k===k) macroSort.dir*=-1; else macroSort={k:k,dir:(MACRO_COLS.find(c=>c.k===k)||{}).num!==false?-1:1}; macroRenderAll(); });
@@ -1657,7 +1697,7 @@ function go(s,dmc){
  applyFocus(s);
 }
 /* ---------- Acompanhamento do resultado (IRVP) — dados REAIS via RPC ---------- */
-let resMensal=[], resBaselines={}, resAnchor='previa', resSel=null, resDerivOpen=true;
+let resMensal=[], resBaselines={}, resAnchor='previa', resSel=null, resDerivOpen=true, resComFator=false;
 function resCons(){ return za==='all'?null:za; }
 function resB(){ return resBaselines[resAnchor]||{}; }
 function resIRVP(vp){ const b=resB(); return (b.meta_m3>0 && vp!=null)?((b.vpbl - vp)/b.meta_m3*100):null; }
@@ -1679,7 +1719,10 @@ function resVCtot(){ return za==='all' ? (RES_VC.ZA0200+RES_VC.ZA1004) : (RES_VC
 function resGatilho(comp){ const idx=(Math.floor(comp/100)-2026)*12+(comp%100-6)+1; return idx<=18?50:75; } // OS 06/2026 = mês 1; Fase 1 (18m) ≥50%, Fase 2 ≥75%
 function resRemun(irvp,comp){ if(irvp==null || comp<RES_CONTRATO_INI) return null; const g=resGatilho(comp); return { g, v: irvp<g ? 0 : (Math.min(irvp,120)/120)*(0.54/42)*resVCtot() }; } // vazio antes do início do contrato
 function resIB(k){ return `<button class="mminfo" data-rinfo="${k}" title="Sobre este bloco">ⓘ</button>`; }
-function resAferNote(){ return `<p class="note" style="margin:0 0 10px;color:#e6a23c;background:rgba(230,162,60,.08);border:1px solid rgba(230,162,60,.25);border-radius:8px;padding:8px 11px;font-size:11.5px">⚙️ <b>VPBL preliminar.</b> Calculada com a macromedição bruta (GMOA). Ainda é necessário realizar a <b>aferição dos macromedidores</b> para encontrar o <b>fator de correção</b> a ser aplicado em cada macro — só então se chega ao <b>VPBL final</b>.</p>`; }
+function resFatorToggle(){ return `<div class="mmfilters" style="margin:0 0 10px"><button class="mmchip ${!resComFator?'on':''}" data-fator="0">Sem fator de correção</button><button class="mmchip ${resComFator?'on':''}" data-fator="1">Com fator de correção</button></div>`; }
+function resAferNote(){ return resComFator
+ ? `<p class="note" style="margin:0 0 10px;color:#3fb27f;background:rgba(63,178,127,.08);border:1px solid rgba(63,178,127,.28);border-radius:8px;padding:8px 11px;font-size:11.5px">✓ <b>Fator de correção aplicado.</b> VD, VPBL, meta, IRVP e remuneração usam a volumetria corrigida por macromedidor (aferição) — versão "VPBL final". Edite os fatores na <b>Análise do macromedido</b>.</p>`
+ : `<p class="note" style="margin:0 0 10px;color:#e6a23c;background:rgba(230,162,60,.08);border:1px solid rgba(230,162,60,.25);border-radius:8px;padding:8px 11px;font-size:11.5px">⚙️ <b>VPBL preliminar (sem fator).</b> Calculada com a macromedição bruta (GMOA). Aplique o <b>fator de correção</b> por macro (aferição) para chegar ao <b>VPBL final</b> — alterne acima ou edite na Análise do macromedido.</p>`; }
 const RES_INFO={
  base:{t:'Linha de base & siglas',h:`<p><b>VD</b> (Volume Disponibilizado) = volume <b>macromedido</b> que entra no sistema = macros de <b>entrada</b> − de <b>saída</b>.<br><b>VC</b> (Volume Consumido) = volume <b>micromedido</b> (lido + estimado nos hidrômetros).<br><b>VP</b> (Volume de Perdas) = <b>VD − VC</b> — água que entrou e não foi medida no consumo (perdas reais + aparentes).</p><p><b>VPBL</b> = VP da <b>linha de base</b> = média do VP nos <b>12 meses antes da assinatura</b> (ZA1004 mar/25–mar/26; ZA0200 abr/25–abr/26; <b>mai/25 não entra</b>).<br><b>Meta</b> = redução de VP contratada: <b>24,2%</b> (ZA1004) e <b>24,5%</b> (ZA0200), aplicada sobre a VPBL.<br><b>VP alvo 100%</b> = VPBL − meta (cumpre 100% da meta); <b>VP alvo 120%</b> = VPBL − 1,2×meta (teto do IRVP = bônus máximo, pois VC = Remuneração Básica × 1,2).</p><p>⚙️ <b>VPBL preliminar.</b> Calculada com a macromedição bruta (GMOA); ainda falta a <b>aferição dos macromedidores</b> para definir o <b>fator de correção</b> de cada macro e chegar ao <b>VPBL final</b>.</p>`},
  irvp:{t:'IRVP — fórmula e gatilhos',h:`<p><b>IRVP</b> (Índice de Redução de Volume de Perdas) = <b>(VPBL − VP do mês) ÷ meta</b>, em %. É o <b>atingimento da meta de redução</b> — só volume; o IP% (percentual de perda) <b>não entra</b> no pagamento.</p><p>100% = meta cumprida (VP = VP alvo). Acima de 100% = superou a meta. Abaixo de 0 = VP acima da baseline (piorou).</p><p><b>Gatilhos de remuneração mínima:</b> <b>≥50%</b> na <b>Fase 1</b> (implantação, 18 meses) e <b>≥75%</b> na <b>Fase 2</b> — abaixo não dispara a parcela mínima de performance.</p><p><b>Redução vs baseline</b> = VPBL − VP (quanto a perda caiu no mês). <b>Δ (VP − VP alvo)</b> = distância até o alvo (negativo = já abaixo do alvo = meta batida).</p><p>⚠️ <b>Bruto, sem fator sazonal (FS).</b> A ZA1004 tem sazonalidade forte; o FS congelado na validação da linha de base é um <b>ajuste proposto (pleito)</b>, ainda não aplicado.</p>`},
@@ -1705,7 +1748,7 @@ function resInit(){ mmCss();
  #s-resultado .resexclb{font-size:8.5px;font-weight:700;color:#fff;background:#c0392b;border-radius:4px;padding:1px 5px;margin-left:5px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}`; document.head.appendChild(st); }
  const body=$('#resBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando acompanhamento do resultado…</p></div></div>';
- sbg.rpc('app_nrw_resultado',{p_consorcio:resCons()}).then(r=>{
+ sbg.rpc('app_nrw_resultado',{p_consorcio:resCons(), p_com_fator:resComFator}).then(r=>{
    if(r.error)throw r.error;
    const d=r.data||{}; resMensal=d.serie||[]; resBaselines=d.baselines||{};
    resAnchor = resBaselines.previa?'previa':(Object.keys(resBaselines)[0]||'previa');
@@ -1725,7 +1768,7 @@ function resBasePanel(){
   {lab:'VP alvo 120%',v:fmt(a120),u:'m³/mês',sub:'VPBL − 1,2×meta · teto do IRVP (bônus máximo)'}
  ];
  return `<div class="panel"><div class="phead"><h3>Linha de base (IRVP)</h3><span class="hint" style="margin-left:6px">${b.janela||''}</span>${resIB('base')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">${resAferNote()}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
+  <div class="pbody">${resFatorToggle()}${resAferNote()}${b.incompleto?`<p class="note" style="margin:0 0 8px;color:#e0675d">⚠️ <b>Linha de base provisória</b> — faltando macromedição de ${(b.meses_faltando||[]).map(mmCmp).join(', ')} (${b.meses_no_calculo||'?'}/${b.meses_esperados||'?'} meses). Fecha sozinho quando o dado entrar.</p>`:''}<div class="mmcards" style="grid-template-columns:repeat(4,1fr)">${cards.map(c=>`<div class="mmcard${c.hd?' hd':''}"><span class="lab">${c.lab}</span><span class="val">${c.v}${c.u?`<small> ${c.u}</small>`:''}</span>${c.sub?`<div class="rescardsub">${c.sub}</div>`:''}</div>`).join('')}</div>
    <details class="resderiv" ${resDerivOpen?'open':''}><summary>Como o VP alvo é calculado (mês a mês)</summary>${resDerivHtml()}</details>
   </div></div>`;
 }
@@ -1797,6 +1840,7 @@ function resSyncHeader(){ const mes=$('#mes'), dmc=$('#mesDmc'); if(!mes)return;
 }
 function resRenderAll(){
  $('#resBody').innerHTML = resBasePanel()+resTrendPanel()+resTablePanel();
+ $('#resBody').querySelectorAll('[data-fator]').forEach(b=>b.onclick=()=>{ const nv=b.dataset.fator==='1'; if(nv!==resComFator){ resComFator=nv; resInit(); } });
  $('#resBody').querySelectorAll('[data-rinfo]').forEach(b=>b.onclick=()=>{ const i=RES_INFO[b.dataset.rinfo]; if(i)mmModal(i.t,i.h); });
  const dt=$('#resBody details.resderiv'); if(dt) dt.addEventListener('toggle',()=>{ resDerivOpen=dt.open; });
 }
