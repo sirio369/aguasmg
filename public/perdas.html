@@ -1624,6 +1624,7 @@ function cfgVigAtual(){ const comps=(cfgData&&cfgData.competencias)||[]; return 
 function cfgVcEff(cons,vig){ const L=(cfgData&&cfgData.lancamentos)||[]; let best=null; L.forEach(l=>{ if(l.consorcio===cons&&l.competencia_vigencia<=vig&&(!best||l.competencia_vigencia>best.competencia_vigencia)) best=l; }); return best?+best.valor_contrato:((cfgData&&cfgData.default_vc&&cfgData.default_vc[cons])||0); }
 function cfgVcExact(cons,vig){ const L=(cfgData&&cfgData.lancamentos)||[]; const m=L.find(l=>l.consorcio===cons&&l.competencia_vigencia===vig); return m?+m.valor_contrato:null; }
 function cfgInit(){ mmCss();
+ if(!document.getElementById('cfgcss')){ const st=document.createElement('style'); st.id='cfgcss'; st.textContent='#cfgBody .formrow{grid-template-columns:1fr minmax(160px,210px)}#cfgBody .formrow input,#cfgBody .formrow select{width:100%;box-sizing:border-box}#cfgBody .formrow input{text-align:right}'; document.head.appendChild(st); }
  const body=$('#cfgBody'); if(!body) return;
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando premissas…</p></div></div>';
  sbg.rpc('app_nrw_premissas').then(r=>{ if(r.error)throw r.error; cfgData=r.data||{}; cfgEdit={}; cfgRender(); })
@@ -1634,7 +1635,7 @@ function cfgRender(){
  const vigOpts=cfgVigList().map(c=>`<option value="${c}"${c===vig?' selected':''}>${mmCmp(c)}</option>`).join('');
  const money=v=>'R$ '+fmt(Math.round(v));
  const zaRow=(cons,nome)=>{ const eff=cfgVcEff(cons,vig), exact=cfgVcExact(cons,vig), val=(cons in cfgEdit)?cfgEdit[cons]:(exact!=null?String(Math.round(exact)):'');
-   return `<div class="formrow"><span>${nome} <small class="note">(efetivo: ${money(eff)})</small></span><input data-cfgvc="${cons}" value="${val}" placeholder="${exact==null?Math.round(eff)+' (herda)':''}" ${pode?'':'disabled'} inputmode="numeric" style="width:160px;text-align:right"></div>`; };
+   return `<div class="formrow"><span>${nome} <small class="note">(efetivo: ${money(eff)})</small></span><input data-cfgvc="${cons}" value="${val}" placeholder="${exact==null?Math.round(eff)+' (herda)':''}" ${pode?'':'disabled'} inputmode="numeric"></div>`; };
  const lanc=(d.lancamentos||[]).slice().sort((a,b)=>a.competencia_vigencia-b.competencia_vigencia||(''+a.consorcio).localeCompare(b.consorcio));
  const lancRows=lanc.length?lanc.map(l=>`<tr><td>${mmCmp(l.competencia_vigencia)}</td><td>${l.consorcio==='ZA0200'?'Betim':'Contagem'}</td><td class="r">${money(+l.valor_contrato)}</td></tr>`).join(''):'<tr><td colspan="3" class="note">Nenhum lançamento — usando o VC assinado padrão.</td></tr>';
  $('#cfgBody').innerHTML=`
@@ -1732,14 +1733,14 @@ function resStatus(irvp){ if(irvp==null) return {l:'—',c:'var(--muted)'};
  if(irvp>=120) return {l:'≥120% · teto (bônus máx.)',c:'#2f80ed'};
  if(irvp>=100) return {l:'Meta atingida (100%)',c:'#3fb27f'};
  if(irvp>=75)  return {l:'≥75% · gatilho Fase 2',c:'#4b9fe0'};
- if(irvp>=50)  return {l:'≥50% · gatilho Fase 1',c:'#e6a23c'};
- if(irvp>=0)   return {l:'Abaixo do gatilho',c:'#e05d5d'};
- return {l:'Pior que a baseline',c:'#d6336c'};
+ if(irvp>=50)  return {l:'≥50% · gatilho Fase 1',c:'var(--muted)'};
+ if(irvp>=0)   return {l:'Abaixo do gatilho',c:'var(--muted)'};
+ return {l:'Pior que a baseline',c:'var(--muted)'};
 }
 /* Remuneração Por Performance (RP) — TR §8.5: RP = (IRVP/120) × (1/42) × (54% × Valor do Contrato),
    paga só com IRVP ≥ gatilho da fase (≥50% nos 18m de implantação, ≥75% nos 42m de apuração) e IRVP limitado a 120%.
    Os 46% restantes do VC são a Remuneração Mínima do Ativo (por obra executada, não pelo IRVP). */
-const RES_VC={ZA0200:101044138.17, ZA1004:101248033.52}; // Valor do Contrato (assinado) por ZA
+const RES_VC={ZA0200:101044138, ZA1004:101248033}; // Valor do Contrato por ZA (fallback; o valor do mês vem da premissa)
 const RES_CONTRATO_INI=202606; // OS assinadas 19/06/2026 (ZA1004 e ZA0200) — antes disso não há remuneração
 function resVCtot(){ return za==='all' ? (RES_VC.ZA0200+RES_VC.ZA1004) : (RES_VC[za]||0); }
 function resGatilho(comp){ const idx=(Math.floor(comp/100)-2026)*12+(comp%100-6)+1; return idx<=18?50:75; } // OS 06/2026 = mês 1; Fase 1 (18m) ≥50%, Fase 2 ≥75%
@@ -2358,7 +2359,7 @@ function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if
  }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#hdMapNote'))$('#hdMapNote').textContent='Erro ao exportar: '+(e.message||e); });
 }
 
-const NRW_REAL=new Set(['mm','macro','resultado','hdpri']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+const NRW_REAL=new Set(['mm','macro','resultado','hdpri','config']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
 function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
  .navi.mock{opacity:.5}
  .navi.mock:hover{opacity:.82}

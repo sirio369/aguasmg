@@ -1998,7 +1998,8 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     usa o VC do mês (fallback na constante `RES_VC`). RPCs novos **`app_nrw_premissas`** (ler; default_vc, competências, lançamentos, pode_editar) e
     **`app_nrw_premissa_vc_salvar(jsonb)`** (upsert lote, admin-only). **Front:** `cfgInit`/`cfgRender` no `#cfgBody` — seletor de vigência (60 meses do
     contrato), VC por ZA (efetivo + input), "Salvar VC" (admin), linha do tempo dos lançamentos, + painel "Outras premissas (referência)" (metas 24,5/24,2%,
-    gatilhos 50/75%). `go('config')` chama `cfgInit`. Validado: série 202606 VC ZA1004 101.248.034 / ALL 202.292.172; reajuste vig. 202701 propaga via LOCF.
+    gatilhos 50/75%). `go('config')` chama `cfgInit`. Validado: reajuste vig. 202701 propaga via LOCF.
+  - **Ajustes 2026-10-15:** `config` entrou em **`NRW_REAL`** → sai a opacidade/selo "exemplo" da sidebar e o banner "Em construção" (só nessa tela; as demais seguem exemplo). **VC corrigido** p/ os valores sem centavos definidos pelo usuário: **ZA1004 101.248.033 / ZA0200 101.044.138** (seed + fallback `nrw_vc` + `default_vc` + `RES_VC`). **Bloco do VC** deixou de estourar: o `.formrow` é grid com coluna de 90px; escopei `#cfgcss` (`#cfgBody .formrow{grid-template-columns:1fr minmax(160px,210px)}` + inputs `width:100%;box-sizing`) e removi o `width:160px` inline. **IRVP% (resStatus):** removidas as cores laranja/vermelho/rosa dos tiers abaixo de 75% (viram `var(--muted)`) — ficam só **azul** (≥120 teto, ≥75 Fase 2) e **verde** (≥100 meta).
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
