@@ -2404,6 +2404,15 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   seção "Pendências abertas" ficou **clicável** — uma pendência `aberta` (só p/ gestão `vrp_gestao`/admin) vira
   botão "programar ›" que chama `vmGerarCorr` e gera a OS corretiva única; `#vmModal` subiu p/ z-index 10001
   (abre sobre a ficha).
+  **Form de execução (2026-10-15):** campos manuais que abrem condicionalmente agora são **obrigatórios**
+  (`vmValid`): descrição do "Intervir" (passo 3·Condição), pressão encontrada quando conecta o manômetro
+  (passo 2), "Descreva Outro" (passo 4). E **cada serviço marcado** no passo 4 abre um bloco próprio com
+  **descrição + fotos obrigatórias** (`vmSlug(serviço)` → `servd_<slug>` em `respostas`, fotos `serv_<slug>_N`),
+  no lugar do campo único de fotos. `vmReport` (PDF) mostra descrição e fotos por serviço (compat. OSs antigas
+  com prefixo `servico`). **Gatilhos de status** (sugerido, ajustável no fim): **improdutiva** = na Chegada,
+  "VRP localizada? Não" ou "Caixa acessível? Não" (botão "Encerrar como improdutivo" + foto do ponto);
+  **concluida_pendencia** = `vmPendencias()` ≥1 (tomada mont/jus não resolvida, adequação civil/acesso não
+  resolvidos, vazamento após=Sim, liberada=Não); senão **concluida**.
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 
