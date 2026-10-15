@@ -2400,7 +2400,42 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   obs lista todas) — uma visita resolve tudo, evita ir ao local mais de uma vez. **Front:** na tela da OS
   (gestão, `vmOsView`), quando há pendência aberta sem corretiva, botão **"Programar correção (OS única)"**
   → abre o diálogo e gera a OS; `vmGerarCorr(pendId, after)` ganhou callback e texto novo. As 2 pendências
-  legadas da VRP-OS-2026-0009 foram **mescladas em 1**.
+  legadas da VRP-OS-2026-0009 foram **mescladas em 1**. **Na ficha da VRP (`vmFichaOpen`, 2026-10-15):** a
+  seção "Pendências abertas" ficou **clicável** — uma pendência `aberta` (só p/ gestão `vrp_gestao`/admin) vira
+  botão "programar ›" que chama `vmGerarCorr` e gera a OS corretiva única; `#vmModal` subiu p/ z-index 10001
+  (abre sobre a ficha).
+  **Form de execução (2026-10-15):** campos manuais que abrem condicionalmente agora são **obrigatórios**
+  (`vmValid`): descrição do "Intervir" (passo 3·Condição), pressão encontrada quando conecta o manômetro
+  (passo 2), "Descreva Outro" (passo 4). E **cada serviço marcado** no passo 4 abre um bloco próprio com
+  **descrição + fotos obrigatórias** (`vmSlug(serviço)` → `servd_<slug>` em `respostas`, fotos `serv_<slug>_N`),
+  no lugar do campo único de fotos. `vmReport` (PDF) mostra descrição e fotos por serviço (compat. OSs antigas
+  com prefixo `servico`). **Gatilhos de status** (sugerido, ajustável no fim): **improdutiva** = na Chegada,
+  "VRP localizada? Não" ou "Caixa acessível? Não" (botão "Encerrar como improdutivo" + foto do ponto);
+  **concluida_pendencia** = `vmPendencias()` ≥1 (tomada mont/jus não resolvida, adequação civil/acesso não
+  resolvidos, vazamento após=Sim, liberada=Não); senão **concluida**.
+  **Status 100% automático (2026-10-15):** o executor **não escolhe mais** o status — removido o seletor da tela
+  de resultado (`vmScrResult`/`vmstatuspick` e o handler `[data-status]`); `S.status=vmSugere()` sempre. Logo,
+  **improdutiva só ocorre pelo caminho da Chegada** (não localizada/inacessível); com visita completa nunca é
+  forçável. **Nova regra de pendência:** condição **"Intervir" sem serviço executável mapeado** (corrosão,
+  ruído, **condição geral** — fora de `VM_INT_SERV`) **gera pendência** com a descrição (ex.: "precisa trocar a
+  VRP"). **"O que aconteceu" visível:** as descrições (`d_<cond>`, `servd_<serviço>`, `serv_outro`) agora
+  aparecem na **tela de resultado** (bloco "O que aconteceu"), no **relatório PDF** (`vmReport` §3/§4) e na
+  **tela da OS da gestão** (`vmOsView` §3/§4) — antes só os rótulos "Intervir/OK" iam pro PDF.
+  **Substituição — parte 1 (2026-10-15):** 3º tipo de OS. **`origem`** aceita **`substituicao`** (programável no diálogo:
+  segmento Preventiva/Corretiva/**Substituição**). Na **finalização** o executor responde **"Necessita substituição da VRP?"**
+  (`nec_subst`); se Sim + descrição → `vmPendencias` gera uma pendência **`tipo='substituicao'`** própria. No `app_vrp_os_concluir`
+  essa pendência **NÃO é consolidada** com as demais (fica separada e evidente); `app_vrp_pendencia_gerar_os` **recusa** gerar
+  corretiva para ela e a **exclui** da cobertura (uma substituição não se resolve por corretiva). `app_vrp_os_programar` permite
+  **programar substituição mesmo com pendência aberta** e vincula/resolve a pendência de substituição. Displays (ficha, OS, lista de
+  pendências) mostram badge **⚠ SUBSTITUIÇÃO** em vermelho.
+  **Substituição — parte 2 (2026-10-15, form próprio):** quando a OS é `substituicao`, o wizard usa um **fluxo próprio**
+  (`vmExecRender`/`vmStepbar`/`vmValid` ramificam por `hdr.origem`): **Chegada → VRP anterior → VRP nova → Pressões →
+  Finalização**. `vmScrSubAnt` mostra o cadastro atual (read-only) + foto da VRP removida + motivo; `vmScrSubNova` captura os
+  **dados cadastrais/técnicos da nova VRP** (diâmetro, modelo, atuação, controlador, pressões de projeto, ponto crítico, obs) +
+  foto da nova. `app_vrp_os_header` agora devolve `origem` e `atuacao`. Na conclusão, `app_vrp_os_concluir` **recadastra
+  `"2 - infra_agua".vrps`** (diametro/pres_max/pres_saida/pres_min/atuacao/observacao) a partir de `p_campos.cad_*`; o **nó de
+  água é mantido**. `respostas.vrp_anterior`/`vrp_nova` guardam o antes×depois, exibido no **relatório PDF** e na **tela da OS**
+  ("🔁 Substituição — anterior → nova"). `nec_subst` fica oculto no fluxo de substituição. Validado E2E: DN 50→200, 58→55 mca.
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 
