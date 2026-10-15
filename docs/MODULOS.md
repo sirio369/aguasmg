@@ -2421,6 +2421,14 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   VRP"). **"O que aconteceu" visível:** as descrições (`d_<cond>`, `servd_<serviço>`, `serv_outro`) agora
   aparecem na **tela de resultado** (bloco "O que aconteceu"), no **relatório PDF** (`vmReport` §3/§4) e na
   **tela da OS da gestão** (`vmOsView` §3/§4) — antes só os rótulos "Intervir/OK" iam pro PDF.
+  **Substituição — parte 1 (2026-10-15):** 3º tipo de OS. **`origem`** aceita **`substituicao`** (programável no diálogo:
+  segmento Preventiva/Corretiva/**Substituição**). Na **finalização** o executor responde **"Necessita substituição da VRP?"**
+  (`nec_subst`); se Sim + descrição → `vmPendencias` gera uma pendência **`tipo='substituicao'`** própria. No `app_vrp_os_concluir`
+  essa pendência **NÃO é consolidada** com as demais (fica separada e evidente); `app_vrp_pendencia_gerar_os` **recusa** gerar
+  corretiva para ela e a **exclui** da cobertura (uma substituição não se resolve por corretiva). `app_vrp_os_programar` permite
+  **programar substituição mesmo com pendência aberta** e vincula/resolve a pendência de substituição. Displays (ficha, OS, lista de
+  pendências) mostram badge **⚠ SUBSTITUIÇÃO** em vermelho. **Falta (parte 2):** o **form específico de substituição** (VRP anterior +
+  VRP nova, dados cadastrais/técnicos + configuração completa) e o **recadastro** de `"2 - infra_agua".vrps` na conclusão.
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 
