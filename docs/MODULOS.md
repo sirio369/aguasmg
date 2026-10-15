@@ -1928,11 +1928,11 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   VPBL 977.337 / meta 236.516 · 24,2%; ZA0200 829.385 / 203.199 · 24,5%) e **prévia** (média de VP nos 12 meses
   pré-assinatura dos nossos dados, **já com factível no VC desde 2026-10-07**: ZA1004 1.008.719; ZA0200 830.781 —
   ~0–3% da contratual, validação). Janelas:
-  ZA1004 abr/25–mar/26, ZA0200 mai/25–abr/26. RPC **`app_nrw_resultado(p_consorcio)`** (definer, admin|dev_acesso):
+  ZA1004 mar/25–mar/26, ZA0200 abr/25–abr/26 (ambas exceto mai/25). RPC **`app_nrw_resultado(p_consorcio)`** (definer, admin|dev_acesso):
   devolve `baselines{contratual,previa}` + `serie` mensal (VD/VC/VP/IP%/L·lig·dia); "Ambos" (p_consorcio null)
-  soma as 2 ZAs. **O IRVP por âncora é calculado no front** (`resIRVP`), então o **toggle contratual↔prévia** é
-  instantâneo (sem refetch). 4 painéis: linha de base + toggle · indicador do mês (hero IRVP + status gatilho
-  ≥50%/≥75%) · VP × baseline × meta (gráfico com corredor baseline→VP alvo) · tabela mês a mês. ⚠️ **bruto, sem
+  soma as 2 ZAs. **O IRVP é calculado no front** (`resIRVP`). A tela usa só a VPBL dos **dados existentes** (`previa`) — o
+  toggle Contratual×Prévia foi **removido** em 2026-10-15 (ver abaixo); o `contratual` ainda vem na RPC, mas o front ignora.
+  Painéis: linha de base · VP × baseline × meta (gráfico com corredor baseline→VP alvo) · tabela mês a mês. ⚠️ **bruto, sem
   fator sazonal** (FS é pleito, não aplicado — ver [[copasa-irvp-metodo]]). Está em `NRW_REAL` (destaque, não opaca).
   Recarregar baseline = re-rodar o INSERT em `linha_base` (prévia recalcula de `macro_mensal` − `mm_mensal`).
   - **Refino (2026-10-06):** RPC devolve `janela_de`/`janela_ate` nas baselines. Linha de base enxugada (3 cards:
@@ -1964,6 +1964,15 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     sempre que a âncora atual tiver meses em `excluir` (ou seja, na prévia) — fora do accordion, sem precisar expandir.
     A marcação segue sendo conceito da **prévia**; na **contratual** (VPBL = número do TR) nenhum mês é excluído, então
     o aviso não aparece (comportamento correto).
+  - **Macro 202503 inserida + VPBL único, sem contratual×prévia (2026-10-15):** carregada a macromedição GMOA de
+    **202503** (ZA1004 e ZA0200) em `macro_mensal` — os meses sobrepostos (202504→202608) já batiam com o banco, então só
+    **202503** era novo (29 linhas). `app_nrw_baseline_rebuild(null)` fechou a janela: **ZA1004 VPBL = 1.003.269 m³/mês**
+    (meta 242.791; era provisória 11/12, agora 12/12) e **ZA0200 = 836.312** (inalterada — 202503 fora da janela 202504→202604);
+    ambas excluem 202505. **Front simplificado:** removido o toggle **Contratual (TR) × Prévia** — a tela usa só a VPBL dos
+    **dados existentes** (fonte `previa`, relabelada apenas "VPBL"); `resAnchor` virou constante interna `'previa'`, `resToggle`/
+    `resSetAnchor`/`data-anchor` removidos. Em lugar do toggle, o painel da Linha de base mostra **uma nota de aferição**
+    (`resAferNote`): *VPBL preliminar — falta aferir os macromedidores para achar o fator de correção por macro e chegar ao
+    VPBL final*. A linha `contratual` do `linha_base` continua no banco (referência do TR), apenas não é mais exibida.
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
