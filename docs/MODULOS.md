@@ -1991,6 +1991,14 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     no painel da Linha de base (resultado, `resComFator`→refetch) com nota que troca de cor; e na *Análise do macromedido* um toggle **Volume sem/com fator**
     + painel **editor "Fator de correção (aferição)"** (`macroFatorPanel`): seletor de vigência + tabela de macros com fator efetivo e input por macro,
     "Salvar fatores" (admin). `sem fator` = idêntico ao anterior (validado: ZA1004 1.003.269 / ZA0200 836.312). Sistema do 202503 normalizado (rtrim).
+  - **Engrenagem de Premissas → Valor do Contrato mês a mês (2026-10-15, tela `config` "Parâmetros & Metas"):** a tela `s-config` (antes mock)
+    virou real. Tabela **`"11 - perdas_nrw".premissa_contrato`** (consorcio, **competencia_vigencia**, valor_contrato) versionada por vigência com
+    **carry-forward** (p/ reajustes), seed 202606 = VC assinado. Função `"11 - perdas_nrw".nrw_vc(cons,comp)` = LOCF (último lançamento ≤ comp,
+    senão o VC assinado). `app_nrw_resultado` passou a devolver **`vcontrato`** por competência na série (soma por ZA no "Ambos"); `resRemun(irvp,comp,vc)`
+    usa o VC do mês (fallback na constante `RES_VC`). RPCs novos **`app_nrw_premissas`** (ler; default_vc, competências, lançamentos, pode_editar) e
+    **`app_nrw_premissa_vc_salvar(jsonb)`** (upsert lote, admin-only). **Front:** `cfgInit`/`cfgRender` no `#cfgBody` — seletor de vigência (60 meses do
+    contrato), VC por ZA (efetivo + input), "Salvar VC" (admin), linha do tempo dos lançamentos, + painel "Outras premissas (referência)" (metas 24,5/24,2%,
+    gatilhos 50/75%). `go('config')` chama `cfgInit`. Validado: série 202606 VC ZA1004 101.248.034 / ALL 202.292.172; reajuste vig. 202701 propaga via LOCF.
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
