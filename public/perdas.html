@@ -7,12 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<!-- Leaflet (mapa logístico da priorização de HD) + clustering + SheetJS (export .xlsx) -->
+<!-- Leaflet (mapa logístico da priorização de HD) + clustering + draw (seleção por área) + SheetJS (export .xlsx) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -1211,6 +1213,31 @@ async function mmLoadRank(){
  catch(e){ if(window.toast)toast('Erro no ranking: '+(e.message||e)); return; }
  mmDetSel=null; mmRenderAll();
 }
+// export CSV do ranking de matrículas (lista filtrada) — espelha o export da priorização de HD
+async function mmExport(){
+ const btn=$('#mmExport'); const fc=mmDmcSel?mmDmcSel.cons:mmCons(), fd=mmDmcSel?mmDmcSel.num:null;
+ if(btn){btn.disabled=true;btn.textContent='Gerando…';}
+ try{
+  const all=[], pageN=500;
+  for(let off=0; off<100000; off+=pageN){
+   const k=await sbg.rpc('app_nrw_mm_ranking',{p_consorcio:fc,p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:pageN,p_offset:off,p_dmc:fd});
+   if(k.error)throw k.error; const rows=k.data||[]; all.push(...rows); if(rows.length<pageN)break;
+  }
+  const head=['Matrícula','Consórcio','Comportamento','Situação','Score anomalia','Meses','Média (m³/mês)','Mediana','CV','Tendência (slope)','Nº zeros','Mínimo','Máximo','Meses irregular (c/ água)','Meses factível'];
+  const esc=v=>{ const s=(v==null?'':String(v)); return /[";\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const dec=v=>v==null?'':String(v).replace('.',',');
+  const lines=[head.map(esc).join(';')];
+  all.forEach(x=>{ const cl=(MM_CLASS[x.classificacao]||{l:x.classificacao}).l, si=(MM_SIT[x.situacao_atual]||{l:x.situacao_atual||'—'}).l;
+   const cons=x.consorcio==='ZA0200'?'Betim':(x.consorcio==='ZA1004'?'Contagem':x.consorcio);
+   lines.push([x.matricula,cons,cl,si,x.score_anomalia,x.n_meses,dec(x.media),dec(x.mediana),dec(x.cv),dec(x.slope),x.n_zeros,dec(x.minimo),dec(x.maximo),x.meses_irregular,x.meses_factivel].map(esc).join(';'));
+  });
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`ranking_matriculas_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },120);
+ }catch(e){ if(window.toast)toast('Erro ao exportar: '+(e.message||e)); }
+ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar CSV';}
+}
 function mmSetMes(c){ mmSel=+c; mmRenderAll(); mmReloadDmc(); }
 async function mmReloadDmc(){ try{ const dm=await sbg.rpc('app_nrw_mm_dmc',{p_consorcio:mmCons(),p_competencia:mmSel}); if(!dm.error){ mmDmc=dm.data||[]; mmRenderAll(); } }catch(e){} }
 function mmSetZa(v){ if(za===v)return; za=v; mmDmcSel=null; document.querySelectorAll('#zaseg button').forEach(x=>x.classList.toggle('on',x.dataset.za===za)); mmInit(); }
@@ -1330,7 +1357,7 @@ function mmAnalysisPanel(){
      <div class="mmdistwrap">${distBars}</div>
     </div>
     <div class="mmblock" style="grid-area:lista">
-     <div class="mmblock-h">Ranking de matrículas <span class="hint">Índice 0–100</span></div>
+     <div class="mmblock-h" style="display:flex;align-items:center;gap:8px">Ranking de matrículas <span class="hint">Índice 0–100</span><button class="hdbtn sec" id="mmExport" style="margin-left:auto">⭳ Exportar CSV</button></div>
      <div class="mmfilters">${chips}</div>
      <div style="overflow:auto;max-height:560px"><table id="mmtbl"><thead><tr><th>Matrícula</th><th>Comportamento</th><th>Situação</th><th class="r">Score</th></tr></thead><tbody>${rows}</tbody></table></div>
     </div>
@@ -1361,6 +1388,7 @@ function mmRenderAll(){
  $('#mmBody').querySelectorAll('.mmchip[data-cls]').forEach(el=>el.onclick=()=>{ mmClass=el.dataset.cls; mmLoadRank(); });
  $('#mmBody').querySelectorAll('.mmdmc th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(mmDmcSort.k===k) mmDmcSort.dir*=-1; else mmDmcSort={k:k,dir:(MM_DMC_COLS.find(c=>c.k===k)||{}).num!==false?-1:1}; mmRenderAll(); });
  $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>mmDetailFill(tr.dataset.cons,tr.dataset.mat));
+ { const ex=$('#mmExport'); if(ex)ex.onclick=mmExport; }
  const box=$('#mmDetail');
  if(box){ if(mmDetSel) mmDetailFill(mmDetSel.cons,mmDetSel.mat); else if(mmRank.length) mmDetailFill(mmRank[0].consorcio,mmRank[0].matricula); }
 }
@@ -1876,7 +1904,7 @@ function resRenderAll(){
 let hdResumo=null, hdRows=[], hdTotal=0, hdDetCache={}, hdMap=null, hdPtLayer=null;
 let hdF={cat:'',motivo:'',cap:'',situacao:'ativa',interno:'',busca:'',adequacao:'',codigo:'',poligono:null};
 let hdSort={k:'ips',dir:-1};
-let hdDraw={on:false,pts:[],layer:null,markers:[]};
+let hdDrawnLayer=null, hdDrawCtl=null;
 const HD_CAT={P1:{l:'P1 · Substituição prioritária',s:'Priorizar',c:'#d6336c'},P2:{l:'P2 · Alta prioridade',s:'Programar próximo ciclo',c:'#e05d5d'},P3:{l:'P3 · Avaliação',s:'Avaliar',c:'#e6a23c'},P4:{l:'P4 · Monitoramento',s:'Acompanhar',c:'#4b9fe0'},P5:{l:'P5 · Sem prioridade',s:'Manter',c:'#8a8f98'}};
 const HD_ADEQ={adequado:{l:'Adequado',c:'#3fb27f'},subdimensionado:{l:'Subdimensionado',c:'#e05d5d'},superdimensionado:{l:'Superdimensionado',c:'#e6a23c'},mudanca:{l:'Mudança de faixa',c:'#c678dd'},indeterminado:{l:'Indeterminado',c:'#8a8f98'}};
 const HD_SIT={R:'Ativa',I:'Inativa/cortada',F:'Factível',P:'Potencial'};
@@ -2168,7 +2196,7 @@ function hdPremSave(){
 
 function hdInit(){ mmCss(); hdCss();
  const body=$('#hdBody'); if(!body)return;
- if(hdMap){ try{hdMap.remove();}catch(e){} hdMap=null; hdPtLayer=null; hdDraw={on:false,pts:[],layer:null,markers:[]}; }
+ if(hdMap){ try{hdMap.remove();}catch(e){} hdMap=null; hdPtLayer=null; hdDrawnLayer=null; hdDrawCtl=null; }
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando priorização de troca de HD…</p></div></div>';
  Promise.all([ sbg.rpc('app_nrw_hd_resumo',hdFilterArgs()), sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:300,p_offset:0})) ])
  .then(([r1,r2])=>{
@@ -2188,7 +2216,7 @@ function hdRenderAll(){ const body=$('#hdBody');
    </div>
    <div class="hdbottom">
      <div class="panel" style="margin:0"><div class="phead"><h3>Mapa logístico</h3><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody">
-        <div class="hdmaptools"><button class="hdbtn sec" id="hdDrawBtn">✏️ Selecionar área</button><button class="hdbtn sec" id="hdClearBtn" hidden>✕ Limpar seleção</button><span class="note" id="hdDrawHint" style="font-size:11px"></span></div>
+        <div class="hdmaptools"><button class="hdbtn sec" id="hdClearBtn" hidden>✕ Limpar seleção</button><span class="note" id="hdDrawHint" style="font-size:11px">Use as ferramentas de desenho no mapa (polígono ou retângulo, canto superior direito) para filtrar por área.</span></div>
         <div id="hdMapDiv"></div><p class="note" id="hdMapNote" style="margin:8px 0 0"></p></div></div>
      <div class="panel" style="margin:0"><div class="phead"><h3>Lista operacional de troca</h3><button class="hdbtn" id="hdExport" style="margin-left:auto">⭳ Exportar .xlsx</button></div><div class="pbody" style="padding-top:8px"><div id="hdRankWrap">${hdRankTable()}</div></div></div>
    </div>`;
@@ -2281,8 +2309,8 @@ function hdWire(){
  document.querySelectorAll('#s-hdpri [data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);});
  hdWireRank(); hdWireCharts();
  const ex=$('#hdExport'); if(ex)ex.onclick=hdExport;
- const db=$('#hdDrawBtn'); if(db)db.onclick=hdDrawClick;
- const cb=$('#hdClearBtn'); if(cb)cb.onclick=hdDrawReset;
+ const cb=$('#hdClearBtn'); if(cb){ cb.onclick=hdDrawReset; cb.hidden=!hdF.poligono; }
+ if(hdF.poligono){ const h=$('#hdDrawHint'); if(h)h.textContent='Área aplicada — a lista e o mapa mostram só as matrículas dentro dela.'; }
 }
 function hdWireRank(){
  document.querySelectorAll('#hdRankWrap table.hdt th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(hdSort.k===k)hdSort.dir*=-1; else {hdSort.k=k;hdSort.dir=({idade_medidor:-1,media:-1,ips:-1})[k]||1;} $('#hdRankWrap').innerHTML=hdRankTable(); hdWireRank(); });
@@ -2303,6 +2331,18 @@ function hdInitMap(){ const div=$('#hdMapDiv'); if(!div)return;
  if(!hdMap){ hdMap=L.map(div,{scrollWheelZoom:true}).setView([-19.96,-44.12],11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(hdMap);
   hdPtLayer=L.layerGroup().addTo(hdMap);
+  hdDrawnLayer=L.featureGroup().addTo(hdMap);
+  if(L.Draw){
+   hdDrawCtl=new L.Control.Draw({
+    position:'topright',
+    draw:{polygon:{shapeOptions:{color:'#0e7c86',weight:2,fillOpacity:.08}},
+          rectangle:{shapeOptions:{color:'#0e7c86',weight:2,fillOpacity:.08}},
+          polyline:false,circle:false,marker:false,circlemarker:false},
+    edit:{featureGroup:hdDrawnLayer,edit:false,remove:false}
+   });
+   hdMap.addControl(hdDrawCtl);
+   hdMap.on(L.Draw.Event.CREATED,e=>{ hdDrawnLayer.clearLayers(); hdDrawnLayer.addLayer(e.layer); hdSelecionarGeom(e.layer.toGeoJSON().geometry); });
+  }
  }
  setTimeout(()=>{ if(hdMap)hdMap.invalidateSize(); },80);
  hdLoadMap();
@@ -2316,43 +2356,29 @@ function hdLoadMap(){ if(!hdMap||!hdPtLayer)return; const note=$('#hdMapNote'); 
    mk.bindPopup(`<b>Matrícula ${p.matricula}</b><br>${p.categoria} · IPS ${p.ips!=null?br1(p.ips):'—'}<br>${p.cap||'—'}→<b>${p.cal_recomendado||'—'}</b> · OS ${p.codigo_servico||'(fora)'}<br><a href="#" onclick="hdOpenDetail(${p.matricula});return false;">ver detalhe</a>`);
    hdPtLayer.addLayer(mk); bounds.push([+p.lat,+p.lon]);
   });
-  if(note)note.textContent=fmt(pts.length)+' ponto(s)'+(hdF.poligono?' na área selecionada':'')+' (máx 8.000, maior IPS). '+(hdF.poligono?'':'Use "Selecionar área" para filtrar por polígono.');
-  if(bounds.length && !hdDraw.on){ try{ hdMap.fitBounds(bounds,{padding:[20,20],maxZoom:15}); }catch(e){} }
+  if(note)note.textContent=fmt(pts.length)+' ponto(s)'+(hdF.poligono?' na área selecionada':'')+' (máx 8.000, maior IPS). '+(hdF.poligono?'':'Desenhe um polígono ou retângulo no mapa para filtrar por área.');
+  if(bounds.length && !hdF.poligono){ try{ hdMap.fitBounds(bounds,{padding:[20,20],maxZoom:15}); }catch(e){} }
  });
 }
-function hdDrawClick(){ if(!hdMap)return;
- if(!hdDraw.on){ // iniciar
-  hdDrawClearLayer(); hdDraw.on=true; hdDraw.pts=[]; hdMap.getContainer().style.cursor='crosshair'; hdMap.on('click',hdDrawAdd);
-  const b=$('#hdDrawBtn'); if(b){b.textContent='✓ Aplicar seleção';b.classList.add('on');} const c=$('#hdClearBtn'); if(c)c.hidden=false;
-  const h=$('#hdDrawHint'); if(h)h.textContent='Clique no mapa para marcar os cantos da área (mín. 3); depois "Aplicar seleção".';
- } else { // aplicar
-  if(hdDraw.pts.length<3){ const h=$('#hdDrawHint'); if(h)h.textContent='Marque pelo menos 3 pontos.'; return; }
-  const ring=hdDraw.pts.map(p=>[p.lng,p.lat]); ring.push(ring[0]);
-  hdF.poligono=JSON.stringify({type:'Polygon',coordinates:[ring]});
-  hdDraw.on=false; hdMap.off('click',hdDrawAdd); hdMap.getContainer().style.cursor='';
-  const b=$('#hdDrawBtn'); if(b){b.textContent='✏️ Selecionar área';b.classList.remove('on');}
-  const h=$('#hdDrawHint'); if(h)h.textContent='';
-  hdReload();
- }
+/* seleção por desenho (polígono/retângulo) — mesmo padrão da programação de pesquisa de vazamento */
+function hdSelecionarGeom(geom){
+ hdF.poligono=JSON.stringify(geom);
+ const c=$('#hdClearBtn'); if(c)c.hidden=false;
+ const h=$('#hdDrawHint'); if(h)h.textContent='Área aplicada — a lista e o mapa mostram só as matrículas dentro dela.';
+ hdReload();
 }
-function hdDrawAdd(e){ hdDraw.pts.push(e.latlng);
- if(hdDraw.layer){ hdMap.removeLayer(hdDraw.layer); }
- hdDraw.layer=L.polygon(hdDraw.pts,{color:'#0e7c86',weight:2,fillOpacity:.08,dashArray:'5,5'}).addTo(hdMap);
- const mk=L.circleMarker(e.latlng,{radius:3,color:'#0e7c86',fillColor:'#0e7c86',fillOpacity:1}).addTo(hdMap); hdDraw.markers.push(mk);
- const b=$('#hdDrawBtn'); if(b)b.textContent='✓ Aplicar seleção ('+hdDraw.pts.length+')';
-}
-function hdDrawClearLayer(){ if(hdDraw.layer){ try{hdMap.removeLayer(hdDraw.layer);}catch(e){} hdDraw.layer=null; } hdDraw.markers.forEach(m=>{try{hdMap.removeLayer(m);}catch(e){}}); hdDraw.markers=[]; }
-function hdDrawReset(){ if(hdMap){ hdMap.off('click',hdDrawAdd); hdMap.getContainer().style.cursor=''; } hdDrawClearLayer(); hdDraw={on:false,pts:[],layer:null,markers:[]};
- const b=$('#hdDrawBtn'); if(b){b.textContent='✏️ Selecionar área';b.classList.remove('on');} const c=$('#hdClearBtn'); if(c)c.hidden=true; const h=$('#hdDrawHint'); if(h)h.textContent='';
+function hdDrawClearLayer(){ if(hdDrawnLayer){ try{hdDrawnLayer.clearLayers();}catch(e){} } }
+function hdDrawReset(){ hdDrawClearLayer();
+ const c=$('#hdClearBtn'); if(c)c.hidden=true; const h=$('#hdDrawHint'); if(h)h.textContent='Use as ferramentas de desenho no mapa (polígono ou retângulo, canto superior direito) para filtrar por área.';
  if(hdF.poligono){ hdF.poligono=null; hdReload(); }
 }
 function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if(btn)btn.textContent='lib .xlsx indisponível'; return; }
  if(btn){btn.disabled=true;btn.textContent='Gerando…';}
  const all=[]; const pageN=1000;
- function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
+ function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Remanejamento','Justificativa'];
-  const data=all.map(x=>[x.matricula,x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
+  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Remanejamento','Justificativa'];
+  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Priorizacao HD');
   XLSX.writeFile(wb,`priorizacao_troca_HD_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
   if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}
