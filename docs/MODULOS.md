@@ -313,7 +313,7 @@
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
 - Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
-  **VRPs**, **Hidrantes**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
+  **VRPs**, **Válvulas de manobra**, **Hidrantes**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
   `step` (célula de cache).
   - **Rede de gás (2026-09, `CAD_VER v5→v6`):** camada **`rede_gas`** (GASMIG, `"4 - redes_terceiros".rede_gas`,
     1.271 linhas MULTILINESTRING, âmbar `#f9a825`, `whole:true`, começa desligada). Só leitura/visualização;
@@ -324,6 +324,12 @@
     camada PostGIS key=`id`/srid 31983). Branch `hidrantes` na RPC `app_cadastro_geojson`
     (props cd_no_agua/nome/funcao/cota/referencia) — popup genérico. `CAD_VER` inalterado (a chave de cache da
     camada nova já é distinta; camadas existentes não mudaram de dado).
+  - **Válvulas de manobra (2026-10-15, sw v249):** camada **`caixas_manobra`** — tabela **`"2 - infra_agua".caixas_manobra`**
+    (448 caixas de manobra = **válvulas/registros de abre-fecha** do sistema; blue-grey `#455a64`, `whole:true`, **começa desligada**
+    — chip que o usuário liga para ver todas). **Exclui VRP** (tabela própria `vrps`, chip próprio). Geom é **MultiPolygon** →
+    o branch `caixas_manobra` da RPC devolve o **ponto representativo** (`ST_PointOnSurface`) p/ render igual às demais unidades
+    (circleMarker); props cd_no_agua/tipo(tipo_co)/material/cota/referencia. **Só ZA1004 tem dado** hoje (Betim = 0). `CAD_VER`
+    inalterado (chave de cache nova distinta; camadas existentes não mudaram).
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
