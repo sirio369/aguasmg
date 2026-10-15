@@ -2393,6 +2393,14 @@ maduro, promover para 🛠️ Execução como foi feito com Projetos). Hub (`vmH
   (quando o backoffice gera a corretiva, `os_correcao_id`) **→ resolvida** (ao concluir a corretiva,
   `resolvida_os_id`). Regra do usuário: **toda pendência se resolve por uma OS corretiva derivada** —
   nunca fecha manual nem "dentro" de outra visita.
+  **Consolidação (2026-10-15):** o encerramento gera **uma única pendência** por OS — `app_vrp_os_concluir`
+  consolida todos os problemas relatados num só registro (descrição em lista ` • `; `tipo='multiplos'` se
+  houver mais de um, `lado` só se único) em vez de 1 linha por item. E **`app_vrp_pendencia_gerar_os` gera
+  UMA OS corretiva que cobre todas as pendências abertas da mesma VRP** (vincula todas via `os_correcao_id`,
+  obs lista todas) — uma visita resolve tudo, evita ir ao local mais de uma vez. **Front:** na tela da OS
+  (gestão, `vmOsView`), quando há pendência aberta sem corretiva, botão **"Programar correção (OS única)"**
+  → abre o diálogo e gera a OS; `vmGerarCorr(pendId, after)` ganhou callback e texto novo. As 2 pendências
+  legadas da VRP-OS-2026-0009 foram **mescladas em 1**.
 - **`vrp_prev_config`** (intervalo padrão por consórcio + `aviso_dias`) + **`vrp_prev_vrp`** (override
   por VRP). Próxima preventiva = última OS concluída + intervalo efetivo (override→consórcio→180).
 

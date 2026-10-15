@@ -4249,12 +4249,16 @@ async function vmOsView(osId){
   h+=vmDsec('4','Serviço')+kv('Ações',serv.length?serv.join(', '):'—')+(r.peca?kv('Peça trocada',r.peca):'');
   h+=vmDsec('5','Finalização')+kv('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+kv('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+kv('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+kv('Estabilizada',vmBool(d.estabilizada))+kv('Vazamento após',vmBool(d.vazamento_pos))+kv('Liberada',vmBool(d.liberada));
   const pend=(d.pendencias||[]);
+  const pendAbertas=pend.filter(p=>p.status==='aberta'&&!p.os_correcao_id);
   if(pend.length){ h+=vmDsec('!','Pendências',true)+pend.map(p=>{
      const lk=p.os_correcao_id?` · <a class="vmoslink" data-os="${p.os_correcao_id}">abrir corretiva ${vEsc(p.os_correcao_numero||'')} ›</a>`:(p.status==='aberta'?' · <span class="sub">sem corretiva ainda</span>':'');
      return `<div class="vmdkv"><span>🔧 ${vEsc(p.descricao||p.tipo)}${lk}</span><b style="color:var(--warn)">${vEsc(p.status)}</b></div>`;
-   }).join(''); }
+   }).join('');
+   if(pendAbertas.length){ h+=`<button class="vmbtn" id="vmProgPendBtn" style="margin-top:10px">🗓️ Programar correção (OS única)</button><p class="sub" style="margin:6px 0 0">Gera uma única OS corretiva cobrindo todas as pendências abertas desta VRP.</p>`; }
+  }
   h+=`<button class="vmbtn" id="vmRepBtn" style="margin-top:16px">📄 Gerar relatório (PDF)</button>`;
   $('#vmOs').innerHTML=h;
+  { const pb=$('#vmProgPendBtn'); if(pb&&pendAbertas.length) pb.onclick=()=>vmGerarCorr(pendAbertas[0].id, ()=>vmOsView(d.id)); }
   $('#vmOs').querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmOsView(b.dataset.os));
   $('#vmSigBtn').onclick=()=>vmSigos(d.id,d.os_sigos);
   $('#vmFichaBtn2').onclick=()=>vmFichaOpen(d.vrp_id);
@@ -4374,16 +4378,16 @@ async function vmSigos(osId, cur){
     try{ const r=await sb.rpc('app_vrp_os_set_sigos',{p_os_id:osId,p_os_sigos:v}); if(r.error)throw r.error; vmModalClose(); toast('✓ OS SIGOS atualizada'); vmOsView(osId); }
     catch(e){ toast('⚠ '+(e.message||e)); } };
 }
-async function vmGerarCorr(pendId){
+async function vmGerarCorr(pendId, after){
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🔧 Gerar OS corretiva</div>
-    <div class="vmmb"><p class="sub" style="margin:0">Cria uma OS corretiva vinculada a esta pendência. Ao concluí-la, a pendência é marcada como resolvida.</p>
+    <div class="vmmb"><p class="sub" style="margin:0">Cria <b>uma única OS corretiva</b> que cobre <b>todas as pendências abertas desta VRP</b> — uma visita resolve tudo. Ao concluí-la, as pendências são marcadas como resolvidas.</p>
       <div><label>Usuário de campo (recebe a OS)</label><select class="vmsel" id="vmGcColab" style="width:100%">${vmColabOpts()}</select></div>
       <div><label>Data programada</label><input class="vmin" type="date" id="vmGcData"></div></div>
     <div class="vmmf"><button class="vmbtn sec" id="vmGcCancel">Cancelar</button><button class="vmbtn" id="vmGcOk">Gerar e notificar</button></div></div>`);
   m.querySelector('#vmGcCancel').onclick=vmModalClose;
   m.querySelector('#vmGcOk').onclick=async()=>{ const uid=(m.querySelector('#vmGcColab')||{}).value||null; const data=(m.querySelector('#vmGcData')||{}).value||null;
     try{ const r=await sb.rpc('app_vrp_pendencia_gerar_os',{p_pendencia_id:pendId,p_atribuido_uuid:uid,p_data:data}); if(r.error)throw r.error;
-      vmModalClose(); toast('✓ Corretiva '+((r.data&&r.data.os_numero)||'')+' gerada'); vmGLoadPend();
+      vmModalClose(); const n=(r.data&&r.data.pendencias_cobertas)||1; toast('✓ Corretiva '+((r.data&&r.data.os_numero)||'')+' gerada'+(n>1?(' ('+n+' pendências)'):'')); (after||vmGLoadPend)();
     }catch(e){ toast('⚠ '+(e.message||e)); } };
 }
 async function vmCfgInit(){
