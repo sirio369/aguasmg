@@ -2297,6 +2297,14 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       **Backend:** `app_proj_doc_set` passou a aceitar `rtq` e a **permitir o campo** (qualquer autenticado, mesmo gate do
       `app_proj_avanco_registrar`) a anexar **só** os 2 docs de encerramento (`as_built`/`rtq`); os demais tipos seguem
       restritos ao Suporte (admin/`proj_sup_acesso`). Sem mudança de tabela (whitelist só na RPC; sem CHECK em `tipo`).
+    - **As-Built/RTQ contam como 100% (2026-10-15, sw v248):** as 2 atividades de encerramento passaram a **entrar no
+      progresso** — `pjPct(doc)` = `node.done?100:0` (antes `null`), `pjLeaves` inclui `doc`, então o **anel/%** da intervenção
+      e o **concluídas/total** só fecham 100% com os **dois PDFs anexados** (a intervenção não fica "Finalizada" sem eles).
+      Para os **cards da lista/mapa** ficarem corretos sem abrir cada intervenção, nova RPC leve **`app_proj_docs_presenca()`**
+      (authenticated; devolve `kind,gid,tipo` dos docs as_built/rtq existentes) → `pjDocsPresLoad`/`pjStampDoc` marcam
+      `node.done` em todas as intervenções no `pjLoad`. `pjDocsLoad` (abrir intervenção) re-marca pelo `pjDocsCur`; anexar/
+      remover chamam `pjSetDocDone(iv,tipo,bool)` (atualiza `pjDocsPres` + `node.done`) antes do `pjRerender`. O chip do nó
+      mostra **"anexado · 100%" / "pendente · 0%"** e o Gantt do relatório volta a listar os nós `doc` com status (anexado/pendente).
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
