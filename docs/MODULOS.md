@@ -1979,7 +1979,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     Contrato)`, paga só com **IRVP ≥ gatilho da fase** (≥50% nos 18 meses de implantação, ≥75% nos 42 de apuração, contados
     da **OS 06/2026**; abaixo = R$ 0) e **IRVP limitado a 120%**. Os 46% restantes do VC são a Remuneração Mínima do Ativo
     (por obra executada, fora do IRVP). Helpers `RES_VC`/`resVCtot`/`resGatilho`/`resRemun`; VC assinado ZA0200
-    R$ 101.044.138 / ZA1004 R$ 101.248.034. Valor **ilustrativo** nos meses anteriores ao início do contrato. Fonte da
+    R$ 101.044.138 / ZA1004 R$ 101.248.034. Fica **vazio** (—) nos meses anteriores ao início do contrato (OS 06/2026, `RES_CONTRATO_INI`). Fonte da
     fórmula: `_extracted/TR ZA1004.txt` §8.5 (idem ZA0200). Meta de redução confirmada: **24,5% (ZA0200) / 24,2% (ZA1004)**.
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
