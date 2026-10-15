@@ -1973,6 +1973,14 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     `resSetAnchor`/`data-anchor` removidos. Em lugar do toggle, o painel da Linha de base mostra **uma nota de aferição**
     (`resAferNote`): *VPBL preliminar — falta aferir os macromedidores para achar o fator de correção por macro e chegar ao
     VPBL final*. A linha `contratual` do `linha_base` continua no banco (referência do TR), apenas não é mais exibida.
+  - **Coluna de Remuneração por Performance na tabela "Mês a mês" (2026-10-15):** removido o banner vermelho redundante
+    "⛔ 05/2025 não entra…" do painel da Linha de base (o selo "não entra" na linha + o aviso no accordion bastam). Nova
+    coluna **Remuneração** na `resTablePanel` com a **fórmula do TR §8.5**: `RP = (IRVP/120) × (1/42) × (54% × Valor do
+    Contrato)`, paga só com **IRVP ≥ gatilho da fase** (≥50% nos 18 meses de implantação, ≥75% nos 42 de apuração, contados
+    da **OS 06/2026**; abaixo = R$ 0) e **IRVP limitado a 120%**. Os 46% restantes do VC são a Remuneração Mínima do Ativo
+    (por obra executada, fora do IRVP). Helpers `RES_VC`/`resVCtot`/`resGatilho`/`resRemun`; VC assinado ZA0200
+    R$ 101.044.138 / ZA1004 R$ 101.248.034. Fica **vazio** (—) nos meses anteriores ao início do contrato (OS 06/2026, `RES_CONTRATO_INI`). Fonte da
+    fórmula: `_extracted/TR ZA1004.txt` §8.5 (idem ZA0200). Meta de redução confirmada: **24,5% (ZA0200) / 24,2% (ZA1004)**.
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
