@@ -2282,6 +2282,21 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       **Remover** (`_remover` + `storage.remove`). `pjOpenCfg` e `pjRel` viraram **async** (carregam docs antes de
       renderizar). No `projeto_rel` os documentos são **só Abrir** (real). O mock `pjMakePdfUrl`/`pjOpenPdf` deixou
       de ser usado pelos docs.
+    - **Atividades de encerramento (As-Built + RTQ) (2026-10-15, sw v247):** toda intervenção termina com **duas
+      atividades-documento** fixas — **Cadastro do As Built** e **Relatório Técnico de Qualidade** — adicionadas ao fim de
+      cada árvore (`PJ_ARV`) e garantidas por reconciliação no `pjLoad` (converte o antigo `pjP('Cadastro / as-built')`;
+      insere/reordena como as 2 últimas; some sozinho ao regravar o snapshot). Novo tipo de nó **`k:'doc'`** (`pjDoc(n,doc)`,
+      `doc` = `as_built`|`rtq`): **registro único via anexo de PDF (não foto)**, sem % — `pjPct` devolve `null` p/ `doc` (não
+      entra no agregado, evita leitura do `pjDocsCur` global entre intervenções na lista/mapa); render próprio em `pjNodeHtml`
+      (chip anexado/pendente + 📎 Anexar/Substituir PDF + 👁 Abrir); wiring `data-docattach`/`data-docfile`/`data-docopen` no
+      `pjWireTree`. O PDF é gravado pelo **mesmo mecanismo de documentos** (`pjDocAnexar`→`app_proj_doc_set`), então entra
+      automaticamente na **lista de Documentos** e no **relatório final/PDF consolidado** (`PJ_DOCS` ganhou `rtq`; `as_built`
+      renomeado p/ "Cadastro do As-Built"). No campo o anexo aparece só com a intervenção **liberada** (`pjLocked`); no Suporte
+      o anexo segue pela seção Documentos. `pjOpen` virou a carregar docs (`pjDocsLoad`) além dos avanços; `pjDocAnexar`/
+      `_remover` re-renderizam a tela corrente via `pjRerender()` (campo×config). Gantt do relatório exclui nós `doc`.
+      **Backend:** `app_proj_doc_set` passou a aceitar `rtq` e a **permitir o campo** (qualquer autenticado, mesmo gate do
+      `app_proj_avanco_registrar`) a anexar **só** os 2 docs de encerramento (`as_built`/`rtq`); os demais tipos seguem
+      restritos ao Suporte (admin/`proj_sup_acesso`). Sem mudança de tabela (whitelist só na RPC; sem CHECK em `tipo`).
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
