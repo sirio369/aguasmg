@@ -357,7 +357,7 @@ exige uma confirmação de custo (`confirm_cost`) fora do alcance das ferramenta
 agendar) — corrigidos pra `irPara('frota')`. "Registrar problema" (2 pontos de entrada: Checklist e
 Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão de `frHistBackTo`.
 Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
-direto do hub deve ser `irPara('frota')`, nunca `='home'`.
+direto do hub deve ser `irPara('frota')`, nunca `='home'`. **Fluxos de 2026-10-16 (e-mail Amanda):** multas/ocorrências/avarias (`frota_registro`, cadastro só da equipe de frotas, aviso só ao colaborador + gestor), manutenção preventiva agendada direto pela Frotas e aviso de ocorrência de checklist pra equipe de frotas — avisos pra "equipe de frotas" usam `frota_responsaveis()` (inclui a engrenagem `frota_admin`), ver docs/MODULOS.md §6.6.
 
 **Meus colaboradores** (`meus_colab`, home › Suporte, só aprovador/admin) — substitui a antiga Gestão de
 Pessoas (removida em 2026-10). Aprovador vê os colaboradores **ativos** que o têm como Aprovador 1/2 (admin vê todos):

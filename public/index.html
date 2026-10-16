@@ -8066,6 +8066,9 @@ const CENTROS_CUSTO_FROTA=[
   ['04.002.010.002','REPARO DE VAZAMENTOS EM REDES, RAMAIS E CAVALETES']
 ];
 const TIPO_PROBLEMA=[['pneu_furado','Pneu furado'],['freio','Freio'],['motor','Motor'],['eletrica','Elétrica'],['suspensao','Suspensão'],['bateria','Bateria'],['ar_condicionado','Ar-condicionado'],['vidro_retrovisor','Vidro/retrovisor'],['outro','Outro']];
+// Só pra exibir: tipos que o colaborador não escolhe no formulário (vêm do checklist / da preventiva agendada pela Frotas).
+const TIPO_PROBLEMA_ALL=TIPO_PROBLEMA.concat([['checklist','Ocorrência no checklist'],['preventiva','Manutenção preventiva']]);
+const REGISTRO_TIPOS=[['multa','Multa'],['ocorrencia','Ocorrência'],['avaria','Avaria']];
 // Lookup genérico p/ listas [codigo,label] (TIPOS_VEICULO, TIPO_PROBLEMA, COMBUSTIVEIS_VEICULO,
 // CENTROS_CUSTO_FROTA...) — usado em vez de repetir `(LISTA.find(t=>t[0]===v)||[,v])[1]||'—'` em
 // cada tela; mesma semântica de antes (achou→label, não achou→valor cru, vazio→'—').
@@ -8169,7 +8172,8 @@ function frotaBlocks(){
       {id:'veiculos_meu',ic:'🚗',lbl:'Veículos'},
       {id:'situacao',ic:'✅',lbl:'Checklist diário',precisaVeic:true,bloqueiaManutencao:true},
       {id:'manutencao',ic:'🔧',lbl:'Manutenção',precisaVeic:true},
-      {id:'lavagem',ic:'🧼',lbl:'Lavagem',precisaVeic:true}]},
+      {id:'lavagem',ic:'🧼',lbl:'Lavagem',precisaVeic:true},
+      {id:'registros',ic:'🚨',lbl:'Multas e ocorrências'}]},
     {t:'Gestor',ic:'🖊️',on:gestor||adm,papel:'Aprovador / Frotas',acts:[
       {id:'ap_manutencao',ic:'🔧',lbl:'Aprovar manutenções',on:gestor},
       {id:'chk_equipe',ic:'📋',lbl:'Checklists da equipe'}]},
@@ -8179,6 +8183,8 @@ function frotaBlocks(){
       {id:'equipamentos',ic:'🔧',lbl:'Equipamentos'},
       {id:'lavagem_fila',ic:'🧼',lbl:'Lavagens a agendar'},
       {id:'manutencao_fila',ic:'🔧',lbl:'Manutenções a agendar'},
+      {id:'preventiva',ic:'🗓️',lbl:'Manutenção preventiva'},
+      {id:'registros_adm',ic:'🚨',lbl:'Multas, ocorrências e avarias'},
       {id:'relatorio',ic:'📊',lbl:'Relatório'}]}
   ];
 }
@@ -8239,6 +8245,8 @@ function frotaOpen(id){
   if(id==='veiculos'){ frotasTarget='home'; irPara('frotas'); return; }
   if(id==='ap_manutencao'){ frotasTarget='manutencao_aprovar'; irPara('frotas'); return; }
   if(id==='chk_equipe'){ frotasTarget='chk_equipe'; irPara('frotas'); return; }
+  if(id==='registros'||id==='registros_adm'){ frotasTarget='registros'; irPara('frotas'); return; }
+  if(id==='preventiva'){ frotasTarget='preventiva'; irPara('frotas'); return; }
   if(id==='relatorio'){ frotasTarget='painel'; irPara('frotas'); return; }
   if(id==='condutores'||id==='lavagem_fila'||id==='manutencao_fila'||id==='equipamentos'){ frotasTarget=id; irPara('frotas'); return; }
 }
@@ -8510,12 +8518,12 @@ async function condRenderManutencao(){
   h+='<button class="btn" id="manfNovo" style="margin-top:10px">🔧 Reportar problema</button>';
   h+='<div class="sec" style="margin-top:16px">Histórico</div>';
   h+= condManutencoes.length ? condManutencoes.map(m=>{
-    const tipoLbl=labelOf(TIPO_PROBLEMA,m.tipo_problema);
+    const tipoLbl=labelOf(TIPO_PROBLEMA_ALL,m.tipo_problema);
     let extra='';
     if(m.status==='reprovado'&&m.motivo_reprovacao) extra=`<div class="sub" style="margin-top:2px">Motivo: ${m.motivo_reprovacao}</div>`;
     else if(m.status==='agendado') extra=`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button class="btn ghost" data-manutconcluir="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar conclusão</button>`;
     else if(m.status==='concluido') extra=`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>`;
-    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${tipoLbl}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div>${m.servico_solicitado?`<div class="sub" style="margin-top:2px">${m.servico_solicitado}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">Reportado em ${fmtData(m.reportado_em)}</div>${extra}</div>`;
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${tipoLbl}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div>${m.servico_solicitado?`<div class="sub" style="margin-top:2px">${m.servico_solicitado}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">${m.tipo_problema==='preventiva'?'Preventiva programada pela equipe de frotas':('Reportado em '+fmtData(m.reportado_em))}</div>${extra}</div>`;
   }).join('') : '<p class="sub" style="margin-top:8px">Nenhuma manutenção ainda.</p>';
   $('#condView').innerHTML=h;
   $('#condVoltar').addEventListener('click',()=>irPara('frota'));
@@ -8524,7 +8532,7 @@ async function condRenderManutencao(){
 }
 function condRenderManutencaoConcluir(){
   const m=condManutencoes.find(x=>String(x.id)===String(condManutencaoSel))||{};
-  const tipoLbl=labelOf(TIPO_PROBLEMA,m.tipo_problema);
+  const tipoLbl=labelOf(TIPO_PROBLEMA_ALL,m.tipo_problema);
   const h=`<button class="btn ghost" id="condVoltar" style="margin:0 0 12px">‹ Voltar</button>
   <div class="sec">🔧 Registrar conclusão — ${tipoLbl}</div>
   <p class="sub" style="margin-top:2px">Já foi buscar o veículo no mecânico? Confirme aqui pra liberar de vez.</p>
@@ -8562,7 +8570,7 @@ async function condRenderCnhHistorico(){
 }
 
 let frotasVeiculos=[], frotasSub='home', frotasVeiculoSel=null, frVeicFiltroTipo='', frVeicFiltroCond='';
-async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar','equipamentos','chk_equipe'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
+async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar','equipamentos','chk_equipe','registros','preventiva'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
 // ---- Supervisão de checklists da equipe (aprovador vê sua equipe; admin/frotas veem tudo) ----
 let frChkDias=7, frChkSel=null, _frChk=null;
 async function frotasRenderChkEquipe(){
@@ -8621,6 +8629,9 @@ async function frotasRender(){
   if(frotasSub==='veiculo_devolver') return frotasRenderVeiculoDevolver();
   if(frotasSub==='manutencao_aprovar') return frotasRenderManutencaoAprovar();
   if(frotasSub==='chk_equipe') return frotasRenderChkEquipe();
+  if(frotasSub==='registros') return frotasRenderRegistros();
+  if(frotasSub==='registro_novo') return frotasRenderRegistroNovo();
+  if(frotasSub==='preventiva') return frotasRenderPreventiva();
   if(frotasSub==='chk_detalhe') return frotasRenderChkDetalhe();
   if(frotasSub==='manutencao_reprovar') return frotasRenderManutencaoReprovar();
   if(frotasSub==='manutencao_concluir_admin') return frotasRenderManutencaoConcluirAdmin();
@@ -8975,7 +8986,7 @@ async function frotasRenderHistorico(){
         else if(e.tipo==='emprestimo_recebido') desc='Recebeu '+(d.placa||'')+' de '+(d.de||'')+' ('+(d.status||'')+')';
         else if(e.tipo==='devolucao') desc='Devolução — '+(d.de||'')+' → '+(d.para||'');
         else if(e.tipo==='checklist') desc='Checklist ('+(d.status||'')+') por '+(d.por||'')+(d.km?(' · km '+d.km):'')+(d.avarias?(' · '+d.avarias):'');
-        else if(e.tipo==='manutencao_solicitada') desc='Problema reportado: '+labelOf(TIPO_PROBLEMA,d.tipo)+' — '+(d.servico||'')+' por '+(d.por||'')+' ('+(MANUT_STATUS_LABEL[d.status]||{l:d.status||''}).l+')';
+        else if(e.tipo==='manutencao_solicitada') desc='Problema reportado: '+labelOf(TIPO_PROBLEMA_ALL,d.tipo)+' — '+(d.servico||'')+' por '+(d.por||'')+' ('+(MANUT_STATUS_LABEL[d.status]||{l:d.status||''}).l+')';
         else desc=e.tipo;
         return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:6px"><div style="display:flex;gap:8px"><span>${HIST_ICON[e.tipo]||'•'}</span><span style="flex:1;font-size:13px">${desc}</span></div><div class="sub" style="margin-top:2px;font-size:11px">${relFmtData(e.ts)}</div></div>`;
       }).join('') : '<p class="sub">Nada encontrado no período.</p>';
@@ -9024,7 +9035,7 @@ async function frotasRenderManutencaoFila(){
   try{ const {data,error}=await sb.rpc('app_frota_manutencoes_agendar_fila'); if(error) throw error; fila=data||[]; }
   catch(e){ $('#frotasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔧 Manutenções a agendar</div>';
-  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">Aprovada em ${fmtData(m.aprovado_em)} · solicitado por ${m.reportado_por||''}</div><button class="btn ghost" data-managendar="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Agendar</button></div>`).join('') : '<p class="sub">Nenhuma manutenção aprovada aguardando agendamento.</p>';
+  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA_ALL,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">Aprovada em ${fmtData(m.aprovado_em)} · solicitado por ${m.reportado_por||''}</div><button class="btn ghost" data-managendar="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Agendar</button></div>`).join('') : '<p class="sub">Nenhuma manutenção aprovada aguardando agendamento.</p>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#frotasView').querySelectorAll('[data-managendar]').forEach(b=>b.addEventListener('click',()=>{frManutSel=b.dataset.managendar;frotasSub='manutencao_agendar';frotasRender();}));
@@ -9048,6 +9059,114 @@ function frotasRenderManutencaoAgendar(){
   });
 }
 
+// ----- Multas, ocorrências e avarias (cadastro da equipe de frotas; aviso só ao colaborador + gestor dele) -----
+// Mesma tela pra todo mundo: a RPC devolve o escopo (frotas/admin = tudo; gestor = equipe; colaborador = os próprios) e `adm`.
+let frRegFiltro='';
+async function frotasRenderRegistros(){
+  $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
+  let res;
+  try{ const {data,error}=await sb.rpc('app_frota_registros_listar',{p_tipo:frRegFiltro||null}); if(error) throw error; res=data||{rows:[]}; }
+  catch(e){ $('#frotasView').innerHTML='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="banner bad">Erro: '+(e.message||e)+'</div>'; $('#frVoltar').addEventListener('click',()=>irPara('frota')); return; }
+  const rows=res.rows||[];
+  let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🚨 Multas, ocorrências e avarias</div>';
+  h+='<p class="sub" style="margin-top:2px">'+(res.adm?'Cadastro feito pela equipe de frotas. O aviso vai só para o colaborador envolvido e para o gestor dele.':'Registros em que você ou alguém da sua equipe é o colaborador envolvido.')+'</p>';
+  if(res.adm) h+='<button class="btn" id="frRegNovo" style="margin-top:10px">➕ Novo registro</button>';
+  h+='<select id="frRegFiltro" style="margin-top:12px"><option value="">Todos os tipos</option>'+REGISTRO_TIPOS.map(t=>`<option value="${t[0]}"${frRegFiltro===t[0]?' selected':''}>${t[1]}</option>`).join('')+'</select>';
+  h+= rows.length ? rows.map(r=>{
+    const anexos=(r.anexos||[]).map((a,i)=>`<a href="${SBASE+a}" target="_blank" rel="noopener">Anexo${r.anexos.length>1?' '+(i+1):''}</a>`).join(' · ');
+    const det=['Colaborador: '+eoH(r.condutor_nome||'—'), r.numero_auto?('Auto '+eoH(r.numero_auto)):'', r.valor!=null?fmtDinheiro(r.valor):'', r.local?eoH(r.local):''].filter(Boolean).join(' · ');
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${labelOf(REGISTRO_TIPOS,r.tipo)}${r.placa?(' — '+r.placa):''}</b><span class="sub" style="font-size:12px;white-space:nowrap">${fmtData(r.data_fato)}</span></div><div class="sub" style="margin-top:2px">${eoH(r.descricao)}</div><div class="sub" style="margin-top:2px">${det}</div>${anexos?`<div class="sub" style="margin-top:2px">${anexos}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">Registrado por ${eoH(r.registrado_por_nome||'—')} em ${fmtData(r.registrado_em)}</div></div>`;
+  }).join('') : '<p class="sub" style="margin-top:10px">Nenhum registro.</p>';
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#frRegFiltro').addEventListener('change',e=>{ frRegFiltro=e.target.value; frotasRenderRegistros(); });
+  if($('#frRegNovo')) $('#frRegNovo').addEventListener('click',()=>{ frotasSub='registro_novo'; frotasRender(); });
+}
+async function frotasRenderRegistroNovo(){
+  await frotasCarregarColaboradores();
+  const cols=frotasColaboradoresOrdenados();
+  FOTO2_BLOBS['regAnexo']=null;
+  const h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">🚨 Novo registro</div>
+  <p class="sub" style="margin-top:2px">Ao salvar, o colaborador envolvido e o gestor dele são avisados no app. Ninguém mais recebe.</p>
+  <label>Tipo *</label><select id="regTipo">${REGISTRO_TIPOS.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('')}</select>
+  <label>Veículo *</label><select id="regVeic"><option value="">Selecione…</option>${frotasVeiculos.map(v=>`<option value="${v.id}">${v.placa} — ${v.modelo||''}</option>`).join('')}</select>
+  <label>Data do fato *</label><input id="regData" type="date" value="${new Date().toISOString().slice(0,10)}"/>
+  <label>Colaborador envolvido *</label><select id="regCond"><option value="">Selecione…</option>${cols.map(c=>`<option value="${c.id}">${eoH(c.nome||c.email)}</option>`).join('')}</select>
+  <div id="regCondHint" class="sub" style="margin-top:4px"></div>
+  <div id="regAutoWrap"><label>Nº do auto de infração</label><input id="regAuto" autocomplete="off"/></div>
+  <label>Valor (R$)</label><input id="regValor" type="number" step="0.01" min="0" inputmode="decimal"/>
+  <label>Local</label><input id="regLocal" autocomplete="off"/>
+  <label>Descrição *</label><textarea id="regDesc" rows="3"></textarea>
+  ${fotoPickHtml('regAnexo','Anexo (foto ou PDF, opcional)',{pdf:true})}
+  <button class="btn" id="regSalvar" style="margin-top:14px">Salvar e avisar</button>`;
+  $('#frotasView').innerHTML=h;
+  wireFotoPick($('#frotasView'));
+  $('#frVoltar').addEventListener('click',()=>{ frotasSub='registros'; frotasRender(); });
+  let condManual=false;
+  $('#regCond').addEventListener('change',()=>{ condManual=true; });
+  const togAuto=()=>$('#regAutoWrap').classList.toggle('hidden',$('#regTipo').value!=='multa');
+  $('#regTipo').addEventListener('change',togAuto); togAuto();
+  // sugere quem estava com o veículo na data do fato (vínculo aberto naquele dia)
+  const sugerir=async()=>{
+    const vid=$('#regVeic').value, dt=$('#regData').value, hint=$('#regCondHint'); hint.textContent='';
+    if(!vid||!dt) return;
+    try{ const {data,error}=await sb.rpc('app_frota_condutor_na_data',{p_veiculo_id:+vid,p_data:dt}); if(error) throw error;
+      if(data&&data.id){ hint.textContent='Com o veículo nessa data: '+(data.nome||''); if(!condManual) $('#regCond').value=data.id; }
+      else hint.textContent='Ninguém estava vinculado a esse veículo nessa data — escolha o colaborador.';
+    }catch(e){}
+  };
+  $('#regVeic').addEventListener('change',sugerir); $('#regData').addEventListener('change',sugerir);
+  $('#regSalvar').addEventListener('click',async()=>{
+    const tipo=$('#regTipo').value, vid=$('#regVeic').value, dt=$('#regData').value, cond=$('#regCond').value, desc=$('#regDesc').value.trim();
+    if(!vid) return toast('Escolha o veículo');
+    if(!dt) return toast('Informe a data');
+    if(!cond) return toast('Escolha o colaborador envolvido');
+    if(!desc) return toast('Descreva o ocorrido');
+    const btn=$('#regSalvar'); btn.disabled=true; btn.textContent='Salvando…';
+    try{
+      const anexo=await uploadFoto2('regAnexo','frota/registros');
+      const vv=$('#regValor').value;
+      const {error}=await sb.rpc('app_frota_registro_salvar',{p_tipo:tipo,p_veiculo_id:+vid,p_condutor_id:cond,p_data_fato:dt,p_descricao:desc,
+        p_valor:vv===''?null:+vv,p_numero_auto:tipo==='multa'?($('#regAuto').value||null):null,p_local:$('#regLocal').value||null,p_anexos:anexo?[anexo]:null});
+      if(error) throw error;
+      FOTO2_BLOBS['regAnexo']=null;
+      toast('✓ Registrado — colaborador e gestor avisados'); frotasSub='registros'; frotasRender();
+    }catch(e){ toast('Erro: '+(e.message||e)); btn.disabled=false; btn.textContent='Salvar e avisar'; }
+  });
+}
+// ----- Manutenção preventiva: a equipe de frotas agenda direto (sem aprovação); avisa colaborador vinculado + gestor -----
+async function frotasRenderPreventiva(){
+  $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
+  let lista=[];
+  try{ const {data,error}=await sb.rpc('app_frota_manutencoes_listar',{}); if(error) throw error; lista=(data||[]).filter(m=>m.tipo_problema==='preventiva'); }
+  catch(e){ $('#frotasView').innerHTML='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="banner bad">Erro: '+(e.message||e)+'</div>'; $('#frVoltar').addEventListener('click',()=>irPara('frota')); return; }
+  const condDe=v=>(v&&v.vinculados&&v.vinculados[0])?v.vinculados[0].nome:null;
+  let h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button>
+  <div class="sec">🗓️ Manutenção preventiva</div>
+  <p class="sub" style="margin-top:2px">Agende a preventiva de um veículo. O colaborador vinculado e o gestor dele recebem aviso com a data. Na volta do mecânico, o colaborador (ou você, em Relatório › Manutenções) registra a conclusão e o custo.</p>
+  <label>Veículo *</label><select id="prevVeic"><option value="">Selecione…</option>${frotasVeiculos.map(v=>`<option value="${v.id}">${v.placa} — ${v.modelo||''}</option>`).join('')}</select>
+  <div id="prevCond" class="sub" style="margin-top:4px"></div>
+  <label>Data programada *</label><input id="prevData" type="date"/>
+  <label>Serviço (ex.: revisão dos 10.000 km)</label><input id="prevDesc" autocomplete="off"/>
+  <button class="btn" id="prevSalvar" style="margin-top:14px">Agendar e avisar</button>
+  <div class="sec" style="margin-top:20px">Preventivas agendadas</div>`;
+  h+= lista.length ? lista.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${m.status==='concluido'?('Concluída em '+fmtData(m.data_liberacao)+(m.orcamento_valor!=null?' · '+fmtDinheiro(m.orcamento_valor):'')):('Programada para '+fmtData(m.data_agendada))}${m.servico_solicitado?(' — '+eoH(m.servico_solicitado)):''}</div><div class="sub" style="margin-top:2px;font-size:11px">Colaborador: ${eoH(m.reportado_por_nome||'—')} · agendada por ${eoH(m.aprovado_por_nome||'—')}</div></div>`).join('') : '<p class="sub" style="margin-top:8px">Nenhuma preventiva agendada ainda.</p>';
+  $('#frotasView').innerHTML=h;
+  $('#frVoltar').addEventListener('click',()=>irPara('frota'));
+  $('#prevVeic').addEventListener('change',()=>{ const v=frotasVeiculos.find(x=>String(x.id)===$('#prevVeic').value); const n=condDe(v);
+    $('#prevCond').textContent = !v ? '' : (n ? ('Será avisado: '+n+' e o gestor dele') : 'Nenhum colaborador vinculado — ninguém será avisado'); });
+  $('#prevSalvar').addEventListener('click',async()=>{
+    const vid=$('#prevVeic').value, dt=$('#prevData').value;
+    if(!vid) return toast('Escolha o veículo');
+    if(!dt) return toast('Informe a data programada');
+    const btn=$('#prevSalvar'); btn.disabled=true;
+    try{ const {data,error}=await sb.rpc('app_frota_preventiva_agendar',{p_veiculo_id:+vid,p_data:dt,p_descricao:$('#prevDesc').value||null}); if(error) throw error;
+      toast(data&&data.condutor_nome?('✓ Agendada — '+data.condutor_nome+' e o gestor avisados'):'✓ Agendada (sem colaborador vinculado)'); frotasRenderPreventiva();
+    }catch(e){ toast('Erro: '+(e.message||e)); btn.disabled=false; }
+  });
+}
+
 function frotasRenderPainel(){
   const ITENS=[['lavagens','🧼','Lavagens'],['manutencoes','🔧','Manutenções'],['custos','💰','Custos por veículo'],['historico','📜','Histórico (veículo/colaborador)']];
   const h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">📊 Relatório</div><p class="sub" style="margin-top:2px">Lavagens, manutenções, custos e histórico de toda a frota — com filtro de veículo, colaborador e período.</p>'
@@ -9063,7 +9182,7 @@ function frotasRenderPainel(){
 let frotasPainelCache={}, frPnlFiltro={veiculo:'',condutorId:'',de:'',ate:''}, frManutCluirSel=null;
 const PAINEL_CFG={
   lavagens:{rpc:'app_frota_lavagens_listar',titulo:'🧼 Lavagens',row:l=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${l.placa}</b>${statusBadge(LAVAGEM_STATUS_LABEL,l.status)}</div><div class="sub" style="margin-top:2px">${l.condutor_nome||''}${l.data?(' · '+fmtData(l.data)):''}${l.valor!=null?(' · '+fmtDinheiro(l.valor)):''}${l.consorcio?(' · '+l.consorcio):''}</div>`},
-  manutencoes:{rpc:'app_frota_manutencoes_listar',titulo:'🔧 Manutenções',row:m=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">solicitado por ${m.reportado_por_nome||''} em ${fmtData(m.reportado_em)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>${m.aprovado_por_nome?`<div class="sub" style="margin-top:2px">${m.status==='reprovado'?'Reprovado':'Aprovado'} por ${m.aprovado_por_nome}${m.motivo_reprovacao?(' — '+m.motivo_reprovacao):''}</div>`:''}${m.status==='agendado'?`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button data-mancluir="${m.id}" class="btn ghost" style="margin-top:8px;padding:8px;font-size:13px">Marcar como concluída</button>`:''}${m.status==='concluido'?`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}</div>`:''}`},
+  manutencoes:{rpc:'app_frota_manutencoes_listar',titulo:'🔧 Manutenções',row:m=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA_ALL,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div><div class="sub" style="margin-top:2px">solicitado por ${m.reportado_por_nome||''} em ${fmtData(m.reportado_em)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>${m.aprovado_por_nome?`<div class="sub" style="margin-top:2px">${m.status==='reprovado'?'Reprovado':'Aprovado'} por ${m.aprovado_por_nome}${m.motivo_reprovacao?(' — '+m.motivo_reprovacao):''}</div>`:''}${m.status==='agendado'?`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button data-mancluir="${m.id}" class="btn ghost" style="margin-top:8px;padding:8px;font-size:13px">Marcar como concluída</button>`:''}${m.status==='concluido'?`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}</div>`:''}`},
   custos:{rpc:'app_frota_custos_por_veiculo',titulo:'💰 Custos por veículo',row:c=>`<div style="display:flex;justify-content:space-between;gap:8px"><b>${c.placa}</b><b>${fmtDinheiro(c.custo_total)}</b></div><div class="sub" style="margin-top:2px">${c.modelo||''}</div><div class="sub" style="margin-top:6px">Lavagem: ${fmtDinheiro(c.lavagens_total)} · Manutenção: ${fmtDinheiro(c.manutencoes_total)}${c.valor_devolucao!=null?(' · Devolução: '+fmtDinheiro(c.valor_devolucao)):''}</div>`}
 };
 async function frotasRenderPainelLista(tipo){
@@ -9128,7 +9247,7 @@ async function frotasRenderManutencaoAprovar(){
   try{ const {data,error}=await sb.rpc('app_frota_manutencao_pendentes'); if(error) throw error; fila=data||[]; }
   catch(e){ $('#frotasView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   let h='<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔧 Aprovar manutenções</div>';
-  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div>${(m.fotos_antes&&m.fotos_antes.length)?`<div class="sub" style="margin-top:2px"><a href="${SBASE+m.fotos_antes[0]}" target="_blank" rel="noopener">Ver foto</a></div>`:''}<div class="sub" style="margin-top:2px">Solicitado por ${m.reportado_por||''} em ${fmtData(m.reportado_em)}</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-manap="${m.id}" style="margin:0;flex:1;padding:9px">Aprovar</button><button data-manrep="${m.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--bad);color:var(--bad)">Reprovar</button></div></div>`).join('') : '<p class="sub">Nenhuma manutenção pendente de aprovação.</p>';
+  h+= fila.length ? fila.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><b>${m.placa}</b><div class="sub" style="margin-top:2px">${labelOf(TIPO_PROBLEMA_ALL,m.tipo_problema)}${m.servico_solicitado?(' — '+m.servico_solicitado):''}</div>${(m.fotos_antes&&m.fotos_antes.length)?`<div class="sub" style="margin-top:2px"><a href="${SBASE+m.fotos_antes[0]}" target="_blank" rel="noopener">Ver foto</a></div>`:''}<div class="sub" style="margin-top:2px">Solicitado por ${m.reportado_por||''} em ${fmtData(m.reportado_em)}</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-manap="${m.id}" style="margin:0;flex:1;padding:9px">Aprovar</button><button data-manrep="${m.id}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--bad);color:var(--bad)">Reprovar</button></div></div>`).join('') : '<p class="sub">Nenhuma manutenção pendente de aprovação.</p>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#frotasView').querySelectorAll('[data-manap]').forEach(b=>b.addEventListener('click',()=>frotasManutAprovar(b.dataset.manap,true)));
@@ -9378,6 +9497,9 @@ async function supGoAct(act){
   if(act==='frota_manutencao_aprovar'){ frotasTarget='manutencao_aprovar'; irPara('frotas'); return; }
   if(act==='condutores'){ frotasTarget='condutores'; irPara('frotas'); return; }
   if(act==='frota_lavagem_agendar'){ frotasTarget='lavagem_fila'; irPara('frotas'); return; }
+  if(act==='frota_registros'){ frotasTarget='registros'; irPara('frotas'); return; }
+  if(act==='frota_chk_equipe'){ frotasTarget='chk_equipe'; irPara('frotas'); return; }
+  if(act==='frota_manutencao_fila'){ frotasTarget='manutencao_fila'; irPara('frotas'); return; }
   try{ await supGetMe(); }catch(e){}
   SCREENS.forEach(s=>{ const el=$('#'+s); if(el) el.classList.toggle('hidden', s!=='suprimentos'); });
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.remove('on'));

@@ -1568,6 +1568,33 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
   consórcio usado em `frotasRenderVeiculoEdit`) → `frotasRenderEquipamentoDetalhe` (fotos, botão
   Editar). Tudo direto via `sb.rpc(...)`, sem fila offline (tela admin/online-only).
 
+### 6.6 Fluxos pedidos pela Amanda (2026-10-16, sw v251) — migração `docs/migracao_frota_fluxos_2026-10.sql`
+- **Equipe de frotas = `"10 - Frotas".frota_responsaveis()`** (ativo e `frota_admin` OU `funcao in ('frotas','admin')`).
+  ⚠️ Antes o aviso "lavagem solicitada" usava `sup_uuids_por_funcao(['frotas','admin'])` e **não chegava a quem só tem a
+  engrenagem** (o responsável de frotas, Lucas, é `funcao='campo'` + `frota_admin`). Avisos pra "a equipe de frotas" devem
+  usar `frota_responsaveis()`.
+- **Gestor direto = `"10 - Frotas".frota_gestores_de(uid)`** (aprovador 1/2 do perfil, **sem** o fallback "todos os
+  aprovadores" do `sup_aprovadores_de`) — usado onde o pedido é avisar **só** o gestor da pessoa.
+- **Multas, ocorrências e avarias** — tabela `frota_registro` (tipo `multa|ocorrencia|avaria`, veículo, colaborador,
+  data do fato, local, nº do auto, valor, descrição, anexos; RLS ligada, só RPC). Cadastro **só pela equipe de frotas**
+  (`app_frota_registro_salvar`); `app_frota_condutor_na_data(veiculo,data)` sugere quem estava com o veículo no dia.
+  Trigger `trg_frota_registro` avisa **apenas** o colaborador + `frota_gestores_de` (link `frota_registros`).
+  Tela `registros` (`frotasRenderRegistros`/`frotasRenderRegistroNovo`) é a mesma pra todos: `app_frota_registros_listar`
+  devolve `{adm, rows}` com escopo (frotas/admin = tudo; gestor = equipe pelo aprovador 1/2; colaborador = os próprios).
+  Botões: Colaborador › "Multas e ocorrências" e Equipe administrativa › "Multas, ocorrências e avarias".
+  O **fluxo externo** (termo de compromisso por e-mail etc.) ainda não foi definido — fora do app por ora.
+- **Manutenção preventiva** — `tipo_problema='preventiva'` (adicionado ao CHECK). `app_frota_preventiva_agendar(veiculo,
+  data,descricao)` (frotas/admin) grava já `agendado`, `aprovado_por`=quem agendou e **`reportado_por`= colaborador vinculado
+  hoje** (assim aparece em "Manutenção" dele e ele mesmo dá baixa com o custo; sem vínculo fica no nome de quem agendou).
+  **Não** muda `frota_veiculo.status` (a data pode ser futura e travaria o checklist). INSERT preventiva → aviso ao
+  colaborador + `frota_gestores_de` com a data (`frota_manutencao`). Tela `preventiva` (`frotasRenderPreventiva`, Equipe
+  administrativa › "Manutenção preventiva") com o formulário + lista das preventivas.
+- **Checklist** — INSERT de `frota_manutencao` com `tipo_problema='checklist'` agora avisa também `frota_responsaveis()`
+  (link `frota_chk_equipe` → tela Checklists da equipe), além do gestor. **Corretiva aprovada** pelo gestor avisa
+  `frota_responsaveis()` que há manutenção a agendar (link `frota_manutencao_fila`).
+- Rótulos: `TIPO_PROBLEMA_ALL` (= `TIPO_PROBLEMA` + checklist/preventiva) é o usado em `labelOf` p/ exibir; o formulário
+  do colaborador continua com `TIPO_PROBLEMA` (ele não escolhe preventiva/checklist).
+
 ### Tabelas (`"10 - Frotas"`)
 `frota_veiculo` (cadastro/combustível/consórcio/contrato — §6.2; **`uso_tipo`/`equipe_id`/
 `condutor_exclusivo_id` ficaram sem uso**, ninguém mais escreve neles, não foram dropados; **`status`
