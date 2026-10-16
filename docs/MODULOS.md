@@ -2580,3 +2580,54 @@ foi **removido** — o módulo antigo já está dentro de Campo como **Visita pr
   Colaborador abaixo (ocupa menos espaço horizontal).
 - **Tooltip de etapa** nos cards de OS (`title`, `VM_STAGE` + selo ⓘ): explica o status e em que etapa do
   processo a OS vive.
+
+## 16. Telemetria (CCO COPASA) — `// MÓDULO TELEMETRIA (CCO COPASA)` · tela `telemetria` (admin-only)
+
+Importa os **CSVs horários/sub-horários exportados do sistema CCO da COPASA** (telemetria de macro,
+reservatório e booster) e alimenta o banco, já cruzando com o cadastro técnico. **Não há API da COPASA**
+(em desenvolvimento) → a extração é manual (o usuário baixa os CSVs) e a ingestão é por **upload no app**.
+Card **📡 Telemetria (CCO)** na home › 🧰 Suporte, **hidden**, mostrado por `homeGate()` só para **admin**
+(`ME.is_admin`); `telemetriaInit()` também barra não-admin.
+
+**Os dados (3 esquemas, detectados pelo cabeçalho):** separador `;`, decimal `.`, timestamp
+`DD/MM/YYYY HH:MM`, granularidade **5 min**, `Sinal`=1 (telemetria viva). Nome do arquivo =
+`CODIGO - CODIGOCOPASA.csv` (o `CODIGOCOPASA` = `cd_no_agua`, chave de cruzamento).
+- `Momento;Vazao;Volume;Sinal` → **macro** (`vazao_volume`): vazão L/s + volume acumulado m³.
+- `Momento;B01;B02;B03;B04;Nivel_Suc;Pressao_Suc;Pressao_Rec;Sinal` → **booster** (`bombas_pressao`).
+- `Momento;Nivel;Sinal` → **reservatório** (`nivel`).
+
+**Banco — schema `"15 - telemetria"` (app-only):**
+- `tele_unidade` — dimensão (1 linha/unidade): código CCO, código COPASA, za/cidade, tipo, esquema +
+  cruzamento com o cadastro (`cadastro_tabela`/`cadastro_id`/`nome`; **`null` = unidade fora do nosso
+  cadastro**). Match por `cd_no_agua` contra `"2 - infra_agua".unidades_{macromedicao,reservatorio,elevatoria,booster_bomba,poco}`.
+- `tele_leitura` — fatos em **formato longo** `(unidade_id, momento, grandeza, valor)`, PK nas 3 primeiras
+  (reprocessar não duplica). Um formato serve os 3 esquemas e qualquer grandeza futura. Índices btree
+  `(unidade_id,momento)`, BRIN `momento`, btree `grandeza`. Momento = `timestamptz` local −03.
+- `tele_carga` — log de ingestão por arquivo.
+- Views `vw_cobertura` (unidade × cadastro × estatística de leituras) e `vw_cadastro_sem_tele` (inverso:
+  pontos do cadastro sem telemetria).
+
+**RPCs públicas (SECURITY DEFINER, grant `authenticated`+`service_role`):**
+- `app_tele_unidade_upsert(p_codigo_unidade,p_codigo_copasa,p_za,p_cidade,p_tipo,p_esquema)` → upsert da
+  unidade, resolve o match com o cadastro, retorna `id`.
+- `app_tele_ingest(p_codigo_unidade,p_rows jsonb,p_arquivo,p_hash)` → insere o lote `[{m,g,v}]` com
+  `on conflict do update`, loga a carga. Exige a unidade já cadastrada.
+- `app_tele_cobertura()` → `setof vw_cobertura` para o painel.
+
+**Frontend (`telemetria`):** dropzone (vários CSVs), prévia (arquivo→unidade/tipo/esquema/linhas/cadastro),
+**Processar** com barra de progresso, resumo e painel **Cobertura × cadastro** (KPIs + tabela). Parsing é
+client-side (mesma lógica do schema); grava **pela sessão do usuário via RPC — sem service key no front**.
+Opção **"Enviar só leituras novas"** (incremental): usa `momento_max` da cobertura por unidade e só manda
+`momento > último`. Consórcio por `webkitRelativePath` (pasta) → seletor → `null` (upsert faz `coalesce`,
+não sobrescreve za bom já gravado). Lotes de 5000 leituras por chamada.
+
+**Cuidados:**
+- **Ingestão é online** (grava direto no banco; não passa pela fila offline). É tarefa de mesa/admin.
+- **Carga histórica** (meses de 5 min = dezenas de milhões de linhas) é pesada numa aba — o módulo faz com
+  progresso e retomada (reprocessar é idempotente; incremental pula o que já entrou), mas para o backfill
+  inicial há também o script `scripts/telemetria/ingest_telemetria.py` (mesmas RPCs, via `service_role`,
+  mais rápido). Dia a dia = só o módulo.
+- Schema **15** (não 14 — "14 - pessoas" é legado). App-only: sem `USAGE` para papéis `gis_*`.
+- **Estado atual (2026-10-16):** dimensão com **101 unidades** carregada; **25 no cadastro, 76 fora**
+  (candidatas a inclusão — ver `vw_cadastro_sem_tele`/`vw_cobertura`). Série temporal entra pelo
+  módulo/script.

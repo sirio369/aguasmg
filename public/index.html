@@ -340,6 +340,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod hidden" id="homeMeusColab" data-go="meus_colab"><div class="ic">📇</div><div class="nm">Meus colaboradores</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
+      <button class="mod hidden" id="homeTelemetria" data-go="telemetria"><div class="ic">📡</div><div class="nm">Telemetria (CCO)</div></button>
     </div>
     <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
@@ -353,6 +354,46 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Marque quem pode ver e entrar nos módulos em desenvolvimento (Projetos e Perdas). O admin sempre tem acesso.</p>
     <input id="devAcessoBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
     <div id="devAcessoList"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="telemetria" class="hidden">
+    <style>
+      #telDrop{border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;background:var(--card)}
+      #telDrop.over{border-color:var(--acc);background:var(--ok-bg)}
+      #telDrop .ic{font-size:30px}
+      #telemetria table.tel{width:100%;border-collapse:collapse;font-size:13px}
+      #telemetria table.tel th,#telemetria table.tel td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+      #telemetria .telwrap{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+      #telemetria .pill{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line)}
+      #telemetria .pill.bad{background:var(--bad);color:#fff;border-color:transparent}
+      #telemetria .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+      #telemetria .kpi>div{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+      #telemetria .kpi b{font-size:22px;display:block}
+    </style>
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Telemetria (CCO)</h1>
+    <p class="sub">Importe os CSVs exportados do sistema CCO da COPASA. O app lê cada arquivo, identifica a unidade pelo nome e alimenta o banco. Reprocessar não duplica (o banco ignora leituras já existentes).</p>
+    <div id="telDrop">
+      <input id="telFiles" type="file" accept=".csv" multiple hidden/>
+      <div class="ic">⭳</div>
+      <div>Arraste os CSVs aqui ou <b>clique para escolher</b></div>
+      <div class="sub">Vários arquivos de uma vez</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0">
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="telSoNovos" checked style="width:auto"/> Enviar só leituras novas</label>
+      <label style="display:flex;align-items:center;gap:8px">Consórcio:
+        <select id="telZa" style="width:auto"><option value="">detectar/manter</option><option value="ZA1004">ZA1004 · Contagem</option><option value="ZA0200">ZA0200 · Betim</option></select>
+      </label>
+    </div>
+    <div id="telPreview"></div>
+    <div id="telActions" class="hidden" style="display:flex;gap:10px;align-items:center;margin-top:10px">
+      <button class="btn" id="telProcessar" style="margin-top:0;width:auto">Processar</button>
+      <button class="btn ghost" id="telLimpar" style="margin-top:0;width:auto">Limpar</button>
+    </div>
+    <div id="telProg" class="hidden" style="margin-top:12px"></div>
+    <div id="telResumo" style="margin-top:12px"></div>
+    <div class="sec" style="margin-top:24px">Cobertura × cadastro</div>
+    <div id="telCob"><p class="sub">—</p></div>
   </main>
 
   <main id="pressao" class="hidden">
@@ -1509,7 +1550,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab'];
+const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1540,6 +1581,7 @@ function irPara(id){
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='dev_acesso') devAcessoInit();
+  if(id==='telemetria') telemetriaInit();
   if(id==='projetos') pjLoad().then(pjHub);
   if(id==='projeto_campo') pjLoad().then(()=>pjInit());
   if(id==='projeto_sup') pjLoad().then(pjSupEnter);
@@ -1555,7 +1597,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -1588,6 +1630,148 @@ function devAcessoRender(){
   }));
 }
 ['condBar','frotasBar'].forEach(bid=>{ const b=$('#'+bid); if(b) b.addEventListener('click',()=>irPara('frota')); });
+
+// ---------- TELEMETRIA (CCO COPASA) ----------
+// Importa CSVs do CCO (vazão/volume macro, nível reservatório, bombas/pressão booster) e alimenta
+// o schema "15 - telemetria" via RPCs (sessão do usuário — sem service key no front). Admin-only.
+let telFilesParsed=[], telCobArr=[], telCobMap={};
+const TEL_SCHEMA={
+  'momento;vazao;volume;sinal':['vazao_volume','macro'],
+  'momento;b01;b02;b03;b04;nivel_suc;pressao_suc;pressao_rec;sinal':['bombas_pressao','booster'],
+  'momento;nivel;sinal':['nivel','reservatorio']
+};
+const TEL_GRAND={vazao:'vazao',volume:'volume',nivel:'nivel',b01:'b01',b02:'b02',b03:'b03',b04:'b04',nivel_suc:'nivel_suc',pressao_suc:'pressao_suc',pressao_rec:'pressao_rec',sinal:'sinal'};
+function telemetriaInit(){
+  if(!(ME&&ME.is_admin)){ toast('Acesso restrito'); irPara('home'); return; }
+  telFilesParsed=[];
+  const p=$('#telPreview'); if(p) p.innerHTML='';
+  const a=$('#telActions'); if(a) a.classList.add('hidden');
+  const r=$('#telResumo'); if(r) r.innerHTML='';
+  const pr=$('#telProg'); if(pr){ pr.classList.add('hidden'); pr.innerHTML=''; }
+  telWire(); telCobLoad();
+}
+function telWire(){
+  const inp=$('#telFiles'), dz=$('#telDrop');
+  if(dz && !dz.dataset.ready){ dz.dataset.ready='1';
+    dz.addEventListener('click',()=>inp&&inp.click());
+    dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+    dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+    dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over'); if(e.dataTransfer) telAddFiles(e.dataTransfer.files);});
+  }
+  if(inp && !inp.dataset.ready){ inp.dataset.ready='1'; inp.addEventListener('change',()=>{ telAddFiles(inp.files); inp.value=''; }); }
+  const pb=$('#telProcessar'); if(pb && !pb.dataset.ready){ pb.dataset.ready='1'; pb.addEventListener('click',telProcessar); }
+  const lb=$('#telLimpar'); if(lb && !lb.dataset.ready){ lb.dataset.ready='1'; lb.addEventListener('click',()=>telemetriaInit()); }
+}
+function telMeta(fname){
+  const bn=fname.replace(/\.csv$/i,'');
+  const parts=bn.split(/\s*[-_]\s*/);
+  let uc=(parts[0]||'').trim(), cc=(parts[1]||'').trim();
+  if(cc){ const m=cc.match(/^[A-Za-z]+[0-9]+/); cc=m?m[0]:''; if(cc.toLowerCase()==='none') cc=''; }
+  if(!cc && /^[A-Za-z]{2,4}\d{6,}$/.test(uc)) cc=uc;
+  return [uc,cc];
+}
+async function telAddFiles(fileList){
+  const arr=[...fileList].filter(f=>/\.csv$/i.test(f.name));
+  if(!arr.length){ toast('Selecione arquivos .csv'); return; }
+  for(const f of arr){
+    let text=''; try{ text=await f.text(); }catch(e){ telFilesParsed.push({name:f.name,ok:false,erro:'não foi possível ler'}); continue; }
+    const nl=text.indexOf('\n'); const header=(nl>=0?text.slice(0,nl):text).trim();
+    const hkey=header.toLowerCase().replace(/\s+/g,'');
+    const sch=TEL_SCHEMA[hkey];
+    const [uc,cc]=telMeta(f.name);
+    const path=(f.webkitRelativePath||'').toLowerCase();
+    let za=null,cidade=null;
+    if(path.includes('contagem')){za='ZA1004';cidade='CONTAGEM';}
+    else if(path.includes('betim')){za='ZA0200';cidade='BETIM';}
+    const selZa=(($('#telZa')||{}).value)||'';
+    if(!za && selZa){ za=selZa; cidade= selZa==='ZA1004'?'CONTAGEM':'BETIM'; }
+    const nlinhas= sch ? Math.max(0, text.split(/\r?\n/).filter(l=>l.trim()).length-1) : 0;
+    telFilesParsed.push({name:f.name,text,uc,cc,esquema:sch?sch[0]:null,tipo:sch?sch[1]:null,za,cidade,nlinhas,ok:!!sch,erro:sch?null:'cabeçalho não reconhecido'});
+  }
+  telRenderPreview();
+}
+function telRenderPreview(){
+  const box=$('#telPreview'); if(!box) return;
+  if(!telFilesParsed.length){ box.innerHTML=''; $('#telActions').classList.add('hidden'); return; }
+  const rows=telFilesParsed.map(f=>{
+    const cob=telCobMap[f.uc];
+    const cad = f.ok ? (cob&&cob.no_cadastro?'<span class="pill">no cadastro</span>':'<span class="pill bad">fora</span>') : '';
+    const sit = f.ok ? (f.esquema) : ('<span class="pill bad">'+vEsc(f.erro||'inválido')+'</span>');
+    return `<tr><td>${vEsc(f.name)}</td><td>${vEsc(f.uc||'—')}</td><td>${vEsc(f.tipo||'—')}</td><td>${sit}</td><td style="text-align:right">${f.ok?f.nlinhas:''}</td><td>${cad}</td></tr>`;
+  }).join('');
+  const nValid=telFilesParsed.filter(f=>f.ok).length;
+  box.innerHTML=`<div class="telwrap"><table class="tel"><thead><tr><th>Arquivo</th><th>Unidade</th><th>Tipo</th><th>Esquema</th><th style="text-align:right">Linhas</th><th>Cadastro</th></tr></thead><tbody>${rows}</tbody></table></div><div class="sub" style="margin-top:6px">${telFilesParsed.length} arquivo(s), ${nValid} válido(s).</div>`;
+  $('#telActions').classList.toggle('hidden', nValid===0);
+}
+function telIso(s){ const m=(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); return m?`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:00-03:00`:null; }
+function telParseReadings(f,last){
+  const nl=f.text.indexOf('\n');
+  const cols=(nl>=0?f.text.slice(0,nl):f.text).trim().split(';').map(c=>c.trim().toLowerCase());
+  const lines=f.text.split(/\r?\n/); const out=new Map();
+  const lastMs = last ? Date.parse(last) : null;
+  for(let li=1; li<lines.length; li++){
+    const line=lines[li]; if(!line.trim()) continue;
+    const rec=line.split(';'); if(rec.length<cols.length) continue;
+    const iso=telIso(rec[0].trim()); if(!iso) continue;
+    if(lastMs!=null && Date.parse(iso)<=lastMs) continue;
+    for(let i=0;i<cols.length;i++){
+      const g=TEL_GRAND[cols[i]]; if(!g) continue;
+      const v=(rec[i]||'').trim().replace(',','.');
+      out.set(iso+'|'+g,{m:iso,g,v:(v===''?null:v)});
+    }
+  }
+  return [...out.values()];
+}
+function telProgRender(fi,nf,nome,sent,tot){
+  const box=$('#telProg'); if(!box) return;
+  const pct= tot? Math.round(sent/tot*100):0;
+  box.innerHTML=`<div class="sub">Arquivo ${fi+1}/${nf}: <b>${vEsc(nome)}</b> — ${sent}/${tot} leituras (${pct}%)</div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:6px"><div style="height:100%;width:${pct}%;background:var(--acc);transition:width .2s"></div></div>`;
+}
+async function telProcessar(){
+  const valid=telFilesParsed.filter(f=>f.ok);
+  if(!valid.length){ toast('Nenhum CSV válido'); return; }
+  const soNovos=(($('#telSoNovos')||{}).checked);
+  const prog=$('#telProg'); if(prog) prog.classList.remove('hidden');
+  const btn=$('#telProcessar'); if(btn) btn.disabled=true;
+  let okFiles=0, errFiles=0, totLeituras=0; const erros=[];
+  for(let fi=0; fi<valid.length; fi++){
+    const f=valid[fi]; telProgRender(fi,valid.length,f.name,0,0);
+    try{
+      const {data:uid,error:e1}=await sb.rpc('app_tele_unidade_upsert',{p_codigo_unidade:f.uc,p_codigo_copasa:f.cc||null,p_za:f.za,p_cidade:f.cidade,p_tipo:f.tipo,p_esquema:f.esquema});
+      if(e1) throw e1;
+      const last = soNovos ? ((telCobMap[f.uc]||{}).momento_max||null) : null;
+      const leituras=telParseReadings(f,last);
+      const B=5000; let sent=0;
+      if(!leituras.length) telProgRender(fi,valid.length,f.name,0,0);
+      for(let i=0;i<leituras.length;i+=B){
+        const chunk=leituras.slice(i,i+B);
+        const {data:n,error:e2}=await sb.rpc('app_tele_ingest',{p_codigo_unidade:f.uc,p_rows:chunk,p_arquivo:(i===0?f.name:null),p_hash:null});
+        if(e2) throw e2;
+        sent+=chunk.length; totLeituras+=(n||0); telProgRender(fi,valid.length,f.name,sent,leituras.length);
+      }
+      okFiles++;
+    }catch(e){ errFiles++; erros.push(f.name+': '+(e.message||e)); }
+  }
+  if(btn) btn.disabled=false;
+  const res=$('#telResumo'); if(res) res.innerHTML=`<div class="banner ${errFiles?'warn':'ok'}">Concluído — ${okFiles} arquivo(s), ${totLeituras} leitura(s) gravada(s)${errFiles?`, ${errFiles} com erro`:''}.</div>`+(erros.length?('<div class="sub" style="margin-top:6px">'+erros.map(vEsc).join('<br>')+'</div>'):'');
+  telCobLoad();
+}
+async function telCobLoad(){
+  const box=$('#telCob'); if(box) box.innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_tele_cobertura'); if(error) throw error;
+    telCobArr=data||[]; telCobMap={}; telCobArr.forEach(r=>{ telCobMap[r.codigo_unidade]=r; });
+    telCobRender(); if(telFilesParsed.length) telRenderPreview();
+  }catch(e){ if(box) box.innerHTML='<div class="banner bad">Erro: '+vEsc(e.message||e)+'</div>'; }
+}
+function telCobRender(){
+  const box=$('#telCob'); if(!box) return;
+  const a=telCobArr; if(!a.length){ box.innerHTML='<p class="sub">Nenhuma unidade cadastrada ainda.</p>'; return; }
+  const tot=a.length, noCad=a.filter(r=>r.no_cadastro).length, comDados=a.filter(r=>r.n_leituras>0).length;
+  const fmt=t=>{ if(!t) return '—'; const d=new Date(t); return isNaN(d)?'—':d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
+  const rows=a.map(r=>`<tr><td>${vEsc(r.codigo_unidade)}</td><td>${vEsc(r.tipo||'—')}</td><td>${vEsc(r.za||'—')}</td><td>${r.no_cadastro?'<span class="pill">sim</span>':'<span class="pill bad">fora</span>'}</td><td style="text-align:right">${(r.n_leituras||0).toLocaleString('pt-BR')}</td><td>${fmt(r.momento_max)}</td></tr>`).join('');
+  box.innerHTML=`<div class="kpi"><div><b>${tot}</b><span class="sub">unidades</span></div><div><b>${noCad}</b><span class="sub">no cadastro</span></div><div><b>${tot-noCad}</b><span class="sub">fora do cadastro</span></div><div><b>${comDados}</b><span class="sub">com leituras</span></div></div><div class="telwrap"><table class="tel"><thead><tr><th>Unidade</th><th>Tipo</th><th>ZA</th><th>Cadastro</th><th style="text-align:right">Leituras</th><th>Última</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 
 // ---------- MÓDULO PROJETOS / INTERVENÇÕES ----------
 const PJ_TIPOS={

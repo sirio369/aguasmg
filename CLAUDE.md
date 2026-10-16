@@ -134,7 +134,7 @@ pwa/
 **Regra de separação (2026-09):** schema define a **audiência**, não só o assunto.
 - **Geo-facing** (o time de GIS conecta o QGIS aqui): `1`–`5`, `7`, `8`, e camadas via view.
 - **App-only** (invisível ao GIS — sem `USAGE` pra papéis `gis_*`, acesso só via RPC `SECURITY DEFINER`):
-  `9`, `10`, `11`, `12`. Tabela nova = decisão explícita no PR de qual lado ela cai.
+  `9`, `10`, `11`, `12`, `15`. Tabela nova = decisão explícita no PR de qual lado ela cai.
 
 | Schema | Conteúdo |
 |---|---|
@@ -149,6 +149,7 @@ pwa/
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
+| `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -377,6 +378,14 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` na categoria **🚧 Em dese
 `homeGate()` por **`ME.dev_acesso`** (controle de acesso por engrenagem — ver abaixo); opaco (`.mod soon`) + 🔒
 para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
+
+**Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🧰 Suporte — schema `15 - telemetria`) — importa os
+CSVs exportados do sistema CCO da COPASA (vazão/volume macro, nível reservatório, bombas/pressão booster),
+identifica a unidade pelo nome do arquivo, grava em **formato longo** (`tele_leitura`) e cruza com o cadastro
+(`tele_unidade.cadastro_tabela`). Upload por dropzone → prévia → **Processar** (lotes via `app_tele_ingest`,
+pela sessão do usuário, **sem service key**; idempotente + incremental) + painel **Cobertura × cadastro**
+(`app_tele_cobertura`). Backfill histórico também pelo script `scripts/telemetria/ingest_telemetria.py`.
+Detalhe em `docs/MODULOS.md §16`.
 
 **Gestão de VRPs** (`vrpman` hub; funções `vm*`, schema `8 - coleta_campo`) — gestão de serviços de manutenção nas VRPs,
 **separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 **"Gestão de VRPs"** na seção **🛠️ Execução**
