@@ -378,7 +378,9 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   **DROP+CREATE**. Não conceder a `gis_*` (schema 12 não tem `USAGE` pra GIS).
 
 ### 3.2 Solicitação de serviços (campo) — `// ABERTURA DE SERVIÇOS` (~L1394) · tela `abertura_servicos`
-- Entrevistador pede abertura de OS (tipo, matrícula, HD, foto do HD, GPS). RPC
+- Entrevistador pede abertura de OS (tipo, matrícula, HD, foto do HD, GPS). Tipos (`#as_tipo`): 106000,
+  1480000, 1490000, 1177900 (117 79 00 — Substituição de Hidrômetro, incluído em 2026-10), FAT0900, 3020000;
+  o rótulo gravado em `tipo_label` vem do `case` dentro da RPC (código novo → atualizar o `case` também). RPC
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
   `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
   `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
