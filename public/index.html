@@ -326,7 +326,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec">🛠️ Execução</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="pressao"><div class="ic">🌡️</div><div class="nm">Mapeamento de pressão</div></button>
-      <button class="mod" data-go="loggers"><div class="ic">📟</div><div class="nm">Loggers temporários</div></button>
+      <button class="mod" data-go="loggers_hub"><div class="ic">📟</div><div class="nm">Loggers</div></button>
       <button class="mod" data-go="pesquisa"><div class="ic">🎧</div><div class="nm">Pesquisa</div></button>
       <button class="mod" data-go="entrevistadores"><div class="ic">🧑‍💼</div><div class="nm">Entrevistadores</div></button>
       <button class="mod" data-go="projetos"><div class="ic">📐</div><div class="nm">Projetos</div></button>
@@ -493,14 +493,24 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="prpMapa" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
+  <main id="loggers_hub" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Loggers</h1>
+    <p class="sub">Escolha o tipo de logger.</p>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" id="lgModoTemp"><div class="ic">⏱️</div><div class="nm">Temporários</div></button>
+      <button class="mod" id="lgModoFixo"><div class="ic">📌</div><div class="nm">Fixos</div></button>
+    </div>
+  </main>
+
   <main id="loggers" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button>
+    <div class="bar"><button class="bk" id="lgVoltarHub">‹ Loggers</button>
       <span style="margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px;">
         <button id="vwLista" style="all:unset;cursor:pointer;padding:6px 14px;">Lista</button>
         <button id="vwMapa" style="all:unset;cursor:pointer;padding:6px 14px;">Mapa</button>
       </span>
     </div>
-    <h1>Loggers temporários</h1>
+    <h1 id="lgTitulo">Loggers</h1>
     <button id="lgNovo" class="btn ghost" style="margin-bottom:10px">➕ Inserir logger</button>
     <div id="lgFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
@@ -1550,7 +1560,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -2504,7 +2514,7 @@ async function pjRel(id){
 }
 
 // ---------- MÓDULO LOGGERS ----------
-let loggersData=[], lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
+let loggersData=[], lgAll=[], lgModo='temp', lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
 function contarSub(kind){ return loggersData.filter(p=>p.situacao==='concluido'&&lgMatchC(p)&&(kind==='com'?!!p.tem_pressao:!p.tem_pressao)).length; }
 const LG_CONS=[{v:'todos',l:'Ambos'},{v:'ZA1004',l:'Contagem'},{v:'ZA0200',l:'Betim'}];
 function lgMatchC(p){ return lgCons==='todos'||p.consorcio===lgCons; }
@@ -2611,14 +2621,16 @@ function distTxt(d){if(d==null)return '';return d<1?Math.round(d*1000)+' m':d.to
 function contar(s){return loggersData.filter(p=>(s==='todos'||p.situacao===s)&&lgMatchC(p)).length;}
 function contarCons(c){return loggersData.filter(p=>(c==='todos'||p.consorcio===c)&&(lgFiltro==='todos'||p.situacao===lgFiltro)).length;}
 async function carregarLoggers(){
+  const tit=$('#lgTitulo'); if(tit) tit.textContent='Loggers · '+(lgModo==='temp'?'Temporários':'Fixos');
   $('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('app_loggers_listar'); if(error) throw error;
-    loggersData=data||[]; localStorage.setItem('loggers_cache',JSON.stringify(loggersData));
+    lgAll=data||[]; localStorage.setItem('loggers_cache',JSON.stringify(lgAll));
   }catch(e){
-    const c=localStorage.getItem('loggers_cache'); loggersData=c?JSON.parse(c):[];
-    if(!loggersData.length){$('#lgLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';$('#lgFiltros').innerHTML='';return;}
+    const c=localStorage.getItem('loggers_cache'); lgAll=c?JSON.parse(c):[];
+    if(!lgAll.length){$('#lgLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';$('#lgFiltros').innerHTML='';return;}
   }
+  loggersData=lgAll.filter(p=>(!!p.logger_temporario)===(lgModo==='temp'));
   renderFiltros(); renderConsFiltros(); atualizarVista();
 }
 function renderFiltros(){
@@ -3243,7 +3255,7 @@ function ligarDetalhe(p){
 }
 function marcarLocal(p,sit){
   const i=loggersData.findIndex(x=>x.id===p.id);
-  if(i>=0){ loggersData[i].situacao=sit; loggersData[i]._pendente=!navigator.onLine; localStorage.setItem('loggers_cache',JSON.stringify(loggersData)); }
+  if(i>=0){ loggersData[i].situacao=sit; loggersData[i]._pendente=!navigator.onLine; localStorage.setItem('loggers_cache',JSON.stringify(lgAll)); }
 }
 async function submeterLogger(){
   if(lgEnviando) return; const p=detPonto, btn=document.getElementById('lgSalvar');
@@ -3254,7 +3266,7 @@ async function submeterLogger(){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     const item={id:uid,tipo:'logger',rpc:'app_logger_criar',pasta:'logger',
       fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach,p_foto_extra:detFotos.f_extra},
-      fields:{p_client_uuid:uid,
+      fields:{p_client_uuid:uid,p_temporario:(lgModo==='temp'),
         p_label:(document.getElementById('cr_label').value||null),
         p_consorcio:(document.getElementById('cr_cons').value||null),
         p_zona:(document.getElementById('cr_zona').value||null),
@@ -3295,6 +3307,9 @@ async function finalizarLogger(){
 }
 if($('#lgBack')) $('#lgBack').addEventListener('click',()=>irPara('loggers'));
 if($('#lgNovo')) $('#lgNovo').addEventListener('click',abrirCriar);
+if($('#lgModoTemp')) $('#lgModoTemp').addEventListener('click',()=>{lgModo='temp';lgFiltro='todos';lgCons='todos';lgSub='todos';irPara('loggers');});
+if($('#lgModoFixo')) $('#lgModoFixo').addEventListener('click',()=>{lgModo='fixo';lgFiltro='todos';lgCons='todos';lgSub='todos';irPara('loggers');});
+if($('#lgVoltarHub')) $('#lgVoltarHub').addEventListener('click',()=>irPara('loggers_hub'));
 if($('#vwLista')) $('#vwLista').addEventListener('click',()=>setView('lista'));
 if($('#vwMapa')) $('#vwMapa').addEventListener('click',()=>setView('mapa'));
 if($('#vwLista')) setView('lista');
