@@ -204,7 +204,9 @@ pwa/
 
 **Coleta de campo** (schema `8 - coleta_campo`):
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
-- **Loggers temporários** (`loggers`/`logger_det`) — ciclo: **pendente → instalado → dados pendentes
+- **Loggers** (card "Loggers" → hub `loggers_hub` com **Temporários**/**Fixos** → `loggers`/`logger_det`) —
+  os dois modos usam a **mesma tela**; `lgModo` filtra pela flag `logger_temporario` (true=temp, false=fixo)
+  e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo: **pendente → instalado → dados pendentes
   (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após
   7 dias). Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
   View `vw_loggers` (tem `consorcio`, geom real × planejada; `situacao_atual` é **derivada** das datas —

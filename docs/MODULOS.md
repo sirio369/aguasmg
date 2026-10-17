@@ -170,7 +170,19 @@
   até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
   → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
-### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
+### 2.2 Loggers — `// MÓDULO LOGGERS` (~L782) · telas `loggers_hub` / `loggers` / `logger_det`
+- **Card "Loggers"** (home, antes "Loggers temporários") → **hub `loggers_hub`** com 2 botões:
+  **⏱️ Temporários** e **📌 Fixos**. Os dois abrem a **mesma tela `loggers`**; o modo (`lgModo`
+  ∈ `temp|fixo`, global) **filtra a lista** e **define a flag** de qualquer logger criado ali.
+- **Flag `instalacao_logger_calibracao.logger_temporario`** (boolean, default **false**): `true`=temporário,
+  `false`=fixo. Marcada `true` nos **97** remanescentes da limpeza de 2026-10-17 (ver abaixo). A listagem
+  (`app_loggers_listar`) devolve a coluna; o front filtra por `lgModo` (temp = flag true). Criação
+  (`app_logger_criar`, **param novo `p_temporario boolean default true`**) grava conforme o botão
+  (`lgModo==='temp'`). A tela `loggers` volta pro `loggers_hub` (botão `#lgVoltarHub`), não pra home.
+- **Limpeza 2026-10-17:** removidos todos os `pendente`, `dados pendentes` (removido) e `concluído`
+  **sem dados de pressão** (135 loggers + 62k linhas de `logger_pressao` via FK CASCADE); backup em
+  `"8 - coleta_campo"._bkp_loggers_del_20261017`/`_bkp_logger_pressao_del_20261017`. Restaram **97**
+  concluídos com pressão, todos `logger_temporario=true`.
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
   → concluido`. **Não existe mais** promoção automática após 7 dias.
 - **Tabela base:** `"8 - coleta_campo".instalacao_logger_calibracao`. **View:** `vw_loggers`
