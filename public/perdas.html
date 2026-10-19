@@ -257,6 +257,7 @@ tbody tr:hover{background:var(--surface-2)}
   </div>
 </div>
 <div class="app">
+  <style>body.aux-solo #nav{display:none}</style>
   <aside id="side">
     <div class="brand"><div class="dot">A</div><div><b>AcquaHub</b><span>Perdas · NRW</span></div></div>
     <div style="padding:8px 10px 2px">
@@ -267,7 +268,6 @@ tbody tr:hover{background:var(--surface-2)}
       <button class="navi on" data-s="painel"><span class="ic">◧</span>Painel de Perdas</button>
       <button class="navi" data-s="resultado"><span class="ic">🎯</span>Acompanhamento do resultado</button>
       <div class="navlab">2 · Dados & diagnóstico</div>
-      <button class="navi" data-s="mm"><span class="ic">📈</span>Análise do micromedido</button>
       <button class="navi" data-s="macro"><span class="ic">🚰</span>Análise de macromedição</button>
       <button class="navi" data-s="nrw_balanco"><span class="ic">∑</span>Balanço hídrico</button>
       <div class="navlab">3 · Ação / combate</div>
@@ -277,7 +277,6 @@ tbody tr:hover{background:var(--surface-2)}
       <button class="navi" data-s="nrw_os"><span class="ic">🛠</span>Gestão de OS / reparos</button>
       <div class="navlab">4 · Execução — comercial</div>
       <button class="navi" data-s="nrw_parque"><span class="ic">⏱</span>Parque de hidrômetros</button>
-      <button class="navi" data-s="hdpri"><span class="ic">🔧</span>Priorização de troca de HD</button>
       <button class="navi" data-s="nrw_fiscalizacao"><span class="ic">🔎</span>Fiscalização de fraudes</button>
       <button class="navi" data-s="nrw_recuperacao"><span class="ic">💧</span>Recuperação de faturamento</button>
       <button class="navi" data-s="nrw_grandes"><span class="ic">🏭</span>Grandes consumidores</button>
@@ -2421,14 +2420,26 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const sbg = createClient('https://lwttadkctfznidzvmury.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3dHRhZGtjdGZ6bmlkenZtdXJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MzQ4NjksImV4cCI6MjEwMTUxMDg2OX0._M5FOmACjrYeRgQ6hXrvmxFp3Et8Jrt-fElYohiiVZc');
 window.sbg = sbg;   // exposto p/ o script principal (RPCs da análise do micromedido)
 const g = document.getElementById('nrwGate'), gm = document.getElementById('gm');
+// Ferramentas migradas p/ "Auxiliar de Programação" (abertas via ?s=): acessíveis ao time de
+// programação (aprovador/admin) mesmo sem dev_acesso, e sem expor o resto do cockpit NRW.
+const _params = new URLSearchParams(location.search);
+const _reqS = _params.get('s');
+const AUX_TOOLS = new Set(['hdpri','mm']);
+const _auxTool = !!(_reqS && AUX_TOOLS.has(_reqS));
 try{
   const { data } = await sbg.auth.getSession();
   if(!(data.session && data.session.user)){ gm.textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.'; }
   else {
     const em = (data.session.user.email || '').toLowerCase();
-    const { data: me } = await sbg.rpc('app_me');   // gate unificado por dev_acesso (controle "Em desenvolvimento")
-    if (me && me.dev_acesso) g.remove();
-    else gm.textContent = 'Acesso restrito — ' + em + ' não tem acesso aos módulos em desenvolvimento.';
+    const { data: me } = await sbg.rpc('app_me');
+    const liberado = !!(me && (me.dev_acesso || (_auxTool && (me.is_admin || me.pode_aprovar))));
+    if (liberado) {
+      g.remove();
+      if (_reqS && document.getElementById('s-'+_reqS) && window.go) window.go(_reqS);
+      if (_auxTool && !(me && me.dev_acesso)) document.body.classList.add('aux-solo');
+    } else {
+      gm.textContent = 'Acesso restrito — ' + em + ' não tem acesso a este módulo.';
+    }
   }
 }catch(e){ gm.textContent = 'Não foi possível verificar o acesso. Faça login no AcquaHub.'; }
 </script>
