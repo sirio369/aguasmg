@@ -257,18 +257,23 @@ pwa/
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
   segmentação resiliente a reimportação da base de rede, em `docs/MODULOS.md §4.3`.
-- **Entrevistadores** (`entrevistadores`) → **Captação de clientes** (`captacao`, view `vw_captacao`),
-  **Solicitação de serviços** de campo (`abertura_servicos`), **Registro de ocorrência**
-  (`ent_ocorrencia`; lista + export Excel em `ent_oc_gestao`, **só aprovador/admin**) e, na subdivisão **🛟 Suporte**,
-  **Roteiro de leitura** (`roteiro`) — mapa por percurso/trecho sobre `vw_roteiro_leitura`(_linha),
-  com filtro de percurso/trecho/matrícula e export TXT (só aprovador). RPCs `app_roteiro_*`.
+- **Entrevistadores** (`entrevistadores`) → só o que é de campo do entrevistador: **Captação de clientes**
+  (`captacao`, view `vw_captacao`), **Solicitação de serviços** de campo (`abertura_servicos`) e
+  **Registro de ocorrência** (`ent_ocorrencia`). **Ocorrências registradas** (`ent_oc_gestao`) e
+  **Roteiro de leitura** (`roteiro`) **saíram daqui** (2026-10 reorg) e vivem agora no Auxiliar de Programação.
 - **Auxiliar de Programação** (`auxiliar_programacao`, na Home › 🧰 Suporte; **só aprovador/admin**,
-  botão liberado por `homeGate()` quando o `ME` carrega) — reúne a **retaguarda**:
-  **Criação de matrículas** (`matriculas`, fila de captações `app_captacao_fila`/`_os`) e
-  **Abertura de serviços** (`programacao_servicos`), que lança o nº da OS da COPASA para as
-  **solicitações** (`app_abertura_fila`/`app_abertura_os`) **e** para as **ocorrências da pesquisa**
-  (`app_ocorrencia_fila`/`app_ocorrencia_os`); **Programação de pesquisa** (programar+atribuir trechos) e
-  **Acompanhamento da pesquisa** (`pp_acomp`, dashboard de resultados do time interno — ver §4.3.8).
+  `homeGate()`; `apInit()` monta o hub) — centraliza a **retaguarda** em **3 categorias** (reorg 2026-10):
+  - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
+    em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
+    (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
+    **Análise por matrícula** (abrem `perdas.html?s=hdpri` / `?s=mm` — ver Perdas/NRW).
+  - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
+    (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
+    **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`).
+  - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma
+    preventivo (`vrpman_prev`) — **migradas do hub `vrpman`** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg` admin).
+  - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
+    (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
@@ -380,8 +385,13 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` na categoria **🚧 Em dese
 `homeGate()` por **`ME.dev_acesso`** (controle de acesso por engrenagem — ver abaixo); opaco (`.mod soon`) + 🔒
 para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
+**Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`) e **Análise do micromedido/por matrícula** (`s-mm`)
+**saíram do menu do cockpit** e passaram a ser acessadas pelo **Auxiliar de Programação** via deep-link
+`perdas.html?s=hdpri` / `?s=mm`. O gate da página libera essas duas para **aprovador/admin mesmo sem `dev_acesso`**;
+nesse caso entra em **`body.aux-solo`** (esconde o `#nav`, mostrando só a ferramenta + "Voltar ao AcquaHub").
+As telas e RPCs (`app_nrw_hd_*`/`app_nrw_mm_*`) continuam no `perdas.html` — só mudou a porta de entrada.
 
-**Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🧰 Suporte — schema `15 - telemetria`) — importa os
+**Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🚧 Em desenvolvimento — schema `15 - telemetria`) — importa os
 CSVs exportados do sistema CCO da COPASA (vazão/volume macro, nível reservatório, bombas/pressão booster),
 identifica a unidade pelo nome do arquivo, grava em **formato longo** (`tele_leitura`) e cruza com o cadastro
 (`tele_unidade.cadastro_tabela`). Upload por dropzone → prévia → **Processar** (lotes via `app_tele_ingest`,
@@ -390,9 +400,8 @@ pela sessão do usuário, **sem service key**; idempotente + incremental) + pain
 Detalhe em `docs/MODULOS.md §16`.
 
 **Gestão de VRPs** (`vrpman` hub; funções `vm*`, schema `8 - coleta_campo`) — gestão de serviços de manutenção nas VRPs,
-**separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 **"Gestão de VRPs"** na seção **🛠️ Execução**
-(promovido de "Em desenvolvimento" em 2026-10-01; **sem gate `dev_acesso`** — entra por `data-go="vrpman"`); o card antigo "VRPs" da seção Execução foi removido (o módulo `vrp` vive em Campo como "Visita primária"); hub com 🏗️ Campo (qualquer
-autenticado) e 🧰 Gestão (gate `ME.vrp_gestao`). **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
+**separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 **"VRPs – Campo"** na seção **🛠️ Execução**
+(promovido de "Em desenvolvimento" em 2026-10-01; **sem gate `dev_acesso`** — entra por `data-go="vrpman"`); o card antigo "VRPs" da seção Execução foi removido (o módulo `vrp` vive em Campo como "Visita primária"). **Reorg 2026-10:** o hub `vrpman` ficou **só com 🏗️ Campo**; a **🧰 Gestão (Gestão de serviços/Ficha cadastral/Cronograma preventivo) migrou para o Auxiliar de Programação › Gestão de VRPs** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg`, back → `auxiliar_programacao`). **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
 corretiva → wizard de 5 telas sobre cabeçalho autofill, fotos (`vmUpload`→`fotos-campo/vrp-os/`), GPS, conclusão
 `app_vrp_os_concluir`; + card **Visita primária** (abre o módulo `vrp` antigo). Ficha+histórico (`app_vrp_ficha`,
 `#vmFicha`) e relatório PDF (`vmReport`). **Gestão = 3 cards diretos no hub** (`vmHub`, sem tela intermediária; ⚙️ acesso na seção Gestão): **Gestão de serviços**

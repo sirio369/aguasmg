@@ -1802,6 +1802,13 @@ pelo fluxo de cadastro-pelo-gestor).
 
 ## 11. Perdas / NRW — cockpit em **página dedicada** `public/perdas.html`
 
+> **Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`) e **Análise do micromedido** (`s-mm`) foram
+> **removidas do menu `#nav`** do cockpit e agora são acessadas pelo **Auxiliar de Programação** (cards que
+> abrem `perdas.html?s=hdpri` / `?s=mm`). O gate do `perdas.html` (script module no fim) passou a liberar essas
+> duas para **aprovador/admin mesmo sem `dev_acesso`**, e nesse caso adiciona **`body.aux-solo`** (CSS
+> `body.aux-solo #nav{display:none}`) → o usuário vê só a ferramenta + "Voltar ao AcquaHub". Deep-link lido de
+> `?s=` e roteado por `window.go(s)`. As telas/RPCs (`app_nrw_hd_*`/`app_nrw_mm_*`) **não mudaram** — só a porta.
+
 Cockpit de acompanhamento de perdas (NRW) por DMC. **Não é uma tela `<main>` do `index.html`** — é
 uma **página HTML separada** (`public/perdas.html`, autocontida: CSS/JS próprios, SVG nativo, sem
 Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card do hub que faz
@@ -2437,6 +2444,12 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
 
 ## 15. Gestão de VRPs (`vrpman`, schema `8 - coleta_campo`)
 
+> **Reorg 2026-10:** o card da home virou **"VRPs – Campo"** e o hub `vrpman` (`vmHub`) ficou **só com 🏗️ Campo**
+> (Minhas OS / Visita primária). As 3 telas de **gestão — `vrpman_serv` (Gestão de serviços), `vrpman_fichas`
+> (Ficha cadastral), `vrpman_prev` (Cronograma preventivo)** — **migraram para o Auxiliar de Programação ›
+> categoria "Gestão de VRPs"** (renderizadas por `apInit()`, gate `ME.vrp_gestao`, ⚙️ `vrpman_cfg` admin). As
+> telas em si não mudaram; seus back-buttons e os redirects de gate agora apontam para `auxiliar_programacao`.
+
 Vertente de **gestão de serviços de manutenção** sobre as VRPs (separada do módulo `vrp`, que é só
 levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria **🚧 Em desenvolvimento** da home
 (gate `ME.dev_acesso` via `homeGate` — opaco `.mod soon` + 🔒 p/ quem não tem, como Perdas/Pessoas; quando
@@ -2598,7 +2611,7 @@ foi **removido** — o módulo antigo já está dentro de Campo como **Visita pr
 Importa os **CSVs horários/sub-horários exportados do sistema CCO da COPASA** (telemetria de macro,
 reservatório e booster) e alimenta o banco, já cruzando com o cadastro técnico. **Não há API da COPASA**
 (em desenvolvimento) → a extração é manual (o usuário baixa os CSVs) e a ingestão é por **upload no app**.
-Card **📡 Telemetria (CCO)** na home › 🧰 Suporte, **hidden**, mostrado por `homeGate()` só para **admin**
+Card **📡 Telemetria (CCO)** na home › 🚧 Em desenvolvimento (movido em 2026-10), **hidden**, mostrado por `homeGate()` só para **admin**
 (`ME.is_admin`); `telemetriaInit()` também barra não-admin.
 
 **Os dados (3 esquemas, detectados pelo cabeçalho):** separador `;`, decimal `.`, timestamp
