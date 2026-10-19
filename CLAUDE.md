@@ -261,8 +261,14 @@ pwa/
   (`captacao`, view `vw_captacao`), **Solicitação de serviços** de campo (`abertura_servicos`) e
   **Registro de ocorrência** (`ent_ocorrencia`). **Ocorrências registradas** (`ent_oc_gestao`) e
   **Roteiro de leitura** (`roteiro`) **saíram daqui** (2026-10 reorg) e vivem agora no Auxiliar de Programação.
-- **Auxiliar de Programação** (`auxiliar_programacao`, na Home › 🧰 Suporte; **só aprovador/admin**,
-  `homeGate()`; `apInit()` monta o hub) — centraliza a **retaguarda** em **3 categorias** (reorg 2026-10):
+- **Auxiliar de Programação** (`auxiliar_programacao`, na Home › 🧰 Suporte) — **acesso geral próprio da tela**
+  (reorg 2026-10): gate `homeGate()` por **`ME.aux_acesso`** (= `perfil.aux_acesso`, admin sempre), controlado por
+  uma **⚙️ engrenagem geral** (`#apCfg`, admin) que abre a tela **`aux_acesso`** (lista de usuários com toggle,
+  `auxAcInit`/`auxAcRender`, RPCs `app_aux_acesso_listar`/`app_aux_acesso_set` — espelham `dev_acesso`). A
+  **engrenagem exclusiva de VRP saiu**: a Gestão de VRPs agora é liberada pelo mesmo acesso geral
+  (`app_me.vrp_gestao` e `vrp_pode_gestao()` passaram a incluir `aux_acesso`). Seed de continuidade: os
+  **aprovadores** existentes receberam `aux_acesso=true`. `apInit()` monta o hub (barra as não-autorizadas) em
+  **3 categorias**:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
     (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
@@ -401,7 +407,7 @@ Detalhe em `docs/MODULOS.md §16`.
 
 **Gestão de VRPs** (`vrpman` hub; funções `vm*`, schema `8 - coleta_campo`) — gestão de serviços de manutenção nas VRPs,
 **separado do módulo `vrp`** (que é só levantamento/visita primária). Card 🔧 **"VRPs – Campo"** na seção **🛠️ Execução**
-(promovido de "Em desenvolvimento" em 2026-10-01; **sem gate `dev_acesso`** — entra por `data-go="vrpman"`); o card antigo "VRPs" da seção Execução foi removido (o módulo `vrp` vive em Campo como "Visita primária"). **Reorg 2026-10:** o hub `vrpman` ficou **só com 🏗️ Campo**; a **🧰 Gestão (Gestão de serviços/Ficha cadastral/Cronograma preventivo) migrou para o Auxiliar de Programação › Gestão de VRPs** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg`, back → `auxiliar_programacao`). **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
+(promovido de "Em desenvolvimento" em 2026-10-01; **sem gate `dev_acesso`** — entra por `data-go="vrpman"`); o card antigo "VRPs" da seção Execução foi removido (o módulo `vrp` vive em Campo como "Visita primária"). **Reorg 2026-10:** o hub `vrpman` ficou **só com 🏗️ Campo**; a **🧰 Gestão (Gestão de serviços/Ficha cadastral/Cronograma preventivo) migrou para o Auxiliar de Programação › Gestão de VRPs** (back → `auxiliar_programacao`; **acesso governado pelo acesso geral do Auxiliar `aux_acesso`** — a engrenagem exclusiva `vrpman_cfg` saiu da navegação; `vrp_pode_gestao()`/`ME.vrp_gestao` passaram a incluir `aux_acesso`). Visita primária (`vrp`): back agora → `vrpman`. **Campo:** "Minhas OS / Executar" (`app_vrp_os_minhas`) + Nova OS
 corretiva → wizard de 5 telas sobre cabeçalho autofill, fotos (`vmUpload`→`fotos-campo/vrp-os/`), GPS, conclusão
 `app_vrp_os_concluir`; + card **Visita primária** (abre o módulo `vrp` antigo). Ficha+histórico (`app_vrp_ficha`,
 `#vmFicha`) e relatório PDF (`vmReport`). **Gestão = 3 cards diretos no hub** (`vmHub`, sem tela intermediária; ⚙️ acesso na seção Gestão): **Gestão de serviços**
