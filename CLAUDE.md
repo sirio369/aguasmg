@@ -442,6 +442,13 @@ campo. **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado aberto, item 
 (toggle 🔒, `−` da quantidade bloqueado). Toggle **No escopo?** em toda atividade E subatividade; peça começa
 pelo **tipo de componente** (`pjSel`), ramal por **OS SIGOS + Hidrômetro** (+ imóvel, as-built A1/A2/A3/P1).
 **Documentos:** anexar/abrir/remover ficam **na configuração** (`projeto_cfg`); no `projeto_rel` é **só abrir**.
+**Importar intervenções (2026-10):** card em Projetos › 🧰 Suporte (gate `pjPodeSup`) → tela `projeto_import`
+(`pjImportInit`) que **lê um `.gpkg` no navegador via sql.js** (cdnjs, lazy), decodifica a geometria GPKG→WKT
+(LINESTRING 31983), mapeia atributos (template `id/projeto/cidade/dmc/tipo/dn/tubulacao/situacao_atual/extensao_m`,
+com fallback do gpkg cru do WaterGEMS: ZONE→dmc, LENGTH_→extensão, D→dn, MATERIAL→tubulação), prévia + campos
+padrão, e grava em `"7 - setorizacao".intervencoes_lineares` via **RPC `app_proj_intervencao_importar(p_rows jsonb)`**
+(SECURITY DEFINER, gate admin/`proj_sup_acesso`, idempotente por `id`). Botão **⭳ template CSV** + spec de colunas
+na própria tela. Objetivo: o setor de projetos/Suporte importa **sem depender de SQL manual**.
 Dados de exemplo em `PJ_IVS` (sem backend ainda; futuro: RPCs `app_proj_*`). Detalhe em `docs/MODULOS.md §8`.
 
 ## 7. Notificações e Web Push

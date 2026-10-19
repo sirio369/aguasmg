@@ -1224,6 +1224,38 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="pjRel"></div>
   </main>
 
+  <main id="projeto_import" class="hidden">
+    <style>
+      #projeto_import table.pjimpt{width:100%;border-collapse:collapse;font-size:12.5px}
+      #projeto_import table.pjimpt th,#projeto_import table.pjimpt td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+      #projeto_import .pjimpwrap{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+      #pjImpDrop{border:2px dashed var(--line);border-radius:14px;padding:22px 16px;text-align:center;cursor:pointer;background:var(--card)}
+      #pjImpDrop.over{border-color:var(--acc);background:var(--ok-bg)}
+      #projeto_import .pjimpf{display:flex;flex-direction:column;gap:3px;flex:1;min-width:150px}
+      #projeto_import .pjimpf label{font-size:11px;color:var(--mut);font-weight:600}
+    </style>
+    <div class="bar"><button class="bk" data-go="projetos">‹ Projetos</button></div>
+    <h1>Importar intervenções (lineares)</h1>
+    <p class="sub">Importe o GeoPackage (.gpkg) da rede enviada pelo setor de projetos → vira intervenções lineares para o time de obras. Idempotente: reimportar o mesmo arquivo atualiza, não duplica.</p>
+    <details>
+      <summary style="cursor:pointer;color:var(--acc);font-weight:600">📋 Modelo de colunas (o que o setor de projetos deve entregar)</summary>
+      <p class="sub" style="margin-top:8px">A camada deve ter geometria <b>LINESTRING</b> em <b>SRID 31983</b> e, idealmente, estas colunas de atributo:</p>
+      <div class="pjimpwrap"><table class="pjimpt"><thead><tr><th>Coluna</th><th>Tipo</th><th>Obrig.</th><th>Exemplo</th></tr></thead><tbody id="pjImpSpec"></tbody></table></div>
+      <button id="pjImpTpl" class="btn ghost" style="width:auto;margin-top:10px;padding:8px 14px">⭳ Baixar template (CSV)</button>
+      <p class="sub" style="margin-top:6px">Se vier o gpkg cru do WaterGEMS (sem essas colunas), o módulo mapeia o que der (ZONE→dmc, LENGTH_→extensão, D→dn, MATERIAL→tubulação) e você completa os campos padrão abaixo.</p>
+    </details>
+    <div class="sec" style="margin-top:16px">Arquivo</div>
+    <div id="pjImpDrop"><input id="pjImpFile" type="file" accept=".gpkg" hidden/><div style="font-size:26px">⭳</div><div>Clique para escolher o <b>.gpkg</b></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">
+      <div class="pjimpf"><label>Projeto (padrão)</label><input id="pjImpProj" placeholder="ex.: AL 16"/></div>
+      <div class="pjimpf"><label>Cidade (padrão)</label><input id="pjImpCidade" placeholder="ex.: CONTAGEM - MG"/></div>
+      <div class="pjimpf"><label>Situação inicial (padrão)</label><input id="pjImpSit" placeholder="ex.: A executar"/></div>
+    </div>
+    <div id="pjImpPrev"></div>
+    <div id="pjImpActions" class="hidden" style="margin-top:10px"><button id="pjImpGo" class="btn" style="width:auto;margin-top:0;padding:12px 20px">Importar</button></div>
+    <div id="pjImpMsg" style="margin-top:10px"></div>
+  </main>
+
   <nav>
     <button class="on" data-go="home"><span class="ic">🏠</span>Início</button>
     <button id="btnNotif"><span class="ic" style="position:relative;display:inline-block">🔔<span id="ntfBadge" style="display:none;position:absolute;top:-5px;right:-9px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;border-radius:999px;padding:0 3px;text-align:center">0</span></span>Avisos</button>
@@ -1576,7 +1608,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1614,6 +1646,7 @@ function irPara(id){
   if(id==='projeto_campo') pjLoad().then(()=>pjInit());
   if(id==='projeto_sup') pjLoad().then(pjSupEnter);
   if(id==='projeto_acesso') pjSupAcesso();
+  if(id==='projeto_import') pjImportInit();
   if(id==='projeto_resumo') pjLoad().then(pjResumoEnter);
   if(id==='vrpman') vmHub();
   if(id==='vrpman_campo') vmCampoInit();
@@ -2103,9 +2136,153 @@ function pjHub(){
    <p class="pjhint" style="margin:0 0 8px">Retaguarda: configurar escopo/quantidades e liberar o cadeado. ${sup?'':'Acesso restrito.'}</p>
    <div class="grid">
      <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_sup':''}"><div class="ic">⚙️</div><div class="nm">Configuração de intervenções${sup?'':' 🔒'}</div></button>
+     <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_import':''}"><div class="ic">📥</div><div class="nm">Importar intervenções${sup?'':' 🔒'}</div></button>
    </div>`;
   $('#pjHub').querySelectorAll('[data-pjgo]').forEach(b=>b.onclick=()=>{ const dst=b.dataset.pjgo; if(!dst){ toast('Acesso restrito à equipe de configuração'); return; } irPara(dst); });
   const ac=$('#pjHubAcesso'); if(ac) ac.onclick=e=>{ e.stopPropagation(); irPara('projeto_acesso'); };
+}
+// ---------- IMPORTAR INTERVENÇÕES (gpkg → "7 - setorizacao".intervencoes_lineares) ----------
+const PJ_IMP_SPEC=[
+  ['id','texto','recomendado','CON-06-AL-16-F01'],
+  ['projeto','texto','sim','AL 16'],
+  ['cidade','texto','sim','CONTAGEM - MG'],
+  ['dmc','texto','sim','DMC-06'],
+  ['tipo','texto','sim','HDD'],
+  ['dn','inteiro','—','63'],
+  ['tubulacao','texto','—','PEAD'],
+  ['codigo_do_documento','texto','—','CTT0034-AL16-R01'],
+  ['responsavel','texto','—','—'],
+  ['situacao_atual','texto','sim','A executar'],
+  ['extensao_m','número','—','194.85 (se vazio, calculado da geometria)']
+];
+let pjImpRows=[], _pjSql=null;
+function pjImportInit(){
+  if(!pjPodeSup()){ toast('Acesso restrito à equipe de configuração'); irPara('projetos'); return; }
+  pjImpRows=[];
+  const sp=$('#pjImpSpec'); if(sp) sp.innerHTML=PJ_IMP_SPEC.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td class="sub">${vEsc(r[3])}</td></tr>`).join('');
+  const p=$('#pjImpPrev'); if(p) p.innerHTML=''; const a=$('#pjImpActions'); if(a) a.classList.add('hidden'); const m=$('#pjImpMsg'); if(m) m.innerHTML='';
+  pjImpWire();
+}
+function pjImpWire(){
+  const dz=$('#pjImpDrop'), inp=$('#pjImpFile');
+  if(dz && !dz.dataset.ready){ dz.dataset.ready='1';
+    dz.addEventListener('click',()=>inp&&inp.click());
+    dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+    dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+    dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over'); if(e.dataTransfer.files[0]) pjImpLer(e.dataTransfer.files[0]);});
+  }
+  if(inp && !inp.dataset.ready){ inp.dataset.ready='1'; inp.addEventListener('change',()=>{ if(inp.files[0]) pjImpLer(inp.files[0]); inp.value=''; }); }
+  const tpl=$('#pjImpTpl'); if(tpl && !tpl.dataset.ready){ tpl.dataset.ready='1'; tpl.addEventListener('click',pjImpTemplate); }
+  const go=$('#pjImpGo'); if(go && !go.dataset.ready){ go.dataset.ready='1'; go.addEventListener('click',pjImpProcessar); }
+  ['pjImpProj','pjImpCidade','pjImpSit'].forEach(id=>{ const el=$('#'+id); if(el && !el.dataset.rp){ el.dataset.rp='1'; el.addEventListener('input',()=>{ if(pjImpRows.length) pjImpPreview(); }); } });
+}
+function pjImpTemplate(){
+  const header=PJ_IMP_SPEC.map(r=>r[0]).join(';');
+  const exemplo=PJ_IMP_SPEC.map(r=>r[3].split(' ')[0]).join(';');
+  const csv='﻿'+header+'\n'+exemplo+'\n';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='template_intervencoes_lineares.csv'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+async function pjLoadSqlJs(){
+  if(_pjSql) return _pjSql;
+  const BASE='https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
+  if(!window.initSqlJs){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=BASE+'sql-wasm.js'; s.onload=res; s.onerror=()=>rej(new Error('falha ao carregar o leitor de gpkg (sql.js)')); document.head.appendChild(s); }); }
+  _pjSql=await window.initSqlJs({locateFile:f=>BASE+f});
+  return _pjSql;
+}
+// GPKG geometry blob -> WKT (LINESTRING / MULTILINESTRING, 2D; ignora Z)
+function pjGpkgWKT(u8){
+  if(!u8||u8.length<8||u8[0]!==71||u8[1]!==80) return null;
+  const flags=u8[3], envSz=({0:0,1:32,2:48,3:48,4:64})[(flags>>1)&7]||0;
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength); const c={p:8+envSz};
+  function g(){
+    const little=u8[c.p]===1; c.p+=1;
+    const t=dv.getUint32(c.p,little); c.p+=4;
+    const z=((t&0x80000000)!==0)||(Math.floor((t&0x7fffffff)/1000)===1);
+    const base=((t&0x7fffffff)%1000)||(t&0xff);
+    const pts=()=>{ const n=dv.getUint32(c.p,little); c.p+=4; const a=[]; for(let i=0;i<n;i++){ const x=dv.getFloat64(c.p,little);c.p+=8; const y=dv.getFloat64(c.p,little);c.p+=8; if(z)c.p+=8; a.push(x.toFixed(3)+' '+y.toFixed(3)); } return a; };
+    if(base===2) return 'LINESTRING('+pts().join(', ')+')';
+    if(base===5){ const nl=dv.getUint32(c.p,little); c.p+=4; const ps=[]; for(let i=0;i<nl;i++){ const w=g(); if(w) ps.push('('+w.replace(/^LINESTRING\s*\(/,'').replace(/\)$/,'')+')'); } return 'MULTILINESTRING('+ps.join(', ')+')'; }
+    return null;
+  }
+  try{ return g(); }catch(e){ return null; }
+}
+async function pjImpLer(file){
+  const prev=$('#pjImpPrev'); prev.innerHTML='<p class="sub">Lendo o arquivo…</p>';
+  $('#pjImpActions').classList.add('hidden'); $('#pjImpMsg').innerHTML='';
+  try{
+    const SQL=await pjLoadSqlJs();
+    const u8=new Uint8Array(await file.arrayBuffer());
+    const db=new SQL.Database(u8);
+    const meta=db.exec("select c.table_name, g.column_name from gpkg_contents c join gpkg_geometry_columns g on lower(g.table_name)=lower(c.table_name) where c.data_type='features' limit 1");
+    if(!meta.length) throw new Error('nenhuma camada de feições encontrada no gpkg');
+    const tbl=meta[0].values[0][0], gcol=meta[0].values[0][1];
+    const r=db.exec('select * from "'+tbl.replace(/"/g,'')+'"');
+    if(!r.length||!r[0].values.length) throw new Error('a camada está vazia');
+    const cols=r[0].columns.map(c=>c.toLowerCase()), vals=r[0].values;
+    const gi=cols.indexOf(gcol.toLowerCase());
+    const col=(names)=>{ for(const n of names){ const i=cols.indexOf(n); if(i>=0) return i; } return -1; };
+    const ix={ id:col(['id','codigo','cod']), projeto:col(['projeto']), cidade:col(['cidade']),
+      dmc:col(['dmc','zone','zona']), tipo:col(['tipo']), dn:col(['dn','d']),
+      tub:col(['tubulacao','material']), doc:col(['codigo_do_documento','documento']),
+      resp:col(['responsavel']), sit:col(['situacao_atual','situacao']),
+      ext:col(['extensao_m','length_','length','comprimento']), label:col(['label']) };
+    const get=(v,i)=> i>=0 ? v[i] : null;
+    pjImpRows=[];
+    for(const v of vals){
+      let gb=v[gi]; if(Array.isArray(gb)) gb=new Uint8Array(gb);
+      const wkt=gb?pjGpkgWKT(gb):null; if(!wkt) continue;
+      let idv=get(v,ix.id); if(idv!=null && /^\d+$/.test(String(idv).trim())) idv=null; // id numérico (WaterGEMS) não é código de cadastro
+      const label=get(v,ix.label);
+      pjImpRows.push({ id:idv!=null?String(idv):null, _label:label!=null?String(label):null,
+        projeto:get(v,ix.projeto), cidade:get(v,ix.cidade), dmc:get(v,ix.dmc), tipo:get(v,ix.tipo),
+        dn:get(v,ix.dn), tubulacao:get(v,ix.tub), codigo_do_documento:get(v,ix.doc),
+        responsavel:get(v,ix.resp), situacao_atual:get(v,ix.sit), extensao_m:get(v,ix.ext), wkt });
+    }
+    db.close();
+    if(!pjImpRows.length) throw new Error('nenhuma linha com geometria LINESTRING válida');
+    pjImpPreview();
+  }catch(e){ prev.innerHTML='<div class="banner bad">Erro ao ler: '+vEsc(e.message||e)+'</div>'; }
+}
+function pjWktLen(wkt){
+  const m=wkt.match(/\(([-0-9.,\s]+)\)/); if(!m) return null;
+  const pts=m[1].split(',').map(s=>s.trim().split(/\s+/).map(Number));
+  let d=0; for(let i=1;i<pts.length;i++){ const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1]; d+=Math.sqrt(dx*dx+dy*dy); }
+  return d;
+}
+function pjImpResolve(){
+  const dProj=(($('#pjImpProj')||{}).value||'').trim(), dCid=(($('#pjImpCidade')||{}).value||'').trim(), dSit=(($('#pjImpSit')||{}).value||'').trim();
+  return pjImpRows.map(r=>{
+    const projeto=r.projeto||dProj||null, cidade=r.cidade||dCid||null, sit=r.situacao_atual||dSit||null;
+    let ext=r.extensao_m; if(ext==null||ext===''){ ext=pjWktLen(r.wkt); }
+    let id=r.id; if(!id && r._label) id=((projeto||'INT').replace(/\s+/g,''))+'-'+r._label;
+    return { id, projeto, cidade, dmc:r.dmc||null, tipo:(r.tipo||'HDD'),
+      dn:(r.dn!=null&&r.dn!==''?String(parseInt(r.dn,10)):null), tubulacao:r.tubulacao||null,
+      codigo_do_documento:r.codigo_do_documento||null, responsavel:r.responsavel||null,
+      situacao_atual:sit, extensao_m:(ext!=null?Number(ext).toFixed(2):null), wkt:r.wkt };
+  });
+}
+function pjImpPreview(){
+  const rows=pjImpResolve(), prev=$('#pjImpPrev');
+  const falta=rows.filter(r=>!r.projeto||!r.dmc||!r.situacao_atual).length;
+  prev.innerHTML='<div class="sub" style="margin:4px 0">'+rows.length+' intervenção(ões) lida(s).'+(falta?(' <b style="color:var(--bad)">'+falta+' sem projeto/DMC/situação</b> — preencha os padrões acima.'):'')+'</div>'+
+    '<div class="pjimpwrap"><table class="pjimpt"><thead><tr><th>id</th><th>projeto</th><th>dmc</th><th>tipo</th><th>dn</th><th>ext (m)</th><th>situação</th></tr></thead><tbody>'+
+    rows.slice(0,300).map(r=>`<tr><td>${vEsc(r.id||'—')}</td><td>${vEsc(r.projeto||'—')}</td><td>${vEsc(r.dmc||'—')}</td><td>${vEsc(r.tipo)}</td><td>${vEsc(r.dn||'—')}</td><td>${vEsc(r.extensao_m||'—')}</td><td>${vEsc(r.situacao_atual||'—')}</td></tr>`).join('')+
+    '</tbody></table></div>';
+  $('#pjImpActions').classList.remove('hidden');
+}
+async function pjImpProcessar(){
+  const rows=pjImpResolve(), go=$('#pjImpGo');
+  if(!rows.length){ toast('Nada para importar'); return; }
+  go.disabled=true; $('#pjImpMsg').innerHTML='<p class="sub">Importando…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_proj_intervencao_importar',{p_rows:rows}); if(error)throw error;
+    const d=data||{};
+    $('#pjImpMsg').innerHTML='<div class="banner ok">✓ '+(d.inseridas||0)+' inseridas, '+(d.atualizadas||0)+' atualizadas.</div>';
+    toast('✓ Intervenções importadas');
+  }catch(e){ $('#pjImpMsg').innerHTML='<div class="banner bad">Erro: '+vEsc(e.message||e)+'</div>'; }
+  go.disabled=false;
 }
 // Suporte · Acesso — mini-cadeado da categoria: define quem acessa (protótipo localStorage; lista real de usuários via sup_admin_usuarios)
 let _pjAcessoUsers=[];
