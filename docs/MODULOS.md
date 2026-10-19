@@ -2449,6 +2449,16 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
 > (Ficha cadastral), `vrpman_prev` (Cronograma preventivo)** — **migraram para o Auxiliar de Programação ›
 > categoria "Gestão de VRPs"** (renderizadas por `apInit()`, gate `ME.vrp_gestao`, ⚙️ `vrpman_cfg` admin). As
 > telas em si não mudaram; seus back-buttons e os redirects de gate agora apontam para `auxiliar_programacao`.
+>
+> **Melhorias 2026-10 (UX):** (1) **Ficha cadastral** (`vmFichasRender`) ganhou **busca pesquisável de VRP**
+> (input + `datalist`, filtra os cards ao digitar); (2) na **ficha aberta** (`vmFichaOpen`) há botão **＋ Abrir OS**
+> (gest.) que reusa `vmProgramar(vrp,num)` → escolhe tipo (corretiva/preventiva/substituição) + usuário + data;
+> (3) o **select de VRP ao Programar** (`vmProgramar`) virou **input+`datalist` pesquisável** (resolve o texto
+> digitado → `vrp_id` via `elig`); (4) **Execução** (`vmPhoto`/`vmPhotoMulti`) — removido `capture="environment"`
+> para o usuário **escolher foto da galeria** (não força a câmera); (5) **Gerar OS a partir de pendência**
+> (`vmGerarCorr`, usado na ficha, na OS e na gestão › Pendências) agora tem **seletor de tipo de OS**
+> (corretiva/preventiva/substituição) — RPC `app_vrp_pendencia_gerar_os` ganhou `p_origem` (drop+create, §0.6;
+> deixou de bloquear pendência de substituição); pendências de substituição também viraram acionáveis.
 
 Vertente de **gestão de serviços de manutenção** sobre as VRPs (separada do módulo `vrp`, que é só
 levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria **🚧 Em desenvolvimento** da home
