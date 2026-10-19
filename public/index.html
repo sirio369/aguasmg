@@ -525,7 +525,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="vrp" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button>
+    <div class="bar"><button class="bk" data-go="vrpman">‹ VRPs – Campo</button>
       <span style="margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px;">
         <button id="vrpVwLista" style="all:unset;cursor:pointer;padding:6px 14px;">Lista</button>
         <button id="vrpVwMapa" style="all:unset;cursor:pointer;padding:6px 14px;">Mapa</button>
@@ -872,7 +872,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="auxiliar_programacao" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <div class="bar"><button class="bk" data-back>‹ Início</button><button id="apCfg" class="hidden" title="Quem acessa o Auxiliar de Programação" style="all:unset;cursor:pointer;font-size:22px;line-height:1;margin-left:auto;padding:2px 6px">⚙️</button></div>
     <h1>Auxiliar de Programação</h1>
 
     <div class="sec" style="margin-top:8px">🧾 Serviços comerciais</div>
@@ -892,8 +892,16 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" id="apAbertPesq"><div class="ic">⚠️</div><div class="nm">Abertura de serviços</div></button>
     </div>
 
-    <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🔧 Gestão de VRPs<button id="apVrpCfg" class="hidden" title="Acesso à gestão" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">⚙️</button></div>
+    <div class="sec" style="margin-top:20px">🔧 Gestão de VRPs</div>
     <div class="grid" id="apVrpGrid" style="margin-top:10px"></div>
+  </main>
+
+  <main id="aux_acesso" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Auxiliar de Programação · Acesso</h1>
+    <p class="sub">Marque quem pode acessar o Auxiliar de Programação. O admin sempre tem acesso.</p>
+    <input id="auxAcBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
+    <div id="auxAcList"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="programacao_pesquisa" class="hidden">
@@ -1568,7 +1576,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1591,6 +1599,7 @@ function irPara(id){
   if(id==='abertura_servicos') asInit();
   if(id==='entrevistadores') entInit();
   if(id==='auxiliar_programacao') apInit();
+  if(id==='aux_acesso') auxAcInit();
   if(id==='ent_ocorrencia') eoInit();
   if(id==='ent_oc_gestao') egInit();
   if(id==='programacao_servicos') pgInit();
@@ -1616,7 +1625,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -3489,20 +3498,49 @@ let pgFiltro='pendente';
 const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Todas']];
 // Auxiliar de Programação — hub em 3 categorias (Serviços comerciais / Pesquisa / Gestão de VRPs)
 function apInit(){
+  // acesso geral à tela (controlado pela engrenagem desta própria tela)
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('home'); return; }
   const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; irPara('programacao_servicos'); };
   const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; irPara('programacao_servicos'); };
   // HD + Análise por matrícula: ferramentas migradas do cockpit NRW → abrem no perdas.html (fora do menu NRW)
   const hd=$('#apHdPri'); if(hd) hd.onclick=()=>{ location.href='perdas.html?s=hdpri'; };
   const mm=$('#apMmAnalise'); if(mm) mm.onclick=()=>{ location.href='perdas.html?s=mm'; };
-  // Gestão de VRPs (migrada do hub vrpman) — gate por vrp_gestao
-  const gestao=!!(ME&&ME.vrp_gestao), admin=!!(ME&&ME.is_admin);
+  // Gestão de VRPs — liberada pelo acesso geral do Auxiliar (quem está nesta tela pode usar)
   const grid=$('#apVrpGrid');
   if(grid){
     grid.innerHTML=[['vrpman_serv','🧾','Gestão de serviços'],['vrpman_fichas','📇','Ficha cadastral'],['vrpman_prev','🚦','Cronograma preventivo']]
-      .map(c=>`<button class="mod ${gestao?'':'soon'}" data-g="${c[0]}"><div class="ic">${c[1]}</div><div class="nm">${c[2]}${gestao?'':' 🔒'}</div></button>`).join('');
-    grid.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ if(gestao) irPara(b.dataset.g); else toast('Acesso restrito à gestão de VRPs'); });
+      .map(c=>`<button class="mod" data-g="${c[0]}"><div class="ic">${c[1]}</div><div class="nm">${c[2]}</div></button>`).join('');
+    grid.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>irPara(b.dataset.g));
   }
-  const cf=$('#apVrpCfg'); if(cf){ cf.classList.toggle('hidden', !(gestao&&admin)); cf.onclick=()=>irPara('vrpman_cfg'); }
+  // engrenagem geral: quem acessa o Auxiliar de Programação (admin)
+  const cf=$('#apCfg'); if(cf){ cf.classList.toggle('hidden', !(ME&&ME.is_admin)); cf.onclick=()=>irPara('aux_acesso'); }
+}
+// Config de acesso ao Auxiliar de Programação (admin-only) — espelha dev_acesso
+let _auxAcUsers=[];
+async function auxAcInit(){
+  if(!(ME&&ME.is_admin)){ irPara('auxiliar_programacao'); return; }
+  const cont=$('#auxAcList'); if(cont) cont.innerHTML='<p class="sub">Carregando…</p>';
+  const bu=$('#auxAcBusca'); if(bu && !bu.dataset.ready){ bu.dataset.ready='1'; bu.addEventListener('input',auxAcRender); }
+  try{ const {data,error}=await sb.rpc('app_aux_acesso_listar'); if(error)throw error; _auxAcUsers=data||[]; }
+  catch(e){ if(cont) cont.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  auxAcRender();
+}
+function auxAcRender(){
+  const termo=(($('#auxAcBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_auxAcUsers.filter(u=>!termo || (u.nome||'').toLowerCase().includes(termo) || (u.email||'').toLowerCase().includes(termo));
+  const cont=$('#auxAcList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{ const lock=!!u.acesso_pelo_cargo;
+    const nota=lock?'<span class="sub" style="font-size:11px">admin — acesso sempre</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="auxAcCk" data-id="${u.id}" ${u.acesso?'checked':''} ${lock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${u.nome||u.email||'—'}</div>${nota}</div></label>`;
+  }).join('');
+  cont.querySelectorAll('.auxAcCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_aux_acesso_set',{p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_auxAcUsers.find(x=>x.id===id); if(u) u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
 }
 // Abertura de serviços: segmentada por origem (comercial = solicitações / pesquisa = ocorrências)
 let pgModo='comercial';
