@@ -399,8 +399,10 @@ O gate da página libera essas ferramentas para **aprovador/admin/`aux_acesso` m
 entra em **`body.aux-solo`** (esconde o `#nav`, mostrando só a ferramenta + "Voltar ao AcquaHub"). As telas e RPCs
 (`app_nrw_hd_*`/`app_nrw_mm_*`/`app_nrw_fraude_*`) continuam no `perdas.html` — só mudou a porta de entrada.
 A **Fiscalização** (`fr*`) reaproveita `mm_matricula_stats` (sem motor novo); RPCs `app_nrw_fraude_resumo/ranking/mapa/detalhe`
-com gate `admin|dev_acesso|aux_acesso`; lentes grandes-consumidores/impedidas/abaixo-da-vizinhança; mapa com polígono
-+ export .xlsx p/ SIGOS. **Fora de escopo:** priorização por DMC e estimativa de recuperação de volume.
+com gate `admin|dev_acesso|aux_acesso`; lentes grandes-consumidores / **consumo com ligação irregular** (`meses_irregular`) /
+**leitura estimada** (`meses_estimada`=`qt_vol_est>0`, coluna nova, rebuild do mm patcheado) / abaixo-da-vizinhança; mapa com
+polígono + export .xlsx p/ SIGOS. **Fora de escopo:** priorização por DMC e estimativa de recuperação de volume.
+⚠️ **`cd_situaca` (R/I/F/P) = situação da LIGAÇÃO** (Real/Inativo/Factível/Potencial), não da leitura — não confundir.
 
 **Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🚧 Em desenvolvimento — schema `15 - telemetria`) — importa os
 CSVs exportados do sistema CCO da COPASA (vazão/volume macro, nível reservatório, bombas/pressão booster),
