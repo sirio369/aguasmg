@@ -271,8 +271,9 @@ pwa/
   **3 categorias**:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
-    (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
-    **Análise por matrícula** (abrem `perdas.html?s=hdpri` / `?s=mm` — ver Perdas/NRW).
+    (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD**,
+    **Fiscalização de irregularidades** e **Análise por matrícula** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` /
+    `?s=mm` — ver Perdas/NRW).
   - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
     (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
     **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`).
@@ -391,11 +392,15 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` na categoria **🚧 Em dese
 `homeGate()` por **`ME.dev_acesso`** (controle de acesso por engrenagem — ver abaixo); opaco (`.mod soon`) + 🔒
 para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
-**Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`) e **Análise do micromedido/por matrícula** (`s-mm`)
-**saíram do menu do cockpit** e passaram a ser acessadas pelo **Auxiliar de Programação** via deep-link
-`perdas.html?s=hdpri` / `?s=mm`. O gate da página libera essas duas para **aprovador/admin mesmo sem `dev_acesso`**;
-nesse caso entra em **`body.aux-solo`** (esconde o `#nav`, mostrando só a ferramenta + "Voltar ao AcquaHub").
-As telas e RPCs (`app_nrw_hd_*`/`app_nrw_mm_*`) continuam no `perdas.html` — só mudou a porta de entrada.
+**Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`), **Fiscalização de irregularidades** (`s-fraudepri`,
+2026-10-20) e **Análise do micromedido/por matrícula** (`s-mm`) são acessadas pelo **Auxiliar de Programação** via
+deep-link `perdas.html?s=hdpri` / `?s=fraudepri` / `?s=mm` (sem item de menu no cockpit; estão em `AUX_TOOLS`).
+O gate da página libera essas ferramentas para **aprovador/admin/`aux_acesso` mesmo sem `dev_acesso`**; nesse caso
+entra em **`body.aux-solo`** (esconde o `#nav`, mostrando só a ferramenta + "Voltar ao AcquaHub"). As telas e RPCs
+(`app_nrw_hd_*`/`app_nrw_mm_*`/`app_nrw_fraude_*`) continuam no `perdas.html` — só mudou a porta de entrada.
+A **Fiscalização** (`fr*`) reaproveita `mm_matricula_stats` (sem motor novo); RPCs `app_nrw_fraude_resumo/ranking/mapa/detalhe`
+com gate `admin|dev_acesso|aux_acesso`; lentes grandes-consumidores/impedidas/abaixo-da-vizinhança; mapa com polígono
++ export .xlsx p/ SIGOS. **Fora de escopo:** priorização por DMC e estimativa de recuperação de volume.
 
 **Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🚧 Em desenvolvimento — schema `15 - telemetria`) — importa os
 CSVs exportados do sistema CCO da COPASA (vazão/volume macro, nível reservatório, bombas/pressão booster),

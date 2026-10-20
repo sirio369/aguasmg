@@ -307,6 +307,9 @@ tbody tr:hover{background:var(--surface-2)}
       <select class="sel hdhf" id="hdfSit" aria-label="situação da ligação" hidden></select>
       <select class="sel hdhf" id="hdfInt" aria-label="situação do padrão" hidden></select>
       <input class="sel hdhf" id="hdfBusca" type="search" placeholder="matrícula…" aria-label="busca matrícula" hidden>
+      <select class="sel frhf" id="frfLente" aria-label="lente de fiscalização" hidden></select>
+      <select class="sel frhf" id="frfClasse" aria-label="classe de suspeita" hidden></select>
+      <input class="sel frhf" id="frfBusca" type="search" placeholder="matrícula…" aria-label="busca matrícula" hidden>
     </div>
     <div class="wrap">
       <!-- PAINEL -->
@@ -577,6 +580,7 @@ tbody tr:hover{background:var(--surface-2)}
       <section class="screen" id="s-macro"><div id="macroBody"></div></section>
 
       <section class="screen" id="s-hdpri"><div id="hdBody"></div></section>
+      <section class="screen" id="s-fraudepri"><div id="frBody"></div></section>
 
       <!-- CONFIG -->
       <section class="screen" id="s-config">
@@ -1699,7 +1703,7 @@ function cfgSalvar(){
  });
 }
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",config:"Parâmetros & Metas"};
+const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_balanco','nrw_contrato']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
@@ -1728,9 +1732,10 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
- if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='hdpri')?'none':'';   // resultado/HD não usam seletor de mês
+ if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='hdpri'||s==='fraudepri')?'none':'';   // resultado/HD/fraude não usam seletor de mês
  if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
  if(s!=='hdpri' && typeof hdHeaderReset==='function') hdHeaderReset();   // esconde os filtros de HD no cabeçalho
+ if(s!=='fraudepri' && typeof frHeaderReset==='function') frHeaderReset();   // esconde os filtros de fiscalização no cabeçalho
  $('#side').classList.remove('open');
  if(s==='painel'){kpis();consolidado();rank();renderMaps();}
  if(s==='nrw_balanco')balancoSheet();
@@ -1746,6 +1751,7 @@ function go(s,dmc){
  if(s==='macro')macroInit();
  if(s==='resultado')resInit();
  if(s==='hdpri')hdInit();
+ if(s==='fraudepri')frInit();
  if(s==='config')cfgInit();
  nrwMockBanner(s);
  applyFocus(s);
@@ -2384,7 +2390,244 @@ function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if
  }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#hdMapNote'))$('#hdMapNote').textContent='Erro ao exportar: '+(e.message||e); });
 }
 
-const NRW_REAL=new Set(['mm','macro','resultado','hdpri','config']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+/* ============================================================
+   FISCALIZAÇÃO DE IRREGULARIDADES (fraudes) — s-fraudepri
+   Tela operacional p/ o time de programação: ranking de suspeita +
+   lentes (grandes consumidores, leituras impedidas/estimadas, abaixo
+   da vizinhança), mapa com seleção por polígono e export .xlsx p/ SIGOS.
+   Fonte: "11 - perdas_nrw".mm_matricula_stats (motor de anomalia) +
+   micromedição (assinatura) + ligacoes/geom (mapa, polígono).
+   ============================================================ */
+let frF={lente:'todos',classe:'',busca:'',poligono:null};
+let frResumo={}, frRows=[], frTotal=0, frDetCache={};
+let frSort={k:'score_anomalia',dir:-1};
+let frMap=null, frPtLayer=null, frDrawnLayer=null, frDrawCtl=null;
+const FR_CLASSE={
+ fraude_potencial:{l:'Fraude potencial',s:'Fiscalizar — prioridade',c:'#d6336c'},
+ queda_continua:{l:'Queda contínua de consumo',s:'Investigar queda',c:'#e05d5d'},
+ nulo_recorrente:{l:'Consumo nulo recorrente',s:'Verificar em campo',c:'#e6a23c'},
+ factivel:{l:'Factível (impedida/estimada)',s:'Regularizar leitura',c:'#4b9fe0'},
+ instavel:{l:'Consumo instável',s:'Acompanhar',c:'#8a8f98'}
+};
+const FR_CLASSE_ORDER=['fraude_potencial','queda_continua','nulo_recorrente','factivel','instavel'];
+const FR_LENTE=[['todos','Todos os suspeitos'],['grandes','Grandes consumidores'],['impedidas','Leituras impedidas/estimadas'],['vizinhanca','Abaixo da vizinhança']];
+const FR_LENTE_DESC={todos:'Todas as classes de suspeita do motor de anomalia.',grandes:'Consumo médio ≥ 50 m³/mês — fraude/desvio aqui vale mais volume.',impedidas:'≥ 3 meses com leitura impedida ou estimada nos últimos 18 meses.',vizinhanca:'Consumo médio abaixo de 40% da mediana do próprio DMC.'};
+const FR_SIT={R:'Lida',I:'Impedida',F:'Estimada',P:'Pendente'};
+const FR_INFO={
+ score:{t:'Score de anomalia & classes',h:`<p>O <b>score (0–100)</b> e a <b>classe</b> vêm do motor de anomalia do micromedido (<i>análise por matrícula</i>), sobre 18 meses de consumo. Classes: <b>fraude potencial</b> (padrão típico de desvio), <b>queda contínua</b> (tendência de queda persistente), <b>consumo nulo recorrente</b> (muitos meses zerados), <b>factível</b> (leitura impedida/estimada recorrente) e <b>instável</b>. Clique numa classe para filtrar a tela.</p>`},
+ lente:{t:'Lentes operacionais',h:`<p>Recortes que ajudam a priorizar a fiscalização:</p><ul style="margin:4px 0 0;padding-left:18px"><li><b>Grandes consumidores</b> — média ≥ 50 m³/mês.</li><li><b>Leituras impedidas/estimadas</b> — ≥ 3 meses sem leitura real.</li><li><b>Abaixo da vizinhança</b> — média < 40% da mediana do DMC (sub-registro/desvio provável).</li></ul>`},
+ viz:{t:'Comparação com a vizinhança',h:`<p>Para cada matrícula calculamos a razão entre o <b>seu consumo médio</b> e a <b>mediana de consumo do próprio DMC</b>. Valores bem abaixo de 100% indicam consumo atípico para a região — indício de sub-registro, by-pass ou desvio. É um indício calibrável, não prova.</p>`}
+};
+function frCss(){ if(document.getElementById('frcss'))return; const st=document.createElement('style'); st.id='frcss'; st.textContent=`
+ body:has(#s-fraudepri.on) .wrap{max-width:none}
+ #s-fraudepri .frtop{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+ @media(max-width:1000px){#s-fraudepri .frtop{grid-template-columns:1fr}}
+ #s-fraudepri .frbottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+ @media(max-width:1000px){#s-fraudepri .frbottom{grid-template-columns:1fr}}
+ #s-fraudepri .frdist{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line-2);cursor:pointer;font-size:12px}
+ #s-fraudepri .frdist:hover{background:var(--surface-2)}
+ #s-fraudepri .frdist.on{background:rgba(var(--accent-rgb),.12);font-weight:600}
+ #s-fraudepri .frdist .lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ #s-fraudepri .frdist .bar{flex:0 0 70px;height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
+ #s-fraudepri .frdist .bar>span{display:block;height:100%}
+ #s-fraudepri .frdist .vv{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted);min-width:46px;text-align:right}
+ #s-fraudepri .frdistwrap{max-height:340px;overflow:auto}
+ #s-fraudepri table.frt{width:100%;border-collapse:collapse;font-size:12px}
+ #s-fraudepri table.frt th,#s-fraudepri table.frt td{padding:5px 7px;border-bottom:1px solid var(--line-2);text-align:left;white-space:nowrap}
+ #s-fraudepri table.frt th{cursor:pointer;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);z-index:1}
+ #s-fraudepri table.frt td.r,#s-fraudepri table.frt th.r{text-align:right;font-variant-numeric:tabular-nums}
+ #s-fraudepri table.frt tbody tr{cursor:pointer}
+ #s-fraudepri table.frt tbody tr:hover{background:var(--surface-2)}
+ #s-fraudepri .frtwrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+ #s-fraudepri .frpill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;color:#fff}
+ #s-fraudepri #frMapDiv{height:560px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+ #s-fraudepri #frMapDiv .leaflet-container{background:var(--surface-2)}
+ #s-fraudepri .frmaptools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+ #s-fraudepri .frbtn{font:inherit;font-size:12px;font-weight:600;padding:6px 11px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:var(--on-accent);cursor:pointer}
+ #s-fraudepri .frbtn.sec{background:var(--surface);color:var(--accent)}
+ #s-fraudepri .frbtn:disabled{opacity:.6;cursor:default}
+ .frdetwrap .frstats{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;font-size:12.5px;margin:9px 0}
+ .frdetwrap .frstats>div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line-2);padding:3px 0}
+ .frdetwrap .frstats .k{color:var(--muted)}
+`; document.head.appendChild(st); }
+function frIB(k){ return `<button class="mminfo" data-frinfo="${k}" title="Sobre">ⓘ</button>`; }
+function frCons(){ return za==='all'?null:za; }
+function frFilterArgs(){ return {p_consorcio:frCons(),p_lente:frF.lente,p_classe:frF.classe||null,p_poligono:frF.poligono||null}; }
+function frRankArgs(extra){ return Object.assign(frFilterArgs(),{p_busca:frF.busca||null},extra||{}); }
+function frMapaArgs(){ const a=frFilterArgs(); a.p_limit=8000; return a; }
+function frZaNome(c){ return ({ZA0200:'Betim',ZA1004:'Contagem'})[c]||c||''; }
+
+function frSyncHeader(){
+ const le=$('#frfLente'); if(le){ le.hidden=false; le.innerHTML=FR_LENTE.map(o=>`<option value="${o[0]}"${o[0]===frF.lente?' selected':''}>${o[1]}</option>`).join(''); le.onchange=()=>{ frF.lente=le.value; frReload(); }; }
+ const cl=$('#frfClasse'); if(cl){ cl.hidden=false; cl.innerHTML=`<option value="">Todas as classes</option>`+FR_CLASSE_ORDER.map(k=>`<option value="${k}"${k===frF.classe?' selected':''}>${FR_CLASSE[k].l}</option>`).join(''); cl.onchange=()=>{ frF.classe=cl.value; frReload(); }; }
+ const bs=$('#frfBusca'); if(bs){ bs.hidden=false; bs.value=frF.busca||''; bs.onchange=()=>{ frF.busca=bs.value.trim(); frReload(); }; }
+}
+function frHeaderReset(){ ['frfLente','frfClasse','frfBusca'].forEach(id=>{ const el=$('#'+id); if(el)el.hidden=true; }); }
+
+function frInit(){ mmCss(); frCss();
+ const body=$('#frBody'); if(!body)return;
+ if(frMap){ try{frMap.remove();}catch(e){} frMap=null; frPtLayer=null; frDrawnLayer=null; frDrawCtl=null; }
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando fiscalização de irregularidades…</p></div></div>';
+ Promise.all([ sbg.rpc('app_nrw_fraude_resumo',frFilterArgs()), sbg.rpc('app_nrw_fraude_ranking',frRankArgs({p_limit:300,p_offset:0})) ])
+ .then(([r1,r2])=>{
+  const err=r1.error||r2.error;
+  if(err){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0;color:var(--crit)">Erro ao carregar: '+(err.message||err)+'</p></div></div>'; return; }
+  frResumo=r1.data||{}; const rk=r2.data||{}; frRows=rk.rows||[]; frTotal=rk.total||0;
+  frRenderAll();
+ });
+}
+function frRenderAll(){ const body=$('#frBody');
+ body.innerHTML =
+  `<div class="frtop">
+     <div class="panel" style="margin:0"><div class="phead"><h3>Classes de suspeita</h3>${frIB('score')}</div><div class="pbody"><div class="frdistwrap" id="frDistClasse">${frDistClasse()}</div></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Lentes operacionais</h3>${frIB('lente')}</div><div class="pbody"><div class="frdistwrap" id="frDistLente">${frDistLente()}</div></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Por consórcio</h3><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody"><div class="frdistwrap" id="frDistCons">${frDistCons()}</div></div></div>
+   </div>
+   <div class="frbottom">
+     <div class="panel" style="margin:0"><div class="phead"><h3>Mapa logístico</h3><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody">
+        <div class="frmaptools"><button class="frbtn sec" id="frClearBtn" hidden>✕ Limpar seleção</button><span class="note" id="frDrawHint" style="font-size:11px">Use as ferramentas de desenho no mapa (polígono ou retângulo, canto superior direito) para montar a rota por área.</span></div>
+        <div id="frMapDiv"></div><p class="note" id="frMapNote" style="margin:8px 0 0"></p></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Fila operacional de fiscalização</h3><button class="frbtn" id="frExport" style="margin-left:auto">⭳ Exportar .xlsx</button></div><div class="pbody" style="padding-top:8px"><div id="frRankWrap">${frRankTable()}</div></div></div>
+   </div>`;
+ frSyncHeader(); frWire(); frInitMap();
+}
+function frBars(obj, fmtLab, activeKey, filterProp, color, order){
+ let e=Object.entries(obj); if(order)e=order.filter(k=>obj[k]!=null).map(k=>[k,obj[k]]); else e=e.sort((a,b)=>b[1]-a[1]);
+ const mx=Math.max(1,...e.map(x=>x[1]));
+ return e.map(([k,n])=>{ const f=fmtLab(k); const on=frF[filterProp]===k;
+   return `<div class="frdist ${on?'on':''}" data-fk="${encodeURIComponent(k)}" data-fp="${filterProp}"><span class="lab">${f.lab}</span><div class="bar"><span style="width:${Math.round(n/mx*100)}%;background:${f.c||color}"></span></div><span class="vv">${fmt(n)}</span></div>`;
+ }).join('')||'<p class="note" style="margin:0">—</p>';
+}
+function frDistClasse(){ return frBars((frResumo||{}).por_classe||{}, k=>({lab:`<span style="color:${(FR_CLASSE[k]||{}).c}"><b>${(FR_CLASSE[k]||{}).l||k}</b></span>`, c:(FR_CLASSE[k]||{}).c||'#888'}), frF.classe, 'classe', null, FR_CLASSE_ORDER); }
+function frDistLente(){ const r=frResumo||{}; const obj={todos:r.total||0,grandes:r.grandes||0,impedidas:r.impedidas||0,vizinhanca:r.vizinhanca||0};
+ return frBars(obj, k=>({lab:FR_LENTE.find(x=>x[0]===k)[1], c:'var(--accent)'}), frF.lente, 'lente', 'var(--accent)', ['todos','grandes','impedidas','vizinhanca']); }
+function frDistCons(){ return frBars((frResumo||{}).por_consorcio||{}, k=>({lab:frZaNome(k), c:'#4b9fe0'}), null, '__noop', '#4b9fe0'); }
+function frCmp(a,b){ const k=frSort.k,d=frSort.dir; let va=a[k],vb=b[k]; if(va==null)va=(typeof vb==='string'?'':-Infinity); if(vb==null)vb=(typeof va==='string'?'':-Infinity); if(typeof va==='string'||typeof vb==='string')return d*String(va).localeCompare(String(vb)); return d*(va-vb); }
+function frRankTable(){
+ const cols=[['classificacao','Suspeita'],['matricula','Matrícula'],['dmc','DMC'],['media','m³/mês'],['meses_irregular','Imped.'],['n_zeros','Zeros'],['pct_vizinhanca','% vizinh.'],['score_anomalia','Score']];
+ const rnum={media:1,meses_irregular:1,n_zeros:1,pct_vizinhanca:1,score_anomalia:1};
+ const rows=frRows.slice().sort(frCmp);
+ const th=cols.map(c=>`<th class="${rnum[c[0]]?'r':''}" data-k="${c[0]}">${c[1]}${frSort.k===c[0]?(frSort.dir<0?' ▾':' ▴'):''}</th>`).join('');
+ const body=rows.map(x=>{ const m=FR_CLASSE[x.classificacao]||{c:'#888',l:x.classificacao};
+   const viz=x.pct_vizinhanca!=null?(x.pct_vizinhanca+'%'):'—';
+   return `<tr data-mat="${x.matricula}"><td><span class="frpill" style="background:${m.c}">${m.l}</span></td><td>${x.matricula}</td><td>${x.dmc||'—'}</td><td class="r">${x.media!=null?br1(x.media):'—'}</td><td class="r">${x.meses_irregular!=null?x.meses_irregular:'—'}</td><td class="r">${x.n_zeros!=null?x.n_zeros:'—'}</td><td class="r">${viz}</td><td class="r"><b>${x.score_anomalia!=null?br1(x.score_anomalia):'—'}</b></td></tr>`;
+ }).join('')||'<tr><td colspan="8" class="note" style="padding:14px">Nenhuma matrícula nesse filtro.</td></tr>';
+ const selMsg=frF.poligono?' · <b style="color:var(--accent)">área selecionada no mapa</b>':'';
+ return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span class="note">${fmt(frTotal)} suspeito(s)${selMsg} · exibindo ${rows.length}</span></div><div class="frtwrap"><table class="frt"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+/* ---- assinatura de fraude (detalhe em popup) ---- */
+function frDetailHtml(d){
+ const stats=d.stats||{}, m=FR_CLASSE[stats.classificacao]||{c:'#888',l:stats.classificacao,s:''}, en=d.endereco||{};
+ const serie=d.serie||[], vals=serie.map(p=>+p.vol||0), maxv=Math.max(1,...vals);
+ const W=360,H=100,pl=4,pr=4,pt=10,pb=14, X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
+ const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
+ const SITC={R:null,I:'#e6a23c',F:'#4b9fe0',P:'#8a8f98'};
+ const dots=serie.map((p,i)=>{ const c=SITC[p.sit]; return c?`<circle cx="${X(i).toFixed(1)}" cy="${Y(vals[i]).toFixed(1)}" r="2.6" fill="${c}"/>`:''; }).join('');
+ const chart=serie.length?`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;margin-top:4px"><polyline points="${pts}" fill="none" stroke="${m.c}" stroke-width="1.6"/>${dots}<text x="${pl}" y="${H-3}" fill="#8899a0" font-size="8">${mmCmp(serie[0].competencia)}</text><text x="${W-pr}" y="${H-3}" fill="#8899a0" font-size="8" text-anchor="end">${mmCmp(serie[serie.length-1].competencia)}</text></svg>`:'<p class="note" style="margin:4px 0 0">Sem histórico de micromedição.</p>';
+ const row=(k,v)=>`<div><span class="k">${k}</span><span>${v}</span></div>`;
+ const slope=stats.slope!=null?br1(stats.slope):'—', cv=stats.cv!=null?br1(stats.cv):'—';
+ return `<div class="frdetwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="frpill" style="background:${m.c}">${m.l}</span> <span class="note">Score <b style="color:${m.c}">${stats.score_anomalia!=null?br1(stats.score_anomalia):'—'}</b></span> <span class="note">${frZaNome(stats.consorcio)}</span></div>
+  <p class="note" style="margin:7px 0 0"><b>${en.endereco||'(sem endereço no cadastro)'}</b>${en.bairro?(' · '+en.bairro):''}</p>
+  <div class="frstats">
+   ${row('Consumo médio', stats.media!=null?br1(stats.media)+' m³/mês':'—')}
+   ${row('Mediana', stats.mediana!=null?br1(stats.mediana)+' m³/mês':'—')}
+   ${row('Último volume', stats.ultimo_vol!=null?br1(stats.ultimo_vol)+' m³':'—')}
+   ${row('Tendência (slope)', slope+' m³/mês')}
+   ${row('Variabilidade (CV)', cv)}
+   ${row('Meses zerados', stats.n_zeros!=null?stats.n_zeros:'—')}
+   ${row('Meses impedidos/estim.', stats.meses_irregular!=null?stats.meses_irregular:'—')}
+   ${row('Meses factíveis', stats.meses_factivel!=null?stats.meses_factivel:'—')}
+   ${row('Situação atual', FR_SIT[stats.situacao_atual]||stats.situacao_atual||'—')}
+   ${row('Perfil / natureza', (en.perfil||'—')+(en.natureza?(' · '+en.natureza):''))}
+   ${row('Situação ligação', en.situacao_lig||'—')}
+   ${row('Economias', en.economias!=null?en.economias:'—')}
+  </div>
+  <div class="mmblock-h" style="margin-top:6px">Assinatura de consumo — micromedição (18 meses) ${frIB('score')}</div>${chart}
+  <p class="note" style="margin:6px 0 0;font-size:11px">Pontos coloridos: <span style="color:#e6a23c">●</span> impedida · <span style="color:#4b9fe0">●</span> estimada · <span style="color:#8a8f98">●</span> pendente. Linha = volume mensal lido/faturado.</p>
+  <p class="note" style="margin:6px 0 0"><b>Leitura de campo:</b> ${FR_CLASSE[stats.classificacao]?FR_CLASSE[stats.classificacao].s:'Avaliar'} — confirmar hidrômetro, lacre, by-pass e padrão de ligação.</p></div>`;
+}
+function frOpenDetail(mat){
+ const render=(d)=>{ mmModal('Matrícula '+mat, frDetailHtml(d)); setTimeout(()=>document.querySelectorAll('#mmModal [data-frinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=FR_INFO[b.dataset.frinfo];if(i)mmModal(i.t,i.h);}),0); };
+ if(frDetCache[mat]){ render(frDetCache[mat]); return; }
+ mmModal('Matrícula '+mat, '<p class="note" style="margin:0">Carregando assinatura…</p>');
+ sbg.rpc('app_nrw_fraude_detalhe',{p_matricula:mat}).then(r=>{ if(r.error){ mmModal('Matrícula '+mat,'<p class="note" style="color:var(--crit)">Erro: '+(r.error.message||'')+'</p>'); return; } frDetCache[mat]=r.data; render(r.data); });
+}
+function frWire(){
+ document.querySelectorAll('#s-fraudepri [data-frinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=FR_INFO[b.dataset.frinfo];if(i)mmModal(i.t,i.h);});
+ frWireRank(); frWireCharts();
+ const ex=$('#frExport'); if(ex)ex.onclick=frExport;
+ const cb=$('#frClearBtn'); if(cb){ cb.onclick=frDrawReset; cb.hidden=!frF.poligono; }
+ if(frF.poligono){ const h=$('#frDrawHint'); if(h)h.textContent='Área aplicada — a fila e o mapa mostram só as matrículas dentro dela.'; }
+}
+function frWireRank(){
+ document.querySelectorAll('#frRankWrap table.frt th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(frSort.k===k)frSort.dir*=-1; else {frSort.k=k;frSort.dir=({media:-1,score_anomalia:-1,meses_irregular:-1,n_zeros:-1}[k])||1;} $('#frRankWrap').innerHTML=frRankTable(); frWireRank(); });
+ document.querySelectorAll('#frRankWrap table.frt tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>frOpenDetail(+tr.dataset.mat));
+}
+function frWireCharts(){ document.querySelectorAll('#s-fraudepri .frdist[data-fp]').forEach(el=>el.onclick=()=>{ const prop=el.dataset.fp; if(prop==='__noop')return; const k=decodeURIComponent(el.dataset.fk);
+  if(prop==='lente'){ frF.lente=(frF.lente===k?'todos':k); } else { frF[prop]=(frF[prop]===k?'':k); }
+  frReload(); }); }
+function frReload(){
+ Promise.all([ sbg.rpc('app_nrw_fraude_resumo',frFilterArgs()), sbg.rpc('app_nrw_fraude_ranking',frRankArgs({p_limit:300,p_offset:0})) ])
+ .then(([r1,r2])=>{ if(r1.error||r2.error)return; frResumo=r1.data||{}; const rk=r2.data||{}; frRows=rk.rows||[]; frTotal=rk.total||0;
+  const u=(id,html)=>{ const e=$('#'+id); if(e)e.innerHTML=html; };
+  u('frDistClasse',frDistClasse()); u('frDistLente',frDistLente()); u('frDistCons',frDistCons()); u('frRankWrap',frRankTable());
+  frSyncHeader(); frWire(); frLoadMap();
+ });
+}
+function frInitMap(){ const div=$('#frMapDiv'); if(!div)return;
+ if(typeof L==='undefined'){ const n=$('#frMapNote'); if(n)n.textContent='Mapa indisponível (Leaflet não carregou).'; return; }
+ if(!frMap){ frMap=L.map(div,{scrollWheelZoom:true}).setView([-19.96,-44.12],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(frMap);
+  frPtLayer=L.layerGroup().addTo(frMap);
+  frDrawnLayer=L.featureGroup().addTo(frMap);
+  if(L.Draw){
+   frDrawCtl=new L.Control.Draw({position:'topright',
+    draw:{polygon:{shapeOptions:{color:'#d6336c',weight:2,fillOpacity:.08}},rectangle:{shapeOptions:{color:'#d6336c',weight:2,fillOpacity:.08}},polyline:false,circle:false,marker:false,circlemarker:false},
+    edit:{featureGroup:frDrawnLayer,edit:false,remove:false}});
+   frMap.addControl(frDrawCtl);
+   frMap.on(L.Draw.Event.CREATED,e=>{ frDrawnLayer.clearLayers(); frDrawnLayer.addLayer(e.layer); frSelecionarGeom(e.layer.toGeoJSON().geometry); });
+  }
+ }
+ setTimeout(()=>{ if(frMap)frMap.invalidateSize(); },80);
+ frLoadMap();
+}
+function frLoadMap(){ if(!frMap||!frPtLayer)return; const note=$('#frMapNote'); if(note)note.textContent='Carregando pontos…';
+ sbg.rpc('app_nrw_fraude_mapa',frMapaArgs()).then(r=>{
+  if(r.error){ if(note)note.textContent='Erro ao carregar o mapa.'; return; }
+  const pts=r.data||[]; frPtLayer.clearLayers(); const bounds=[];
+  pts.forEach(p=>{ if(p.lat==null||p.lon==null)return; const m=FR_CLASSE[p.classificacao]||{c:'#888',l:p.classificacao};
+   const mk=L.circleMarker([+p.lat,+p.lon],{radius:4,color:'#fff',weight:.8,fillColor:m.c,fillOpacity:.9});
+   mk.bindPopup(`<b>Matrícula ${p.matricula}</b><br>${m.l} · score ${p.score_anomalia!=null?br1(p.score_anomalia):'—'}<br><a href="#" onclick="frOpenDetail(${p.matricula});return false;">ver assinatura</a>`);
+   frPtLayer.addLayer(mk); bounds.push([+p.lat,+p.lon]);
+  });
+  if(note)note.textContent=fmt(pts.length)+' ponto(s)'+(frF.poligono?' na área selecionada':'')+' (máx 8.000, maior score). '+(frF.poligono?'':'Desenhe um polígono ou retângulo no mapa para montar a rota por área.');
+  if(bounds.length && !frF.poligono){ try{ frMap.fitBounds(bounds,{padding:[20,20],maxZoom:15}); }catch(e){} }
+ });
+}
+function frSelecionarGeom(geom){
+ frF.poligono=JSON.stringify(geom);
+ const c=$('#frClearBtn'); if(c)c.hidden=false;
+ const h=$('#frDrawHint'); if(h)h.textContent='Área aplicada — a fila e o mapa mostram só as matrículas dentro dela.';
+ frReload();
+}
+function frDrawReset(){ if(frDrawnLayer){ try{frDrawnLayer.clearLayers();}catch(e){} }
+ const c=$('#frClearBtn'); if(c)c.hidden=true; const h=$('#frDrawHint'); if(h)h.textContent='Use as ferramentas de desenho no mapa (polígono ou retângulo, canto superior direito) para montar a rota por área.';
+ if(frF.poligono){ frF.poligono=null; frReload(); }
+}
+function frExport(){ const btn=$('#frExport'); if(typeof XLSX==='undefined'){ if(btn)btn.textContent='lib .xlsx indisponível'; return; }
+ if(btn){btn.disabled=true;btn.textContent='Gerando…';}
+ const all=[]; const pageN=1000;
+ function fetchPage(off){ return sbg.rpc('app_nrw_fraude_ranking',frRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
+ fetchPage(0).then(()=>{
+  const head=['Matrícula','Consórcio','Bairro','Endereço','DMC','Classe de suspeita','Score anomalia','Consumo médio (m³/mês)','Último volume (m³)','Tendência (slope)','Meses zerados','Meses impedidos/estimados','% vs vizinhança (DMC)','Situação atual'];
+  const data=all.map(x=>[x.matricula,x.consorcio||'',x.bairro||'',x.endereco||'',x.dmc||'',(FR_CLASSE[x.classificacao]||{l:x.classificacao}).l,x.score_anomalia!=null?+x.score_anomalia:'',x.media!=null?+x.media:'',x.ultimo_vol!=null?+x.ultimo_vol:'',x.slope!=null?+x.slope:'',x.n_zeros!=null?+x.n_zeros:'',x.meses_irregular!=null?+x.meses_irregular:'',x.pct_vizinhanca!=null?+x.pct_vizinhanca:'',FR_SIT[x.situacao_atual]||x.situacao_atual||'']);
+  const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Fiscalizacao');
+  XLSX.writeFile(wb,`fiscalizacao_irregularidades_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}
+ }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#frMapNote'))$('#frMapNote').textContent='Erro ao exportar: '+(e.message||e); });
+}
+
+const NRW_REAL=new Set(['mm','macro','resultado','hdpri','fraudepri','config']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
 function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
  .navi.mock{opacity:.5}
  .navi.mock:hover{opacity:.82}
@@ -2424,7 +2667,7 @@ const g = document.getElementById('nrwGate'), gm = document.getElementById('gm')
 // programação (aprovador/admin) mesmo sem dev_acesso, e sem expor o resto do cockpit NRW.
 const _params = new URLSearchParams(location.search);
 const _reqS = _params.get('s');
-const AUX_TOOLS = new Set(['hdpri','mm']);
+const AUX_TOOLS = new Set(['hdpri','mm','fraudepri']);
 const _auxTool = !!(_reqS && AUX_TOOLS.has(_reqS));
 try{
   const { data } = await sbg.auth.getSession();
@@ -2432,7 +2675,7 @@ try{
   else {
     const em = (data.session.user.email || '').toLowerCase();
     const { data: me } = await sbg.rpc('app_me');
-    const liberado = !!(me && (me.dev_acesso || (_auxTool && (me.is_admin || me.pode_aprovar))));
+    const liberado = !!(me && (me.dev_acesso || (_auxTool && (me.is_admin || me.pode_aprovar || me.aux_acesso))));
     if (liberado) {
       g.remove();
       if (_reqS && document.getElementById('s-'+_reqS) && window.go) window.go(_reqS);
