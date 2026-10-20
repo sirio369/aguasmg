@@ -271,9 +271,9 @@ pwa/
   **3 categorias**:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
-    (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD**,
-    **Fiscalização de irregularidades** e **Análise por matrícula** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` /
-    `?s=mm` — ver Perdas/NRW).
+    (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
+    **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW). *(Análise
+    por matrícula / `?s=mm` foi removida do Auxiliar em 2026-10-20; a tela segue existindo no cockpit NRW.)*
   - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
     (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
     **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`).
