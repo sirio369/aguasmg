@@ -288,7 +288,7 @@ pwa/
   (1) **`pavimento`** (Home › 🛠️ Execução) = formulário de campo: serviço de origem (vazamento/ramal/fiscalização/
   vrp/rede_vca/rede_hdd/dmc), OS SIGOS, **coordenada travada no GPS** (`pavOnGps`, trava ≤`PRECISAO_MAX` 15m —
   "Fique próximo ao local"), **multi-seleção de tipos de pavimento** (chips: grama/asfalto/concreto/bloquete/
-  paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta/terra) e, por tipo, **dimensão + 2 fotos
+  paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta) e, por tipo, **dimensão + 2 fotos
   obrigatórias** (câmera **ou galeria**). Salva **1 registro por tipo** (mesmo `grupo` uuid) via a fila offline
   (`enviarOuEnfileirar`, fotos `p_foto1`/`p_foto2`). (2) **`pavprog`** (Auxiliar de Programação) = lista agrupada por
   ponto, filtros consórcio + serviço de origem, fotos (bucket público `fotos-campo`) e export .xlsx (gate `aux_acesso`).
