@@ -299,7 +299,7 @@ pwa/
   (`os_sigos`=OS de origem, do campo; `os_recomposicao`=OS da recomposição, lançada no `pavprog`.)
   Backend: `"8 - coleta_campo".pav_recomposicao` (1 linha/tipo, geom 4326, `os_recomposicao`/`os_recomp_em`/`os_recomp_por`,
   RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) / `app_pav_minhas` / `app_pav_listar` / `app_pav_os`
-  (admin|aux_acesso). sw v263.
+  (admin|aux_acesso). sw v264.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
