@@ -1089,18 +1089,24 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="pavprog" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Gestão de Pavimento</h1>
-    <p class="sub">Pavimentos registrados em campo para programar a recomposição.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 10px;align-items:center">
+    <p class="sub">Pavimentos registrados em campo — lance o nº da OS da recomposição.</p>
+    <div class="seg" id="pavpStatusSeg" style="margin:6px 0 8px">
+      <button type="button" data-st="pendente" class="sel">Pendentes</button>
+      <button type="button" data-st="criada">OS criada</button>
+      <button type="button" data-st="todos">Todas</button>
+    </div>
+    <div class="seg" id="pavpViewSeg" style="margin:0 0 10px">
+      <button type="button" data-v="lista" class="sel">📋 Lista</button>
+      <button type="button" data-v="mapa">🗺️ Mapa</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center">
       <select id="pavpCons"><option value="">Todos os consórcios</option><option value="ZA0200">Betim (ZA0200)</option><option value="ZA1004">Contagem (ZA1004)</option></select>
-      <select id="pavpStatus"><option value="pendente">⏳ Pendentes de OS</option><option value="criada">✓ OS criada</option><option value="todos">Todos os status</option></select>
-      <select id="pavpPrazo"><option value="">Todos os prazos</option><option value="ok">🟢 No prazo (≤7 dias)</option><option value="aten">🟡 Atenção (8–15 dias)</option><option value="atraso">🔴 Atrasado (&gt;15 dias)</option></select>
-      <select id="pavpSort"><option value="antigos">Mais antigos primeiro</option><option value="recentes">Mais recentes primeiro</option></select>
+      <div class="msdd" id="pavpOrigDd"><button type="button" class="msdd-btn" id="pavpOrigBtn">Serviço de origem ▾</button><div class="msdd-panel hidden" id="pavpOrigPanel"></div></div>
       <button id="pavpXlsx" class="btn sec" style="margin-left:auto">⭳ Exportar</button>
     </div>
-    <div class="sub" style="font-size:12px;margin:0 0 4px">Serviço de origem (toque para filtrar — seleção múltipla)</div>
-    <div id="pavpOrigChips" class="pavchips" style="margin-bottom:10px"></div>
     <div id="pavpResumo" style="margin-bottom:10px"></div>
     <div id="pavpLista"></div>
+    <div id="pavpMapa" class="hidden" style="margin-top:4px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
   <main id="matriculas" class="hidden">
@@ -3655,6 +3661,12 @@ function pavCss(){ if(document.getElementById('pavcss'))return; const st=documen
  .pavchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
  .pavchip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;background:var(--card);user-select:none}
  .pavchip.on{background:#0e7c86;color:#fff;border-color:transparent}
+ .msdd{position:relative}
+ .msdd-btn{font:inherit;font-size:14px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:inherit;cursor:pointer;min-width:200px;text-align:left}
+ .msdd-panel{position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:250px;max-height:320px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
+ .msdd-opt{display:flex;align-items:center;gap:9px;padding:9px 9px;border-radius:8px;cursor:pointer;font-size:14px}
+ .msdd-opt:hover{background:rgba(127,127,127,.12)}
+ .msdd-opt input{width:17px;height:17px}
  #pavimento .pavblk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:12px 0;background:var(--card)}
  #pavimento .pavblk h4{margin:0 0 6px;font-size:14px}
  #pavimento .pavfotos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -3717,26 +3729,28 @@ async function pavMinhasRender(){ const c=document.getElementById('pavMinhas'); 
     }).join(''):'<p class="sub">Você ainda não registrou pavimentos.</p>';
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar seus registros.</p>'; } }
 // --- Auxiliar de Programação: Gestão de Pavimento (lista + filtros + controle de prazo) ---
-let pavpUltimo=[], pavpOrig=new Set(), pavpPrazo='', pavpSort='antigos', pavpStatus='pendente';
-const PAV_SLA=[7,15]; // dias pendente (sem OS): ≤7 no prazo · 8–15 atenção · >15 atrasado
+let pavpUltimo=[], pavpOrig=new Set(), pavpPrazo='', pavpStatus='pendente', pavpView='lista', pavpMap=null, pavpMarkers=null, pavpOddWired=false;
+const PAV_SLA=[3,5]; // dias pendente (sem OS): 0–3 no prazo · 4–5 atenção · >5 atrasado
 function pavDias(iso){ if(!iso)return null; return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
 function pavBucket(d){ if(d==null)return{key:'',lbl:'—',c:'#8a8f98'}; if(d<=PAV_SLA[0])return{key:'ok',lbl:'No prazo',c:'#2f8b6c'}; if(d<=PAV_SLA[1])return{key:'aten',lbl:'Atenção',c:'#e6a23c'}; return{key:'atraso',lbl:'Atrasado',c:'#d6336c'}; }
 function pavDiasTxt(d){ return d==null?'—':(d<=0?'hoje':(d===1?'há 1 dia':('há '+d+' dias'))); }
 function pavEhPend(g){ return !g.os_recomposicao; }
 function pavProgInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
-  pavCss(); pavpRenderOrigChips();
+  pavCss(); pavpRenderOrigDd();
+  document.querySelectorAll('#pavpStatusSeg button').forEach(b=>b.onclick=()=>{ pavpStatus=b.dataset.st; document.querySelectorAll('#pavpStatusSeg button').forEach(x=>x.classList.toggle('sel',x===b)); pavProgRender(); });
+  document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.onclick=()=>pavProgSetView(b.dataset.v));
+  const ob=document.getElementById('pavpOrigBtn'); if(ob) ob.onclick=e=>{ e.stopPropagation(); const p=document.getElementById('pavpOrigPanel'); if(p)p.classList.toggle('hidden'); };
+  if(!pavpOddWired){ document.addEventListener('click',e=>{ const dd=document.getElementById('pavpOrigDd'), p=document.getElementById('pavpOrigPanel'); if(dd&&p&&!dd.contains(e.target)) p.classList.add('hidden'); }); pavpOddWired=true; }
   if($('#pavpCons')) $('#pavpCons').onchange=pavProgCarregar;
-  if($('#pavpStatus')) $('#pavpStatus').onchange=()=>{ pavpStatus=$('#pavpStatus').value; pavProgRender(); };
-  if($('#pavpPrazo')) $('#pavpPrazo').onchange=()=>{ pavpPrazo=$('#pavpPrazo').value; pavProgRender(); };
-  if($('#pavpSort')) $('#pavpSort').onchange=()=>{ pavpSort=$('#pavpSort').value; pavProgRender(); };
   if($('#pavpXlsx')) $('#pavpXlsx').onclick=pavProgExport;
   pavProgCarregar(); }
-function pavpRenderOrigChips(){ const c=document.getElementById('pavpOrigChips'); if(!c)return;
-  c.innerHTML='<div class="pavchip '+(pavpOrig.size===0?'on':'')+'" data-orig="">Todos</div>'+Object.entries(PAV_ORIGEM).map(([k,l])=>`<div class="pavchip ${pavpOrig.has(k)?'on':''}" data-orig="${k}">${l}</div>`).join('');
-  c.querySelectorAll('.pavchip').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.orig;
-    if(k===''){ pavpOrig.clear(); } else { if(pavpOrig.has(k))pavpOrig.delete(k); else pavpOrig.add(k); }
-    pavpRenderOrigChips(); pavProgRender(); }); }
+function pavpRenderOrigDd(){ const btn=document.getElementById('pavpOrigBtn'), panel=document.getElementById('pavpOrigPanel'); if(!btn||!panel)return;
+  btn.textContent=(pavpOrig.size?(pavpOrig.size+' serviço(s) de origem'):'Serviço de origem: todos')+' ▾';
+  panel.innerHTML=Object.entries(PAV_ORIGEM).map(([k,l])=>`<label class="msdd-opt"><input type="checkbox" data-orig="${k}" ${pavpOrig.has(k)?'checked':''}/> ${l}</label>`).join('')
+    +'<div class="msdd-opt" data-clear style="justify-content:center;color:var(--acc);font-weight:600">Limpar seleção</div>';
+  panel.querySelectorAll('input[data-orig]').forEach(cb=>cb.onchange=()=>{ const k=cb.dataset.orig; if(cb.checked)pavpOrig.add(k); else pavpOrig.delete(k); pavpRenderOrigDd(); pavProgRender(); });
+  const cl=panel.querySelector('[data-clear]'); if(cl)cl.onclick=()=>{ pavpOrig.clear(); pavpRenderOrigDd(); pavProgRender(); }; }
 async function pavProgCarregar(){ const c=document.getElementById('pavpLista'); if(!c)return; c.innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_pav_listar',{p_consorcio:$('#pavpCons').value||null,p_servico_origem:null}); if(error)throw error;
     pavpUltimo=data||[]; pavProgRender();
@@ -3748,43 +3762,56 @@ function pavProgFiltrado(soOrigem){ let arr=pavpUltimo.slice();
     else if(pavpStatus==='criada') arr=arr.filter(g=>!pavEhPend(g));
     if(pavpPrazo) arr=arr.filter(g=>pavEhPend(g) && pavBucket(pavDias(g.created_at)).key===pavpPrazo);
   }
-  arr.sort((a,b)=>{ const da=new Date(a.created_at).getTime(), db=new Date(b.created_at).getTime(); return pavpSort==='recentes'?db-da:da-db; });
+  arr.sort((a,b)=>new Date(a.created_at).getTime()-new Date(b.created_at).getTime()); // mais antigos primeiro
   return arr; }
-function pavProgRender(){ const c=document.getElementById('pavpLista'); if(!c)return;
-  const base=pavProgFiltrado(true), cnt={ok:0,aten:0,atraso:0}; let criadas=0, maisAntigo=null;
-  base.forEach(g=>{ if(!pavEhPend(g)){ criadas++; return; } const d=pavDias(g.created_at), b=pavBucket(d); if(cnt[b.key]!=null)cnt[b.key]++; if(d!=null&&(maisAntigo==null||d>maisAntigo))maisAntigo=d; });
-  const r=document.getElementById('pavpResumo');
-  if(r){ r.innerHTML=base.length?('<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;align-items:center"><b style="color:var(--muted);font-weight:600">Pendentes de OS:</b>'
-    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(47,139,108,.15);color:#2f8b6c;font-weight:700">🟢 ${cnt.ok} no prazo</span>`
-    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(230,162,60,.15);color:#e6a23c;font-weight:700">🟡 ${cnt.aten} atenção</span>`
-    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(214,51,108,.15);color:#d6336c;font-weight:700">🔴 ${cnt.atraso} atrasado</span>`
-    +(maisAntigo!=null?`<span style="padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)">mais antigo: ${pavDiasTxt(maisAntigo)}</span>`:'')
-    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(14,124,134,.12);color:#0e7c86;font-weight:700">✓ ${criadas} com OS</span>`
-    +'</div>'):''; }
-  const arr=pavProgFiltrado();
-  if(!arr.length){ c.innerHTML='<p class="sub">Nenhum pavimento nesse filtro.</p>'; return; }
-  c.innerHTML='<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(g=>{
-    const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d);
-    const barra=pend?b.c:'#0e7c86';
-    const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'—';
-    const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
-    const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
-    const badge=pend
-      ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span>`
-      : `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:#0e7c86;padding:2px 10px;border-radius:999px;white-space:nowrap">✓ OS ${pavH(g.os_recomposicao)}</span>`;
-    const osBox=pend
-      ? `<div style="display:flex;gap:6px;margin-top:8px"><input id="pavos_${g.grupo}" placeholder="nº da OS SIGOS da recomposição" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`
-      : `<div class="sub" style="margin-top:6px;font-size:12px">OS lançada${g.os_recomp_por?(' por '+pavH(g.os_recomp_por)):''}${g.os_recomp_em?(' em '+new Date(g.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`;
-    const itens=(g.itens||[]).map(it=>{ const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
-      return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div></div>`;
-    }).join('');
-    return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${barra};border-radius:12px;padding:12px 13px;margin-bottom:10px">
-      <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
-      <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
-      ${itens}
-      ${osBox}</div>`;
+function pavProgResumo(){ const r=document.getElementById('pavpResumo'); if(!r)return;
+  const base=pavProgFiltrado(true).filter(pavEhPend), cnt={ok:0,aten:0,atraso:0};
+  base.forEach(g=>{ const b=pavBucket(pavDias(g.created_at)); if(cnt[b.key]!=null)cnt[b.key]++; });
+  const B={ok:{e:'🟢',l:'no prazo',c:'#2f8b6c'},aten:{e:'🟡',l:'atenção',c:'#e6a23c'},atraso:{e:'🔴',l:'atrasado',c:'#d6336c'}};
+  r.innerHTML='<div class="pavchips" style="margin-top:0">'+['ok','aten','atraso'].map(k=>{ const on=pavpPrazo===k;
+    return `<div class="pavchip" data-prazo="${k}" style="${on?('background:'+B[k].c+';border-color:transparent;color:#fff'):''}">${B[k].e} ${cnt[k]} ${B[k].l}</div>`; }).join('')+'</div>';
+  r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.prazo; pavpPrazo=(pavpPrazo===k?'':k);
+    if(pavpPrazo && pavpStatus!=='pendente'){ pavpStatus='pendente'; document.querySelectorAll('#pavpStatusSeg button').forEach(x=>x.classList.toggle('sel',x.dataset.st==='pendente')); }
+    pavProgRender(); }); }
+function pavProgRender(){ pavProgResumo();
+  const arr=pavProgFiltrado(), c=document.getElementById('pavpLista');
+  if(c){ c.innerHTML = arr.length ? ('<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(pavProgCard).join('')) : '<p class="sub">Nenhum pavimento nesse filtro.</p>';
+    c.querySelectorAll('.pavoscriar').forEach(btn=>btn.onclick=()=>pavProgCriarOS(btn.dataset.grupo)); }
+  if(pavpView==='mapa') pavProgMapa(); }
+function pavProgCard(g){
+  const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d), barra=pend?b.c:'#0e7c86';
+  const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'—';
+  const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
+  const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+  const badge=pend
+    ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span>`
+    : `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:#0e7c86;padding:2px 10px;border-radius:999px;white-space:nowrap">✓ OS ${pavH(g.os_recomposicao)}</span>`;
+  const osBox=pend
+    ? `<div style="display:flex;gap:6px;margin-top:8px"><input id="pavos_${g.grupo}" placeholder="nº da OS SIGOS da recomposição" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`
+    : `<div class="sub" style="margin-top:6px;font-size:12px">OS lançada${g.os_recomp_por?(' por '+pavH(g.os_recomp_por)):''}${g.os_recomp_em?(' em '+new Date(g.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`;
+  const itens=(g.itens||[]).map(it=>{ const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
+    return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div></div>`;
   }).join('');
-  c.querySelectorAll('.pavoscriar').forEach(btn=>btn.onclick=()=>pavProgCriarOS(btn.dataset.grupo)); }
+  return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${barra};border-radius:12px;padding:12px 13px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
+    <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
+    ${itens}
+    ${osBox}</div>`; }
+function pavProgSetView(v){ pavpView=v;
+  document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v));
+  const l=document.getElementById('pavpLista'), m=document.getElementById('pavpMapa');
+  if(l)l.classList.toggle('hidden',v!=='lista'); if(m)m.classList.toggle('hidden',v!=='mapa');
+  if(v==='mapa') pavProgMapa(); }
+function pavProgMapa(){ const el=document.getElementById('pavpMapa'); if(!el||typeof L==='undefined')return;
+  if(!pavpMap){ el.innerHTML=''; pavpMap=L.map(el); mapAddCamadaBase(pavpMap); pavpMap.setView([-19.94,-44.1],11); pavpMarkers=L.layerGroup().addTo(pavpMap); }
+  setTimeout(()=>{ try{pavpMap.invalidateSize();}catch(e){} },60);
+  if(!pavpMarkers)return; pavpMarkers.clearLayers(); const bounds=[];
+  pavProgFiltrado().forEach(g=>{ if(g.lat==null||g.lon==null)return; const pend=pavEhPend(g), b=pavBucket(pavDias(g.created_at)), col=pend?b.c:'#0e7c86';
+    const mk=L.circleMarker([+g.lat,+g.lon],{radius:7,color:'#fff',weight:1.5,fillColor:col,fillOpacity:.95});
+    const tipos=(g.itens||[]).map(it=>PAV_TIPO_LBL(it.tipo)).join(', ');
+    mk.bindPopup(`<b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><br>${pend?(b.lbl+' · '+pavDiasTxt(pavDias(g.created_at))):('✓ OS '+pavH(g.os_recomposicao))}<br><span style="font-size:11px">${pavH(tipos)}</span>`);
+    pavpMarkers.addLayer(mk); bounds.push([+g.lat,+g.lon]); });
+  if(bounds.length){ try{ pavpMap.fitBounds(bounds,{padding:[30,30],maxZoom:16}); }catch(e){} } }
 async function pavProgCriarOS(grupo){ const inp=document.getElementById('pavos_'+grupo); const os=(inp&&inp.value.trim())||'';
   if(!os) return toast('Informe o número da OS SIGOS');
   try{ const {error}=await sb.rpc('app_pav_os',{p_grupo:grupo,p_os:os}); if(error)throw error; toast('✓ OS criada');
