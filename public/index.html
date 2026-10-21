@@ -1090,11 +1090,16 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Gestão de Pavimento</h1>
     <p class="sub">Pavimentos registrados em campo para programar a recomposição.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px;align-items:center">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 10px;align-items:center">
       <select id="pavpCons"><option value="">Todos os consórcios</option><option value="ZA0200">Betim (ZA0200)</option><option value="ZA1004">Contagem (ZA1004)</option></select>
-      <select id="pavpOrigem"><option value="">Todos os serviços de origem</option></select>
+      <select id="pavpStatus"><option value="pendente">⏳ Pendentes de OS</option><option value="criada">✓ OS criada</option><option value="todos">Todos os status</option></select>
+      <select id="pavpPrazo"><option value="">Todos os prazos</option><option value="ok">🟢 No prazo (≤7 dias)</option><option value="aten">🟡 Atenção (8–15 dias)</option><option value="atraso">🔴 Atrasado (&gt;15 dias)</option></select>
+      <select id="pavpSort"><option value="antigos">Mais antigos primeiro</option><option value="recentes">Mais recentes primeiro</option></select>
       <button id="pavpXlsx" class="btn sec" style="margin-left:auto">⭳ Exportar</button>
     </div>
+    <div class="sub" style="font-size:12px;margin:0 0 4px">Serviço de origem (toque para filtrar — seleção múltipla)</div>
+    <div id="pavpOrigChips" class="pavchips" style="margin-bottom:10px"></div>
+    <div id="pavpResumo" style="margin-bottom:10px"></div>
     <div id="pavpLista"></div>
   </main>
 
@@ -3647,9 +3652,9 @@ const pavH=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const PAV_FOTO_URL=p=>p?sb.storage.from('fotos-campo').getPublicUrl(p).data.publicUrl:null;
 let pavState={}; // { tipo: {dimensao, f1, f2} }
 function pavCss(){ if(document.getElementById('pavcss'))return; const st=document.createElement('style'); st.id='pavcss'; st.textContent=`
- #pavimento .pavchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
- #pavimento .pavchip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;background:var(--card);user-select:none}
- #pavimento .pavchip.on{background:#0e7c86;color:#fff;border-color:transparent}
+ .pavchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+ .pavchip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;background:var(--card);user-select:none}
+ .pavchip.on{background:#0e7c86;color:#fff;border-color:transparent}
  #pavimento .pavblk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:12px 0;background:var(--card)}
  #pavimento .pavblk h4{margin:0 0 6px;font-size:14px}
  #pavimento .pavfotos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -3711,36 +3716,85 @@ async function pavMinhasRender(){ const c=document.getElementById('pavMinhas'); 
       return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><div class="sub" style="margin-top:2px">${g.os_sigos?('OS '+pavH(g.os_sigos)+' · '):''}${pavH(tipos)}</div><div class="sub" style="margin-top:2px;font-size:12px">${dt}</div></div>`;
     }).join(''):'<p class="sub">Você ainda não registrou pavimentos.</p>';
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar seus registros.</p>'; } }
-// --- Auxiliar de Programação: Gestão de Pavimento (lista + filtros) ---
-let pavpUltimo=[];
+// --- Auxiliar de Programação: Gestão de Pavimento (lista + filtros + controle de prazo) ---
+let pavpUltimo=[], pavpOrig=new Set(), pavpPrazo='', pavpSort='antigos', pavpStatus='pendente';
+const PAV_SLA=[7,15]; // dias pendente (sem OS): ≤7 no prazo · 8–15 atenção · >15 atrasado
+function pavDias(iso){ if(!iso)return null; return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
+function pavBucket(d){ if(d==null)return{key:'',lbl:'—',c:'#8a8f98'}; if(d<=PAV_SLA[0])return{key:'ok',lbl:'No prazo',c:'#2f8b6c'}; if(d<=PAV_SLA[1])return{key:'aten',lbl:'Atenção',c:'#e6a23c'}; return{key:'atraso',lbl:'Atrasado',c:'#d6336c'}; }
+function pavDiasTxt(d){ return d==null?'—':(d<=0?'hoje':(d===1?'há 1 dia':('há '+d+' dias'))); }
+function pavEhPend(g){ return !g.os_recomposicao; }
 function pavProgInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
-  const o=document.getElementById('pavpOrigem'); if(o && o.children.length<=1) o.innerHTML='<option value="">Todos os serviços de origem</option>'+Object.entries(PAV_ORIGEM).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+  pavCss(); pavpRenderOrigChips();
   if($('#pavpCons')) $('#pavpCons').onchange=pavProgCarregar;
-  if($('#pavpOrigem')) $('#pavpOrigem').onchange=pavProgCarregar;
+  if($('#pavpStatus')) $('#pavpStatus').onchange=()=>{ pavpStatus=$('#pavpStatus').value; pavProgRender(); };
+  if($('#pavpPrazo')) $('#pavpPrazo').onchange=()=>{ pavpPrazo=$('#pavpPrazo').value; pavProgRender(); };
+  if($('#pavpSort')) $('#pavpSort').onchange=()=>{ pavpSort=$('#pavpSort').value; pavProgRender(); };
   if($('#pavpXlsx')) $('#pavpXlsx').onclick=pavProgExport;
   pavProgCarregar(); }
+function pavpRenderOrigChips(){ const c=document.getElementById('pavpOrigChips'); if(!c)return;
+  c.innerHTML='<div class="pavchip '+(pavpOrig.size===0?'on':'')+'" data-orig="">Todos</div>'+Object.entries(PAV_ORIGEM).map(([k,l])=>`<div class="pavchip ${pavpOrig.has(k)?'on':''}" data-orig="${k}">${l}</div>`).join('');
+  c.querySelectorAll('.pavchip').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.orig;
+    if(k===''){ pavpOrig.clear(); } else { if(pavpOrig.has(k))pavpOrig.delete(k); else pavpOrig.add(k); }
+    pavpRenderOrigChips(); pavProgRender(); }); }
 async function pavProgCarregar(){ const c=document.getElementById('pavpLista'); if(!c)return; c.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_pav_listar',{p_consorcio:$('#pavpCons').value||null,p_servico_origem:$('#pavpOrigem').value||null}); if(error)throw error;
+  try{ const {data,error}=await sb.rpc('app_pav_listar',{p_consorcio:$('#pavpCons').value||null,p_servico_origem:null}); if(error)throw error;
     pavpUltimo=data||[]; pavProgRender();
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; } }
-function pavProgRender(){ const c=document.getElementById('pavpLista'); if(!c)return; const arr=pavpUltimo;
-  if(!arr.length){ c.innerHTML='<p class="sub">Nenhum pavimento registrado nesse filtro.</p>'; return; }
+function pavProgFiltrado(soOrigem){ let arr=pavpUltimo.slice();
+  if(pavpOrig.size) arr=arr.filter(g=>pavpOrig.has(g.servico_origem));
+  if(soOrigem!==true){
+    if(pavpStatus==='pendente') arr=arr.filter(pavEhPend);
+    else if(pavpStatus==='criada') arr=arr.filter(g=>!pavEhPend(g));
+    if(pavpPrazo) arr=arr.filter(g=>pavEhPend(g) && pavBucket(pavDias(g.created_at)).key===pavpPrazo);
+  }
+  arr.sort((a,b)=>{ const da=new Date(a.created_at).getTime(), db=new Date(b.created_at).getTime(); return pavpSort==='recentes'?db-da:da-db; });
+  return arr; }
+function pavProgRender(){ const c=document.getElementById('pavpLista'); if(!c)return;
+  const base=pavProgFiltrado(true), cnt={ok:0,aten:0,atraso:0}; let criadas=0, maisAntigo=null;
+  base.forEach(g=>{ if(!pavEhPend(g)){ criadas++; return; } const d=pavDias(g.created_at), b=pavBucket(d); if(cnt[b.key]!=null)cnt[b.key]++; if(d!=null&&(maisAntigo==null||d>maisAntigo))maisAntigo=d; });
+  const r=document.getElementById('pavpResumo');
+  if(r){ r.innerHTML=base.length?('<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;align-items:center"><b style="color:var(--muted);font-weight:600">Pendentes de OS:</b>'
+    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(47,139,108,.15);color:#2f8b6c;font-weight:700">🟢 ${cnt.ok} no prazo</span>`
+    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(230,162,60,.15);color:#e6a23c;font-weight:700">🟡 ${cnt.aten} atenção</span>`
+    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(214,51,108,.15);color:#d6336c;font-weight:700">🔴 ${cnt.atraso} atrasado</span>`
+    +(maisAntigo!=null?`<span style="padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)">mais antigo: ${pavDiasTxt(maisAntigo)}</span>`:'')
+    +`<span style="padding:3px 9px;border-radius:999px;background:rgba(14,124,134,.12);color:#0e7c86;font-weight:700">✓ ${criadas} com OS</span>`
+    +'</div>'):''; }
+  const arr=pavProgFiltrado();
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhum pavimento nesse filtro.</p>'; return; }
   c.innerHTML='<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(g=>{
-    const dt=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
+    const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d);
+    const barra=pend?b.c:'#0e7c86';
+    const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'—';
     const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
     const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+    const badge=pend
+      ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span>`
+      : `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:#0e7c86;padding:2px 10px;border-radius:999px;white-space:nowrap">✓ OS ${pavH(g.os_recomposicao)}</span>`;
+    const osBox=pend
+      ? `<div style="display:flex;gap:6px;margin-top:8px"><input id="pavos_${g.grupo}" placeholder="nº da OS SIGOS da recomposição" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`
+      : `<div class="sub" style="margin-top:6px;font-size:12px">OS lançada${g.os_recomp_por?(' por '+pavH(g.os_recomp_por)):''}${g.os_recomp_em?(' em '+new Date(g.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`;
     const itens=(g.itens||[]).map(it=>{ const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
       return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div></div>`;
     }).join('');
-    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
-      <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
-      <div class="sub" style="margin-top:3px">${g.os_sigos?('OS '+pavH(g.os_sigos)+' · '):''}${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
-      ${itens}</div>`;
-  }).join(''); }
-function pavProgExport(){ const arr=pavpUltimo; if(!arr.length) return toast('Nada para exportar.');
-  const aoa=[['Data/hora','Serviço de origem','OS SIGOS','Consórcio','Usuário','Latitude','Longitude','Tipo de pavimento','Dimensão','Foto 1','Foto 2']];
-  arr.forEach(g=>(g.itens||[]).forEach(it=>aoa.push([g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'',PAV_ORIGEM[g.servico_origem]||g.servico_origem,g.os_sigos||'',g.consorcio||'',g.usuario||'',g.lat??'',g.lon??'',PAV_TIPO_LBL(it.tipo),it.dimensao||'',PAV_FOTO_URL(it.foto1)||'',PAV_FOTO_URL(it.foto2)||''])));
+    return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${barra};border-radius:12px;padding:12px 13px;margin-bottom:10px">
+      <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
+      <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
+      ${itens}
+      ${osBox}</div>`;
+  }).join('');
+  c.querySelectorAll('.pavoscriar').forEach(btn=>btn.onclick=()=>pavProgCriarOS(btn.dataset.grupo)); }
+async function pavProgCriarOS(grupo){ const inp=document.getElementById('pavos_'+grupo); const os=(inp&&inp.value.trim())||'';
+  if(!os) return toast('Informe o número da OS SIGOS');
+  try{ const {error}=await sb.rpc('app_pav_os',{p_grupo:grupo,p_os:os}); if(error)throw error; toast('✓ OS criada');
+    const g=pavpUltimo.find(x=>x.grupo===grupo); if(g){ g.os_recomposicao=os; g.os_recomp_em=new Date().toISOString(); g.os_recomp_por=(ME&&(ME.nome||ME.email))||'—'; }
+    pavProgRender();
+  }catch(e){ toast('Erro ao criar OS: '+(e.message||e)); } }
+function pavProgExport(){ const arr=pavProgFiltrado(); if(!arr.length) return toast('Nada para exportar.');
+  const aoa=[['Data de solicitação','Dias pendente','Faixa de prazo','Status OS','OS recomposição','Serviço de origem','OS origem','Consórcio','Solicitante','Latitude','Longitude','Tipo de pavimento','Dimensão','Foto 1','Foto 2']];
+  arr.forEach(g=>{ const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d); const ds=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
+    (g.itens||[]).forEach(it=>aoa.push([ds,pend?(d??''):'',pend?b.lbl:'',pend?'Pendente':'OS criada',g.os_recomposicao||'',PAV_ORIGEM[g.servico_origem]||g.servico_origem,g.os_sigos||'',g.consorcio||'',g.usuario||'',g.lat??'',g.lon??'',PAV_TIPO_LBL(it.tipo),it.dimensao||'',PAV_FOTO_URL(it.foto1)||'',PAV_FOTO_URL(it.foto2)||''])); });
   exportarXlsx('gestao_pavimento_'+new Date().toISOString().slice(0,10)+'.xlsx','Pavimento',aoa); }
 
 // ---------- REGISTRO DE OCORRÊNCIA (Entrevistadores) ----------
