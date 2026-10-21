@@ -331,6 +331,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="entrevistadores"><div class="ic">🧑‍💼</div><div class="nm">Entrevistadores</div></button>
       <button class="mod" data-go="projetos"><div class="ic">📐</div><div class="nm">Projetos</div></button>
       <button class="mod" data-go="vrpman"><div class="ic">🔧</div><div class="nm">VRPs – Campo</div></button>
+      <button class="mod" data-go="pavimento"><div class="ic">🧱</div><div class="nm">Gestão de Pavimento</div></button>
     </div>
     <div class="sec" style="margin-top:20px">🧰 Suporte</div>
     <div class="grid" style="margin-top:10px">
@@ -894,6 +895,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
     <div class="sec" style="margin-top:20px">🔧 Gestão de VRPs</div>
     <div class="grid" id="apVrpGrid" style="margin-top:10px"></div>
+
+    <div class="sec" style="margin-top:20px">🧱 Gestão de Pavimento</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="pavprog"><div class="ic">🧱</div><div class="nm">Pavimentos a recompor</div></button>
+    </div>
   </main>
 
   <main id="aux_acesso" class="hidden">
@@ -1051,6 +1057,45 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <div id="pgOcLista" style="margin-top:8px"></div>
       <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
     </div>
+  </main>
+
+  <main id="pavimento" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Gestão de Pavimento</h1>
+    <p class="sub">Registro do pavimento a recompor, no local do serviço.</p>
+    <div id="pavGps" class="banner warn">Fique próximo ao local para salvar a coordenada — obtendo GPS…</div>
+    <label for="pav_origem">Serviço de origem *</label>
+    <select id="pav_origem">
+      <option value="">Selecione…</option>
+      <option value="vazamento">Reparo de vazamento</option>
+      <option value="ramal">Instalação/substituição de ramal</option>
+      <option value="fiscalizacao">Fiscalização</option>
+      <option value="vrp">Gestão de VRPs</option>
+      <option value="rede_vca">Rede VCA</option>
+      <option value="rede_hdd">Rede HDD</option>
+      <option value="dmc">Implantação de DMC</option>
+    </select>
+    <label for="pav_os">Ordem de serviço de origem (OS SIGOS)</label>
+    <input id="pav_os" autocomplete="off" placeholder="nº da OS do serviço de origem"/>
+    <label style="margin-top:14px">Tipo(s) de pavimento a recompor *</label>
+    <p class="sub" style="margin:2px 0 0;font-size:12px">Toque para selecionar um ou mais tipos.</p>
+    <div id="pavTipos" class="pavchips"></div>
+    <div id="pavBlocos"></div>
+    <button id="pavSalvar" class="btn" disabled>Salvar registro</button>
+    <div class="sec" style="margin-top:22px">Meus últimos registros</div>
+    <div id="pavMinhas"></div>
+  </main>
+
+  <main id="pavprog" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Gestão de Pavimento</h1>
+    <p class="sub">Pavimentos registrados em campo para programar a recomposição.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px;align-items:center">
+      <select id="pavpCons"><option value="">Todos os consórcios</option><option value="ZA0200">Betim (ZA0200)</option><option value="ZA1004">Contagem (ZA1004)</option></select>
+      <select id="pavpOrigem"><option value="">Todos os serviços de origem</option></select>
+      <button id="pavpXlsx" class="btn sec" style="margin-left:auto">⭳ Exportar</button>
+    </div>
+    <div id="pavpLista"></div>
   </main>
 
   <main id="matriculas" class="hidden">
@@ -1372,7 +1417,7 @@ function iniciarGPS(){
     const a=Math.round(gps.acc);
     if(gps.acc<=PRECISAO_MAX) banner('ok',`GPS ${a} m · dentro da tolerância`);
     else banner('warn',`GPS ${a} m · aguardando ≤ ${PRECISAO_MAX} m`);
-    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps();
+    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps(); if(typeof pavOnGps==='function') pavOnGps();
   },err=>{ banner('bad','Sem sinal de GPS — ative a localização'); },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 function banner(cls,txt){const b=$('#gpsBanner');b.className='banner '+cls;b.textContent=txt;}
@@ -1608,7 +1653,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1638,6 +1683,8 @@ function irPara(id){
   if(id==='programacao_pesquisa') ppInit();
   if(id==='pp_acomp') paInit();
   if(id==='matriculas') mtInit();
+  if(id==='pavimento') pavInit();
+  if(id==='pavprog') pavProgInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='dev_acesso') devAcessoInit();
@@ -3592,6 +3639,110 @@ if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
   enviarOuEnfileirar(item,'✓ Serviço solicitado');
   asReset(); irPara('entrevistadores');
 });
+// ---------- GESTÃO DE PAVIMENTO ----------
+const PAV_ORIGEM={vazamento:'Reparo de vazamento',ramal:'Instalação/substituição de ramal',fiscalizacao:'Fiscalização',vrp:'Gestão de VRPs',rede_vca:'Rede VCA',rede_hdd:'Rede HDD',dmc:'Implantação de DMC'};
+const PAV_TIPOS=[['grama','Grama'],['asfalto','Asfalto'],['concreto','Concreto'],['bloquete','Bloquete (bloco intertravado)'],['paralelepipedo','Paralelepípedo'],['pedra_portuguesa','Pedra portuguesa'],['piso_especial','Piso especial'],['piso_tatil','Piso tátil'],['meio_fio','Meio-fio / guia'],['sarjeta','Sarjeta'],['terra','Terra / chão batido']];
+const PAV_TIPO_LBL=k=>(PAV_TIPOS.find(t=>t[0]===k)||[])[1]||k;
+const pavH=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PAV_FOTO_URL=p=>p?sb.storage.from('fotos-campo').getPublicUrl(p).data.publicUrl:null;
+let pavState={}; // { tipo: {dimensao, f1, f2} }
+function pavCss(){ if(document.getElementById('pavcss'))return; const st=document.createElement('style'); st.id='pavcss'; st.textContent=`
+ #pavimento .pavchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+ #pavimento .pavchip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;background:var(--card);user-select:none}
+ #pavimento .pavchip.on{background:#0e7c86;color:#fff;border-color:transparent}
+ #pavimento .pavblk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:12px 0;background:var(--card)}
+ #pavimento .pavblk h4{margin:0 0 6px;font-size:14px}
+ #pavimento .pavfotos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ #pavimento .pavfotos .photo{margin-top:0}
+ #pavimento .pavprev{width:100%;border-radius:8px;border:1px solid var(--line);margin-top:6px}`;
+ document.head.appendChild(st); }
+function pavOnGps(){ const b=document.getElementById('pavGps'); if(!b)return;
+  const ok=gps&&gps.acc<=PRECISAO_MAX;
+  if(ok){ b.className='banner ok'; b.textContent='📍 '+gps.lat.toFixed(6)+', '+gps.lon.toFixed(6)+' · ±'+Math.round(gps.acc)+' m — no local'; }
+  else { b.className='banner warn'; b.textContent='Fique próximo ao local para salvar a coordenada'+(gps?(' — GPS ±'+Math.round(gps.acc)+' m (aguardando ≤ '+PRECISAO_MAX+' m)'):' — obtendo GPS…'); }
+  pavValidar(); }
+function pavInit(){ pavCss(); pavRenderTipos(); pavRenderBlocos(); pavOnGps(); pavMinhasRender(); }
+function pavRenderTipos(){ const c=document.getElementById('pavTipos'); if(!c)return;
+  c.innerHTML=PAV_TIPOS.map(([k,l])=>`<div class="pavchip ${pavState[k]?'on':''}" data-pt="${k}">${l}</div>`).join('');
+  c.querySelectorAll('.pavchip').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.pt;
+    if(pavState[k]){ delete pavState[k]; ch.classList.remove('on'); } else { pavState[k]={dimensao:'',f1:null,f2:null}; ch.classList.add('on'); }
+    pavRenderBlocos(); pavValidar(); }); }
+function pavRenderBlocos(){ const c=document.getElementById('pavBlocos'); if(!c)return; const keys=Object.keys(pavState);
+  c.innerHTML=keys.map(k=>{ const s=pavState[k];
+    return `<div class="pavblk"><h4>${PAV_TIPO_LBL(k)}</h4>
+      <label>Dimensão a recompor *</label>
+      <input class="pavdim" data-pt="${k}" value="${pavH(s.dimensao)}" placeholder="ex.: 2,0 × 1,5 m ou 3 m²" autocomplete="off"/>
+      <label style="margin-top:8px">2 fotos *</label>
+      <div class="pavfotos">
+        <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="pavfoto" data-pt="${k}" data-n="1"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="pavfoto" data-pt="${k}" data-n="1"/></label></div><img class="pavprev hidden" data-pt="${k}" data-n="1" alt=""/></div>
+        <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="pavfoto" data-pt="${k}" data-n="2"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="pavfoto" data-pt="${k}" data-n="2"/></label></div><img class="pavprev hidden" data-pt="${k}" data-n="2" alt=""/></div>
+      </div></div>`; }).join('');
+  c.querySelectorAll('.pavdim').forEach(i=>i.oninput=()=>{ if(pavState[i.dataset.pt]) pavState[i.dataset.pt].dimensao=i.value; pavValidar(); });
+  c.querySelectorAll('.pavfoto').forEach(inp=>inp.onchange=async e=>{ const f=e.target.files[0], k=inp.dataset.pt, n=inp.dataset.n;
+    const img=c.querySelector('.pavprev[data-pt="'+k+'"][data-n="'+n+'"]');
+    if(f && pavState[k]){ const b=await comprimir(f); pavState[k]['f'+n]=b; if(img){img.src=URL.createObjectURL(b);img.classList.remove('hidden');} }
+    else if(pavState[k]){ pavState[k]['f'+n]=null; if(img) img.classList.add('hidden'); }
+    pavValidar(); });
+  keys.forEach(k=>['1','2'].forEach(n=>{ const b=pavState[k]['f'+n]; if(b){ const img=c.querySelector('.pavprev[data-pt="'+k+'"][data-n="'+n+'"]'); if(img){img.src=URL.createObjectURL(b);img.classList.remove('hidden');} } })); }
+function pavValidar(){ const btn=document.getElementById('pavSalvar'); if(!btn)return;
+  const okGps=gps&&gps.acc<=PRECISAO_MAX, keys=Object.keys(pavState);
+  const okTipos=keys.length>0 && keys.every(k=>{ const s=pavState[k]; return s.dimensao.trim() && s.f1 && s.f2; });
+  const el=document.getElementById('pav_origem');
+  btn.disabled=!(okGps && el && el.value && okTipos); }
+if($('#pav_origem')) $('#pav_origem').addEventListener('change',pavValidar);
+if($('#pavSalvar')) $('#pavSalvar').addEventListener('click',()=>{
+  if(!gps||gps.acc>PRECISAO_MAX) return toast('Fique no local — GPS insuficiente');
+  const origem=$('#pav_origem').value; if(!origem) return toast('Escolha o serviço de origem');
+  const keys=Object.keys(pavState); if(!keys.length) return toast('Selecione ao menos um tipo de pavimento');
+  for(const k of keys){ const s=pavState[k]; if(!s.dimensao.trim()) return toast('Informe a dimensão de "'+PAV_TIPO_LBL(k)+'"'); if(!s.f1||!s.f2) return toast('2 fotos são obrigatórias em "'+PAV_TIPO_LBL(k)+'"'); }
+  const grupo=crypto.randomUUID(), os=$('#pav_os').value.trim()||null, cons=localStorage.getItem('consorcio')||null;
+  keys.forEach(k=>{ const s=pavState[k], uid=crypto.randomUUID();
+    enviarOuEnfileirar({id:uid,tipo:'pavimento',rpc:'app_pav_registrar',pasta:'pavimento',
+      fotos:{p_foto1:s.f1,p_foto2:s.f2},
+      fields:{p_id:uid,p_grupo:grupo,p_servico_origem:origem,p_os_sigos:os,p_tipo:k,p_dimensao:s.dimensao.trim(),
+        p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,p_consorcio:cons,p_dispositivo:navigator.userAgent.slice(0,60)}},
+      '✓ Pavimento registrado'); });
+  pavReset(); });
+function pavReset(){ pavState={}; const o=$('#pav_origem'); if(o)o.value=''; const os=$('#pav_os'); if(os)os.value=''; pavRenderTipos(); pavRenderBlocos(); pavValidar(); setTimeout(pavMinhasRender,600); }
+async function pavMinhasRender(){ const c=document.getElementById('pavMinhas'); if(!c)return;
+  try{ const {data,error}=await sb.rpc('app_pav_minhas'); if(error)throw error; const arr=data||[];
+    c.innerHTML=arr.length?arr.map(g=>{ const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'';
+      const tipos=(g.tipos||[]).map(PAV_TIPO_LBL).join(', ');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><div class="sub" style="margin-top:2px">${g.os_sigos?('OS '+pavH(g.os_sigos)+' · '):''}${pavH(tipos)}</div><div class="sub" style="margin-top:2px;font-size:12px">${dt}</div></div>`;
+    }).join(''):'<p class="sub">Você ainda não registrou pavimentos.</p>';
+  }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar seus registros.</p>'; } }
+// --- Auxiliar de Programação: Gestão de Pavimento (lista + filtros) ---
+let pavpUltimo=[];
+function pavProgInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  const o=document.getElementById('pavpOrigem'); if(o && o.children.length<=1) o.innerHTML='<option value="">Todos os serviços de origem</option>'+Object.entries(PAV_ORIGEM).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+  if($('#pavpCons')) $('#pavpCons').onchange=pavProgCarregar;
+  if($('#pavpOrigem')) $('#pavpOrigem').onchange=pavProgCarregar;
+  if($('#pavpXlsx')) $('#pavpXlsx').onclick=pavProgExport;
+  pavProgCarregar(); }
+async function pavProgCarregar(){ const c=document.getElementById('pavpLista'); if(!c)return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pav_listar',{p_consorcio:$('#pavpCons').value||null,p_servico_origem:$('#pavpOrigem').value||null}); if(error)throw error;
+    pavpUltimo=data||[]; pavProgRender();
+  }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; } }
+function pavProgRender(){ const c=document.getElementById('pavpLista'); if(!c)return; const arr=pavpUltimo;
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhum pavimento registrado nesse filtro.</p>'; return; }
+  c.innerHTML='<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(g=>{
+    const dt=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
+    const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
+    const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+    const itens=(g.itens||[]).map(it=>{ const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
+      return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div></div>`;
+    }).join('');
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
+      <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
+      <div class="sub" style="margin-top:3px">${g.os_sigos?('OS '+pavH(g.os_sigos)+' · '):''}${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
+      ${itens}</div>`;
+  }).join(''); }
+function pavProgExport(){ const arr=pavpUltimo; if(!arr.length) return toast('Nada para exportar.');
+  const aoa=[['Data/hora','Serviço de origem','OS SIGOS','Consórcio','Usuário','Latitude','Longitude','Tipo de pavimento','Dimensão','Foto 1','Foto 2']];
+  arr.forEach(g=>(g.itens||[]).forEach(it=>aoa.push([g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'',PAV_ORIGEM[g.servico_origem]||g.servico_origem,g.os_sigos||'',g.consorcio||'',g.usuario||'',g.lat??'',g.lon??'',PAV_TIPO_LBL(it.tipo),it.dimensao||'',PAV_FOTO_URL(it.foto1)||'',PAV_FOTO_URL(it.foto2)||''])));
+  exportarXlsx('gestao_pavimento_'+new Date().toISOString().slice(0,10)+'.xlsx','Pavimento',aoa); }
+
 // ---------- REGISTRO DE OCORRÊNCIA (Entrevistadores) ----------
 // Entrevistador registra; só gestores (pode_aprovar) listam e exportam. GPS é gravado se houver, mas não bloqueia.
 let eoLigou=null;

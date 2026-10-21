@@ -279,8 +279,21 @@ pwa/
     **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`).
   - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma
     preventivo (`vrpman_prev`) — **migradas do hub `vrpman`** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg` admin).
+  - **🧱 Gestão de Pavimento:** Pavimentos a recompor (`pavprog`) — lista os registros de campo do módulo
+    **Gestão de Pavimento** (`pavimento`, na Home › 🛠️ Execução) agrupados por ponto, com filtro por **consórcio** e
+    **serviço de origem**, fotos e export .xlsx. Ver módulo Gestão de Pavimento abaixo.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
+- **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**
+  (1) **`pavimento`** (Home › 🛠️ Execução) = formulário de campo: serviço de origem (vazamento/ramal/fiscalização/
+  vrp/rede_vca/rede_hdd/dmc), OS SIGOS, **coordenada travada no GPS** (`pavOnGps`, trava ≤`PRECISAO_MAX` 15m —
+  "Fique próximo ao local"), **multi-seleção de tipos de pavimento** (chips: grama/asfalto/concreto/bloquete/
+  paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta/terra) e, por tipo, **dimensão + 2 fotos
+  obrigatórias** (câmera **ou galeria**). Salva **1 registro por tipo** (mesmo `grupo` uuid) via a fila offline
+  (`enviarOuEnfileirar`, fotos `p_foto1`/`p_foto2`). (2) **`pavprog`** (Auxiliar de Programação) = lista agrupada por
+  ponto, filtros consórcio + serviço de origem, fotos (bucket público `fotos-campo`) e export .xlsx (gate `aux_acesso`).
+  Backend: `"8 - coleta_campo".pav_recomposicao` (1 linha/tipo, geom 4326, RLS deny-all) + RPCs definer
+  `app_pav_registrar` (authenticated) / `app_pav_minhas` / `app_pav_listar` (admin|aux_acesso). sw v261.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.

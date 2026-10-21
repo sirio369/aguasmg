@@ -362,6 +362,16 @@
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
 
+### 2.6 Gestão de Pavimento — `// ---------- GESTÃO DE PAVIMENTO ----------` · tela `pavimento` (2026-10-21)
+- **Objetivo:** registrar em campo o **pavimento a recompor** depois de um serviço (vazamento, ramal, VRP, rede, DMC etc.), com fotos e georreferência, para o time de programação programar a recomposição.
+- **Formulário (`pavInit`/`pavRenderTipos`/`pavRenderBlocos`/`pavValidar`):**
+  - **Serviço de origem** (select, `PAV_ORIGEM`): vazamento · ramal · fiscalização · vrp · rede_vca · rede_hdd · dmc.
+  - **OS SIGOS** de origem (texto, opcional).
+  - **Coordenada travada no GPS** (`pavOnGps`): mostra lat/lon ao vivo, **sem edição**; banner "Fique próximo ao local para salvar a coordenada" até `gps.acc ≤ PRECISAO_MAX` (15 m) — mesma trava anti-lançamento-remoto da pressão/loggers.
+  - **Tipos de pavimento = multi-seleção** (chips `PAV_TIPOS`: grama/asfalto/concreto/bloquete/paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta/terra). Cada tipo selecionado **abre um bloco** com **dimensão** + **2 fotos obrigatórias** (câmera **e galeria**, `comprimir` 1600px). Estado em `pavState={tipo:{dimensao,f1,f2}}`.
+  - **Salvar:** gera um `grupo` uuid e envia **1 item por tipo** pela **fila offline** (`enviarOuEnfileirar`, `rpc:'app_pav_registrar'`, `pasta:'pavimento'`, fotos `p_foto1`/`p_foto2`). "Meus últimos registros" via `app_pav_minhas` (agrupado por grupo).
+- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
+
 ---
 
 ## 3. Entrevistadores — tela `entrevistadores`
@@ -816,6 +826,9 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 - **Decisões do produto (2026-09-14):** passada contada **por segmento** (não rodada global
   sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
   **manual** pelo programador (nada de reabertura automática por prazo, por ora).
+
+### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
+- Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços": lista os registros do módulo de campo **Gestão de Pavimento** (`pavimento`, §2.6) **agrupados por ponto** (grupo), com **filtro por consórcio e por serviço de origem** (`pavProgInit`/`pavProgCarregar`/`pavProgRender`), miniaturas das fotos (URL pública do `fotos-campo`), link de mapa e **export .xlsx** (`pavProgExport`). RPC `app_pav_listar(p_consorcio,p_servico_origem)`.
 
 ---
 
