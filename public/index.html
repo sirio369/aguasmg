@@ -4660,14 +4660,22 @@ function vmScr4(){
   } else { h+=`<p class="sub" style="margin-top:14px">Marque ao menos um serviço executado acima.</p>`; }
   return h;
 }
+// Pressão-alvo de jusante = projeto (na substituição, o projeto informado para a VRP nova).
+function vmAlvoJus(){ const S=vmExec,H=S.hdr; const v=H.origem==='substituicao'?S.ans.cad_pres_saida:H.proj_jus; const n=parseFloat(String(v==null?'':v).replace(',','.')); return isNaN(n)?null:n; }
+// true quando a jusante final foi informada e ficou diferente do projeto (exige justificativa)
+function vmJusForaProjeto(){ const a=vmAlvoJus(), f=parseFloat(String(vmExec.ans.fim_jus||'').replace(',','.')); return a!=null && !isNaN(f) && Math.abs(f-a)>=0.05; }
 function vmScr5(){
-  const S=vmExec,H=S.hdr;
+  const S=vmExec,H=S.hdr, alvo=vmAlvoJus();
   let h=`<h3 style="margin:2px 0">5 · Regulagem / finalização</h3>
+   ${alvo!=null?`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">🎯 Deixe a <b>jusante em ${vmN(alvo)} mca</b> — pressão de projeto${H.origem!=='substituicao'&&H.proj_mont!=null?(' (montante de projeto: '+vmN(H.proj_mont)+' mca)'):''}</div>`
+     :`<div class="vmpb">Sem pressão de projeto cadastrada para esta VRP — informe a pressão em que ela foi deixada.</div>`}
    <div class="vmref">
      <div class="p"><span>Mont. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_mont" value="${vEsc(S.ans.fim_mont||'')}"></div>
      <div class="p"><span>Jus. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_jus" value="${vEsc(S.ans.fim_jus||'')}"></div>`;
   if(H.ponto_critico_ref) h+=`<div class="p"><span>Ponto crítico</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_pc" value="${vEsc(S.ans.fim_pc||'')}"></div>`;
-  h+=`</div>
+  h+=`</div>`;
+  if(vmJusForaProjeto()) h+=`<div class="vmq" style="margin-top:8px"><div class="vmpb">⚠️ Jusante final (${vmN(S.ans.fim_jus)} mca) diferente do projeto (${vmN(alvo)} mca).</div><label>Por que não ficou conforme o projeto? <span class="vmreq">*</span></label><textarea class="vmin" data-in="fim_jus_motivo" placeholder="Ex.: rede não sustenta, ponto crítico abaixo do mínimo, orientação da gestão…">${vEsc(S.ans.fim_jus_motivo||'')}</textarea></div>`;
+  h+=`
    <div class="vmq"><label>VRP estabilizada? <span class="vmreq">*</span></label>${vmOptRow('estab',['Sim','Não'])}</div>
    <div class="vmq"><label>Vazamento após o serviço? <span class="vmreq">*</span></label>${vmOptRow('vaz_pos',['Não','Sim'])}</div>
    <div class="vmq"><label>VRP liberada? <span class="vmreq">*</span></label>${vmOptRow('liberada',['Sim','Não'])}</div>
@@ -4701,6 +4709,7 @@ function vmScrResult(){
   VM_COND.forEach(([k,l])=>{ if(S.cond[k]==='Intervir'&&String(S.cond['d_'+k]||'').trim()) det.push(['Condição · '+l, S.cond['d_'+k]]); });
   [...S.serv].forEach(s=>{ const sl=vmSlug(s); if(String(S.ans['servd_'+sl]||'').trim()) det.push(['Serviço · '+s, S.ans['servd_'+sl]]); });
   if(S.serv.has('Outro')&&String(S.ans.serv_outro||'').trim()) det.push(['Serviço · Outro (o quê)', S.ans.serv_outro]);
+  if(vmJusForaProjeto()&&String(S.ans.fim_jus_motivo||'').trim()) det.push(['Jusante fora do projeto ('+vmN(vmAlvoJus())+' mca)', S.ans.fim_jus_motivo]);
   const detHtml=det.length?`<div class="vmsumm" style="margin-top:10px;text-align:left"><div style="color:var(--mut);font-weight:600;margin-bottom:2px">O que aconteceu</div>${det.map(d=>`<div style="margin-top:6px"><b>${vEsc(d[0])}:</b> ${vEsc(d[1])}</div>`).join('')}</div>`:'';
   let h=`<div class="vmresult"><div style="font-size:30px">${sug==='improdutiva'?'🚫':(sug==='concluida'?'✅':'⚠️')}</div>
     <div class="sub" style="margin:4px 0 0">${S.hdr.os_numero}</div>
@@ -4719,6 +4728,7 @@ function vmWireExec(){
   el.querySelectorAll('[data-cond]').forEach(b=>b.onclick=()=>{const k=b.dataset.cond;const nv=vmExec.cond[k]===b.dataset.val?undefined:b.dataset.val;vmExec.cond[k]=nv; if(nv==='Intervir'&&VM_INT_SERV[k])vmExec.serv.add(VM_INT_SERV[k]); vmExecRender();});
   el.querySelectorAll('[data-serv]').forEach(b=>b.onclick=()=>{const s=b.dataset.serv;vmExec.serv.has(s)?vmExec.serv.delete(s):vmExec.serv.add(s);vmExecRender();});
   el.querySelectorAll('[data-in]').forEach(i=>i.oninput=()=>{vmExec.ans[i.dataset.in]=i.value;});
+  el.querySelectorAll('[data-in="fim_jus"]').forEach(i=>i.onchange=()=>{vmExec.ans.fim_jus=i.value;vmExecRender();}); // mostra/oculta o aviso "fora do projeto"
   el.querySelectorAll('[data-condd]').forEach(i=>i.oninput=()=>{vmExec.cond['d_'+i.dataset.condd]=i.value;});
   el.querySelectorAll('[data-photo]').forEach(inp=>inp.onchange=async ev=>{const k=inp.dataset.photo,f=ev.target.files[0];if(!f)return;try{vmExec.fotos[k]=await comprimir(f);}catch(e){vmExec.fotos[k]=f;}vmExecRender();});
   const q=id=>el.querySelector(id);
@@ -4735,14 +4745,14 @@ function vmValid(){
     if(S.step===2){ if(!Object.keys(S.fotos).some(k=>(k==='vrp_removida'||k.indexOf('vrp_removida_')===0)&&S.fotos[k])){toast('Foto da VRP removida');return false;} return true; }
     if(S.step===3){ if(!String(S.ans.cad_diametro||'').trim()||!String(S.ans.sub_modelo||'').trim()){toast('Informe diâmetro e modelo da nova VRP');return false;} if(!Object.keys(S.fotos).some(k=>(k==='vrp_nova'||k.indexOf('vrp_nova_')===0)&&S.fotos[k])){toast('Foto da VRP nova instalada');return false;} return true; }
     if(S.step===4){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){toast('Informe a pressão encontrada');return false;} } return true; }
-    if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} return true; }
+    if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;} return true; }
     return true;
   }
   if(S.step===1){ if(!S.ans.localizada||!S.ans.acessivel){toast('Responda localizada e acesso');return false;} if(!S.fotos.geral_antes_ext&&!S.fotos.geral_antes_int){toast('Tire ao menos 1 foto geral');return false;} return true; }
   if(S.step===2){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){ toast('Informe a pressão encontrada ('+(lado==='mont'?'montante':'jusante')+')'); return false; } } return true; }
   if(S.step===3){ for(const [k,l] of VM_COND){ if(S.cond[k]==='Intervir' && !String(S.cond['d_'+k]||'').trim()){ toast('Descreva o que intervir em '+l.toLowerCase()); return false; } } return true; }
   if(S.step===4){ if(!S.serv.size){toast('Marque ao menos um serviço executado');return false;} if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} if(S.serv.has('Outro')&&!String(S.ans.serv_outro||'').trim()){toast('Descreva o serviço "Outro"');return false;} for(const s of S.serv){ const sl=vmSlug(s); if(!String(S.ans['servd_'+sl]||'').trim()){toast('Descreva o serviço: '+s);return false;} const temFoto=Object.keys(S.fotos).some(k=>(k==='serv_'+sl||k.indexOf('serv_'+sl+'_')===0)&&S.fotos[k]); if(!temFoto){toast('Adicione foto do serviço: '+s);return false;} } return true; }
-  if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(!S.ans.nec_subst){toast('Responda se necessita substituição');return false;} if(S.ans.nec_subst==='Sim'&&!String(S.ans.subst_desc||'').trim()){toast('Descreva a necessidade de substituição');return false;} return true; }
+  if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;} if(!S.ans.nec_subst){toast('Responda se necessita substituição');return false;} if(S.ans.nec_subst==='Sim'&&!String(S.ans.subst_desc||'').trim()){toast('Descreva a necessidade de substituição');return false;} return true; }
   return true;
 }
 async function vmUpload(blob,suf){ const path='vrp-os/'+crypto.randomUUID()+'_'+suf; const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true}); if(error) throw error; return path; }
