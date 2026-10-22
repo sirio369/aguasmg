@@ -343,16 +343,7 @@ tbody tr:hover{background:var(--surface-2)}
       <!-- FICHA -->
 
       <!-- BALANÇO HÍDRICO -->
-      <section class="screen" id="s-nrw_balanco">
-        <div class="panel"><div class="pbody" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:240px"><h3 style="font-size:15px">Balanço hídrico (IWA)</h3>
-          <p class="note" style="margin:4px 0 0">A folha padrão IWA por DMC/ZA e competência. Fecha quando entrar a <b>vazão de entrada (Qin)</b>; hoje o lado do consumo usa o proxy do cadastro.</p></div>
-          <span class="chip wait" style="font-size:12px">parcial · aguardando Qin</span>
-        </div></div>
-        <div class="panel"><div class="phead"><h3 id="balTit">Folha do balanço — escopo</h3><span class="hint">m³/mês</span></div>
-          <div class="pbody"><div class="sheet" id="sheet"></div></div>
-        </div>
-      </section>
+      <section class="screen" id="s-nrw_balanco"><div id="bhBody"></div></section>
 
       <!-- MNF -->
 
@@ -885,22 +876,6 @@ function auditoria(){
 }
 
 /* ---------- análise & decisão ---------- */
-function balancoSheet(){
- const cons=scope().reduce((a,d)=>a+d.cons,0), consK=fmt(cons);
- const row=(cls,lab,val,w)=>`<div class="srow ${cls}"><span>${lab}</span><span class="v ${w?'wait':''}">${val}</span></div>`;
- $('#sheet').innerHTML=
-  row('h','Volume de entrada no sistema (Qin)','—',1)+
-  row('lvl2','Consumo autorizado','—',1)+
-  row('lvl3','Faturado micromedido (proxy do cadastro)',consK,0)+
-  row('lvl3','Faturado não-medido / estimado','—',1)+
-  row('lvl3','Não-faturado (usos operacionais)','—',1)+
-  row('lvl2 h','Perdas de água (Qin − consumo autorizado)','—',1)+
-  row('lvl3','Aparentes — submedição, fraude, erros','—',1)+
-  row('lvl3','Reais — rede, ramais, reservatório','—',1)+
-  row('h','Água faturada (proxy)',consK,0)+
-  row('h','NRW — água não faturada','—',1);
- $('#balTit').textContent='Folha do balanço — '+(za==='all'?'Betim + Contagem':(za==='ZA0200'?'Betim':'Contagem'));
-}
 function planoAcao(){
  const mxOs=Math.max(...DMC.map(d=>d.osKm)), audMax=Math.max(...Object.values(AUDITMAP).map(a=>a.i+a.z));
  const rows=scope().map(d=>{
@@ -1630,9 +1605,184 @@ function cfgSalvar(){
    cfgInit();
  });
 }
+/* ---------- Balanço hídrico — checklist e rastreio dos dados (IWA, ZA inteira) — dados REAIS via RPC ----------
+   Cada item do checklist é verificado ao vivo na tabela de origem (app_nrw_checklist). Status final =
+   ajuste manual do admin > verificação automática > status de partida. Ajustes exigem nota e vão para o histórico. */
+let bhData=null, bhSel=null, bhFiltro='all', bhOpen=null;
+const BH_ST={ok:{l:'temos',c:'#3fb27f'},part:{l:'em parte',c:'#e6a23c'},miss:{l:'não temos',c:'#e05d5d'}};
+const BH_ORIG={manual:'ajuste manual',auto:'verificado agora',base:'status de partida'};
+// células do quadro IWA: [chave, nome, fórmula/descrição, coluna, linha início, linha fim, folhas que a compõem (vazio = folha)]
+const BH_CELLS=[
+ ['siv','Volume de entrada do sistema','Entradas − saídas (água exportada) dos macros de fechamento',1,1,10,[]],
+ ['aut','Consumo autorizado','Faturado + não faturado',2,1,5,['aut_fat_med','aut_fat_nmed','aut_nf_med','aut_nf_nmed']],
+ ['perdas','Perdas de água','Entrada − consumo autorizado',2,5,10,['siv','aut_fat_med','aut_fat_nmed','aut_nf_med','aut_nf_nmed']],
+ ['aut_fat','Autorizado faturado','Medido + não medido',3,1,3,['aut_fat_med','aut_fat_nmed']],
+ ['aut_nf','Autorizado não faturado','Medido + não medido',3,3,5,['aut_nf_med','aut_nf_nmed']],
+ ['ap','Perdas aparentes','Não autorizado + imprecisão de medição e erros de dados',3,5,7,['ap_nao_aut','ap_imprec']],
+ ['re','Perdas reais','Resíduo: perdas − aparentes, conferido com a UARL e os componentes',3,7,10,['siv','aut_fat_med','aut_fat_nmed','aut_nf_med','aut_nf_nmed','ap_nao_aut','ap_imprec','re_rede','re_ramal','re_reserv','infra']],
+ ['aut_fat_med','Faturado medido','Micromedição: lido + estimado + factível',4,1,2,[]],
+ ['aut_fat_nmed','Faturado não medido','Ligações faturadas sem hidrômetro',4,2,3,[]],
+ ['aut_nf_med','Não faturado medido','Próprios da COPASA com medidor',4,3,4,[]],
+ ['aut_nf_nmed','Não faturado não medido','Social, descargas de rede, bombeiros',4,4,5,[]],
+ ['ap_nao_aut','Consumo não autorizado','Fraudes e ligações clandestinas',4,5,6,[]],
+ ['ap_imprec','Imprecisão de medição e erros de dados','Submedição dos hidrômetros e leituras estimadas',4,6,7,[]],
+ ['re_rede','Vazamentos em adutoras e redes','',4,7,8,[]],
+ ['re_ramal','Vazamentos em ramais até o hidrômetro','',4,8,9,[]],
+ ['re_reserv','Vazamento e extravasamento em reservatórios','',4,9,10,[]],
+ ['fat','Água faturada','Autorizado faturado',5,1,3,['aut_fat_med','aut_fat_nmed']],
+ ['nrw','Água não faturada (NRW)','Entrada − água faturada',5,3,10,['siv','aut_fat_med','aut_fat_nmed']]
+];
+const BH_EXTRA=[['infra','Infraestrutura e pressão (UARL)','Lm, Nc, Lp, pressão e horas de abastecimento — referência da perda real inevitável'],
+ ['contrato','Contrato','Linha de base, meta e valor do contrato']];
+function bhEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function bhCss(){ if(document.getElementById('bhcss'))return; const st=document.createElement('style'); st.id='bhcss'; st.textContent=`
+ .bhwrap{overflow-x:auto;padding-bottom:4px}
+ .bhhead,.bhgrid{display:grid;grid-template-columns:1.05fr 1fr 1.05fr 1.5fr 1fr;gap:4px;min-width:860px}
+ .bhhead{margin-bottom:4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+ .bhcell{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:8px;border:1px solid var(--line);border-left:4px solid var(--cc);background:color-mix(in srgb,var(--cc) 12%,transparent)}
+ .bhcell.der{border-style:dashed;border-left-style:solid;background:color-mix(in srgb,var(--cc) 5%,transparent)}
+ .bhcell:hover{border-color:var(--cc)}
+ .bhcell.sel{outline:2px solid var(--accent);outline-offset:1px}
+ .bhcell:focus-visible{outline:2px solid var(--accent)}
+ .bhcell .nm{font-weight:600;font-size:12.5px;line-height:1.25}
+ .bhcell .fx{font-size:11px;color:var(--muted);line-height:1.35}
+ .bhcell .ct{font-size:10.5px;color:var(--muted);margin-top:auto;padding-top:3px;font-variant-numeric:tabular-nums}
+ .bhextra{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px;min-width:860px}
+ .bhst{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;color:var(--cc);background:color-mix(in srgb,var(--cc) 14%,transparent);white-space:nowrap}
+ .bhst::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+ .bhorig{display:block;font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap}
+ .bhkpis{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+ .bhkpi{display:flex;align-items:baseline;gap:7px;padding:7px 13px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+ .bhkpi b{font-size:22px;font-variant-numeric:tabular-nums;color:var(--cc,inherit)}
+ .bhkpi span{font-size:12px;color:var(--muted)}
+ .bhtbl{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px}
+ .bhtbl th,.bhtbl td{text-align:left;white-space:normal}
+ .bhtbl th{font-size:10.5px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;padding:7px 8px;border-bottom:1px solid var(--line)}
+ .bhtbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+ .bhtbl td.id{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+ .bhtbl td.ev{color:var(--ink-2,#c9d6da);font-size:12px;min-width:260px}
+ .bhtbl td:nth-child(2){min-width:180px}
+ .bhtbl tr.it{cursor:pointer}
+ .bhtbl tr.it:hover{background:rgba(var(--accent-rgb),.06)}
+ .bhtbl tr.it.open{background:rgba(var(--accent-rgb),.11)}
+ .bhtbl tr.grp td{background:rgba(var(--accent-rgb),.07);font-weight:600;font-size:12px;border-bottom:none}
+ .bhdet{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;padding:4px 2px 10px}
+ .bhdet .k{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+ .bhdet .full{grid-column:1/-1}
+ .bhdiff{color:#e6a23c;font-size:11.5px;margin-top:4px}
+ .bhform{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
+ .bhform input{flex:1;min-width:220px;background:var(--surface-2,#12212a);border:1px solid var(--line);color:inherit;border-radius:8px;padding:6px 10px;font-size:13px}
+ .bhlog{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px}
+ .bhlog li{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+ .bhlog .when{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+ .bhtrace{display:flex;flex-direction:column;gap:8px}
+ .bhtrace .leaves{display:flex;flex-wrap:wrap;gap:6px}
+ .bhtrace .leaf{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px}
+ .bhtrace .leaf:hover{border-color:var(--accent)}
+ @media(max-width:760px){.bhdet{grid-template-columns:1fr}}`; document.head.appendChild(st); }
+function bhInit(){ mmCss(); bhCss();
+ const body=$('#bhBody'); if(!body) return;
+ if(!bhData) body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Verificando os dados de cada componente do balanço…</p></div></div>';
+ sbg.rpc('app_nrw_checklist').then(r=>{ if(r.error)throw r.error; bhData=r.data||{}; bhRender(); })
+  .catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+bhEsc(e.message||e)+'</p></div></div>'; });
+}
+function bhItens(){ return (bhData&&bhData.itens)||[]; }
+function bhOrigem(it){ return it.status_manual?'manual':(it.status_auto?'auto':'base'); }
+function bhAgg(sts){ if(!sts.length) return 'miss'; if(sts.every(s=>s==='ok')) return 'ok'; if(sts.every(s=>s==='miss')) return 'miss'; return 'part'; }
+function bhLeaves(k){ const c=BH_CELLS.find(x=>x[0]===k); return (c&&c[6].length)?c[6]:[k]; }
+function bhItensDe(k){ const lv=bhLeaves(k); return bhItens().filter(it=>(it.componentes||[]).some(c=>lv.includes(c))); }
+function bhSt(s){ const t=BH_ST[s]||BH_ST.miss; return `<span class="bhst" style="--cc:${t.c}">${t.l}</span>`; }
+function bhCount(its){ const n={ok:0,part:0,miss:0}; its.forEach(it=>n[it.status]=(n[it.status]||0)+1); return n; }
+function bhCell(k,nm,fx,der,style){ const its=bhItensDe(k), st=bhAgg(its.map(i=>i.status)), n=bhCount(its);
+ return `<button class="bhcell${der?' der':''}${bhSel===k?' sel':''}" data-bhc="${k}" style="--cc:${BH_ST[st].c};${style||''}" title="Ver de onde vem">
+  <span class="nm">${nm}</span>${fx?`<span class="fx">${fx}</span>`:''}<span class="ct">${its.length?`${n.ok} temos · ${n.part} em parte · ${n.miss} não temos`:'nenhum item'}</span></button>`; }
+function bhNomeCel(k){ const c=BH_CELLS.find(x=>x[0]===k)||BH_EXTRA.find(x=>x[0]===k); return c?c[1]:k; }
+function bhRender(){
+ const d=bhData||{}, its=bhItens(), n=bhCount(its), pode=!!d.pode_editar;
+ const quando=d.gerado_em?new Date(d.gerado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—';
+ const grid=BH_CELLS.map(c=>bhCell(c[0],c[1],c[2],c[6].length>0,`grid-column:${c[3]};grid-row:${c[4]}/${c[5]}`)).join('');
+ const extra=BH_EXTRA.map(c=>bhCell(c[0],c[1],c[2],false,'')).join('');
+ // rastreio da célula selecionada
+ let trace='';
+ if(bhSel){ const c=BH_CELLS.find(x=>x[0]===bhSel)||BH_EXTRA.find(x=>x[0]===bhSel), lv=bhLeaves(bhSel), comp=lv.length>1||lv[0]!==bhSel;
+  const leaves=comp?`<span class="note" style="font-size:11.5px">Depende de:</span><div class="leaves">${lv.map(l=>{ const li=bhItensDe(l); return `<button class="leaf" data-bhc="${l}">${bhSt(bhAgg(li.map(i=>i.status)))} ${bhNomeCel(l)}</button>`; }).join('')}</div>`:'';
+  trace=`<div class="panel" style="margin-top:14px"><div class="phead"><h3>Rastreio · ${bhEsc(c?c[1]:bhSel)}</h3><button class="mmchip" id="bhLimpa" style="margin-left:auto">Ver todos os itens ✕</button></div>
+   <div class="pbody bhtrace"><p class="note" style="margin:0">${bhEsc(c&&c[2]?c[2]:'')}</p>${leaves}
+   <p class="note" style="margin:0;font-size:11.5px">A lista abaixo mostra só os ${bhItensDe(bhSel).length} itens que alimentam esta célula. Clique num item para ver a tabela de origem e a verificação.</p></div></div>`; }
+ // checklist
+ let lista=bhSel?bhItensDe(bhSel):its; if(bhFiltro!=='all') lista=lista.filter(it=>it.status===bhFiltro);
+ let rows='', grp=null;
+ lista.forEach(it=>{ if(it.grupo!==grp){ grp=it.grupo; rows+=`<tr class="grp"><td colspan="5">${it.grupo} · ${bhEsc(it.grupo_nome)}</td></tr>`; }
+  const o=bhOrigem(it), aberto=bhOpen===it.id;
+  rows+=`<tr class="it${aberto?' open':''}" data-bhi="${it.id}"><td class="id">${it.id}</td><td><b>${bhEsc(it.item)}</b></td>
+   <td>${bhSt(it.status)}<span class="bhorig">${BH_ORIG[o]}</span></td>
+   <td class="ev">${bhEsc(it.evidencia||it.nota_base||'Sem verificação automática.')}</td><td class="id">fase ${it.fase}</td></tr>`;
+  if(aberto) rows+=`<tr><td></td><td colspan="4">${bhDetalhe(it,pode)}</td></tr>`; });
+ if(!rows) rows='<tr><td colspan="5" class="note">Nenhum item com esse filtro.</td></tr>';
+ const fb=(k,l)=>`<button class="mmchip${bhFiltro===k?' on':''}" data-bhf="${k}">${l}</button>`;
+ const log=(d.log||[]).slice(0,15);
+ const logHtml=log.length?`<ul class="bhlog">${log.map(l=>`<li><span class="when">${new Date(l.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</span><b>${bhEsc(l.item_id)}</b> ${bhLogSt(l.antes)} → ${bhLogSt(l.depois)} <span>${bhEsc(l.nota)}</span> <span class="note">— ${bhEsc(l.por||'?')}</span></li>`).join('')}</ul>`:'<p class="note" style="margin:0">Nenhum ajuste manual ainda. Os status vêm da verificação automática ou do status de partida.</p>';
+ $('#bhBody').innerHTML=`
+  <div class="panel"><div class="pbody" style="display:flex;flex-direction:column;gap:12px">
+   <p class="note" style="margin:0">Cada item do checklist é verificado na tabela de origem toda vez que esta tela abre. Clique numa célula do quadro para ver de onde ela vem e o que falta. As duas ZAs são tratadas juntas, sem divisão por DMC.</p>
+   <div class="bhkpis">
+    <div class="bhkpi"><b>${its.length}</b><span>itens</span></div>
+    <div class="bhkpi" style="--cc:${BH_ST.ok.c}"><b>${n.ok}</b><span>temos</span></div>
+    <div class="bhkpi" style="--cc:${BH_ST.part.c}"><b>${n.part}</b><span>em parte</span></div>
+    <div class="bhkpi" style="--cc:${BH_ST.miss.c}"><b>${n.miss}</b><span>não temos</span></div>
+    <span class="note" style="margin-left:auto;font-size:11.5px">Verificado em ${quando}</span>
+    <button class="mmchip" id="bhRecheck">↻ Verificar de novo</button>
+   </div></div></div>
+  <div class="panel" style="margin-top:14px"><div class="phead"><h3>Quadro IWA · de onde vem cada componente</h3><span class="hint">tracejado = calculado a partir das células à direita</span></div>
+   <div class="pbody"><div class="bhwrap">
+    <div class="bhhead"><div>Entrada</div><div>Destino</div><div>Classe</div><div>Componente</div><div>Receita</div></div>
+    <div class="bhgrid">${grid}</div>
+    <div class="bhextra">${extra}</div>
+   </div></div></div>
+  ${trace}
+  <div class="panel" style="margin-top:14px"><div class="phead"><h3>Checklist de dados${bhSel?' · '+bhEsc(bhNomeCel(bhSel)):''}</h3></div>
+   <div class="pbody"><div class="mmfilters">${fb('all','Todos')}${fb('ok','Temos')}${fb('part','Em parte')}${fb('miss','Não temos')}</div>
+    <div style="overflow-x:auto"><table class="bhtbl"><thead><tr><th>ID</th><th>Dado</th><th>Situação</th><th>O que existe agora</th><th>Fase</th></tr></thead><tbody>${rows}</tbody></table></div>
+   </div></div>
+  <div class="panel" style="margin-top:14px"><div class="phead"><h3>Histórico de ajustes</h3></div><div class="pbody">${logHtml}</div></div>`;
+ const b=$('#bhBody');
+ b.querySelectorAll('[data-bhc]').forEach(x=>x.onclick=()=>{ bhSel=(bhSel===x.dataset.bhc)?null:x.dataset.bhc; bhOpen=null; bhRender(); });
+ b.querySelectorAll('[data-bhf]').forEach(x=>x.onclick=()=>{ bhFiltro=x.dataset.bhf; bhRender(); });
+ b.querySelectorAll('tr.it').forEach(tr=>tr.onclick=()=>{ bhOpen=(bhOpen===tr.dataset.bhi)?null:tr.dataset.bhi; bhRender(); });
+ b.querySelectorAll('[data-bhgo]').forEach(x=>x.onclick=e=>{ e.stopPropagation(); go(x.dataset.bhgo); });
+ const lp=$('#bhLimpa'); if(lp) lp.onclick=()=>{ bhSel=null; bhRender(); };
+ const rc=$('#bhRecheck'); if(rc) rc.onclick=()=>{ rc.disabled=true; rc.textContent='Verificando…'; bhInit(); };
+ const sv=$('#bhSalvar'); if(sv) sv.onclick=bhSalvar;
+}
+function bhLogSt(s){ return s==='auto'||!s?'<span class="note">automático</span>':bhSt(s); }
+function bhDetalhe(it,pode){
+ const o=bhOrigem(it), ver=it.status_auto?`${bhSt(it.status_auto)} ${bhEsc(it.evidencia||'')}`:(it.evidencia?bhEsc(it.evidencia)+' <span class="note">(só informativo; o status vem do ajuste ou do status de partida)</span>':'<span class="note">Sem verificação automática para este item.</span>');
+ const diff=(it.status_manual&&it.status_auto&&it.status_manual!==it.status_auto)?`<div class="bhdiff">⚠ O ajuste manual (${BH_ST[it.status_manual].l}) difere da verificação automática (${BH_ST[it.status_auto].l}).</div>`:'';
+ const hist=((bhData&&bhData.log)||[]).filter(l=>l.item_id===it.id);
+ const telaOk=it.tela&&document.getElementById('s-'+it.tela);
+ const opt=(v,l)=>`<option value="${v}"${(it.status_manual||'auto')===v?' selected':''}>${l}</option>`;
+ return `<div class="bhdet">
+  <div><span class="k">O que é preciso</span>${bhEsc(it.necessidade||'—')}</div>
+  <div><span class="k">Quem fornece</span>${bhEsc(it.fornecedor||'—')}</div>
+  <div><span class="k">Origem no banco</span><span class="mono" style="font-size:11.5px">${bhEsc(it.origem||'—')}</span>${telaOk?`<div style="margin-top:6px"><button class="mmchip" data-bhgo="${it.tela}">Abrir ${bhEsc(TITLES[it.tela]||it.tela)} →</button></div>`:''}</div>
+  <div><span class="k">Verificação automática${it.frescor?' · '+bhEsc(it.frescor):''}</span>${ver}</div>
+  ${it.nota_base?`<div class="full"><span class="k">Contexto</span>${bhEsc(it.nota_base)}</div>`:''}
+  <div class="full"><span class="k">Situação final · ${BH_ORIG[o]}</span>${bhSt(it.status)}${it.status_manual?` <span>${bhEsc(it.nota||'')}</span> <span class="note">— ${bhEsc(it.atualizado_por||'?')}, ${new Date(it.atualizado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</span>`:''}${diff}
+   ${pode?`<div class="bhform" onclick="event.stopPropagation()"><select class="mmsel" id="bhSelSt">${opt('auto','Automático (sem ajuste)')}${opt('ok','Temos')}${opt('part','Em parte')}${opt('miss','Não temos')}</select><input id="bhNota" placeholder="Nota obrigatória: por que mudou, qual evidência" maxlength="500"><button class="btn pri" id="bhSalvar" data-id="${it.id}">Salvar ajuste</button><span id="bhMsg" class="note"></span></div>`:''}</div>
+  ${hist.length?`<div class="full"><span class="k">Histórico deste item</span><ul class="bhlog">${hist.map(l=>`<li><span class="when">${new Date(l.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</span>${bhLogSt(l.antes)} → ${bhLogSt(l.depois)} <span>${bhEsc(l.nota)}</span> <span class="note">— ${bhEsc(l.por||'?')}</span></li>`).join('')}</ul></div>`:''}
+ </div>`; }
+function bhSalvar(e){ e.stopPropagation();
+ const id=e.currentTarget.dataset.id, st=$('#bhSelSt').value, nota=($('#bhNota').value||'').trim(), msg=$('#bhMsg');
+ if(!nota){ msg.style.color='#e05d5d'; msg.textContent='Escreva a nota antes de salvar.'; return; }
+ msg.style.color=''; msg.textContent='Salvando…';
+ sbg.rpc('app_nrw_checklist_salvar',{p_id:id,p_status:st==='auto'?null:st,p_nota:nota}).then(r=>{
+  if(r.error){ msg.style.color='#e05d5d'; msg.textContent='Erro: '+(r.error.message||r.error); return; }
+  bhInit();
+ });
+}
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",config:"Parâmetros & Metas"};
-const COMPET=new Set(['painel','nrw_balanco','nrw_contrato']);
+const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico — rastreio dos dados",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",config:"Parâmetros & Metas"};
+const COMPET=new Set(['painel','nrw_contrato']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
  const old=scr.querySelector('.focusbar'); if(old) old.remove();
@@ -1660,13 +1810,14 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
- if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='hdpri'||s==='fraudepri')?'none':'';   // resultado/HD/fraude não usam seletor de mês
+ if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='hdpri'||s==='fraudepri'||s==='nrw_balanco')?'none':'';   // resultado/HD/fraude/balanço não usam seletor de mês
+ $('#zaseg').style.display=s==='nrw_balanco'?'none':'';   // o rastreio do balanço cobre as duas ZAs juntas
  if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
  if(s!=='hdpri' && typeof hdHeaderReset==='function') hdHeaderReset();   // esconde os filtros de HD no cabeçalho
  if(s!=='fraudepri' && typeof frHeaderReset==='function') frHeaderReset();   // esconde os filtros de fiscalização no cabeçalho
  $('#side').classList.remove('open');
  if(s==='painel'){kpis();consolidado();rank();renderMaps();}
- if(s==='nrw_balanco')balancoSheet();
+ if(s==='nrw_balanco')bhInit();
  if(s==='nrw_contrato')contratoCards();
  if(s==='nrw_os')osReparos();
  if(s==='nrw_parque')parqueTool();
@@ -2561,7 +2712,7 @@ function frExport(){ const btn=$('#frExport'); if(typeof XLSX==='undefined'){ if
  }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#frMapNote'))$('#frMapNote').textContent='Erro ao exportar: '+(e.message||e); });
 }
 
-const NRW_REAL=new Set(['mm','macro','resultado','hdpri','fraudepri','config']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+const NRW_REAL=new Set(['mm','macro','resultado','hdpri','fraudepri','config','nrw_balanco']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
 function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
  .navi.mock{opacity:.5}
  .navi.mock:hover{opacity:.82}
