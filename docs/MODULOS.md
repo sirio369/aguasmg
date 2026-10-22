@@ -1820,6 +1820,15 @@ pelo fluxo de cadastro-pelo-gestor).
 
 ## 11. Perdas / NRW — cockpit em **página dedicada** `public/perdas.html`
 
+> **Menu do cockpit (2026-10-22):** `#nav` voltou a exibir **Análise do micromedido** (`mm`) e **Análise de
+> macromedição** (`macro`) em *2 · Dados & diagnóstico*, e **Priorização de troca de HD** (`hdpri`) +
+> **Fiscalização de irregularidades** em *4 · Execução — comercial* (os deep-links `?s=` e o Auxiliar seguem
+> funcionando). **Removidos do menu:** Painel de Perdas, Componentes IWA, Gestão de OS/reparos, Parque de
+> hidrômetros, Recuperação de faturamento, Grandes consumidores e Performance contratual (as `<section>`s
+> continuam no arquivo, só sem entrada). Tela inicial = `resultado` (`go('resultado')` no fim do script principal).
+> Botão "Componentes IWA →" do Balanço removido. Isso substitui o que a nota de reorg abaixo diz sobre `hdpri`/`mm`
+> estarem fora do menu.
+
 > **Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`) e **Análise do micromedido** (`s-mm`) foram
 > **removidas do menu `#nav`** do cockpit e agora são acessadas pelo **Auxiliar de Programação** (cards que
 > abrem `perdas.html?s=hdpri` / `?s=mm`). O gate do `perdas.html` (script module no fim) passou a liberar essas

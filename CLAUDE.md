@@ -411,6 +411,7 @@ acompanhamento de perdas por DMC. Card `#cardPerdas` na categoria **🚧 Em dese
 `homeGate()` por **`ME.dev_acesso`** (controle de acesso por engrenagem — ver abaixo); opaco (`.mod soon`) + 🔒
 para quem não tem. A página tem guarda própria pela sessão Supabase.
 Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/MODULOS.md §11`.
+**Menu (2026-10-22):** `hdpri`/`mm`/`macro` voltaram ao `#nav` do cockpit (Dados & diagnóstico / Execução — comercial); saíram Painel, Componentes IWA, OS/reparos, Parque, Recuperação, Grandes consumidores e Performance contratual (ver `docs/MODULOS.md §11`).
 **Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`), **Fiscalização de irregularidades** (`s-fraudepri`,
 2026-10-20) e **Análise do micromedido/por matrícula** (`s-mm`) são acessadas pelo **Auxiliar de Programação** via
 deep-link `perdas.html?s=hdpri` / `?s=fraudepri` / `?s=mm` (sem item de menu no cockpit; estão em `AUX_TOOLS`).
