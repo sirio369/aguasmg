@@ -326,11 +326,12 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec">🛠️ Execução</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="pressao"><div class="ic">🌡️</div><div class="nm">Mapeamento de pressão</div></button>
-      <button class="mod" data-go="loggers"><div class="ic">📟</div><div class="nm">Loggers temporários</div></button>
+      <button class="mod" data-go="loggers_hub"><div class="ic">📟</div><div class="nm">Loggers</div></button>
       <button class="mod" data-go="pesquisa"><div class="ic">🎧</div><div class="nm">Pesquisa</div></button>
       <button class="mod" data-go="entrevistadores"><div class="ic">🧑‍💼</div><div class="nm">Entrevistadores</div></button>
       <button class="mod" data-go="projetos"><div class="ic">📐</div><div class="nm">Projetos</div></button>
-      <button class="mod" data-go="vrpman"><div class="ic">🔧</div><div class="nm">Gestão de VRPs</div></button>
+      <button class="mod" data-go="vrpman"><div class="ic">🔧</div><div class="nm">VRPs – Campo</div></button>
+      <button class="mod" data-go="pavimento"><div class="ic">🧱</div><div class="nm">Gestão de Pavimento</div></button>
     </div>
     <div class="sec" style="margin-top:20px">🧰 Suporte</div>
     <div class="grid" style="margin-top:10px">
@@ -344,6 +345,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
       <button class="mod soon" id="cardPerdas"><div class="ic">📉</div><div class="nm">Perdas (NRW) 🔒</div></button>
+      <button class="mod hidden" id="homeTelemetria" data-go="telemetria"><div class="ic">📡</div><div class="nm">Telemetria (CCO)</div></button>
     </div>
   </main>
 
@@ -353,6 +355,46 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Marque quem pode ver e entrar nos módulos em desenvolvimento (Projetos e Perdas). O admin sempre tem acesso.</p>
     <input id="devAcessoBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
     <div id="devAcessoList"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="telemetria" class="hidden">
+    <style>
+      #telDrop{border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;background:var(--card)}
+      #telDrop.over{border-color:var(--acc);background:var(--ok-bg)}
+      #telDrop .ic{font-size:30px}
+      #telemetria table.tel{width:100%;border-collapse:collapse;font-size:13px}
+      #telemetria table.tel th,#telemetria table.tel td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+      #telemetria .telwrap{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+      #telemetria .pill{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line)}
+      #telemetria .pill.bad{background:var(--bad);color:#fff;border-color:transparent}
+      #telemetria .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+      #telemetria .kpi>div{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+      #telemetria .kpi b{font-size:22px;display:block}
+    </style>
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Telemetria (CCO)</h1>
+    <p class="sub">Importe os CSVs exportados do sistema CCO da COPASA. O app lê cada arquivo, identifica a unidade pelo nome e alimenta o banco. Reprocessar não duplica (o banco ignora leituras já existentes).</p>
+    <div id="telDrop">
+      <input id="telFiles" type="file" accept=".csv" multiple hidden/>
+      <div class="ic">⭳</div>
+      <div>Arraste os CSVs aqui ou <b>clique para escolher</b></div>
+      <div class="sub">Vários arquivos de uma vez</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0">
+      <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="telSoNovos" checked style="width:auto"/> Enviar só leituras novas</label>
+      <label style="display:flex;align-items:center;gap:8px">Consórcio:
+        <select id="telZa" style="width:auto"><option value="">detectar/manter</option><option value="ZA1004">ZA1004 · Contagem</option><option value="ZA0200">ZA0200 · Betim</option></select>
+      </label>
+    </div>
+    <div id="telPreview"></div>
+    <div id="telActions" class="hidden" style="display:flex;gap:10px;align-items:center;margin-top:10px">
+      <button class="btn" id="telProcessar" style="margin-top:0;width:auto">Processar</button>
+      <button class="btn ghost" id="telLimpar" style="margin-top:0;width:auto">Limpar</button>
+    </div>
+    <div id="telProg" class="hidden" style="margin-top:12px"></div>
+    <div id="telResumo" style="margin-top:12px"></div>
+    <div class="sec" style="margin-top:24px">Cobertura × cadastro</div>
+    <div id="telCob"><p class="sub">—</p></div>
   </main>
 
   <main id="pressao" class="hidden">
@@ -452,14 +494,24 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="prpMapa" style="height:46vh;min-height:280px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
+  <main id="loggers_hub" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Loggers</h1>
+    <p class="sub">Escolha o tipo de logger.</p>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" id="lgModoTemp"><div class="ic">⏱️</div><div class="nm">Temporários</div></button>
+      <button class="mod" id="lgModoFixo"><div class="ic">📌</div><div class="nm">Fixos</div></button>
+    </div>
+  </main>
+
   <main id="loggers" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button>
+    <div class="bar"><button class="bk" id="lgVoltarHub">‹ Loggers</button>
       <span style="margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px;">
         <button id="vwLista" style="all:unset;cursor:pointer;padding:6px 14px;">Lista</button>
         <button id="vwMapa" style="all:unset;cursor:pointer;padding:6px 14px;">Mapa</button>
       </span>
     </div>
-    <h1>Loggers temporários</h1>
+    <h1 id="lgTitulo">Loggers</h1>
     <button id="lgNovo" class="btn ghost" style="margin-bottom:10px">➕ Inserir logger</button>
     <div id="lgFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
@@ -474,7 +526,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="vrp" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button>
+    <div class="bar"><button class="bk" data-go="vrpman">‹ VRPs – Campo</button>
       <span style="margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px;">
         <button id="vrpVwLista" style="all:unset;cursor:pointer;padding:6px 14px;">Lista</button>
         <button id="vrpVwMapa" style="all:unset;cursor:pointer;padding:6px 14px;">Mapa</button>
@@ -589,7 +641,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="vrpman" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
-    <h1>Gestão de VRPs</h1>
+    <h1>VRPs – Campo</h1>
     <div id="vmHub"></div>
   </main>
   <main id="vrpman_campo" class="hidden">
@@ -659,17 +711,17 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </style>
 
   <main id="vrpman_serv" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Gestão de serviços</h1>
     <div id="vmServ"></div>
   </main>
   <main id="vrpman_fichas" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Ficha cadastral · VRPs</h1>
     <div id="vmFichas"></div>
   </main>
   <main id="vrpman_prev" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Cronograma preventivo</h1>
     <div id="vmPrev"></div>
   </main>
@@ -678,7 +730,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="vmOs"></div>
   </main>
   <main id="vrpman_cfg" class="hidden">
-    <div class="bar"><button class="bk" data-go="vrpman">‹ Gestão de VRPs</button></div>
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Acesso à Gestão de VRPs</h1>
     <div id="vmCfg"></div>
   </main>
@@ -791,20 +843,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="abertura_servicos"><div class="ic">🧾</div><div class="nm">Solicitação de serviços</div></button>
       <button class="mod" data-go="ent_ocorrencia"><div class="ic">⚠️</div><div class="nm">Registro de ocorrência</div></button>
     </div>
-    <div id="entOcGest" class="hidden">
-      <div class="sec" style="margin-top:20px">📋 Gestores</div>
-      <div class="grid" style="margin-top:10px">
-        <button class="mod" data-go="ent_oc_gestao"><div class="ic">📋</div><div class="nm">Ocorrências registradas</div></button>
-      </div>
-    </div>
-    <div class="sec" style="margin-top:20px">🛟 Suporte</div>
-    <div class="grid" style="margin-top:10px">
-      <button class="mod" data-go="roteiro"><div class="ic">🗺️</div><div class="nm">Roteiro de leitura</div></button>
-    </div>
   </main>
 
   <main id="roteiro" class="hidden">
-    <div class="bar"><button class="bk" id="rlBack">‹ Entrevistadores</button></div>
+    <div class="bar"><button class="bk" id="rlBack">‹ Auxiliar de Programação</button></div>
     <h1>Roteiro de leitura</h1>
     <p class="sub">Selecione um percurso para ver seus pontos (matrículas) e trechos no mapa.</p>
     <div style="display:flex;gap:8px">
@@ -831,14 +873,41 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="auxiliar_programacao" class="hidden">
-    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <div class="bar"><button class="bk" data-back>‹ Início</button><button id="apCfg" class="hidden" title="Quem acessa o Auxiliar de Programação" style="all:unset;cursor:pointer;font-size:22px;line-height:1;margin-left:auto;padding:2px 6px">⚙️</button></div>
     <h1>Auxiliar de Programação</h1>
+
+    <div class="sec" style="margin-top:8px">🧾 Serviços comerciais</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="matriculas"><div class="ic">🆕</div><div class="nm">Criação de matrículas</div></button>
-      <button class="mod" data-go="programacao_servicos"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
+      <button class="mod" id="apAbertCom"><div class="ic">🗂️</div><div class="nm">Abertura de serviços</div></button>
+      <button class="mod" data-go="ent_oc_gestao"><div class="ic">📋</div><div class="nm">Ocorrências registradas</div></button>
+      <button class="mod" data-go="roteiro"><div class="ic">🗺️</div><div class="nm">Roteiro de leitura</div></button>
+      <button class="mod" id="apHdPri"><div class="ic">🔧</div><div class="nm">Priorização de troca de HD</div></button>
+      <button class="mod" id="apFraudePri"><div class="ic">🕵️</div><div class="nm">Fiscalização de irregularidades</div></button>
+    </div>
+
+    <div class="sec" style="margin-top:20px">🎧 Pesquisa de Vazamentos</div>
+    <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="programacao_pesquisa"><div class="ic">🔎</div><div class="nm">Programação de pesquisa</div></button>
       <button class="mod" data-go="pp_acomp"><div class="ic">📊</div><div class="nm">Acompanhamento da pesquisa</div></button>
+      <button class="mod" id="apAbertPesq"><div class="ic">⚠️</div><div class="nm">Abertura de serviços</div></button>
     </div>
+
+    <div class="sec" style="margin-top:20px">🔧 Gestão de VRPs</div>
+    <div class="grid" id="apVrpGrid" style="margin-top:10px"></div>
+
+    <div class="sec" style="margin-top:20px">🧱 Gestão de Pavimento</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="pavprog"><div class="ic">🧱</div><div class="nm">Pavimentos a recompor</div></button>
+    </div>
+  </main>
+
+  <main id="aux_acesso" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Auxiliar de Programação · Acesso</h1>
+    <p class="sub">Marque quem pode acessar o Auxiliar de Programação. O admin sempre tem acesso.</p>
+    <input id="auxAcBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
+    <div id="auxAcList"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="programacao_pesquisa" class="hidden">
@@ -935,7 +1004,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="ent_oc_gestao" class="hidden">
-    <div class="bar"><button class="bk" id="egBack">‹ Entrevistadores</button></div>
+    <div class="bar"><button class="bk" id="egBack">‹ Auxiliar de Programação</button></div>
     <h1>Ocorrências registradas</h1>
     <p class="sub">Ocorrências abertas pelos entrevistadores (visível só para gestores).</p>
     <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
@@ -976,15 +1045,68 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="programacao_servicos" class="hidden">
     <div class="bar"><button class="bk" id="pgBack">‹ Auxiliar de Programação</button></div>
-    <h1>Abertura de serviços</h1>
-    <p class="sub">Lance o número da OS criada no sistema da COPASA.</p>
+    <h1 id="pgTitulo">Abertura de serviços</h1>
+    <p class="sub" id="pgSub">Lance o número da OS criada no sistema da COPASA.</p>
     <div id="pgFiltros" style="display:flex;gap:6px;margin:8px 0 12px"></div>
-    <div class="sec">🧾 Solicitações de serviço</div>
-    <div id="pgLista" style="margin-top:8px"></div>
-    <div class="sec" style="margin-top:22px">⚠️ Ocorrências — pesquisa de vazamentos</div>
-    <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
-    <div id="pgOcLista" style="margin-top:8px"></div>
-    <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+    <div id="pgSecSol">
+      <div class="sec">🧾 Solicitações de serviço</div>
+      <div id="pgLista" style="margin-top:8px"></div>
+    </div>
+    <div id="pgSecOc">
+      <div class="sec">⚠️ Ocorrências — pesquisa de vazamentos</div>
+      <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
+      <div id="pgOcLista" style="margin-top:8px"></div>
+      <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+    </div>
+  </main>
+
+  <main id="pavimento" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Gestão de Pavimento</h1>
+    <p class="sub">Registro do pavimento a recompor, no local do serviço.</p>
+    <div id="pavGps" class="banner warn">Fique próximo ao local para salvar a coordenada — obtendo GPS…</div>
+    <label for="pav_origem">Serviço de origem *</label>
+    <select id="pav_origem">
+      <option value="">Selecione…</option>
+      <option value="vazamento">Reparo de vazamento</option>
+      <option value="ramal">Instalação/substituição de ramal</option>
+      <option value="fiscalizacao">Fiscalização</option>
+      <option value="vrp">Gestão de VRPs</option>
+      <option value="rede_vca">Rede VCA</option>
+      <option value="rede_hdd">Rede HDD</option>
+      <option value="dmc">Implantação de DMC</option>
+    </select>
+    <label for="pav_os">Ordem de serviço de origem (OS SIGOS)</label>
+    <input id="pav_os" autocomplete="off" placeholder="nº da OS do serviço de origem"/>
+    <label style="margin-top:14px">Tipo(s) de pavimento a recompor *</label>
+    <p class="sub" style="margin:2px 0 0;font-size:12px">Toque para selecionar um ou mais tipos.</p>
+    <div id="pavTipos" class="pavchips"></div>
+    <div id="pavBlocos"></div>
+    <button id="pavSalvar" class="btn" disabled>Salvar registro</button>
+    <div class="sec" style="margin-top:22px">Meus últimos registros</div>
+    <div id="pavMinhas"></div>
+  </main>
+
+  <main id="pavprog" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Gestão de Pavimento</h1>
+    <p class="sub">Pavimentos registrados em campo — lance o nº da OS da recomposição.</p>
+    <div class="seg" id="pavpStatusSeg" style="margin:6px 0 8px">
+      <button type="button" data-st="pendente" class="sel">Pendentes</button>
+      <button type="button" data-st="criada">OS criada</button>
+      <button type="button" data-st="todos">Todas</button>
+    </div>
+    <div class="seg" id="pavpViewSeg" style="margin:0 0 10px">
+      <button type="button" data-v="lista" class="sel">📋 Lista</button>
+      <button type="button" data-v="mapa">🗺️ Mapa</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center">
+      <select id="pavpCons" class="pavddsel"><option value="">Todos</option><option value="ZA0200">Betim</option><option value="ZA1004">Contagem</option></select>
+      <div class="msdd" id="pavpOrigDd"><button type="button" class="msdd-btn" id="pavpOrigBtn">Serviço de origem ▾</button><div class="msdd-panel hidden" id="pavpOrigPanel"></div></div>
+    </div>
+    <div id="pavpResumo" style="margin-bottom:10px"></div>
+    <div id="pavpLista"></div>
+    <div id="pavpMapa" class="hidden" style="margin-top:4px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
   <main id="matriculas" class="hidden">
@@ -1158,6 +1280,38 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="pjRel"></div>
   </main>
 
+  <main id="projeto_import" class="hidden">
+    <style>
+      #projeto_import table.pjimpt{width:100%;border-collapse:collapse;font-size:12.5px}
+      #projeto_import table.pjimpt th,#projeto_import table.pjimpt td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+      #projeto_import .pjimpwrap{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+      #pjImpDrop{border:2px dashed var(--line);border-radius:14px;padding:22px 16px;text-align:center;cursor:pointer;background:var(--card)}
+      #pjImpDrop.over{border-color:var(--acc);background:var(--ok-bg)}
+      #projeto_import .pjimpf{display:flex;flex-direction:column;gap:3px;flex:1;min-width:150px}
+      #projeto_import .pjimpf label{font-size:11px;color:var(--mut);font-weight:600}
+    </style>
+    <div class="bar"><button class="bk" data-go="projetos">‹ Projetos</button></div>
+    <h1>Importar intervenções (lineares)</h1>
+    <p class="sub">Importe o GeoPackage (.gpkg) da rede enviada pelo setor de projetos → vira intervenções lineares para o time de obras. Idempotente: reimportar o mesmo arquivo atualiza, não duplica.</p>
+    <details>
+      <summary style="cursor:pointer;color:var(--acc);font-weight:600">📋 Modelo de colunas (o que o setor de projetos deve entregar)</summary>
+      <p class="sub" style="margin-top:8px">A camada deve ter geometria <b>LINESTRING</b> em <b>SRID 31983</b> e, idealmente, estas colunas de atributo:</p>
+      <div class="pjimpwrap"><table class="pjimpt"><thead><tr><th>Coluna</th><th>Tipo</th><th>Obrig.</th><th>Exemplo</th></tr></thead><tbody id="pjImpSpec"></tbody></table></div>
+      <button id="pjImpTpl" class="btn ghost" style="width:auto;margin-top:10px;padding:8px 14px">⭳ Baixar template (CSV)</button>
+      <p class="sub" style="margin-top:6px">Se vier o gpkg cru do WaterGEMS (sem essas colunas), o módulo mapeia o que der (ZONE→dmc, LENGTH_→extensão, D→dn, MATERIAL→tubulação) e você completa os campos padrão abaixo.</p>
+    </details>
+    <div class="sec" style="margin-top:16px">Arquivo</div>
+    <div id="pjImpDrop"><input id="pjImpFile" type="file" accept=".gpkg" hidden/><div style="font-size:26px">⭳</div><div>Clique para escolher o <b>.gpkg</b></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">
+      <div class="pjimpf"><label>Projeto (padrão)</label><input id="pjImpProj" placeholder="ex.: AL 16"/></div>
+      <div class="pjimpf"><label>Cidade (padrão)</label><input id="pjImpCidade" placeholder="ex.: CONTAGEM - MG"/></div>
+      <div class="pjimpf"><label>Situação inicial (padrão)</label><input id="pjImpSit" placeholder="ex.: A executar"/></div>
+    </div>
+    <div id="pjImpPrev"></div>
+    <div id="pjImpActions" class="hidden" style="margin-top:10px"><button id="pjImpGo" class="btn" style="width:auto;margin-top:0;padding:12px 20px">Importar</button></div>
+    <div id="pjImpMsg" style="margin-top:10px"></div>
+  </main>
+
   <nav>
     <button class="on" data-go="home"><span class="ic">🏠</span>Início</button>
     <button id="btnNotif"><span class="ic" style="position:relative;display:inline-block">🔔<span id="ntfBadge" style="display:none;position:absolute;top:-5px;right:-9px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;line-height:16px;border-radius:999px;padding:0 3px;text-align:center">0</span></span>Avisos</button>
@@ -1274,7 +1428,7 @@ function iniciarGPS(){
     const a=Math.round(gps.acc);
     if(gps.acc<=PRECISAO_MAX) banner('ok',`GPS ${a} m · dentro da tolerância`);
     else banner('warn',`GPS ${a} m · aguardando ≤ ${PRECISAO_MAX} m`);
-    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps();
+    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps(); if(typeof pavOnGps==='function') pavOnGps();
   },err=>{ banner('bad','Sem sinal de GPS — ative a localização'); },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 function banner(cls,txt){const b=$('#gpsBanner');b.className='banner '+cls;b.textContent=txt;}
@@ -1510,7 +1664,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1532,19 +1686,25 @@ function irPara(id){
   if(id==='frotas') frotasInit();
   if(id==='abertura_servicos') asInit();
   if(id==='entrevistadores') entInit();
+  if(id==='auxiliar_programacao') apInit();
+  if(id==='aux_acesso') auxAcInit();
   if(id==='ent_ocorrencia') eoInit();
   if(id==='ent_oc_gestao') egInit();
   if(id==='programacao_servicos') pgInit();
   if(id==='programacao_pesquisa') ppInit();
   if(id==='pp_acomp') paInit();
   if(id==='matriculas') mtInit();
+  if(id==='pavimento') pavInit();
+  if(id==='pavprog') pavProgInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='dev_acesso') devAcessoInit();
+  if(id==='telemetria') telemetriaInit();
   if(id==='projetos') pjLoad().then(pjHub);
   if(id==='projeto_campo') pjLoad().then(()=>pjInit());
   if(id==='projeto_sup') pjLoad().then(pjSupEnter);
   if(id==='projeto_acesso') pjSupAcesso();
+  if(id==='projeto_import') pjImportInit();
   if(id==='projeto_resumo') pjLoad().then(pjResumoEnter);
   if(id==='vrpman') vmHub();
   if(id==='vrpman_campo') vmCampoInit();
@@ -1556,7 +1716,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -1589,6 +1749,148 @@ function devAcessoRender(){
   }));
 }
 ['condBar','frotasBar'].forEach(bid=>{ const b=$('#'+bid); if(b) b.addEventListener('click',()=>irPara('frota')); });
+
+// ---------- TELEMETRIA (CCO COPASA) ----------
+// Importa CSVs do CCO (vazão/volume macro, nível reservatório, bombas/pressão booster) e alimenta
+// o schema "15 - telemetria" via RPCs (sessão do usuário — sem service key no front). Admin-only.
+let telFilesParsed=[], telCobArr=[], telCobMap={};
+const TEL_SCHEMA={
+  'momento;vazao;volume;sinal':['vazao_volume','macro'],
+  'momento;b01;b02;b03;b04;nivel_suc;pressao_suc;pressao_rec;sinal':['bombas_pressao','booster'],
+  'momento;nivel;sinal':['nivel','reservatorio']
+};
+const TEL_GRAND={vazao:'vazao',volume:'volume',nivel:'nivel',b01:'b01',b02:'b02',b03:'b03',b04:'b04',nivel_suc:'nivel_suc',pressao_suc:'pressao_suc',pressao_rec:'pressao_rec',sinal:'sinal'};
+function telemetriaInit(){
+  if(!(ME&&ME.is_admin)){ toast('Acesso restrito'); irPara('home'); return; }
+  telFilesParsed=[];
+  const p=$('#telPreview'); if(p) p.innerHTML='';
+  const a=$('#telActions'); if(a) a.classList.add('hidden');
+  const r=$('#telResumo'); if(r) r.innerHTML='';
+  const pr=$('#telProg'); if(pr){ pr.classList.add('hidden'); pr.innerHTML=''; }
+  telWire(); telCobLoad();
+}
+function telWire(){
+  const inp=$('#telFiles'), dz=$('#telDrop');
+  if(dz && !dz.dataset.ready){ dz.dataset.ready='1';
+    dz.addEventListener('click',()=>inp&&inp.click());
+    dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+    dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+    dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over'); if(e.dataTransfer) telAddFiles(e.dataTransfer.files);});
+  }
+  if(inp && !inp.dataset.ready){ inp.dataset.ready='1'; inp.addEventListener('change',()=>{ telAddFiles(inp.files); inp.value=''; }); }
+  const pb=$('#telProcessar'); if(pb && !pb.dataset.ready){ pb.dataset.ready='1'; pb.addEventListener('click',telProcessar); }
+  const lb=$('#telLimpar'); if(lb && !lb.dataset.ready){ lb.dataset.ready='1'; lb.addEventListener('click',()=>telemetriaInit()); }
+}
+function telMeta(fname){
+  const bn=fname.replace(/\.csv$/i,'');
+  const parts=bn.split(/\s*[-_]\s*/);
+  let uc=(parts[0]||'').trim(), cc=(parts[1]||'').trim();
+  if(cc){ const m=cc.match(/^[A-Za-z]+[0-9]+/); cc=m?m[0]:''; if(cc.toLowerCase()==='none') cc=''; }
+  if(!cc && /^[A-Za-z]{2,4}\d{6,}$/.test(uc)) cc=uc;
+  return [uc,cc];
+}
+async function telAddFiles(fileList){
+  const arr=[...fileList].filter(f=>/\.csv$/i.test(f.name));
+  if(!arr.length){ toast('Selecione arquivos .csv'); return; }
+  for(const f of arr){
+    let text=''; try{ text=await f.text(); }catch(e){ telFilesParsed.push({name:f.name,ok:false,erro:'não foi possível ler'}); continue; }
+    const nl=text.indexOf('\n'); const header=(nl>=0?text.slice(0,nl):text).trim();
+    const hkey=header.toLowerCase().replace(/\s+/g,'');
+    const sch=TEL_SCHEMA[hkey];
+    const [uc,cc]=telMeta(f.name);
+    const path=(f.webkitRelativePath||'').toLowerCase();
+    let za=null,cidade=null;
+    if(path.includes('contagem')){za='ZA1004';cidade='CONTAGEM';}
+    else if(path.includes('betim')){za='ZA0200';cidade='BETIM';}
+    const selZa=(($('#telZa')||{}).value)||'';
+    if(!za && selZa){ za=selZa; cidade= selZa==='ZA1004'?'CONTAGEM':'BETIM'; }
+    const nlinhas= sch ? Math.max(0, text.split(/\r?\n/).filter(l=>l.trim()).length-1) : 0;
+    telFilesParsed.push({name:f.name,text,uc,cc,esquema:sch?sch[0]:null,tipo:sch?sch[1]:null,za,cidade,nlinhas,ok:!!sch,erro:sch?null:'cabeçalho não reconhecido'});
+  }
+  telRenderPreview();
+}
+function telRenderPreview(){
+  const box=$('#telPreview'); if(!box) return;
+  if(!telFilesParsed.length){ box.innerHTML=''; $('#telActions').classList.add('hidden'); return; }
+  const rows=telFilesParsed.map(f=>{
+    const cob=telCobMap[f.uc];
+    const cad = f.ok ? (cob&&cob.no_cadastro?'<span class="pill">no cadastro</span>':'<span class="pill bad">fora</span>') : '';
+    const sit = f.ok ? (f.esquema) : ('<span class="pill bad">'+vEsc(f.erro||'inválido')+'</span>');
+    return `<tr><td>${vEsc(f.name)}</td><td>${vEsc(f.uc||'—')}</td><td>${vEsc(f.tipo||'—')}</td><td>${sit}</td><td style="text-align:right">${f.ok?f.nlinhas:''}</td><td>${cad}</td></tr>`;
+  }).join('');
+  const nValid=telFilesParsed.filter(f=>f.ok).length;
+  box.innerHTML=`<div class="telwrap"><table class="tel"><thead><tr><th>Arquivo</th><th>Unidade</th><th>Tipo</th><th>Esquema</th><th style="text-align:right">Linhas</th><th>Cadastro</th></tr></thead><tbody>${rows}</tbody></table></div><div class="sub" style="margin-top:6px">${telFilesParsed.length} arquivo(s), ${nValid} válido(s).</div>`;
+  $('#telActions').classList.toggle('hidden', nValid===0);
+}
+function telIso(s){ const m=(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); return m?`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:00-03:00`:null; }
+function telParseReadings(f,last){
+  const nl=f.text.indexOf('\n');
+  const cols=(nl>=0?f.text.slice(0,nl):f.text).trim().split(';').map(c=>c.trim().toLowerCase());
+  const lines=f.text.split(/\r?\n/); const out=new Map();
+  const lastMs = last ? Date.parse(last) : null;
+  for(let li=1; li<lines.length; li++){
+    const line=lines[li]; if(!line.trim()) continue;
+    const rec=line.split(';'); if(rec.length<cols.length) continue;
+    const iso=telIso(rec[0].trim()); if(!iso) continue;
+    if(lastMs!=null && Date.parse(iso)<=lastMs) continue;
+    for(let i=0;i<cols.length;i++){
+      const g=TEL_GRAND[cols[i]]; if(!g) continue;
+      const v=(rec[i]||'').trim().replace(',','.');
+      out.set(iso+'|'+g,{m:iso,g,v:(v===''?null:v)});
+    }
+  }
+  return [...out.values()];
+}
+function telProgRender(fi,nf,nome,sent,tot){
+  const box=$('#telProg'); if(!box) return;
+  const pct= tot? Math.round(sent/tot*100):0;
+  box.innerHTML=`<div class="sub">Arquivo ${fi+1}/${nf}: <b>${vEsc(nome)}</b> — ${sent}/${tot} leituras (${pct}%)</div><div style="height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:6px"><div style="height:100%;width:${pct}%;background:var(--acc);transition:width .2s"></div></div>`;
+}
+async function telProcessar(){
+  const valid=telFilesParsed.filter(f=>f.ok);
+  if(!valid.length){ toast('Nenhum CSV válido'); return; }
+  const soNovos=(($('#telSoNovos')||{}).checked);
+  const prog=$('#telProg'); if(prog) prog.classList.remove('hidden');
+  const btn=$('#telProcessar'); if(btn) btn.disabled=true;
+  let okFiles=0, errFiles=0, totLeituras=0; const erros=[];
+  for(let fi=0; fi<valid.length; fi++){
+    const f=valid[fi]; telProgRender(fi,valid.length,f.name,0,0);
+    try{
+      const {data:uid,error:e1}=await sb.rpc('app_tele_unidade_upsert',{p_codigo_unidade:f.uc,p_codigo_copasa:f.cc||null,p_za:f.za,p_cidade:f.cidade,p_tipo:f.tipo,p_esquema:f.esquema});
+      if(e1) throw e1;
+      const last = soNovos ? ((telCobMap[f.uc]||{}).momento_max||null) : null;
+      const leituras=telParseReadings(f,last);
+      const B=5000; let sent=0;
+      if(!leituras.length) telProgRender(fi,valid.length,f.name,0,0);
+      for(let i=0;i<leituras.length;i+=B){
+        const chunk=leituras.slice(i,i+B);
+        const {data:n,error:e2}=await sb.rpc('app_tele_ingest',{p_codigo_unidade:f.uc,p_rows:chunk,p_arquivo:(i===0?f.name:null),p_hash:null});
+        if(e2) throw e2;
+        sent+=chunk.length; totLeituras+=(n||0); telProgRender(fi,valid.length,f.name,sent,leituras.length);
+      }
+      okFiles++;
+    }catch(e){ errFiles++; erros.push(f.name+': '+(e.message||e)); }
+  }
+  if(btn) btn.disabled=false;
+  const res=$('#telResumo'); if(res) res.innerHTML=`<div class="banner ${errFiles?'warn':'ok'}">Concluído — ${okFiles} arquivo(s), ${totLeituras} leitura(s) gravada(s)${errFiles?`, ${errFiles} com erro`:''}.</div>`+(erros.length?('<div class="sub" style="margin-top:6px">'+erros.map(vEsc).join('<br>')+'</div>'):'');
+  telCobLoad();
+}
+async function telCobLoad(){
+  const box=$('#telCob'); if(box) box.innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_tele_cobertura'); if(error) throw error;
+    telCobArr=data||[]; telCobMap={}; telCobArr.forEach(r=>{ telCobMap[r.codigo_unidade]=r; });
+    telCobRender(); if(telFilesParsed.length) telRenderPreview();
+  }catch(e){ if(box) box.innerHTML='<div class="banner bad">Erro: '+vEsc(e.message||e)+'</div>'; }
+}
+function telCobRender(){
+  const box=$('#telCob'); if(!box) return;
+  const a=telCobArr; if(!a.length){ box.innerHTML='<p class="sub">Nenhuma unidade cadastrada ainda.</p>'; return; }
+  const tot=a.length, noCad=a.filter(r=>r.no_cadastro).length, comDados=a.filter(r=>r.n_leituras>0).length;
+  const fmt=t=>{ if(!t) return '—'; const d=new Date(t); return isNaN(d)?'—':d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
+  const rows=a.map(r=>`<tr><td>${vEsc(r.codigo_unidade)}</td><td>${vEsc(r.tipo||'—')}</td><td>${vEsc(r.za||'—')}</td><td>${r.no_cadastro?'<span class="pill">sim</span>':'<span class="pill bad">fora</span>'}</td><td style="text-align:right">${(r.n_leituras||0).toLocaleString('pt-BR')}</td><td>${fmt(r.momento_max)}</td></tr>`).join('');
+  box.innerHTML=`<div class="kpi"><div><b>${tot}</b><span class="sub">unidades</span></div><div><b>${noCad}</b><span class="sub">no cadastro</span></div><div><b>${tot-noCad}</b><span class="sub">fora do cadastro</span></div><div><b>${comDados}</b><span class="sub">com leituras</span></div></div><div class="telwrap"><table class="tel"><thead><tr><th>Unidade</th><th>Tipo</th><th>ZA</th><th>Cadastro</th><th style="text-align:right">Leituras</th><th>Última</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 
 // ---------- MÓDULO PROJETOS / INTERVENÇÕES ----------
 const PJ_TIPOS={
@@ -1625,6 +1927,9 @@ const PJ_PECA_TIPOS=['Válvula de manobra','Ventosa','Descarga'];
 const pjSel=(n,v,opts)=>({n,k:'sel',v:v||'',opts:opts||PJ_PECA_TIPOS});   // seleção de tipo (config): não é mensurável
 // atividade de ENCERRAMENTO: registro único via anexo de PDF (não foto); o PDF vira documento final (ver PJ_DOCS: as_built/rtq)
 const pjDoc=(n,doc)=>({n,k:'doc',doc});
+// OS SIGOS da intervenção: 1ª atividade de TODA árvore. Só número (k:'reg' → fora do % de avanço) e sem toggle "No escopo?" (não é ativável/desativável)
+const pjOS=()=>({n:'OS SIGOS',k:'reg',os:true,v:'—'});
+const pjOsVal=iv=>{ const n=((iv&&iv.arv)||[]).find(x=>x&&x.os); return (n&&n.v&&n.v!=='—')?String(n.v):''; };
 const pjG=(n,f,o={})=>({n,k:'g',f,...o});
 const pjOc=(e,es,r,rc)=>[pjP('Escavação',e),pjP('Escoramento',es),pjP('Reaterro',r),pjP('Recomposição de pavimento',rc)];
 const pjIL=(nome,m,ex,t,civOff=true)=>pjG(nome||'Interligação',[{...pjG('Obra civil da caixa',pjOc(0,0,0,0)),ativo:!civOff},pjP('Manobra / parada de rede',m),pjP('Execução (corte / peças / junta)',ex),pjP('Teste / religação',t)]);
@@ -1694,33 +1999,33 @@ PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 let pjLoaded=false, PJ_LIMITES=[], PJ_DMCS=[];
 // árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
 const PJ_ARV={
-  vrp_impl:()=>[pjP('Locação e cadastro de interferências',0),
+  vrp_impl:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
     pjG('Câmara da VRP',[...pjOc(0,0,0,0),pjP('Execução da câmara',0)]),
     pjP('Montagem hidráulica (VRP + by-pass, registros, filtro, manômetros)',0),
     pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade',0),pjP('Calibração / ajuste de set point',0),
     {...pjP('Telemetria / macromedidor associado',0),ativo:true},pjP('Comissionamento',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  valvula:()=>[pjP('Locação e cadastro de interferências',0),
+  valvula:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
     pjG('Obra civil (vala/caixa)',pjOc(0,0,0,0)),
     {...pjP('Retirada da válvula antiga (se substituição)',0),ativo:false},
     pjP('Instalação da válvula + acessórios',0),
     pjIL('Interligação / religação',0,0,0),
     pjP('Teste de estanqueidade / manobra',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  rede_vca:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
+  rede_vca:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
     pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
     pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
   // HDD = perfuração direcional (não destrutiva): sem vala/reaterro/pavimento; só valas de entrada/saída, furo piloto, alargamento e puxamento
-  rede_hdd:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
+  rede_hdd:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
     pjP('Mobilização e montagem do equipamento HDD',0),pjValas([pjVala(1,'Entrada'),pjVala(2,'Saída')]),
     pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
     pjM('Puxamento da tubulação (pullback)',ext||1,0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
-    pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]
+    pjDoc('Relatório de Furo','rel_furo'),pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]   // HDD: Relatório de Furo antes do As Built
 };
 const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
 const pjMapTipo=(tipo,isLine)=>isLine?'rede_vca':(PJ_TIPO_MAP[tipo]||'vrp_impl');
@@ -1771,10 +2076,15 @@ async function pjLoad(force){
   // converte o antigo "Cadastro / as-built" (%) e garante os 2 nós-doc como as 2 últimas atividades, nessa ordem. Some sozinho ao regravar o snapshot.
   ivs.forEach(iv=>{ if(!Array.isArray(iv.arv))return;
     iv.arv=iv.arv.filter(n=>!(n&&n.k!=='doc'&&/cadastro\s*\/?\s*as-?built/i.test(n.n||'')));
-    [['Cadastro do As Built','as_built'],['Relatório Técnico de Qualidade','rtq']].forEach(([nm,dc])=>{
+    const fin=[['Cadastro do As Built','as_built'],['Relatório Técnico de Qualidade','rtq']];
+    if(iv.tipo==='rede_hdd') fin.unshift(['Relatório de Furo','rel_furo']);   // só HDD, antes do As Built (2026-10-22)
+    fin.forEach(([nm,dc])=>{
       const i=iv.arv.findIndex(n=>n&&n.k==='doc'&&n.doc===dc);
       if(i<0) iv.arv.push(pjDoc(nm,dc)); else iv.arv.push(iv.arv.splice(i,1)[0]);
     });
+    // OS SIGOS (2026-10-22): garante o campo como 1ª atividade em snapshots salvos antes dele existir
+    const oi=iv.arv.findIndex(n=>n&&n.os);
+    if(oi<0) iv.arv.unshift(pjOS()); else if(oi>0) iv.arv.unshift(iv.arv.splice(oi,1)[0]);
   });
   await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca As-Built/RTQ já anexados (100%) em todas as intervenções
   PJ_IVS=ivs; pjLoaded=true;
@@ -1892,9 +2202,153 @@ function pjHub(){
    <p class="pjhint" style="margin:0 0 8px">Retaguarda: configurar escopo/quantidades e liberar o cadeado. ${sup?'':'Acesso restrito.'}</p>
    <div class="grid">
      <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_sup':''}"><div class="ic">⚙️</div><div class="nm">Configuração de intervenções${sup?'':' 🔒'}</div></button>
+     <button class="mod ${sup?'':'soon'}" data-pjgo="${sup?'projeto_import':''}"><div class="ic">📥</div><div class="nm">Importar intervenções${sup?'':' 🔒'}</div></button>
    </div>`;
   $('#pjHub').querySelectorAll('[data-pjgo]').forEach(b=>b.onclick=()=>{ const dst=b.dataset.pjgo; if(!dst){ toast('Acesso restrito à equipe de configuração'); return; } irPara(dst); });
   const ac=$('#pjHubAcesso'); if(ac) ac.onclick=e=>{ e.stopPropagation(); irPara('projeto_acesso'); };
+}
+// ---------- IMPORTAR INTERVENÇÕES (gpkg → "7 - setorizacao".intervencoes_lineares) ----------
+const PJ_IMP_SPEC=[
+  ['id','texto','recomendado','CON-06-AL-16-F01'],
+  ['projeto','texto','sim','AL 16'],
+  ['cidade','texto','sim','CONTAGEM - MG'],
+  ['dmc','texto','sim','DMC-06'],
+  ['tipo','texto','sim','HDD'],
+  ['dn','inteiro','—','63'],
+  ['tubulacao','texto','—','PEAD'],
+  ['codigo_do_documento','texto','—','CTT0034-AL16-R01'],
+  ['responsavel','texto','—','—'],
+  ['situacao_atual','texto','sim','A executar'],
+  ['extensao_m','número','—','194.85 (se vazio, calculado da geometria)']
+];
+let pjImpRows=[], _pjSql=null;
+function pjImportInit(){
+  if(!pjPodeSup()){ toast('Acesso restrito à equipe de configuração'); irPara('projetos'); return; }
+  pjImpRows=[];
+  const sp=$('#pjImpSpec'); if(sp) sp.innerHTML=PJ_IMP_SPEC.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td class="sub">${vEsc(r[3])}</td></tr>`).join('');
+  const p=$('#pjImpPrev'); if(p) p.innerHTML=''; const a=$('#pjImpActions'); if(a) a.classList.add('hidden'); const m=$('#pjImpMsg'); if(m) m.innerHTML='';
+  pjImpWire();
+}
+function pjImpWire(){
+  const dz=$('#pjImpDrop'), inp=$('#pjImpFile');
+  if(dz && !dz.dataset.ready){ dz.dataset.ready='1';
+    dz.addEventListener('click',()=>inp&&inp.click());
+    dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+    dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+    dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over'); if(e.dataTransfer.files[0]) pjImpLer(e.dataTransfer.files[0]);});
+  }
+  if(inp && !inp.dataset.ready){ inp.dataset.ready='1'; inp.addEventListener('change',()=>{ if(inp.files[0]) pjImpLer(inp.files[0]); inp.value=''; }); }
+  const tpl=$('#pjImpTpl'); if(tpl && !tpl.dataset.ready){ tpl.dataset.ready='1'; tpl.addEventListener('click',pjImpTemplate); }
+  const go=$('#pjImpGo'); if(go && !go.dataset.ready){ go.dataset.ready='1'; go.addEventListener('click',pjImpProcessar); }
+  ['pjImpProj','pjImpCidade','pjImpSit'].forEach(id=>{ const el=$('#'+id); if(el && !el.dataset.rp){ el.dataset.rp='1'; el.addEventListener('input',()=>{ if(pjImpRows.length) pjImpPreview(); }); } });
+}
+function pjImpTemplate(){
+  const header=PJ_IMP_SPEC.map(r=>r[0]).join(';');
+  const exemplo=PJ_IMP_SPEC.map(r=>r[3].split(' ')[0]).join(';');
+  const csv='﻿'+header+'\n'+exemplo+'\n';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='template_intervencoes_lineares.csv'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+async function pjLoadSqlJs(){
+  if(_pjSql) return _pjSql;
+  const BASE='https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
+  if(!window.initSqlJs){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=BASE+'sql-wasm.js'; s.onload=res; s.onerror=()=>rej(new Error('falha ao carregar o leitor de gpkg (sql.js)')); document.head.appendChild(s); }); }
+  _pjSql=await window.initSqlJs({locateFile:f=>BASE+f});
+  return _pjSql;
+}
+// GPKG geometry blob -> WKT (LINESTRING / MULTILINESTRING, 2D; ignora Z)
+function pjGpkgWKT(u8){
+  if(!u8||u8.length<8||u8[0]!==71||u8[1]!==80) return null;
+  const flags=u8[3], envSz=({0:0,1:32,2:48,3:48,4:64})[(flags>>1)&7]||0;
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength); const c={p:8+envSz};
+  function g(){
+    const little=u8[c.p]===1; c.p+=1;
+    const t=dv.getUint32(c.p,little); c.p+=4;
+    const z=((t&0x80000000)!==0)||(Math.floor((t&0x7fffffff)/1000)===1);
+    const base=((t&0x7fffffff)%1000)||(t&0xff);
+    const pts=()=>{ const n=dv.getUint32(c.p,little); c.p+=4; const a=[]; for(let i=0;i<n;i++){ const x=dv.getFloat64(c.p,little);c.p+=8; const y=dv.getFloat64(c.p,little);c.p+=8; if(z)c.p+=8; a.push(x.toFixed(3)+' '+y.toFixed(3)); } return a; };
+    if(base===2) return 'LINESTRING('+pts().join(', ')+')';
+    if(base===5){ const nl=dv.getUint32(c.p,little); c.p+=4; const ps=[]; for(let i=0;i<nl;i++){ const w=g(); if(w) ps.push('('+w.replace(/^LINESTRING\s*\(/,'').replace(/\)$/,'')+')'); } return 'MULTILINESTRING('+ps.join(', ')+')'; }
+    return null;
+  }
+  try{ return g(); }catch(e){ return null; }
+}
+async function pjImpLer(file){
+  const prev=$('#pjImpPrev'); prev.innerHTML='<p class="sub">Lendo o arquivo…</p>';
+  $('#pjImpActions').classList.add('hidden'); $('#pjImpMsg').innerHTML='';
+  try{
+    const SQL=await pjLoadSqlJs();
+    const u8=new Uint8Array(await file.arrayBuffer());
+    const db=new SQL.Database(u8);
+    const meta=db.exec("select c.table_name, g.column_name from gpkg_contents c join gpkg_geometry_columns g on lower(g.table_name)=lower(c.table_name) where c.data_type='features' limit 1");
+    if(!meta.length) throw new Error('nenhuma camada de feições encontrada no gpkg');
+    const tbl=meta[0].values[0][0], gcol=meta[0].values[0][1];
+    const r=db.exec('select * from "'+tbl.replace(/"/g,'')+'"');
+    if(!r.length||!r[0].values.length) throw new Error('a camada está vazia');
+    const cols=r[0].columns.map(c=>c.toLowerCase()), vals=r[0].values;
+    const gi=cols.indexOf(gcol.toLowerCase());
+    const col=(names)=>{ for(const n of names){ const i=cols.indexOf(n); if(i>=0) return i; } return -1; };
+    const ix={ id:col(['id','codigo','cod']), projeto:col(['projeto']), cidade:col(['cidade']),
+      dmc:col(['dmc','zone','zona']), tipo:col(['tipo']), dn:col(['dn','d']),
+      tub:col(['tubulacao','material']), doc:col(['codigo_do_documento','documento']),
+      resp:col(['responsavel']), sit:col(['situacao_atual','situacao']),
+      ext:col(['extensao_m','length_','length','comprimento']), label:col(['label']) };
+    const get=(v,i)=> i>=0 ? v[i] : null;
+    pjImpRows=[];
+    for(const v of vals){
+      let gb=v[gi]; if(Array.isArray(gb)) gb=new Uint8Array(gb);
+      const wkt=gb?pjGpkgWKT(gb):null; if(!wkt) continue;
+      let idv=get(v,ix.id); if(idv!=null && /^\d+$/.test(String(idv).trim())) idv=null; // id numérico (WaterGEMS) não é código de cadastro
+      const label=get(v,ix.label);
+      pjImpRows.push({ id:idv!=null?String(idv):null, _label:label!=null?String(label):null,
+        projeto:get(v,ix.projeto), cidade:get(v,ix.cidade), dmc:get(v,ix.dmc), tipo:get(v,ix.tipo),
+        dn:get(v,ix.dn), tubulacao:get(v,ix.tub), codigo_do_documento:get(v,ix.doc),
+        responsavel:get(v,ix.resp), situacao_atual:get(v,ix.sit), extensao_m:get(v,ix.ext), wkt });
+    }
+    db.close();
+    if(!pjImpRows.length) throw new Error('nenhuma linha com geometria LINESTRING válida');
+    pjImpPreview();
+  }catch(e){ prev.innerHTML='<div class="banner bad">Erro ao ler: '+vEsc(e.message||e)+'</div>'; }
+}
+function pjWktLen(wkt){
+  const m=wkt.match(/\(([-0-9.,\s]+)\)/); if(!m) return null;
+  const pts=m[1].split(',').map(s=>s.trim().split(/\s+/).map(Number));
+  let d=0; for(let i=1;i<pts.length;i++){ const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1]; d+=Math.sqrt(dx*dx+dy*dy); }
+  return d;
+}
+function pjImpResolve(){
+  const dProj=(($('#pjImpProj')||{}).value||'').trim(), dCid=(($('#pjImpCidade')||{}).value||'').trim(), dSit=(($('#pjImpSit')||{}).value||'').trim();
+  return pjImpRows.map(r=>{
+    const projeto=r.projeto||dProj||null, cidade=r.cidade||dCid||null, sit=r.situacao_atual||dSit||null;
+    let ext=r.extensao_m; if(ext==null||ext===''){ ext=pjWktLen(r.wkt); }
+    let id=r.id; if(!id && r._label) id=((projeto||'INT').replace(/\s+/g,''))+'-'+r._label;
+    return { id, projeto, cidade, dmc:r.dmc||null, tipo:(r.tipo||'HDD'),
+      dn:(r.dn!=null&&r.dn!==''?String(parseInt(r.dn,10)):null), tubulacao:r.tubulacao||null,
+      codigo_do_documento:r.codigo_do_documento||null, responsavel:r.responsavel||null,
+      situacao_atual:sit, extensao_m:(ext!=null?Number(ext).toFixed(2):null), wkt:r.wkt };
+  });
+}
+function pjImpPreview(){
+  const rows=pjImpResolve(), prev=$('#pjImpPrev');
+  const falta=rows.filter(r=>!r.projeto||!r.dmc||!r.situacao_atual).length;
+  prev.innerHTML='<div class="sub" style="margin:4px 0">'+rows.length+' intervenção(ões) lida(s).'+(falta?(' <b style="color:var(--bad)">'+falta+' sem projeto/DMC/situação</b> — preencha os padrões acima.'):'')+'</div>'+
+    '<div class="pjimpwrap"><table class="pjimpt"><thead><tr><th>id</th><th>projeto</th><th>dmc</th><th>tipo</th><th>dn</th><th>ext (m)</th><th>situação</th></tr></thead><tbody>'+
+    rows.slice(0,300).map(r=>`<tr><td>${vEsc(r.id||'—')}</td><td>${vEsc(r.projeto||'—')}</td><td>${vEsc(r.dmc||'—')}</td><td>${vEsc(r.tipo)}</td><td>${vEsc(r.dn||'—')}</td><td>${vEsc(r.extensao_m||'—')}</td><td>${vEsc(r.situacao_atual||'—')}</td></tr>`).join('')+
+    '</tbody></table></div>';
+  $('#pjImpActions').classList.remove('hidden');
+}
+async function pjImpProcessar(){
+  const rows=pjImpResolve(), go=$('#pjImpGo');
+  if(!rows.length){ toast('Nada para importar'); return; }
+  go.disabled=true; $('#pjImpMsg').innerHTML='<p class="sub">Importando…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_proj_intervencao_importar',{p_rows:rows}); if(error)throw error;
+    const d=data||{};
+    $('#pjImpMsg').innerHTML='<div class="banner ok">✓ '+(d.inseridas||0)+' inseridas, '+(d.atualizadas||0)+' atualizadas.</div>';
+    toast('✓ Intervenções importadas');
+  }catch(e){ $('#pjImpMsg').innerHTML='<div class="banner bad">Erro: '+vEsc(e.message||e)+'</div>'; }
+  go.disabled=false;
 }
 // Suporte · Acesso — mini-cadeado da categoria: define quem acessa (protótipo localStorage; lista real de usuários via sup_admin_usuarios)
 let _pjAcessoUsers=[];
@@ -2030,7 +2484,9 @@ function pjResumoCsv(feed){
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u; a.download='resumo_avancos_projetos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('CSV gerado'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
 // ---------- documentos da intervenção (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por tipo ----------
-const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
+const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'rel_furo',ic:'🕳️',n:'Relatório de Furo',hdd:true},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
+// documentos aplicáveis à intervenção: "Relatório de Furo" existe só em HDD (lista de documentos, relatório e PDF consolidado)
+const pjDocsFor=iv=>PJ_DOCS.filter(dc=>!dc.hdd||(iv&&iv.tipo==='rede_hdd'));
 let pjDocsCur={};   // tipo -> {tipo,nome,path} da intervenção corrente
 // presença dos documentos de ENCERRAMENTO (as_built/rtq) por intervenção — marca node.done nos cards da lista sem abrir cada uma
 let pjDocsPres={};   // 'kind|gid' -> Set(tipos)
@@ -2081,7 +2537,7 @@ function pjRenderCfg(keep){
   const hasAdv=iv.arv.some(pjHasAdv);
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
   // Projeto 3D aparece logo após o "Projeto executivo" (só intervenções de VRP)
-  const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
+  const docsHtml=pjDocsFor(iv).map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,28)}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="${dc.t}">📎 ${ok?'Substituir':'Anexar'}</button>${ok?`<button class="btn ghost pjmini bad" data-remove="${dc.t}">🗑 Remover</button>`:''}<input type="file" accept="application/pdf" hidden data-file="${dc.t}"></span></div>`;
     return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   const lockCard=iv.locked
@@ -2146,7 +2602,9 @@ function pjNodeHtml(node){
   const tog=(cfg&&(isG||t==='%'||t==='m'))
     ? `<span class="pjsw sm ${inact?'':'on'} ${togEdit?'':'dis'}" ${togEdit?`data-toggle="${rid}"`:''} title="${advTog?'Tem lançamento — não pode sair do escopo':'No escopo?'}"></span>${(editar&&advTog)?'<span class="pjfroz" title="Congelado: já tem lançamento">🔒</span>':''}` : '';
   let right='';
-  if(t==='reg'){
+  if(t==='reg' && node.os){   // OS SIGOS: só número, editável no campo e no Suporte (dado da intervenção, não escopo → sem toggle nem cadeado)
+    right=`<input class="pjreginp" data-osigos="${rid}" inputmode="numeric" pattern="[0-9]*" maxlength="20" value="${node.v&&node.v!=='—'?String(node.v).replace(/\D/g,''):''}" placeholder="nº da OS">`;
+  } else if(t==='reg'){
     right = cfg
       ? `<span class="pjregv mut">${node.v&&node.v!=='—'?node.v:'• campo'}</span>`
       : `<input class="pjreginp" data-reg="${rid}" value="${node.v&&node.v!=='—'?String(node.v).replace(/"/g,'&quot;'):''}" placeholder="—"${pjLocked?'':' disabled'}>`;
@@ -2239,6 +2697,8 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-docattach]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const inp=d.querySelector('[data-docfile="'+b.dataset.docattach+'"]'); if(inp)inp.click(); });
   d.querySelectorAll('[data-docfile]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.docfile]; const f=inp.files&&inp.files[0]; if(n&&f) pjDocAnexar(pjCurIv(),n.doc,f); });
   d.querySelectorAll('[data-docopen]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); try{ window.open(SBASE+b.dataset.docopen,'_blank'); }catch(_){} });
+  d.querySelectorAll('[data-osigos]').forEach(inp=>{ inp.oninput=()=>{ const v=inp.value.replace(/\D/g,''); if(v!==inp.value) inp.value=v; };   // só dígitos
+    inp.onchange=()=>{ const n=pjReg[inp.dataset.osigos]; if(n){ n.v=inp.value.replace(/\D/g,'')||'—'; pjSave(pjCurIv()); toast(n.v==='—'?'OS SIGOS removida':'OS SIGOS salva'); } }; });
   d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n){ n.v=inp.value.trim()||'—'; pjSave(pjCurIv()); } });
   d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjSave(pjCurIv()); rerender(k); } });
   d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjSave(pjCurIv()); rerender(k); } });
@@ -2278,13 +2738,13 @@ async function pjRel(id){
   const t=PJ_TIPOS[iv.tipo],asbuilt=pjStatusDe(iv)==='done';
   await pjDocsLoad(iv); await pjAvancosLoad(iv);
   // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
-  const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
+  const docsHtml=pjDocsFor(iv).map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`;
     return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   // "Gantt" de progresso por atividade. AUDITORIA: o antigo plotava por ts (data de REGISTRO do avanço), não por data de obra; sem cronograma planejado e com lançamento em lote (ex. F02 = 6 avanços em 8 min, 02/10) a linha do tempo colapsava e o eixo repetia a mesma data. Trocado por barra de PROGRESSO (0–100%) + janela de registro como rótulo honesto.
   const _allAv=Object.values(pjAvancosCur).flat();
   const gfmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
-  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime());
+  const acts=iv.arv.filter(n=>n.ativo!==false&&n.k!=='reg').map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime());
     if(n.k==='doc') return {n:n.n,p:n.done?100:0,nav:0,first:null,last:null,doc:true,done:!!n.done};
     return {n:n.n,p:pjPct(n),nav:es.length,first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
   const gantHtml=acts.map(a=>{ const pc=Math.max(0,Math.min(a.p||0,100)), cls=(a.p||0)>100?'over':((a.p||0)>=100?'ok':''), w=a.doc?(a.done?100:0):(a.first==null?0:Math.max(2,pc));
@@ -2321,7 +2781,7 @@ async function pjRel(id){
 }
 
 // ---------- MÓDULO LOGGERS ----------
-let loggersData=[], lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
+let loggersData=[], lgAll=[], lgModo='temp', lgFiltro='todos', lgCons='todos', lgSub='todos', detFotos={}, detPonto=null, lgEnviando=false;
 function contarSub(kind){ return loggersData.filter(p=>p.situacao==='concluido'&&lgMatchC(p)&&(kind==='com'?!!p.tem_pressao:!p.tem_pressao)).length; }
 const LG_CONS=[{v:'todos',l:'Ambos'},{v:'ZA1004',l:'Contagem'},{v:'ZA0200',l:'Betim'}];
 function lgMatchC(p){ return lgCons==='todos'||p.consorcio===lgCons; }
@@ -2368,7 +2828,7 @@ async function pjRelPdf(iv){ if(!iv)return;
 // renderiza os anexos (PDFs do executivo/licença/alvará/as-built) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
 async function pjRelRenderAnexos(iv){
   const box=document.getElementById('relAnexos'); if(!box) return;
-  const docs=PJ_DOCS.map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
+  const docs=pjDocsFor(iv).map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
   if(!docs.length){ box.innerHTML='<p class="relPend">Nenhum documento anexado para incluir ao final. Anexe na configuração (Suporte) antes da emissão.</p>'; return; }
   box.innerHTML='<p class="relPend" id="relAnexProg">⏳ Renderizando anexos (0/'+docs.length+')… aguarde antes de salvar o PDF.</p>';
   const prog=document.getElementById('relAnexProg');
@@ -2402,9 +2862,9 @@ async function pjRelRenderAnexos(iv){
 function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv);
   let h='<div class="relTop"><div><h1>Relatório consolidado da intervenção</h1><div class="sub">'+(iv.local||'')+'</div></div><div class="relBadge">'+p+'% concluído</div></div><div class="relBody">';
   h+='<div class="relSec"><span class="relNum">1</span> Dados da intervenção</div>';
-  h+='<div class="relGrid">'+relField('Código',iv.cod)+relField('Tipo',t.n)+relField('Consórcio',iv.cons)+relField('Responsável',iv.resp)+relField('Início',iv.ini)+relField(iv.fim?'Conclusão':'Situação',iv.fim||'Em andamento')+(iv.ext?relField('Extensão',(+iv.ext).toLocaleString('pt-BR')+' m'):'')+(iv.dn?relField('DN',iv.dn):'')+(iv.dmc?relField('DMC',iv.dmc):'')+relField('Progresso total',p+'%')+'</div>';
+  h+='<div class="relGrid">'+relField('Código',iv.cod)+relField('Tipo',t.n)+relField('OS SIGOS',pjOsVal(iv)||'—')+relField('Consórcio',iv.cons)+relField('Responsável',iv.resp)+relField('Início',iv.ini)+relField(iv.fim?'Conclusão':'Situação',iv.fim||'Em andamento')+(iv.ext?relField('Extensão',(+iv.ext).toLocaleString('pt-BR')+' m'):'')+(iv.dn?relField('DN',iv.dn):'')+(iv.dmc?relField('DMC',iv.dmc):'')+relField('Progresso total',p+'%')+'</div>';
   h+='<div class="relSec"><span class="relNum">2</span> Progresso por atividade</div>';
-  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>({n:n.n,p:pjPct(n)}));
+  const acts=iv.arv.filter(n=>n.ativo!==false&&n.k!=='reg').map(n=>({n:n.n,p:pjPct(n)}));   // OS SIGOS (reg) não é atividade de avanço
   h+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">'+acts.map(a=>{const w=Math.max(0,Math.min(a.p||0,100));return '<tr><td style="padding:5px 6px;border-bottom:1px solid #eee">'+a.n+'</td><td style="width:150px;border-bottom:1px solid #eee"><div style="background:#eef2f7;border-radius:5px;height:10px"><div style="background:#0a7d5e;height:100%;border-radius:5px;width:'+w+'%"></div></div></td><td style="width:48px;text-align:right;padding:5px 6px;border-bottom:1px solid #eee;font-weight:700">'+a.p+'%</td></tr>';}).join('')+'</table>';
   h+='<div class="relSec"><span class="relNum">3</span> Avanços por atividade · subatividade</div>';
   const grupos=pjRelGrupos(iv);
@@ -2414,7 +2874,7 @@ function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv)
       s.avs.forEach(e=>{ const quem=e.autor_nome||e.equipe||'—', eq=(e.autor_nome&&e.equipe)?(' · '+e.equipe):''; h+='<div style="font-size:11.5px;margin:7px 0 0;color:#333"><b>'+relFmtData(e.ts)+'</b> · +'+e.valor+(e.unidade==='m'?' m':'%')+' · <span style="color:#555">👤 '+quem+eq+'</span>'+(e.obs?'<div style="color:#444;font-style:italic;margin-top:1px">"'+e.obs+'"</div>':'')+'</div>'+relFotos((e.fotos||[]).map((pp,i)=>['Foto '+(i+1),pp])); });
     }); });
   h+='<div class="relSec"><span class="relNum">4</span> Documentos e anexos</div>';
-  PJ_DOCS.forEach(dc=>{ const doc=pjDocsCur[dc.t];
+  pjDocsFor(iv).forEach(dc=>{ const doc=pjDocsCur[dc.t];
     if(doc) h+='<div style="font-size:12px;margin-top:7px">'+dc.ic+' <b>'+dc.n+'</b> — <span style="color:#0a7d5e;font-weight:700">anexado</span> <span style="color:#777">('+(doc.nome||(doc.path||'').split('/').pop()||'documento')+')</span></div>';
     else h+='<div style="margin-top:7px"><div style="font-size:12px">'+dc.ic+' <b>'+dc.n+'</b></div><div class="relPend">Ainda não anexado no sistema — pendente de anexo na configuração da intervenção (Suporte). Deve ser anexado antes da emissão final.</div></div>';
   });
@@ -2428,14 +2888,16 @@ function distTxt(d){if(d==null)return '';return d<1?Math.round(d*1000)+' m':d.to
 function contar(s){return loggersData.filter(p=>(s==='todos'||p.situacao===s)&&lgMatchC(p)).length;}
 function contarCons(c){return loggersData.filter(p=>(c==='todos'||p.consorcio===c)&&(lgFiltro==='todos'||p.situacao===lgFiltro)).length;}
 async function carregarLoggers(){
+  const tit=$('#lgTitulo'); if(tit) tit.textContent='Loggers · '+(lgModo==='temp'?'Temporários':'Fixos');
   $('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('app_loggers_listar'); if(error) throw error;
-    loggersData=data||[]; localStorage.setItem('loggers_cache',JSON.stringify(loggersData));
+    lgAll=data||[]; localStorage.setItem('loggers_cache',JSON.stringify(lgAll));
   }catch(e){
-    const c=localStorage.getItem('loggers_cache'); loggersData=c?JSON.parse(c):[];
-    if(!loggersData.length){$('#lgLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';$('#lgFiltros').innerHTML='';return;}
+    const c=localStorage.getItem('loggers_cache'); lgAll=c?JSON.parse(c):[];
+    if(!lgAll.length){$('#lgLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';$('#lgFiltros').innerHTML='';return;}
   }
+  loggersData=lgAll.filter(p=>(!!p.logger_temporario)===(lgModo==='temp'));
   renderFiltros(); renderConsFiltros(); atualizarVista();
 }
 function renderFiltros(){
@@ -3060,7 +3522,7 @@ function ligarDetalhe(p){
 }
 function marcarLocal(p,sit){
   const i=loggersData.findIndex(x=>x.id===p.id);
-  if(i>=0){ loggersData[i].situacao=sit; loggersData[i]._pendente=!navigator.onLine; localStorage.setItem('loggers_cache',JSON.stringify(loggersData)); }
+  if(i>=0){ loggersData[i].situacao=sit; loggersData[i]._pendente=!navigator.onLine; localStorage.setItem('loggers_cache',JSON.stringify(lgAll)); }
 }
 async function submeterLogger(){
   if(lgEnviando) return; const p=detPonto, btn=document.getElementById('lgSalvar');
@@ -3071,7 +3533,7 @@ async function submeterLogger(){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     const item={id:uid,tipo:'logger',rpc:'app_logger_criar',pasta:'logger',
       fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach,p_foto_extra:detFotos.f_extra},
-      fields:{p_client_uuid:uid,
+      fields:{p_client_uuid:uid,p_temporario:(lgModo==='temp'),
         p_label:(document.getElementById('cr_label').value||null),
         p_consorcio:(document.getElementById('cr_cons').value||null),
         p_zona:(document.getElementById('cr_zona').value||null),
@@ -3112,6 +3574,9 @@ async function finalizarLogger(){
 }
 if($('#lgBack')) $('#lgBack').addEventListener('click',()=>irPara('loggers'));
 if($('#lgNovo')) $('#lgNovo').addEventListener('click',abrirCriar);
+if($('#lgModoTemp')) $('#lgModoTemp').addEventListener('click',()=>{lgModo='temp';lgFiltro='todos';lgCons='todos';lgSub='todos';irPara('loggers');});
+if($('#lgModoFixo')) $('#lgModoFixo').addEventListener('click',()=>{lgModo='fixo';lgFiltro='todos';lgCons='todos';lgSub='todos';irPara('loggers');});
+if($('#lgVoltarHub')) $('#lgVoltarHub').addEventListener('click',()=>irPara('loggers_hub'));
 if($('#vwLista')) $('#vwLista').addEventListener('click',()=>setView('lista'));
 if($('#vwMapa')) $('#vwMapa').addEventListener('click',()=>setView('mapa'));
 if($('#vwLista')) setView('lista');
@@ -3199,6 +3664,180 @@ if($('#asSalvar')) $('#asSalvar').addEventListener('click',()=>{
   enviarOuEnfileirar(item,'✓ Serviço solicitado');
   asReset(); irPara('entrevistadores');
 });
+// ---------- GESTÃO DE PAVIMENTO ----------
+const PAV_ORIGEM={vazamento:'Reparo de vazamento',ramal:'Instalação/substituição de ramal',fiscalizacao:'Fiscalização',vrp:'Gestão de VRPs',rede_vca:'Rede VCA',rede_hdd:'Rede HDD',dmc:'Implantação de DMC'};
+const PAV_TIPOS=[['grama','Grama'],['asfalto','Asfalto'],['concreto','Concreto'],['bloquete','Bloquete (bloco intertravado)'],['paralelepipedo','Paralelepípedo'],['pedra_portuguesa','Pedra portuguesa'],['piso_especial','Piso especial'],['piso_tatil','Piso tátil'],['meio_fio','Meio-fio / guia'],['sarjeta','Sarjeta']];
+const PAV_TIPO_LBL=k=>(PAV_TIPOS.find(t=>t[0]===k)||[])[1]||k;
+const pavH=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PAV_FOTO_URL=p=>p?sb.storage.from('fotos-campo').getPublicUrl(p).data.publicUrl:null;
+let pavState={}; // { tipo: {dimensao, f1, f2} }
+function pavCss(){ if(document.getElementById('pavcss'))return; const st=document.createElement('style'); st.id='pavcss'; st.textContent=`
+ .pavchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+ .pavchip{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;background:var(--card);user-select:none}
+ .pavchip.on{background:#0e7c86;color:#fff;border-color:transparent}
+ .msdd{position:relative}
+ .msdd-btn{font:inherit;font-size:14px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:inherit;cursor:pointer;min-width:180px;text-align:left}
+ .pavddsel{width:auto;flex:0 0 auto;font:inherit;font-size:14px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:inherit;cursor:pointer;min-width:112px;max-width:160px}
+ .msdd-panel{position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:250px;max-height:320px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
+ .msdd-opt{display:flex;align-items:center;gap:9px;padding:9px 9px;border-radius:8px;cursor:pointer;font-size:14px}
+ .msdd-opt:hover{background:rgba(127,127,127,.12)}
+ .msdd-opt input{width:17px;height:17px}
+ #pavimento .pavblk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:12px 0;background:var(--card)}
+ #pavimento .pavblk h4{margin:0 0 6px;font-size:14px}
+ #pavimento .pavfotos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ #pavimento .pavfotos .photo{margin-top:0}
+ #pavimento .pavprev{width:100%;border-radius:8px;border:1px solid var(--line);margin-top:6px}`;
+ document.head.appendChild(st); }
+function pavOnGps(){ const b=document.getElementById('pavGps'); if(!b)return;
+  const ok=gps&&gps.acc<=PRECISAO_MAX;
+  if(ok){ b.className='banner ok'; b.textContent='📍 '+gps.lat.toFixed(6)+', '+gps.lon.toFixed(6)+' · ±'+Math.round(gps.acc)+' m — no local'; }
+  else { b.className='banner warn'; b.textContent='Fique próximo ao local para salvar a coordenada'+(gps?(' — GPS ±'+Math.round(gps.acc)+' m (aguardando ≤ '+PRECISAO_MAX+' m)'):' — obtendo GPS…'); }
+  pavValidar(); }
+function pavInit(){ pavCss(); pavRenderTipos(); pavRenderBlocos(); pavOnGps(); pavMinhasRender(); }
+function pavRenderTipos(){ const c=document.getElementById('pavTipos'); if(!c)return;
+  c.innerHTML=PAV_TIPOS.map(([k,l])=>`<div class="pavchip ${pavState[k]?'on':''}" data-pt="${k}">${l}</div>`).join('');
+  c.querySelectorAll('.pavchip').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.pt;
+    if(pavState[k]){ delete pavState[k]; ch.classList.remove('on'); } else { pavState[k]={dimensao:'',f1:null,f2:null}; ch.classList.add('on'); }
+    pavRenderBlocos(); pavValidar(); }); }
+function pavRenderBlocos(){ const c=document.getElementById('pavBlocos'); if(!c)return; const keys=Object.keys(pavState);
+  c.innerHTML=keys.map(k=>{ const s=pavState[k];
+    return `<div class="pavblk"><h4>${PAV_TIPO_LBL(k)}</h4>
+      <label>Dimensão a recompor *</label>
+      <input class="pavdim" data-pt="${k}" value="${pavH(s.dimensao)}" placeholder="ex.: 2,0 × 1,5 m ou 3 m²" autocomplete="off"/>
+      <label style="margin-top:8px">2 fotos *</label>
+      <div class="pavfotos">
+        <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="pavfoto" data-pt="${k}" data-n="1"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="pavfoto" data-pt="${k}" data-n="1"/></label></div><img class="pavprev hidden" data-pt="${k}" data-n="1" alt=""/></div>
+        <div class="photo"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" class="pavfoto" data-pt="${k}" data-n="2"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" class="pavfoto" data-pt="${k}" data-n="2"/></label></div><img class="pavprev hidden" data-pt="${k}" data-n="2" alt=""/></div>
+      </div></div>`; }).join('');
+  c.querySelectorAll('.pavdim').forEach(i=>i.oninput=()=>{ if(pavState[i.dataset.pt]) pavState[i.dataset.pt].dimensao=i.value; pavValidar(); });
+  c.querySelectorAll('.pavfoto').forEach(inp=>inp.onchange=async e=>{ const f=e.target.files[0], k=inp.dataset.pt, n=inp.dataset.n;
+    const img=c.querySelector('.pavprev[data-pt="'+k+'"][data-n="'+n+'"]');
+    if(f && pavState[k]){ const b=await comprimir(f); pavState[k]['f'+n]=b; if(img){img.src=URL.createObjectURL(b);img.classList.remove('hidden');} }
+    else if(pavState[k]){ pavState[k]['f'+n]=null; if(img) img.classList.add('hidden'); }
+    pavValidar(); });
+  keys.forEach(k=>['1','2'].forEach(n=>{ const b=pavState[k]['f'+n]; if(b){ const img=c.querySelector('.pavprev[data-pt="'+k+'"][data-n="'+n+'"]'); if(img){img.src=URL.createObjectURL(b);img.classList.remove('hidden');} } })); }
+function pavValidar(){ const btn=document.getElementById('pavSalvar'); if(!btn)return;
+  const okGps=gps&&gps.acc<=PRECISAO_MAX, keys=Object.keys(pavState);
+  const okTipos=keys.length>0 && keys.every(k=>{ const s=pavState[k]; return s.dimensao.trim() && s.f1 && s.f2; });
+  const el=document.getElementById('pav_origem');
+  btn.disabled=!(okGps && el && el.value && okTipos); }
+if($('#pav_origem')) $('#pav_origem').addEventListener('change',pavValidar);
+if($('#pavSalvar')) $('#pavSalvar').addEventListener('click',()=>{
+  if(!gps||gps.acc>PRECISAO_MAX) return toast('Fique no local — GPS insuficiente');
+  const origem=$('#pav_origem').value; if(!origem) return toast('Escolha o serviço de origem');
+  const keys=Object.keys(pavState); if(!keys.length) return toast('Selecione ao menos um tipo de pavimento');
+  for(const k of keys){ const s=pavState[k]; if(!s.dimensao.trim()) return toast('Informe a dimensão de "'+PAV_TIPO_LBL(k)+'"'); if(!s.f1||!s.f2) return toast('2 fotos são obrigatórias em "'+PAV_TIPO_LBL(k)+'"'); }
+  const grupo=crypto.randomUUID(), os=$('#pav_os').value.trim()||null, cons=localStorage.getItem('consorcio')||null;
+  keys.forEach(k=>{ const s=pavState[k], uid=crypto.randomUUID();
+    enviarOuEnfileirar({id:uid,tipo:'pavimento',rpc:'app_pav_registrar',pasta:'pavimento',
+      fotos:{p_foto1:s.f1,p_foto2:s.f2},
+      fields:{p_id:uid,p_grupo:grupo,p_servico_origem:origem,p_os_sigos:os,p_tipo:k,p_dimensao:s.dimensao.trim(),
+        p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,p_consorcio:cons,p_dispositivo:navigator.userAgent.slice(0,60)}},
+      '✓ Pavimento registrado'); });
+  pavReset(); });
+function pavReset(){ pavState={}; const o=$('#pav_origem'); if(o)o.value=''; const os=$('#pav_os'); if(os)os.value=''; pavRenderTipos(); pavRenderBlocos(); pavValidar(); setTimeout(pavMinhasRender,600); }
+async function pavMinhasRender(){ const c=document.getElementById('pavMinhas'); if(!c)return;
+  try{ const {data,error}=await sb.rpc('app_pav_minhas'); if(error)throw error; const arr=data||[];
+    c.innerHTML=arr.length?arr.map(g=>{ const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'';
+      const tipos=(g.tipos||[]).map(PAV_TIPO_LBL).join(', ');
+      return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><div class="sub" style="margin-top:2px">${g.os_sigos?('OS '+pavH(g.os_sigos)+' · '):''}${pavH(tipos)}</div><div class="sub" style="margin-top:2px;font-size:12px">${dt}</div></div>`;
+    }).join(''):'<p class="sub">Você ainda não registrou pavimentos.</p>';
+  }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar seus registros.</p>'; } }
+// --- Auxiliar de Programação: Gestão de Pavimento (lista + filtros + controle de prazo) ---
+let pavpUltimo=[], pavpOrig=new Set(), pavpPrazo='', pavpStatus='pendente', pavpView='lista', pavpMap=null, pavpMarkers=null, pavpOddWired=false;
+const PAV_SLA=[3,5]; // dias pendente (sem OS): 0–3 no prazo · 4–5 atenção · >5 atrasado
+function pavDias(iso){ if(!iso)return null; return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
+function pavBucket(d){ if(d==null)return{key:'',lbl:'—',c:'#8a8f98'}; if(d<=PAV_SLA[0])return{key:'ok',lbl:'No prazo',c:'#2f8b6c'}; if(d<=PAV_SLA[1])return{key:'aten',lbl:'Atenção',c:'#e6a23c'}; return{key:'atraso',lbl:'Atrasado',c:'#d6336c'}; }
+function pavDiasTxt(d){ return d==null?'—':(d<=0?'hoje':(d===1?'há 1 dia':('há '+d+' dias'))); }
+function pavEhPend(g){ return !g.os_recomposicao; }
+function pavProgInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  pavCss(); pavpRenderOrigDd();
+  document.querySelectorAll('#pavpStatusSeg button').forEach(b=>b.onclick=()=>{ pavpStatus=b.dataset.st; document.querySelectorAll('#pavpStatusSeg button').forEach(x=>x.classList.toggle('sel',x===b)); pavProgRender(); });
+  document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.onclick=()=>pavProgSetView(b.dataset.v));
+  const ob=document.getElementById('pavpOrigBtn'); if(ob) ob.onclick=e=>{ e.stopPropagation(); const p=document.getElementById('pavpOrigPanel'); if(p)p.classList.toggle('hidden'); };
+  if(!pavpOddWired){ document.addEventListener('click',e=>{ const dd=document.getElementById('pavpOrigDd'), p=document.getElementById('pavpOrigPanel'); if(dd&&p&&!dd.contains(e.target)) p.classList.add('hidden'); }); pavpOddWired=true; }
+  if($('#pavpCons')) $('#pavpCons').onchange=pavProgCarregar;
+  pavProgCarregar(); }
+function pavpRenderOrigDd(){ const btn=document.getElementById('pavpOrigBtn'), panel=document.getElementById('pavpOrigPanel'); if(!btn||!panel)return;
+  btn.textContent=(pavpOrig.size?(pavpOrig.size+' serviço(s) de origem'):'Serviço de origem: todos')+' ▾';
+  panel.innerHTML=Object.entries(PAV_ORIGEM).map(([k,l])=>`<label class="msdd-opt"><input type="checkbox" data-orig="${k}" ${pavpOrig.has(k)?'checked':''}/> ${l}</label>`).join('')
+    +'<div class="msdd-opt" data-clear style="justify-content:center;color:var(--acc);font-weight:600">Limpar seleção</div>';
+  panel.querySelectorAll('input[data-orig]').forEach(cb=>cb.onchange=()=>{ const k=cb.dataset.orig; if(cb.checked)pavpOrig.add(k); else pavpOrig.delete(k); pavpRenderOrigDd(); pavProgRender(); });
+  const cl=panel.querySelector('[data-clear]'); if(cl)cl.onclick=()=>{ pavpOrig.clear(); pavpRenderOrigDd(); pavProgRender(); }; }
+async function pavProgCarregar(){ const c=document.getElementById('pavpLista'); if(!c)return; c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pav_listar',{p_consorcio:$('#pavpCons').value||null,p_servico_origem:null}); if(error)throw error;
+    pavpUltimo=data||[]; pavProgRender();
+  }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; } }
+function pavProgFiltrado(soOrigem){ let arr=pavpUltimo.slice();
+  if(pavpOrig.size) arr=arr.filter(g=>pavpOrig.has(g.servico_origem));
+  if(soOrigem!==true){
+    if(pavpStatus==='pendente') arr=arr.filter(pavEhPend);
+    else if(pavpStatus==='criada') arr=arr.filter(g=>!pavEhPend(g));
+    if(pavpPrazo) arr=arr.filter(g=>pavEhPend(g) && pavBucket(pavDias(g.created_at)).key===pavpPrazo);
+  }
+  arr.sort((a,b)=>new Date(a.created_at).getTime()-new Date(b.created_at).getTime()); // mais antigos primeiro
+  return arr; }
+function pavProgResumo(){ const r=document.getElementById('pavpResumo'); if(!r)return;
+  const base=pavProgFiltrado(true).filter(pavEhPend), cnt={ok:0,aten:0,atraso:0};
+  base.forEach(g=>{ const b=pavBucket(pavDias(g.created_at)); if(cnt[b.key]!=null)cnt[b.key]++; });
+  const B={ok:{e:'🟢',l:'no prazo',c:'#2f8b6c'},aten:{e:'🟡',l:'atenção',c:'#e6a23c'},atraso:{e:'🔴',l:'atrasado',c:'#d6336c'}};
+  r.innerHTML='<div class="pavchips" style="margin-top:0">'+['ok','aten','atraso'].map(k=>{ const on=pavpPrazo===k;
+    return `<div class="pavchip" data-prazo="${k}" style="${on?('background:'+B[k].c+';border-color:transparent;color:#fff'):''}">${B[k].e} ${cnt[k]} ${B[k].l}</div>`; }).join('')+'</div>';
+  r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.prazo; pavpPrazo=(pavpPrazo===k?'':k);
+    if(pavpPrazo && pavpStatus!=='pendente'){ pavpStatus='pendente'; document.querySelectorAll('#pavpStatusSeg button').forEach(x=>x.classList.toggle('sel',x.dataset.st==='pendente')); }
+    pavProgRender(); }); }
+function pavProgRender(){ pavProgResumo();
+  const arr=pavProgFiltrado(), c=document.getElementById('pavpLista');
+  if(c){ c.innerHTML = arr.length ? ('<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(pavProgCard).join('')) : '<p class="sub">Nenhum pavimento nesse filtro.</p>';
+    c.querySelectorAll('.pavoscriar').forEach(btn=>btn.onclick=()=>pavProgCriarOS(btn.dataset.grupo)); }
+  if(pavpView==='mapa') pavProgMapa(); }
+function pavProgCard(g){
+  const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d), barra=pend?b.c:'#0e7c86';
+  const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'—';
+  const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
+  const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+  const badge=pend
+    ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span>`
+    : `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:#0e7c86;padding:2px 10px;border-radius:999px;white-space:nowrap">✓ OS ${pavH(g.os_recomposicao)}</span>`;
+  const osBox=pend
+    ? `<div style="display:flex;gap:6px;margin-top:8px"><input id="pavos_${g.grupo}" placeholder="nº da OS SIGOS da recomposição" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`
+    : `<div class="sub" style="margin-top:6px;font-size:12px">OS lançada${g.os_recomp_por?(' por '+pavH(g.os_recomp_por)):''}${g.os_recomp_em?(' em '+new Date(g.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`;
+  const itens=(g.itens||[]).map(it=>{ const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
+    return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div></div>`;
+  }).join('');
+  return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${barra};border-radius:12px;padding:12px 13px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
+    <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
+    ${itens}
+    ${osBox}</div>`; }
+function pavProgSetView(v){ pavpView=v;
+  document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v));
+  const l=document.getElementById('pavpLista'), m=document.getElementById('pavpMapa');
+  if(l)l.classList.toggle('hidden',v!=='lista'); if(m)m.classList.toggle('hidden',v!=='mapa');
+  if(v==='mapa') pavProgMapa(); }
+function pavProgMapa(){ const el=document.getElementById('pavpMapa'); if(!el||typeof L==='undefined')return;
+  if(!pavpMap){ el.innerHTML=''; pavpMap=L.map(el); mapAddCamadaBase(pavpMap); pavpMap.setView([-19.94,-44.1],11); pavpMarkers=L.layerGroup().addTo(pavpMap); }
+  setTimeout(()=>{ try{pavpMap.invalidateSize();}catch(e){} },60);
+  if(!pavpMarkers)return; pavpMarkers.clearLayers(); const bounds=[];
+  pavProgFiltrado().forEach(g=>{ if(g.lat==null||g.lon==null)return; const pend=pavEhPend(g), b=pavBucket(pavDias(g.created_at)), col=pend?b.c:'#0e7c86';
+    const mk=L.circleMarker([+g.lat,+g.lon],{radius:7,color:'#fff',weight:1.5,fillColor:col,fillOpacity:.95});
+    const tipos=(g.itens||[]).map(it=>PAV_TIPO_LBL(it.tipo)).join(', ');
+    mk.bindPopup(`<b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><br>${pend?(b.lbl+' · '+pavDiasTxt(pavDias(g.created_at))):('✓ OS '+pavH(g.os_recomposicao))}<br><span style="font-size:11px">${pavH(tipos)}</span>`);
+    pavpMarkers.addLayer(mk); bounds.push([+g.lat,+g.lon]); });
+  if(bounds.length){ try{ pavpMap.fitBounds(bounds,{padding:[30,30],maxZoom:16}); }catch(e){} } }
+async function pavProgCriarOS(grupo){ const inp=document.getElementById('pavos_'+grupo); const os=(inp&&inp.value.trim())||'';
+  if(!os) return toast('Informe o número da OS SIGOS');
+  try{ const {error}=await sb.rpc('app_pav_os',{p_grupo:grupo,p_os:os}); if(error)throw error; toast('✓ OS criada');
+    const g=pavpUltimo.find(x=>x.grupo===grupo); if(g){ g.os_recomposicao=os; g.os_recomp_em=new Date().toISOString(); g.os_recomp_por=(ME&&(ME.nome||ME.email))||'—'; }
+    pavProgRender();
+  }catch(e){ toast('Erro ao criar OS: '+(e.message||e)); } }
+function pavProgExport(){ const arr=pavProgFiltrado(); if(!arr.length) return toast('Nada para exportar.');
+  const aoa=[['Data de solicitação','Dias pendente','Faixa de prazo','Status OS','OS recomposição','Serviço de origem','OS origem','Consórcio','Solicitante','Latitude','Longitude','Tipo de pavimento','Dimensão','Foto 1','Foto 2']];
+  arr.forEach(g=>{ const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d); const ds=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
+    (g.itens||[]).forEach(it=>aoa.push([ds,pend?(d??''):'',pend?b.lbl:'',pend?'Pendente':'OS criada',g.os_recomposicao||'',PAV_ORIGEM[g.servico_origem]||g.servico_origem,g.os_sigos||'',g.consorcio||'',g.usuario||'',g.lat??'',g.lon??'',PAV_TIPO_LBL(it.tipo),it.dimensao||'',PAV_FOTO_URL(it.foto1)||'',PAV_FOTO_URL(it.foto2)||''])); });
+  exportarXlsx('gestao_pavimento_'+new Date().toISOString().slice(0,10)+'.xlsx','Pavimento',aoa); }
+
 // ---------- REGISTRO DE OCORRÊNCIA (Entrevistadores) ----------
 // Entrevistador registra; só gestores (pode_aprovar) listam e exportam. GPS é gravado se houver, mas não bloqueia.
 let eoLigou=null;
@@ -3218,7 +3857,7 @@ function eoInit(){ eoOnGps(); eoRenderCopasa(); }
 if($('#eo_tipo')) $('#eo_tipo').addEventListener('change',eoRenderCopasa);
 document.querySelectorAll('#eoCopasa [data-eosn]').forEach(b=>b.addEventListener('click',()=>{ eoLigou=(b.dataset.eosn==='S'); eoRenderCopasa(); }));
 if($('#eoBack')) $('#eoBack').addEventListener('click',()=>irPara('entrevistadores'));
-if($('#egBack')) $('#egBack').addEventListener('click',()=>irPara('entrevistadores'));
+if($('#egBack')) $('#egBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
 if($('#eoSalvar')) $('#eoSalvar').addEventListener('click',()=>{
   const t=$('#eo_tipo').value, mat=$('#eo_matricula').value.trim();
   if(!mat) return toast('Informe a matrícula do imóvel');
@@ -3239,7 +3878,7 @@ if($('#eoSalvar')) $('#eoSalvar').addEventListener('click',()=>{
 // --- Gestão (pode_aprovar): lista por período + export Excel ---
 let egUltimo=[];
 function egInit(){
-  if(!(ME&&ME.pode_aprovar)){ toast('Acesso restrito a gestores'); irPara('entrevistadores'); return; }
+  if(!(ME&&ME.pode_aprovar)){ toast('Acesso restrito a gestores'); irPara('auxiliar_programacao'); return; }
   const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   if(!$('#egDe').value){ const h=new Date(); $('#egDe').value=iso(new Date(h.getFullYear(),h.getMonth(),1)); $('#egAte').value=iso(h); }
   egCarregar();
@@ -3280,7 +3919,68 @@ if($('#egXlsx')) $('#egXlsx').addEventListener('click',()=>{
 // ---------- PROGRAMAÇÃO DE SERVIÇOS (aprovador/admin) ----------
 let pgFiltro='pendente';
 const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Todas']];
-function pgInit(){ pgRenderFiltros(); pgOcRenderTabs(); pgCarregar(); pgCarregarOc(); }
+// Auxiliar de Programação — hub em 3 categorias (Serviços comerciais / Pesquisa / Gestão de VRPs)
+function apInit(){
+  // acesso geral à tela (controlado pela engrenagem desta própria tela)
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('home'); return; }
+  const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; irPara('programacao_servicos'); };
+  const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; irPara('programacao_servicos'); };
+  // Ferramentas migradas do cockpit NRW → abrem no perdas.html (fora do menu NRW)
+  const hd=$('#apHdPri'); if(hd) hd.onclick=()=>{ location.href='perdas.html?s=hdpri'; };
+  const fr=$('#apFraudePri'); if(fr) fr.onclick=()=>{ location.href='perdas.html?s=fraudepri'; };
+  // Gestão de VRPs — liberada pelo acesso geral do Auxiliar (quem está nesta tela pode usar)
+  const grid=$('#apVrpGrid');
+  if(grid){
+    grid.innerHTML=[['vrpman_serv','🧾','Gestão de serviços'],['vrpman_fichas','📇','Ficha cadastral'],['vrpman_prev','🚦','Cronograma preventivo']]
+      .map(c=>`<button class="mod" data-g="${c[0]}"><div class="ic">${c[1]}</div><div class="nm">${c[2]}</div></button>`).join('');
+    grid.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>irPara(b.dataset.g));
+  }
+  // engrenagem geral: quem acessa o Auxiliar de Programação (admin)
+  const cf=$('#apCfg'); if(cf){ cf.classList.toggle('hidden', !(ME&&ME.is_admin)); cf.onclick=()=>irPara('aux_acesso'); }
+}
+// Config de acesso ao Auxiliar de Programação (admin-only) — espelha dev_acesso
+let _auxAcUsers=[];
+async function auxAcInit(){
+  if(!(ME&&ME.is_admin)){ irPara('auxiliar_programacao'); return; }
+  const cont=$('#auxAcList'); if(cont) cont.innerHTML='<p class="sub">Carregando…</p>';
+  const bu=$('#auxAcBusca'); if(bu && !bu.dataset.ready){ bu.dataset.ready='1'; bu.addEventListener('input',auxAcRender); }
+  try{ const {data,error}=await sb.rpc('app_aux_acesso_listar'); if(error)throw error; _auxAcUsers=data||[]; }
+  catch(e){ if(cont) cont.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  auxAcRender();
+}
+function auxAcRender(){
+  const termo=(($('#auxAcBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_auxAcUsers.filter(u=>!termo || (u.nome||'').toLowerCase().includes(termo) || (u.email||'').toLowerCase().includes(termo));
+  const cont=$('#auxAcList'); if(!cont) return;
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{ const lock=!!u.acesso_pelo_cargo;
+    const nota=lock?'<span class="sub" style="font-size:11px">admin — acesso sempre</span>':'<span class="sub" style="font-size:11px">'+(u.funcao||'—')+'</span>';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="auxAcCk" data-id="${u.id}" ${u.acesso?'checked':''} ${lock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${u.nome||u.email||'—'}</div>${nota}</div></label>`;
+  }).join('');
+  cont.querySelectorAll('.auxAcCk').forEach(ck=>ck.addEventListener('change',async()=>{
+    const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_aux_acesso_set',{p_uuid:id,p_on:on}); if(error)throw error;
+      const u=_auxAcUsers.find(x=>x.id===id); if(u) u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido');
+    }catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; }
+    ck.disabled=false;
+  }));
+}
+// Abertura de serviços: segmentada por origem (comercial = solicitações / pesquisa = ocorrências)
+let pgModo='comercial';
+function pgInit(){
+  const sol = pgModo!=='pesquisa';
+  const secS=$('#pgSecSol'), secO=$('#pgSecOc');
+  if(secS) secS.classList.toggle('hidden', !sol);
+  if(secO) secO.classList.toggle('hidden', sol);
+  const tit=$('#pgTitulo'), sub=$('#pgSub');
+  if(tit) tit.textContent = sol ? 'Abertura de serviços' : 'Abertura de serviços — ocorrências';
+  if(sub) sub.textContent = sol
+    ? 'Solicitações dos entrevistadores — lance o nº da OS criada na COPASA.'
+    : 'Ocorrências da pesquisa de vazamentos — lance o nº da OS criada na COPASA.';
+  pgRenderFiltros();
+  if(sol){ pgCarregar(); }
+  else { pgOcRenderTabs(); pgCarregarOc(); }
+}
 function pgRenderFiltros(){
   const c=document.getElementById('pgFiltros'); if(!c) return;
   c.innerHTML=PG_FILTROS.map(f=>`<button class="btn ghost" data-pgf="${f[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${pgFiltro===f[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${f[1]}</button>`).join('');
@@ -3793,17 +4493,8 @@ function vmHub(){
      <button class="mod" data-go="vrpman_campo"><div class="ic">🧰</div><div class="nm">Minhas OS / Executar</div></button>
      <button class="mod" data-go="vrp"><div class="ic">🎛️</div><div class="nm">Visita primária</div></button>
    </div>
-   <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🧰 Gestão${(gestao&&admin)?'<button id="vmHubCfg" title="Acesso à gestão" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px;border:1px solid var(--line)">⚙️</button>':''}</div>
-   <p class="sub" style="margin:0 0 8px">${gestao?'Backoffice de manutenção das VRPs.':'Acesso restrito à equipe de gestão.'}</p>
-   <div class="grid">
-     <button class="mod ${gestao?'':'soon'}" data-g="vrpman_serv"><div class="ic">🧾</div><div class="nm">Gestão de serviços${gestao?'':' 🔒'}</div></button>
-     <button class="mod ${gestao?'':'soon'}" data-g="vrpman_fichas"><div class="ic">📇</div><div class="nm">Ficha cadastral${gestao?'':' 🔒'}</div></button>
-     <button class="mod ${gestao?'':'soon'}" data-g="vrpman_prev"><div class="ic">🚦</div><div class="nm">Cronograma preventivo${gestao?'':' 🔒'}</div></button>
-   </div>`;
-  // cards dinâmicos: o handler global de [data-go] só liga o que existe no load, então ligamos aqui
+   <p class="sub" style="margin-top:16px;font-size:12px">A gestão de VRPs (serviços, ficha cadastral, cronograma preventivo) agora fica em <b>Auxiliar de Programação › Gestão de VRPs</b>.</p>`;
   $('#vmHub').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>irPara(b.dataset.go));
-  $('#vmHub').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ if(gestao) irPara(b.dataset.g); else toast('Acesso restrito à gestão'); });
-  const cf=$('#vmHubCfg'); if(cf) cf.onclick=()=>irPara('vrpman_cfg');
 }
 
 let vmCampoView='lista', vmCampoMap=null, vmCampoLayer=null;
@@ -3889,7 +4580,7 @@ function vmOptRow(key,opts,cls){
   const cur=vmExec.ans[key];
   return `<div class="vmopts">`+opts.map(o=>{let ex='';if(cls==='tri')ex=o==='OK'?'ok':(o==='Intervir'?'int':'nv');return `<button class="vmopt ${ex} ${cur===o?'on':''}" data-opt="${key}" data-val="${vEsc(o)}">${o}</button>`;}).join('')+`</div>`;
 }
-function vmPhoto(key,label){ const has=!!vmExec.fotos[key]; return `<label class="vmphoto ${has?'has':''}"><span class="cam">${has?'✓':'📷'}</span>${label}<input type="file" accept="image/*" capture="environment" data-photo="${key}"></label>`; }
+function vmPhoto(key,label){ const has=!!vmExec.fotos[key]; return `<label class="vmphoto ${has?'has':''}"><span class="cam">${has?'✓':'📷'}</span>${label}<input type="file" accept="image/*" data-photo="${key}"></label>`; }
 function vmScr1(){
   const S=vmExec;
   let h=`<h3 style="margin:2px 0">1 · Chegada</h3>
@@ -3956,8 +4647,8 @@ function vmScr3(){
 }
 function vmPhotoMulti(prefix,label){
   const S=vmExec; const keys=Object.keys(S.fotos).filter(k=>(k===prefix||k.indexOf(prefix+'_')===0)&&S.fotos[k]);
-  let h=keys.map(k=>`<label class="vmphoto has"><span class="cam">✓</span>${label}<input type="file" accept="image/*" capture="environment" data-photo="${k}"></label>`).join('');
-  h+=`<label class="vmphoto"><span class="cam">📷</span>+ ${label}<input type="file" accept="image/*" capture="environment" data-photo="${prefix}_${keys.length}"></label>`;
+  let h=keys.map(k=>`<label class="vmphoto has"><span class="cam">✓</span>${label}<input type="file" accept="image/*" data-photo="${k}"></label>`).join('');
+  h+=`<label class="vmphoto"><span class="cam">🖼️</span>+ ${label}<input type="file" accept="image/*" data-photo="${prefix}_${keys.length}"></label>`;
   return h;
 }
 function vmScr4(){
@@ -4127,13 +4818,13 @@ async function vmFichaOpen(vrpId){
   }).join(''):'<p class="sub">Sem serviços registrados.</p>';
   const vmGest=!!(ME&&(ME.vrp_gestao||ME.is_admin));
   const pendHtml=pend.length?pend.map(p=>{ const sub=p.tipo==='substituicao'; const txt=`${sub?'🔁':'🔧'} ${vEsc(p.descricao||p.tipo)}${p.lado?(' ('+p.lado+')'):''}`;
+    if(p.status==='aberta'&&vmGest) return `<button class="vmfhist" data-progpend="${p.id}"><div style="min-width:0"><span>${txt}</span><div class="vl" style="color:var(--warn)">aberta · toque para gerar a OS${sub?' (substituição)':''}</div></div><span class="sub">gerar OS ›</span></button>`;
     if(sub) return `<div class="vmfkv"><span>${txt}</span><b style="color:var(--bad);font-weight:700">⚠ SUBSTITUIÇÃO · ${vEsc(p.status)}</b></div>`;
-    if(p.status==='aberta'&&vmGest) return `<button class="vmfhist" data-progpend="${p.id}"><div style="min-width:0"><span>${txt}</span><div class="vl" style="color:var(--warn)">aberta · toque para programar a correção</div></div><span class="sub">programar ›</span></button>`;
     return `<div class="vmfkv"><span>${txt}</span><b style="color:var(--warn)">${vEsc(p.status)}</b></div>`;
   }).join(''):'<p class="sub">Nenhuma pendência aberta.</p>';
   const prox=prev.proxima?('Próxima: '+vmFmtDate(prev.proxima)):'sem histórico';
   f.innerHTML=`<div class="vmfcard">
-    <div class="vmfhd"><div><h2>${vEsc(c.num_vrp||'VRP')}</h2><div class="s">${vmConsLbl(c.consorcio)}${c.dmc?(' · DMC '+c.dmc):''}${c.cd_no_agua?(' · nó '+vEsc(c.cd_no_agua)):''}</div></div><button class="vmfclose" id="vmfX">Fechar</button></div>
+    <div class="vmfhd"><div><h2>${vEsc(c.num_vrp||'VRP')}</h2><div class="s">${vmConsLbl(c.consorcio)}${c.dmc?(' · DMC '+c.dmc):''}${c.cd_no_agua?(' · nó '+vEsc(c.cd_no_agua)):''}</div></div><div style="display:flex;gap:8px;align-items:center">${vmGest?'<button class="vmtbtn" id="vmFichaNovaOs">＋ Abrir OS</button>':''}<button class="vmfclose" id="vmfX">Fechar</button></div></div>
     <div class="vmfbody">
       <div class="vmfsec">📇 Ficha cadastral</div><div class="vmfgrid">${cad.map(r=>`<div class="vmfkv"><span>${r[0]}</span><b>${vEsc(String(r[1]))}</b></div>`).join('')}</div>
       <div class="vmfsec">🚦 Preventiva</div><div class="vmfkv"><span>${prox}</span><b>intervalo ${prev.intervalo||180}d</b></div>
@@ -4141,6 +4832,7 @@ async function vmFichaOpen(vrpId){
       <div class="vmfsec" style="margin-top:12px">⚠️ Pendências abertas</div>${pendHtml}
     </div></div>`;
   f.querySelector('#vmfX').onclick=()=>f.classList.remove('on');
+  { const no=f.querySelector('#vmFichaNovaOs'); if(no) no.onclick=()=>{ f.classList.remove('on'); vmProgramar(vrpId, c.num_vrp); }; }
   f.onclick=e=>{ if(e.target===f) f.classList.remove('on'); };
   f.querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmReport(b.dataset.os));
   f.querySelectorAll('[data-progpend]').forEach(b=>b.onclick=()=>vmGerarCorr(b.dataset.progpend, ()=>vmFichaOpen(vrpId)));
@@ -4241,7 +4933,7 @@ function vmGWireFilters(el, reload){
 }
 // Área 1 — Gestão de serviços (OS + Pendências)
 async function vmServInit(){
-  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('vrpman'); return; }
+  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   await vmGShared();
   if(vmG.tab!=='pend') vmG.tab='gestao';
   vmServRender();
@@ -4257,7 +4949,7 @@ function vmServRender(){
 }
 // Área 3 — Cronograma preventivo
 async function vmPrevInit(){
-  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('vrpman'); return; }
+  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   await vmGShared();
   $('#vmPrev').innerHTML=vmGFilterBar({})+'<div id="vmPrevBody"><p class="sub">Carregando…</p></div>';
   vmBodySel='#vmPrevBody';
@@ -4267,7 +4959,7 @@ async function vmPrevInit(){
 // Área 2 — Ficha cadastral (lista/mapa de todas as VRPs)
 let vmFichasCache=[];
 async function vmFichasInit(){
-  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('vrpman'); return; }
+  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   await vmGShared(); vmFichasRender();
 }
 async function vmFichasRender(){
@@ -4280,8 +4972,14 @@ async function vmFichasRender(){
   vmFichasCache=arr;
   const n=$('#vmFichasN'); if(n)n.textContent=arr.length+' VRPs';
   if(vmG.view==='mapa'){ $('#vmFichasBody').innerHTML='<div class="vmmap" id="vmFMap"></div>'; vmFichasMap(arr); return; }
-  $('#vmFichasBody').innerHTML = arr.length? arr.map(vmFichaCard).join('') : '<p class="sub">Nenhuma VRP no filtro.</p>';
-  $('#vmFichasBody').querySelectorAll('[data-ficha]').forEach(b=>b.onclick=()=>vmFichaOpen(+b.dataset.ficha));
+  const opts=arr.map(f=>`<option value="${vEsc(f.num_vrp||('VRP '+f.vrp_id))}">`).join('');
+  $('#vmFichasBody').innerHTML = `<input class="vmin" id="vmFSearch" list="vmFSearchList" autocomplete="off" placeholder="🔎 Buscar VRP (digite o nome/código)…" style="margin-bottom:8px;width:100%"><datalist id="vmFSearchList">${opts}</datalist><div id="vmFCards"></div>`;
+  const cards=$('#vmFCards');
+  const paint=(t)=>{ const q=(t||'').trim().toLowerCase(); const fa=q?arr.filter(f=>String(f.num_vrp||'').toLowerCase().includes(q)):arr;
+    cards.innerHTML = fa.length? fa.map(vmFichaCard).join('') : '<p class="sub">Nenhuma VRP encontrada.</p>';
+    cards.querySelectorAll('[data-ficha]').forEach(b=>b.onclick=()=>vmFichaOpen(+b.dataset.ficha)); };
+  paint('');
+  const se=$('#vmFSearch'); if(se) se.addEventListener('input',e=>paint(e.target.value));
 }
 function vmFichaCard(f){
   const ult=f.ultimo?relFmtData(f.ultimo).slice(0,10):'sem serviço';
@@ -4389,7 +5087,7 @@ async function vmOsView(osId){
      return `<div class="vmdkv"><span>${sub?'🔁':'🔧'} ${vEsc(p.descricao||p.tipo)}${lk}</span><b style="color:${sub?'var(--bad)':'var(--warn)'};font-weight:${sub?'700':'600'}">${sub?'⚠ SUBSTITUIÇÃO · ':''}${vEsc(p.status)}</b></div>`;
    }).join('');
    if(pend.some(p=>p.tipo==='substituicao'&&p.status==='aberta')) h+=`<p class="sub" style="margin:8px 0 0;color:var(--bad)"><b>⚠ Esta VRP precisa de SUBSTITUIÇÃO</b> — programe uma OS do tipo <b>Substituição</b> (não corretiva).</p>`;
-   if(pendAbertas.length){ h+=`<button class="vmbtn" id="vmProgPendBtn" style="margin-top:10px">🗓️ Programar correção (OS única)</button><p class="sub" style="margin:6px 0 0">Gera uma única OS corretiva cobrindo todas as pendências abertas desta VRP.</p>`; }
+   if(pendAbertas.length){ h+=`<button class="vmbtn" id="vmProgPendBtn" style="margin-top:10px">🗓️ Gerar OS para as pendências</button><p class="sub" style="margin:6px 0 0">Gera uma única OS (você escolhe o tipo: corretiva/preventiva/substituição) cobrindo todas as pendências abertas desta VRP.</p>`; }
   }
   h+=`<button class="vmbtn" id="vmRepBtn" style="margin-top:16px">📄 Gerar relatório (PDF)</button>`;
   $('#vmOs').innerHTML=h;
@@ -4407,7 +5105,7 @@ async function vmGLoadPend(){
   catch(e){ $(vmBodySel).innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   const rows=pend.length?pend.map(p=>{ const st=VM_PST[p.status]||[p.status,'var(--mut)'];
     const corr=p.status==='resolvida'&&p.resolvida_em?('<div class="sub">'+relFmtData(p.resolvida_em)+'</div>'):'';
-    const acao=(p.tipo==='substituicao')?'<span class="sub" style="color:var(--bad);font-weight:700">⚠ Substituição</span>':(p.status==='aberta'?`<button class="vmtbtn" data-gerar="${p.id}">＋ Gerar corretiva</button>`:(p.status==='em_andamento'?'<span class="sub">aguardando exec.</span>':'—'));
+    const acao=(p.status==='aberta')?`<button class="vmtbtn" data-gerar="${p.id}">＋ Gerar OS</button>`:(p.status==='em_andamento'?'<span class="sub">aguardando exec.</span>':(p.tipo==='substituicao'?'<span class="sub" style="color:var(--bad);font-weight:700">⚠ Substituição</span>':'—'));
     const lkPai=p.os_id?`<a class="vmoslink" data-os="${p.os_id}" title="OS que originou a pendência">⬆ ${vEsc(p.os_numero||'OS pai')}</a>`:'<span class="sub">—</span>';
     const lkCorr=p.os_correcao_id?`<a class="vmoslink" data-os="${p.os_correcao_id}" title="OS corretiva em andamento">🔧 ${vEsc(p.os_correcao_numero||'corretiva')}</a>`
       :(p.resolvida_os_id?`<a class="vmoslink" data-os="${p.resolvida_os_id}" title="OS corretiva que resolveu">✅ ${vEsc(p.resolvida_numero||'resolvida')}</a>`:'<span class="sub">sem corretiva</span>');
@@ -4481,13 +5179,12 @@ function vmModal(html){ const m=$('#vmModal'); m.innerHTML=html; m.classList.add
 function vmModalClose(){ $('#vmModal').classList.remove('on'); }
 function vmColabOpts(sel){ return vmGColab.map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${vEsc(c.nome)}</option>`).join(''); }
 async function vmProgramar(vrpId, vrpNum){
-  let vrpField;
+  let vrpField, elig=[];
   if(vrpId){ vrpField=`<div><label>VRP</label><input class="vmin" value="${vEsc(vrpNum||('VRP '+vrpId))}" readonly></div>`; }
   else {
-    let elig=[];
     try{ const r=await sb.rpc('app_vrp_os_programaveis',{p_consorcio:vmG.cons||null,p_dmc:vmG.dmc||null}); if(!r.error) elig=r.data||[]; }catch(e){}
-    const list=elig.map(f=>`<option value="${f.vrp_id}">${vEsc(f.num_vrp||('VRP '+f.vrp_id))} · ${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</option>`).join('');
-    vrpField=`<div><label>VRP</label><select class="vmsel" id="vmPgVrp" style="width:100%">${list||'<option value="">— nenhuma VRP disponível (todas com serviço em aberto) —</option>'}</select></div>`; }
+    const opts=elig.map(f=>`<option value="${vEsc(f.num_vrp||('VRP '+f.vrp_id))}">${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</option>`).join('');
+    vrpField=`<div><label>VRP (digite para filtrar)</label><input class="vmin" id="vmPgVrp" list="vmPgVrpList" autocomplete="off" placeholder="${elig.length?'busque pelo nome/código…':'nenhuma VRP disponível (todas com serviço em aberto)'}" style="width:100%"><datalist id="vmPgVrpList">${opts}</datalist></div>`; }
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🗓️ Programar OS</div>
     <div class="vmmb">${vrpField}
       <div><label>Usuário de campo (recebe a OS)</label><select class="vmsel" id="vmPgColab" style="width:100%">${vmColabOpts()}</select></div>
@@ -4498,7 +5195,9 @@ async function vmProgramar(vrpId, vrpNum){
   m.querySelectorAll('#vmPgOrig button').forEach(b=>b.onclick=()=>{orig=b.dataset.o;m.querySelectorAll('#vmPgOrig button').forEach(x=>x.classList.toggle('on',x===b));});
   m.querySelector('#vmPgCancel').onclick=vmModalClose;
   m.querySelector('#vmPgOk').onclick=async()=>{
-    const sel=m.querySelector('#vmPgVrp'); const vid=vrpId||(sel?+sel.value:0); if(!vid)return toast('Escolha a VRP');
+    let vid=vrpId;
+    if(!vid){ const inp=m.querySelector('#vmPgVrp'); const txt=((inp&&inp.value)||'').trim(); const found=elig.find(f=>(f.num_vrp||('VRP '+f.vrp_id))===txt); vid=found?found.vrp_id:0; }
+    if(!vid) return toast('Escolha uma VRP da lista');
     const uid=(m.querySelector('#vmPgColab')||{}).value||null; const data=(m.querySelector('#vmPgData')||{}).value||null;
     try{ const r=await sb.rpc('app_vrp_os_programar',{p_vrp_id:vid,p_atribuido_uuid:uid,p_data:data,p_origem:orig}); if(r.error)throw r.error;
       vmModalClose(); toast('✓ OS '+((r.data&&r.data.os_numero)||'')+' programada'); if(vmG.tab==='prev')vmGLoadPrev(); else vmGLoadOs();
@@ -4514,19 +5213,22 @@ async function vmSigos(osId, cur){
     catch(e){ toast('⚠ '+(e.message||e)); } };
 }
 async function vmGerarCorr(pendId, after){
-  const m=vmModal(`<div class="vmmcard"><div class="vmmh">🔧 Gerar OS corretiva</div>
-    <div class="vmmb"><p class="sub" style="margin:0">Cria <b>uma única OS corretiva</b> que cobre <b>todas as pendências abertas desta VRP</b> — uma visita resolve tudo. Ao concluí-la, as pendências são marcadas como resolvidas.</p>
+  const m=vmModal(`<div class="vmmcard"><div class="vmmh">🔧 Gerar OS para a pendência</div>
+    <div class="vmmb"><p class="sub" style="margin:0">Escolha o <b>tipo de OS</b> para sanar a pendência. A OS cobre as <b>pendências abertas desta VRP</b>; ao concluí-la, elas são marcadas como resolvidas.</p>
+      <div><label>Tipo de OS</label><div class="vmseg" id="vmGcOrig"><button data-o="corretiva" class="on">Corretiva</button><button data-o="preventiva">Preventiva</button><button data-o="substituicao">Substituição</button></div></div>
       <div><label>Usuário de campo (recebe a OS)</label><select class="vmsel" id="vmGcColab" style="width:100%">${vmColabOpts()}</select></div>
       <div><label>Data programada</label><input class="vmin" type="date" id="vmGcData"></div></div>
     <div class="vmmf"><button class="vmbtn sec" id="vmGcCancel">Cancelar</button><button class="vmbtn" id="vmGcOk">Gerar e notificar</button></div></div>`);
+  let orig='corretiva';
+  m.querySelectorAll('#vmGcOrig button').forEach(b=>b.onclick=()=>{orig=b.dataset.o;m.querySelectorAll('#vmGcOrig button').forEach(x=>x.classList.toggle('on',x===b));});
   m.querySelector('#vmGcCancel').onclick=vmModalClose;
   m.querySelector('#vmGcOk').onclick=async()=>{ const uid=(m.querySelector('#vmGcColab')||{}).value||null; const data=(m.querySelector('#vmGcData')||{}).value||null;
-    try{ const r=await sb.rpc('app_vrp_pendencia_gerar_os',{p_pendencia_id:pendId,p_atribuido_uuid:uid,p_data:data}); if(r.error)throw r.error;
-      vmModalClose(); const n=(r.data&&r.data.pendencias_cobertas)||1; toast('✓ Corretiva '+((r.data&&r.data.os_numero)||'')+' gerada'+(n>1?(' ('+n+' pendências)'):'')); (after||vmGLoadPend)();
+    try{ const r=await sb.rpc('app_vrp_pendencia_gerar_os',{p_pendencia_id:pendId,p_atribuido_uuid:uid,p_data:data,p_origem:orig}); if(r.error)throw r.error;
+      vmModalClose(); const n=(r.data&&r.data.pendencias_cobertas)||1; toast('✓ OS '+((r.data&&r.data.os_numero)||'')+' gerada'+(n>1?(' ('+n+' pendências)'):'')); (after||vmGLoadPend)();
     }catch(e){ toast('⚠ '+(e.message||e)); } };
 }
 async function vmCfgInit(){
-  if(!(ME&&ME.is_admin)){ toast('Só admin'); irPara('vrpman'); return; }
+  if(!(ME&&ME.is_admin)){ toast('Só admin'); irPara('auxiliar_programacao'); return; }
   $('#vmCfg').innerHTML='<p class="sub">Carregando…</p>';
   try{ const r=await sb.rpc('app_vrp_acesso_listar'); if(r.error)throw r.error; vmCfgUsers=r.data||[]; }
   catch(e){ $('#vmCfg').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
@@ -4832,7 +5534,7 @@ async function rlBuscarMat(){
     document.getElementById('rlMsg').textContent='Matrícula '+x.matricula+' — '+x.cidade+' · Setor '+x.setor+' · Rota '+x.rota;
   }catch(e){document.getElementById('rlMsg').textContent='Erro: '+(e.message||e);}
 }
-if($('#rlBack')) $('#rlBack').addEventListener('click',function(){irPara('entrevistadores');});
+if($('#rlBack')) $('#rlBack').addEventListener('click',function(){irPara('auxiliar_programacao');});
 if($('#rlZA')) $('#rlZA').addEventListener('change',function(e){
   rlZA=e.target.value||'';
   const cur=rlPercursos&&rlPercursos.find(function(p){return p.percurso_id===rlPerc;});
@@ -6601,22 +7303,30 @@ function supEqMeusWire(){
 }
 
 // --- Solicitar equipamento (colaborador) ---
+let eqSolDisp=[], eqSolFcons='';
+function supEqSolRenderOpts(){ const sel=document.getElementById('eqSolEq'); if(!sel)return;
+  const arr=eqSolFcons?eqSolDisp.filter(e=>e.consorcio===eqSolFcons):eqSolDisp;
+  sel.innerHTML='<option value="">Selecione…</option>'+arr.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}${e.num_serie?(' · nº '+e.num_serie):''}${e.consorcio?(' · '+supConsLbl(e.consorcio)):''}</option>`).join('');
+}
 async function supVEqSolicitar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const [d,m]=await Promise.all([sb.rpc('sup_equip_disponiveis'),sb.rpc('sup_minhas_solic_equip')]);
     if(d.error)throw d.error;
-    const disp=d.data||[], minhas=m.data||[];
+    const disp=d.data||[], minhas=m.data||[]; eqSolDisp=disp; eqSolFcons='';
     let h='<div class="sec">🙋 Solicitar equipamento</div><p class="sub" style="margin-top:2px">Só aparecem equipamentos disponíveis (não estão em uso).</p>';
     if(disp.length){
-      h+=`<label>Equipamento</label>
-      <select id="eqSolEq"><option value="">Selecione…</option>${disp.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}${e.num_serie?(' · nº '+e.num_serie):''}</option>`).join('')}</select>
+      h+=`<label>Consórcio</label>
+      <select id="eqSolCons"><option value="">Todos os consórcios</option>${SUP_CONS_OPTS()}</select>
+      <label>Equipamento</label>
+      <select id="eqSolEq"></select>
       <label>Observação</label><textarea id="eqSolObs" rows="2" placeholder="Ex.: para a OS 88.421"></textarea>
       <button id="eqSolSend" class="btn" style="margin-top:10px">Enviar solicitação</button>`;
     } else { h+='<p class="sub">Nenhum equipamento disponível no momento.</p>'; }
     h+='<div class="sec" style="margin-top:26px">📨 Minhas solicitações pendentes</div>';
     h+= minhas.length ? minhas.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b>${s.tipo?('<div class="sub" style="margin-top:2px">'+s.tipo+' · '+eqDia(s.criado_em)+'</div>'):''}</div><button class="btn ghost" data-solcancel="${s.id}" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Cancelar</button></div>${s.codigo?('<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:18px;letter-spacing:3px;color:var(--acc)">'+s.codigo+'</b> <span class="sub">— informe ao almoxarife</span></div>'):''}</div>`).join('') : '<p class="sub">Você não tem solicitações pendentes.</p>';
     $('#supView').innerHTML=h;
+    if(disp.length){ supEqSolRenderOpts(); const fc=$('#eqSolCons'); if(fc) fc.addEventListener('change',()=>{ eqSolFcons=fc.value; supEqSolRenderOpts(); }); }
     const send=$('#eqSolSend');
     if(send) send.addEventListener('click',async()=>{
       const eq=$('#eqSolEq').value; if(!eq) return toast('Escolha o equipamento');
@@ -6632,6 +7342,10 @@ async function supVEqSolicitar(){
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
+// --- Equipamentos: consórcio (Águas Integradas = ZA1004 · Eficiência Hídrica = ZA0200) ---
+const SUP_CONS={ZA1004:'Águas Integradas',ZA0200:'Eficiência Hídrica'};
+const supConsLbl=c=>SUP_CONS[c]||'—';
+const SUP_CONS_OPTS=(sel)=>`<option value="ZA1004"${sel==='ZA1004'?' selected':''}>Águas Integradas (Contagem)</option><option value="ZA0200"${sel==='ZA0200'?' selected':''}>Eficiência Hídrica (Betim)</option>`;
 // --- Gerir equipamentos (almoxarife) ---
 async function supVEqGerir(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
@@ -6652,8 +7366,11 @@ async function supVEqGerir(){
       <label>Tipo *</label>
       <select id="eqcTipo">${eqTipos.length?('<option value="">Selecione…</option>'+eqTipos.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')):'<option value="">— cadastre um tipo acima —</option>'}</select>
       <label>Nome / identificação *</label><input id="eqcNome" autocomplete="off" placeholder="ex.: Furadeira 01"/>
+      <label>Consórcio *</label>
+      <select id="eqcConsorcio"><option value="">Selecione…</option>${SUP_CONS_OPTS()}</select>
       <label>Nº de série / patrimônio</label><input id="eqcSerie" autocomplete="off"/>
-      <button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar equipamento</button>`;
+      <button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar equipamento</button>
+      <p class="sub" style="margin-top:10px">Para editar equipamentos já cadastrados (inclusive adicionar o consórcio), use a tela <b>Equipamentos cadastrados</b>.</p>`;
     $('#eqtAdd').addEventListener('click',supEqTipoCadastrar);
     $('#eqcAdd').addEventListener('click',supEqCadastrar);
     supEqTiposRender();
@@ -6676,7 +7393,8 @@ async function supEqTipoCadastrar(){
 async function supEqCadastrar(){
   const nome=($('#eqcNome').value||'').trim(); if(!nome) return toast('Informe o nome do equipamento');
   const tid=$('#eqcTipo').value; if(!tid) return toast('Escolha o tipo do equipamento');
-  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo_id:+tid,p_num_serie:($('#eqcSerie').value||'').trim()||null});
+  const cons=$('#eqcConsorcio').value; if(!cons) return toast('Selecione o consórcio');
+  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo_id:+tid,p_num_serie:($('#eqcSerie').value||'').trim()||null,p_consorcio:cons});
   if(error){ toast(/num_serie|duplicate|unique/i.test(error.message||'')?'⚠ Já existe equipamento com esse nº de série':'⚠ '+(error.message||error)); return; }
   toast('✓ Equipamento cadastrado'); supVEqGerir();
 }
@@ -6720,10 +7438,10 @@ async function supVEqEntregar(){
 }
 
 // --- Equipamentos cadastrados (almoxarife): inventário do acervo — estoque × em uso × manutenção ---
-let eqInvData=[], eqInvTipo='', eqInvBusca='', eqInvSit='todos';
+let eqInvData=[], eqInvTipo='', eqInvBusca='', eqInvSit='todos', eqInvCons='', eqInvEditId=null;
 function eqInvSituacao(e){ if(e.manutencao_aberta||e.status==='manutencao') return 'manutencao'; if(e.status==='em_uso') return 'uso'; return 'estoque'; }
 async function supVEqInventario(){
-  eqInvTipo=''; eqInvBusca=''; eqInvSit='todos';
+  eqInvTipo=''; eqInvBusca=''; eqInvSit='todos'; eqInvCons=''; eqInvEditId=null;
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_equip_listar'); if(error)throw error;
@@ -6733,14 +7451,16 @@ async function supVEqInventario(){
     const sits=[['todos','Todos'],['estoque','Em estoque'],['uso','Em uso']].concat(temManut?[['manutencao','Manutenção']]:[]);
     $('#supView').innerHTML=
       '<div class="sec">🗃️ Equipamentos cadastrados</div>'+
-      '<p class="sub" style="margin:2px 0 10px">Gestão do acervo: o que está em estoque, emprestado e em manutenção.</p>'+
+      '<p class="sub" style="margin:2px 0 10px">Gestão do acervo: o que está em estoque, emprestado e em manutenção. Toque ✏️ para editar (inclusive o consórcio).</p>'+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px">'+
         '<input id="eqInvBusca" placeholder="🔎 Nome ou nº de série" style="width:100%"/>'+
         '<select id="eqInvTipo" style="width:100%"><option value="">Todos os tipos</option>'+tipos.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')+'</select>'+
+        '<select id="eqInvCons" style="width:100%"><option value="">Todos os consórcios</option>'+SUP_CONS_OPTS()+'<option value="__sem">— sem consórcio —</option></select>'+
         '<div id="eqInvSit" style="display:flex;gap:6px;flex-wrap:wrap"></div>'+
       '</div>'+
       '<div id="eqInvResumo" class="sub" style="margin:6px 0"></div>'+
       '<div id="eqInvLista"></div>';
+    $('#eqInvCons').addEventListener('change',e=>{ eqInvCons=e.target.value; eqInvRender(); });
     const sitc=$('#eqInvSit');
     const pintaSit=()=>sitc.querySelectorAll('[data-eqsit]').forEach(x=>{const on=x.dataset.eqsit===eqInvSit;x.style.background=on?'var(--acc)':'';x.style.color=on?'var(--acc-ink)':'';x.style.borderColor=on?'var(--acc)':'';});
     sitc.innerHTML=sits.map(s=>`<button class="btn ghost" data-eqsit="${s[0]}" style="margin:0;padding:7px 12px;font-size:13px">${s[1]}</button>`).join('');
@@ -6757,6 +7477,8 @@ function eqInvRender(){
   const arr=eqInvData.filter(e=>{
     if(eqInvTipo && (e.tipo||'')!==eqInvTipo) return false;
     if(eqInvSit!=='todos' && eqInvSituacao(e)!==eqInvSit) return false;
+    if(eqInvCons==='__sem' && e.consorcio) return false;
+    if(eqInvCons && eqInvCons!=='__sem' && e.consorcio!==eqInvCons) return false;
     if(q){ const hay=((e.nome||'')+' '+(e.num_serie||'')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
@@ -6766,14 +7488,35 @@ function eqInvRender(){
   const grupos={}; arr.forEach(e=>{ const t=e.tipo||'Sem tipo'; (grupos[t]=grupos[t]||[]).push(e); });
   const tks=Object.keys(grupos).sort((a,b)=>a.localeCompare(b,'pt-BR'));
   cont.innerHTML=tks.map(t=>`<div class="sec" style="margin-top:16px">🧰 ${t} <span class="sub" style="font-weight:400">(${grupos[t].length})</span></div>`+grupos[t].map(eqInvCard).join('')).join('');
+  cont.querySelectorAll('.eqInvEdit').forEach(b=>b.addEventListener('click',()=>{ eqInvEditId=+b.dataset.id; eqInvRender(); }));
+  cont.querySelectorAll('.eqInvCancel').forEach(b=>b.addEventListener('click',()=>{ eqInvEditId=null; eqInvRender(); }));
+  cont.querySelectorAll('.eqInvSalvar').forEach(b=>b.addEventListener('click',()=>eqInvSalvar(+b.dataset.id)));
 }
 function eqInvCard(e){
-  const sub=e.num_serie?('nº '+e.num_serie):'';
-  const resp=(e.status==='em_uso'&&e.responsavel)?`<div class="sub" style="margin-top:2px">👤 ${e.responsavel}${e.termo_status==='pendente'?' · aceite pendente':''}</div>`:'';
-  const manut=e.manutencao_aberta?`<div style="margin-top:4px;font-size:12px;color:var(--bad)">🔧 ${e.manutencao_desc||'Em manutenção'}</div>`:'';
+  if(eqInvEditId===e.id){
+    return `<div style="background:var(--card);border:1px solid var(--acc);border-radius:12px;padding:12px 13px;margin-bottom:8px">
+      <label>Nome / identificação</label><input id="eqeNome_${e.id}" value="${eoH(e.nome||'')}" autocomplete="off"/>
+      <label>Consórcio</label><select id="eqeCons_${e.id}"><option value="">— não definido —</option>${SUP_CONS_OPTS(e.consorcio)}</select>
+      <label>Nº de série / patrimônio</label><input id="eqeSerie_${e.id}" value="${eoH(e.num_serie||'')}" autocomplete="off"/>
+      <label>Observação</label><textarea id="eqeObs_${e.id}" rows="2">${eoH(e.obs||'')}</textarea>
+      <div style="display:flex;gap:6px;margin-top:10px"><button class="btn eqInvSalvar" data-id="${e.id}" style="flex:1">Salvar</button><button class="btn ghost eqInvCancel" style="flex:0 0 auto;width:auto;padding:10px 16px">Cancelar</button></div>
+    </div>`;
+  }
+  const sub=e.num_serie?('nº '+eoH(e.num_serie)):'';
+  const consChip=e.consorcio?`<span style="font-size:11px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap">${supConsLbl(e.consorcio)}</span>`:'<span style="font-size:11px;color:var(--bad);white-space:nowrap">sem consórcio</span>';
+  const resp=(e.status==='em_uso'&&e.responsavel)?`<div class="sub" style="margin-top:2px">👤 ${eoH(e.responsavel)}${e.termo_status==='pendente'?' · aceite pendente':''}</div>`:'';
+  const manut=e.manutencao_aberta?`<div style="margin-top:4px;font-size:12px;color:var(--bad)">🔧 ${eoH(e.manutencao_desc||'Em manutenção')}</div>`:'';
   const dev=e.devolucao_solicitada?`<div style="margin-top:4px;font-size:12px;color:var(--warn)">🔁 devolução solicitada</div>`:'';
   const prev=e.preventiva_vencida?`<div style="margin-top:4px;font-size:12px;color:var(--warn)">🛠️ preventiva vencida</div>`:'';
-  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+(e.nome||'—')+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+resp+'</div>'+eqStatusChip(e)+'</div>'+manut+dev+prev+'</div>';
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+eoH(e.nome||'—')+'</b> '+consChip+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+resp+'</div>'+eqStatusChip(e)+'<button class="btn ghost eqInvEdit" data-id="'+e.id+'" style="margin:0;width:auto;padding:7px 11px;font-size:13px">✏️</button></div>'+manut+dev+prev+'</div>';
+}
+async function eqInvSalvar(id){
+  const nome=($('#eqeNome_'+id).value||'').trim(); if(!nome) return toast('Informe o nome');
+  const cons=$('#eqeCons_'+id).value||null, serie=($('#eqeSerie_'+id).value||'').trim()||null, obs=($('#eqeObs_'+id).value||'').trim()||null;
+  const {error}=await sb.rpc('sup_equip_editar',{p_id:id,p_nome:nome,p_consorcio:cons,p_num_serie:serie,p_obs:obs});
+  if(error){ toast(/num_serie|duplicate|unique/i.test(error.message||'')?'⚠ Já existe equipamento com esse nº de série':'⚠ '+(error.message||error)); return; }
+  toast('✓ Equipamento atualizado'); eqInvEditId=null;
+  const l=await sb.rpc('sup_equip_listar'); if(!l.error) eqInvData=l.data||[]; eqInvRender();
 }
 
 // --- Manutenção: corretiva (defeito) + preventiva de todos (almoxarife) ---

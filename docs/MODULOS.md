@@ -170,7 +170,19 @@
   até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
   → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
-### 2.2 Loggers temporários — `// MÓDULO LOGGERS` (~L782) · telas `loggers` / `logger_det`
+### 2.2 Loggers — `// MÓDULO LOGGERS` (~L782) · telas `loggers_hub` / `loggers` / `logger_det`
+- **Card "Loggers"** (home, antes "Loggers temporários") → **hub `loggers_hub`** com 2 botões:
+  **⏱️ Temporários** e **📌 Fixos**. Os dois abrem a **mesma tela `loggers`**; o modo (`lgModo`
+  ∈ `temp|fixo`, global) **filtra a lista** e **define a flag** de qualquer logger criado ali.
+- **Flag `instalacao_logger_calibracao.logger_temporario`** (boolean, default **false**): `true`=temporário,
+  `false`=fixo. Marcada `true` nos **97** remanescentes da limpeza de 2026-10-17 (ver abaixo). A listagem
+  (`app_loggers_listar`) devolve a coluna; o front filtra por `lgModo` (temp = flag true). Criação
+  (`app_logger_criar`, **param novo `p_temporario boolean default true`**) grava conforme o botão
+  (`lgModo==='temp'`). A tela `loggers` volta pro `loggers_hub` (botão `#lgVoltarHub`), não pra home.
+- **Limpeza 2026-10-17:** removidos todos os `pendente`, `dados pendentes` (removido) e `concluído`
+  **sem dados de pressão** (135 loggers + 62k linhas de `logger_pressao` via FK CASCADE); backup em
+  `"8 - coleta_campo"._bkp_loggers_del_20261017`/`_bkp_logger_pressao_del_20261017`. Restaram **97**
+  concluídos com pressão, todos `logger_temporario=true`.
 - **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
   → concluido`. **Não existe mais** promoção automática após 7 dias.
 - **Tabela base:** `"8 - coleta_campo".instalacao_logger_calibracao`. **View:** `vw_loggers`
@@ -350,6 +362,16 @@
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
 
+### 2.6 Gestão de Pavimento — `// ---------- GESTÃO DE PAVIMENTO ----------` · tela `pavimento` (2026-10-21)
+- **Objetivo:** registrar em campo o **pavimento a recompor** depois de um serviço (vazamento, ramal, VRP, rede, DMC etc.), com fotos e georreferência, para o time de programação programar a recomposição.
+- **Formulário (`pavInit`/`pavRenderTipos`/`pavRenderBlocos`/`pavValidar`):**
+  - **Serviço de origem** (select, `PAV_ORIGEM`): vazamento · ramal · fiscalização · vrp · rede_vca · rede_hdd · dmc.
+  - **OS SIGOS** de origem (texto, opcional).
+  - **Coordenada travada no GPS** (`pavOnGps`): mostra lat/lon ao vivo, **sem edição**; banner "Fique próximo ao local para salvar a coordenada" até `gps.acc ≤ PRECISAO_MAX` (15 m) — mesma trava anti-lançamento-remoto da pressão/loggers.
+  - **Tipos de pavimento = multi-seleção** (chips `PAV_TIPOS`: grama/asfalto/concreto/bloquete/paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta). Cada tipo selecionado **abre um bloco** com **dimensão** + **2 fotos obrigatórias** (câmera **e galeria**, `comprimir` 1600px). Estado em `pavState={tipo:{dimensao,f1,f2}}`.
+  - **Salvar:** gera um `grupo` uuid e envia **1 item por tipo** pela **fila offline** (`enviarOuEnfileirar`, `rpc:'app_pav_registrar'`, `pasta:'pavimento'`, fotos `p_foto1`/`p_foto2`). "Meus últimos registros" via `app_pav_minhas` (agrupado por grupo).
+- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
+
 ---
 
 ## 3. Entrevistadores — tela `entrevistadores`
@@ -380,7 +402,7 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 ### 3.2 Solicitação de serviços (campo) — `// ABERTURA DE SERVIÇOS` (~L1394) · tela `abertura_servicos`
 - Entrevistador pede abertura de OS (tipo, matrícula, HD, foto do HD, GPS). Tipos (`#as_tipo`): 106000,
   1480000, 1490000, 1177900 (117 79 00 — Substituição de Hidrômetro, incluído em 2026-10), FAT0900, 3020000;
-  o rótulo gravado em `tipo_label` vem do `case` dentro da RPC (código novo → atualizar o `case` também). RPC
+  o rótulo gravado em `tipo_label` vem do `case` dentro da RPC (código novo → atualizar o `case` também; o do 1177900 está em `docs/migracao_abertura_servico_1177900.sql`). RPC
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
   `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
   `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
@@ -807,6 +829,13 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
   **manual** pelo programador (nada de reabertura automática por prazo, por ora).
 
+### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
+- Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*
+- **Cabeçalho espelhado na "abertura de serviços — ocorrências" (2026-10-21b):** **tabs de status** `.seg` (`#pavpStatusSeg`: Pendentes [default] / OS criada / Todas) + **alternância de visão** `.seg` (`#pavpViewSeg`: 📋 Lista / 🗺️ Mapa, `pavProgSetView`). **Mapa** (`#pavpMapa`, `pavProgMapa`): Leaflet (`L.map`+`mapAddCamadaBase`) com `circleMarker` colorido por faixa de prazo (pendentes) / teal (com OS), popup e `fitBounds`.
+- **Filtros (client-side exceto consórcio):** consórcio (select, server-side) · **serviço de origem = dropdown multi-seleção** (`.msdd`/`#pavpOrigDd` — botão + painel de checkboxes, `pavpRenderOrigDd`; fecha ao clicar fora) · **prazo = chips clicáveis com contagem** no `#pavpResumo` (🟢 no prazo / 🟡 atenção / 🔴 atrasado — cada chip mostra o nº e filtra; clicar força status=Pendentes). Removidos o select de prazo e o de ordenação (ordem fixa = mais antigos primeiro).
+- **Controle de prazo (a partir da data de solicitação `created_at`):** `pavDias`/`pavBucket` (`PAV_SLA=[3,5]` → **0–3 no prazo · 4–5 atenção · >5 atrasado**) → badge colorido "faixa · há N dias" + borda esquerda; **o relógio conta só enquanto NÃO há OS** de recomposição.
+- **Distinção OS criada × pendente (espelha a ocorrência da pesquisa):** o programador **lança a OS SIGOS da recomposição** no card pendente (input + "Criar OS" → `pavProgCriarOS` → RPC **`app_pav_os(p_grupo,p_os)`**, gate admin|aux_acesso, grava `os_recomposicao`/`os_recomp_em`/`os_recomp_por` em todas as linhas do grupo). Com OS → badge verde "✓ OS <nº>". Colunas novas na tabela `pav_recomposicao`: `os_recomposicao`/`os_recomp_em`/`os_recomp_por`. (⚠️ `os_sigos` = OS **de origem**, preenchida no campo; `os_recomposicao` = OS **da recomposição**, preenchida aqui.) sw **v264**.
+
 ---
 
 ## 5. Almoxarifado — `// MÓDULO SUPRIMENTOS` (~L2403) · tela `suprimentos` (schema `"9 - suprimentos"`)
@@ -913,7 +942,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   tipo** (`🧰 <tipo> (n)`; `tipo` nulo → "Sem tipo"), com resumo de contagens no topo; cada card mostra
   nº de série, chip de status (`eqStatusChip`), responsável (se em uso) e badges de manutenção/
   devolução solicitada/preventiva vencida. Estado em `eqInvData/eqInvTipo/eqInvBusca/eqInvSit`;
-  filtros redesenham só `#eqInvLista` (a busca não perde foco). Só leitura — nenhuma ação de escrita.
+  filtros redesenham só `#eqInvLista` (a busca não perde foco).
+- **Consórcio no equipamento (2026-10-22, sw v266):** coluna `sup_equipamento.consorcio` (ZA1004=**Águas Integradas**/Contagem · ZA0200=**Eficiência Hídrica**/Betim). **Cadastrar equipamentos**: dropdown de consórcio **obrigatório** (`sup_equip_cadastrar` ganhou `p_consorcio` — §0.6: 4→5 args). **Equipamentos cadastrados** (`eq_inventario`): passou a **permitir edição** — chip de consórcio no card + botão **✏️** que abre form inline (nome/consórcio/série/obs) → nova RPC **`sup_equip_editar(p_id,p_nome,p_consorcio,p_num_serie,p_obs)`** (almox) p/ adicionar consórcio nos já existentes; ganhou **filtro de consórcio** (`#eqInvCons`, inclui "— sem consórcio —"). **Solicitar equipamento** (`supVEqSolicitar`): **filtro de consórcio** (`#eqSolCons`) que filtra o dropdown de equipamentos (`supEqSolRenderOpts`). `sup_equip_listar`/`_disponiveis` devolvem `consorcio`; helpers `SUP_CONS`/`supConsLbl`/`SUP_CONS_OPTS`.
 - RPCs: `sup_equip_cadastrar`, `sup_equip_tipo_cadastrar`, `sup_equip_tipos_listar`,
   `sup_equip_listar` (usada tb. pelo inventário acima — já traz tipo/status/responsável/
   manutencao_aberta/devolucao_solicitada/preventiva_*), `sup_equip_disponiveis`,
@@ -1570,7 +1600,7 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
   consórcio usado em `frotasRenderVeiculoEdit`) → `frotasRenderEquipamentoDetalhe` (fotos, botão
   Editar). Tudo direto via `sb.rpc(...)`, sem fila offline (tela admin/online-only).
 
-### 6.6 Fluxos pedidos pela Amanda (2026-10-16, sw v251) — migração `docs/migracao_frota_fluxos_2026-10.sql`
+### 6.6 Fluxos pedidos pela Amanda (2026-10-16, sw v269) — migração `docs/migracao_frota_fluxos_2026-10.sql`
 - **Equipe de frotas = `"10 - Frotas".frota_responsaveis()`** (ativo e `frota_admin` OU `funcao in ('frotas','admin')`).
   ⚠️ Antes o aviso "lavagem solicitada" usava `sup_uuids_por_funcao(['frotas','admin'])` e **não chegava a quem só tem a
   engrenagem** (o responsável de frotas, Lucas, é `funcao='campo'` + `frota_admin`). Avisos pra "a equipe de frotas" devem
@@ -1818,6 +1848,22 @@ pelo fluxo de cadastro-pelo-gestor).
 ---
 
 ## 11. Perdas / NRW — cockpit em **página dedicada** `public/perdas.html`
+
+> **Menu do cockpit (2026-10-22):** `#nav` voltou a exibir **Análise do micromedido** (`mm`) e **Análise de
+> macromedição** (`macro`) em *2 · Dados & diagnóstico*, e **Priorização de troca de HD** (`hdpri`) +
+> **Fiscalização de irregularidades** em *4 · Execução — comercial* (os deep-links `?s=` e o Auxiliar seguem
+> funcionando). **Removidos do menu:** Painel de Perdas, Componentes IWA, Gestão de OS/reparos, Parque de
+> hidrômetros, Recuperação de faturamento, Grandes consumidores e Performance contratual (as `<section>`s
+> continuam no arquivo, só sem entrada). Tela inicial = `resultado` (`go('resultado')` no fim do script principal).
+> Botão "Componentes IWA →" do Balanço removido. Isso substitui o que a nota de reorg abaixo diz sobre `hdpri`/`mm`
+> estarem fora do menu.
+
+> **Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`) e **Análise do micromedido** (`s-mm`) foram
+> **removidas do menu `#nav`** do cockpit e agora são acessadas pelo **Auxiliar de Programação** (cards que
+> abrem `perdas.html?s=hdpri` / `?s=mm`). O gate do `perdas.html` (script module no fim) passou a liberar essas
+> duas para **aprovador/admin mesmo sem `dev_acesso`**, e nesse caso adiciona **`body.aux-solo`** (CSS
+> `body.aux-solo #nav{display:none}`) → o usuário vê só a ferramenta + "Voltar ao AcquaHub". Deep-link lido de
+> `?s=` e roteado por `window.go(s)`. As telas/RPCs (`app_nrw_hd_*`/`app_nrw_mm_*`) **não mudaram** — só a porta.
 
 Cockpit de acompanhamento de perdas (NRW) por DMC. **Não é uma tela `<main>` do `index.html`** — é
 uma **página HTML separada** (`public/perdas.html`, autocontida: CSS/JS próprios, SVG nativo, sem
@@ -2084,6 +2130,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   - **RPCs de leitura** (definer, gate admin|dev_acesso): `app_nrw_hd_resumo(p_consorcio,p_situacao,p_interno)` ·
     `app_nrw_hd_ranking(...filtros...,p_limit,p_offset)` · `app_nrw_hd_mapa(...)` (GeoJSON lon/lat 4326 via join `ligacoes.geom`, top por IPS) ·
     `app_nrw_hd_detalhe(p_matricula)` (blocos + série 18m + calibre). Filtro de situação default **só ativa (R)**.
+  - **⚠️ Situação da ligação pela micromedição atual (2026-10-22):** o `situacao_lig` (filtro ativa/inativa + `remanejamento_sugerido`=interno+ativa) **deixou de vir do cadastro estático `"3 - comercial".ligacoes.situacao_lig`** e passa a vir de **`"0 - vitrine_gis".vw_gis_micromedicao_atual.situacao_ligacao`** (R/I/F/P do **último mês da micromedição**; `ligacoes` fica só de fallback via `coalesce`). Motivo: o cadastro estava **desatualizado em 28.660 matrículas (22%)** — 19.806 "ativas" no cadastro estavam **inativas** no último mês faturado. `app_nrw_hd_rebuild`/`_rebuild_chunk` patcheados (CTE `lig`→view + `ligcad` fallback); dados atuais atualizados in-place (UPDATE `situacao_lig`+`remanejamento_sugerido` a partir da view). A view atualiza junto com cada carga mensal de micromedição → sempre a última situação.
   - **Frontend:** 4 painéis — **Resumo** (cards P1–P5 + remanejamentos + IPS médio + barras de motivos e de códigos SIENGE),
     **Lista operacional** (filtros categoria/motivo/calibre/situação/interno/busca + tabela ordenável + **export .xlsx**), **Mapa
     logístico** (Leaflet + markercluster, pontos coloridos por prioridade) e **Detalhe** por matrícula (stats + mini-gráfico + justificativa +
@@ -2104,6 +2151,19 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   - **Metodologia dinâmica + exemplo congelado (2026-10-09e):** no popup `hdMetodologia`/`hdRenderMetodologia`, os **pesos** dos componentes, o rótulo **"(maior peso)"**, os **cortes P1–P4** e o **limiar de idade alta** passaram a ser lidos **ao vivo de `hd_config`** (via `hdPremData`, carregado no `hdInit`/`hdLoadCodMap`; se faltar, o popup busca `app_nrw_hd_premissas` antes de renderizar). O **exemplo** (matrícula 2212803) virou um **snapshot congelado** (`const HD_EXEMPLO`) — fixo, com selo "❄ Snapshot fixo" e os pesos de referência que usou; **não muda** se as premissas forem alteradas (evita número incoerente). sw v224.
   - **Seleção do mapa por leaflet-draw + endereço no export (2026-10-15, sw v245):** o **seletor de área do mapa** deixou de ser o desenho manual de vértices (clique-a-clique) e passou a usar o **controle padrão `L.Control.Draw`** (polígono **e** retângulo), **igual ao da programação de pesquisa de vazamento** (`index.html` `ppInit`). Libs novas no `<head>` do perdas.html: **Leaflet.draw 1.0.4** (CSS+JS). As ferramentas moram no canto superior direito do mapa; `L.Draw.Event.CREATED` → `hdSelecionarGeom(geom)` (seta `hdF.poligono` com o GeoJSON cru do shape e `hdReload()`); botão **✕ Limpar seleção** (`hdDrawReset`) zera a área. Saíram `hdDrawClick`/`hdDrawAdd` e o estado `hdDraw`; entraram `hdDrawnLayer`/`hdDrawCtl`. **Export .xlsx** da priorização ganhou **Bairro** e **Endereço** (logo após a Matrícula) — **só no arquivo**, não na lista operacional: `app_nrw_hd_ranking` recebeu `p_incluir_endereco boolean default false` (⚠️ §0.6: a assinatura de 12 args foi **dropada** antes de recriar a de 13) que faz um `left join lateral` em `"0 - vitrine_gis".vw_gis_cadastro_comercial` (por `matricula`+`consorcio`) só quando `true`; `hdExport` chama com `p_incluir_endereco:true`, as telas (lista/mapa) chamam sem o flag → sem custo do join. ⚠️ **rua 99,99% em Contagem/0% em Betim** (a `logradouros` só tem Contagem) — em Betim o `endereco` traz só o número; `bairro` cobre as duas ZAs.
   - **Export CSV do ranking de matrículas (micromedido, 2026-10-15, sw v245):** a **Análise por matrícula** (tela `mm`) ganhou botão **⭳ Exportar CSV** no cabeçalho do bloco "Ranking de matrículas" (`#mmExport`, `mmExport`) — espelha o export da priorização de HD, exporta a **lista filtrada** (consórcio/DMC via `mmDmcSel`, classificação `mmClass`, busca `mmBusca`) paginando `app_nrw_mm_ranking` (`p_limit:500`). CSV com BOM UTF-8, separador `;` e decimais com vírgula (Excel-PT); colunas: Matrícula, Consórcio, Comportamento, Situação, Score, Meses, Média, Mediana, CV, Tendência (slope), Nº zeros, Mín, Máx, Meses irregular, Meses factível. Sem RPC nova.
+  - **⚠️ Recomendação por p90+média-4m e filtro "troca efetiva" (2026-10-20d — só DB, sem sw):** corrige o caso em que o motor recomendava **trocar o HD por um calibre IGUAL** (ex.: Y→Y) — descoberto na matrícula 113902859. Eram **84,3k/132k (64%)** recomendando o mesmo calibre, **77,5k deles em medidor novo** (<10 anos) = "trocas fantasma" sem motivo (nem calibre, nem idade); já causaram trocas desnecessárias em campo.
+    - **Nova referência de dimensionamento** `ref_dim = greatest(mediana, least(p90, média_4m))` usada em `adequacao` (a `utilizacao` e os demais sub-scores seguem na `ref`=mediana). O `least(p90, média_4m)` **exige que o p90 E a média dos últimos 4 meses concordem** para escalar → **robusto a pico isolado** (1 mês alto não move o p90). Nova coluna `"11 - perdas_nrw".hd_priorizacao.media_4m` (a antiga `media_3m` foi dropada).
+    - **⚠️ Recomendação só com margem:** `cal_recomendado` **só muda de calibre quando `adequacao in ('subdimensionado','superdimensionado')`** — i.e. consumo **> 1,5× o máx da faixa** (subdim) ou **< mín** (superdim). **Migração de faixa que ainda cabe no calibre atual (`mudanca`) → mantém o calibre** (não é troca). Antes, qualquer migração marginal gerava upsize. Ex.: 113902859 tem `ref_dim=15`, Y cobre até 10 (1,5×=15) → `15 > 15` é falso → **permanece Y**.
+    - **Coluna/flag `troca_efetiva`** = `(cal_recomendado ≠ cap) OU (idade ≥ idade_alta)`. **Os 3 RPCs de leitura filtram por `troca_efetiva` por padrão** (`app_nrw_hd_resumo`/`_mapa` sempre; `app_nrw_hd_ranking` ganhou `p_incluir_sem_troca boolean default false` — ⚠️ §0.6: assinatura de 13 args dropada e recriada com 14) → **saem do radar de quem programa**; o ranking devolve `media_4m`/`p90`/`troca_efetiva` nas linhas. Swaps por idade (mesmo calibre, HD velho) **continuam** no radar.
+    - **Efeito:** radar caiu de 132k → **35,9k** itens efetivos (27%); só **28,5k trocas de calibre reais** (24,2k subdim + 4,3k superdim) + 7,4k por idade; **30,8k "mudança de faixa que cabe no calibre"** não geram mais troca. 113902859 → **Y→Y, `troca_efetiva=false`** (fora do radar). **Patches:** `app_nrw_hd_rebuild` e `app_nrw_hd_rebuild_chunk` (computam `media_4m`, `ref_dim`, cal_rec com margem, `troca_efetiva`); dados atuais recomputados por UPDATE in-place + `justificativa` regenerada. **Nenhuma mudança de frontend** (filtro server-side).
+- **Fiscalização de irregularidades / fraudes (2026-10-20, tela REAL — `s-fraudepri`, sw v257):** tela operacional p/ o **time de programação** montar a **rota de fiscalização** (export p/ o SIGOS), modelada na Priorização de troca de HD. **Dois caminhos de acesso:** (1) item de menu no **cockpit NRW** — seção "4 · Execução — comercial", `data-s="fraudepri"` (dev_acesso); (2) **Auxiliar de Programação › Serviços comerciais** (`#apFraudePri` em `index.html` → `perdas.html?s=fraudepri`, aux-solo p/ aux_acesso/aprovador/admin). Em `AUX_TOOLS` e `NRW_REAL`. **2026-10-20c (sw v259):** esta tela **substituiu no menu os dois mocks** "Indicativo de fraude" (`fraude`/`s-fraude`) e "Fiscalização de fraudes" (`nrw_fiscalizacao`/`s-nrw_fiscalizacao`) — os dois `<section>` foram **removidos** e o card "Consumo não-autorizado" do mapa de ação (Componentes IWA) repontado p/ `go:"fraudepri"` (as funções mortas `fraude()`/`fiscalizacaoTool()` ficam inacessíveis — `go()` dá no-op em tela inexistente).
+  - **Sem motor novo** — reaproveita a classificação de anomalia já pronta em **`"11 - perdas_nrw".mm_matricula_stats`** (score_anomalia/classificação/slope/cv/n_zeros/meses_irregular/meses_factivel). **Universo de suspeitos** = classes `fraude_potencial`, `queda_continua`, `nulo_recorrente`, `factivel`, `instavel` (≈41,4k; exclui estável/crescimento). DMC por matrícula via `mm_dmc_map.codigo_dmc` (join por matrícula **+ consórcio**).
+  - **Lentes operacionais** (recortes de priorização, selecionáveis no painel ou no cabeçalho): **grandes consumidores** (média ≥ 50 m³/mês), **consumo com ligação irregular** (`meses_irregular` ≥ 3 = meses faturando volume com a **situação da ligação** `cd_situaca` em Inativo/Factível/Potencial — "cortado mas com água"), **leitura estimada recorrente** (`meses_estimada` ≥ 3 = meses com `qt_vol_est>0`, sem leitura real do hidrômetro), **abaixo da vizinhança** (média < 40% da **mediana do próprio DMC** — CTE `percentile_cont(0.5)` por DMC×consórcio). A coluna **% vizinhança** no ranking = média÷mediana_DMC×100.
+  - **⚠️ Correção 2026-10-20b (sw v258):** o `cd_situaca` (R/I/F/P) e o `cd_situa_3` (AA/IA/FA/PA) são a **SITUAÇÃO DA LIGAÇÃO de água** (Real/Inativo/Factível/Potencial — conforme os slides comerciais da COPASA), **não** a situação da leitura. A 1ª versão rotulava `meses_irregular` como "leituras impedidas/estimadas" — **errado**: ele conta consumo em ligação não-Real (sinal de fraude, renomeado p/ "consumo com ligação irregular"). A **leitura estimada** de verdade = `qt_vol_est>0`; criei a coluna **`"11 - perdas_nrw".mm_matricula_stats.meses_estimada`** (backfill em buckets `nu_matricu%4`; **`app_nrw_mm_stats_rebuild` patcheado** p/ computá-la: `count(*) filter (where qt_vol_est>0)`). Duas lentes/colunas distintas agora: **Lig.irreg** e **Estim.**. FR_SIT corrigido (R=Real/Ativa, I=Inativo, F=Factível, P=Potencial). Assinatura: pontos ● coloridos = situação da ligação (I/F/P), ◯ azul = mês com leitura estimada.
+  - **RPCs** (definer, gate **admin | dev_acesso | aux_acesso** via helper `_nrw_fraude_gate()` — mais permissivo que o HD p/ cobrir o acesso pelo Auxiliar): `app_nrw_fraude_resumo(...,p_poligono,p_est_min)` (total + por_classe + por_consorcio + contagens grandes/ligirreg/estimada/vizinhança) · `app_nrw_fraude_ranking(...,p_poligono,p_incluir_endereco,p_est_min)` (bairro/endereço via `left join lateral vw_gis_cadastro_comercial` só no export) · `app_nrw_fraude_mapa(...,p_limit,p_est_min)` (lon/lat 4326 via `ligacoes.geom`, top por score, máx 8.000) · `app_nrw_fraude_detalhe(p_matricula)` (stats + **série de 18m da micromedição com `cd_situaca` e flag `est`=`qt_vol_est>0`** + endereço/perfil). Filtro espacial = `st_contains` sobre `ligacoes.geom` (31983), mesmo padrão do HD.
+  - **⚠️ Situação da ligação pela micromedição atual (2026-10-22):** a **"situação atual" exibida** (ranking + detalhe) passou a vir de **`"0 - vitrine_gis".vw_gis_micromedicao_atual.situacao_ligacao`** (último mês) via `coalesce(mv.situacao_ligacao, s.situacao_atual)` — ancorando na view a fonte canônica. Na prática **0 divergências** hoje (o `mm_matricula_stats.situacao_atual` já era o cd_situaca do último mês), mas garante robustez se a última competência da matrícula for < o mês global da base. (O mesmo ajuste foi feito, com impacto real, no HD — ver §1 troca de HD.)
+  - **Frontend** (`fr*` em `perdas.html`, bloco clássico): 3 distribuições no topo (**Classes de suspeita** · **Lentes** · **Por consórcio**), cross-filter por clique; **mapa Leaflet + L.Control.Draw** (polígono/retângulo, cor #d6336c) que filtra espacialmente a **fila operacional** e o mapa; **export .xlsx** p/ SIGOS (matrícula, consórcio, bairro, endereço, DMC, classe, score, média, último vol, slope, zeros, meses s/ ligação ativa, meses leitura estimada, % vizinhança, situação da ligação). **Assinatura de fraude** no popup (`frDetailHtml`): sparkline de 18m com ● por situação da ligação (I/F/P) e ◯ nos meses de leitura estimada + bloco de estatísticas. Reusa libs já carregadas (Leaflet/Leaflet.draw/SheetJS). **Não há** priorização por DMC nem estimativa de recuperação de volume (fora de escopo por decisão do usuário).
+  - **Gate do `perdas.html` alinhado:** a liberação das ferramentas aux (`AUX_TOOLS`) passou a aceitar também **`me.aux_acesso`** (além de `is_admin`/`pode_aprovar`) — consistente com o controle de acesso do próprio Auxiliar de Programação (a ⚙️ geral).
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
   têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
@@ -2360,6 +2420,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       `node.done` em todas as intervenções no `pjLoad`. `pjDocsLoad` (abrir intervenção) re-marca pelo `pjDocsCur`; anexar/
       remover chamam `pjSetDocDone(iv,tipo,bool)` (atualiza `pjDocsPres` + `node.done`) antes do `pjRerender`. O chip do nó
       mostra **"anexado · 100%" / "pendente · 0%"** e o Gantt do relatório volta a listar os nós `doc` com status (anexado/pendente).
+    - **OS SIGOS + Relatório de Furo (2026-10-22, sw v268):** (1) **OS SIGOS** é a **1ª atividade de TODA árvore** (`pjOS()`:
+      nó `k:'reg'` com flag `os:true`) — **só número** (input `inputmode=numeric`, `oninput` tira não-dígitos, `data-osigos`),
+      salvo no snapshot (`pjSave`) e editável no Campo e no Suporte. Por ser `reg`: **não conta no avanço** (`pjPct`→`null`),
+      **sem toggle "No escopo?"** nem cadeado (só `isG/%/m` têm toggle) e fora do Gantt/progresso do relatório (filtro `k!=='reg'`).
+      O valor sai nos "Dados da intervenção" do PDF (`pjOsVal`). Snapshots antigos ganham o nó no `pjLoad` (reconciliação:
+      `unshift` se faltar, move p/ o início se estiver fora de lugar). (2) **Relatório de Furo** (`rel_furo`) = atividade-documento
+      **exclusiva de `rede_hdd`**, **antes** do As Built (ordem HDD: … teste › Relatório de Furo › As Built › RTQ). Mesmo mecanismo
+      do As-Built/RTQ (PDF, conta 100% quando anexado, campo anexa com a intervenção liberada). `PJ_DOCS` ganhou `{t:'rel_furo',hdd:true}`
+      e **`pjDocsFor(iv)`** filtra os docs aplicáveis — usada na lista de Documentos (cfg e relatório), na seção 4 do PDF e nos
+      **anexos mesclados** do PDF consolidado (ordem de `PJ_DOCS`: furo antes do as-built). **Backend (migração `proj_doc_rel_furo`):**
+      `app_proj_doc_set` aceita `rel_furo` e o libera ao campo (junto de `as_built`/`rtq`); `app_proj_docs_presenca` inclui `rel_furo`.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
@@ -2453,6 +2524,22 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
   `logo-eficiencia-hidrica.png` (usados só pela carta proposta) ficaram em `public/` e no `ASSETS` do `sw.js`.
 
 ## 15. Gestão de VRPs (`vrpman`, schema `8 - coleta_campo`)
+
+> **Reorg 2026-10:** o card da home virou **"VRPs – Campo"** e o hub `vrpman` (`vmHub`) ficou **só com 🏗️ Campo**
+> (Minhas OS / Visita primária). As 3 telas de **gestão — `vrpman_serv` (Gestão de serviços), `vrpman_fichas`
+> (Ficha cadastral), `vrpman_prev` (Cronograma preventivo)** — **migraram para o Auxiliar de Programação ›
+> categoria "Gestão de VRPs"** (renderizadas por `apInit()`, gate `ME.vrp_gestao`, ⚙️ `vrpman_cfg` admin). As
+> telas em si não mudaram; seus back-buttons e os redirects de gate agora apontam para `auxiliar_programacao`.
+>
+> **Melhorias 2026-10 (UX):** (1) **Ficha cadastral** (`vmFichasRender`) ganhou **busca pesquisável de VRP**
+> (input + `datalist`, filtra os cards ao digitar); (2) na **ficha aberta** (`vmFichaOpen`) há botão **＋ Abrir OS**
+> (gest.) que reusa `vmProgramar(vrp,num)` → escolhe tipo (corretiva/preventiva/substituição) + usuário + data;
+> (3) o **select de VRP ao Programar** (`vmProgramar`) virou **input+`datalist` pesquisável** (resolve o texto
+> digitado → `vrp_id` via `elig`); (4) **Execução** (`vmPhoto`/`vmPhotoMulti`) — removido `capture="environment"`
+> para o usuário **escolher foto da galeria** (não força a câmera); (5) **Gerar OS a partir de pendência**
+> (`vmGerarCorr`, usado na ficha, na OS e na gestão › Pendências) agora tem **seletor de tipo de OS**
+> (corretiva/preventiva/substituição) — RPC `app_vrp_pendencia_gerar_os` ganhou `p_origem` (drop+create, §0.6;
+> deixou de bloquear pendência de substituição); pendências de substituição também viraram acionáveis.
 
 Vertente de **gestão de serviços de manutenção** sobre as VRPs (separada do módulo `vrp`, que é só
 levantamento/inventário). Card **🔧 Manutenção de VRPs** na categoria **🚧 Em desenvolvimento** da home
@@ -2609,3 +2696,54 @@ foi **removido** — o módulo antigo já está dentro de Campo como **Visita pr
   Colaborador abaixo (ocupa menos espaço horizontal).
 - **Tooltip de etapa** nos cards de OS (`title`, `VM_STAGE` + selo ⓘ): explica o status e em que etapa do
   processo a OS vive.
+
+## 16. Telemetria (CCO COPASA) — `// MÓDULO TELEMETRIA (CCO COPASA)` · tela `telemetria` (admin-only)
+
+Importa os **CSVs horários/sub-horários exportados do sistema CCO da COPASA** (telemetria de macro,
+reservatório e booster) e alimenta o banco, já cruzando com o cadastro técnico. **Não há API da COPASA**
+(em desenvolvimento) → a extração é manual (o usuário baixa os CSVs) e a ingestão é por **upload no app**.
+Card **📡 Telemetria (CCO)** na home › 🚧 Em desenvolvimento (movido em 2026-10), **hidden**, mostrado por `homeGate()` só para **admin**
+(`ME.is_admin`); `telemetriaInit()` também barra não-admin.
+
+**Os dados (3 esquemas, detectados pelo cabeçalho):** separador `;`, decimal `.`, timestamp
+`DD/MM/YYYY HH:MM`, granularidade **5 min**, `Sinal`=1 (telemetria viva). Nome do arquivo =
+`CODIGO - CODIGOCOPASA.csv` (o `CODIGOCOPASA` = `cd_no_agua`, chave de cruzamento).
+- `Momento;Vazao;Volume;Sinal` → **macro** (`vazao_volume`): vazão L/s + volume acumulado m³.
+- `Momento;B01;B02;B03;B04;Nivel_Suc;Pressao_Suc;Pressao_Rec;Sinal` → **booster** (`bombas_pressao`).
+- `Momento;Nivel;Sinal` → **reservatório** (`nivel`).
+
+**Banco — schema `"15 - telemetria"` (app-only):**
+- `tele_unidade` — dimensão (1 linha/unidade): código CCO, código COPASA, za/cidade, tipo, esquema +
+  cruzamento com o cadastro (`cadastro_tabela`/`cadastro_id`/`nome`; **`null` = unidade fora do nosso
+  cadastro**). Match por `cd_no_agua` contra `"2 - infra_agua".unidades_{macromedicao,reservatorio,elevatoria,booster_bomba,poco}`.
+- `tele_leitura` — fatos em **formato longo** `(unidade_id, momento, grandeza, valor)`, PK nas 3 primeiras
+  (reprocessar não duplica). Um formato serve os 3 esquemas e qualquer grandeza futura. Índices btree
+  `(unidade_id,momento)`, BRIN `momento`, btree `grandeza`. Momento = `timestamptz` local −03.
+- `tele_carga` — log de ingestão por arquivo.
+- Views `vw_cobertura` (unidade × cadastro × estatística de leituras) e `vw_cadastro_sem_tele` (inverso:
+  pontos do cadastro sem telemetria).
+
+**RPCs públicas (SECURITY DEFINER, grant `authenticated`+`service_role`):**
+- `app_tele_unidade_upsert(p_codigo_unidade,p_codigo_copasa,p_za,p_cidade,p_tipo,p_esquema)` → upsert da
+  unidade, resolve o match com o cadastro, retorna `id`.
+- `app_tele_ingest(p_codigo_unidade,p_rows jsonb,p_arquivo,p_hash)` → insere o lote `[{m,g,v}]` com
+  `on conflict do update`, loga a carga. Exige a unidade já cadastrada.
+- `app_tele_cobertura()` → `setof vw_cobertura` para o painel.
+
+**Frontend (`telemetria`):** dropzone (vários CSVs), prévia (arquivo→unidade/tipo/esquema/linhas/cadastro),
+**Processar** com barra de progresso, resumo e painel **Cobertura × cadastro** (KPIs + tabela). Parsing é
+client-side (mesma lógica do schema); grava **pela sessão do usuário via RPC — sem service key no front**.
+Opção **"Enviar só leituras novas"** (incremental): usa `momento_max` da cobertura por unidade e só manda
+`momento > último`. Consórcio por `webkitRelativePath` (pasta) → seletor → `null` (upsert faz `coalesce`,
+não sobrescreve za bom já gravado). Lotes de 5000 leituras por chamada.
+
+**Cuidados:**
+- **Ingestão é online** (grava direto no banco; não passa pela fila offline). É tarefa de mesa/admin.
+- **Carga histórica** (meses de 5 min = dezenas de milhões de linhas) é pesada numa aba — o módulo faz com
+  progresso e retomada (reprocessar é idempotente; incremental pula o que já entrou), mas para o backfill
+  inicial há também o script `scripts/telemetria/ingest_telemetria.py` (mesmas RPCs, via `service_role`,
+  mais rápido). Dia a dia = só o módulo.
+- Schema **15** (não 14 — "14 - pessoas" é legado). App-only: sem `USAGE` para papéis `gis_*`.
+- **Estado atual (2026-10-16):** dimensão com **101 unidades** carregada; **25 no cadastro, 76 fora**
+  (candidatas a inclusão — ver `vw_cadastro_sem_tele`/`vw_cobertura`). Série temporal entra pelo
+  módulo/script.
