@@ -2391,6 +2391,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       `node.done` em todas as intervenções no `pjLoad`. `pjDocsLoad` (abrir intervenção) re-marca pelo `pjDocsCur`; anexar/
       remover chamam `pjSetDocDone(iv,tipo,bool)` (atualiza `pjDocsPres` + `node.done`) antes do `pjRerender`. O chip do nó
       mostra **"anexado · 100%" / "pendente · 0%"** e o Gantt do relatório volta a listar os nós `doc` com status (anexado/pendente).
+    - **OS SIGOS + Relatório de Furo (2026-10-22, sw v268):** (1) **OS SIGOS** é a **1ª atividade de TODA árvore** (`pjOS()`:
+      nó `k:'reg'` com flag `os:true`) — **só número** (input `inputmode=numeric`, `oninput` tira não-dígitos, `data-osigos`),
+      salvo no snapshot (`pjSave`) e editável no Campo e no Suporte. Por ser `reg`: **não conta no avanço** (`pjPct`→`null`),
+      **sem toggle "No escopo?"** nem cadeado (só `isG/%/m` têm toggle) e fora do Gantt/progresso do relatório (filtro `k!=='reg'`).
+      O valor sai nos "Dados da intervenção" do PDF (`pjOsVal`). Snapshots antigos ganham o nó no `pjLoad` (reconciliação:
+      `unshift` se faltar, move p/ o início se estiver fora de lugar). (2) **Relatório de Furo** (`rel_furo`) = atividade-documento
+      **exclusiva de `rede_hdd`**, **antes** do As Built (ordem HDD: … teste › Relatório de Furo › As Built › RTQ). Mesmo mecanismo
+      do As-Built/RTQ (PDF, conta 100% quando anexado, campo anexa com a intervenção liberada). `PJ_DOCS` ganhou `{t:'rel_furo',hdd:true}`
+      e **`pjDocsFor(iv)`** filtra os docs aplicáveis — usada na lista de Documentos (cfg e relatório), na seção 4 do PDF e nos
+      **anexos mesclados** do PDF consolidado (ordem de `PJ_DOCS`: furo antes do as-built). **Backend (migração `proj_doc_rel_furo`):**
+      `app_proj_doc_set` aceita `rel_furo` e o libera ao campo (junto de `as_built`/`rtq`); `app_proj_docs_presenca` inclui `rel_furo`.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
