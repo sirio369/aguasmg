@@ -468,7 +468,7 @@ de liberação**), gateada por `pjPodeSup()` = admin **ou** grant por pessoa def
 `iv.locked`):** o Suporte configura e **libera**; enquanto em configuração os **avanços ficam bloqueados** no
 campo. **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado aberto, item com lançamento não sai do escopo
 (toggle 🔒, `−` da quantidade bloqueado). Toggle **No escopo?** em toda atividade E subatividade; peça começa
-pelo **tipo de componente** (`pjSel`), ramal por **OS SIGOS + Hidrômetro** (+ imóvel, as-built A1/A2/A3/P1).
+pelo **tipo de componente** (`pjSel`); toda intervenção abre com **OS SIGOS** (campo numérico, fora do avanço/escopo) e as de **HDD** têm o PDF **Relatório de Furo** antes do As Built (2026-10-22); ramal por **OS SIGOS + Hidrômetro** (+ imóvel, as-built A1/A2/A3/P1).
 **Documentos:** anexar/abrir/remover ficam **na configuração** (`projeto_cfg`); no `projeto_rel` é **só abrir**.
 **Importar intervenções (2026-10):** card em Projetos › 🧰 Suporte (gate `pjPodeSup`) → tela `projeto_import`
 (`pjImportInit`) que **lê um `.gpkg` no navegador via sql.js** (cdnjs, lazy), decodifica a geometria GPKG→WKT

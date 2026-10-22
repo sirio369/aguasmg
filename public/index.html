@@ -1926,6 +1926,9 @@ const PJ_PECA_TIPOS=['Válvula de manobra','Ventosa','Descarga'];
 const pjSel=(n,v,opts)=>({n,k:'sel',v:v||'',opts:opts||PJ_PECA_TIPOS});   // seleção de tipo (config): não é mensurável
 // atividade de ENCERRAMENTO: registro único via anexo de PDF (não foto); o PDF vira documento final (ver PJ_DOCS: as_built/rtq)
 const pjDoc=(n,doc)=>({n,k:'doc',doc});
+// OS SIGOS da intervenção: 1ª atividade de TODA árvore. Só número (k:'reg' → fora do % de avanço) e sem toggle "No escopo?" (não é ativável/desativável)
+const pjOS=()=>({n:'OS SIGOS',k:'reg',os:true,v:'—'});
+const pjOsVal=iv=>{ const n=((iv&&iv.arv)||[]).find(x=>x&&x.os); return (n&&n.v&&n.v!=='—')?String(n.v):''; };
 const pjG=(n,f,o={})=>({n,k:'g',f,...o});
 const pjOc=(e,es,r,rc)=>[pjP('Escavação',e),pjP('Escoramento',es),pjP('Reaterro',r),pjP('Recomposição de pavimento',rc)];
 const pjIL=(nome,m,ex,t,civOff=true)=>pjG(nome||'Interligação',[{...pjG('Obra civil da caixa',pjOc(0,0,0,0)),ativo:!civOff},pjP('Manobra / parada de rede',m),pjP('Execução (corte / peças / junta)',ex),pjP('Teste / religação',t)]);
@@ -1995,33 +1998,33 @@ PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 let pjLoaded=false, PJ_LIMITES=[], PJ_DMCS=[];
 // árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
 const PJ_ARV={
-  vrp_impl:()=>[pjP('Locação e cadastro de interferências',0),
+  vrp_impl:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
     pjG('Câmara da VRP',[...pjOc(0,0,0,0),pjP('Execução da câmara',0)]),
     pjP('Montagem hidráulica (VRP + by-pass, registros, filtro, manômetros)',0),
     pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade',0),pjP('Calibração / ajuste de set point',0),
     {...pjP('Telemetria / macromedidor associado',0),ativo:true},pjP('Comissionamento',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  valvula:()=>[pjP('Locação e cadastro de interferências',0),
+  valvula:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
     pjG('Obra civil (vala/caixa)',pjOc(0,0,0,0)),
     {...pjP('Retirada da válvula antiga (se substituição)',0),ativo:false},
     pjP('Instalação da válvula + acessórios',0),
     pjIL('Interligação / religação',0,0,0),
     pjP('Teste de estanqueidade / manobra',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  rede_vca:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
+  rede_vca:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
     pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
     pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
   // HDD = perfuração direcional (não destrutiva): sem vala/reaterro/pavimento; só valas de entrada/saída, furo piloto, alargamento e puxamento
-  rede_hdd:(ext)=>[pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
+  rede_hdd:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
     pjP('Mobilização e montagem do equipamento HDD',0),pjValas([pjVala(1,'Entrada'),pjVala(2,'Saída')]),
     pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
     pjM('Puxamento da tubulação (pullback)',ext||1,0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
-    pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]
+    pjDoc('Relatório de Furo','rel_furo'),pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]   // HDD: Relatório de Furo antes do As Built
 };
 const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
 const pjMapTipo=(tipo,isLine)=>isLine?'rede_vca':(PJ_TIPO_MAP[tipo]||'vrp_impl');
@@ -2072,10 +2075,15 @@ async function pjLoad(force){
   // converte o antigo "Cadastro / as-built" (%) e garante os 2 nós-doc como as 2 últimas atividades, nessa ordem. Some sozinho ao regravar o snapshot.
   ivs.forEach(iv=>{ if(!Array.isArray(iv.arv))return;
     iv.arv=iv.arv.filter(n=>!(n&&n.k!=='doc'&&/cadastro\s*\/?\s*as-?built/i.test(n.n||'')));
-    [['Cadastro do As Built','as_built'],['Relatório Técnico de Qualidade','rtq']].forEach(([nm,dc])=>{
+    const fin=[['Cadastro do As Built','as_built'],['Relatório Técnico de Qualidade','rtq']];
+    if(iv.tipo==='rede_hdd') fin.unshift(['Relatório de Furo','rel_furo']);   // só HDD, antes do As Built (2026-10-22)
+    fin.forEach(([nm,dc])=>{
       const i=iv.arv.findIndex(n=>n&&n.k==='doc'&&n.doc===dc);
       if(i<0) iv.arv.push(pjDoc(nm,dc)); else iv.arv.push(iv.arv.splice(i,1)[0]);
     });
+    // OS SIGOS (2026-10-22): garante o campo como 1ª atividade em snapshots salvos antes dele existir
+    const oi=iv.arv.findIndex(n=>n&&n.os);
+    if(oi<0) iv.arv.unshift(pjOS()); else if(oi>0) iv.arv.unshift(iv.arv.splice(oi,1)[0]);
   });
   await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca As-Built/RTQ já anexados (100%) em todas as intervenções
   PJ_IVS=ivs; pjLoaded=true;
@@ -2475,7 +2483,9 @@ function pjResumoCsv(feed){
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u; a.download='resumo_avancos_projetos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('CSV gerado'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
 // ---------- documentos da intervenção (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por tipo ----------
-const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
+const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'rel_furo',ic:'🕳️',n:'Relatório de Furo',hdd:true},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
+// documentos aplicáveis à intervenção: "Relatório de Furo" existe só em HDD (lista de documentos, relatório e PDF consolidado)
+const pjDocsFor=iv=>PJ_DOCS.filter(dc=>!dc.hdd||(iv&&iv.tipo==='rede_hdd'));
 let pjDocsCur={};   // tipo -> {tipo,nome,path} da intervenção corrente
 // presença dos documentos de ENCERRAMENTO (as_built/rtq) por intervenção — marca node.done nos cards da lista sem abrir cada uma
 let pjDocsPres={};   // 'kind|gid' -> Set(tipos)
@@ -2526,7 +2536,7 @@ function pjRenderCfg(keep){
   const hasAdv=iv.arv.some(pjHasAdv);
   // documentos: anexar/abrir/remover moram AQUI (config); no relatório é só abrir
   // Projeto 3D aparece logo após o "Projeto executivo" (só intervenções de VRP)
-  const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
+  const docsHtml=pjDocsFor(iv).map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span>${ok&&doc.nome?` <span class="pjhint" style="margin:0">· ${String(doc.nome).slice(0,28)}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:''}<button class="btn ghost pjmini" data-attach="${dc.t}">📎 ${ok?'Substituir':'Anexar'}</button>${ok?`<button class="btn ghost pjmini bad" data-remove="${dc.t}">🗑 Remover</button>`:''}<input type="file" accept="application/pdf" hidden data-file="${dc.t}"></span></div>`;
     return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   const lockCard=iv.locked
@@ -2591,7 +2601,9 @@ function pjNodeHtml(node){
   const tog=(cfg&&(isG||t==='%'||t==='m'))
     ? `<span class="pjsw sm ${inact?'':'on'} ${togEdit?'':'dis'}" ${togEdit?`data-toggle="${rid}"`:''} title="${advTog?'Tem lançamento — não pode sair do escopo':'No escopo?'}"></span>${(editar&&advTog)?'<span class="pjfroz" title="Congelado: já tem lançamento">🔒</span>':''}` : '';
   let right='';
-  if(t==='reg'){
+  if(t==='reg' && node.os){   // OS SIGOS: só número, editável no campo e no Suporte (dado da intervenção, não escopo → sem toggle nem cadeado)
+    right=`<input class="pjreginp" data-osigos="${rid}" inputmode="numeric" pattern="[0-9]*" maxlength="20" value="${node.v&&node.v!=='—'?String(node.v).replace(/\D/g,''):''}" placeholder="nº da OS">`;
+  } else if(t==='reg'){
     right = cfg
       ? `<span class="pjregv mut">${node.v&&node.v!=='—'?node.v:'• campo'}</span>`
       : `<input class="pjreginp" data-reg="${rid}" value="${node.v&&node.v!=='—'?String(node.v).replace(/"/g,'&quot;'):''}" placeholder="—"${pjLocked?'':' disabled'}>`;
@@ -2684,6 +2696,8 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-docattach]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const inp=d.querySelector('[data-docfile="'+b.dataset.docattach+'"]'); if(inp)inp.click(); });
   d.querySelectorAll('[data-docfile]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.docfile]; const f=inp.files&&inp.files[0]; if(n&&f) pjDocAnexar(pjCurIv(),n.doc,f); });
   d.querySelectorAll('[data-docopen]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); try{ window.open(SBASE+b.dataset.docopen,'_blank'); }catch(_){} });
+  d.querySelectorAll('[data-osigos]').forEach(inp=>{ inp.oninput=()=>{ const v=inp.value.replace(/\D/g,''); if(v!==inp.value) inp.value=v; };   // só dígitos
+    inp.onchange=()=>{ const n=pjReg[inp.dataset.osigos]; if(n){ n.v=inp.value.replace(/\D/g,'')||'—'; pjSave(pjCurIv()); toast(n.v==='—'?'OS SIGOS removida':'OS SIGOS salva'); } }; });
   d.querySelectorAll('[data-reg]').forEach(inp=>inp.onchange=()=>{ const n=pjReg[inp.dataset.reg]; if(n){ n.v=inp.value.trim()||'—'; pjSave(pjCurIv()); } });
   d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjSave(pjCurIv()); rerender(k); } });
   d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjSave(pjCurIv()); rerender(k); } });
@@ -2723,13 +2737,13 @@ async function pjRel(id){
   const t=PJ_TIPOS[iv.tipo],asbuilt=pjStatusDe(iv)==='done';
   await pjDocsLoad(iv); await pjAvancosLoad(iv);
   // documentos da intervenção — no relatório é SÓ ABRIR (anexar/remover ficam na configuração/Suporte)
-  const docsHtml=PJ_DOCS.map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
+  const docsHtml=pjDocsFor(iv).map(dc=>{ const doc=pjDocsCur[dc.t], ok=!!doc;
     const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">${dc.ic} <b>${dc.n}</b> <span class="pjst ${ok?'ok':'pend'}">${ok?'anexado':'pendente'}</span></span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo na configuração</span>'}</span></div>`;
     return (dc.t==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   // "Gantt" de progresso por atividade. AUDITORIA: o antigo plotava por ts (data de REGISTRO do avanço), não por data de obra; sem cronograma planejado e com lançamento em lote (ex. F02 = 6 avanços em 8 min, 02/10) a linha do tempo colapsava e o eixo repetia a mesma data. Trocado por barra de PROGRESSO (0–100%) + janela de registro como rótulo honesto.
   const _allAv=Object.values(pjAvancosCur).flat();
   const gfmt=ms=>{const d=new Date(ms);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
-  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime());
+  const acts=iv.arv.filter(n=>n.ativo!==false&&n.k!=='reg').map(n=>{ const es=_allAv.filter(e=>e.atividade===n.n), ds=es.map(e=>new Date(e.ts).getTime());
     if(n.k==='doc') return {n:n.n,p:n.done?100:0,nav:0,first:null,last:null,doc:true,done:!!n.done};
     return {n:n.n,p:pjPct(n),nav:es.length,first:ds.length?Math.min(...ds):null,last:ds.length?Math.max(...ds):null}; });
   const gantHtml=acts.map(a=>{ const pc=Math.max(0,Math.min(a.p||0,100)), cls=(a.p||0)>100?'over':((a.p||0)>=100?'ok':''), w=a.doc?(a.done?100:0):(a.first==null?0:Math.max(2,pc));
@@ -2813,7 +2827,7 @@ async function pjRelPdf(iv){ if(!iv)return;
 // renderiza os anexos (PDFs do executivo/licença/alvará/as-built) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
 async function pjRelRenderAnexos(iv){
   const box=document.getElementById('relAnexos'); if(!box) return;
-  const docs=PJ_DOCS.map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
+  const docs=pjDocsFor(iv).map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
   if(!docs.length){ box.innerHTML='<p class="relPend">Nenhum documento anexado para incluir ao final. Anexe na configuração (Suporte) antes da emissão.</p>'; return; }
   box.innerHTML='<p class="relPend" id="relAnexProg">⏳ Renderizando anexos (0/'+docs.length+')… aguarde antes de salvar o PDF.</p>';
   const prog=document.getElementById('relAnexProg');
@@ -2847,9 +2861,9 @@ async function pjRelRenderAnexos(iv){
 function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv);
   let h='<div class="relTop"><div><h1>Relatório consolidado da intervenção</h1><div class="sub">'+(iv.local||'')+'</div></div><div class="relBadge">'+p+'% concluído</div></div><div class="relBody">';
   h+='<div class="relSec"><span class="relNum">1</span> Dados da intervenção</div>';
-  h+='<div class="relGrid">'+relField('Código',iv.cod)+relField('Tipo',t.n)+relField('Consórcio',iv.cons)+relField('Responsável',iv.resp)+relField('Início',iv.ini)+relField(iv.fim?'Conclusão':'Situação',iv.fim||'Em andamento')+(iv.ext?relField('Extensão',(+iv.ext).toLocaleString('pt-BR')+' m'):'')+(iv.dn?relField('DN',iv.dn):'')+(iv.dmc?relField('DMC',iv.dmc):'')+relField('Progresso total',p+'%')+'</div>';
+  h+='<div class="relGrid">'+relField('Código',iv.cod)+relField('Tipo',t.n)+relField('OS SIGOS',pjOsVal(iv)||'—')+relField('Consórcio',iv.cons)+relField('Responsável',iv.resp)+relField('Início',iv.ini)+relField(iv.fim?'Conclusão':'Situação',iv.fim||'Em andamento')+(iv.ext?relField('Extensão',(+iv.ext).toLocaleString('pt-BR')+' m'):'')+(iv.dn?relField('DN',iv.dn):'')+(iv.dmc?relField('DMC',iv.dmc):'')+relField('Progresso total',p+'%')+'</div>';
   h+='<div class="relSec"><span class="relNum">2</span> Progresso por atividade</div>';
-  const acts=iv.arv.filter(n=>n.ativo!==false).map(n=>({n:n.n,p:pjPct(n)}));
+  const acts=iv.arv.filter(n=>n.ativo!==false&&n.k!=='reg').map(n=>({n:n.n,p:pjPct(n)}));   // OS SIGOS (reg) não é atividade de avanço
   h+='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">'+acts.map(a=>{const w=Math.max(0,Math.min(a.p||0,100));return '<tr><td style="padding:5px 6px;border-bottom:1px solid #eee">'+a.n+'</td><td style="width:150px;border-bottom:1px solid #eee"><div style="background:#eef2f7;border-radius:5px;height:10px"><div style="background:#0a7d5e;height:100%;border-radius:5px;width:'+w+'%"></div></div></td><td style="width:48px;text-align:right;padding:5px 6px;border-bottom:1px solid #eee;font-weight:700">'+a.p+'%</td></tr>';}).join('')+'</table>';
   h+='<div class="relSec"><span class="relNum">3</span> Avanços por atividade · subatividade</div>';
   const grupos=pjRelGrupos(iv);
@@ -2859,7 +2873,7 @@ function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=pjIvPct(iv)
       s.avs.forEach(e=>{ const quem=e.autor_nome||e.equipe||'—', eq=(e.autor_nome&&e.equipe)?(' · '+e.equipe):''; h+='<div style="font-size:11.5px;margin:7px 0 0;color:#333"><b>'+relFmtData(e.ts)+'</b> · +'+e.valor+(e.unidade==='m'?' m':'%')+' · <span style="color:#555">👤 '+quem+eq+'</span>'+(e.obs?'<div style="color:#444;font-style:italic;margin-top:1px">"'+e.obs+'"</div>':'')+'</div>'+relFotos((e.fotos||[]).map((pp,i)=>['Foto '+(i+1),pp])); });
     }); });
   h+='<div class="relSec"><span class="relNum">4</span> Documentos e anexos</div>';
-  PJ_DOCS.forEach(dc=>{ const doc=pjDocsCur[dc.t];
+  pjDocsFor(iv).forEach(dc=>{ const doc=pjDocsCur[dc.t];
     if(doc) h+='<div style="font-size:12px;margin-top:7px">'+dc.ic+' <b>'+dc.n+'</b> — <span style="color:#0a7d5e;font-weight:700">anexado</span> <span style="color:#777">('+(doc.nome||(doc.path||'').split('/').pop()||'documento')+')</span></div>';
     else h+='<div style="margin-top:7px"><div style="font-size:12px">'+dc.ic+' <b>'+dc.n+'</b></div><div class="relPend">Ainda não anexado no sistema — pendente de anexo na configuração da intervenção (Suporte). Deve ser anexado antes da emissão final.</div></div>';
   });
