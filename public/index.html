@@ -7288,22 +7288,30 @@ function supEqMeusWire(){
 }
 
 // --- Solicitar equipamento (colaborador) ---
+let eqSolDisp=[], eqSolFcons='';
+function supEqSolRenderOpts(){ const sel=document.getElementById('eqSolEq'); if(!sel)return;
+  const arr=eqSolFcons?eqSolDisp.filter(e=>e.consorcio===eqSolFcons):eqSolDisp;
+  sel.innerHTML='<option value="">Selecione…</option>'+arr.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}${e.num_serie?(' · nº '+e.num_serie):''}${e.consorcio?(' · '+supConsLbl(e.consorcio)):''}</option>`).join('');
+}
 async function supVEqSolicitar(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const [d,m]=await Promise.all([sb.rpc('sup_equip_disponiveis'),sb.rpc('sup_minhas_solic_equip')]);
     if(d.error)throw d.error;
-    const disp=d.data||[], minhas=m.data||[];
+    const disp=d.data||[], minhas=m.data||[]; eqSolDisp=disp; eqSolFcons='';
     let h='<div class="sec">🙋 Solicitar equipamento</div><p class="sub" style="margin-top:2px">Só aparecem equipamentos disponíveis (não estão em uso).</p>';
     if(disp.length){
-      h+=`<label>Equipamento</label>
-      <select id="eqSolEq"><option value="">Selecione…</option>${disp.map(e=>`<option value="${e.id}">${e.nome}${e.tipo?(' · '+e.tipo):''}${e.num_serie?(' · nº '+e.num_serie):''}</option>`).join('')}</select>
+      h+=`<label>Consórcio</label>
+      <select id="eqSolCons"><option value="">Todos os consórcios</option>${SUP_CONS_OPTS()}</select>
+      <label>Equipamento</label>
+      <select id="eqSolEq"></select>
       <label>Observação</label><textarea id="eqSolObs" rows="2" placeholder="Ex.: para a OS 88.421"></textarea>
       <button id="eqSolSend" class="btn" style="margin-top:10px">Enviar solicitação</button>`;
     } else { h+='<p class="sub">Nenhum equipamento disponível no momento.</p>'; }
     h+='<div class="sec" style="margin-top:26px">📨 Minhas solicitações pendentes</div>';
     h+= minhas.length ? minhas.map(s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>${s.equipamento}</b>${s.tipo?('<div class="sub" style="margin-top:2px">'+s.tipo+' · '+eqDia(s.criado_em)+'</div>'):''}</div><button class="btn ghost" data-solcancel="${s.id}" style="margin:0;width:auto;padding:8px 12px;font-size:13px">Cancelar</button></div>${s.codigo?('<div style="margin-top:8px;background:var(--ok-bg);border-radius:8px;padding:7px 10px;font-size:13px">🎫 Código de retirada: <b style="font-size:18px;letter-spacing:3px;color:var(--acc)">'+s.codigo+'</b> <span class="sub">— informe ao almoxarife</span></div>'):''}</div>`).join('') : '<p class="sub">Você não tem solicitações pendentes.</p>';
     $('#supView').innerHTML=h;
+    if(disp.length){ supEqSolRenderOpts(); const fc=$('#eqSolCons'); if(fc) fc.addEventListener('change',()=>{ eqSolFcons=fc.value; supEqSolRenderOpts(); }); }
     const send=$('#eqSolSend');
     if(send) send.addEventListener('click',async()=>{
       const eq=$('#eqSolEq').value; if(!eq) return toast('Escolha o equipamento');
@@ -7319,6 +7327,10 @@ async function supVEqSolicitar(){
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
+// --- Equipamentos: consórcio (Águas Integradas = ZA1004 · Eficiência Hídrica = ZA0200) ---
+const SUP_CONS={ZA1004:'Águas Integradas',ZA0200:'Eficiência Hídrica'};
+const supConsLbl=c=>SUP_CONS[c]||'—';
+const SUP_CONS_OPTS=(sel)=>`<option value="ZA1004"${sel==='ZA1004'?' selected':''}>Águas Integradas (Contagem)</option><option value="ZA0200"${sel==='ZA0200'?' selected':''}>Eficiência Hídrica (Betim)</option>`;
 // --- Gerir equipamentos (almoxarife) ---
 async function supVEqGerir(){
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
@@ -7339,8 +7351,11 @@ async function supVEqGerir(){
       <label>Tipo *</label>
       <select id="eqcTipo">${eqTipos.length?('<option value="">Selecione…</option>'+eqTipos.map(t=>`<option value="${t.id}">${t.nome}</option>`).join('')):'<option value="">— cadastre um tipo acima —</option>'}</select>
       <label>Nome / identificação *</label><input id="eqcNome" autocomplete="off" placeholder="ex.: Furadeira 01"/>
+      <label>Consórcio *</label>
+      <select id="eqcConsorcio"><option value="">Selecione…</option>${SUP_CONS_OPTS()}</select>
       <label>Nº de série / patrimônio</label><input id="eqcSerie" autocomplete="off"/>
-      <button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar equipamento</button>`;
+      <button id="eqcAdd" class="btn" style="margin-top:10px">Cadastrar equipamento</button>
+      <p class="sub" style="margin-top:10px">Para editar equipamentos já cadastrados (inclusive adicionar o consórcio), use a tela <b>Equipamentos cadastrados</b>.</p>`;
     $('#eqtAdd').addEventListener('click',supEqTipoCadastrar);
     $('#eqcAdd').addEventListener('click',supEqCadastrar);
     supEqTiposRender();
@@ -7363,7 +7378,8 @@ async function supEqTipoCadastrar(){
 async function supEqCadastrar(){
   const nome=($('#eqcNome').value||'').trim(); if(!nome) return toast('Informe o nome do equipamento');
   const tid=$('#eqcTipo').value; if(!tid) return toast('Escolha o tipo do equipamento');
-  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo_id:+tid,p_num_serie:($('#eqcSerie').value||'').trim()||null});
+  const cons=$('#eqcConsorcio').value; if(!cons) return toast('Selecione o consórcio');
+  const {error}=await sb.rpc('sup_equip_cadastrar',{p_nome:nome,p_tipo_id:+tid,p_num_serie:($('#eqcSerie').value||'').trim()||null,p_consorcio:cons});
   if(error){ toast(/num_serie|duplicate|unique/i.test(error.message||'')?'⚠ Já existe equipamento com esse nº de série':'⚠ '+(error.message||error)); return; }
   toast('✓ Equipamento cadastrado'); supVEqGerir();
 }
@@ -7407,10 +7423,10 @@ async function supVEqEntregar(){
 }
 
 // --- Equipamentos cadastrados (almoxarife): inventário do acervo — estoque × em uso × manutenção ---
-let eqInvData=[], eqInvTipo='', eqInvBusca='', eqInvSit='todos';
+let eqInvData=[], eqInvTipo='', eqInvBusca='', eqInvSit='todos', eqInvCons='', eqInvEditId=null;
 function eqInvSituacao(e){ if(e.manutencao_aberta||e.status==='manutencao') return 'manutencao'; if(e.status==='em_uso') return 'uso'; return 'estoque'; }
 async function supVEqInventario(){
-  eqInvTipo=''; eqInvBusca=''; eqInvSit='todos';
+  eqInvTipo=''; eqInvBusca=''; eqInvSit='todos'; eqInvCons=''; eqInvEditId=null;
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_equip_listar'); if(error)throw error;
@@ -7420,14 +7436,16 @@ async function supVEqInventario(){
     const sits=[['todos','Todos'],['estoque','Em estoque'],['uso','Em uso']].concat(temManut?[['manutencao','Manutenção']]:[]);
     $('#supView').innerHTML=
       '<div class="sec">🗃️ Equipamentos cadastrados</div>'+
-      '<p class="sub" style="margin:2px 0 10px">Gestão do acervo: o que está em estoque, emprestado e em manutenção.</p>'+
+      '<p class="sub" style="margin:2px 0 10px">Gestão do acervo: o que está em estoque, emprestado e em manutenção. Toque ✏️ para editar (inclusive o consórcio).</p>'+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px">'+
         '<input id="eqInvBusca" placeholder="🔎 Nome ou nº de série" style="width:100%"/>'+
         '<select id="eqInvTipo" style="width:100%"><option value="">Todos os tipos</option>'+tipos.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('')+'</select>'+
+        '<select id="eqInvCons" style="width:100%"><option value="">Todos os consórcios</option>'+SUP_CONS_OPTS()+'<option value="__sem">— sem consórcio —</option></select>'+
         '<div id="eqInvSit" style="display:flex;gap:6px;flex-wrap:wrap"></div>'+
       '</div>'+
       '<div id="eqInvResumo" class="sub" style="margin:6px 0"></div>'+
       '<div id="eqInvLista"></div>';
+    $('#eqInvCons').addEventListener('change',e=>{ eqInvCons=e.target.value; eqInvRender(); });
     const sitc=$('#eqInvSit');
     const pintaSit=()=>sitc.querySelectorAll('[data-eqsit]').forEach(x=>{const on=x.dataset.eqsit===eqInvSit;x.style.background=on?'var(--acc)':'';x.style.color=on?'var(--acc-ink)':'';x.style.borderColor=on?'var(--acc)':'';});
     sitc.innerHTML=sits.map(s=>`<button class="btn ghost" data-eqsit="${s[0]}" style="margin:0;padding:7px 12px;font-size:13px">${s[1]}</button>`).join('');
@@ -7444,6 +7462,8 @@ function eqInvRender(){
   const arr=eqInvData.filter(e=>{
     if(eqInvTipo && (e.tipo||'')!==eqInvTipo) return false;
     if(eqInvSit!=='todos' && eqInvSituacao(e)!==eqInvSit) return false;
+    if(eqInvCons==='__sem' && e.consorcio) return false;
+    if(eqInvCons && eqInvCons!=='__sem' && e.consorcio!==eqInvCons) return false;
     if(q){ const hay=((e.nome||'')+' '+(e.num_serie||'')).toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
@@ -7453,14 +7473,35 @@ function eqInvRender(){
   const grupos={}; arr.forEach(e=>{ const t=e.tipo||'Sem tipo'; (grupos[t]=grupos[t]||[]).push(e); });
   const tks=Object.keys(grupos).sort((a,b)=>a.localeCompare(b,'pt-BR'));
   cont.innerHTML=tks.map(t=>`<div class="sec" style="margin-top:16px">🧰 ${t} <span class="sub" style="font-weight:400">(${grupos[t].length})</span></div>`+grupos[t].map(eqInvCard).join('')).join('');
+  cont.querySelectorAll('.eqInvEdit').forEach(b=>b.addEventListener('click',()=>{ eqInvEditId=+b.dataset.id; eqInvRender(); }));
+  cont.querySelectorAll('.eqInvCancel').forEach(b=>b.addEventListener('click',()=>{ eqInvEditId=null; eqInvRender(); }));
+  cont.querySelectorAll('.eqInvSalvar').forEach(b=>b.addEventListener('click',()=>eqInvSalvar(+b.dataset.id)));
 }
 function eqInvCard(e){
-  const sub=e.num_serie?('nº '+e.num_serie):'';
-  const resp=(e.status==='em_uso'&&e.responsavel)?`<div class="sub" style="margin-top:2px">👤 ${e.responsavel}${e.termo_status==='pendente'?' · aceite pendente':''}</div>`:'';
-  const manut=e.manutencao_aberta?`<div style="margin-top:4px;font-size:12px;color:var(--bad)">🔧 ${e.manutencao_desc||'Em manutenção'}</div>`:'';
+  if(eqInvEditId===e.id){
+    return `<div style="background:var(--card);border:1px solid var(--acc);border-radius:12px;padding:12px 13px;margin-bottom:8px">
+      <label>Nome / identificação</label><input id="eqeNome_${e.id}" value="${eoH(e.nome||'')}" autocomplete="off"/>
+      <label>Consórcio</label><select id="eqeCons_${e.id}"><option value="">— não definido —</option>${SUP_CONS_OPTS(e.consorcio)}</select>
+      <label>Nº de série / patrimônio</label><input id="eqeSerie_${e.id}" value="${eoH(e.num_serie||'')}" autocomplete="off"/>
+      <label>Observação</label><textarea id="eqeObs_${e.id}" rows="2">${eoH(e.obs||'')}</textarea>
+      <div style="display:flex;gap:6px;margin-top:10px"><button class="btn eqInvSalvar" data-id="${e.id}" style="flex:1">Salvar</button><button class="btn ghost eqInvCancel" style="flex:0 0 auto;width:auto;padding:10px 16px">Cancelar</button></div>
+    </div>`;
+  }
+  const sub=e.num_serie?('nº '+eoH(e.num_serie)):'';
+  const consChip=e.consorcio?`<span style="font-size:11px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap">${supConsLbl(e.consorcio)}</span>`:'<span style="font-size:11px;color:var(--bad);white-space:nowrap">sem consórcio</span>';
+  const resp=(e.status==='em_uso'&&e.responsavel)?`<div class="sub" style="margin-top:2px">👤 ${eoH(e.responsavel)}${e.termo_status==='pendente'?' · aceite pendente':''}</div>`:'';
+  const manut=e.manutencao_aberta?`<div style="margin-top:4px;font-size:12px;color:var(--bad)">🔧 ${eoH(e.manutencao_desc||'Em manutenção')}</div>`:'';
   const dev=e.devolucao_solicitada?`<div style="margin-top:4px;font-size:12px;color:var(--warn)">🔁 devolução solicitada</div>`:'';
   const prev=e.preventiva_vencida?`<div style="margin-top:4px;font-size:12px;color:var(--warn)">🛠️ preventiva vencida</div>`:'';
-  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+(e.nome||'—')+'</b>'+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+resp+'</div>'+eqStatusChip(e)+'</div>'+manut+dev+prev+'</div>';
+  return '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;min-width:0"><b>'+eoH(e.nome||'—')+'</b> '+consChip+(sub?('<div class="sub" style="margin-top:2px">'+sub+'</div>'):'')+resp+'</div>'+eqStatusChip(e)+'<button class="btn ghost eqInvEdit" data-id="'+e.id+'" style="margin:0;width:auto;padding:7px 11px;font-size:13px">✏️</button></div>'+manut+dev+prev+'</div>';
+}
+async function eqInvSalvar(id){
+  const nome=($('#eqeNome_'+id).value||'').trim(); if(!nome) return toast('Informe o nome');
+  const cons=$('#eqeCons_'+id).value||null, serie=($('#eqeSerie_'+id).value||'').trim()||null, obs=($('#eqeObs_'+id).value||'').trim()||null;
+  const {error}=await sb.rpc('sup_equip_editar',{p_id:id,p_nome:nome,p_consorcio:cons,p_num_serie:serie,p_obs:obs});
+  if(error){ toast(/num_serie|duplicate|unique/i.test(error.message||'')?'⚠ Já existe equipamento com esse nº de série':'⚠ '+(error.message||error)); return; }
+  toast('✓ Equipamento atualizado'); eqInvEditId=null;
+  const l=await sb.rpc('sup_equip_listar'); if(!l.error) eqInvData=l.data||[]; eqInvRender();
 }
 
 // --- Manutenção: corretiva (defeito) + preventiva de todos (almoxarife) ---

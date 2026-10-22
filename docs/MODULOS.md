@@ -940,7 +940,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   tipo** (`🧰 <tipo> (n)`; `tipo` nulo → "Sem tipo"), com resumo de contagens no topo; cada card mostra
   nº de série, chip de status (`eqStatusChip`), responsável (se em uso) e badges de manutenção/
   devolução solicitada/preventiva vencida. Estado em `eqInvData/eqInvTipo/eqInvBusca/eqInvSit`;
-  filtros redesenham só `#eqInvLista` (a busca não perde foco). Só leitura — nenhuma ação de escrita.
+  filtros redesenham só `#eqInvLista` (a busca não perde foco).
+- **Consórcio no equipamento (2026-10-22, sw v266):** coluna `sup_equipamento.consorcio` (ZA1004=**Águas Integradas**/Contagem · ZA0200=**Eficiência Hídrica**/Betim). **Cadastrar equipamentos**: dropdown de consórcio **obrigatório** (`sup_equip_cadastrar` ganhou `p_consorcio` — §0.6: 4→5 args). **Equipamentos cadastrados** (`eq_inventario`): passou a **permitir edição** — chip de consórcio no card + botão **✏️** que abre form inline (nome/consórcio/série/obs) → nova RPC **`sup_equip_editar(p_id,p_nome,p_consorcio,p_num_serie,p_obs)`** (almox) p/ adicionar consórcio nos já existentes; ganhou **filtro de consórcio** (`#eqInvCons`, inclui "— sem consórcio —"). **Solicitar equipamento** (`supVEqSolicitar`): **filtro de consórcio** (`#eqSolCons`) que filtra o dropdown de equipamentos (`supEqSolRenderOpts`). `sup_equip_listar`/`_disponiveis` devolvem `consorcio`; helpers `SUP_CONS`/`supConsLbl`/`SUP_CONS_OPTS`.
 - RPCs: `sup_equip_cadastrar`, `sup_equip_tipo_cadastrar`, `sup_equip_tipos_listar`,
   `sup_equip_listar` (usada tb. pelo inventário acima — já traz tipo/status/responsável/
   manutencao_aberta/devolucao_solicitada/preventiva_*), `sup_equip_disponiveis`,
