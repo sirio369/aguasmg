@@ -4569,7 +4569,7 @@ function vmHeaderHtml(){
   return `<div class="vmhd"><div class="os">OS ${H.os_numero}${vmExec.improd?' · improdutivo':' · em execução'}</div>
     <h2>${vEsc(H.num_vrp||'VRP')}</h2>
     <div class="r"><span>${vmConsLbl(H.consorcio)}${H.dmc?(' · DMC '+H.dmc):''}</span><b>${ME&&ME.nome?vEsc(ME.nome):''}</b></div>
-    ${(()=>{ const sp=vmAlvoJus(); return `<div class="vmpb" style="margin-top:8px;${sp!=null?'background:var(--ok-bg);border-color:var(--ok);color:var(--ok)':''}">🎯 <b>Setpoint da VRP (jusante): ${sp!=null?(vmN(sp)+' mca'):'não cadastrado'}</b>${H.proj_mont!=null&&H.origem!=='substituicao'?(' · montante de projeto '+vmN(H.proj_mont)+' mca'):''}</div>`; })()}
+    ${(()=>{ const sp=vmAlvoJus(); return `<div class="vmpb" style="margin-top:8px;${sp!=null?'background:var(--ok-bg);border-color:var(--ok);color:var(--ok)':''}">🎯 <b>Setpoint da VRP (jusante): ${sp!=null?(vmN(sp)+' mca'):(H.origem==='substituicao'?'informe o projeto da VRP nova':'não cadastrado')}</b>${H.proj_mont!=null&&H.origem!=='substituicao'?(' · montante de projeto '+vmN(H.proj_mont)+' mca'):''}</div>`; })()}
     <details><summary>▾ dados do cadastro (autofill)</summary>${rows.map(r=>`<div class="r"><span>${r[0]}</span><b>${vEsc(String(r[1]))}</b></div>`).join('')}</details>
     <button class="vmbtn sec" id="vmFichaBtn" style="margin-top:8px;padding:8px">📋 Ficha e histórico da VRP</button></div>`;
 }
@@ -4609,7 +4609,7 @@ function vmLado(lado,label,proj,ult){
   }
   return h+`</div>`;
 }
-function vmScr2(){ const H=vmExec.hdr; const n=H.origem==='substituicao'?'4':'2'; return `<h3 style="margin:2px 0">${n} · Pressões</h3>`+vmLado('mont','Montante',H.proj_mont,H.ult_mont)+vmLado('jus','Jusante',H.proj_jus,H.ult_jus); }
+function vmScr2(){ const H=vmExec.hdr; const n=H.origem==='substituicao'?'4':'2'; return `<h3 style="margin:2px 0">${n} · Pressões</h3>`+vmLado('mont','Montante',H.proj_mont,H.ult_mont)+vmLado('jus','Jusante',H.origem==='substituicao'?vmAlvoJus():H.proj_jus,H.ult_jus); }
 function vmScrSubAnt(){ const H=vmExec.hdr, S=vmExec;
   const ctl=H.tem_controlador==null?'—':(H.tem_controlador?('Sim'+(H.controlador_modelo?(' · '+H.controlador_modelo):'')):'Não');
   const ref=(l,v)=>`<div class="vmdkv"><span>${l}</span><b>${vEsc(v==null||v===''?'—':String(v))}</b></div>`;
@@ -4679,7 +4679,8 @@ function vmScr4(){
 // Pressão-alvo de jusante = projeto (na substituição, o projeto informado para a VRP nova).
 function vmAlvoJus(){ const S=vmExec,H=S.hdr; const v=H.origem==='substituicao'?S.ans.cad_pres_saida:H.proj_jus; const n=parseFloat(String(v==null?'':v).replace(',','.')); return isNaN(n)?null:n; }
 // true quando a jusante final foi informada e ficou diferente do projeto (exige justificativa)
-function vmJusForaProjeto(){ const a=vmAlvoJus(), f=parseFloat(String(vmExec.ans.fim_jus||'').replace(',','.')); return a!=null && !isNaN(f) && Math.abs(f-a)>=0.05; }
+const VM_JUS_TOL=0.1; // mca — resolução típica do manômetro; abaixo disso não exige justificativa
+function vmJusForaProjeto(){ const a=vmAlvoJus(), f=parseFloat(String(vmExec.ans.fim_jus||'').replace(',','.')); return a!=null && !isNaN(f) && Math.round(Math.abs(f-a)*100)>=Math.round(VM_JUS_TOL*100); }
 function vmScr5(){
   const S=vmExec,H=S.hdr, alvo=vmAlvoJus();
   let h=`<h3 style="margin:2px 0">5 · Regulagem / finalização</h3>
@@ -4744,7 +4745,7 @@ function vmWireExec(){
   el.querySelectorAll('[data-cond]').forEach(b=>b.onclick=()=>{const k=b.dataset.cond;const nv=vmExec.cond[k]===b.dataset.val?undefined:b.dataset.val;vmExec.cond[k]=nv; if(nv==='Intervir'&&VM_INT_SERV[k])vmExec.serv.add(VM_INT_SERV[k]); vmExecRender();});
   el.querySelectorAll('[data-serv]').forEach(b=>b.onclick=()=>{const s=b.dataset.serv;vmExec.serv.has(s)?vmExec.serv.delete(s):vmExec.serv.add(s);vmExecRender();});
   el.querySelectorAll('[data-in]').forEach(i=>i.oninput=()=>{vmExec.ans[i.dataset.in]=i.value;});
-  el.querySelectorAll('[data-in="fim_jus"]').forEach(i=>i.onchange=()=>{vmExec.ans.fim_jus=i.value;vmExecRender();}); // mostra/oculta o aviso "fora do projeto"
+  el.querySelectorAll('[data-in="fim_jus"]').forEach(i=>i.onchange=()=>{ const antes=vmJusForaProjeto(); vmExec.ans.fim_jus=i.value; if(vmJusForaProjeto()!==antes) vmExecRender(); }); // só re-renderiza quando o aviso "fora do projeto" aparece/some (evita perder o foco ao tocar no próximo campo)
   el.querySelectorAll('[data-condd]').forEach(i=>i.oninput=()=>{vmExec.cond['d_'+i.dataset.condd]=i.value;});
   el.querySelectorAll('[data-photo]').forEach(inp=>inp.onchange=async ev=>{const k=inp.dataset.photo,f=ev.target.files[0];if(!f)return;try{vmExec.fotos[k]=await comprimir(f);}catch(e){vmExec.fotos[k]=f;}vmExecRender();});
   const q=id=>el.querySelector(id);
@@ -4795,6 +4796,7 @@ async function vmEnviar(){
       campos.cad_atuacao=S.ans.cad_atuacao||null; campos.cad_obs=S.ans.cad_obs||null;
     }
     const respostas=Object.assign({}, S.ans, {condicao:S.cond, servicos:[...S.serv]});
+    if(!vmJusForaProjeto()) delete respostas.fim_jus_motivo; // justificativa só vale se a jusante final ficou fora do setpoint
     if(S.hdr.origem==='substituicao'){
       respostas.vrp_anterior={diametro:S.hdr.diametro,modelo:S.hdr.modelo,controlador:S.hdr.tem_controlador,atuacao:S.hdr.atuacao,proj_mont:S.hdr.proj_mont,proj_jus:S.hdr.proj_jus,proj_min:S.hdr.proj_min};
       respostas.vrp_nova={diametro:S.ans.cad_diametro,modelo:S.ans.sub_modelo,controlador:(S.ans.sub_controlador==='Sim'),controlador_modelo:S.ans.sub_controlador_modelo,atuacao:S.ans.cad_atuacao,proj_mont:S.ans.cad_pres_max,proj_jus:S.ans.cad_pres_saida,proj_min:S.ans.cad_pres_min,motivo:S.ans.sub_motivo};
