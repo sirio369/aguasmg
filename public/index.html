@@ -9278,7 +9278,7 @@ async function condRenderManutencao(){
     const tipoLbl=labelOf(TIPO_PROBLEMA_ALL,m.tipo_problema);
     let extra='';
     if(m.status==='reprovado'&&m.motivo_reprovacao) extra=`<div class="sub" style="margin-top:2px">Motivo: ${m.motivo_reprovacao}</div>`;
-    else if(m.status==='agendado') extra=`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}</div><button class="btn ghost" data-manutconcluir="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar conclusão</button>`;
+    else if(m.status==='agendado') extra=`<div class="sub" style="margin-top:2px">Agendada para ${fmtData(m.data_agendada)}${frManutAgendaInfo(m)?(' '+frManutAgendaInfo(m)):''}</div><button class="btn ghost" data-manutconcluir="${m.id}" style="margin-top:8px;padding:8px;font-size:13px">Registrar conclusão</button>`;
     else if(m.status==='concluido') extra=`<div class="sub" style="margin-top:2px">Concluída em ${fmtData(m.data_liberacao)}${m.orcamento_valor!=null?(' · '+fmtDinheiro(m.orcamento_valor)):''}</div>`;
     return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${tipoLbl}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div>${m.servico_solicitado?`<div class="sub" style="margin-top:2px">${m.servico_solicitado}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">${m.tipo_problema==='preventiva'?'Preventiva programada pela equipe de frotas':('Reportado em '+fmtData(m.reportado_em))}</div>${extra}</div>`;
   }).join('') : '<p class="sub" style="margin-top:8px">Nenhuma manutenção ainda.</p>';
@@ -9893,6 +9893,8 @@ async function frotasRenderRegistroNovo(){
   });
 }
 // ----- Manutenção preventiva: a equipe de frotas agenda direto (sem aprovação); avisa colaborador vinculado + gestor -----
+// Horário/local/obs do agendamento de manutenção (preventiva), no mesmo formato da lavagem
+function frManutAgendaInfo(m){ return [m.horario_agendado?('às '+String(m.horario_agendado).slice(0,5)):'', m.local_agendado?('📍 '+eoH(m.local_agendado)):'', m.obs_agendamento?('Obs.: '+eoH(m.obs_agendamento)):''].filter(Boolean).join(' · '); }
 async function frotasRenderPreventiva(){
   $('#frotasView').innerHTML='<p class="sub">Carregando…</p>';
   let lista=[];
@@ -9905,20 +9907,24 @@ async function frotasRenderPreventiva(){
   <label>Veículo *</label><select id="prevVeic"><option value="">Selecione…</option>${frotasVeiculos.map(v=>`<option value="${v.id}">${v.placa} — ${v.modelo||''}</option>`).join('')}</select>
   <div id="prevCond" class="sub" style="margin-top:4px"></div>
   <label>Data programada *</label><input id="prevData" type="date"/>
+  <label>Horário</label><input id="prevHora" type="time"/>
+  <label>Local *</label><input id="prevLocal" placeholder="oficina / endereço" autocomplete="off"/>
   <label>Serviço (ex.: revisão dos 10.000 km)</label><input id="prevDesc" autocomplete="off"/>
+  <label>Observação</label><textarea id="prevObs" rows="2" placeholder="ex.: levar o manual, deixar a chave na portaria…"></textarea>
   <button class="btn" id="prevSalvar" style="margin-top:14px">Agendar e avisar</button>
   <div class="sec" style="margin-top:20px">Preventivas agendadas</div>`;
-  h+= lista.length ? lista.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${m.status==='concluido'?('Concluída em '+fmtData(m.data_liberacao)+(m.orcamento_valor!=null?' · '+fmtDinheiro(m.orcamento_valor):'')):('Programada para '+fmtData(m.data_agendada))}${m.servico_solicitado?(' — '+eoH(m.servico_solicitado)):''}</div><div class="sub" style="margin-top:2px;font-size:11px">Colaborador: ${eoH(m.reportado_por_nome||'—')} · agendada por ${eoH(m.aprovado_por_nome||'—')}</div></div>`).join('') : '<p class="sub" style="margin-top:8px">Nenhuma preventiva agendada ainda.</p>';
+  h+= lista.length ? lista.map(m=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px"><b>${m.placa}</b>${statusBadge(MANUT_STATUS_LABEL,m.status)}</div><div class="sub" style="margin-top:2px">${m.status==='concluido'?('Concluída em '+fmtData(m.data_liberacao)+(m.orcamento_valor!=null?' · '+fmtDinheiro(m.orcamento_valor):'')):('Programada para '+fmtData(m.data_agendada))}${m.servico_solicitado?(' — '+eoH(m.servico_solicitado)):''}</div>${m.status!=='concluido'&&frManutAgendaInfo(m)?`<div class="sub" style="margin-top:2px">${frManutAgendaInfo(m)}</div>`:''}<div class="sub" style="margin-top:2px;font-size:11px">Colaborador: ${eoH(m.reportado_por_nome||'—')} · agendada por ${eoH(m.aprovado_por_nome||'—')}</div></div>`).join('') : '<p class="sub" style="margin-top:8px">Nenhuma preventiva agendada ainda.</p>';
   $('#frotasView').innerHTML=h;
   $('#frVoltar').addEventListener('click',()=>irPara('frota'));
   $('#prevVeic').addEventListener('change',()=>{ const v=frotasVeiculos.find(x=>String(x.id)===$('#prevVeic').value); const n=condDe(v);
     $('#prevCond').textContent = !v ? '' : (n ? ('Será avisado: '+n+' e o gestor dele') : 'Nenhum colaborador vinculado — ninguém será avisado'); });
   $('#prevSalvar').addEventListener('click',async()=>{
-    const vid=$('#prevVeic').value, dt=$('#prevData').value;
+    const vid=$('#prevVeic').value, dt=$('#prevData').value, local=$('#prevLocal').value.trim();
     if(!vid) return toast('Escolha o veículo');
     if(!dt) return toast('Informe a data programada');
+    if(!local) return toast('Informe o local');
     const btn=$('#prevSalvar'); btn.disabled=true;
-    try{ const {data,error}=await sb.rpc('app_frota_preventiva_agendar',{p_veiculo_id:+vid,p_data:dt,p_descricao:$('#prevDesc').value||null}); if(error) throw error;
+    try{ const {data,error}=await sb.rpc('app_frota_preventiva_agendar',{p_veiculo_id:+vid,p_data:dt,p_descricao:$('#prevDesc').value||null,p_horario:$('#prevHora').value||null,p_local:local,p_obs:$('#prevObs').value.trim()||null}); if(error) throw error;
       toast(data&&data.condutor_nome?('✓ Agendada — '+data.condutor_nome+' e o gestor avisados'):'✓ Agendada (sem colaborador vinculado)'); frotasRenderPreventiva();
     }catch(e){ toast('Erro: '+(e.message||e)); btn.disabled=false; }
   });

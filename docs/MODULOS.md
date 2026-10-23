@@ -1621,6 +1621,11 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
   **Não** muda `frota_veiculo.status` (a data pode ser futura e travaria o checklist). INSERT preventiva → aviso ao
   colaborador + `frota_gestores_de` com a data (`frota_manutencao`). Tela `preventiva` (`frotasRenderPreventiva`, Equipe
   administrativa › "Manutenção preventiva") com o formulário + lista das preventivas.
+  **Horário/local/obs (2026-10-23, `docs/migracao_frota_preventiva_local.sql`):** igual ao agendamento de lavagem — colunas
+  `frota_manutencao.horario_agendado`/`local_agendado`/`obs_agendamento`; `app_frota_preventiva_agendar` ganhou
+  `p_horario,p_local,p_obs` (assinatura antiga **dropada**, §0.6; local obrigatório só na tela). O aviso da preventiva leva
+  data/horário/local/serviço/obs; `app_frota_manutencoes_listar`/`app_frota_minhas_manutencoes` devolvem os 3 campos
+  (`frManutAgendaInfo` mostra na lista da Frotas e na Manutenção do colaborador).
 - **Checklist** — INSERT de `frota_manutencao` com `tipo_problema='checklist'` agora avisa também `frota_responsaveis()`
   (link `frota_chk_equipe` → tela Checklists da equipe), além do gestor. **Corretiva aprovada** pelo gestor avisa
   `frota_responsaveis()` que há manutenção a agendar (link `frota_manutencao_fila`).
