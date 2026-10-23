@@ -530,6 +530,7 @@ const DMC=[
 DMC.forEach(d=>{d.geom=JSON.parse(d.gj);d.osKm=d.os/d.rede;d.consLig=d.cons/d.ativas;});
 
 const fmt=n=>Math.round(n).toLocaleString('pt-BR');
+const sitDesde=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):'—';
 const fmt1=n=>n.toLocaleString('pt-BR',{maximumFractionDigits:1});
 const $=s=>document.querySelector(s);
 let za="all", ind="osKm", sel=DMC.find(d=>d.code==="DMC-06"&&d.za==="ZA1004"), focusDmc=null;
@@ -2377,6 +2378,7 @@ function hdDetailHtml(d){
    <div><span class="k">Vol. no período</span><span>${d.volume_periodo!=null?fmt(Math.round(d.volume_periodo))+' m³':'—'}</span></div>
    <div><span class="k">Interno/externo</span><span>${d.interno_externo||'—'}</span></div>
    <div><span class="k">Situação ligação</span><span>${HD_SIT[d.situacao_lig]||d.situacao_lig||'—'}</span></div>
+   <div><span class="k">Situação desde</span><span>${sitDesde(d.situacao_desde)}</span></div>
   </div>
   <div class="mmblock-h" style="margin-top:6px">Consumo micromedido (18 meses)</div>${chart}
   <p class="note" style="margin:9px 0 2px"><b>Por que priorizar:</b> ${d.justificativa||'—'}</p>
@@ -2461,8 +2463,8 @@ function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if
  const all=[]; const pageN=1000;
  function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Remanejamento','Justificativa'];
-  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
+  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Situação desde','Remanejamento','Justificativa'];
+  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.situacao_desde?sitDesde(x.situacao_desde):'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Priorizacao HD');
   XLSX.writeFile(wb,`priorizacao_troca_HD_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
   if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}
@@ -2622,9 +2624,9 @@ function frDetailHtml(d){
    ${row('Meses faturando s/ ligação ativa', stats.meses_irregular!=null?stats.meses_irregular:'—')}
    ${row('Meses com leitura estimada', stats.meses_estimada!=null?stats.meses_estimada:'—')}
    ${row('Meses factível / fat. mínimo', stats.meses_factivel!=null?stats.meses_factivel:'—')}
-   ${row('Situação da ligação (últ. mês)', FR_SIT[stats.situacao_atual]||stats.situacao_atual||'—')}
+   ${row('Situação da ligação (cadastro)', FR_SIT[stats.situacao_atual]||stats.situacao_atual||'—')}
+   ${row('Situação desde', sitDesde(stats.situacao_desde))}
    ${row('Perfil / natureza', (en.perfil||'—')+(en.natureza?(' · '+en.natureza):''))}
-   ${row('Situação ligação (cadastro)', en.situacao_lig||'—')}
    ${row('Economias', en.economias!=null?en.economias:'—')}
   </div>
   <div class="mmblock-h" style="margin-top:6px">Assinatura de consumo — micromedição (18 meses) ${frIB('score')}</div>${chart}
@@ -2704,8 +2706,8 @@ function frExport(){ const btn=$('#frExport'); if(typeof XLSX==='undefined'){ if
  const all=[]; const pageN=1000;
  function fetchPage(off){ return sbg.rpc('app_nrw_fraude_ranking',frRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Consórcio','Bairro','Endereço','DMC','Classe de suspeita','Score anomalia','Consumo médio (m³/mês)','Último volume (m³)','Tendência (slope)','Meses zerados','Meses faturando s/ ligação ativa','Meses com leitura estimada','% vs vizinhança (DMC)','Situação da ligação (últ. mês)'];
-  const data=all.map(x=>[x.matricula,x.consorcio||'',x.bairro||'',x.endereco||'',x.dmc||'',(FR_CLASSE[x.classificacao]||{l:x.classificacao}).l,x.score_anomalia!=null?+x.score_anomalia:'',x.media!=null?+x.media:'',x.ultimo_vol!=null?+x.ultimo_vol:'',x.slope!=null?+x.slope:'',x.n_zeros!=null?+x.n_zeros:'',x.meses_irregular!=null?+x.meses_irregular:'',x.meses_estimada!=null?+x.meses_estimada:'',x.pct_vizinhanca!=null?+x.pct_vizinhanca:'',FR_SIT[x.situacao_atual]||x.situacao_atual||'']);
+  const head=['Matrícula','Consórcio','Bairro','Endereço','DMC','Classe de suspeita','Score anomalia','Consumo médio (m³/mês)','Último volume (m³)','Tendência (slope)','Meses zerados','Meses faturando s/ ligação ativa','Meses com leitura estimada','% vs vizinhança (DMC)','Situação da ligação (cadastro)','Situação desde'];
+  const data=all.map(x=>[x.matricula,x.consorcio||'',x.bairro||'',x.endereco||'',x.dmc||'',(FR_CLASSE[x.classificacao]||{l:x.classificacao}).l,x.score_anomalia!=null?+x.score_anomalia:'',x.media!=null?+x.media:'',x.ultimo_vol!=null?+x.ultimo_vol:'',x.slope!=null?+x.slope:'',x.n_zeros!=null?+x.n_zeros:'',x.meses_irregular!=null?+x.meses_irregular:'',x.meses_estimada!=null?+x.meses_estimada:'',x.pct_vizinhanca!=null?+x.pct_vizinhanca:'',FR_SIT[x.situacao_atual]||x.situacao_atual||'',x.situacao_desde?sitDesde(x.situacao_desde):'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Fiscalizacao');
   XLSX.writeFile(wb,`fiscalizacao_irregularidades_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
   if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}
