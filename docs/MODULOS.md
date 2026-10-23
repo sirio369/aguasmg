@@ -2628,6 +2628,12 @@ com botões OK/Intervir/Não verificado, campos condicionais, pendências autom�
 fotos via `comprimir`+`vmUpload` (bucket `fotos-campo` prefixo `vrp-os/`), GPS global `gps`; conclusão
 `vmEnviar`→`app_vrp_os_concluir`. **Ficha da VRP** (`vmFichaOpen`, overlay `#vmFicha`) e **relatório PDF**
 (`vmReport`, reusa `#relatorio`+`REL_CSS`+`window.print`). Telas: `vrpman`/`vrpman_campo`/`vrpman_exec`.
+**Setpoint em campo (2026-10-23):** o cabeçalho da OS (`vmHeaderHtml`) mostra sempre, fora do "dados do cadastro", o **🎯 Setpoint da VRP (jusante)** = `vmAlvoJus()` (+ montante de projeto como referência); na tela Pressões o card de jusante rotula o valor como "Setpoint (projeto)".
+**Pressão de projeto na finalização (2026-10-21):** a tela 5 mostra a meta "🎯 Deixe a jusante em X mca"
+(`vmAlvoJus()` = `proj_jus` do cabeçalho; na substituição, o `cad_pres_saida` digitado p/ a VRP nova). Se a
+**Jus. final** (`fim_jus`) ficar diferente do projeto (`vmJusForaProjeto()`, diferença ≥ 0,05 mca), pede
+justificativa obrigatória `fim_jus_motivo` (vai no `respostas` jsonb, sem mudança de banco) e ela aparece no
+resumo antes de enviar. O `onchange` de `fim_jus` re-renderiza a tela (os demais `data-in` só gravam no `oninput`).
 ⚠️ **Cuidados:** funções `vm*` vivem no `<script type="module">` (não globais); a OS é criada no
 `app_vrp_os_abrir` (abandonar o wizard deixa uma OS `em_execucao` — o backoffice enxerga). Base de VRPs
 = `"2 - infra_agua".vrps` (148; `atuacao` é código, ex. "AL"; `pres_max`≈montante, `pres_saida`≈jusante).
