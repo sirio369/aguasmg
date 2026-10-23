@@ -2635,8 +2635,7 @@ nova) + o montante de projeto como referência. Na tela Pressões o card de jusa
 (`fim_jus`) ficar fora do setpoint (`vmJusForaProjeto()`, diferença ≥ `VM_JUS_TOL` = 0,1 mca), pede justificativa
 obrigatória `fim_jus_motivo` (vai no `respostas` jsonb, sem mudança de banco; é descartada no envio se a jusante
 voltou p/ dentro da tolerância) e ela aparece no resumo. O `onchange` de `fim_jus` só re-renderiza quando o aviso
-aparece/some (não perde o foco ao tocar no próximo campo). ⚠️ Existe a coluna `pres_saida_campo` ("Jusante em campo",
-PR #216 fechado): se o setpoint certo for ela, trocar a fonte em `vmAlvoJus()`.
+aparece/some (não perde o foco ao tocar no próximo campo). O setpoint é a **pressão de projeto** (decisão confirmada em 2026-10-23); `pres_saida_campo` ("Jusante em campo") não é usada aqui.
 ⚠️ **Cuidados:** funções `vm*` vivem no `<script type="module">` (não globais); a OS é criada no
 `app_vrp_os_abrir` (abandonar o wizard deixa uma OS `em_execucao` — o backoffice enxerga). Base de VRPs
 = `"2 - infra_agua".vrps` (148; `atuacao` é código, ex. "AL"; `pres_max`≈montante, `pres_saida`≈jusante).
