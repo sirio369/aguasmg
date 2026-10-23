@@ -4569,6 +4569,7 @@ function vmHeaderHtml(){
   return `<div class="vmhd"><div class="os">OS ${H.os_numero}${vmExec.improd?' · improdutivo':' · em execução'}</div>
     <h2>${vEsc(H.num_vrp||'VRP')}</h2>
     <div class="r"><span>${vmConsLbl(H.consorcio)}${H.dmc?(' · DMC '+H.dmc):''}</span><b>${ME&&ME.nome?vEsc(ME.nome):''}</b></div>
+    ${(()=>{ const sp=vmAlvoJus(); return `<div class="vmpb" style="margin-top:8px;${sp!=null?'background:var(--ok-bg);border-color:var(--ok);color:var(--ok)':''}">🎯 <b>Setpoint da VRP (jusante): ${sp!=null?(vmN(sp)+' mca'):(H.origem==='substituicao'?'informe o projeto da VRP nova':'não cadastrado')}</b>${H.proj_mont!=null&&H.origem!=='substituicao'?(' · montante de projeto '+vmN(H.proj_mont)+' mca'):''}</div>`; })()}
     <details><summary>▾ dados do cadastro (autofill)</summary>${rows.map(r=>`<div class="r"><span>${r[0]}</span><b>${vEsc(String(r[1]))}</b></div>`).join('')}</details>
     <button class="vmbtn sec" id="vmFichaBtn" style="margin-top:8px;padding:8px">📋 Ficha e histórico da VRP</button></div>`;
 }
@@ -4596,7 +4597,7 @@ function vmScr1(){
 function vmLado(lado,label,proj,ult){
   const S=vmExec, kc='conn_'+lado, kv='val_'+lado, kt='tom_'+lado, conn=S.ans[kc];
   let h=`<div class="vmcard"><div class="h">${lado==='mont'?'⬆️ Montante':'⬇️ Jusante'}</div>
-    <div class="vmref"><div class="p"><span>Projeto</span><b>${vmN(proj)}</b></div><div class="p"><span>Últ. ajustada</span><b>${vmN(ult)}</b></div></div>
+    <div class="vmref"><div class="p"><span>${lado==='jus'?'Setpoint (projeto)':'Projeto'}</span><b>${vmN(proj)}</b></div><div class="p"><span>Últ. ajustada</span><b>${vmN(ult)}</b></div></div>
     <div class="vmq" style="margin-bottom:8px"><label>Consegue conectar o manômetro?</label>${vmOptRow(kc,['Sim','Não'])}</div>`;
   if(conn==='Sim') h+=`<div class="vmq" style="margin-bottom:0"><label>Pressão encontrada (mca) <span class="vmreq">*</span></label><input class="vmin" inputmode="decimal" data-in="${kv}" value="${vEsc(S.ans[kv]||'')}"></div>`;
   else if(conn==='Não'){ h+=`<div class="vmq" style="margin-bottom:0"><label>Tomada de pressão:</label>${vmOptRow(kt,['Inexistente','Obstruída','Outro'])}</div>`;
@@ -4608,7 +4609,7 @@ function vmLado(lado,label,proj,ult){
   }
   return h+`</div>`;
 }
-function vmScr2(){ const H=vmExec.hdr; const n=H.origem==='substituicao'?'4':'2'; return `<h3 style="margin:2px 0">${n} · Pressões</h3>`+vmLado('mont','Montante',H.proj_mont,H.ult_mont)+vmLado('jus','Jusante',H.proj_jus,H.ult_jus); }
+function vmScr2(){ const H=vmExec.hdr; const n=H.origem==='substituicao'?'4':'2'; return `<h3 style="margin:2px 0">${n} · Pressões</h3>`+vmLado('mont','Montante',H.proj_mont,H.ult_mont)+vmLado('jus','Jusante',H.origem==='substituicao'?vmAlvoJus():H.proj_jus,H.ult_jus); }
 function vmScrSubAnt(){ const H=vmExec.hdr, S=vmExec;
   const ctl=H.tem_controlador==null?'—':(H.tem_controlador?('Sim'+(H.controlador_modelo?(' · '+H.controlador_modelo):'')):'Não');
   const ref=(l,v)=>`<div class="vmdkv"><span>${l}</span><b>${vEsc(v==null||v===''?'—':String(v))}</b></div>`;
@@ -4675,14 +4676,23 @@ function vmScr4(){
   } else { h+=`<p class="sub" style="margin-top:14px">Marque ao menos um serviço executado acima.</p>`; }
   return h;
 }
+// Pressão-alvo de jusante = projeto (na substituição, o projeto informado para a VRP nova).
+function vmAlvoJus(){ const S=vmExec,H=S.hdr; const v=H.origem==='substituicao'?S.ans.cad_pres_saida:H.proj_jus; const n=parseFloat(String(v==null?'':v).replace(',','.')); return isNaN(n)?null:n; }
+// true quando a jusante final foi informada e ficou diferente do projeto (exige justificativa)
+const VM_JUS_TOL=0.1; // mca — resolução típica do manômetro; abaixo disso não exige justificativa
+function vmJusForaProjeto(){ const a=vmAlvoJus(), f=parseFloat(String(vmExec.ans.fim_jus||'').replace(',','.')); return a!=null && !isNaN(f) && Math.round(Math.abs(f-a)*100)>=Math.round(VM_JUS_TOL*100); }
 function vmScr5(){
-  const S=vmExec,H=S.hdr;
+  const S=vmExec,H=S.hdr, alvo=vmAlvoJus();
   let h=`<h3 style="margin:2px 0">5 · Regulagem / finalização</h3>
+   ${alvo!=null?`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">🎯 Deixe a <b>jusante no setpoint: ${vmN(alvo)} mca</b> (pressão de projeto)${H.origem!=='substituicao'&&H.proj_mont!=null?(' (montante de projeto: '+vmN(H.proj_mont)+' mca)'):''}</div>`
+     :`<div class="vmpb">Sem pressão de projeto cadastrada para esta VRP — informe a pressão em que ela foi deixada.</div>`}
    <div class="vmref">
      <div class="p"><span>Mont. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_mont" value="${vEsc(S.ans.fim_mont||'')}"></div>
      <div class="p"><span>Jus. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_jus" value="${vEsc(S.ans.fim_jus||'')}"></div>`;
   if(H.ponto_critico_ref) h+=`<div class="p"><span>Ponto crítico</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_pc" value="${vEsc(S.ans.fim_pc||'')}"></div>`;
-  h+=`</div>
+  h+=`</div>`;
+  if(vmJusForaProjeto()) h+=`<div class="vmq" style="margin-top:8px"><div class="vmpb">⚠️ Jusante final (${vmN(S.ans.fim_jus)} mca) diferente do setpoint (${vmN(alvo)} mca).</div><label>Por que não ficou no setpoint de projeto? <span class="vmreq">*</span></label><textarea class="vmin" data-in="fim_jus_motivo" placeholder="Ex.: rede não sustenta, ponto crítico abaixo do mínimo, orientação da gestão…">${vEsc(S.ans.fim_jus_motivo||'')}</textarea></div>`;
+  h+=`
    <div class="vmq"><label>VRP estabilizada? <span class="vmreq">*</span></label>${vmOptRow('estab',['Sim','Não'])}</div>
    <div class="vmq"><label>Vazamento após o serviço? <span class="vmreq">*</span></label>${vmOptRow('vaz_pos',['Não','Sim'])}</div>
    <div class="vmq"><label>VRP liberada? <span class="vmreq">*</span></label>${vmOptRow('liberada',['Sim','Não'])}</div>
@@ -4716,6 +4726,7 @@ function vmScrResult(){
   VM_COND.forEach(([k,l])=>{ if(S.cond[k]==='Intervir'&&String(S.cond['d_'+k]||'').trim()) det.push(['Condição · '+l, S.cond['d_'+k]]); });
   [...S.serv].forEach(s=>{ const sl=vmSlug(s); if(String(S.ans['servd_'+sl]||'').trim()) det.push(['Serviço · '+s, S.ans['servd_'+sl]]); });
   if(S.serv.has('Outro')&&String(S.ans.serv_outro||'').trim()) det.push(['Serviço · Outro (o quê)', S.ans.serv_outro]);
+  if(vmJusForaProjeto()&&String(S.ans.fim_jus_motivo||'').trim()) det.push(['Jusante fora do projeto ('+vmN(vmAlvoJus())+' mca)', S.ans.fim_jus_motivo]);
   const detHtml=det.length?`<div class="vmsumm" style="margin-top:10px;text-align:left"><div style="color:var(--mut);font-weight:600;margin-bottom:2px">O que aconteceu</div>${det.map(d=>`<div style="margin-top:6px"><b>${vEsc(d[0])}:</b> ${vEsc(d[1])}</div>`).join('')}</div>`:'';
   let h=`<div class="vmresult"><div style="font-size:30px">${sug==='improdutiva'?'🚫':(sug==='concluida'?'✅':'⚠️')}</div>
     <div class="sub" style="margin:4px 0 0">${S.hdr.os_numero}</div>
@@ -4734,6 +4745,7 @@ function vmWireExec(){
   el.querySelectorAll('[data-cond]').forEach(b=>b.onclick=()=>{const k=b.dataset.cond;const nv=vmExec.cond[k]===b.dataset.val?undefined:b.dataset.val;vmExec.cond[k]=nv; if(nv==='Intervir'&&VM_INT_SERV[k])vmExec.serv.add(VM_INT_SERV[k]); vmExecRender();});
   el.querySelectorAll('[data-serv]').forEach(b=>b.onclick=()=>{const s=b.dataset.serv;vmExec.serv.has(s)?vmExec.serv.delete(s):vmExec.serv.add(s);vmExecRender();});
   el.querySelectorAll('[data-in]').forEach(i=>i.oninput=()=>{vmExec.ans[i.dataset.in]=i.value;});
+  el.querySelectorAll('[data-in="fim_jus"]').forEach(i=>i.onchange=()=>{ const antes=vmJusForaProjeto(); vmExec.ans.fim_jus=i.value; if(vmJusForaProjeto()!==antes) vmExecRender(); }); // só re-renderiza quando o aviso "fora do projeto" aparece/some (evita perder o foco ao tocar no próximo campo)
   el.querySelectorAll('[data-condd]').forEach(i=>i.oninput=()=>{vmExec.cond['d_'+i.dataset.condd]=i.value;});
   el.querySelectorAll('[data-photo]').forEach(inp=>inp.onchange=async ev=>{const k=inp.dataset.photo,f=ev.target.files[0];if(!f)return;try{vmExec.fotos[k]=await comprimir(f);}catch(e){vmExec.fotos[k]=f;}vmExecRender();});
   const q=id=>el.querySelector(id);
@@ -4750,14 +4762,14 @@ function vmValid(){
     if(S.step===2){ if(!Object.keys(S.fotos).some(k=>(k==='vrp_removida'||k.indexOf('vrp_removida_')===0)&&S.fotos[k])){toast('Foto da VRP removida');return false;} return true; }
     if(S.step===3){ if(!String(S.ans.cad_diametro||'').trim()||!String(S.ans.sub_modelo||'').trim()){toast('Informe diâmetro e modelo da nova VRP');return false;} if(!Object.keys(S.fotos).some(k=>(k==='vrp_nova'||k.indexOf('vrp_nova_')===0)&&S.fotos[k])){toast('Foto da VRP nova instalada');return false;} return true; }
     if(S.step===4){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){toast('Informe a pressão encontrada');return false;} } return true; }
-    if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} return true; }
+    if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;} return true; }
     return true;
   }
   if(S.step===1){ if(!S.ans.localizada||!S.ans.acessivel){toast('Responda localizada e acesso');return false;} if(!S.fotos.geral_antes_ext&&!S.fotos.geral_antes_int){toast('Tire ao menos 1 foto geral');return false;} return true; }
   if(S.step===2){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){ toast('Informe a pressão encontrada ('+(lado==='mont'?'montante':'jusante')+')'); return false; } } return true; }
   if(S.step===3){ for(const [k,l] of VM_COND){ if(S.cond[k]==='Intervir' && !String(S.cond['d_'+k]||'').trim()){ toast('Descreva o que intervir em '+l.toLowerCase()); return false; } } return true; }
   if(S.step===4){ if(!S.serv.size){toast('Marque ao menos um serviço executado');return false;} if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} if(S.serv.has('Outro')&&!String(S.ans.serv_outro||'').trim()){toast('Descreva o serviço "Outro"');return false;} for(const s of S.serv){ const sl=vmSlug(s); if(!String(S.ans['servd_'+sl]||'').trim()){toast('Descreva o serviço: '+s);return false;} const temFoto=Object.keys(S.fotos).some(k=>(k==='serv_'+sl||k.indexOf('serv_'+sl+'_')===0)&&S.fotos[k]); if(!temFoto){toast('Adicione foto do serviço: '+s);return false;} } return true; }
-  if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(!S.ans.nec_subst){toast('Responda se necessita substituição');return false;} if(S.ans.nec_subst==='Sim'&&!String(S.ans.subst_desc||'').trim()){toast('Descreva a necessidade de substituição');return false;} return true; }
+  if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;} if(!S.ans.nec_subst){toast('Responda se necessita substituição');return false;} if(S.ans.nec_subst==='Sim'&&!String(S.ans.subst_desc||'').trim()){toast('Descreva a necessidade de substituição');return false;} return true; }
   return true;
 }
 async function vmUpload(blob,suf){ const path='vrp-os/'+crypto.randomUUID()+'_'+suf; const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true}); if(error) throw error; return path; }
@@ -4784,6 +4796,7 @@ async function vmEnviar(){
       campos.cad_atuacao=S.ans.cad_atuacao||null; campos.cad_obs=S.ans.cad_obs||null;
     }
     const respostas=Object.assign({}, S.ans, {condicao:S.cond, servicos:[...S.serv]});
+    if(!vmJusForaProjeto()) delete respostas.fim_jus_motivo; // justificativa só vale se a jusante final ficou fora do setpoint
     if(S.hdr.origem==='substituicao'){
       respostas.vrp_anterior={diametro:S.hdr.diametro,modelo:S.hdr.modelo,controlador:S.hdr.tem_controlador,atuacao:S.hdr.atuacao,proj_mont:S.hdr.proj_mont,proj_jus:S.hdr.proj_jus,proj_min:S.hdr.proj_min};
       respostas.vrp_nova={diametro:S.ans.cad_diametro,modelo:S.ans.sub_modelo,controlador:(S.ans.sub_controlador==='Sim'),controlador_modelo:S.ans.sub_controlador_modelo,atuacao:S.ans.cad_atuacao,proj_mont:S.ans.cad_pres_max,proj_jus:S.ans.cad_pres_saida,proj_min:S.ans.cad_pres_min,motivo:S.ans.sub_motivo};
