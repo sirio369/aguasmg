@@ -971,7 +971,9 @@ const MM_CLASS={
  pico_isolado:{l:'Pico isolado',c:'#e6a23c',acao:'Inspeção de vazamento interno ou erro de leitura.'},
  queda_continua:{l:'Queda contínua',c:'#e05d5d',acao:'Conferir leitura, desocupação, fraude ou vazamento corrigido.'},
  crescimento_continuo:{l:'Crescimento contínuo',c:'#4b9fe0',acao:'Revisão cadastral / categoria (possível ampliação/ocupação).'},
- instavel:{l:'Instável',c:'#c678dd',acao:'Cliente prioritário para fiscalização (alta variabilidade).'}
+ instavel:{l:'Instável',c:'#c678dd',acao:'Cliente prioritário para fiscalização (alta variabilidade).'},
+ reativada:{l:'Reativada (regularizada)',c:'#2f9e8f',acao:'Estava inativa/factível faturando volume, mas o cadastro (ligacoes) já a mostra como Real depois desses meses — regularizada; acompanhar, não é mais suspeita.'},
+ divergencia_cadastro:{l:'Divergência de cadastro',c:'#a0522d',acao:'Cadastro diz Real desde antes dos meses em que a micromedição a mostrava inativa/factível com volume — conferir o cadastro.'}
 };
 // situação da ligação (cd_situaca): R=Real/ativa, I=Inativa/cortada, F=Factível, P=Potencial
 const MM_SIT={R:{l:'Ativa',c:'#3fb27f'},I:{l:'Inativa/cortada',c:'#d6336c'},F:{l:'Factível',c:'#e6a23c'},P:{l:'Potencial',c:'#e6a23c'}};
@@ -2489,11 +2491,13 @@ const FR_CLASSE={
  queda_continua:{l:'Queda contínua de consumo',s:'Investigar queda',c:'#e05d5d'},
  nulo_recorrente:{l:'Consumo nulo recorrente',s:'Verificar em campo',c:'#e6a23c'},
  factivel:{l:'Factível / faturado mínimo',s:'Verificar faturamento',c:'#4b9fe0'},
- instavel:{l:'Consumo instável',s:'Acompanhar',c:'#8a8f98'}
+ instavel:{l:'Consumo instável',s:'Acompanhar',c:'#8a8f98'},
+ reativada:{l:'Reativada (regularizada)',s:'Acompanhar',c:'#2f9e8f'},
+ divergencia_cadastro:{l:'Divergência de cadastro',s:'Conferir cadastro',c:'#a0522d'}
 };
-const FR_CLASSE_ORDER=['fraude_potencial','queda_continua','nulo_recorrente','factivel','instavel'];
-const FR_LENTE=[['todos','Todos os suspeitos'],['grandes','Grandes consumidores'],['ligirreg','Consumo com ligação irregular'],['estimada','Leitura estimada recorrente'],['vizinhanca','Abaixo da vizinhança']];
-const FR_LENTE_DESC={todos:'Todas as classes de suspeita do motor de anomalia.',grandes:'Consumo médio ≥ 50 m³/mês — fraude/desvio aqui vale mais volume.',ligirreg:'≥ 3 meses faturando volume com a ligação Inativa/Factível/Potencial (deveria estar sem fornecimento).',estimada:'≥ 3 meses com leitura estimada (qt_vol_est>0) nos últimos 18 meses.',vizinhanca:'Consumo médio abaixo de 40% da mediana do próprio DMC.'};
+const FR_CLASSE_ORDER=['fraude_potencial','queda_continua','nulo_recorrente','factivel','instavel','reativada','divergencia_cadastro'];
+const FR_LENTE=[['todos','Todos os suspeitos'],['grandes','Grandes consumidores'],['ligirreg','Consumo com ligação irregular'],['estimada','Leitura estimada recorrente'],['vizinhanca','Abaixo da vizinhança'],['reativadas','Reativadas (regularizadas)']];
+const FR_LENTE_DESC={reativadas:'Matrículas que estavam inativas/factíveis faturando volume e que o cadastro (ligacoes) já mostra como Real depois disso — regularizadas, fora da lista de suspeitas — mais as poucas com divergência de cadastro.',todos:'Todas as classes de suspeita do motor de anomalia.',grandes:'Consumo médio ≥ 50 m³/mês — fraude/desvio aqui vale mais volume.',ligirreg:'≥ 3 meses faturando volume com a ligação Inativa/Factível/Potencial (deveria estar sem fornecimento).',estimada:'≥ 3 meses com leitura estimada (qt_vol_est>0) nos últimos 18 meses.',vizinhanca:'Consumo médio abaixo de 40% da mediana do próprio DMC.'};
 const FR_SIT={R:'Real / Ativa',I:'Inativo',F:'Factível',P:'Potencial'};
 const FR_INFO={
  score:{t:'Score de anomalia & classes',h:`<p>O <b>score (0–100)</b> e a <b>classe</b> vêm do motor de anomalia do micromedido (<i>análise por matrícula</i>), sobre 18 meses de consumo. Classes: <b>fraude potencial</b> (consumo faturado com a ligação Inativa/Factível/Potencial — "cortado mas com água"), <b>queda contínua</b> (tendência de queda persistente), <b>consumo nulo recorrente</b> (muitos meses zerados), <b>factível / faturado mínimo</b> (faturamento mínimo com ligação não-Real) e <b>instável</b>. Clique numa classe para filtrar a tela.</p>`},
@@ -2581,8 +2585,8 @@ function frBars(obj, fmtLab, activeKey, filterProp, color, order){
  }).join('')||'<p class="note" style="margin:0">—</p>';
 }
 function frDistClasse(){ return frBars((frResumo||{}).por_classe||{}, k=>({lab:`<span style="color:${(FR_CLASSE[k]||{}).c}"><b>${(FR_CLASSE[k]||{}).l||k}</b></span>`, c:(FR_CLASSE[k]||{}).c||'#888'}), frF.classe, 'classe', null, FR_CLASSE_ORDER); }
-function frDistLente(){ const r=frResumo||{}; const obj={todos:r.total||0,grandes:r.grandes||0,ligirreg:r.ligirreg||0,estimada:r.estimada||0,vizinhanca:r.vizinhanca||0};
- return frBars(obj, k=>({lab:FR_LENTE.find(x=>x[0]===k)[1], c:'var(--accent)'}), frF.lente, 'lente', 'var(--accent)', ['todos','grandes','ligirreg','estimada','vizinhanca']); }
+function frDistLente(){ const r=frResumo||{}; const obj={todos:r.total||0,grandes:r.grandes||0,ligirreg:r.ligirreg||0,estimada:r.estimada||0,vizinhanca:r.vizinhanca||0,reativadas:r.reativadas||0};
+ return frBars(obj, k=>({lab:FR_LENTE.find(x=>x[0]===k)[1], c:'var(--accent)'}), frF.lente, 'lente', 'var(--accent)', ['todos','grandes','ligirreg','estimada','vizinhanca','reativadas']); }
 function frDistCons(){ return frBars((frResumo||{}).por_consorcio||{}, k=>({lab:frZaNome(k), c:'#4b9fe0'}), null, '__noop', '#4b9fe0'); }
 function frCmp(a,b){ const k=frSort.k,d=frSort.dir; let va=a[k],vb=b[k]; if(va==null)va=(typeof vb==='string'?'':-Infinity); if(vb==null)vb=(typeof va==='string'?'':-Infinity); if(typeof va==='string'||typeof vb==='string')return d*String(va).localeCompare(String(vb)); return d*(va-vb); }
 function frRankTable(){
