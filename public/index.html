@@ -341,6 +341,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod hidden" id="homeMeusColab" data-go="meus_colab"><div class="ic">📇</div><div class="nm">Meus colaboradores</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
+      <button class="mod hidden" id="homeVitrine" data-go="vitrine"><div class="ic">📺</div><div class="nm">Vitrine</div></button>
     </div>
     <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
@@ -355,6 +356,56 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Marque quem pode ver e entrar nos módulos em desenvolvimento (Projetos e Perdas). O admin sempre tem acesso.</p>
     <input id="devAcessoBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
     <div id="devAcessoList"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="vitrine" class="hidden">
+    <style>
+      #vitrine{position:fixed;inset:0;z-index:2000;background:#0b1220;color:#e8eef8;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif}
+      #vitrine{--vt-card:#121c2e;--vt-line:#22314d;--vt-mut:#8ea0bd;--vt-acc:#38bdf8}
+      .vt-slide{position:absolute;inset:0;padding:3.2vh 3vw 6vh;display:none;flex-direction:column;gap:2vh}
+      .vt-slide.on{display:flex;animation:vtfade .8s}
+      @keyframes vtfade{from{opacity:0}to{opacity:1}}
+      .vt-top{display:flex;justify-content:space-between;align-items:baseline;gap:2vw}
+      .vt-top h1{font-size:4.6vh;font-weight:700;letter-spacing:-.02em;margin:0}
+      .vt-sub{color:var(--vt-mut);font-size:2.2vh}
+      .vt-brand{color:var(--vt-acc);font-weight:700;font-size:2.2vh;letter-spacing:.08em;text-transform:uppercase}
+      .vt-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1.6vw}
+      .vt-kpi{background:var(--vt-card);border:1px solid var(--vt-line);border-radius:1.6vh;padding:2.4vh 1.4vw;border-top:.6vh solid var(--k)}
+      .vt-kpi b{display:block;font-size:8vh;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}
+      .vt-kpi span{color:var(--vt-mut);font-size:2.2vh}
+      .vt-grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:1.6vw;flex:1;min-height:0}
+      .vt-card{background:var(--vt-card);border:1px solid var(--vt-line);border-radius:1.6vh;padding:2vh 1.4vw;min-height:0;overflow:hidden}
+      .vt-map{flex:1;min-height:0;border-radius:1.6vh;border:1px solid var(--vt-line);overflow:hidden;background:#0e1626}
+      .vt-legend{display:flex;gap:1.6vw;flex-wrap:wrap;font-size:2vh;color:var(--vt-mut)}
+      .vt-legend i{display:inline-block;width:1.6vh;height:1.6vh;border-radius:50%;margin-right:.5vw;vertical-align:middle}
+      .vt-days{display:flex;flex-direction:column;gap:1.4vh}
+      .vt-dayrow{display:grid;grid-template-columns:13vw 1fr 5vw;align-items:center;gap:1vw;font-size:2.3vh}
+      .vt-bar{display:flex;height:3.2vh;border-radius:.8vh;overflow:hidden;background:#0e1626}
+      .vt-tl{display:flex;flex-direction:column;gap:1vh;overflow:hidden}
+      .vt-tl div{display:grid;grid-template-columns:6vw 1.4vh 1fr;gap:.8vw;align-items:center;font-size:2.1vh}
+      .vt-tl i{width:1.4vh;height:1.4vh;border-radius:50%}
+      .vt-tl em{font-style:normal;color:var(--vt-mut)}
+      .vt-photo{display:grid;grid-template-columns:2.2fr 1fr;gap:1.6vw;flex:1;min-height:0}
+      .vt-pics{display:grid;gap:1vw;min-height:0}
+      .vt-pics.n1{grid-template-columns:1fr}.vt-pics.n2{grid-template-columns:1fr 1fr}.vt-pics.n3,.vt-pics.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+      .vt-pics img{width:100%;height:100%;object-fit:cover;border-radius:1.4vh;border:1px solid var(--vt-line);background:#0e1626;min-height:0}
+      .vt-pics.n3 img:first-child{grid-row:span 2}
+      .vt-info{display:flex;flex-direction:column;gap:1.6vh;min-height:0}
+      .vt-tag{display:inline-block;padding:.6vh 1vw;border-radius:99px;font-size:2vh;font-weight:600;color:#0b1220;background:var(--k)}
+      .vt-info .q{font-size:2.4vh;color:var(--vt-mut)}.vt-info .d{font-size:2.8vh;line-height:1.3}.vt-info .p{font-size:2.6vh;font-weight:600}
+      .vt-info .vt-map{min-height:24vh}
+      .vt-foot{position:absolute;left:3vw;right:3vw;bottom:2vh;display:flex;justify-content:space-between;color:var(--vt-mut);font-size:1.8vh}
+      .vt-prog{position:absolute;left:0;bottom:0;height:.6vh;background:var(--vt-acc);width:0}
+      .vt-pin{width:2.2vh;height:2.2vh;border-radius:50%;border:.35vh solid #fff;box-shadow:0 0 1.2vh rgba(0,0,0,.6)}
+      .vt-ctl{position:absolute;top:1.6vh;right:1.6vw;z-index:5;display:flex;gap:.6vw;opacity:.25;transition:opacity .3s}
+      .vt-ctl:hover{opacity:1}
+      .vt-ctl button{all:unset;cursor:pointer;background:var(--vt-card);border:1px solid var(--vt-line);border-radius:1vh;padding:.8vh 1vw;font-size:1.8vh;color:#e8eef8}
+      .vt-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3vh;color:var(--vt-mut)}
+    </style>
+    <div class="vt-ctl"><button id="vtFull" title="Tela cheia">⛶ Tela cheia</button><button id="vtSair" title="Voltar ao app">✕ Sair</button></div>
+    <div id="vtDeck"></div>
+    <div class="vt-foot"><span id="vtPos"></span><span id="vtFonte"></span></div>
+    <div class="vt-prog" id="vtProg"></div>
   </main>
 
   <main id="telemetria" class="hidden">
@@ -1664,7 +1715,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1698,6 +1749,7 @@ function irPara(id){
   if(id==='pavprog') pavProgInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
+  if(id==='vitrine') vtInit(); else vtParar();
   if(id==='dev_acesso') devAcessoInit();
   if(id==='telemetria') telemetriaInit();
   if(id==='projetos') pjLoad().then(pjHub);
@@ -1716,7 +1768,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); }
+function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt) vt.classList.toggle('hidden', !vtPode()); }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -10262,6 +10314,122 @@ async function supGoAct(act){
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.remove('on'));
   supAreaId = act.indexOf('eq_')===0?'equip':(act.indexOf('epi_')===0?'epi':(act.indexOf('ferramenta_')===0?'ferramenta':'insumos'));
   if(SUP_ACTS[act]) supOpen(act); else supHome();
+}
+
+// ---------- VITRINE (TV) — atividades de campo + indicadores, ao vivo, em loop ----------
+// Restrito a Geovana e Sander: o botão some para os demais e a RPC app_vitrine_dados recusa (mesma lista no banco).
+// (lista dentro da função e estado em var: homeGate/irPara podem rodar antes desta parte do módulo ser avaliada)
+function vtPode(){ return !!(ME&&ME.email&&['geovana.mendonca@aguasmg.com.br','sander.sirio@aguasmg.com.br'].includes(String(ME.email).toLowerCase())); }
+const VT_G={logger_in:'Logger instalado',logger_out:'Logger removido',vrp:'VRP (manutenção)',pav:'Recomposição de pavimento',obra:'Obra / HDD',outro:'Outras atividades'};
+const VT_COR={logger_in:'#22c55e',logger_out:'#f59e0b',vrp:'#38bdf8',pav:'#a78bfa',obra:'#f43f5e',outro:'#94a3b8'};
+const VT_CONS={ZA0200:'Betim',ZA1004:'Contagem','Águas Integradas':'Contagem','Eficiência Hídrica':'Betim'};
+const VT_DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+var vtSlides=[], vtCur=-1, vtTimer=null, vtTick=null, vtPaused=false, vtT0=0, vtAtivo=false;
+const vtEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const vtFmtD=s=>s.split('-').reverse().slice(0,2).join('/');
+function vtGrupo(t){ if(t.startsWith('Instalação de logger'))return'logger_in'; if(t.startsWith('Remoção de logger'))return'logger_out'; if(t.startsWith('VRP'))return'vrp'; if(t.startsWith('Recomposição'))return'pav'; if(t.startsWith('Obra'))return'obra'; return'outro'; }
+function vtParar(){ vtAtivo=false; clearTimeout(vtTimer); clearInterval(vtTick); document.removeEventListener('keydown',vtKey); }
+function vtKey(e){ if(!vtAtivo) return;
+  if(e.key==='ArrowRight') vtShow(vtCur+1); else if(e.key==='ArrowLeft') vtShow(vtCur-1);
+  else if(e.key===' '){ e.preventDefault(); vtPaused=!vtPaused; vtShow(vtCur); } else if(e.key==='Escape'&&!document.fullscreenElement) irPara('home'); }
+async function vtInit(){
+  if(!vtPode()){ toast('Acesso restrito'); irPara('home'); return; }
+  vtParar(); vtAtivo=true; vtPaused=false;
+  document.addEventListener('keydown',vtKey);
+  $('#vtSair').onclick=()=>{ if(document.fullscreenElement) document.exitFullscreen().catch(()=>{}); irPara('home'); };
+  $('#vtFull').onclick=()=>{ const el=$('#vitrine'); (document.fullscreenElement?document.exitFullscreen():el.requestFullscreen()).catch(()=>{}); };
+  vtTick=setInterval(()=>{ const s=vtSlides[vtCur]; if(!s) return; $('#vtProg').style.width = vtPaused?'0':Math.min(100,(Date.now()-vtT0)/s.dur*100)+'%'; },200);
+  await vtCarregar(true);
+}
+async function vtCarregar(primeira){
+  if(primeira) $('#vtDeck').innerHTML='<div class="vt-msg">Carregando atividades…</div>';
+  let d;
+  try{ const r=await sb.rpc('app_vitrine_dados',{}); if(r.error) throw r.error; d=r.data; }
+  catch(e){ if(primeira){ $('#vtDeck').innerHTML='<div class="vt-msg">Não foi possível carregar: '+vtEsc(e.message||e)+'</div>'; } else { vtShow(0); } return; }
+  if(!vtAtivo) return;
+  vtMontar(d); vtShow(0);
+}
+function vtMapa(el, pts, zoom){
+  if(typeof L==='undefined'){ el.innerHTML='<div class="vt-msg" style="position:static;height:100%">Mapa indisponível</div>'; return; }
+  const m=L.map(el,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16}).addTo(m);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16}).addTo(m);
+  const ll=[];
+  pts.forEach(e=>{ if(e.lat==null) return; ll.push([e.lat,e.lon]);
+    L.marker([e.lat,e.lon],{icon:L.divIcon({className:'',html:`<div class="vt-pin" style="background:${VT_COR[e.g]}"></div>`,iconSize:[18,18],iconAnchor:[9,9]})}).addTo(m); });
+  if(ll.length===1) m.setView(ll[0], Math.min(zoom||15,16)); else if(ll.length) m.fitBounds(ll,{padding:[40,40],maxZoom:15}); else m.setView([-19.94,-44.12],11);
+  return m;
+}
+function vtMontar(d){
+  const deck=$('#vtDeck'); deck.innerHTML=''; vtSlides=[];
+  const add=(html,dur,mapPts,zoom)=>{ const el=document.createElement('section'); el.className='vt-slide'; el.innerHTML=html; deck.appendChild(el);
+    let m=null; const s={el,dur,onShow:mapPts?(()=>{ const box=el.querySelector('.vt-map'); if(!box) return; if(!m) m=vtMapa(box,mapPts,zoom); setTimeout(()=>m&&m.invalidateSize(),50); }):null}; vtSlides.push(s); };
+  const EV=(d.ev||[]).map(e=>{ const q=new Date(String(e.quando).slice(0,19)); const dia=String(e.quando).slice(0,10);
+    return {tipo:e.tipo,g:vtGrupo(e.tipo),dia,hora:String(e.quando).slice(11,16),diaLbl:VT_DIAS[q.getDay()]+' '+vtFmtD(dia),cons:VT_CONS[e.consorcio]||'',quem:e.quem||'',descr:e.descr||'',lat:e.lat,lon:e.lon,fotos:(e.fotos||[]).slice(0,4).map(f=>SBASE+f)}; });
+  const I=d.ind||{}, gerado=d.gerado||'';
+  $('#vtFonte').textContent='Fonte: AcquaHub · atualizado '+gerado+' · recarrega a cada volta';
+  const porG={}; EV.forEach(e=>porG[e.g]=(porG[e.g]||0)+1);
+  const dias=[...new Set(EV.map(e=>e.dia))];
+  const legend='<div class="vt-legend">'+Object.keys(VT_G).filter(g=>porG[g]).map(g=>`<span><i style="background:${VT_COR[g]}"></i>${VT_G[g]}</span>`).join('')+'</div>';
+  const kpi=(n,l,c,sub)=>`<div class="vt-kpi" style="--k:${c}"><b>${n}</b><span>${l}</span>${sub?`<div class="vt-sub" style="margin-top:.8vh;font-size:1.8vh">${sub}</div>`:''}</div>`;
+  const desde=vtFmtD(String(d.desde||'').slice(0,10));
+  // capa
+  const maxDia=Math.max(1,...dias.map(x=>EV.filter(e=>e.dia===x).length));
+  add(`<div class="vt-top"><div><div class="vt-brand">Águas MG · campo</div><h1>Atividades registradas no AcquaHub</h1><div class="vt-sub">desde ${desde} · ${EV.length} atividades · ${new Set(EV.map(e=>e.quem)).size} colaboradores</div></div></div>
+   <div class="vt-kpis">${['logger_in','logger_out','vrp','pav','obra'].map(g=>kpi(porG[g]||0,VT_G[g],VT_COR[g])).join('')}</div>
+   <div class="vt-card" style="flex:1"><h2 style="margin:0 0 2vh;font-size:3.6vh">Por dia</h2><div class="vt-days">${dias.map(x=>{const its=EV.filter(e=>e.dia===x);
+     return `<div class="vt-dayrow"><span>${its[0].diaLbl}</span><div class="vt-bar" style="width:${Math.max(8,its.length/maxDia*100)}%">${Object.keys(VT_G).map(g=>{const n=its.filter(e=>e.g===g).length; return n?`<div style="flex:${n};background:${VT_COR[g]}"></div>`:'';}).join('')}</div><b>${its.length}</b></div>`;}).join('')||'<span class="vt-sub">Nenhuma atividade no período.</span>'}</div><div style="margin-top:2.4vh">${legend}</div></div>`, 14000);
+  // indicadores
+  const fr=I.frota||{}, mn=I.manut||{}, vo=I.vrp_os_mes||{}, pe=I.pessoas||{};
+  const num=v=>String(v==null?0:v).replace('.',',');
+  add(`<div class="vt-top"><div><div class="vt-brand">Indicadores · AcquaHub</div><h1>Situação agora</h1></div><div class="vt-sub">posição de ${gerado}</div></div>
+   <div class="vt-kpis" style="grid-template-columns:repeat(4,1fr)">
+    ${kpi(I.loggers_em_campo||0,'Loggers em campo agora',VT_COR.logger_in)}
+    ${kpi(fr.em_uso||0,'Veículos em uso',VT_COR.vrp,`${fr.disponivel||0} disponíveis · ${fr.manutencao||0} em manutenção`)}
+    ${kpi((mn.pendente||0)+(mn.aprovado||0)+(mn.agendado||0),'Manutenções de frota em aberto',VT_COR.logger_out,`${mn.pendente||0} aguardando aprovação · ${mn.aprovado||0} a agendar · ${mn.agendado||0} agendadas`)}
+    ${kpi(I.vrp_pend_abertas||0,'Pendências de VRP abertas',VT_COR.obra,'geradas nas OS de campo')}</div>
+   <div class="vt-kpis" style="grid-template-columns:repeat(4,1fr)">
+    ${kpi(I.abertura_sem_os||0,'Solicitações de serviço sem OS',VT_COR.pav,'aguardando nº da OS COPASA')}
+    ${kpi(I.ocorr_sem_os||0,'Ocorrências da pesquisa sem OS',VT_COR.pav,'vazamentos e outras ocorrências')}
+    ${kpi(I.checklists_hoje||0,'Checklists de veículo hoje',VT_COR.vrp,`${I.veic_vinculados||0} veículos com condutor vinculado`)}
+    ${kpi((pe.ZA1004||0)+(pe.ZA0200||0),'Usuários ativos no app','#38bdf8',`Contagem ${pe.ZA1004||0} · Betim ${pe.ZA0200||0}`)}</div>`, 16000);
+  add(`<div class="vt-top"><div><div class="vt-brand">Indicadores · AcquaHub</div><h1>No mês até agora</h1></div><div class="vt-sub">posição de ${gerado}</div></div>
+   <div class="vt-kpis" style="grid-template-columns:repeat(4,1fr)">
+    ${kpi(I.loggers_inst_mes||0,'Loggers instalados',VT_COR.logger_in)}
+    ${kpi((vo.concluida||0)+(vo.concluida_pendencia||0),'OS de VRP concluídas',VT_COR.vrp,`${vo.concluida_pendencia||0} com pendência · ${vo.improdutiva||0} improdutiva · ${vo.programada||0} programadas`)}
+    ${kpi(I.pav_mes||0,'Recomposições de pavimento',VT_COR.pav)}
+    ${kpi(I.obra_avancos||0,'Avanços de obra lançados',VT_COR.obra,`por ${I.obra_pessoas||0} pessoas`)}</div>
+   <div class="vt-kpis" style="grid-template-columns:repeat(4,1fr)">
+    ${kpi(num(I.pesq_km_rede),'Km de rede pesquisados',VT_COR.logger_out,'pesquisa de vazamento')}
+    ${kpi(num(I.pesq_km_andado),'Km andados na pesquisa',VT_COR.logger_out,`${I.pesq_trechos||0} trechos`)}
+    ${kpi(I.ocorr_mes||0,'Ocorrências registradas',VT_COR.outro,'pesquisa de vazamento')}
+    ${kpi(I.abertura_mes||0,'Solicitações de serviço',VT_COR.outro,'abertas pelo campo')}</div>`, 16000);
+  // mapa geral
+  const geo=EV.filter(e=>e.lat!=null);
+  add(`<div class="vt-top"><div><div class="vt-brand">Onde estamos trabalhando</div><h1>Mapa das atividades desde ${desde}</h1></div><div class="vt-sub">${geo.length} pontos com GPS${EV.length>geo.length?` · ${EV.length-geo.length} sem GPS`:''}</div></div>
+   <div class="vt-map"></div>${legend}`, 16000, geo);
+  // por dia + fotos
+  dias.forEach(x=>{ const its=EV.filter(e=>e.dia===x), lbl=its[0].diaLbl;
+    add(`<div class="vt-top"><div><div class="vt-brand">${lbl}</div><h1>${its.length} atividade${its.length>1?'s':''} no dia</h1></div><div class="vt-sub">${[...new Set(its.map(e=>e.cons).filter(Boolean))].join(' · ')}</div></div>
+     <div class="vt-grid2"><div class="vt-map"></div><div class="vt-card vt-tl">${its.map(e=>`<div><b>${e.hora}</b><i style="background:${VT_COR[e.g]}"></i><span>${vtEsc(e.tipo)} <em>· ${vtEsc(e.quem)}</em></span></div>`).join('')}</div></div>`, 14000, its.filter(e=>e.lat!=null));
+    its.filter(e=>e.fotos.length).forEach(e=>{
+      add(`<div class="vt-top"><div><div class="vt-brand">${lbl} · ${e.hora}</div><h1>${vtEsc(e.tipo)}</h1></div><div class="vt-sub">${vtEsc(e.cons)}</div></div>
+       <div class="vt-photo"><div class="vt-pics n${e.fotos.length}">${e.fotos.map(f=>`<img src="${vtEsc(f)}" alt="">`).join('')}</div>
+        <div class="vt-info"><span><span class="vt-tag" style="--k:${VT_COR[e.g]}">${VT_G[e.g]}</span></span>
+         <div class="p">👷 ${vtEsc(e.quem)}</div><div class="d">${vtEsc(e.descr)}</div><div class="q">${lbl} às ${e.hora}${e.cons?' · '+vtEsc(e.cons):''}</div>
+         ${e.lat!=null?'<div class="vt-map"></div>':''}</div></div>`, 10000, e.lat!=null?[e]:null, 16);
+    });
+  });
+  EV.forEach(e=>e.fotos.forEach(f=>{ const i=new Image(); i.src=f; }));
+}
+function vtShow(i){
+  if(!vtAtivo||!vtSlides.length) return;
+  if(i>=vtSlides.length){ vtCarregar(false); return; } // fim da volta: busca dados novos e recomeça
+  vtSlides.forEach(s=>s.el.classList.remove('on'));
+  vtCur=(i+vtSlides.length)%vtSlides.length; const s=vtSlides[vtCur]; s.el.classList.add('on'); if(s.onShow) s.onShow();
+  $('#vtPos').textContent=(vtCur+1)+' / '+vtSlides.length+(vtPaused?' · pausado (espaço continua)':'');
+  clearTimeout(vtTimer); vtT0=Date.now();
+  if(!vtPaused) vtTimer=setTimeout(()=>vtShow(vtCur+1), s.dur);
 }
 const _btnNotif=$('#btnNotif'); if(_btnNotif) _btnNotif.addEventListener('click',()=>irPara('notificacoes'));
 const _ntfMk=$('#ntfMarcar'); if(_ntfMk) _ntfMk.addEventListener('click',ntfMarcarTodas);
