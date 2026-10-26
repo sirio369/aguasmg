@@ -419,7 +419,7 @@ Dados ainda em snapshot estático (futuro: RPCs `app_nrw_*`). Detalhe em `docs/M
 **Menu (2026-10-22):** `hdpri`/`mm`/`macro` voltaram ao `#nav` do cockpit (Dados & diagnóstico / Execução — comercial); saíram Painel, Componentes IWA, OS/reparos, Parque, Recuperação, Grandes consumidores e Performance contratual (ver `docs/MODULOS.md §11`).
 **Balanço hídrico (2026-10-22, `s-nrw_balanco`, real):** checklist dinâmico de dados do balanço IWA (ZA inteira) — quadro IWA clicável com rastreio da origem de cada componente; itens em `"11 - perdas_nrw".bh_checklist_item` verificados ao vivo por `app_nrw_checklist()`; ajuste manual (admin, nota obrigatória, histórico em `bh_checklist_log`) via `app_nrw_checklist_salvar`.
 **Reorg 2026-10:** **Priorização de troca de HD** (`s-hdpri`), **Fiscalização de irregularidades** (`s-fraudepri`,
-2026-10-20) e **Análise do micromedido/por matrícula** (`s-mm`) são acessadas pelo **Auxiliar de Programação** via
+2026-10-20) e **Análise do micromedido** (`s-mm`; desde 2026-10-26 com bloco **Indicadores de micromedição** da linha de base — sem Abertura por DMC/Análise por matrícula) são acessadas pelo **Auxiliar de Programação** via
 deep-link `perdas.html?s=hdpri` / `?s=fraudepri` / `?s=mm` (sem item de menu no cockpit; estão em `AUX_TOOLS`).
 O gate da página libera essas ferramentas para **aprovador/admin/`aux_acesso` mesmo sem `dev_acesso`**; nesse caso
 entra em **`body.aux-solo`** (esconde o `#nav`, mostrando só a ferramenta + "Voltar ao AcquaHub"). As telas e RPCs
