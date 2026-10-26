@@ -7,6 +7,7 @@ create table if not exists "11 - perdas_nrw".mm_indicadores (
   n_ativas_estimadas int not null, n_ativas_zero int not null, n_nao_ativas int not null,
   n_nao_ativas_vol int not null, n_nao_ativas_fac int not null,
   volume_total bigint not null, volume_medido bigint not null, volume_estimado bigint not null, volume_factivel bigint not null,
+  n_economias_ativas bigint not null default 0, volume_nao_ativas bigint not null default 0,
   atualizado_em timestamptz not null default now(),
   primary key (consorcio, competencia)
 );
@@ -19,7 +20,8 @@ begin
   delete from "11 - perdas_nrw".mm_indicadores where (p_consorcio is null or consorcio=p_consorcio);
   insert into "11 - perdas_nrw".mm_indicadores
     (consorcio, competencia, n_ligacoes, n_ativas, n_faturadas, n_ativas_estimadas, n_ativas_zero,
-     n_nao_ativas, n_nao_ativas_vol, n_nao_ativas_fac, volume_total, volume_medido, volume_estimado, volume_factivel)
+     n_nao_ativas, n_nao_ativas_vol, n_nao_ativas_fac, volume_total, volume_medido, volume_estimado, volume_factivel,
+     n_economias_ativas, volume_nao_ativas)
   select za, competencia,
     count(*),
     count(*) filter (where cd_situaca='R'),
@@ -32,7 +34,9 @@ begin
     coalesce(sum(qt_volume_),0) + coalesce(sum(qt_vol_fac),0),
     coalesce(sum(qt_volume_) filter (where qt_vol_est=0),0),
     coalesce(sum(qt_volume_) filter (where qt_vol_est>0),0),
-    coalesce(sum(qt_vol_fac),0)
+    coalesce(sum(qt_vol_fac),0),
+    coalesce(sum(qt_economi) filter (where cd_situaca='R'),0),
+    coalesce(sum(qt_volume_ + qt_vol_fac) filter (where cd_situaca<>'R'),0)
   from "5 - info_copasa".micromedicao_historico
   where competencia<>202505 and (p_consorcio is null or za=p_consorcio)
   group by za, competencia;
