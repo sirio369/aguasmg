@@ -385,6 +385,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       .vt-tl div{display:grid;grid-template-columns:6vw 1.4vh 1fr;gap:.8vw;align-items:center;font-size:2.1vh}
       .vt-tl i{width:1.4vh;height:1.4vh;border-radius:50%}
       .vt-tl em{font-style:normal;color:var(--vt-mut)}
+      .vt-tl span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .vt-tl .vt-mais{margin:0;color:var(--vt-mut);font-size:2vh}
       .vt-photo{display:grid;grid-template-columns:2.2fr 1fr;gap:1.6vw;flex:1;min-height:0}
       .vt-pics{display:grid;gap:1vw;min-height:0}
       .vt-pics.n1{grid-template-columns:1fr}.vt-pics.n2{grid-template-columns:1fr 1fr}.vt-pics.n3,.vt-pics.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
@@ -10324,7 +10326,7 @@ const VT_G={logger_in:'Logger instalado',logger_out:'Logger removido',vrp:'VRP (
 const VT_COR={logger_in:'#22c55e',logger_out:'#f59e0b',vrp:'#38bdf8',pav:'#a78bfa',obra:'#f43f5e',outro:'#94a3b8'};
 const VT_CONS={ZA0200:'Betim',ZA1004:'Contagem','Águas Integradas':'Contagem','Eficiência Hídrica':'Betim'};
 const VT_DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-var vtSlides=[], vtCur=-1, vtTimer=null, vtTick=null, vtPaused=false, vtT0=0, vtAtivo=false;
+var vtSlides=[], vtCur=-1, vtTimer=null, vtTick=null, vtPaused=false, vtT0=0, vtAtivo=false, vtMapas=[];
 const vtEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const vtFmtD=s=>s.split('-').reverse().slice(0,2).join('/');
 function vtGrupo(t){ if(t.startsWith('Instalação de logger'))return'logger_in'; if(t.startsWith('Remoção de logger'))return'logger_out'; if(t.startsWith('VRP'))return'vrp'; if(t.startsWith('Recomposição'))return'pav'; if(t.startsWith('Obra'))return'obra'; return'outro'; }
@@ -10342,7 +10344,7 @@ async function vtInit(){
   await vtCarregar(true);
 }
 async function vtCarregar(primeira){
-  if(primeira) $('#vtDeck').innerHTML='<div class="vt-msg">Carregando atividades…</div>';
+  if(primeira){ vtSoltarMapas(); $('#vtDeck').innerHTML='<div class="vt-msg">Carregando atividades…</div>'; }
   let d;
   try{ const r=await sb.rpc('app_vitrine_dados',{}); if(r.error) throw r.error; d=r.data; }
   catch(e){ if(primeira){ $('#vtDeck').innerHTML='<div class="vt-msg">Não foi possível carregar: '+vtEsc(e.message||e)+'</div>'; } else { vtShow(0); } return; }
@@ -10351,7 +10353,7 @@ async function vtCarregar(primeira){
 }
 function vtMapa(el, pts, zoom){
   if(typeof L==='undefined'){ el.innerHTML='<div class="vt-msg" style="position:static;height:100%">Mapa indisponível</div>'; return; }
-  const m=L.map(el,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false});
+  const m=L.map(el,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false}); vtMapas.push(m);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16}).addTo(m);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16}).addTo(m);
   const ll=[];
@@ -10360,10 +10362,18 @@ function vtMapa(el, pts, zoom){
   if(ll.length===1) m.setView(ll[0], Math.min(zoom||15,16)); else if(ll.length) m.fitBounds(ll,{padding:[40,40],maxZoom:15}); else m.setView([-19.94,-44.12],11);
   return m;
 }
+// o Leaflet prende cada mapa no resize do window: sem remove() a TV vaza ~1 mapa por slide a cada volta
+function vtSoltarMapas(){ vtMapas.forEach(m=>{ try{ m.remove(); }catch(e){} }); vtMapas=[]; }
+// linha do tempo do dia que não cabe: esconde as mais antigas e põe "+N mais cedo" (medido na hora: depende da tela)
+function vtAjustaTl(el){ const tl=el.querySelector('.vt-tl'); if(!tl||tl.dataset.ok||!tl.clientHeight) return; tl.dataset.ok='1';
+  if(tl.scrollHeight<=tl.clientHeight+1) return;
+  const rows=[...tl.children], mais=document.createElement('p'); mais.className='vt-mais'; tl.prepend(mais);
+  let n=0; while(n<rows.length-1&&tl.scrollHeight>tl.clientHeight+1){ rows[n++].style.display='none'; mais.textContent='+ '+n+' atividade'+(n>1?'s':'')+' mais cedo'; }
+}
 function vtMontar(d){
-  const deck=$('#vtDeck'); deck.innerHTML=''; vtSlides=[];
+  const deck=$('#vtDeck'); vtSoltarMapas(); deck.innerHTML=''; vtSlides=[];
   const add=(html,dur,mapPts,zoom)=>{ const el=document.createElement('section'); el.className='vt-slide'; el.innerHTML=html; deck.appendChild(el);
-    let m=null; const s={el,dur,onShow:mapPts?(()=>{ const box=el.querySelector('.vt-map'); if(!box) return; if(!m) m=vtMapa(box,mapPts,zoom); setTimeout(()=>m&&m.invalidateSize(),50); }):null}; vtSlides.push(s); };
+    let m=null; const s={el,dur,onShow:()=>{ vtAjustaTl(el); if(!mapPts) return; const box=el.querySelector('.vt-map'); if(!box) return; if(!m) m=vtMapa(box,mapPts,zoom); setTimeout(()=>m&&m.invalidateSize(),50); }}; vtSlides.push(s); };
   const EV=(d.ev||[]).map(e=>{ const q=new Date(String(e.quando).slice(0,19)); const dia=String(e.quando).slice(0,10);
     return {tipo:e.tipo,g:vtGrupo(e.tipo),dia,hora:String(e.quando).slice(11,16),diaLbl:VT_DIAS[q.getDay()]+' '+vtFmtD(dia),cons:VT_CONS[e.consorcio]||'',quem:e.quem||'',descr:e.descr||'',lat:e.lat,lon:e.lon,fotos:(e.fotos||[]).slice(0,4).map(f=>SBASE+f)}; });
   const I=d.ind||{}, gerado=d.gerado||'';

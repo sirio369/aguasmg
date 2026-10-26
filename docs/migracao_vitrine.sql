@@ -55,7 +55,7 @@ begin
      from "12 - retaguarda".abertura_servico a left join public.perfil p on p.id=a.usuario where a.data_hora >= (v_desde::timestamp at time zone 'America/Sao_Paulo')
    ) ev), '[]'::jsonb),
    'ind', jsonb_build_object(
-     'loggers_em_campo', (select count(*) from "8 - coleta_campo".instalacao_logger_calibracao where data_remocao is null and coalesce(ativo,true)),
+     'loggers_em_campo', (select count(*) from "8 - coleta_campo".instalacao_logger_calibracao where data_instalacao is not null and data_remocao is null and coalesce(ativo,true)),
      'loggers_inst_mes', (select count(*) from "8 - coleta_campo".instalacao_logger_calibracao where data_instalacao >= date_trunc('month', now() at time zone 'America/Sao_Paulo')),
      'vrp_os_mes', coalesce((select jsonb_object_agg(status, n) from (select status, count(*) n from "8 - coleta_campo".vrp_os
                      where coalesce(executado_em,aberto_em) >= date_trunc('month', now()) group by 1) x), '{}'::jsonb),
