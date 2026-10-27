@@ -2838,3 +2838,18 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
+
+## 18. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (admin-only, 2026-10-27) — `docs/migracao_avisos.sql`
+
+- **Admin** (Home › 🧰 Suporte › 📢 Avisos, `#homeAvisos`, gate `ME.is_admin` + RPC `aviso_eh_admin()`): cria/edita aviso com
+  título, texto (`**negrito**` + quebras), imagem (upload → bucket `fotos-campo/avisos/` via `uploadFoto2`), texto do botão,
+  destino do botão (`AV_LINKS` = mesmos links de notificação, roteados por `supGoAct`), público (`todos` |
+  `condutores_vinculados`), período (de/até) e ativo. **Pré-visualizar** mostra o pop-up como o usuário verá.
+- **Usuário:** `avPopAbrir()` roda **1x por carregamento do app**, logo após o `app_me` (em `mostrar`), chama
+  `app_avisos_ativos()` e exibe os avisos vigentes em sequência (`#avPop`, overlay com ✕; clicar fora fecha).
+- **Imagem:** `./...` = arquivo do site (`public/avisos/`), `http...` = URL, senão = caminho no bucket (`avImg`).
+- **Lembretes push** (`lembrete='checklist_frota'`): `aviso_lembretes_run(slot)` via **pg_cron** `aviso-lembrete-1..5`
+  (08h/10h/12h/14h/16h BRT, seg–sex) — notifica **só quem tem veículo vinculado e não fez o checklist do dia**, com o texto do
+  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up.
+- **Tabela** `public.app_aviso` (RLS ligada, sem policy — só RPC). 1º aviso (seed): "Checklist diário do veículo", até
+  30/10/2026, pop-up p/ todos, imagem `./avisos/checklist-frota-2026-10.webp`.
