@@ -10675,10 +10675,15 @@ async function avInit(){
     return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:10px">
      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${eoH(a.titulo)}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;background:var(${vig?'--ok-bg':'--line'});color:var(${vig?'--ok':'--mut'})">${vig?'No ar':(a.ativo?'Fora do período':'Desativado')}</span></div>
      <div class="sub" style="margin-top:3px">${fmtData(a.inicio)} a ${fmtData(a.fim)} · ${a.publico==='condutores_vinculados'?'só quem tem carro vinculado':'todos'}${a.lembrete==='checklist_frota'?' · 🔔 5 lembretes/dia do checklist':''}</div>
-     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" data-avprev="${a.id}" style="margin:0;flex:1;padding:8px">👁 Pré-visualizar</button><button class="btn ghost" data-aved="${a.id}" style="margin:0;flex:1;padding:8px">✏️ Editar</button></div></div>`; }).join('') : '<p class="sub" style="margin-top:10px">Nenhum aviso ainda.</p>';
+     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" data-avprev="${a.id}" style="margin:0;flex:1;padding:8px">👁 Pré-visualizar</button><button class="btn ghost" data-aved="${a.id}" style="margin:0;flex:1;padding:8px">✏️ Editar</button><button class="btn ghost" data-avtog="${a.id}" style="margin:0;flex:1;padding:8px">${a.ativo?'⏸ Desativar':'▶ Ativar'}</button></div></div>`; }).join('') : '<p class="sub" style="margin-top:10px">Nenhum aviso ainda.</p>';
   $('#avView').innerHTML=h;
   $('#avNovo').onclick=()=>{ avEdit=null; avForm(); };
   $('#avView').querySelectorAll('[data-aved]').forEach(b=>b.onclick=()=>{ avEdit=avLista.find(x=>String(x.id)===b.dataset.aved); avForm(); });
+  // ativar/desativar direto da lista (mantém os demais campos)
+  $('#avView').querySelectorAll('[data-avtog]').forEach(b=>b.onclick=async()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avtog); b.disabled=true;
+    try{ const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id,p_titulo:a.titulo,p_texto:a.texto,p_imagem:null,p_botao_texto:a.botao_texto,p_botao_link:a.botao_link,
+        p_publico:a.publico,p_inicio:a.inicio,p_fim:a.fim,p_ativo:!a.ativo,p_lembrete:a.lembrete,p_lembrete_textos:a.lembrete_textos}); if(error) throw error;
+      toast(a.ativo?'Aviso desativado':'✓ Aviso ativado'); avInit(); }catch(e){ toast('Erro: '+(e.message||e)); b.disabled=false; } });
   $('#avView').querySelectorAll('[data-avprev]').forEach(b=>b.onclick=()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avprev); const pop=$('#avPop'); $('#avPopBody').innerHTML=avCard(a); pop.classList.remove('hidden'); $('#avPopX').onclick=()=>pop.classList.add('hidden'); pop.onclick=e=>{ if(e.target===pop) pop.classList.add('hidden'); }; $('#avPopBody').querySelectorAll('[data-avgo]').forEach(x=>x.onclick=()=>pop.classList.add('hidden')); });
 }
 function avForm(){

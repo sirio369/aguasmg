@@ -2844,7 +2844,7 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
 - **Admin** (Home › 🧰 Suporte › 📢 Avisos, `#homeAvisos`, gate `ME.is_admin` + RPC `aviso_eh_admin()`): cria/edita aviso com
   título, texto (`**negrito**` + quebras), imagem (upload → bucket `fotos-campo/avisos/` via `uploadFoto2`), texto do botão,
   destino do botão (`AV_LINKS` = mesmos links de notificação, roteados por `supGoAct`), público (`todos` |
-  `condutores_vinculados`), período (de/até) e ativo. **Pré-visualizar** mostra o pop-up como o usuário verá.
+  `condutores_vinculados`), período (de/até) e ativo; na lista, botão **⏸ Desativar / ▶ Ativar** (mesma RPC, só inverte `ativo`). **Pré-visualizar** mostra o pop-up como o usuário verá.
 - **Usuário:** `avPopAbrir()` roda **1x por carregamento do app**, logo após o `app_me` (em `mostrar`), chama
   `app_avisos_ativos()` e exibe os avisos vigentes em sequência (`#avPop`, overlay com ✕; clicar fora fecha).
 - **Imagem:** `./...` = arquivo do site (`public/avisos/`), `http...` = URL, senão = caminho no bucket (`avImg`).
