@@ -1,14 +1,13 @@
 -- Vitrine (TV): atividades de campo com fotos + indicadores, ao vivo. 2026-10-26.
--- Acesso restrito a Geovana e Sander (checado aqui no banco E no botão do app).
+-- Módulo "Em desenvolvimento": acesso pela engrenagem da categoria (perfil.dev_acesso; admin sempre) —
+-- mesmo gate das RPCs app_nrw_* e do card no app (ME.dev_acesso). 2026-10-27: saiu a lista de e-mails fixa.
 -- Idempotente. Só leitura (função SECURITY DEFINER que lê as tabelas de campo).
 create or replace function public.app_vitrine_dados(p_desde date default null)
 returns jsonb language plpgsql stable security definer set search_path to 'public' as $$
-declare v_email text; v_desde date;
+declare v_id uuid := auth.uid(); v_desde date;
 begin
-  select lower(email) into v_email from public.perfil where id = auth.uid();
-  if v_email is null or v_email not in ('geovana.mendonca@aguasmg.com.br','sander.sirio@aguasmg.com.br') then
-    raise exception 'sem permissão';
-  end if;
+  if v_id is null then raise exception 'nao autenticado'; end if;
+  if not exists (select 1 from public.perfil where id=v_id and (funcao='admin' or coalesce(dev_acesso,false))) then raise exception 'sem permissão'; end if;
   -- padrão: desde a última sexta-feira (ou hoje, se hoje for sexta)
   v_desde := coalesce(p_desde, (now() at time zone 'America/Sao_Paulo')::date
              - ((extract(isodow from (now() at time zone 'America/Sao_Paulo')::date)::int + 2) % 7));
