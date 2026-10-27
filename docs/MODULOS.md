@@ -2760,3 +2760,24 @@ não sobrescreve za bom já gravado). Lotes de 5000 leituras por chamada.
 - **Estado atual (2026-10-16):** dimensão com **101 unidades** carregada; **25 no cadastro, 76 fora**
   (candidatas a inclusão — ver `vw_cadastro_sem_tele`/`vw_cobertura`). Série temporal entra pelo
   módulo/script.
+
+## 17. Vitrine (TV) — `// VITRINE (TV)` · tela `vitrine` (restrita a Geovana e Sander, 2026-10-26)
+
+Painel para a TV da sala: **apresentação em loop** com as atividades de campo (fotos + mapas) e indicadores,
+**ao vivo** — a cada volta completa busca os dados de novo (`vtCarregar`) e recomeça.
+- **Acesso:** botão `#homeVitrine` (Home › 🧰 Suporte) só aparece se `ME.email` ∈ {geovana.mendonca, sander.sirio}
+  (`vtPode()`); a RPC **`app_vitrine_dados(p_desde date default null)`** (SECURITY DEFINER, `docs/migracao_vitrine.sql`)
+  recusa qualquer outro usuário (mesma lista). Para liberar mais alguém: incluir o e-mail **nos dois lugares**.
+- **Período:** padrão = desde a última sexta-feira (`p_desde` nulo). Atividades: instalação/remoção de logger, OS de VRP
+  executadas (≠ programada), ocorrências da pesquisa, recomposição de pavimento, mapeamento de pressão, avanços de obra
+  (sem GPS) e solicitações de serviço. Indicadores: "Situação agora" (loggers em campo, frota, manutenções, pendências
+  VRP, solicitações/ocorrências sem OS, checklists do dia, usuários) e "No mês até agora". "Loggers em campo" = instalados
+  e não removidos (`data_instalacao` preenchida — o planejado ainda não instalado não conta).
+- **Tela:** `<main id="vitrine">` é overlay `position:fixed` com tema escuro próprio (`.vt-*`), botões ⛶ Tela cheia e
+  ✕ Sair (canto sup. dir., semitransparentes). Teclado: ←/→ navega, espaço pausa, Esc sai. Mapas Leaflet com base
+  **Esri Dark Gray** (o CARTO passou a exigir chave). `irPara` chama `vtParar()` ao sair (limpa timers).
+- Estado em `var`/lista dentro da função de propósito: `homeGate`/`irPara` podem rodar antes do fim da avaliação do módulo.
+- **Cuidados:** a TV roda o dia todo — todo mapa criado vai para `vtMapas` e `vtSoltarMapas()` faz `m.remove()` antes
+  de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
+  chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
+  tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
