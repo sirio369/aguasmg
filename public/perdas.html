@@ -530,6 +530,7 @@ const DMC=[
 DMC.forEach(d=>{d.geom=JSON.parse(d.gj);d.osKm=d.os/d.rede;d.consLig=d.cons/d.ativas;});
 
 const fmt=n=>Math.round(n).toLocaleString('pt-BR');
+const sitDesde=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):'—';
 const fmt1=n=>n.toLocaleString('pt-BR',{maximumFractionDigits:1});
 const $=s=>document.querySelector(s);
 let za="all", ind="osKm", sel=DMC.find(d=>d.code==="DMC-06"&&d.za==="ZA1004"), focusDmc=null;
@@ -962,20 +963,7 @@ function grandesTool(){
 }
 
 /* ---------- Análise do micromedido (dados REAIS via RPC) ---------- */
-const MM_CLASS={
- fraude_potencial:{l:'Fraude potencial',c:'#d6336c',acao:'Ligação inativa/cortada (I/F/P) faturando volume — prioridade máxima de fiscalização (possível religação clandestina / by-pass).'},
- factivel:{l:'Factível (fraude)',c:'#b5179e',acao:'Imóvel SEM situação ativa (inativo/cortado), mas com consumo de água via leitura (coluna factível) — forte indício de fraude/religação clandestina. Priorizar fiscalização.'},
- estavel:{l:'Estável',c:'#3fb27f',acao:'Consumo típico — sem ação.'},
- nulo_recorrente:{l:'Nulo recorrente',c:'#8a8f98',acao:'Verificar hidrômetro parado / imóvel desocupado / cadastro.'},
- pico_isolado:{l:'Pico isolado',c:'#e6a23c',acao:'Inspeção de vazamento interno ou erro de leitura.'},
- queda_continua:{l:'Queda contínua',c:'#e05d5d',acao:'Conferir leitura, desocupação, fraude ou vazamento corrigido.'},
- crescimento_continuo:{l:'Crescimento contínuo',c:'#4b9fe0',acao:'Revisão cadastral / categoria (possível ampliação/ocupação).'},
- instavel:{l:'Instável',c:'#c678dd',acao:'Cliente prioritário para fiscalização (alta variabilidade).'}
-};
-// situação da ligação (cd_situaca): R=Real/ativa, I=Inativa/cortada, F=Factível, P=Potencial
-const MM_SIT={R:{l:'Ativa',c:'#3fb27f'},I:{l:'Inativa/cortada',c:'#d6336c'},F:{l:'Factível',c:'#e6a23c'},P:{l:'Potencial',c:'#e6a23c'}};
-function mmSitLabel(s){ const o=MM_SIT[s]; return o?o.l:(s||'—'); }
-let mmClass='', mmBusca='', mmResumo=null, mmRank=[], mmMensal=[], mmDmc=[], mmSel=null, mmDetSel=null, mmDetCache={};
+let mmMensal=[], mmDmc=[], mmSel=null, mmInd=null;
 let mmDmcSel=null; // {cons,num} do filtro de DMC do cabeçalho (null = todos)
 function mmDmcList(){ return (mmDmc||[]).slice().sort((a,b)=>(''+(a.consorcio+(a.codigo_dmc||a.numero_dmc))).localeCompare(''+(b.consorcio+(b.codigo_dmc||b.numero_dmc)),'pt-BR')); }
 const MM_MES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -998,23 +986,12 @@ const MM_SEAS_MET={
 };
 const MM_SEAS_ORDER=['lpd','volume_total','volume_medido','volume_naomedido','volume_factivel','n_faturadas'];
 let mmSeasMet='lpd';
-let mmDmcSort={k:'lpd',dir:-1}; // ordenação livre da tabela de DMCs
 function mmSeasNum(v){ return mmSeasMet==='lpd'?br1(v):fmt(v); }               // valor por extenso (sem k/M)
 function mmSeasFmt(v){ return mmSeasNum(v)+' '+MM_SEAS_MET[mmSeasMet].u; }      // com unidade (tooltips)
 const MM_INFO={
  lpd:{t:'L/lig/dia — como é calculado',h:`<p><b>Litros por ligação por dia</b> = Volume <b>micromedido total</b> do mês ÷ nº de ligações ÷ <b>30 dias</b> × 1000. Esta análise olha <b>só a micromedição</b> — o volume faturado não entra.</p><p>Assume 30 dias por mês (a base ainda não tem o dia da leitura). Como divide pelo nº de ligações, <b>normaliza tudo por ligação</b> — permite comparar meses e DMCs sem o viés do crescimento do nº de matrículas (o volume total sobe só porque entram mais ligações).</p><p><b>Volume micromedido (total)</b> = <b>lido</b> (leitura real do hidrômetro) + <b>estimado</b> (consumo imputado quando não houve leitura) + <b>factível</b> (consumo lido em imóvel <b>sem situação ativa</b> — inativo/cortado — indício de fraude). O faturado mínimo (tarifa de consumo zero) <b>não entra</b>. Os cards decompõem justamente essas três parcelas para achar a origem de cada oscilação.</p>`},
  season:{t:'Sazonalidade & tendência',h:`<p>Por padrão tudo em <b>L/lig/dia</b> para "empatar" as variáveis e não distorcer a percepção.</p><p><b>Chips de composição</b>: alternam a visualização entre <b>L/lig·dia</b>, <b>volume micromedido</b> (total = lido + estimado), <b>volume lido</b> (leitura real do hidrômetro), <b>volume estimado</b> (consumo imputado, sem faturado mínimo) e <b>ligações</b> com micromedição. Decompor assim ajuda a achar <b>o que</b> causa uma flutuação: se o L/lig/dia oscilou, foi o volume lido que caiu, o estimado que subiu, ou só entraram mais ligações?</p><p><b>Heatmap</b>: cada célula é a composição escolhida naquele mês/ano (mais claro = maior). A linha <b>Sazonal</b> mostra o desvio médio de cada mês‑calendário vs a média geral (laranja acima / azul abaixo).</p><p><b>Gráfico</b>: linha = ano mais recente; a <b>sombra</b> é a faixa mín–máx dos anos anteriores. ⚠️ Base atual = 18 meses (2025‑03 a 2026‑08): a sombra hoje reflete só 2025 e alguns meses ainda não têm sobreposição ano a ano.</p>`},
- dmc:{t:'DMCs mais sensíveis',h:`<p>Cruzamento espacial <b>matrícula → DMC</b> (ponto da ligação dentro do limite vigente do DMC) × micromedição.</p><p><b>L/lig/dia</b> por DMC no último mês, com variação <b>MoM</b> (mês anterior) e <b>YoY</b> (mesmo mês do ano anterior), <b>% não medido</b>, nº de <b>fraudes potenciais</b> e <b>score médio</b> de anomalia. DMCs no topo (maior L/lig/dia ou piores deltas) são candidatos a priorização de campanha.</p>`},
- rank:{t:'Ranking de anomalia — variáveis e método',h:`<ul style="padding-left:18px;margin:0;line-height:1.65">
-  <li><b>Comportamento</b>: classe derivada das métricas, na precedência fraude → factível → nulo recorrente → pico isolado → queda contínua → crescimento contínuo → instável → estável.</li>
-  <li><b>Factível</b>: imóvel <b>sem situação ativa</b> (inativo/cortado) com <b>consumo de água lido</b> (coluna factível, qt_vol_fac) — indício de fraude/religação clandestina. Diferente de "fraude potencial": aqui o volume medido é zero (a ligação está fora), mas há leitura no campo factível. O selo <b>N× factível</b> conta esses meses.</li>
-  <li><b>Situação</b>: situação da ligação (cd_situaca) na última competência — Ativa (R), Inativa/cortada (I), Factível (F), Potencial (P). O selo <b>N× c/água</b> conta os meses com a ligação I/F/P faturando volume (indício de fraude).</li>
-  <li><b>Média m³</b>: média mensal do volume micromedido (consumido) nos 18 meses.</li>
-  <li><b>CV</b>: coeficiente de variação = desvio‑padrão ÷ média. Alto = consumo instável.</li>
-  <li><b>Tendência</b>: inclinação (slope) da regressão linear do volume ao longo dos meses, em m³/mês.</li>
-  <li><b>Zeros</b>: meses com volume zero sobre o total de meses.</li>
-  <li><b>Score (0–100)</b>: Índice de Anomalia = (3·pico + 2·tendência + 2·CV + 1·zeros + 3·fraude) ÷ 11 × 100. Pico = máx ÷ média; fraude = nº de meses cortada com água.</li>
- </ul>`}
+ ind:{t:'Indicadores de micromedição — definições',h:`<p>Calculados mensalmente por ZA sobre o <b>histórico de micromedição</b> (mesmo critério do relatório de linha de base, item 7.2 e Anexo E). A coluna <b>Média LB</b> é a média mensal dos meses da <b>janela da linha de base prévia</b> de cada ZA (mai/2025 fora: arquivo duplicado de abril).</p><ul style="padding-left:18px;margin:0 0 8px;line-height:1.6"><li><b>Volume total</b> = lido + estimado + <b>factível</b>. <b>Estimado</b> = volume das ligações com leitura estimada (qt_vol_est &gt; 0); <b>lido</b> (medido) = o restante.</li><li><b>I1</b> Ativas com leitura estimada = ativas (situação R) estimadas ÷ ativas — proxy de não leitura.</li><li><b>I2</b> Volume estimado ÷ volume total. <b>I3</b> Volume medido ÷ volume total.</li><li><b>I4</b> Ativas com volume zero ÷ ativas.</li><li><b>I5</b> Ligações não ativas (inativas, factíveis e potenciais) ÷ total de ligações.</li><li><b>I6</b> Consumo por ligação = volume total ÷ ligações faturadas (volume ou factível &gt; 0) ÷ 30 dias × 1000 (L/lig·dia, mesma premissa do módulo).</li><li><b>I7</b> Consumo por economia ativa = (volume total − volume das não ativas) ÷ economias ativas (m³/economia/mês).</li><li><b>I8</b> Não ativas com volume lido ou estimado &gt; 0 (lig./mês) — indício de ligação irregular ou cadastro desatualizado.</li><li><b>I9</b> Volume factível ÷ volume total (I2 + I3 + I9 = 100%).</li><li><b>I10</b> Não ativas com volume factível &gt; 0 (lig./mês).</li></ul><p>O significado do <b>factível</b> (consumo em ligação sem situação ativa) foi inferido dos dados e ainda não foi confirmado pela COPASA. Os indicadores são da <b>ZA inteira</b>: não respondem ao filtro de DMC.</p>`}
 };
 function mmModal(title,html){ let o=document.getElementById('mmModal');
  if(!o){ o=document.createElement('div'); o.id='mmModal'; o.className='mmmodal';
@@ -1062,15 +1039,6 @@ function mmCss(){ if(document.getElementById('mmcss'))return; const st=document.
  .mmhna{background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.05) 3px,rgba(255,255,255,.05) 6px)}
  .mmhsel{outline:2px solid var(--accent);outline-offset:-2px}
  .mmhdev{color:#0d1418;font-weight:600}
- .mmdmc{width:100%}
- .mmdistwrap{display:flex;flex-direction:column;gap:8px}
- .mmdist{display:grid;grid-template-columns:158px 1fr 92px;align-items:center;gap:10px;cursor:pointer;padding:2px 0;border-radius:6px}
- .mmdist.sel{font-weight:600;background:rgba(var(--accent-rgb),.07)}
- .mmdist .mmdlab{font-size:12.5px;display:flex;align-items:center;gap:7px}
- .mmdist .mmdlab i{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
- .mmdbar{height:9px;border-radius:5px;background:var(--surface-2,#12212a);overflow:hidden}
- .mmdbar span{display:block;height:100%;border-radius:5px}
- .mmdval{font-size:11.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
  .mmanalgrid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-top:12px;align-items:start}
  @media(max-width:860px){.mmanalgrid{grid-template-columns:1fr}}
  .mmdetail-sticky{position:sticky;top:8px}
@@ -1086,63 +1054,36 @@ function mmCss(){ if(document.getElementById('mmcss'))return; const st=document.
  .mmstats>div{display:flex;flex-direction:column}
  .mmstats .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
  .mmstats .v{font-size:14px;font-weight:600}
- .mmdmc th[data-k]{cursor:pointer;user-select:none;white-space:nowrap}
- .mmdmc th[data-k]:hover{color:var(--accent)}
- .mmdmc th .ar{opacity:.9;margin-left:2px;font-size:10px}
- .mmanalgrid2{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"faixas lista" "detalhe lista";gap:14px;margin-top:12px;align-items:start}
- @media(max-width:860px){.mmanalgrid2{grid-template-columns:1fr;grid-template-areas:"faixas" "lista" "detalhe"}}
  .mmblock{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}
  .mmblock-h{font-size:13px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px}
- .mmblock-h .hint{font-size:11px;color:var(--muted);font-weight:400;margin-left:auto}`; document.head.appendChild(st); }
+ .mmblock-h .hint{font-size:11px;color:var(--muted);font-weight:400;margin-left:auto}
+ .mmind{width:100%;border-collapse:collapse;font-size:12.5px}
+ .mmind th,.mmind td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+ .mmind th{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;text-align:left;position:sticky;top:0;background:var(--surface,#0f1a1f)}
+ .mmind td.cod{color:var(--accent);font-weight:600;width:1%}
+ .mmind tr.grp td{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);background:rgba(var(--accent-rgb),.05)}
+ .mmind tr.inj td{background:rgba(var(--accent-rgb),.07)}
+ .mmind tr.sel td{font-weight:600}
+ .mmind tr.gap td{color:var(--muted);font-style:italic}
+ .mmind tr.avg td{font-weight:600;border-top:2px solid var(--line)}
+`; document.head.appendChild(st); }
 async function mmInit(){ mmCss();
  if(mmDmcSel && za!=='all' && mmDmcSel.cons!==za) mmDmcSel=null; // consórcio mudou pela barra global → limpa DMC de outra cidade
  const body=$('#mmBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise do micromedido…</p></div></div>';
- let r,k,mn,dm;
+ let mn,dm,ind;
  try{
-  const fc=mmDmcSel?mmDmcSel.cons:mmCons(), fd=mmDmcSel?mmDmcSel.num:null; // consórcio/dmc efetivos p/ indicador·sazonalidade·análise
-  [r,k,mn,dm]=await Promise.all([
-   sbg.rpc('app_nrw_mm_resumo',{p_consorcio:fc,p_dmc:fd}),
-   sbg.rpc('app_nrw_mm_ranking',{p_consorcio:fc,p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:150,p_offset:0,p_dmc:fd}),
+  const fc=mmDmcSel?mmDmcSel.cons:mmCons(), fd=mmDmcSel?mmDmcSel.num:null; // consórcio/dmc efetivos p/ indicador·sazonalidade
+  [mn,dm,ind]=await Promise.all([
    sbg.rpc('app_nrw_mm_mensal',{p_consorcio:fc,p_dmc:fd}),
-   sbg.rpc('app_nrw_mm_dmc',{p_consorcio:mmCons(),p_competencia:mmSel})
+   sbg.rpc('app_nrw_mm_dmc',{p_consorcio:mmCons(),p_competencia:mmSel}),
+   sbg.rpc('app_nrw_mm_indicadores',{p_consorcio:mmCons()}) // indicadores da linha de base: sempre ZA inteira (não filtra DMC)
   ]);
-  if(r.error)throw r.error; if(k.error)throw k.error; if(mn.error)throw mn.error; if(dm.error)throw dm.error;
+  if(mn.error)throw mn.error; if(dm.error)throw dm.error;
  }catch(e){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; return; }
- mmResumo=r.data; mmRank=k.data||[]; mmMensal=mn.data||[]; mmDmc=dm.data||[];
+ mmMensal=mn.data||[]; mmDmc=dm.data||[]; mmInd=ind.error?{erro:ind.error.message||String(ind.error)}:ind.data;
  if(mmSel==null || !mmMensal.some(p=>p.competencia===mmSel)) mmSel=mmMensal.length?mmMensal[mmMensal.length-1].competencia:null;
- mmDetSel=null; mmDetCache={}; mmRenderAll();
-}
-async function mmLoadRank(){
- const fc=mmDmcSel?mmDmcSel.cons:mmCons(), fd=mmDmcSel?mmDmcSel.num:null;
- try{ const k=await sbg.rpc('app_nrw_mm_ranking',{p_consorcio:fc,p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:150,p_offset:0,p_dmc:fd}); if(k.error)throw k.error; mmRank=k.data||[]; }
- catch(e){ if(window.toast)toast('Erro no ranking: '+(e.message||e)); return; }
- mmDetSel=null; mmRenderAll();
-}
-// export CSV do ranking de matrículas (lista filtrada) — espelha o export da priorização de HD
-async function mmExport(){
- const btn=$('#mmExport'); const fc=mmDmcSel?mmDmcSel.cons:mmCons(), fd=mmDmcSel?mmDmcSel.num:null;
- if(btn){btn.disabled=true;btn.textContent='Gerando…';}
- try{
-  const all=[], pageN=500;
-  for(let off=0; off<100000; off+=pageN){
-   const k=await sbg.rpc('app_nrw_mm_ranking',{p_consorcio:fc,p_classificacao:mmClass||null,p_busca:mmBusca||null,p_limit:pageN,p_offset:off,p_dmc:fd});
-   if(k.error)throw k.error; const rows=k.data||[]; all.push(...rows); if(rows.length<pageN)break;
-  }
-  const head=['Matrícula','Consórcio','Comportamento','Situação','Score anomalia','Meses','Média (m³/mês)','Mediana','CV','Tendência (slope)','Nº zeros','Mínimo','Máximo','Meses irregular (c/ água)','Meses factível'];
-  const esc=v=>{ const s=(v==null?'':String(v)); return /[";\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  const dec=v=>v==null?'':String(v).replace('.',',');
-  const lines=[head.map(esc).join(';')];
-  all.forEach(x=>{ const cl=(MM_CLASS[x.classificacao]||{l:x.classificacao}).l, si=(MM_SIT[x.situacao_atual]||{l:x.situacao_atual||'—'}).l;
-   const cons=x.consorcio==='ZA0200'?'Betim':(x.consorcio==='ZA1004'?'Contagem':x.consorcio);
-   lines.push([x.matricula,cons,cl,si,x.score_anomalia,x.n_meses,dec(x.media),dec(x.mediana),dec(x.cv),dec(x.slope),x.n_zeros,dec(x.minimo),dec(x.maximo),x.meses_irregular,x.meses_factivel].map(esc).join(';'));
-  });
-  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=`ranking_matriculas_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },120);
- }catch(e){ if(window.toast)toast('Erro ao exportar: '+(e.message||e)); }
- if(btn){btn.disabled=false;btn.textContent='⭳ Exportar CSV';}
+ mmRenderAll();
 }
 function mmSetMes(c){ mmSel=+c; mmRenderAll(); mmReloadDmc(); }
 async function mmReloadDmc(){ try{ const dm=await sbg.rpc('app_nrw_mm_dmc',{p_consorcio:mmCons(),p_competencia:mmSel}); if(!dm.error){ mmDmc=dm.data||[]; mmRenderAll(); } }catch(e){} }
@@ -1218,61 +1159,82 @@ function mmSeasonPanel(){
    <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). A linha <b>Sazonal</b> é sempre o desvio % vs a média geral da composição. Passe o mouse nos pontos para o valor exato.</p>
   </div></div>`;
 }
-/* ---- painel 3: DMCs mais sensíveis (ordenação livre por coluna) ---- */
-const MM_DMC_COLS=[
- {k:'dmc',   lab:'DMC',                num:false, r:false, get:x=>x.codigo_dmc||('DMC-'+x.numero_dmc), cell:x=>`<b>${x.codigo_dmc||('DMC-'+x.numero_dmc)}</b>`},
- {k:'lig',   lab:'Ligações',           num:true,  r:true,  get:x=>+x.n_faturadas||0, cell:x=>fmt(x.n_faturadas||0)},
- {k:'mt',    lab:'Micro total',        num:true,  r:true,  get:x=>+x.volume_total||0, cell:x=>fmt(x.volume_total||0)},
- {k:'ml',    lab:'Micro lido',         num:true,  r:true,  get:x=>+x.volume_medido||0, cell:x=>fmt(x.volume_medido||0)},
- {k:'me',    lab:'Micro estimado',     num:true,  r:true,  get:x=>+x.volume_naomedido||0, cell:x=>fmt(x.volume_naomedido||0)},
- {k:'lpd',   lab:'L/lig·dia',          num:true,  r:true,  get:x=>+x.lpd, cell:x=>`<b>${br1(x.lpd)}</b>`},
- {k:'mom',   lab:'MoM',                num:true,  r:true,  get:x=>x.lpd_mom==null?null:+x.lpd_mom, cell:x=>`<span style="color:${mmDelta(x.lpd_mom)}">${x.lpd_mom!=null?mmSig(x.lpd_mom)+'%':'—'}</span>`},
- {k:'yoy',   lab:'YoY',                num:true,  r:true,  get:x=>x.lpd_yoy==null?null:+x.lpd_yoy, cell:x=>`<span style="color:${mmDelta(x.lpd_yoy)}">${x.lpd_yoy!=null?mmSig(x.lpd_yoy)+'%':'—'}</span>`},
- {k:'est',   lab:'% estimado',         num:true,  r:true,  get:x=>+x.pct_naomedido, cell:x=>br1(x.pct_naomedido)+'%'},
- {k:'fraude',lab:'Suspeita de fraude', num:true,  r:true,  get:x=>+x.n_fraude||0, cell:x=>`<span${x.n_fraude>0?' style="color:#d6336c;font-weight:600"':''}>${fmt(x.n_fraude||0)}</span>`}
+/* ---- painel 3: indicadores de micromedição (relatório de linha de base, item 7.2 · Anexo E) ---- */
+const MM_IND_ROWS=[
+ {g:'Base de cálculo'},
+ {lab:'Ligações (total)',                    csv:'Ligações (total)',          ab:'Ligações',        get:r=>r.n_ligacoes,      f:v=>fmt(v)},
+ {lab:'Ligações ativas',                     csv:'Ligações ativas',           ab:'Ativas',          get:r=>r.n_ativas,        f:v=>fmt(v)},
+ {lab:'Volume total, com factível (m³/mês)', csv:'Volume total (m³)',         ab:'Vol. total (m³)', get:r=>r.volume_total,    f:v=>fmt(v)},
+ {lab:'&nbsp;&nbsp;do qual lido',            csv:'Volume lido (m³)',          ab:'Vol. lido',       get:r=>r.volume_medido,   f:v=>fmt(v)},
+ {lab:'&nbsp;&nbsp;do qual estimado',        csv:'Volume estimado (m³)',      ab:'Vol. estimado',   get:r=>r.volume_estimado, f:v=>fmt(v)},
+ {lab:'&nbsp;&nbsp;do qual factível',        csv:'Volume factível (m³)',      ab:'Vol. factível',   get:r=>r.volume_factivel, f:v=>fmt(v)},
+ {g:'Indicadores'},
+ {cod:'I1', lab:'Ativas com leitura estimada',        csv:'I1 Ativas com leitura estimada (%)',        get:r=>r.n_ativas?100*r.n_ativas_estimadas/r.n_ativas:null,         f:v=>br1(v)+'%'},
+ {cod:'I2', lab:'Volume estimado',                    csv:'I2 Volume estimado (%)',                    get:r=>r.volume_total?100*r.volume_estimado/r.volume_total:null,    f:v=>br1(v)+'%'},
+ {cod:'I3', lab:'Volume medido',                      csv:'I3 Volume medido (%)',                      get:r=>r.volume_total?100*r.volume_medido/r.volume_total:null,      f:v=>br1(v)+'%'},
+ {cod:'I4', lab:'Ativas com volume zero',             csv:'I4 Ativas com volume zero (%)',             get:r=>r.n_ativas?100*r.n_ativas_zero/r.n_ativas:null,              f:v=>br1(v)+'%'},
+ {cod:'I5', lab:'Ligações não ativas',                csv:'I5 Ligações não ativas (%)',                get:r=>r.n_ligacoes?100*r.n_nao_ativas/r.n_ligacoes:null,           f:v=>br1(v)+'%'},
+ {cod:'I6', lab:'Consumo por ligação (L/ligação·dia)', csv:'I6 Consumo (L/ligação·dia)',               get:r=>r.n_faturadas?r.volume_total*1000/r.n_faturadas/30:null,     f:v=>fmt(v), fd:v=>br1(v)},
+ {cod:'I7', lab:'Consumo por economia ativa (m³/economia/mês)', csv:'I7 Consumo por economia ativa (m³/mês)', get:r=>r.n_economias_ativas?(r.volume_total-r.volume_nao_ativas)/r.n_economias_ativas:null, f:v=>v.toFixed(2).replace('.',','), fd:v=>v.toFixed(2).replace('.',',')},
+ {cod:'I8', lab:'Não ativas com volume lido ou estimado (lig./mês)', csv:'I8 Não ativas com volume lido ou estimado (lig.)', get:r=>r.n_nao_ativas_vol, f:v=>fmt(v), fd:(v,m)=>m?br1(v):fmt(v)},
+ {cod:'I9', lab:'Volume factível',                    csv:'I9 Volume factível (%)',                    get:r=>r.volume_total?100*r.volume_factivel/r.volume_total:null,    f:v=>br1(v)+'%'},
+ {cod:'I10',lab:'Não ativas com volume factível (lig./mês)',         csv:'I10 Não ativas com volume factível (lig.)',         get:r=>r.n_nao_ativas_fac, f:v=>fmt(v), fd:(v,m)=>m?br1(v):fmt(v)}
 ];
-function mmDmcPanel(){
- if(!mmDmc.length) return '';
- const col=MM_DMC_COLS.find(c=>c.k===mmDmcSort.k)||MM_DMC_COLS.find(c=>c.k==='lpd'), dir=mmDmcSort.dir;
- const arr=mmDmc.slice().sort((a,b)=>{ let va=col.get(a),vb=col.get(b);
-   if(col.num){ va=(va==null?-Infinity:va); vb=(vb==null?-Infinity:vb); return (va-vb)*dir; }
-   return (''+va).localeCompare(''+vb,'pt-BR')*dir; });
- const th=MM_DMC_COLS.map(c=>`<th class="${c.r?'r':''}" data-k="${c.k}">${c.lab}${mmDmcSort.k===c.k?`<span class="ar">${dir<0?'▼':'▲'}</span>`:''}</th>`).join('');
- const rows=arr.map(x=>'<tr>'+MM_DMC_COLS.map(c=>`<td class="${c.r?'r':''}">${c.cell(x)}</td>`).join('')+'</tr>').join('');
- return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Abertura por DMC</h3>${mmIB('dmc')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody"><div style="overflow-x:auto"><table class="mmdmc"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
-}
-/* ---- painel 4: análise por matrícula (distribuição + ranking + detalhe lado a lado) ---- */
-function mmAnalysisPanel(){
- const R=mmResumo||{}, tot=R.n_matriculas||1, pc=R.por_classificacao||{};
- const order=['fraude_potencial','factivel','instavel','pico_isolado','queda_continua','crescimento_continuo','nulo_recorrente','estavel'];
- const distBars=order.filter(k=>pc[k]!=null).map(k=>{ const m=MM_CLASS[k],n=pc[k],w=Math.round(n/tot*100);
-  return `<div class="mmdist ${mmClass===k?'sel':''}" data-cls="${k}"><span class="mmdlab"><i style="background:${m.c}"></i>${m.l}</span><div class="mmdbar"><span style="width:${w}%;background:${m.c}"></span></div><span class="mmdval">${fmt(n)} · ${w}%</span></div>`;
+const MM_ZA_NOME={ZA1004:'Contagem',ZA0200:'Betim'};
+function mmIndCons(){ return za==='all'?['ZA1004','ZA0200']:[za]; }
+function mmIndSerie(c){ return ((mmInd&&mmInd.serie)||[]).filter(r=>r.consorcio===c); }
+function mmIndNaJanela(c,comp){ const j=((mmInd&&mmInd.janela)||{})[c]; return !!j && comp>=j.de && comp<=j.ate && !(j.excluir||[]).includes(comp); }
+function mmIndMedia(c,get){ const v=mmIndSerie(c).filter(r=>mmIndNaJanela(c,r.competencia)).map(get).filter(x=>x!=null&&isFinite(x)); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; }
+// todos os meses do intervalo (mai/2025 fica como lacuna "sem dado")
+function mmIndMeses(c){ const S=mmIndSerie(c); if(!S.length) return []; const out=[]; let y=Math.floor(S[0].competencia/100), m=S[0].competencia%100; const fim=S[S.length-1].competencia;
+ while(y*100+m<=fim){ out.push(y*100+m); m++; if(m>12){m=1;y++;} } return out; }
+function mmIndJanelaTxt(c){ const j=((mmInd&&mmInd.janela)||{})[c]; return j?mmCmp(j.de)+' a '+mmCmp(j.ate)+((j.excluir||[]).length?' (sem '+j.excluir.map(mmCmp).join(', ')+')':''):'—'; }
+function mmIndPanel(){
+ const head=`<div class="phead"><h3>Indicadores de micromedição</h3>${mmIB('ind')}<span class="chip real" style="margin-left:auto">real</span></div>`;
+ if(!mmInd||mmInd.erro) return `<div class="panel" style="margin-top:14px">${head}<div class="pbody"><p class="note" style="color:#e05d5d;margin:0">Não foi possível carregar os indicadores${mmInd&&mmInd.erro?': '+mmInd.erro:''}.</p></div></div>`;
+ const cons=mmIndCons().filter(c=>mmIndSerie(c).length);
+ if(!cons.length) return `<div class="panel" style="margin-top:14px">${head}<div class="pbody"><p class="note" style="margin:0">Sem dados de micromedição para esta ZA.</p></div></div>`;
+ const selTxt=mmCmp(mmSel);
+ // quadro-resumo: média da janela da linha de base × mês selecionado, por ZA
+ const th1=cons.map(c=>`<th colspan="2" style="text-align:center">${c} · ${MM_ZA_NOME[c]}</th>`).join('');
+ const th2=cons.map(()=>`<th class="r">Média LB</th><th class="r">${selTxt}</th>`).join('');
+ const rows=MM_IND_ROWS.map(r=>{
+  if(r.g) return `<tr class="grp"><td colspan="${2+cons.length*2}">${r.g}</td></tr>`;
+  const tds=cons.map(c=>{ const med=mmIndMedia(c,r.get), cur=mmIndSerie(c).find(x=>x.competencia===mmSel), v=cur?r.get(cur):null;
+   return `<td class="r"><b>${med!=null?r.f(med):'—'}</b></td><td class="r">${v!=null&&isFinite(v)?r.f(v):'—'}</td>`; }).join('');
+  return `<tr><td class="cod">${r.cod||''}</td><td>${r.lab}</td>${tds}</tr>`;
  }).join('');
- const chips='<button class="mmchip '+(mmClass===''?'on':'')+'" data-cls="">Todas</button>'+order.map(k=>`<button class="mmchip ${mmClass===k?'on':''}" data-cls="${k}">${MM_CLASS[k].l}</button>`).join('');
- const rows=mmRank.map(x=>{ const m=MM_CLASS[x.classificacao]||{l:x.classificacao,c:'#888'}, si=MM_SIT[x.situacao_atual]||{l:x.situacao_atual||'—',c:'#8a8f98'};
-  const irr=(x.meses_irregular||0)>0?` <span class="mmtag" style="--cc:#d6336c" title="meses inativa/cortada com volume faturado">${x.meses_irregular}× c/água</span>`:'';
-  const fac=(x.meses_factivel||0)>0?` <span class="mmtag" style="--cc:#b5179e" title="meses sem situação ativa com consumo lido (factível) — indício de fraude">${x.meses_factivel}× factível</span>`:'';
-  return `<tr data-mat="${x.matricula}" data-cons="${x.consorcio}" style="cursor:pointer"><td>${x.matricula}</td><td><span class="mmtag" style="--cc:${m.c}">${m.l}</span></td><td><span style="color:${si.c}">${si.l}</span>${irr}${fac}</td><td class="r"><b>${x.score_anomalia}</b></td></tr>`;
- }).join('')||'<tr><td colspan="4" class="note">Nenhuma matrícula nesse filtro.</td></tr>';
- return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Análise por matrícula</h3>${mmIB('rank')}<span class="chip real" style="margin-left:auto">real</span></div>
-  <div class="pbody">
-   <div class="mmanalgrid2">
-    <div class="mmblock" style="grid-area:faixas">
-     <div class="mmblock-h">Distribuição por comportamento</div>
-     <div class="mmdistwrap">${distBars}</div>
-    </div>
-    <div class="mmblock" style="grid-area:lista">
-     <div class="mmblock-h" style="display:flex;align-items:center;gap:8px">Ranking de matrículas <span class="hint">Índice 0–100</span><button class="hdbtn" id="mmExport" style="margin-left:auto">⭳ Exportar CSV</button></div>
-     <div class="mmfilters">${chips}</div>
-     <div style="overflow:auto;max-height:560px"><table id="mmtbl"><thead><tr><th>Matrícula</th><th>Comportamento</th><th>Situação</th><th class="r">Score</th></tr></thead><tbody>${rows}</tbody></table></div>
-    </div>
-    <div class="mmblock" style="grid-area:detalhe">
-     <div class="mmblock-h">Detalhe da matrícula <span class="hint">18 meses</span></div>
-     <div id="mmDetail"><p class="note" style="margin:0">Selecione uma matrícula no ranking à direita.</p></div>
-    </div>
-   </div>
-  </div></div>`;
+ const jan=cons.map(c=>`<b>${c}</b> ${mmIndJanelaTxt(c)}`).join(' · ');
+ const resumo=`<div style="overflow-x:auto"><table class="mmind"><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Indicador</th>${th1}</tr><tr>${th2}</tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="note" style="margin:8px 0 0;font-size:11px">Média LB = média mensal na janela da linha de base prévia — ${jan}. Volume total inclui o factível. Indicadores da ZA inteira${mmDmcSel?' (não respondem ao filtro de DMC)':''}.</p>`;
+ // detalhamento mensal (Anexo E): um quadro por ZA, todos os indicadores mês a mês
+ const cols=MM_IND_ROWS.filter(r=>r.cod);
+ const mensal=cons.map(c=>{
+  const byC={}; mmIndSerie(c).forEach(r=>byC[r.competencia]=r);
+  const body=mmIndMeses(c).map(comp=>{ const r=byC[comp];
+   if(!r) return `<tr class="gap"><td>${mmCmp(comp)}</td><td colspan="${cols.length}">sem dado (arquivo da COPASA duplicado de abril)</td></tr>`;
+   const cl=(mmIndNaJanela(c,comp)?'inj':'')+(comp===mmSel?' sel':'');
+   return `<tr class="${cl}"><td>${mmCmp(comp)}</td>${cols.map(k=>{ const v=k.get(r); return `<td class="r">${v!=null&&isFinite(v)?(k.fd||k.f)(v):'—'}</td>`; }).join('')}</tr>`; }).join('');
+  const avg=`<tr class="avg"><td>Média LB</td>${cols.map(k=>{ const v=mmIndMedia(c,k.get); return `<td class="r">${v!=null?(k.fd||k.f)(v,1):'—'}</td>`; }).join('')}</tr>`;
+  return `<div class="mmblock" style="margin-top:12px"><div class="mmblock-h">Detalhamento mensal · ${c} (${MM_ZA_NOME[c]}) <span class="hint">janela da LB destacada · ${mmIndJanelaTxt(c)}</span></div>
+   <div style="overflow:auto;max-height:520px"><table class="mmind"><thead><tr><th>Mês</th>${cols.map(k=>`<th class="r" title="${k.csv}">${k.cod||k.ab}</th>`).join('')}</tr></thead><tbody>${body}${avg}</tbody></table></div></div>`;
+ }).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Indicadores de micromedição</h3>${mmIB('ind')}<button class="hdbtn" id="mmIndExport" style="margin-left:auto">⭳ Exportar CSV</button><span class="chip real" style="margin-left:8px">real</span></div>
+  <div class="pbody">${resumo}${mensal}</div></div>`;
+}
+// export CSV do detalhamento mensal (todas as ZAs exibidas) — alimenta o Anexo E do relatório
+function mmIndExport(){
+ const cols=MM_IND_ROWS.filter(r=>r.cod);
+ const esc=v=>{ const s=(v==null?'':String(v)); return /[";\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+ const dec=v=>v==null||!isFinite(v)?'':String(Math.round(v*100)/100).replace('.',',');
+ const lines=[['Consórcio','Mês','Na janela da LB'].concat(cols.map(k=>k.csv)).map(esc).join(';')];
+ mmIndCons().forEach(c=>{ const byC={}; mmIndSerie(c).forEach(r=>byC[r.competencia]=r);
+  mmIndMeses(c).forEach(comp=>{ const r=byC[comp]; lines.push([c,mmCmp(comp),r?(mmIndNaJanela(c,comp)?'Sim':'Não'):'Sem dado'].concat(cols.map(k=>r?dec(k.get(r)):'')).map(esc).join(';')); });
+  lines.push([c,'Média LB','Sim'].concat(cols.map(k=>dec(mmIndMedia(c,k.get)))).map(esc).join(';')); });
+ const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+ const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+ a.download=`indicadores_micromedicao_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.csv`;
+ document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },120);
 }
 // filtros do micromedido moram SÓ no cabeçalho (barra do topo): consórcio = #zaseg (global), mês = #mes, DMC = #mesDmc
 function mmSyncHeader(){
@@ -1286,59 +1248,11 @@ function mmSyncHeader(){
 }
 function mmHeaderReset(){ const dmc=$('#mesDmc'); if(dmc){ dmc.hidden=true; dmc.onchange=null; } const mes=$('#mes'); if(mes){ mes.onchange=null; mes.innerHTML='<option>set/2026</option><option>ago/2026</option><option>jul/2026</option>'; } }
 function mmRenderAll(){
- $('#mmBody').innerHTML = mmKpiPanel()+mmSeasonPanel()+mmDmcPanel()+mmAnalysisPanel();
+ $('#mmBody').innerHTML = mmKpiPanel()+mmSeasonPanel()+mmIndPanel();
  mmSyncHeader();
  $('#mmBody').querySelectorAll('.mminfo').forEach(b=>b.onclick=()=>{ const i=MM_INFO[b.dataset.info]; if(i)mmModal(i.t,i.h); });
  $('#mmBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ mmSeasMet=el.dataset.seas; mmRenderAll(); });
- $('#mmBody').querySelectorAll('.mmdist').forEach(el=>el.onclick=()=>{ mmClass=(mmClass===el.dataset.cls?'':el.dataset.cls); mmLoadRank(); });
- $('#mmBody').querySelectorAll('.mmchip[data-cls]').forEach(el=>el.onclick=()=>{ mmClass=el.dataset.cls; mmLoadRank(); });
- $('#mmBody').querySelectorAll('.mmdmc th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(mmDmcSort.k===k) mmDmcSort.dir*=-1; else mmDmcSort={k:k,dir:(MM_DMC_COLS.find(c=>c.k===k)||{}).num!==false?-1:1}; mmRenderAll(); });
- $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>mmDetailFill(tr.dataset.cons,tr.dataset.mat));
- { const ex=$('#mmExport'); if(ex)ex.onclick=mmExport; }
- const box=$('#mmDetail');
- if(box){ if(mmDetSel) mmDetailFill(mmDetSel.cons,mmDetSel.mat); else if(mmRank.length) mmDetailFill(mmRank[0].consorcio,mmRank[0].matricula); }
-}
-async function mmDetailFill(cons,mat){
- const box=$('#mmDetail'); if(!box)return; mmDetSel={cons:cons,mat:''+mat};
- $('#mmBody').querySelectorAll('#mmtbl tbody tr[data-mat]').forEach(tr=>tr.classList.toggle('rowsel', tr.dataset.mat===(''+mat)&&tr.dataset.cons===cons));
- const key=cons+'|'+mat;
- if(mmDetCache[key]){ mmDetailRender(mmDetCache[key],cons,mat); return; }
- box.innerHTML='<p class="note" style="margin:0">Carregando série…</p>';
- let d; try{ d=await sbg.rpc('app_nrw_mm_serie',{p_consorcio:cons,p_matricula:Number(mat)}); if(d.error)throw d.error; }catch(e){ box.innerHTML='<p class="note" style="color:#e05d5d">Erro: '+(e.message||e)+'</p>'; return; }
- mmDetCache[key]=d.data; mmDetailRender(d.data,cons,mat);
-}
-function mmDetailRender(data,cons,mat){
- const box=$('#mmDetail'); if(!box)return;
- const st=(data&&data.stats)||{}, serie=(data&&data.serie)||[], m=MM_CLASS[st.classificacao]||{l:st.classificacao,c:'#888',acao:''};
- const W=520,H=150,pl=34,pr=10,pt=12,pb=22, vals=serie.map(p=>Number(p.volume)||0), maxv=Math.max(1,...vals);
- const X=i=>pl+(serie.length<=1?0:i/(serie.length-1))*(W-pl-pr), Y=v=>pt+(1-v/maxv)*(H-pt-pb);
- const pts=serie.map((p,i)=>X(i).toFixed(1)+','+Y(vals[i]).toFixed(1)).join(' ');
- const dots=serie.map((p,i)=>{ const cx=X(i).toFixed(1), cy=Y(vals[i]).toFixed(1);
-  if(p.irregular) return `<circle cx="${cx}" cy="${cy}" r="4.2" fill="#d6336c" stroke="#fff" stroke-width="1"><title>${mmCmp(p.competencia)}: ${vals[i]} m³ — ligação ${mmSitLabel(p.sit_lig)} com faturamento (irregular)</title></circle>`;
-  if(p.is_factivel) return `<circle cx="${cx}" cy="${cy}" r="4.2" fill="#b5179e" stroke="#fff" stroke-width="1"><title>${mmCmp(p.competencia)}: factível ${p.factivel} m³ — ligação ${mmSitLabel(p.sit_lig)} (sem situação ativa) com consumo lido</title></circle>`;
-  return `<circle cx="${cx}" cy="${cy}" r="${p.estimado?'2.3':'3'}" fill="${p.estimado?'#8a8f98':m.c}"><title>${mmCmp(p.competencia)}: ${vals[i]} m³${p.estimado?' (estimado)':''} · ${mmSitLabel(p.sit_lig)}</title></circle>`; }).join('');
- const nIrr=serie.filter(p=>p.irregular).length, nFac=serie.filter(p=>p.is_factivel).length, medY=Y(Number(st.media)||0);
- box.innerHTML=`<div class="mmdhead"><div><b style="font-size:16px">Matrícula ${st.matricula}</b> <span class="mmtag" style="--cc:${m.c}">${m.l}</span> <span class="note">${cons==='ZA0200'?'Betim':'Contagem'}</span></div><div class="note">score <b style="color:${m.c}">${st.score_anomalia}</b></div></div>
-  <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px;margin:8px 0">
-   <line x1="${pl}" y1="${medY.toFixed(1)}" x2="${W-pr}" y2="${medY.toFixed(1)}" stroke="#ffffff30" stroke-dasharray="4 4"/>
-   <text x="${pl}" y="${(medY-3).toFixed(1)}" fill="#ffffff66" font-size="9">média ${(Number(st.media)||0).toFixed(1)}</text>
-   <polyline points="${pts}" fill="none" stroke="${m.c}" stroke-width="1.6"/>${dots}
-   <text x="${pl}" y="${H-6}" fill="#ffffff66" font-size="9">${serie.length?mmCmp(serie[0].competencia):''}</text>
-   <text x="${W-pr}" y="${H-6}" fill="#ffffff66" font-size="9" text-anchor="end">${serie.length?mmCmp(serie[serie.length-1].competencia):''}</text></svg>
-  <div class="mmstats">
-   <div><span class="k">Média</span><span class="v">${(Number(st.media)||0).toFixed(1)} m³</span></div>
-   <div><span class="k">Mediana</span><span class="v">${(Number(st.mediana)||0).toFixed(1)}</span></div>
-   <div><span class="k">Mín–Máx</span><span class="v">${st.minimo}–${st.maximo}</span></div>
-   <div><span class="k">CV</span><span class="v">${st.cv!=null?Math.round(st.cv*100)+'%':'—'}</span></div>
-   <div><span class="k">Tendência</span><span class="v">${st.slope!=null?(st.slope>0?'+':'')+st.slope+' m³/mês':'—'}</span></div>
-   <div><span class="k">Meses zerados</span><span class="v">${st.n_zeros}/${st.n_meses}</span></div>
-   <div><span class="k">Situação atual</span><span class="v" style="color:${(MM_SIT[st.situacao_atual]||{}).c||'inherit'}">${mmSitLabel(st.situacao_atual)}</span></div>
-   <div><span class="k">Meses cortada c/ água</span><span class="v" style="color:${(st.meses_irregular||nIrr)>0?'#d6336c':'inherit'}">${st.meses_irregular!=null?st.meses_irregular:nIrr}</span></div>
-   <div><span class="k">Meses factível</span><span class="v" style="color:${(st.meses_factivel||nFac)>0?'#b5179e':'inherit'}">${st.meses_factivel!=null?st.meses_factivel:nFac}</span></div>
-  </div>
-  ${(st.meses_irregular||nIrr)>0?`<p class="note" style="margin-top:10px;color:#d6336c"><b>⚠ Indício de fraude:</b> ${st.meses_irregular!=null?st.meses_irregular:nIrr} mês(es) com a ligação inativa/cortada (I/F/P) porém faturando volume — pontos em <b>vermelho</b>.</p>`:''}
-  ${(st.meses_factivel||nFac)>0?`<p class="note" style="margin-top:8px;color:#b5179e"><b>⚠ Factível (indício de fraude):</b> ${st.meses_factivel!=null?st.meses_factivel:nFac} mês(es) com o imóvel <b>sem situação ativa</b> mas com <b>consumo de água lido</b> (coluna factível) — pontos em <b>magenta</b>. O volume medido é zero nesses meses; a leitura aparece só no campo factível.</p>`:''}
-  <p class="note" style="margin-top:10px"><b>Ação sugerida:</b> ${m.acao}</p>`;
+ { const ex=$('#mmIndExport'); if(ex)ex.onclick=mmIndExport; }
 }
 /* ---------- Análise de macromedição (dados REAIS via RPC — espelha a análise do micromedido) ---------- */
 let macroMensal=[], macroMacros=[], macroSel=null, macroDetSel=null, macroDetCache={}, macroSeasMet='vol_disponibilizado', macroSort={k:'vol',dir:-1};
@@ -2377,6 +2291,7 @@ function hdDetailHtml(d){
    <div><span class="k">Vol. no período</span><span>${d.volume_periodo!=null?fmt(Math.round(d.volume_periodo))+' m³':'—'}</span></div>
    <div><span class="k">Interno/externo</span><span>${d.interno_externo||'—'}</span></div>
    <div><span class="k">Situação ligação</span><span>${HD_SIT[d.situacao_lig]||d.situacao_lig||'—'}</span></div>
+   <div><span class="k">Situação desde</span><span>${sitDesde(d.situacao_desde)}</span></div>
   </div>
   <div class="mmblock-h" style="margin-top:6px">Consumo micromedido (18 meses)</div>${chart}
   <p class="note" style="margin:9px 0 2px"><b>Por que priorizar:</b> ${d.justificativa||'—'}</p>
@@ -2461,8 +2376,8 @@ function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if
  const all=[]; const pageN=1000;
  function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Remanejamento','Justificativa'];
-  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
+  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Situação desde','Remanejamento','Justificativa'];
+  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.situacao_desde?sitDesde(x.situacao_desde):'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Priorizacao HD');
   XLSX.writeFile(wb,`priorizacao_troca_HD_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
   if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}
@@ -2487,11 +2402,13 @@ const FR_CLASSE={
  queda_continua:{l:'Queda contínua de consumo',s:'Investigar queda',c:'#e05d5d'},
  nulo_recorrente:{l:'Consumo nulo recorrente',s:'Verificar em campo',c:'#e6a23c'},
  factivel:{l:'Factível / faturado mínimo',s:'Verificar faturamento',c:'#4b9fe0'},
- instavel:{l:'Consumo instável',s:'Acompanhar',c:'#8a8f98'}
+ instavel:{l:'Consumo instável',s:'Acompanhar',c:'#8a8f98'},
+ reativada:{l:'Reativada (regularizada)',s:'Acompanhar',c:'#2f9e8f'},
+ divergencia_cadastro:{l:'Divergência de cadastro',s:'Conferir cadastro',c:'#a0522d'}
 };
-const FR_CLASSE_ORDER=['fraude_potencial','queda_continua','nulo_recorrente','factivel','instavel'];
-const FR_LENTE=[['todos','Todos os suspeitos'],['grandes','Grandes consumidores'],['ligirreg','Consumo com ligação irregular'],['estimada','Leitura estimada recorrente'],['vizinhanca','Abaixo da vizinhança']];
-const FR_LENTE_DESC={todos:'Todas as classes de suspeita do motor de anomalia.',grandes:'Consumo médio ≥ 50 m³/mês — fraude/desvio aqui vale mais volume.',ligirreg:'≥ 3 meses faturando volume com a ligação Inativa/Factível/Potencial (deveria estar sem fornecimento).',estimada:'≥ 3 meses com leitura estimada (qt_vol_est>0) nos últimos 18 meses.',vizinhanca:'Consumo médio abaixo de 40% da mediana do próprio DMC.'};
+const FR_CLASSE_ORDER=['fraude_potencial','queda_continua','nulo_recorrente','factivel','instavel','reativada','divergencia_cadastro'];
+const FR_LENTE=[['todos','Todos os suspeitos'],['grandes','Grandes consumidores'],['ligirreg','Consumo com ligação irregular'],['estimada','Leitura estimada recorrente'],['vizinhanca','Abaixo da vizinhança'],['reativadas','Reativadas (regularizadas)']];
+const FR_LENTE_DESC={reativadas:'Matrículas que estavam inativas/factíveis faturando volume e que o cadastro (ligacoes) já mostra como Real depois disso — regularizadas, fora da lista de suspeitas — mais as poucas com divergência de cadastro.',todos:'Todas as classes de suspeita do motor de anomalia.',grandes:'Consumo médio ≥ 50 m³/mês — fraude/desvio aqui vale mais volume.',ligirreg:'≥ 3 meses faturando volume com a ligação Inativa/Factível/Potencial (deveria estar sem fornecimento).',estimada:'≥ 3 meses com leitura estimada (qt_vol_est>0) nos últimos 18 meses.',vizinhanca:'Consumo médio abaixo de 40% da mediana do próprio DMC.'};
 const FR_SIT={R:'Real / Ativa',I:'Inativo',F:'Factível',P:'Potencial'};
 const FR_INFO={
  score:{t:'Score de anomalia & classes',h:`<p>O <b>score (0–100)</b> e a <b>classe</b> vêm do motor de anomalia do micromedido (<i>análise por matrícula</i>), sobre 18 meses de consumo. Classes: <b>fraude potencial</b> (consumo faturado com a ligação Inativa/Factível/Potencial — "cortado mas com água"), <b>queda contínua</b> (tendência de queda persistente), <b>consumo nulo recorrente</b> (muitos meses zerados), <b>factível / faturado mínimo</b> (faturamento mínimo com ligação não-Real) e <b>instável</b>. Clique numa classe para filtrar a tela.</p>`},
@@ -2579,8 +2496,8 @@ function frBars(obj, fmtLab, activeKey, filterProp, color, order){
  }).join('')||'<p class="note" style="margin:0">—</p>';
 }
 function frDistClasse(){ return frBars((frResumo||{}).por_classe||{}, k=>({lab:`<span style="color:${(FR_CLASSE[k]||{}).c}"><b>${(FR_CLASSE[k]||{}).l||k}</b></span>`, c:(FR_CLASSE[k]||{}).c||'#888'}), frF.classe, 'classe', null, FR_CLASSE_ORDER); }
-function frDistLente(){ const r=frResumo||{}; const obj={todos:r.total||0,grandes:r.grandes||0,ligirreg:r.ligirreg||0,estimada:r.estimada||0,vizinhanca:r.vizinhanca||0};
- return frBars(obj, k=>({lab:FR_LENTE.find(x=>x[0]===k)[1], c:'var(--accent)'}), frF.lente, 'lente', 'var(--accent)', ['todos','grandes','ligirreg','estimada','vizinhanca']); }
+function frDistLente(){ const r=frResumo||{}; const obj={todos:r.total||0,grandes:r.grandes||0,ligirreg:r.ligirreg||0,estimada:r.estimada||0,vizinhanca:r.vizinhanca||0,reativadas:r.reativadas||0};
+ return frBars(obj, k=>({lab:FR_LENTE.find(x=>x[0]===k)[1], c:'var(--accent)'}), frF.lente, 'lente', 'var(--accent)', ['todos','grandes','ligirreg','estimada','vizinhanca','reativadas']); }
 function frDistCons(){ return frBars((frResumo||{}).por_consorcio||{}, k=>({lab:frZaNome(k), c:'#4b9fe0'}), null, '__noop', '#4b9fe0'); }
 function frCmp(a,b){ const k=frSort.k,d=frSort.dir; let va=a[k],vb=b[k]; if(va==null)va=(typeof vb==='string'?'':-Infinity); if(vb==null)vb=(typeof va==='string'?'':-Infinity); if(typeof va==='string'||typeof vb==='string')return d*String(va).localeCompare(String(vb)); return d*(va-vb); }
 function frRankTable(){
@@ -2622,9 +2539,9 @@ function frDetailHtml(d){
    ${row('Meses faturando s/ ligação ativa', stats.meses_irregular!=null?stats.meses_irregular:'—')}
    ${row('Meses com leitura estimada', stats.meses_estimada!=null?stats.meses_estimada:'—')}
    ${row('Meses factível / fat. mínimo', stats.meses_factivel!=null?stats.meses_factivel:'—')}
-   ${row('Situação da ligação (últ. mês)', FR_SIT[stats.situacao_atual]||stats.situacao_atual||'—')}
+   ${row('Situação da ligação (cadastro)', FR_SIT[stats.situacao_atual]||stats.situacao_atual||'—')}
+   ${row('Situação desde', sitDesde(stats.situacao_desde))}
    ${row('Perfil / natureza', (en.perfil||'—')+(en.natureza?(' · '+en.natureza):''))}
-   ${row('Situação ligação (cadastro)', en.situacao_lig||'—')}
    ${row('Economias', en.economias!=null?en.economias:'—')}
   </div>
   <div class="mmblock-h" style="margin-top:6px">Assinatura de consumo — micromedição (18 meses) ${frIB('score')}</div>${chart}
@@ -2704,8 +2621,8 @@ function frExport(){ const btn=$('#frExport'); if(typeof XLSX==='undefined'){ if
  const all=[]; const pageN=1000;
  function fetchPage(off){ return sbg.rpc('app_nrw_fraude_ranking',frRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; all.push(...rows); if(rows.length===pageN && all.length<(rk.total||0) && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Consórcio','Bairro','Endereço','DMC','Classe de suspeita','Score anomalia','Consumo médio (m³/mês)','Último volume (m³)','Tendência (slope)','Meses zerados','Meses faturando s/ ligação ativa','Meses com leitura estimada','% vs vizinhança (DMC)','Situação da ligação (últ. mês)'];
-  const data=all.map(x=>[x.matricula,x.consorcio||'',x.bairro||'',x.endereco||'',x.dmc||'',(FR_CLASSE[x.classificacao]||{l:x.classificacao}).l,x.score_anomalia!=null?+x.score_anomalia:'',x.media!=null?+x.media:'',x.ultimo_vol!=null?+x.ultimo_vol:'',x.slope!=null?+x.slope:'',x.n_zeros!=null?+x.n_zeros:'',x.meses_irregular!=null?+x.meses_irregular:'',x.meses_estimada!=null?+x.meses_estimada:'',x.pct_vizinhanca!=null?+x.pct_vizinhanca:'',FR_SIT[x.situacao_atual]||x.situacao_atual||'']);
+  const head=['Matrícula','Consórcio','Bairro','Endereço','DMC','Classe de suspeita','Score anomalia','Consumo médio (m³/mês)','Último volume (m³)','Tendência (slope)','Meses zerados','Meses faturando s/ ligação ativa','Meses com leitura estimada','% vs vizinhança (DMC)','Situação da ligação (cadastro)','Situação desde'];
+  const data=all.map(x=>[x.matricula,x.consorcio||'',x.bairro||'',x.endereco||'',x.dmc||'',(FR_CLASSE[x.classificacao]||{l:x.classificacao}).l,x.score_anomalia!=null?+x.score_anomalia:'',x.media!=null?+x.media:'',x.ultimo_vol!=null?+x.ultimo_vol:'',x.slope!=null?+x.slope:'',x.n_zeros!=null?+x.n_zeros:'',x.meses_irregular!=null?+x.meses_irregular:'',x.meses_estimada!=null?+x.meses_estimada:'',x.pct_vizinhanca!=null?+x.pct_vizinhanca:'',FR_SIT[x.situacao_atual]||x.situacao_atual||'',x.situacao_desde?sitDesde(x.situacao_desde):'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Fiscalizacao');
   XLSX.writeFile(wb,`fiscalizacao_irregularidades_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
   if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}

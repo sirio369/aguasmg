@@ -44,6 +44,10 @@
     `programacao_pesquisa`, `pp_config`, `rede_pp_segmento`/`_fonte`, §4.3): artefato interno do app que
     convive no mesmo schema da rede por conveniência de FK/trigger, mas não é cadastro curado — quem
     precisa ver isso no QGIS usa a vitrine (`vw_gis_programacao_pesquisa`), nunca a tabela crua.
+11. **Consórcio de um registro de campo não vem do `localStorage 'consorcio'`** — esse valor só é gravado
+    pela tela de Pressão (quem nunca lançou pressão manda `null`). Resolva **no servidor**: ZA do ponto
+    (`"1 - suporte_geografico".limite_za`) → valor do app → `perfil.consorcio` (ex.: `app_pav_registrar`, §2.6;
+    `app_abertura_servico_registrar`, §3.2). O perfil fica por último: a mesma pessoa atende as duas ZAs.
 
 ---
 
@@ -370,7 +374,7 @@
   - **Coordenada travada no GPS** (`pavOnGps`): mostra lat/lon ao vivo, **sem edição**; banner "Fique próximo ao local para salvar a coordenada" até `gps.acc ≤ PRECISAO_MAX` (15 m) — mesma trava anti-lançamento-remoto da pressão/loggers.
   - **Tipos de pavimento = multi-seleção** (chips `PAV_TIPOS`: grama/asfalto/concreto/bloquete/paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta). Cada tipo selecionado **abre um bloco** com **dimensão** + **2 fotos obrigatórias** (câmera **e galeria**, `comprimir` 1600px). Estado em `pavState={tipo:{dimensao,f1,f2}}`.
   - **Salvar:** gera um `grupo` uuid e envia **1 item por tipo** pela **fila offline** (`enviarOuEnfileirar`, `rpc:'app_pav_registrar'`, `pasta:'pavimento'`, fotos `p_foto1`/`p_foto2`). "Meus últimos registros" via `app_pav_minhas` (agrupado por grupo).
-- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
+- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`; **`consorcio` = ZA cujo `"1 - suporte_geografico".limite_za` contém o ponto → senão `p_consorcio` → senão `perfil.consorcio`** — 2026-10-27, `docs/migracao_pav_consorcio.sql`; antes vinha só do `localStorage 'consorcio'`, que **só a tela de Pressão grava**, e 22/23 registros ficaram sem consórcio — backfill feito, backup `"8 - coleta_campo"._bkp_pav_consorcio_20261027`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
 
 ---
 
@@ -406,6 +410,11 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
   `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
   `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
+- **Consórcio (2026-10-27):** a RPC grava `consorcio` = ZA do `limite_za` que contém o ponto → `p_consorcio` →
+  `perfil.consorcio` (`docs/migracao_abertura_servico_consorcio.sql`). Antes vinha só do `localStorage` (§0.11) e
+  7/7 estavam sem consórcio — backfill feito (backup `"12 - retaguarda"._bkp_abertura_consorcio_20261027`). O perfil
+  **não** serve de fonte principal: entrevistadores atendem as duas ZAs (4/7 divergiam); o ponto bateu com o
+  consórcio da matrícula em `"3 - comercial".ligacoes` em 7/7.
 
 ### 3.3 Roteiro de leitura (Suporte) — `// SUPORTE › ROTEIRO DE LEITURA` (~L1926) · tela `roteiro`
 - Mapa por **percurso/trecho** sobre `"8 - coleta_campo".vw_roteiro_leitura` (pontos, 133k) e
@@ -832,7 +841,7 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
 - Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*
 - **Cabeçalho espelhado na "abertura de serviços — ocorrências" (2026-10-21b):** **tabs de status** `.seg` (`#pavpStatusSeg`: Pendentes [default] / OS criada / Todas) + **alternância de visão** `.seg` (`#pavpViewSeg`: 📋 Lista / 🗺️ Mapa, `pavProgSetView`). **Mapa** (`#pavpMapa`, `pavProgMapa`): Leaflet (`L.map`+`mapAddCamadaBase`) com `circleMarker` colorido por faixa de prazo (pendentes) / teal (com OS), popup e `fitBounds`.
-- **Filtros (client-side exceto consórcio):** consórcio (select, server-side) · **serviço de origem = dropdown multi-seleção** (`.msdd`/`#pavpOrigDd` — botão + painel de checkboxes, `pavpRenderOrigDd`; fecha ao clicar fora) · **prazo = chips clicáveis com contagem** no `#pavpResumo` (🟢 no prazo / 🟡 atenção / 🔴 atrasado — cada chip mostra o nº e filtra; clicar força status=Pendentes). Removidos o select de prazo e o de ordenação (ordem fixa = mais antigos primeiro).
+- **Filtros (client-side exceto consórcio):** consórcio (select, server-side — `app_pav_listar` filtra `consorcio = p_consorcio`, por isso o registro **precisa** ter consórcio; ver §2.6) · **serviço de origem = dropdown multi-seleção** (`.msdd`/`#pavpOrigDd` — botão + painel de checkboxes, `pavpRenderOrigDd`; fecha ao clicar fora) · **prazo = chips clicáveis com contagem** no `#pavpResumo` (🟢 no prazo / 🟡 atenção / 🔴 atrasado — cada chip mostra o nº e filtra; clicar força status=Pendentes). Removidos o select de prazo e o de ordenação (ordem fixa = mais antigos primeiro).
 - **Controle de prazo (a partir da data de solicitação `created_at`):** `pavDias`/`pavBucket` (`PAV_SLA=[3,5]` → **0–3 no prazo · 4–5 atenção · >5 atrasado**) → badge colorido "faixa · há N dias" + borda esquerda; **o relógio conta só enquanto NÃO há OS** de recomposição.
 - **Distinção OS criada × pendente (espelha a ocorrência da pesquisa):** o programador **lança a OS SIGOS da recomposição** no card pendente (input + "Criar OS" → `pavProgCriarOS` → RPC **`app_pav_os(p_grupo,p_os)`**, gate admin|aux_acesso, grava `os_recomposicao`/`os_recomp_em`/`os_recomp_por` em todas as linhas do grupo). Com OS → badge verde "✓ OS <nº>". Colunas novas na tabela `pav_recomposicao`: `os_recomposicao`/`os_recomp_em`/`os_recomp_por`. (⚠️ `os_sigos` = OS **de origem**, preenchida no campo; `os_recomposicao` = OS **da recomposição**, preenchida aqui.) sw **v264**.
 
@@ -1881,7 +1890,8 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   restrito')`. **Controle de acesso (2026-09):** engrenagem ⚙️ `#homeDevAcesso` na categoria (só admin) → tela
   `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`) que lista usuários com toggle; backend
   `perfil.dev_acesso` + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set` (admin-only) + `app_me` repassa
-  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded.
+  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded. A mesma engrenagem governa a **Vitrine (TV)**
+  (`#homeVitrine`, §17).
 - **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
   supabase-js (mesma `SB_URL`/anon key do app; exposto em **`window.sbg`** p/ o script principal usar nos RPCs),
   lê `auth.getSession()` e, **se `app_me().dev_acesso` for falso** (ou sem sessão), mantém o overlay `#nrwGate`
@@ -1958,6 +1968,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     **texto escuro** (`#0d1418`) — corrige branco-em-azul-claro no valor baixo. **Abertura por DMC** (ex-"DMCs mais
     sensíveis"): sem coluna Cons., **+ Micro total/lido/estimado**, sem Score, ordenação livre. **Análise por
     matrícula:** removida a busca por matrícula.
+  - **⚠️ Tela reformulada — Indicadores de micromedição (2026-10-26, sw v274):** saíram da tela `s-mm` os blocos **Abertura por DMC** e **Análise por matrícula** (distribuição por comportamento, ranking, detalhe da matrícula, export CSV do ranking — `mmDmcPanel`/`mmAnalysisPanel`/`mmDetail*`/`mmExport`/`MM_CLASS`/`MM_SIT` removidos do front; as RPCs `app_nrw_mm_resumo/_ranking/_serie/_dmc` e `mm_matricula_stats` **continuam** no banco — alimentam Fiscalização e HD). A tela agora tem **Indicador do mês** + **Sazonalidade** + novo bloco **Indicadores de micromedição** (`mmIndPanel`), que espelha o item 7.2 e o Anexo E do **relatório de linha de base** (ZA1004/ZA0200 R01): quadro-resumo (colunas **Média LB** × mês selecionado, por ZA; base = ligações, ativas, volume total/lido/estimado/factível, mais os indicadores) + **detalhamento mensal** por ZA só com os indicadores (= **Anexo E.1** do relatório; janela da LB destacada, 05/2025 como lacuna "sem dado") + **⭳ Exportar CSV** (`mmIndExport`). Indicadores (numeração **final do relatório, I1–I10**): **I1** ativas com leitura estimada, **I2** volume estimado, **I3** volume medido, **I4** ativas com volume zero, **I5** ligações não ativas, **I6** consumo por ligação (L/lig·dia), **I7** consumo por economia ativa (m³/economia/mês = (volume total − volume das não ativas) ÷ economias ativas), **I8** não ativas com volume lido/estimado, **I9** volume factível (I2 + I3 + I9 = 100%), **I10** não ativas com volume factível (definições no ⓘ). Critério = do módulo (volume total = lido + estimado + factível; faturada = volume>0 ou factível>0; estimado = `qt_volume_` das linhas com `qt_vol_est>0`). **Sempre ZA inteira** (não responde ao filtro de DMC). Backend: tabela **`"11 - perdas_nrw".mm_indicadores`** (consorcio, competencia, contagens/volumes; RLS deny-all; **202505 excluído**) refeita por `app_nrw_mm_indicadores_rebuild(p_consorcio)` — **chamada automaticamente no fim de `app_nrw_mm_stats_rebuild`** — e lida por **`app_nrw_mm_indicadores(p_consorcio)`** (definer, admin|`dev_acesso`) que devolve `{serie, janela}`; a janela de cada ZA vem do `linha_base` (`fonte='previa'`: ZA1004 03/2025–03/2026, ZA0200 04/2025–04/2026, sem 05/2025). Médias da janela = média dos valores mensais (bate com o relatório: ZA1004 I1 18,6% / I2 15,8% / L/lig·dia 628; ZA0200 14,1% / 10,3% / 493). DDL em `docs/migracao_mm_indicadores_2026-10.sql`. Cortados pelo usuário e **não implementados**: ligações faturadas, faixa 1–10 m³, taxa de faturamento, zero persistente e estimativa persistente. Tabela `mm_indicadores` também guarda `n_economias_ativas` e `volume_nao_ativas` (p/ o I7).
   - **Cruzamento matrícula→DMC (2026-09-24):** `"11 - perdas_nrw".mm_dmc_map` (spatial join `ligacoes.geom` ×
     `"7 - setorizacao".dmc.geom` vigente, `distinct on` p/ dedup de borda; 134.867 lig, ZA0200 6 DMCs / ZA1004 9) +
     `"11 - perdas_nrw".mm_dmc_mensal` (por DMC×mês: n_faturadas/volume_total/medido/não medido, populada em loop por
@@ -2764,3 +2775,27 @@ não sobrescreve za bom já gravado). Lotes de 5000 leituras por chamada.
 - **Estado atual (2026-10-16):** dimensão com **101 unidades** carregada; **25 no cadastro, 76 fora**
   (candidatas a inclusão — ver `vw_cadastro_sem_tele`/`vw_cobertura`). Série temporal entra pelo
   módulo/script.
+
+## 17. Vitrine (TV) — `// VITRINE (TV)` · tela `vitrine` (🚧 Em desenvolvimento, gate `dev_acesso` — 2026-10-27)
+
+Painel para a TV da sala: **apresentação em loop** com as atividades de campo (fotos + mapas) e indicadores,
+**ao vivo** — a cada volta completa busca os dados de novo (`vtCarregar`) e recomeça.
+- **Acesso:** card `#homeVitrine` na categoria **🚧 Em desenvolvimento** (mesmo padrão do `#cardPerdas`): nasce
+  `mod soon` + 🔒; `homeGate()` libera por **`ME.dev_acesso`** (admin sempre) — tira `soon`/🔒 e liga `onclick` →
+  `irPara('vitrine')`; sem acesso, o clique dá `toast('Acesso restrito')`. `vtInit` repete o check (`vtPode()`).
+  A RPC **`app_vitrine_dados(p_desde date default null)`** (SECURITY DEFINER, `docs/migracao_vitrine.sql`) usa o
+  mesmo gate das `app_nrw_*` (`funcao='admin' or dev_acesso`). **Liberar alguém = engrenagem ⚙️ da categoria**
+  (`dev_acesso`), sem código. (Até 2026-10-27 era uma lista de e-mails fixa no app e na RPC — removida.)
+- **Período:** padrão = desde a última sexta-feira (`p_desde` nulo). Atividades: instalação/remoção de logger, OS de VRP
+  executadas (≠ programada), ocorrências da pesquisa, recomposição de pavimento, mapeamento de pressão, avanços de obra
+  (sem GPS) e solicitações de serviço. Indicadores: "Situação agora" (loggers em campo, frota, manutenções, pendências
+  VRP, solicitações/ocorrências sem OS, checklists do dia, usuários) e "No mês até agora". "Loggers em campo" = instalados
+  e não removidos (`data_instalacao` preenchida — o planejado ainda não instalado não conta).
+- **Tela:** `<main id="vitrine">` é overlay `position:fixed` com tema escuro próprio (`.vt-*`), botões ⛶ Tela cheia e
+  ✕ Sair (canto sup. dir., semitransparentes). Teclado: ←/→ navega, espaço pausa, Esc sai. Mapas Leaflet com base
+  **Esri Dark Gray** (o CARTO passou a exigir chave). `irPara` chama `vtParar()` ao sair (limpa timers).
+- Estado em `var`/lista dentro da função de propósito: `homeGate`/`irPara` podem rodar antes do fim da avaliação do módulo.
+- **Cuidados:** a TV roda o dia todo — todo mapa criado vai para `vtMapas` e `vtSoltarMapas()` faz `m.remove()` antes
+  de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
+  chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
+  tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
