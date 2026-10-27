@@ -46,7 +46,8 @@
     precisa ver isso no QGIS usa a vitrine (`vw_gis_programacao_pesquisa`), nunca a tabela crua.
 11. **Consórcio de um registro de campo não vem do `localStorage 'consorcio'`** — esse valor só é gravado
     pela tela de Pressão (quem nunca lançou pressão manda `null`). Resolva **no servidor**: ZA do ponto
-    (`"1 - suporte_geografico".limite_za`) → valor do app → `perfil.consorcio` (ex.: `app_pav_registrar`, §2.6).
+    (`"1 - suporte_geografico".limite_za`) → valor do app → `perfil.consorcio` (ex.: `app_pav_registrar`, §2.6;
+    `app_abertura_servico_registrar`, §3.2). O perfil fica por último: a mesma pessoa atende as duas ZAs.
 
 ---
 
@@ -409,6 +410,11 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
   `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
   `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
+- **Consórcio (2026-10-27):** a RPC grava `consorcio` = ZA do `limite_za` que contém o ponto → `p_consorcio` →
+  `perfil.consorcio` (`docs/migracao_abertura_servico_consorcio.sql`). Antes vinha só do `localStorage` (§0.11) e
+  7/7 estavam sem consórcio — backfill feito (backup `"12 - retaguarda"._bkp_abertura_consorcio_20261027`). O perfil
+  **não** serve de fonte principal: entrevistadores atendem as duas ZAs (4/7 divergiam); o ponto bateu com o
+  consórcio da matrícula em `"3 - comercial".ligacoes` em 7/7.
 
 ### 3.3 Roteiro de leitura (Suporte) — `// SUPORTE › ROTEIRO DE LEITURA` (~L1926) · tela `roteiro`
 - Mapa por **percurso/trecho** sobre `"8 - coleta_campo".vw_roteiro_leitura` (pontos, 133k) e
