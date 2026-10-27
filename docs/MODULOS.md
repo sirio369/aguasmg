@@ -497,10 +497,11 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   filtrados** (`pgOcData`, recarregado a cada troca de filtro pendente/criada/todas); clicar no ponto
   abre um **popup com o mesmo card** (inclui input+Salvar da OS, fiado no `popupopen`). Salvar fecha o
   popup e recarrega. `pgInit` chama `pgOcRenderTabs`.
-- **Ocorrências: filtros + card compacto + deep-link (2026-10-27).** Dois selects lado a lado acima do Lista/Mapa:
-  **tipo** (`#pgOcFTipo` — "Todos os vazamentos"/`@vaz`, "Todas as fraudes"/`@fraude` ou o tipo exato, com
-  **contagem** em cada opção; tipo antigo fora da lista, ex. `Outro`, aparece se houver) e **consórcio**
-  (`#pgOcFCons`). Filtro **no cliente** sobre `pgOcData` (`pgOcFiltrado`), vale p/ lista e mapa; estado
+- **Ocorrências: filtros + card compacto + deep-link (2026-10-27).** Três selects lado a lado acima do Lista/Mapa
+  (no celular o consórcio desce): **tipo** (`#pgOcFTipo` — "Todos os vazamentos"/`@vaz`, "Todas as fraudes"/`@fraude`
+  ou o tipo exato, com **contagem** em cada opção; tipo antigo fora da lista, ex. `Outro`, aparece se houver),
+  **local** (`#pgOcFLocal`, sw v278 — o **combinado tipo × local** dá o porte da equipe, ex. vazamento não visível na
+  rede; contagens de cada dropdown respeitam os outros dois filtros) e **consórcio** (`#pgOcFCons`). Filtro **no cliente** sobre `pgOcData` (`pgOcFiltrado`), vale p/ lista e mapa; estado
   `pgOcFTipo`/`pgOcFCons` sobrevive ao Salvar OS e à troca de aba. `pgCarregarOc` só busca; quem desenha é
   `pgOcRender`. **Card (`.occ`, CSS global):** grid de 2 colunas — esquerda: tipo (⚠️ vazamento / 🚩 fraude) +
   tags local/consórcio, endereço, 👤 nome (`usuario_nome`, do perfil) · 📌 coordenada, 💬 obs; direita (sob a data):
@@ -841,24 +842,32 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   "pesquisado"/"histórico" — eram redundantes: o heatmap de passadas **é** derivado do histórico
   (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
   permanente — pra análise só o histórico importa, e ele já vira o heatmap.)
-- **KPIs (5):** km de rede pesquisado · km andado · vazamentos · vaz/km (por km de rede) · velocidade
-  média. (Saiu a "cobertura da programação".) **Vazamentos não contam fraude** (2026-10-27, §2.3) — nem no KPI
-  nem no resumo por colaborador.
+- **KPIs (6, 2026-10-27):** km de rede pesquisado · km andado · vazamentos · **fraudes** · **ocorrências / km de
+  rede** (`ocorr_km` = (vazamentos + fraudes) ÷ km de rede — substituiu o vaz/km na tela; a RPC ainda devolve
+  `vaz_km`) · velocidade média. **Vazamentos não contam fraude** (§2.3).
 - **Popup da ocorrência no mapa (2026-10-27):** clicar no ponto abre tipo, data de envio (`data_hora` = hora em
   que chegou ao servidor), nome de quem enviou, OS (se houver), 📷 foto, 🧭 Navegar (Google Maps) e **"Abrir na
   abertura de serviços ›"** → `pgOcAbrir` (§4.2). `paOcPopup`; é um `L.popup().openOn(paMap)` **avulso**, não
   `bindPopup`: o autoPan do popup dispara `moveend` → `paCarregarMapa` → `clearLayers`, que fecharia um popup
   preso ao marcador. `app_pp_passadas_bbox` devolve `foto`, `local`, `usuario_nome` nas ocorrências.
-- **Quadros "Vazamentos por colaborador" e "Ocorrências reportadas por colaborador" (2026-10-27)**, entre o mapa e
-  o resumo: `app_pp_acompanhamento.ocorrencias` = `[{nome,tipo,n,com_os}]` (mesmos filtros; quem **reportou**,
-  casado com o perfil por nome OU email) e o front pivota (`paOcQuadros`/`paTabela`). Vazamentos: colunas por tipo
-  de vazamento (+ tipo antigo, ex. `Outro`, só se houver) · Total · OS criada. Ocorrências: Vazamentos (somados) ·
-  cada fraude · Total · OS criada. Linha de total no rodapé.
-- **Resumo por colaborador:** repete os indicadores de cima por pessoa — km rede pesquisado · km andado ·
-  vazamentos · vaz/km · velocidade. (Saíram "km programado" e "%".)
+- **Abaixo do mapa, 2 blocos (2026-10-27, sw v278 — substituíram "Vazamentos por colaborador", "Ocorrências
+  reportadas por colaborador" e "Resumo por colaborador", que se repetiam):**
+  - **Produtividade por colaborador** (`paResumo`, colunas `PA_RES_COLS`): km andado · km de rede (com barra) ·
+    vazamentos · fraudes · ocorr./km · km/h. **Cabeçalho ordena** (`paResSort`, padrão km de rede ↓); rodapé
+    **Equipe** = os KPIs. Universo (`resumo`) = quem teve **rede executada, trecho andado ou ocorrência** no
+    filtro (antes: só quem tinha rede programada/executada em qualquer data — quem só andou/reportou sumia e quem
+    só foi programado aparecia zerado). Quem reporta sem lançar trecho aparece com km 0 e ocorr./km 0.
+  - **Ocorrências por tipo e local** (`paMatriz`, `app_pp_acompanhamento.matriz` = `[{tipo,local,n,com_os}]`):
+    linhas = tipos agrupados Vazamento / Fraude (todos os da lista, + antigos que aparecerem; subtotal no
+    cabeçalho do grupo), colunas = locais (`OC_LOCAIS`/`OC_LOC_ROT`), total por linha e coluna, célula colorida pela
+    intensidade (tooltip com com/sem OS). **Tocar na célula** → `pgOcAbrirFiltro(tipo,local,consórcio)` abre a
+    Abertura de serviços na aba **Todas** já filtrada (§4.2). Período/colaborador do Acompanhamento **não** viajam
+    (a Abertura não tem esses filtros), então lá pode haver mais cards que a célula.
+  - `app_pp_acompanhamento.ocorrencias` (nome × tipo) ficou só p/ a v277 — pode sair da RPC depois do deploy da
+    v278 (`docs/migracao_pesquisa_produtividade_matriz.sql`).
 - **RPCs (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio, p_colaborador,
-  p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo` (agora com km
-  rede/andado/vaz/vaz-km/velocidade por colaborador); `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,
+  p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo` (km
+  rede/andado/vaz/fraudes/ocorr-km/vaz-km/velocidade por colaborador) + `matriz` (tipo × local); `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,
   p_consorcio, p_colaborador, p_data_ini, p_data_fim)` → `passadas` (heatmap) + `reportes` + `ocorrencias`
   (as duas últimas filtradas por consórcio/colaborador/data; casamento traço↔usuário por **nome OU
   email**, mesma pegadinha da 4.3.5). O dropdown "Todos os coletores" de análise vive **aqui** (tela do

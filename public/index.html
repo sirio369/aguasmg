@@ -1059,12 +1059,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="paTgRep" type="button" class="fchip" data-c="#d81b60">Reporte de campo</button>
     </div>
     <div id="paMapa" style="height:48vh;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
-    <div class="sec" style="margin-top:20px">Vazamentos por colaborador</div>
-    <div id="paVaz" style="overflow-x:auto;margin-top:8px"></div>
-    <div class="sec" style="margin-top:20px">Ocorrências reportadas por colaborador</div>
-    <div id="paOcorr" style="overflow-x:auto;margin-top:8px"></div>
-    <div class="sec" style="margin-top:20px">Resumo por colaborador</div>
+    <div class="sec" style="margin-top:20px">Produtividade por colaborador</div>
     <div id="paResumo" style="overflow-x:auto;margin-top:8px"></div>
+    <div class="sec" style="margin-top:20px">Ocorrências por tipo e local</div>
+    <p class="sub" style="margin:6px 0 0;font-size:12px">Toque num número para ver essas ocorrências na abertura de serviços.</p>
+    <div id="paMatriz" style="overflow-x:auto;margin-top:8px"></div>
   </main>
 
   <main id="ent_ocorrencia" class="hidden">
@@ -1141,9 +1140,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="pgSecOc">
       <div class="sec">⚠️ Ocorrências — pesquisa de vazamentos</div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <select id="pgOcFTipo" style="flex:1;min-width:0"><option value="">Todos os tipos</option></select>
-        <select id="pgOcFCons" style="flex:1;min-width:0"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+        <select id="pgOcFTipo" style="flex:1 1 150px;min-width:0"><option value="">Todos os tipos</option></select>
+        <select id="pgOcFLocal" style="flex:1 1 150px;min-width:0"><option value="">Todos os locais</option></select>
+        <select id="pgOcFCons" style="flex:1 1 150px;min-width:0"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
       </div>
       <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
       <div id="pgOcLista" style="margin-top:8px"></div>
@@ -4063,6 +4063,9 @@ const OC_TIPOS_VAZ=['Vazamento visível','Vazamento não visível (ruído)','Ext
 const OC_TIPOS_FRAUDE=['Fraude - Derivação de ramal','Fraude - Ligação clandestina','Fraude - Rompimento de lacre','Fraude - Corte violado','Fraude - Hidrômetro violado'];
 const OC_ROT={'Vazamento visível':'Visível','Vazamento não visível (ruído)':'Não visível','Extravasamento':'Extravas.','Cavalete / hidrômetro':'Cavalete/HD',
   'Fraude - Derivação de ramal':'Derivação','Fraude - Ligação clandestina':'Clandestina','Fraude - Rompimento de lacre':'Lacre','Fraude - Corte violado':'Corte violado','Fraude - Hidrômetro violado':'HD violado'};
+// Locais (`#ocLocal`) — filtro da abertura e colunas da matriz tipo × local do Acompanhamento
+const OC_LOCAIS=['Rede (distribuição)','Ramal / ligação','Cavalete','Registro / válvula','Outro'];
+const OC_LOC_ROT={'Rede (distribuição)':'Rede','Ramal / ligação':'Ramal','Cavalete':'Cavalete','Registro / válvula':'Registro','Outro':'Outro'};
 function ocEhFraude(t){ return /^fraude/i.test(t||''); }
 function ocIcone(t){ return ocEhFraude(t)?'🚩':'⚠️'; }
 function ocDataCurta(iso){ return iso?new Date(iso).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}).replace(',',''):'—'; }
@@ -4171,16 +4174,28 @@ function pgOcCard(s,popup){
       </div>`;
 }
 let pgOcData=[], pgOcMode='lista', pgOcMap=null, pgOcMarkers=null;
-let pgOcFTipo='', pgOcFCons='', pgOcFoco=null;   // filtros (tipo: tipo exato | '@vaz' | '@fraude') + card a destacar
-function pgOcFiltrado(semTipo){
+// filtros: tipo (tipo exato | '@vaz' | '@fraude') · local (combinado tipo × local = esforço da equipe, ex. não visível
+// na rede) · consórcio; + card a destacar
+let pgOcFTipo='', pgOcFLocal='', pgOcFCons='', pgOcFoco=null;
+function pgOcFiltrado(sem){   // sem = 'tipo' | 'local' → ignora esse filtro (p/ as contagens do próprio dropdown)
   return (pgOcData||[]).filter(o=>(!pgOcFCons||o.consorcio===pgOcFCons)
-    && (semTipo||!pgOcFTipo||(pgOcFTipo==='@vaz'?!ocEhFraude(o.tipo):(pgOcFTipo==='@fraude'?ocEhFraude(o.tipo):o.tipo===pgOcFTipo))));
+    && (sem==='local'||!pgOcFLocal||o.local===pgOcFLocal)
+    && (sem==='tipo'||!pgOcFTipo||(pgOcFTipo==='@vaz'?!ocEhFraude(o.tipo):(pgOcFTipo==='@fraude'?ocEhFraude(o.tipo):o.tipo===pgOcFTipo))));
 }
-// dropdown de tipo com contagem (respeita consórcio + aba de status); tipos antigos fora da lista (ex. 'Outro') aparecem se houver
+// dropdown de local com contagem (respeita tipo + consórcio + aba); locais fora da lista aparecem se houver
+function pgOcRenderFLocal(){
+  const s=document.getElementById('pgOcFLocal'); if(!s) return;
+  const arr=pgOcFiltrado('local'), n=l=>arr.filter(o=>o.local===l).length;
+  const locs=[...OC_LOCAIS,...[...new Set(arr.map(o=>o.local).filter(Boolean))].filter(l=>!OC_LOCAIS.includes(l)).sort()];
+  if(pgOcFLocal && !locs.includes(pgOcFLocal)) locs.push(pgOcFLocal);
+  const opt=(v,l,k)=>`<option value="${vEsc(v)}"${pgOcFLocal===v?' selected':''}>${vEsc(l)} (${k})</option>`;
+  s.innerHTML=opt('','Todos os locais',arr.length)+locs.map(l=>opt(l,l,n(l))).join('');
+}
+// dropdown de tipo com contagem (respeita local + consórcio + aba de status); tipos antigos fora da lista (ex. 'Outro') aparecem se houver
 function pgOcRenderFTipo(){
   const s=document.getElementById('pgOcFTipo'), c=document.getElementById('pgOcFCons'); if(!s) return;
   if(c) c.value=pgOcFCons;
-  const arr=pgOcFiltrado(true), n=t=>arr.filter(o=>o.tipo===t).length;
+  const arr=pgOcFiltrado('tipo'), n=t=>arr.filter(o=>o.tipo===t).length;
   const tipos=[...new Set(arr.map(o=>o.tipo).filter(Boolean))];
   const vaz=[...OC_TIPOS_VAZ,...tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort()];
   const fra=[...OC_TIPOS_FRAUDE,...tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort()];
@@ -4192,9 +4207,9 @@ function pgOcRenderFTipo(){
 }
 function pgOcRender(){
   const c=document.getElementById('pgOcLista'); if(!c) return;
-  pgOcRenderFTipo();
+  pgOcRenderFTipo(); pgOcRenderFLocal();
   const arr=pgOcFiltrado();
-  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+((pgOcFTipo||pgOcFCons)?' no filtro':(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':'')))+'.</p>'; }
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+((pgOcFTipo||pgOcFLocal||pgOcFCons)?' no filtro':(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':'')))+'.</p>'; }
   else {
     c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
     c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
@@ -4207,7 +4222,14 @@ function pgOcRender(){
 // atalho do popup do Acompanhamento da pesquisa → card da ocorrência (aba certa, sem filtros, rola e destaca)
 function pgOcAbrir(id,temOs){
   pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro=temOs?'criada':'pendente';
-  pgOcFTipo=''; pgOcFCons=''; pgOcMode='lista'; pgOcFoco=id;
+  pgOcFTipo=''; pgOcFLocal=''; pgOcFCons=''; pgOcMode='lista'; pgOcFoco=id;
+  irPara('programacao_servicos');
+}
+// atalho da matriz tipo × local do Acompanhamento → abertura já filtrada (aba "Todas", p/ bater com a contagem da célula;
+// período/colaborador do Acompanhamento não existem aqui)
+function pgOcAbrirFiltro(tipo,local,cons){
+  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro='todas';
+  pgOcFTipo=tipo||''; pgOcFLocal=local||''; pgOcFCons=cons||''; pgOcMode='lista'; pgOcFoco=null;
   irPara('programacao_servicos');
 }
 function pgOcRenderTabs(){
@@ -4250,6 +4272,7 @@ async function pgSalvarOcOs(id){
 }
 if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara(pgBackTo));
 if($('#pgOcFTipo')) $('#pgOcFTipo').addEventListener('change',e=>{ pgOcFTipo=e.target.value; pgOcRender(); });
+if($('#pgOcFLocal')) $('#pgOcFLocal').addEventListener('change',e=>{ pgOcFLocal=e.target.value; pgOcRender(); });
 if($('#pgOcFCons')) $('#pgOcFCons').addEventListener('change',e=>{ pgOcFCons=e.target.value; pgOcRender(); });
 
 // ---------- CRIAÇÃO DE MATRÍCULAS (Retaguarda) ----------
@@ -6036,7 +6059,7 @@ async function paAtualizar(){
   try{
     const {data,error}=await sb.rpc('app_pp_acompanhamento',paFiltros());
     if(error)throw error;
-    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paOcQuadros(data.ocorrencias||[]); paResumo(data.resumo||[]);
+    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paResRows=data.resumo||[]; paResKpis=data.kpis||{}; paResumo(); paMatriz(data.matriz||[]);
   }catch(e){ toast('Erro no acompanhamento: '+(e.message||e)); }
   paCarregarMapa();
 }
@@ -6045,7 +6068,8 @@ function paCards(k){
     {lbl:'Km de rede pesquisado',val:Number(k.km_rede_pesquisado||0).toFixed(2)+' km'},
     {lbl:'Km andado (reporte)',val:Number(k.km_andado||0).toFixed(2)+' km'},
     {lbl:'Vazamentos',val:String(k.vazamentos||0)},
-    {lbl:'Vaz / km de rede',val:Number(k.vaz_km||0).toFixed(2)},
+    {lbl:'Fraudes',val:String(k.fraudes||0)},
+    {lbl:'Ocorrências / km de rede',val:Number(k.ocorr_km||0).toFixed(2)},
     {lbl:'Velocidade média',val:Number(k.velocidade_kmh||0).toFixed(1)+' km/h'}
   ];
   document.getElementById('paCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px"><div style="font-size:12px;color:var(--mut)">'+c.lbl+'</div><div style="font-size:21px;font-weight:700;margin-top:3px">'+c.val+'</div></div>').join('');
@@ -6061,41 +6085,64 @@ function paProgresso(arr){
   }).join('');
   leg.innerHTML=arr.map(b=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:11px;height:11px;border-radius:3px;background:'+PA_PASS_COL[b.passada]+';display:inline-block"></i>'+(b.passada>=5?'5+':b.passada)+'× · '+Number(b.km||0).toFixed(0)+' km</span>').join('');
 }
-function paResumo(rows){
-  const el=document.getElementById('paResumo');
-  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem execução no filtro.</p>'; return; }
-  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:460px">'
-    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;font-weight:400;padding:6px 4px">Colaborador</th><th style="font-weight:400;padding:6px 4px">km rede</th><th style="font-weight:400;padding:6px 4px">km andado</th><th style="font-weight:400;padding:6px 4px">vaz.</th><th style="font-weight:400;padding:6px 4px">vaz/km</th><th style="font-weight:400;padding:6px 4px">km/h</th></tr></thead><tbody>'
-    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+(r.nome||'—')+'</td><td style="padding:7px 4px">'+Number(r.km_rede_pesquisado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.km_andado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+(r.vazamentos||0)+'</td><td style="padding:7px 4px">'+Number(r.vaz_km||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.velocidade_kmh||0).toFixed(1)+'</td></tr>').join('')
+// Produtividade por colaborador (2026-10-27): quem teve atividade no filtro (rede executada, trecho andado ou
+// ocorrência). Ocorr./km = (vazamentos + fraudes) ÷ km de rede pesquisada. Cabeçalho ordena; rodapé "Equipe" = KPIs.
+let paResRows=[], paResKpis={}, paResSort={k:'km_rede_pesquisado',dir:-1};
+const PA_RES_COLS=[
+  {k:'km_andado',l:'Km andado',t:'Km andado (soma dos trechos reportados)',f:v=>Number(v||0).toFixed(2)},
+  {k:'km_rede_pesquisado',l:'Km de rede',t:'Km de rede pesquisada (execução)',f:v=>Number(v||0).toFixed(2),bar:1},
+  {k:'vazamentos',l:'Vazamentos',f:v=>String(v||0)},
+  {k:'fraudes',l:'Fraudes',f:v=>String(v||0)},
+  {k:'ocorr_km',l:'Ocorr./km',t:'(Vazamentos + fraudes) ÷ km de rede pesquisada',f:v=>Number(v||0).toFixed(2)},
+  {k:'velocidade_kmh',l:'km/h',t:'Velocidade média (km andado ÷ tempo)',f:v=>Number(v||0).toFixed(1)}];
+function paResumo(){
+  const el=document.getElementById('paResumo'), rows=paResRows.slice();
+  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem atividade no filtro.</p>'; return; }
+  const s=paResSort;
+  rows.sort((a,b)=>s.k==='nome'?s.dir*String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'):s.dir*(Number(a[s.k]||0)-Number(b[s.k]||0)));
+  const maxKm=Math.max(...rows.map(r=>Number(r.km_rede_pesquisado||0)),0.01);
+  const th='font-weight:400;padding:6px 4px;cursor:pointer;user-select:none;white-space:nowrap', td='padding:7px 4px;white-space:nowrap';
+  const seta=k=>s.k===k?(s.dir<0?' ▾':' ▴'):'';
+  const k=paResKpis;
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">'
+    +'<thead><tr style="color:var(--mut);text-align:right"><th data-ps="nome" style="text-align:left;'+th+'">Colaborador'+seta('nome')+'</th>'
+    +PA_RES_COLS.map(c=>'<th data-ps="'+c.k+'" title="'+vEsc(c.t||c.l)+'" style="'+th+(s.k===c.k?';color:var(--ink)':'')+'">'+c.l+seta(c.k)+'</th>').join('')+'</tr></thead><tbody>'
+    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+vEsc(r.nome||'—')+'</td>'
+      +PA_RES_COLS.map(c=>'<td style="'+td+'">'+(c.bar?'<span style="display:inline-block;vertical-align:middle;height:6px;border-radius:3px;background:#1D9E75;opacity:.75;margin-right:6px;width:'+Math.round(Number(r[c.k]||0)/maxKm*48)+'px"></span>':'')+c.f(r[c.k])+'</td>').join('')+'</tr>').join('')
+    +'<tr style="border-top:2px solid var(--line);text-align:right;font-weight:700"><td style="text-align:left;'+td+'">Equipe</td>'
+    +PA_RES_COLS.map(c=>'<td style="'+td+'">'+c.f(k[c.k])+'</td>').join('')+'</tr>'
     +'</tbody></table>';
+  el.querySelectorAll('[data-ps]').forEach(h=>h.addEventListener('click',()=>{
+    const key=h.dataset.ps; paResSort = paResSort.k===key ? {k:key,dir:-paResSort.dir} : {k:key,dir:key==='nome'?1:-1}; paResumo(); }));
 }
-// Quadros de ocorrências (2026-10-27): app_pp_acompanhamento.ocorrencias = [{nome,tipo,n,com_os}] → pivô por colaborador.
-// "Vazamentos" = tipos de vazamento (+ coluna p/ tipo antigo, ex. 'Outro', só se houver); "Ocorrências reportadas" =
-// vazamentos somados + cada fraude. Mesma regra do KPI: vazamento = tudo que não é fraude (ocEhFraude).
-function paTabela(el,cols,rows,vazio){
-  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">'+vazio+'</p>'; return; }
-  const th='font-weight:400;padding:6px 4px', td='padding:7px 4px';
-  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:'+(150+cols.length*72)+'px">'
-    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;'+th+'">Colaborador</th>'+cols.map(c=>'<th title="'+vEsc(c.t||c.l)+'" style="'+th+'">'+vEsc(c.l)+'</th>').join('')+'</tr></thead><tbody>'
-    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;'+td+'">'+vEsc(r.nome)+'</td>'+cols.map(c=>'<td style="'+td+(c.b?';font-weight:700':'')+'">'+(r[c.k]||0)+'</td>').join('')+'</tr>').join('')
-    +'<tr style="border-top:2px solid var(--line);text-align:right;font-weight:700"><td style="text-align:left;'+td+'">Total</td>'+cols.map(c=>'<td style="'+td+'">'+rows.reduce((a,r)=>a+(r[c.k]||0),0)+'</td>').join('')+'</tr>'
+// Ocorrências por tipo × local (2026-10-27): app_pp_acompanhamento.matriz = [{tipo,local,n,com_os}]. Linhas agrupadas
+// Vazamento / Fraude (todos os tipos da lista, + antigos que aparecerem), colunas = locais; cor pela intensidade.
+// Célula → abertura de serviços filtrada no tipo + local (+ consórcio do topo) via pgOcAbrirFiltro.
+function paMatriz(arr){
+  const el=document.getElementById('paMatriz'); if(!el) return;
+  const cel={}; arr.forEach(r=>{ cel[r.tipo+'|'+r.local]=r; });
+  const tipos=[...new Set(arr.map(r=>r.tipo))], locs=[...new Set(arr.map(r=>r.local))];
+  const cols=[...OC_LOCAIS,...locs.filter(l=>!OC_LOCAIS.includes(l)).sort()];
+  const grupos=[['Vazamento',[...OC_TIPOS_VAZ,...tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort()]],
+                ['Fraude',[...OC_TIPOS_FRAUDE,...tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort()]]];
+  const n=(t,l)=>Number((cel[t+'|'+l]||{}).n||0), nT=t=>cols.reduce((a,l)=>a+n(t,l),0);
+  const max=Math.max(1,...arr.map(r=>Number(r.n||0)));
+  const td='padding:6px 4px;text-align:right;border-top:1px solid var(--line)';
+  const celula=(t,l)=>{ const v=n(t,l); if(!v) return '<td style="'+td+';color:var(--mut)">·</td>';
+    const os=Number((cel[t+'|'+l]||{}).com_os||0);
+    return '<td data-mt="'+vEsc(t)+'" data-ml="'+vEsc(l)+'" title="'+vEsc(t+' · '+l+': '+v+' (com OS '+os+' · sem OS '+(v-os)+')')+'" style="'+td+';cursor:pointer;font-weight:700;background:color-mix(in srgb,#1D9E75 '+Math.round(14+56*v/max)+'%,transparent)">'+v+'</td>'; };
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:520px">'
+    +'<thead><tr style="color:var(--mut)"><th style="text-align:left;font-weight:400;padding:6px 4px">Tipo</th>'
+    +cols.map(l=>'<th title="'+vEsc(l)+'" style="font-weight:400;padding:6px 4px;text-align:right">'+vEsc(OC_LOC_ROT[l]||l)+'</th>').join('')
+    +'<th style="font-weight:400;padding:6px 4px;text-align:right">Total</th></tr></thead><tbody>'
+    +grupos.map(([g,ts])=>'<tr><td colspan="'+(cols.length+2)+'" style="padding:10px 4px 3px;font-size:12px;color:var(--mut)">'+g+' · '+ts.reduce((a,t)=>a+nT(t),0)+'</td></tr>'
+      +ts.map(t=>'<tr><td style="padding:6px 4px;border-top:1px solid var(--line)">'+vEsc(g==='Fraude'?t.replace(/^Fraude - /,''):t)+'</td>'
+        +cols.map(l=>celula(t,l)).join('')+'<td style="'+td+';font-weight:700">'+nT(t)+'</td></tr>').join('')).join('')
+    +'<tr style="font-weight:700"><td style="padding:7px 4px;border-top:2px solid var(--line)">Total</td>'
+    +cols.map(l=>'<td style="padding:7px 4px;text-align:right;border-top:2px solid var(--line)">'+arr.filter(r=>r.local===l).reduce((a,r)=>a+Number(r.n||0),0)+'</td>').join('')
+    +'<td style="padding:7px 4px;text-align:right;border-top:2px solid var(--line)">'+arr.reduce((a,r)=>a+Number(r.n||0),0)+'</td></tr>'
     +'</tbody></table>';
-}
-function paOcQuadros(arr){
-  const por={};   // nome → {nome, <tipo>:n, _vaz, _vos, _fra, _tot, _os}
-  arr.forEach(r=>{ const o=por[r.nome]||(por[r.nome]={nome:r.nome}); const n=Number(r.n||0), os=Number(r.com_os||0);
-    o[r.tipo]=(o[r.tipo]||0)+n; o._tot=(o._tot||0)+n; o._os=(o._os||0)+os;
-    if(ocEhFraude(r.tipo)) o._fra=(o._fra||0)+n; else { o._vaz=(o._vaz||0)+n; o._vos=(o._vos||0)+os; } });
-  const rows=Object.values(por).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
-  const tipos=[...new Set(arr.map(r=>r.tipo))];
-  const extraV=tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort(), extraF=tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort();
-  const col=t=>({k:t,l:OC_ROT[t]||t,t});
-  paTabela(document.getElementById('paVaz'),
-    [...OC_TIPOS_VAZ.map(col),...extraV.map(col),{k:'_vaz',l:'Total',b:1},{k:'_vos',l:'OS criada'}],
-    rows.filter(r=>r._vaz), 'Nenhum vazamento no filtro.');
-  paTabela(document.getElementById('paOcorr'),
-    [{k:'_vaz',l:'Vazamentos',t:'Todos os tipos de vazamento'},...OC_TIPOS_FRAUDE.map(col),...extraF.map(col),{k:'_tot',l:'Total',b:1},{k:'_os',l:'OS criada'}],
-    rows, 'Nenhuma ocorrência no filtro.');
+  el.querySelectorAll('[data-mt]').forEach(c=>c.addEventListener('click',()=>pgOcAbrirFiltro(c.dataset.mt,c.dataset.ml,document.getElementById('paCons').value||'')));
 }
 // popup da ocorrência no mapa: foto, tipo, data de envio, usuário, navegar e atalho p/ o card na abertura de serviços.
 // Popup avulso (openOn) e não bindPopup: o moveend do autoPan recarrega o mapa e limparia o marcador — e o popup junto.
