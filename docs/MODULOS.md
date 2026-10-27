@@ -1876,7 +1876,8 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   restrito')`. **Controle de acesso (2026-09):** engrenagem ⚙️ `#homeDevAcesso` na categoria (só admin) → tela
   `dev_acesso` (`devAcessoInit`/`devAcessoRender`, espelha `supAreaGate`) que lista usuários com toggle; backend
   `perfil.dev_acesso` + RPCs `app_dev_acesso_listar`/`app_dev_acesso_set` (admin-only) + `app_me` repassa
-  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded.
+  `dev_acesso` (admin sempre). Substituiu o gate por e-mail hardcoded. A mesma engrenagem governa a **Vitrine (TV)**
+  (`#homeVitrine`, §17).
 - **Guarda na própria página:** ao final de `perdas.html`, um `<script type="module">` cria um cliente
   supabase-js (mesma `SB_URL`/anon key do app; exposto em **`window.sbg`** p/ o script principal usar nos RPCs),
   lê `auth.getSession()` e, **se `app_me().dev_acesso` for falso** (ou sem sessão), mantém o overlay `#nrwGate`
@@ -2761,13 +2762,16 @@ não sobrescreve za bom já gravado). Lotes de 5000 leituras por chamada.
   (candidatas a inclusão — ver `vw_cadastro_sem_tele`/`vw_cobertura`). Série temporal entra pelo
   módulo/script.
 
-## 17. Vitrine (TV) — `// VITRINE (TV)` · tela `vitrine` (restrita a Geovana e Sander, 2026-10-26)
+## 17. Vitrine (TV) — `// VITRINE (TV)` · tela `vitrine` (🚧 Em desenvolvimento, gate `dev_acesso` — 2026-10-27)
 
 Painel para a TV da sala: **apresentação em loop** com as atividades de campo (fotos + mapas) e indicadores,
 **ao vivo** — a cada volta completa busca os dados de novo (`vtCarregar`) e recomeça.
-- **Acesso:** botão `#homeVitrine` (Home › 🧰 Suporte) só aparece se `ME.email` ∈ {geovana.mendonca, sander.sirio}
-  (`vtPode()`); a RPC **`app_vitrine_dados(p_desde date default null)`** (SECURITY DEFINER, `docs/migracao_vitrine.sql`)
-  recusa qualquer outro usuário (mesma lista). Para liberar mais alguém: incluir o e-mail **nos dois lugares**.
+- **Acesso:** card `#homeVitrine` na categoria **🚧 Em desenvolvimento** (mesmo padrão do `#cardPerdas`): nasce
+  `mod soon` + 🔒; `homeGate()` libera por **`ME.dev_acesso`** (admin sempre) — tira `soon`/🔒 e liga `onclick` →
+  `irPara('vitrine')`; sem acesso, o clique dá `toast('Acesso restrito')`. `vtInit` repete o check (`vtPode()`).
+  A RPC **`app_vitrine_dados(p_desde date default null)`** (SECURITY DEFINER, `docs/migracao_vitrine.sql`) usa o
+  mesmo gate das `app_nrw_*` (`funcao='admin' or dev_acesso`). **Liberar alguém = engrenagem ⚙️ da categoria**
+  (`dev_acesso`), sem código. (Até 2026-10-27 era uma lista de e-mails fixa no app e na RPC — removida.)
 - **Período:** padrão = desde a última sexta-feira (`p_desde` nulo). Atividades: instalação/remoção de logger, OS de VRP
   executadas (≠ programada), ocorrências da pesquisa, recomposição de pavimento, mapeamento de pressão, avanços de obra
   (sem GPS) e solicitações de serviço. Indicadores: "Situação agora" (loggers em campo, frota, manutenções, pendências
