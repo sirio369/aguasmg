@@ -58,6 +58,28 @@ input:focus,select,textarea:focus{outline:2px solid var(--acc);outline-offset:-1
 .fchip.on::before{opacity:1}
 .kchip{display:inline-flex;align-items:baseline;gap:4px;font-size:12px;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
 .kchip b{font-size:14px;color:var(--ink)}
+/* Card de ocorrência da pesquisa (Abertura de serviços — ocorrências), compacto (2026-10-27): a coluna da direita
+   (data, links, OS) usa o espaço sob a data; no celular e no popup do mapa ela desce. Não usar .sub aqui (margem 16px). */
+.occ{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:2px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:8px;font-size:13px}
+.occ.foco{outline:2px solid var(--acc);outline-offset:1px}
+.occ-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;line-height:1.35}
+.occ-h b{font-size:14px;margin-right:2px}
+.occ-tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:0 7px;white-space:nowrap}
+.occ-l{color:var(--mut);margin-top:3px;line-height:1.35;overflow-wrap:anywhere}
+.occ-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.occ-dt{font-size:11px;color:var(--mut);white-space:nowrap}
+.occ-links{display:flex;gap:12px;font-size:12px}
+.occ-ok{background:var(--ok-bg);border-radius:8px;padding:2px 8px;font-size:12px}
+.occ-os{display:flex;gap:6px;width:100%}
+.occ-os input{flex:1;min-width:0;padding:7px 10px;font-size:14px}
+.occ-os .btn{margin:0;width:auto;padding:7px 12px;font-size:14px}
+.occ.pop{display:block;border:none;background:none;padding:2px 1px;margin:0}
+.occ.pop .occ-side{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:6px}
+@media (max-width:600px){
+  .occ{display:block}
+  .occ-side{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:6px}
+  .occ-os input{font-size:16px}
+}
 .seg button{flex:1;font:inherit;font-size:14px;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--mut)}
 .seg button.sel{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
 .banner{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:13px;margin-bottom:6px}
@@ -836,11 +858,19 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <label for="ocTipo">Tipo de ocorrência *</label>
     <select id="ocTipo">
       <option value="">Selecione…</option>
-      <option>Vazamento visível</option>
-      <option>Vazamento não visível (ruído)</option>
-      <option>Extravasamento</option>
-      <option>Cavalete / hidrômetro</option>
-      <option>Outro</option>
+      <optgroup label="Vazamento">
+        <option>Vazamento visível</option>
+        <option>Vazamento não visível (ruído)</option>
+        <option>Extravasamento</option>
+        <option>Cavalete / hidrômetro</option>
+      </optgroup>
+      <optgroup label="Fraude">
+        <option>Fraude - Derivação de ramal</option>
+        <option>Fraude - Ligação clandestina</option>
+        <option>Fraude - Rompimento de lacre</option>
+        <option>Fraude - Corte violado</option>
+        <option>Fraude - Hidrômetro violado</option>
+      </optgroup>
     </select>
     <label for="ocLocal">Local *</label>
     <select id="ocLocal">
@@ -1029,6 +1059,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="paTgRep" type="button" class="fchip" data-c="#d81b60">Reporte de campo</button>
     </div>
     <div id="paMapa" style="height:48vh;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
+    <div class="sec" style="margin-top:20px">Vazamentos por colaborador</div>
+    <div id="paVaz" style="overflow-x:auto;margin-top:8px"></div>
+    <div class="sec" style="margin-top:20px">Ocorrências reportadas por colaborador</div>
+    <div id="paOcorr" style="overflow-x:auto;margin-top:8px"></div>
     <div class="sec" style="margin-top:20px">Resumo por colaborador</div>
     <div id="paResumo" style="overflow-x:auto;margin-top:8px"></div>
   </main>
@@ -1107,6 +1141,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="pgSecOc">
       <div class="sec">⚠️ Ocorrências — pesquisa de vazamentos</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <select id="pgOcFTipo" style="flex:1;min-width:0"><option value="">Todos os tipos</option></select>
+        <select id="pgOcFCons" style="flex:1;min-width:0"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
+      </div>
       <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
       <div id="pgOcLista" style="margin-top:8px"></div>
       <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
@@ -3977,8 +4015,8 @@ const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Toda
 function apInit(){
   // acesso geral à tela (controlado pela engrenagem desta própria tela)
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('home'); return; }
-  const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; irPara('programacao_servicos'); };
-  const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; irPara('programacao_servicos'); };
+  const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; pgBackTo='auxiliar_programacao'; irPara('programacao_servicos'); };
+  const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; pgBackTo='auxiliar_programacao'; irPara('programacao_servicos'); };
   // Ferramentas migradas do cockpit NRW → abrem no perdas.html (fora do menu NRW)
   const hd=$('#apHdPri'); if(hd) hd.onclick=()=>{ location.href='perdas.html?s=hdpri'; };
   const fr=$('#apFraudePri'); if(fr) fr.onclick=()=>{ location.href='perdas.html?s=fraudepri'; };
@@ -4019,9 +4057,19 @@ function auxAcRender(){
     ck.disabled=false;
   }));
 }
+// Tipos de ocorrência da pesquisa (tela `ocorrencia`). 2026-10-27: entram as fraudes e sai o 'Outro' (registros
+// antigos com 'Outro' continuam valendo e contam como vazamento). Regra única: vazamento = tudo que não é fraude.
+const OC_TIPOS_VAZ=['Vazamento visível','Vazamento não visível (ruído)','Extravasamento','Cavalete / hidrômetro'];
+const OC_TIPOS_FRAUDE=['Fraude - Derivação de ramal','Fraude - Ligação clandestina','Fraude - Rompimento de lacre','Fraude - Corte violado','Fraude - Hidrômetro violado'];
+const OC_ROT={'Vazamento visível':'Visível','Vazamento não visível (ruído)':'Não visível','Extravasamento':'Extravas.','Cavalete / hidrômetro':'Cavalete/HD',
+  'Fraude - Derivação de ramal':'Derivação','Fraude - Ligação clandestina':'Clandestina','Fraude - Rompimento de lacre':'Lacre','Fraude - Corte violado':'Corte violado','Fraude - Hidrômetro violado':'HD violado'};
+function ocEhFraude(t){ return /^fraude/i.test(t||''); }
+function ocIcone(t){ return ocEhFraude(t)?'🚩':'⚠️'; }
+function ocDataCurta(iso){ return iso?new Date(iso).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}).replace(',',''):'—'; }
 // Abertura de serviços: segmentada por origem (comercial = solicitações / pesquisa = ocorrências)
-let pgModo='comercial';
+let pgModo='comercial', pgBackTo='auxiliar_programacao';
 function pgInit(){
+  const bk=$('#pgBack'); if(bk) bk.textContent = pgBackTo==='pp_acomp' ? '‹ Acompanhamento da pesquisa' : '‹ Auxiliar de Programação';
   const sol = pgModo!=='pesquisa';
   const secS=$('#pgSecSol'), secO=$('#pgSecOc');
   if(secS) secS.classList.toggle('hidden', !sol);
@@ -4033,7 +4081,7 @@ function pgInit(){
     : 'Ocorrências da pesquisa de vazamentos — lance o nº da OS criada na COPASA.';
   pgRenderFiltros();
   if(sol){ pgCarregar(); }
-  else { pgOcRenderTabs(); pgCarregarOc(); }
+  else { pgOcRenderTabs(); pgOcAplicarView(); pgCarregarOc(); }
 }
 function pgRenderFiltros(){
   const c=document.getElementById('pgFiltros'); if(!c) return;
@@ -4098,26 +4146,70 @@ function pgOcFillEnderecos(root){
   });
 }
 // --- card compartilhado entre lista e popup do mapa ---
+// Compacto (2026-10-27): à esquerda tipo+tags, endereço, quem/coordenada e obs; à direita (sob a data) links, OS e o
+// campo de OS. No celular e no popup a coluna da direita desce (CSS .occ).
 function pgOcCard(s,popup){
-  const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
-  const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto</a>`:'';
-  const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
-  const info=[s.local?('Local: '+s.local):'',s.consorcio||''].filter(Boolean).join(' · ');
-  const coord=(s.lat!=null&&s.lon!=null)?`<div class="sub" style="margin-top:3px">📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span></div>
-        <div class="sub" style="margin-top:2px"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}" style="color:var(--mut)">buscando endereço…</span></div>`:'';
-  const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
-  const wrap=popup?'padding:2px 1px':'background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px';
-  return `<div style="${wrap}">
-        <div style="display:flex;gap:8px;align-items:center"><b>⚠️ ${s.tipo||'Ocorrência'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
-        <div class="sub" style="margin-top:3px">${info}</div>
-        <div class="sub" style="margin-top:2px">Por ${s.usuario||'—'} · ${foto}${mapa}</div>
-        ${coord}
-        ${s.observacao?('<div class="sub" style="margin-top:3px">Obs: '+s.observacao+'</div>'):''}
-        ${done}
-        <div style="display:flex;gap:6px;margin-top:8px"><input class="pgOcOs" data-id="${s.id}" value="${(s.os_numero||'').replace(/"/g,'&quot;')}" placeholder="Nº da OS na COPASA" style="flex:1;min-width:0"/><button class="btn" data-ocsave="${s.id}" style="margin:0;width:auto;padding:9px 14px">Salvar</button></div>
+  const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener">📷 Foto</a>`:'';
+  const mapa=(s.lat&&s.lon)?`<a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener">📍 Mapa</a>`:'';
+  const tags=[s.local,s.consorcio].filter(Boolean).map(t=>`<span class="occ-tag">${vEsc(t)}</span>`).join('');
+  const quem=`👤 ${vEsc(s.usuario_nome||s.usuario||'—')}`+((s.lat!=null&&s.lon!=null)?` · 📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span>`:'');
+  const end=(s.lat!=null&&s.lon!=null)?`<div class="occ-l"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}">buscando endereço…</span></div>`:'';
+  const done=s.os_numero?`<div class="occ-ok">✓ OS <b>${vEsc(s.os_numero)}</b>${s.os_por?(' · '+vEsc(s.os_por)):''}</div>`:'';
+  return `<div class="occ${popup?' pop':''}" data-occ="${s.id}">
+        <div class="occ-main">
+          <div class="occ-h"><b>${ocIcone(s.tipo)} ${vEsc(s.tipo||'Ocorrência')}</b>${tags}</div>
+          ${end}
+          <div class="occ-l">${quem}</div>
+          ${s.observacao?(`<div class="occ-l">💬 ${vEsc(s.observacao)}</div>`):''}
+        </div>
+        <div class="occ-side">
+          <div class="occ-dt">${ocDataCurta(s.data_hora)}</div>
+          <div class="occ-links">${foto}${mapa}</div>
+          ${done}
+          <div class="occ-os"><input class="pgOcOs" data-id="${s.id}" value="${vEsc(s.os_numero||'')}" placeholder="Nº da OS na COPASA"/><button class="btn" data-ocsave="${s.id}">Salvar</button></div>
+        </div>
       </div>`;
 }
 let pgOcData=[], pgOcMode='lista', pgOcMap=null, pgOcMarkers=null;
+let pgOcFTipo='', pgOcFCons='', pgOcFoco=null;   // filtros (tipo: tipo exato | '@vaz' | '@fraude') + card a destacar
+function pgOcFiltrado(semTipo){
+  return (pgOcData||[]).filter(o=>(!pgOcFCons||o.consorcio===pgOcFCons)
+    && (semTipo||!pgOcFTipo||(pgOcFTipo==='@vaz'?!ocEhFraude(o.tipo):(pgOcFTipo==='@fraude'?ocEhFraude(o.tipo):o.tipo===pgOcFTipo))));
+}
+// dropdown de tipo com contagem (respeita consórcio + aba de status); tipos antigos fora da lista (ex. 'Outro') aparecem se houver
+function pgOcRenderFTipo(){
+  const s=document.getElementById('pgOcFTipo'), c=document.getElementById('pgOcFCons'); if(!s) return;
+  if(c) c.value=pgOcFCons;
+  const arr=pgOcFiltrado(true), n=t=>arr.filter(o=>o.tipo===t).length;
+  const tipos=[...new Set(arr.map(o=>o.tipo).filter(Boolean))];
+  const vaz=[...OC_TIPOS_VAZ,...tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort()];
+  const fra=[...OC_TIPOS_FRAUDE,...tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort()];
+  const opt=(v,l,k)=>`<option value="${vEsc(v)}"${pgOcFTipo===v?' selected':''}>${vEsc(l)} (${k})</option>`;
+  const nV=arr.filter(o=>!ocEhFraude(o.tipo)).length;
+  s.innerHTML=opt('','Todos os tipos',arr.length)
+    +'<optgroup label="Vazamento">'+opt('@vaz','Todos os vazamentos',nV)+vaz.map(t=>opt(t,t,n(t))).join('')+'</optgroup>'
+    +'<optgroup label="Fraude">'+opt('@fraude','Todas as fraudes',arr.length-nV)+fra.map(t=>opt(t,t,n(t))).join('')+'</optgroup>';
+}
+function pgOcRender(){
+  const c=document.getElementById('pgOcLista'); if(!c) return;
+  pgOcRenderFTipo();
+  const arr=pgOcFiltrado();
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+((pgOcFTipo||pgOcFCons)?' no filtro':(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':'')))+'.</p>'; }
+  else {
+    c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
+    c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
+    pgOcFillEnderecos(c);
+  }
+  if(pgOcFoco){ const el=c.querySelector('[data-occ="'+pgOcFoco+'"]'); pgOcFoco=null;
+    if(el){ el.classList.add('foco'); setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),80); } }
+  if(pgOcMode==='mapa') pgOcCarregarMapa();
+}
+// atalho do popup do Acompanhamento da pesquisa → card da ocorrência (aba certa, sem filtros, rola e destaca)
+function pgOcAbrir(id,temOs){
+  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro=temOs?'criada':'pendente';
+  pgOcFTipo=''; pgOcFCons=''; pgOcMode='lista'; pgOcFoco=id;
+  irPara('programacao_servicos');
+}
 function pgOcRenderTabs(){
   const c=document.getElementById('pgOcTabs'); if(!c) return;
   const opts=[['lista','📋 Lista'],['mapa','🗺️ Mapa']];
@@ -4135,7 +4227,7 @@ function pgOcCarregarMapa(){
     pgOcMap.on('popupopen',ev=>{ const el=ev.popup.getElement(); if(!el)return; el.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave))); pgOcFillEnderecos(el); }); }
   setTimeout(()=>pgOcMap.invalidateSize(),0);
   pgOcMarkers.clearLayers();
-  const arr=(pgOcData||[]).filter(s=>s.lat!=null&&s.lon!=null), pts=[];
+  const arr=pgOcFiltrado().filter(s=>s.lat!=null&&s.lon!=null), pts=[];
   arr.forEach(s=>{
     const cor=s.os_numero?'#1D9E75':'#dc2626';
     const m=L.circleMarker([s.lat,s.lon],{radius:8,color:'#fff',weight:2,fillColor:cor,fillOpacity:1});
@@ -4147,12 +4239,8 @@ function pgOcCarregarMapa(){
 }
 async function pgCarregarOc(){
   const c=document.getElementById('pgOcLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; const arr=data||[]; pgOcData=arr;
-    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':''))+'.</p>'; if(pgOcMode==='mapa') pgOcCarregarMapa(); return; }
-    c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
-    c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
-    pgOcFillEnderecos(c);
-    if(pgOcMode==='mapa') pgOcCarregarMapa();
+  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; pgOcData=data||[];
+    pgOcRender();
   }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 async function pgSalvarOcOs(id){
@@ -4160,7 +4248,9 @@ async function pgSalvarOcOs(id){
   try{ const {error}=await sb.rpc('app_ocorrencia_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); if(pgOcMap)pgOcMap.closePopup(); pgCarregarOc(); }
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
-if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
+if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara(pgBackTo));
+if($('#pgOcFTipo')) $('#pgOcFTipo').addEventListener('change',e=>{ pgOcFTipo=e.target.value; pgOcRender(); });
+if($('#pgOcFCons')) $('#pgOcFCons').addEventListener('change',e=>{ pgOcFCons=e.target.value; pgOcRender(); });
 
 // ---------- CRIAÇÃO DE MATRÍCULAS (Retaguarda) ----------
 let mtFiltro='pendente';
@@ -5900,6 +5990,8 @@ function paInit(){
     paLayerGrp=L.layerGroup().addTo(paMap);   // 1 grupo p/ heatmap+reporte+ocorrências — clearLayers evita camada órfã
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
     paMap.on('moveend',()=>paCarregarMapa());
+    paMap.on('popupopen',ev=>{ const el=ev.popup.getElement(); if(!el)return;
+      el.querySelectorAll('.paOcAbrir').forEach(a=>a.addEventListener('click',()=>{ paMap.closePopup(); pgOcAbrir(a.dataset.id,a.dataset.os==='1'); })); });
     // filtro de passadas dentro do mapa (igual legenda-filtro da Programação): isola por categoria,
     // multi-seleção, vazio = todas — re-renderiza o viewport atual filtrado, SEM dar zoom no clique.
     const PaLg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
@@ -5944,7 +6036,7 @@ async function paAtualizar(){
   try{
     const {data,error}=await sb.rpc('app_pp_acompanhamento',paFiltros());
     if(error)throw error;
-    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paResumo(data.resumo||[]);
+    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paOcQuadros(data.ocorrencias||[]); paResumo(data.resumo||[]);
   }catch(e){ toast('Erro no acompanhamento: '+(e.message||e)); }
   paCarregarMapa();
 }
@@ -5976,6 +6068,48 @@ function paResumo(rows){
     +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;font-weight:400;padding:6px 4px">Colaborador</th><th style="font-weight:400;padding:6px 4px">km rede</th><th style="font-weight:400;padding:6px 4px">km andado</th><th style="font-weight:400;padding:6px 4px">vaz.</th><th style="font-weight:400;padding:6px 4px">vaz/km</th><th style="font-weight:400;padding:6px 4px">km/h</th></tr></thead><tbody>'
     +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+(r.nome||'—')+'</td><td style="padding:7px 4px">'+Number(r.km_rede_pesquisado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.km_andado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+(r.vazamentos||0)+'</td><td style="padding:7px 4px">'+Number(r.vaz_km||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.velocidade_kmh||0).toFixed(1)+'</td></tr>').join('')
     +'</tbody></table>';
+}
+// Quadros de ocorrências (2026-10-27): app_pp_acompanhamento.ocorrencias = [{nome,tipo,n,com_os}] → pivô por colaborador.
+// "Vazamentos" = tipos de vazamento (+ coluna p/ tipo antigo, ex. 'Outro', só se houver); "Ocorrências reportadas" =
+// vazamentos somados + cada fraude. Mesma regra do KPI: vazamento = tudo que não é fraude (ocEhFraude).
+function paTabela(el,cols,rows,vazio){
+  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">'+vazio+'</p>'; return; }
+  const th='font-weight:400;padding:6px 4px', td='padding:7px 4px';
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:'+(150+cols.length*72)+'px">'
+    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;'+th+'">Colaborador</th>'+cols.map(c=>'<th title="'+vEsc(c.t||c.l)+'" style="'+th+'">'+vEsc(c.l)+'</th>').join('')+'</tr></thead><tbody>'
+    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;'+td+'">'+vEsc(r.nome)+'</td>'+cols.map(c=>'<td style="'+td+(c.b?';font-weight:700':'')+'">'+(r[c.k]||0)+'</td>').join('')+'</tr>').join('')
+    +'<tr style="border-top:2px solid var(--line);text-align:right;font-weight:700"><td style="text-align:left;'+td+'">Total</td>'+cols.map(c=>'<td style="'+td+'">'+rows.reduce((a,r)=>a+(r[c.k]||0),0)+'</td>').join('')+'</tr>'
+    +'</tbody></table>';
+}
+function paOcQuadros(arr){
+  const por={};   // nome → {nome, <tipo>:n, _vaz, _vos, _fra, _tot, _os}
+  arr.forEach(r=>{ const o=por[r.nome]||(por[r.nome]={nome:r.nome}); const n=Number(r.n||0), os=Number(r.com_os||0);
+    o[r.tipo]=(o[r.tipo]||0)+n; o._tot=(o._tot||0)+n; o._os=(o._os||0)+os;
+    if(ocEhFraude(r.tipo)) o._fra=(o._fra||0)+n; else { o._vaz=(o._vaz||0)+n; o._vos=(o._vos||0)+os; } });
+  const rows=Object.values(por).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+  const tipos=[...new Set(arr.map(r=>r.tipo))];
+  const extraV=tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort(), extraF=tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort();
+  const col=t=>({k:t,l:OC_ROT[t]||t,t});
+  paTabela(document.getElementById('paVaz'),
+    [...OC_TIPOS_VAZ.map(col),...extraV.map(col),{k:'_vaz',l:'Total',b:1},{k:'_vos',l:'OS criada'}],
+    rows.filter(r=>r._vaz), 'Nenhum vazamento no filtro.');
+  paTabela(document.getElementById('paOcorr'),
+    [{k:'_vaz',l:'Vazamentos',t:'Todos os tipos de vazamento'},...OC_TIPOS_FRAUDE.map(col),...extraF.map(col),{k:'_tot',l:'Total',b:1},{k:'_os',l:'OS criada'}],
+    rows, 'Nenhuma ocorrência no filtro.');
+}
+// popup da ocorrência no mapa: foto, tipo, data de envio, usuário, navegar e atalho p/ o card na abertura de serviços.
+// Popup avulso (openOn) e não bindPopup: o moveend do autoPan recarrega o mapa e limparia o marcador — e o popup junto.
+function paOcPopup(p,ll){
+  const a='display:inline-block;margin-top:5px;color:var(--acc);font-weight:600';
+  const foto=p.foto?'<a href="'+fotoURL(p.foto)+'" target="_blank" rel="noopener" style="'+a+'">📷 Ver foto</a>':'<span style="color:var(--mut)">📷 sem foto</span>';
+  return '<div style="font-size:13px;line-height:1.55;min-width:200px">'
+    +'<b style="font-size:14px">'+ocIcone(p.tipo)+' '+vEsc(p.tipo||'Ocorrência')+'</b>'
+    +'<div>📅 Enviada em '+ocDataCurta(p.data)+'</div>'
+    +'<div>👤 '+vEsc(p.usuario_nome||p.usuario||'—')+'</div>'
+    +'<div>'+(p.os?('✓ OS <b>'+vEsc(p.os)+'</b>'):'⏳ Sem OS')+'</div>'
+    +foto+'<br>'
+    +'<a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" rel="noopener" style="'+a+'">🧭 Navegar</a><br>'
+    +'<a class="paOcAbrir" data-id="'+vEsc(p.id)+'" data-os="'+(p.os?1:0)+'" style="'+a+';cursor:pointer">📋 Abrir na abertura de serviços ›</a></div>';
 }
 function paPintarToggles(){
   [['paTgOc',paShowOc],['paTgRep',paShowRep]].forEach(([id,on])=>{
@@ -6015,7 +6149,9 @@ async function paCarregarMapa(){
     }
     // ocorrências (vazamentos) — ativável
     if(paShowOc && data.ocorrencias&&(data.ocorrencias.features||[]).length){
-      L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paLayerGrp);
+      L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:7,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1})
+        .bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')
+        .on('click',()=>L.popup({minWidth:220,maxWidth:300}).setLatLng(ll).setContent(paOcPopup(ft.properties||{},ll)).openOn(paMap))}).addTo(paLayerGrp);
     }
   }catch(e){ if(gen===paGen) toast('Erro no mapa: '+(e.message||e)); }
 }

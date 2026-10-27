@@ -240,7 +240,8 @@ pwa/
   concluído e no preview de finalização. **No PDF mora no tópico 5 · Pressão** (saiu do tópico
   1 · Localização, onde ficava sem nada pra comparar do lado).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
-  As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
+  As **ocorrências** (vazamentos e, desde 2026-10-27, **fraudes** — tipos `Fraude - …`; vazamento = tudo que não é
+  fraude) registradas aqui (`app_ocorrencia_registrar`, consórcio pelo ponto, tabela
   `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
   alimentam a fila de **Abertura de serviços** (ver Auxiliar de Programação), onde recebem nº de OS.
 - **Programação de pesquisa de vazamento** (`programacao_pesquisa`, dentro de Auxiliar de Programação;
@@ -257,7 +258,9 @@ pwa/
   "Minha produtividade" pessoal simplificada (`app_pesquisa_minha`, `auth.uid()`); time interno tem, no
   Auxiliar de Programação, **Programar** (rede colorida por nº de passadas 0×..5+×) + **Acompanhamento**
   (tela `pp_acomp`: KPIs com 2 km + vaz/km por km de rede, progresso das 5 passadas, mapa heatmap de
-  passadas + ocorrências/reporte ativáveis, resumo por colaborador). O cruzamento roda em
+  passadas + ocorrências/reporte ativáveis — ocorrência com popup e atalho p/ o card na Abertura de serviços —,
+  quadros de vazamentos e de ocorrências reportadas por colaborador × tipo, resumo por colaborador; a Abertura
+  de serviços — ocorrências filtra por tipo e consórcio). O cruzamento roda em
   **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
