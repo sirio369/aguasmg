@@ -259,8 +259,9 @@ pwa/
   Auxiliar de Programação, **Programar** (rede colorida por nº de passadas 0×..5+×) + **Acompanhamento**
   (tela `pp_acomp`: KPIs com 2 km + vaz/km por km de rede, progresso das 5 passadas, mapa heatmap de
   passadas + ocorrências/reporte ativáveis — ocorrência com popup e atalho p/ o card na Abertura de serviços —,
-  quadros de vazamentos e de ocorrências reportadas por colaborador × tipo, resumo por colaborador; a Abertura
-  de serviços — ocorrências filtra por tipo e consórcio). O cruzamento roda em
+  produtividade por colaborador com ocorrências/km = (vazamentos + fraudes) ÷ km de rede, matriz ocorrências por
+  tipo × local que abre a Abertura já filtrada; a Abertura de serviços — ocorrências filtra por tipo, local e
+  consórcio). O cruzamento roda em
   **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
