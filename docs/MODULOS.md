@@ -2838,3 +2838,11 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
+
+## Login — tela `#login` (redesenho 2026-10-27)
+- Ilustração de fundo escolhida pelo tamanho da tela (CSS, sem JS): **celular/estreito** = `public/login/login-celular.webp`
+  (vertical; `background-size:100% auto` ancorada embaixo + `background-attachment:local`; `.lg-box` reserva
+  `margin-bottom:calc(100vw*.78)` p/ os personagens nunca ficarem atrás do formulário — em tela baixa a página rola);
+  **notebook** (`min-width:860px` **e** `min-aspect-ratio:4/3`) = `login-notebook.webp` (cover), formulário à esquerda.
+- Campos com ícone (e-mail/cadeado) e botão 👁 `#lgOlho` (mostrar/ocultar senha). IDs `#email/#senha/#entrar/#loginErr` mantidos.
+- Login continua sempre em tema claro.
