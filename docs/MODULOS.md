@@ -44,6 +44,10 @@
     `programacao_pesquisa`, `pp_config`, `rede_pp_segmento`/`_fonte`, §4.3): artefato interno do app que
     convive no mesmo schema da rede por conveniência de FK/trigger, mas não é cadastro curado — quem
     precisa ver isso no QGIS usa a vitrine (`vw_gis_programacao_pesquisa`), nunca a tabela crua.
+11. **Consórcio de um registro de campo não vem do `localStorage 'consorcio'`** — esse valor só é gravado
+    pela tela de Pressão (quem nunca lançou pressão manda `null`). Resolva **no servidor**: ZA do ponto
+    (`"1 - suporte_geografico".limite_za`) → valor do app → `perfil.consorcio` (ex.: `app_pav_registrar`, §2.6;
+    `app_abertura_servico_registrar`, §3.2). O perfil fica por último: a mesma pessoa atende as duas ZAs.
 
 ---
 
@@ -370,7 +374,7 @@
   - **Coordenada travada no GPS** (`pavOnGps`): mostra lat/lon ao vivo, **sem edição**; banner "Fique próximo ao local para salvar a coordenada" até `gps.acc ≤ PRECISAO_MAX` (15 m) — mesma trava anti-lançamento-remoto da pressão/loggers.
   - **Tipos de pavimento = multi-seleção** (chips `PAV_TIPOS`: grama/asfalto/concreto/bloquete/paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta). Cada tipo selecionado **abre um bloco** com **dimensão** + **2 fotos obrigatórias** (câmera **e galeria**, `comprimir` 1600px). Estado em `pavState={tipo:{dimensao,f1,f2}}`.
   - **Salvar:** gera um `grupo` uuid e envia **1 item por tipo** pela **fila offline** (`enviarOuEnfileirar`, `rpc:'app_pav_registrar'`, `pasta:'pavimento'`, fotos `p_foto1`/`p_foto2`). "Meus últimos registros" via `app_pav_minhas` (agrupado por grupo).
-- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
+- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`; **`consorcio` = ZA cujo `"1 - suporte_geografico".limite_za` contém o ponto → senão `p_consorcio` → senão `perfil.consorcio`** — 2026-10-27, `docs/migracao_pav_consorcio.sql`; antes vinha só do `localStorage 'consorcio'`, que **só a tela de Pressão grava**, e 22/23 registros ficaram sem consórcio — backfill feito, backup `"8 - coleta_campo"._bkp_pav_consorcio_20261027`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
 
 ---
 
@@ -406,6 +410,11 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   `app_abertura_servico_registrar` (fila, pasta `abertura`). "Minhas solicitações":
   `app_abertura_servico_minhas`. Tabela `"12 - retaguarda".abertura_servico` (movida de
   `"8 - coleta_campo"` na reorg de 2026-09; *app-only*, não exposta a GIS).
+- **Consórcio (2026-10-27):** a RPC grava `consorcio` = ZA do `limite_za` que contém o ponto → `p_consorcio` →
+  `perfil.consorcio` (`docs/migracao_abertura_servico_consorcio.sql`). Antes vinha só do `localStorage` (§0.11) e
+  7/7 estavam sem consórcio — backfill feito (backup `"12 - retaguarda"._bkp_abertura_consorcio_20261027`). O perfil
+  **não** serve de fonte principal: entrevistadores atendem as duas ZAs (4/7 divergiam); o ponto bateu com o
+  consórcio da matrícula em `"3 - comercial".ligacoes` em 7/7.
 
 ### 3.3 Roteiro de leitura (Suporte) — `// SUPORTE › ROTEIRO DE LEITURA` (~L1926) · tela `roteiro`
 - Mapa por **percurso/trecho** sobre `"8 - coleta_campo".vw_roteiro_leitura` (pontos, 133k) e
@@ -832,7 +841,7 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
 - Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*
 - **Cabeçalho espelhado na "abertura de serviços — ocorrências" (2026-10-21b):** **tabs de status** `.seg` (`#pavpStatusSeg`: Pendentes [default] / OS criada / Todas) + **alternância de visão** `.seg` (`#pavpViewSeg`: 📋 Lista / 🗺️ Mapa, `pavProgSetView`). **Mapa** (`#pavpMapa`, `pavProgMapa`): Leaflet (`L.map`+`mapAddCamadaBase`) com `circleMarker` colorido por faixa de prazo (pendentes) / teal (com OS), popup e `fitBounds`.
-- **Filtros (client-side exceto consórcio):** consórcio (select, server-side) · **serviço de origem = dropdown multi-seleção** (`.msdd`/`#pavpOrigDd` — botão + painel de checkboxes, `pavpRenderOrigDd`; fecha ao clicar fora) · **prazo = chips clicáveis com contagem** no `#pavpResumo` (🟢 no prazo / 🟡 atenção / 🔴 atrasado — cada chip mostra o nº e filtra; clicar força status=Pendentes). Removidos o select de prazo e o de ordenação (ordem fixa = mais antigos primeiro).
+- **Filtros (client-side exceto consórcio):** consórcio (select, server-side — `app_pav_listar` filtra `consorcio = p_consorcio`, por isso o registro **precisa** ter consórcio; ver §2.6) · **serviço de origem = dropdown multi-seleção** (`.msdd`/`#pavpOrigDd` — botão + painel de checkboxes, `pavpRenderOrigDd`; fecha ao clicar fora) · **prazo = chips clicáveis com contagem** no `#pavpResumo` (🟢 no prazo / 🟡 atenção / 🔴 atrasado — cada chip mostra o nº e filtra; clicar força status=Pendentes). Removidos o select de prazo e o de ordenação (ordem fixa = mais antigos primeiro).
 - **Controle de prazo (a partir da data de solicitação `created_at`):** `pavDias`/`pavBucket` (`PAV_SLA=[3,5]` → **0–3 no prazo · 4–5 atenção · >5 atrasado**) → badge colorido "faixa · há N dias" + borda esquerda; **o relógio conta só enquanto NÃO há OS** de recomposição.
 - **Distinção OS criada × pendente (espelha a ocorrência da pesquisa):** o programador **lança a OS SIGOS da recomposição** no card pendente (input + "Criar OS" → `pavProgCriarOS` → RPC **`app_pav_os(p_grupo,p_os)`**, gate admin|aux_acesso, grava `os_recomposicao`/`os_recomp_em`/`os_recomp_por` em todas as linhas do grupo). Com OS → badge verde "✓ OS <nº>". Colunas novas na tabela `pav_recomposicao`: `os_recomposicao`/`os_recomp_em`/`os_recomp_por`. (⚠️ `os_sigos` = OS **de origem**, preenchida no campo; `os_recomposicao` = OS **da recomposição**, preenchida aqui.) sw **v264**.
 
