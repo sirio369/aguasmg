@@ -47,7 +47,9 @@
 11. **Consórcio de um registro de campo não vem do `localStorage 'consorcio'`** — esse valor só é gravado
     pela tela de Pressão (quem nunca lançou pressão manda `null`). Resolva **no servidor**: ZA do ponto
     (`"1 - suporte_geografico".limite_za`) → valor do app → `perfil.consorcio` (ex.: `app_pav_registrar`, §2.6;
-    `app_abertura_servico_registrar`, §3.2). O perfil fica por último: a mesma pessoa atende as duas ZAs.
+    `app_abertura_servico_registrar`, §3.2; `app_ocorrencia_registrar`, §2.3). O perfil fica por último: a mesma
+    pessoa atende as duas ZAs. Pior que `null` é o valor **errado**: na ocorrência da pesquisa 8/19 estavam na ZA
+    oposta ao ponto (o aparelho tinha o consórcio da última Pressão).
 
 ---
 
@@ -301,6 +303,16 @@
   `consorcio`, `usuario` texto, `pesquisa_id`, `origem`). Foto obrigatória. É **dado geo**
   (movida de `"12 - retaguarda"` em 2026-09): visível no QGIS via `0 - vitrine_gis.vw_gis_ocorrencia`
   (curada — sem `foto`/`usuario`/gps cru).
+- **Tipos (`#ocTipo`, 2026-10-27):** dois grupos — **Vazamento** (visível · não visível (ruído) · extravasamento ·
+  cavalete/hidrômetro) e **Fraude** (`Fraude - Derivação de ramal` · `- Ligação clandestina` · `- Rompimento de
+  lacre` · `- Corte violado` · `- Hidrômetro violado`). **`Outro` saiu** do dropdown (3 registros antigos seguem
+  valendo). O texto do option é o valor gravado em `tipo`. **Regra única: vazamento = tipo que não começa com
+  `Fraude`** — front `ocEhFraude()` (+ `OC_TIPOS_VAZ`/`OC_TIPOS_FRAUDE`/`OC_ROT` rótulos curtos, junto da Abertura
+  de serviços) e SQL `tipo not ilike 'fraude%'` no `app_pp_acompanhamento`. Tipo novo de fraude: começar com
+  `Fraude - ` e incluir em `OC_TIPOS_FRAUDE`.
+- **Consórcio (2026-10-27):** `app_ocorrencia_registrar` grava a ZA do ponto (§0.11) — antes gravava o
+  `localStorage`, e 8/19 estavam na ZA errada; backfill feito (backup das chaves em
+  `"8 - coleta_campo"._bkp_ocorrencia_consorcio_20261027`, `docs/migracao_pesquisa_ocorrencias_fraude.sql`).
 - **Importante:** as ocorrências alimentam a **fila de Abertura de serviços** (§Auxiliar de
   Programação) via `app_ocorrencia_fila`/`app_ocorrencia_os` (colunas `os_numero/os_criada_em/os_por`).
 - **Produtividade** (`// MÓDULO PRODUTIVIDADE` ~L2200): RPCs `app_pesquisa_filtros`,
@@ -485,6 +497,18 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   filtrados** (`pgOcData`, recarregado a cada troca de filtro pendente/criada/todas); clicar no ponto
   abre um **popup com o mesmo card** (inclui input+Salvar da OS, fiado no `popupopen`). Salvar fecha o
   popup e recarrega. `pgInit` chama `pgOcRenderTabs`.
+- **Ocorrências: filtros + card compacto + deep-link (2026-10-27).** Dois selects lado a lado acima do Lista/Mapa:
+  **tipo** (`#pgOcFTipo` — "Todos os vazamentos"/`@vaz`, "Todas as fraudes"/`@fraude` ou o tipo exato, com
+  **contagem** em cada opção; tipo antigo fora da lista, ex. `Outro`, aparece se houver) e **consórcio**
+  (`#pgOcFCons`). Filtro **no cliente** sobre `pgOcData` (`pgOcFiltrado`), vale p/ lista e mapa; estado
+  `pgOcFTipo`/`pgOcFCons` sobrevive ao Salvar OS e à troca de aba. `pgCarregarOc` só busca; quem desenha é
+  `pgOcRender`. **Card (`.occ`, CSS global):** grid de 2 colunas — esquerda: tipo (⚠️ vazamento / 🚩 fraude) +
+  tags local/consórcio, endereço, 👤 nome (`usuario_nome`, do perfil) · 📌 coordenada, 💬 obs; direita (sob a data):
+  📷 Foto/📍 Mapa, ✓ OS e o campo de OS. ≤600px e no popup (`.occ.pop`) a coluna da direita desce. Não usar
+  `.sub` dentro do card (margem inferior de 16px — era o que deixava o card alto). **Deep-link:**
+  `pgOcAbrir(id,temOs)` (chamado pelo popup do Acompanhamento, §4.3.8) abre em modo pesquisa, na aba certa
+  (pendente/OS criada), limpa os filtros, rola até o card (`data-occ`) e o destaca (`.occ.foco`); o "‹ voltar"
+  segue `pgBackTo` (volta ao Acompanhamento nesse caso). `app_ocorrencia_fila` passou a devolver `usuario_nome`.
 
 ### 4.3 Programação de pesquisa de vazamento — `// MÓDULO PROGRAMAÇÃO DE PESQUISA` (~L2438) · tela `programacao_pesquisa` (dentro de Auxiliar de Programação)
 
@@ -818,7 +842,18 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
   permanente — pra análise só o histórico importa, e ele já vira o heatmap.)
 - **KPIs (5):** km de rede pesquisado · km andado · vazamentos · vaz/km (por km de rede) · velocidade
-  média. (Saiu a "cobertura da programação".)
+  média. (Saiu a "cobertura da programação".) **Vazamentos não contam fraude** (2026-10-27, §2.3) — nem no KPI
+  nem no resumo por colaborador.
+- **Popup da ocorrência no mapa (2026-10-27):** clicar no ponto abre tipo, data de envio (`data_hora` = hora em
+  que chegou ao servidor), nome de quem enviou, OS (se houver), 📷 foto, 🧭 Navegar (Google Maps) e **"Abrir na
+  abertura de serviços ›"** → `pgOcAbrir` (§4.2). `paOcPopup`; é um `L.popup().openOn(paMap)` **avulso**, não
+  `bindPopup`: o autoPan do popup dispara `moveend` → `paCarregarMapa` → `clearLayers`, que fecharia um popup
+  preso ao marcador. `app_pp_passadas_bbox` devolve `foto`, `local`, `usuario_nome` nas ocorrências.
+- **Quadros "Vazamentos por colaborador" e "Ocorrências reportadas por colaborador" (2026-10-27)**, entre o mapa e
+  o resumo: `app_pp_acompanhamento.ocorrencias` = `[{nome,tipo,n,com_os}]` (mesmos filtros; quem **reportou**,
+  casado com o perfil por nome OU email) e o front pivota (`paOcQuadros`/`paTabela`). Vazamentos: colunas por tipo
+  de vazamento (+ tipo antigo, ex. `Outro`, só se houver) · Total · OS criada. Ocorrências: Vazamentos (somados) ·
+  cada fraude · Total · OS criada. Linha de total no rodapé.
 - **Resumo por colaborador:** repete os indicadores de cima por pessoa — km rede pesquisado · km andado ·
   vazamentos · vaz/km · velocidade. (Saíram "km programado" e "%".)
 - **RPCs (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio, p_colaborador,
