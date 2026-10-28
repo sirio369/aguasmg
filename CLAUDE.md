@@ -367,9 +367,9 @@ descrição-Nível-3, `CENTROS_CUSTO_FROTA` — subconjunto curado pelo usuário
 já existente — sem aluguel próprio). Tela de Frotas ganhou filtro (tipo/condutor) no topo da lista e
 um "Ver detalhes" por veículo que abre Editar/Vínculo(admin)/Histórico/Relatório/Devolver numa página
 só, em vez de 5 botões no card. **Colaborador**, no seu módulo: CNH (só dados de CNH, não lista mais
-veículo nenhum), **Veículos** (self-service acima), **checklist diário** (layout em cartão, lembrete
-automático 7:30 da manhã pra quem tem vínculo ativo + CNH ativa, `pg_cron` +
-`frota_checklist_lembrete_diario`), **Manutenção** e **Lavagem** — cada uma é uma tela de
+veículo nenhum), **Veículos** (self-service acima), **checklist diário** (layout em cartão; os lembretes
+diários automáticos das 7h30 e 16h50 foram **removidos** em 2026-10-28 — `docs/migracao_remove_lembretes_frota.sql`;
+lembrete de checklist hoje só pelo módulo Avisos, enquanto houver aviso vigente), **Manutenção** e **Lavagem** — cada uma é uma tela de
 **histórico + ação**, não só
 um formulário avulso (**renomeadas na 5ª rodada**, eram "Registrar problema (manutenção)"/"Solicitar
 lavagem", iam direto pro formulário sem mostrar nada do que já existia). Estes 3 últimos ficam

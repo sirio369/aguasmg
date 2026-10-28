@@ -3048,7 +3048,7 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
 - **Destino "Notificações":** `supGoAct('notificacoes')` abre a tela `notificacoes` (antes caía no hub do Almoxarifado).
 - **Lembretes push** (`lembrete='checklist_frota'`): `aviso_lembretes_run(slot)` via **pg_cron** `aviso-lembrete-1..5`
   (08h/10h/12h/14h/16h BRT, seg–sex) — notifica **só quem tem veículo vinculado e não fez o checklist do dia**, com o texto do
-  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
+  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. É o **único** lembrete de checklist do app desde 2026-10-28 (os diários antigos de 7h30/16h50 da Frota foram removidos — `docs/migracao_remove_lembretes_frota.sql`); sem aviso vigente, ninguém é lembrado. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
 - **Grants:** `aviso_eh_admin()`/`aviso_tem_veiculo(uuid)` são internos (revogados de anon/authenticated); `aviso_lembretes_run` só o cron.
 - **Tabela** `public.app_aviso` (RLS ligada, sem policy — só RPC). 1º aviso (seed): "Checklist diário do veículo", até
   30/10/2026, pop-up p/ todos, imagem `./avisos/checklist-frota-2026-10.webp`.
