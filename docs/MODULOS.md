@@ -2324,6 +2324,10 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel`
 
+- **Indicadores (2026-10-27):** card **📊 Indicadores** no bloco 🏗️ Campo do hub (`pjHub`, `#pjIndicadores`) abre o painel
+  externo `https://indicadores-aguas-mg-v2.vercel.app/#resumo` em **nova aba** (`window.open`, `noopener`). Visível a quem
+  acessa Projetos (sem gate próprio).
+
 Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD, **válvulas**).
 
 - **⭐ Reground nos dados reais (2026-09-25):** `PJ_IVS` deixou de ser mock — agora é **carregado do banco** por
