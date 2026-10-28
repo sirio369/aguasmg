@@ -2467,7 +2467,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m; item lançado
     congela — ver `pjHasAdv` acima); **stepper Quantidade** (`data-repadd/repdel`); **select de tipo** (`sel`,
     `data-sel`) nas peças. Tudo **desabilitado quando `pjLocked`** (frozen). Abaixo do escopo, **📎 Documentos**
-    — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/as-built. Wiring da árvore compartilhado
+    — **é AQUI que se anexa/abre/remove** projeto executivo/autorização de via/relatórios (furo/solda [HDD])/as-built/RTQ. Wiring da árvore compartilhado
     com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
     - **Documentos REAIS (2026-09-25):** 1 arquivo (PDF) por tipo (`PJ_DOCS`: executivo/licenca/alvara/as_built).
       Upload no bucket **`fotos-campo`** (reaproveitado, prefixo `projetos/<kind>/<gid>/`), registro em
@@ -2512,6 +2512,30 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       e **`pjDocsFor(iv)`** filtra os docs aplicáveis — usada na lista de Documentos (cfg e relatório), na seção 4 do PDF e nos
       **anexos mesclados** do PDF consolidado (ordem de `PJ_DOCS`: furo antes do as-built). **Backend (migração `proj_doc_rel_furo`):**
       `app_proj_doc_set` aceita `rel_furo` e o libera ao campo (junto de `as_built`/`rtq`); `app_proj_docs_presenca` inclui `rel_furo`.
+    - **Autorização de Intervenção de Via + Relatório de Solda + sai a Licença (2026-10-28, sw v281):** (1) **Licença ambiental
+      saiu** de `PJ_DOCS` (cfg, relatório, PDF consolidado) e da whitelist do `app_proj_doc_set` — os anexos antigos (`tipo='licenca'`,
+      1 na linha 16) **ficam no banco**, só não aparecem. (2) O antigo **"Alvará de execução" virou "Autorização de Intervenção de
+      Via"** — **mesmo tipo `alvara`** (anexos existentes migram sozinhos), constante `PJ_AIV_N`/`pjAIV()`. Agora é **atividade-documento
+      obrigatória de TODA intervenção**, **logo após a OS SIGOS** (2ª atividade): anexada pelo **campo na tela de lançamento**, igual
+      ao As-Built/RTQ, e conta **100% quando anexada** → a intervenção **não chega a 100% sem ela** (não trava o lançamento de avanço).
+      Snapshots antigos ganham o nó no `pjLoad` (reconciliação: insere/move para o índice 1, renomeia). (3) **Relatório de Solda**
+      (`rel_solda`, `hdd:true`) = atividade-documento **só de `rede_hdd`**, entre Furo e As-Built (ordem HDD: … › Furo › Solda ›
+      As Built › RTQ). Os três entram no relatório consolidado e nos anexos mesclados do PDF via `pjDocsFor(iv)` (ordem de `PJ_DOCS`).
+      **Backend (migração `proj_excluir_intervencao_e_docs_aiv_solda`):** `app_proj_doc_set` aceita `rel_solda` e libera ao campo
+      `alvara`/`as_built`/`rtq`/`rel_furo`/`rel_solda`; `app_proj_docs_presenca` inclui `alvara` e `rel_solda`.
+    - **Excluir intervenção (2026-10-28, sw v281):** botão **🗑️ Excluir intervenção** no canto superior direito do `projeto_cfg`
+      (`#pjCfgDel`, na `.bar` ao lado do "‹ Suporte"; visível p/ `pjPodeSup()`). Só exclui **sem lançamento**: bloqueado (opaco, toast
+      com o motivo) se houver avanço em qualquer item (`pjHasAdv`) **ou** documento da tela de lançamento anexado (`pjIvDocLanc` —
+      nó-doc 100%; remova o anexo antes). Confirmação no modal global `vmModal` (`pjExcluirConfirm`) → RPC
+      **`app_proj_intervencao_excluir(p_kind,p_gid)`** (definer, gate admin/`proj_sup_acesso`) que **revalida** (log `intervencao_avanco`,
+      `%`/`m` > 0 no snapshot via `jsonb_path_exists`, docs `alvara/rel_furo/rel_solda/as_built/rtq`) e apaga **de forma definitiva**:
+      a linha em `"7 - setorizacao".intervencoes_pontuais|lineares` (o trigger `a_audit` grava a geometria), `intervencao_estado` e
+      `intervencao_documento`. Rastro extra em `intervencoes_audit` (`operacao='EXCLUSAO_APP'`, estado + documentos + `excluido_por`,
+      `alterado_por`=e-mail). Devolve `paths` dos arquivos → o app apaga no Storage (`storage.remove`; delete direto em `storage.objects`
+      é bloqueado pelo Supabase). **Policy nova** `fotos_campo_projetos_sup_delete` (DELETE em `fotos-campo`, prefixo `projetos/`, só
+      admin/`proj_sup_acesso`) — antes **nenhum** `storage.remove` do módulo apagava de fato (sem policy de DELETE, falhava em silêncio;
+      no campo, sem acesso ao Suporte, a troca de PDF continua deixando o arquivo antigo órfão). ⚠️ Se a camada de intervenções for
+      **reimportada do gpkg de origem**, a intervenção excluída pode voltar.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
@@ -2525,7 +2549,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       Por atividade) soma **só Puxamento** (`rede_hdd`) e **Assentamento de tubulação** (`rede_vca`) via
       `pjRsEhMetroRede`/`mNum` — evita dupla contagem (piloto, escavação etc. não entram). O **Por dia** passou a
       agrupar **dia → intervenção → avanços**; cada avanço individual segue mostrando seu valor real (+N m/%).
-  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
+  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = `pjDocsFor(iv)` (projeto executivo, autorização de intervenção de via, relatórios de furo/solda [HDD], as-built, RTQ),
     **só com botão Abrir** (arquivo real do Storage) — **anexar/remover ficam na configuração** (`projeto_cfg`).
     **Progresso por atividade (2026-10-06, era "mini-Gantt"):** AUDITORIA — o Gantt antigo plotava a barra por
     `ts` (data de **registro** do avanço), não por data de obra; sem cronograma planejado e com lançamento em
