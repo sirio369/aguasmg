@@ -48,7 +48,7 @@ button{font-family:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* shell */
-.app{display:grid;grid-template-columns:224px 1fr;min-height:100vh}
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
 aside{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line-2)}
 .brand .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:var(--on-accent);font-weight:700;font-size:15px}
@@ -238,7 +238,7 @@ tbody tr:hover{background:var(--surface-2)}
 .scorebar i{display:block;height:100%;border-radius:4px}
 @media(max-width:920px){
   .app{grid-template-columns:1fr}
-  aside{position:fixed;left:-240px;transition:.2s;z-index:20}aside.open{left:0}
+  aside{position:fixed;width:248px;left:-250px;transition:.2s;z-index:20}aside.open{left:0}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .grid2,.cols{grid-template-columns:1fr}
   .menubtn{display:inline-grid!important}
@@ -1268,7 +1268,9 @@ const MACRO_SEAS_ORDER=['vol_disponibilizado','lpd','vol_entrada','vol_saida','n
 const MACRO_COLS=[
  {k:'macro',lab:'Macromedidor',num:false,r:false,get:x=>x.cd_no_agua,cell:x=>`<b>${x.cd_no_agua}</b>`},
  {k:'func', lab:'Função',      num:false,r:false,get:x=>x.funcao,cell:x=>`<span class="mmtag" style="--cc:${x.funcao==='entrada'?'#4b9fe0':'#e6a23c'}">${x.funcao}</span>`},
- {k:'vol',  lab:'Volume (m³)', num:true, r:true, get:x=>+x.volume_total||0,cell:x=>fmt(x.volume_total||0)},
+ {k:'med',  lab:'Medido (m³)', num:true, r:true, get:x=>+x.volume_medido||0,cell:x=>fmt(x.volume_medido||0)},
+ {k:'est',  lab:'Estimado (m³)',num:true,r:true, get:x=>+x.volume_estimado||0,cell:x=>macroEstCell(x)},
+ {k:'vol',  lab:'Total (m³)',  num:true, r:true, get:x=>+x.volume_total||0,cell:x=>`<b>${fmt(x.volume_total||0)}</b>`},
  {k:'vaz',  lab:'Vazão (l/s)', num:true, r:true, get:x=>+x.vazao_media_ls||0,cell:x=>br1(x.vazao_media_ls||0)},
  {k:'mom',  lab:'MoM',         num:true, r:true, get:x=>x.mom==null?null:+x.mom,cell:x=>`<span style="color:${mmDelta(x.mom)}">${x.mom!=null?mmSig(x.mom)+'%':'—'}</span>`},
  {k:'yoy',  lab:'YoY',         num:true, r:true, get:x=>x.yoy==null?null:+x.yoy,cell:x=>`<span style="color:${mmDelta(x.yoy)}">${x.yoy!=null?mmSig(x.yoy)+'%':'—'}</span>`}
@@ -1276,14 +1278,14 @@ const MACRO_COLS=[
 const MACRO_INFO={
  kpi:{t:'Indicador de volume da ZA',h:`<p>O <b>volume disponibilizado</b> da ZA = soma dos macros de <b>entrada</b> − soma dos macros de <b>saída</b> (fonte GMOA). É a água que ficou para consumo/perda na região.</p><p><b>L/lig·dia</b> = volume disponibilizado ÷ nº de ligações ÷ 30 dias × 1000 — <b>mesma premissa do micromedido</b> (mesmo denominador de ligações), então os dois são diretamente comparáveis: disponibilizado − consumido (micromedido) ≈ <b>perda por ligação</b>.</p><p>MoM = vs mês anterior · YoY = mesmo mês do ano anterior.</p>`},
  season:{t:'Sazonalidade & tendência',h:`<p>Heatmap mês×ano da composição escolhida (mais claro = maior). A linha <b>Sazonal</b> é o desvio % de cada mês-calendário vs a média geral (laranja acima / azul abaixo). Gráfico: linha = ano mais recente, sombra = faixa mín–máx dos anos anteriores.</p><p>Troque a composição (disponibilizado / L/lig·dia / entrada / saída / ligações) para achar a origem das flutuações. ⚠️ Base = 17 meses (abr/2025–ago/2026); a sombra ano-a-ano ainda é parcial.</p>`},
- macros:{t:'Abertura por macromedidor',h:`<p>Cada macromedidor do fechamento da ZA no mês selecionado, com volume total, vazão média, função (entrada/saída) e variação <b>MoM</b>/<b>YoY</b>. Toque numa linha para a série histórica e as estatísticas do medidor.</p>`}
+ macros:{t:'Abertura por macromedidor',h:`<p>Cada macromedidor do fechamento da ZA no mês selecionado, com o volume <b>segregado</b> como o GMOA informa: <b>Medido</b> (registrado pelo medidor/telemetria) + <b>Estimado</b> (volume atribuído pela COPASA no período sem medição — falha de telemetria, medidor parado, etc.) = <b>Total</b>. O total é o que entra no volume disponibilizado e no resultado.</p><p>Estimado em <b style="color:#e6a23c">laranja</b> com a % do total do macro: quanto maior, menos o volume do mês foi de fato medido. Também: vazão média, função (entrada/saída) e variação <b>MoM</b>/<b>YoY</b> do total. Toque numa linha para a série histórica e as estatísticas do medidor.</p>`}
 };
 function macroCons(){ return za==='all'?null:za; }
 function macroIB(key){ return `<button class="mminfo" data-minfo="${key}" title="Sobre este bloco">ⓘ</button>`; }
 function macroSeasNum(v){ return macroSeasMet==='lpd'?br1(v):fmt(v); }
 function macroSeasFmt(v){ return macroSeasNum(v)+' '+MACRO_SEAS_MET[macroSeasMet].u; }
 function macroInit(){ mmCss();
- if(!document.getElementById('macrocss')){ const st=document.createElement('style'); st.id='macrocss'; st.textContent='#s-macro td.r,#s-macro th.r{text-align:right;font-variant-numeric:tabular-nums}'; document.head.appendChild(st); }
+ if(!document.getElementById('macrocss')){ const st=document.createElement('style'); st.id='macrocss'; st.textContent='#s-macro td.r,#s-macro th.r{text-align:right;font-variant-numeric:tabular-nums}body:has(#s-macro.on) .wrap{max-width:none}'; document.head.appendChild(st); }
  const body=$('#macroBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise de macromedição…</p></div></div>';
  const fc=macroCons();
@@ -1354,6 +1356,9 @@ function macroSeasonPanel(){
   </div></div>`;
 }
 /* ---- painel 3: abertura por macromedidor (lista + detalhe) ---- */
+function macroEstCell(x){ const e=+x.volume_estimado||0, t=+x.volume_total||0;
+ if(!e) return `<span style="color:var(--muted)">0</span>`;
+ return `<span style="color:#e6a23c;font-weight:600" title="${t?br1(100*e/t):'—'}% do total do macro foi estimado">${fmt(e)} <small>(${t?br1(100*e/t):'—'}%)</small></span>`; }
 function macroMacrosPanel(){
  if(!macroMacros.length) return '';
  const col=MACRO_COLS.find(c=>c.k===macroSort.k)||MACRO_COLS.find(c=>c.k==='vol'), dir=macroSort.dir;
@@ -1361,11 +1366,12 @@ function macroMacrosPanel(){
  const th=MACRO_COLS.map(c=>`<th class="${c.r?'r':''}" data-k="${c.k}">${c.lab}${macroSort.k===c.k?`<span class="ar">${dir<0?'▼':'▲'}</span>`:''}</th>`).join('');
  const rows=arr.map(x=>`<tr data-cd="${x.cd_no_agua}" data-cons="${x.consorcio}" style="cursor:pointer">`+MACRO_COLS.map(c=>`<td class="${c.r?'r':''}">${c.cell(x)}</td>`).join('')+'</tr>').join('');
  const te=arr.filter(x=>x.funcao==='entrada').reduce((a,x)=>a+(+x.volume_total||0),0), ts=arr.filter(x=>x.funcao==='saida').reduce((a,x)=>a+(+x.volume_total||0),0);
+ const nEst=arr.filter(x=>(+x.volume_estimado||0)>0).length, vEst=arr.reduce((a,x)=>a+(+x.volume_estimado||0),0);
  return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Abertura por macromedidor</h3><span class="hint" style="margin-left:6px">${mmCmp(macroSel)}</span>${macroIB('macros')}<span class="chip real" style="margin-left:auto">real</span></div>
   <div class="pbody">
    <div class="mmanalgrid">
     <div class="mmblock">
-     <div class="mmblock-h">Macromedidores <span class="hint">entrada ${fmt(Math.round(te))} m³ · saída ${fmt(Math.round(ts))} m³</span></div>
+     <div class="mmblock-h">Macromedidores <span class="hint">entrada ${fmt(Math.round(te))} m³ · saída ${fmt(Math.round(ts))} m³ · ${nEst?`<b style="color:#e6a23c">estimado ${fmt(Math.round(vEst))} m³ em ${nEst} macro${nEst>1?'s':''}</b>`:'sem volume estimado'}</span></div>
      <div style="overflow:auto;max-height:520px"><table class="mmdmc" id="macrotbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>
     </div>
     <div class="mmblock mmdetail-sticky">

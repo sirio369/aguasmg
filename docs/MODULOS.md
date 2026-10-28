@@ -2072,6 +2072,15 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   por ligação. 4 painéis (Indicador do mês · Sazonalidade/tendência heatmap+linha · Abertura por macromedidor ·
   Detalhe do medidor), reaproveitando CSS/helpers do `mm` (`mmcard`/`mmheat`/`mmHeat`/`mmDiv`/`br1`/`mmCmp`...).
   Recarregar = refazer o INSERT em `macro_mensal` a partir das planilhas GMOA.
+  - **Medido × estimado na Abertura por macromedidor (2026-10-28):** a tabela mostra o volume **segregado** como o
+    GMOA informa — **Medido** + **Estimado** (laranja, com % do total do macro) = **Total** — e o cabeçalho soma o
+    estimado do mês ("estimado X m³ em N macros"). `app_nrw_macro_macros` passou a devolver `volume_medido` e
+    `volume_estimado` (`coalesce(...,0)`; com fator, o mesmo multiplicador do total — o fator ainda vale sobre o total,
+    não só sobre a parcela medida). No GMOA medido + estimado = total (1 linha difere 0,22 m³ por arredondamento da
+    fonte); `volume_estimado` vem **vazio** nos macros de telemetria e **0** nos de leitura — os dois contam como 0.
+    Demais painéis e o resultado seguem lendo só o total. Na tela de macromedição o conteúdo ocupa a largura toda
+    (`body:has(#s-macro.on) .wrap{max-width:none}`, como HD/Fiscalização); a barra lateral do cockpit passou de
+    224 → **248 px** (nome "Análise de macromedição" numa linha; no celular a barra fechada fica inteira fora da tela).
   - **Camada `unidades_macromedicao` (view, schema 2):** ganhou 3 colunas via left join com `macro_fechamento` —
     **`fechamento_za`** (bool), **`funcao_medicao`** (entrada/saída) e **`sistema_macro`**. Marca 24 dos 37 macros
     da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
