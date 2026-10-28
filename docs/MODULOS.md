@@ -2072,6 +2072,28 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   por ligação. 4 painéis (Indicador do mês · Sazonalidade/tendência heatmap+linha · Abertura por macromedidor ·
   Detalhe do medidor), reaproveitando CSS/helpers do `mm` (`mmcard`/`mmheat`/`mmHeat`/`mmDiv`/`br1`/`mmCmp`...).
   Recarregar = refazer o INSERT em `macro_mensal` a partir das planilhas GMOA.
+  - **Medido × estimado na Abertura por macromedidor (2026-10-28):** a tabela mostra o volume **segregado** como o
+    GMOA informa — **Medido** + **Estimado** (laranja, com % do total do macro) = **Total** — e o cabeçalho soma o
+    estimado do mês ("estimado X m³ em N macros"). `app_nrw_macro_macros` passou a devolver `volume_medido` e
+    `volume_estimado` (`coalesce(...,0)`; com fator, o mesmo multiplicador do total — o fator ainda vale sobre o total,
+    não só sobre a parcela medida). No GMOA medido + estimado = total (1 linha difere 0,22 m³ por arredondamento da
+    fonte); `volume_estimado` vem **vazio** nos macros de telemetria e **0** nos de leitura — os dois contam como 0.
+    Demais painéis e o resultado seguem lendo só o total. Na tela de macromedição o conteúdo ocupa a largura toda
+    (`body:has(#s-macro.on) .wrap{max-width:none}`, como HD/Fiscalização); a barra lateral do cockpit passou de
+    224 → **248 px** (nome "Análise de macromedição" numa linha; no celular a barra fechada fica inteira fora da tela).
+  - **Bloco "Macromedidores × meses" + nova ordem (2026-10-28):** ordem dos blocos = Indicador do mês · Abertura por
+    macromedidor · Sazonalidade & tendência · **Macromedidores × meses** · Fator de correção. O bloco novo é uma matriz
+    **macro (linha) × competência (coluna)** com todos os meses e todos os macros que já apareceram no GMOA da ZA
+    (total em mil m³; cor = medido / medido+estimado / só estimado / zerado / sem registro no arquivo do mês). Coluna
+    **Situação** vs o último mês da ZA: *Medindo* · *Parou* (já mediu; no último mês saiu do GMOA, veio só estimado ou
+    zerado — mostra o último mês medido) · *Nunca medido* (só estimado); "entrou em MM/AAAA" p/ quem começou depois do
+    início da série. Filtros: Todos / Deixaram de medir / Com estimado / Entraram depois. Agrupado por ZA+função, os que
+    pararam primeiro; clique na linha abre a série no detalhe da Abertura; em tela estreita abre rolado nos meses
+    recentes (coluna do macro fixa). RPC **`app_nrw_macro_matriz(p_consorcio, p_com_fator)`** (definer, admin|`dev_acesso`,
+    execute só `authenticated`): 1 linha por consórcio×macro×competência com `vm`/`ve`/`vt` (soma dos sentidos; com
+    fator, mesmo multiplicador). Status calculado no front (`macroMatModel`). Ex. (09/2026): 4 saídas da ZA1004
+    (EMM0000383/0556535/0556538/0559170) saem do GMOA após 07/2026 e a EMM0000131 entra em 08/2026 com volume ≈ soma
+    delas; EMM0613252 (ZA0200) sai após 07/2026; EMM1697373 nunca medido.
   - **Camada `unidades_macromedicao` (view, schema 2):** ganhou 3 colunas via left join com `macro_fechamento` —
     **`fechamento_za`** (bool), **`funcao_medicao`** (entrada/saída) e **`sistema_macro`**. Marca 24 dos 37 macros
     da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
@@ -2445,7 +2467,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m; item lançado
     congela — ver `pjHasAdv` acima); **stepper Quantidade** (`data-repadd/repdel`); **select de tipo** (`sel`,
     `data-sel`) nas peças. Tudo **desabilitado quando `pjLocked`** (frozen). Abaixo do escopo, **📎 Documentos**
-    — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/as-built. Wiring da árvore compartilhado
+    — **é AQUI que se anexa/abre/remove** projeto executivo/autorização de via/relatórios (furo/solda [HDD])/as-built/RTQ. Wiring da árvore compartilhado
     com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
     - **Documentos REAIS (2026-09-25):** 1 arquivo (PDF) por tipo (`PJ_DOCS`: executivo/licenca/alvara/as_built).
       Upload no bucket **`fotos-campo`** (reaproveitado, prefixo `projetos/<kind>/<gid>/`), registro em
@@ -2490,6 +2512,30 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       e **`pjDocsFor(iv)`** filtra os docs aplicáveis — usada na lista de Documentos (cfg e relatório), na seção 4 do PDF e nos
       **anexos mesclados** do PDF consolidado (ordem de `PJ_DOCS`: furo antes do as-built). **Backend (migração `proj_doc_rel_furo`):**
       `app_proj_doc_set` aceita `rel_furo` e o libera ao campo (junto de `as_built`/`rtq`); `app_proj_docs_presenca` inclui `rel_furo`.
+    - **Autorização de Intervenção de Via + Relatório de Solda + sai a Licença (2026-10-28, sw v281):** (1) **Licença ambiental
+      saiu** de `PJ_DOCS` (cfg, relatório, PDF consolidado) e da whitelist do `app_proj_doc_set` — os anexos antigos (`tipo='licenca'`,
+      1 na linha 16) **ficam no banco**, só não aparecem. (2) O antigo **"Alvará de execução" virou "Autorização de Intervenção de
+      Via"** — **mesmo tipo `alvara`** (anexos existentes migram sozinhos), constante `PJ_AIV_N`/`pjAIV()`. Agora é **atividade-documento
+      obrigatória de TODA intervenção**, **logo após a OS SIGOS** (2ª atividade): anexada pelo **campo na tela de lançamento**, igual
+      ao As-Built/RTQ, e conta **100% quando anexada** → a intervenção **não chega a 100% sem ela** (não trava o lançamento de avanço).
+      Snapshots antigos ganham o nó no `pjLoad` (reconciliação: insere/move para o índice 1, renomeia). (3) **Relatório de Solda**
+      (`rel_solda`, `hdd:true`) = atividade-documento **só de `rede_hdd`**, entre Furo e As-Built (ordem HDD: … › Furo › Solda ›
+      As Built › RTQ). Os três entram no relatório consolidado e nos anexos mesclados do PDF via `pjDocsFor(iv)` (ordem de `PJ_DOCS`).
+      **Backend (migração `proj_excluir_intervencao_e_docs_aiv_solda`):** `app_proj_doc_set` aceita `rel_solda` e libera ao campo
+      `alvara`/`as_built`/`rtq`/`rel_furo`/`rel_solda`; `app_proj_docs_presenca` inclui `alvara` e `rel_solda`.
+    - **Excluir intervenção (2026-10-28, sw v281):** botão **🗑️ Excluir intervenção** no canto superior direito do `projeto_cfg`
+      (`#pjCfgDel`, na `.bar` ao lado do "‹ Suporte"; visível p/ `pjPodeSup()`). Só exclui **sem lançamento**: bloqueado (opaco, toast
+      com o motivo) se houver avanço em qualquer item (`pjHasAdv`) **ou** documento da tela de lançamento anexado (`pjIvDocLanc` —
+      nó-doc 100%; remova o anexo antes). Confirmação no modal global `vmModal` (`pjExcluirConfirm`) → RPC
+      **`app_proj_intervencao_excluir(p_kind,p_gid)`** (definer, gate admin/`proj_sup_acesso`) que **revalida** (log `intervencao_avanco`,
+      `%`/`m` > 0 no snapshot via `jsonb_path_exists`, docs `alvara/rel_furo/rel_solda/as_built/rtq`) e apaga **de forma definitiva**:
+      a linha em `"7 - setorizacao".intervencoes_pontuais|lineares` (o trigger `a_audit` grava a geometria), `intervencao_estado` e
+      `intervencao_documento`. Rastro extra em `intervencoes_audit` (`operacao='EXCLUSAO_APP'`, estado + documentos + `excluido_por`,
+      `alterado_por`=e-mail). Devolve `paths` dos arquivos → o app apaga no Storage (`storage.remove`; delete direto em `storage.objects`
+      é bloqueado pelo Supabase). **Policy nova** `fotos_campo_projetos_sup_delete` (DELETE em `fotos-campo`, prefixo `projetos/`, só
+      admin/`proj_sup_acesso`) — antes **nenhum** `storage.remove` do módulo apagava de fato (sem policy de DELETE, falhava em silêncio;
+      no campo, sem acesso ao Suporte, a troca de PDF continua deixando o arquivo antigo órfão). ⚠️ Se a camada de intervenções for
+      **reimportada do gpkg de origem**, a intervenção excluída pode voltar.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
@@ -2503,7 +2549,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       Por atividade) soma **só Puxamento** (`rede_hdd`) e **Assentamento de tubulação** (`rede_vca`) via
       `pjRsEhMetroRede`/`mNum` — evita dupla contagem (piloto, escavação etc. não entram). O **Por dia** passou a
       agrupar **dia → intervenção → avanços**; cada avanço individual segue mostrando seu valor real (+N m/%).
-  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
+  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = `pjDocsFor(iv)` (projeto executivo, autorização de intervenção de via, relatórios de furo/solda [HDD], as-built, RTQ),
     **só com botão Abrir** (arquivo real do Storage) — **anexar/remover ficam na configuração** (`projeto_cfg`).
     **Progresso por atividade (2026-10-06, era "mini-Gantt"):** AUDITORIA — o Gantt antigo plotava a barra por
     `ts` (data de **registro** do avanço), não por data de obra; sem cronograma planejado e com lançamento em

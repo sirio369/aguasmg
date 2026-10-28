@@ -1370,7 +1370,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="projeto_cfg" class="hidden">
-    <div class="bar"><button class="bk" id="pjCfgBack">‹ Suporte</button></div>
+    <div class="bar"><button class="bk" id="pjCfgBack">‹ Suporte</button><button class="btn ghost pjmini bad hidden" id="pjCfgDel" style="margin-left:auto">🗑️ Excluir intervenção</button></div>
     <div id="pjCfg"></div>
   </main>
 
@@ -2039,8 +2039,11 @@ const pjM=(n,meta,exec,o={})=>({n,k:'m',meta,exec,un:o.un||'m',...o});
 const pjR=(n,v)=>({n,k:'reg',v});
 const PJ_PECA_TIPOS=['Válvula de manobra','Ventosa','Descarga'];
 const pjSel=(n,v,opts)=>({n,k:'sel',v:v||'',opts:opts||PJ_PECA_TIPOS});   // seleção de tipo (config): não é mensurável
-// atividade de ENCERRAMENTO: registro único via anexo de PDF (não foto); o PDF vira documento final (ver PJ_DOCS: as_built/rtq)
+// atividade-DOCUMENTO: registro único via anexo de PDF (não foto) na tela de lançamento; o PDF vira documento final (ver PJ_DOCS: alvara/rel_furo/rel_solda/as_built/rtq)
 const pjDoc=(n,doc)=>({n,k:'doc',doc});
+// Autorização de Intervenção de Via (2026-10-28; tipo 'alvara' = antigo "Alvará de execução"): obrigatória em TODA intervenção, logo após a OS SIGOS — sem ela a intervenção não chega a 100%
+const PJ_AIV_N='Autorização de Intervenção de Via';
+const pjAIV=()=>pjDoc(PJ_AIV_N,'alvara');
 // OS SIGOS da intervenção: 1ª atividade de TODA árvore. Só número (k:'reg' → fora do % de avanço) e sem toggle "No escopo?" (não é ativável/desativável)
 const pjOS=()=>({n:'OS SIGOS',k:'reg',os:true,v:'—'});
 const pjOsVal=iv=>{ const n=((iv&&iv.arv)||[]).find(x=>x&&x.os); return (n&&n.v&&n.v!=='—')?String(n.v):''; };
@@ -2113,33 +2116,33 @@ PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 let pjLoaded=false, PJ_LIMITES=[], PJ_DMCS=[];
 // árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
 const PJ_ARV={
-  vrp_impl:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
+  vrp_impl:()=>[pjOS(),pjAIV(),pjP('Locação e cadastro de interferências',0),
     pjG('Câmara da VRP',[...pjOc(0,0,0,0),pjP('Execução da câmara',0)]),
     pjP('Montagem hidráulica (VRP + by-pass, registros, filtro, manômetros)',0),
     pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade',0),pjP('Calibração / ajuste de set point',0),
     {...pjP('Telemetria / macromedidor associado',0),ativo:true},pjP('Comissionamento',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  valvula:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
+  valvula:()=>[pjOS(),pjAIV(),pjP('Locação e cadastro de interferências',0),
     pjG('Obra civil (vala/caixa)',pjOc(0,0,0,0)),
     {...pjP('Retirada da válvula antiga (se substituição)',0),ativo:false},
     pjP('Instalação da válvula + acessórios',0),
     pjIL('Interligação / religação',0,0,0),
     pjP('Teste de estanqueidade / manobra',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  rede_vca:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
+  rede_vca:(ext)=>[pjOS(),pjAIV(),pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
     pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
     pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
   // HDD = perfuração direcional (não destrutiva): sem vala/reaterro/pavimento; só valas de entrada/saída, furo piloto, alargamento e puxamento
-  rede_hdd:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
+  rede_hdd:(ext)=>[pjOS(),pjAIV(),pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
     pjP('Mobilização e montagem do equipamento HDD',0),pjValas([pjVala(1,'Entrada'),pjVala(2,'Saída')]),
     pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
     pjM('Puxamento da tubulação (pullback)',ext||1,0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
-    pjDoc('Relatório de Furo','rel_furo'),pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]   // HDD: Relatório de Furo antes do As Built
+    pjDoc('Relatório de Furo','rel_furo'),pjDoc('Relatório de Solda','rel_solda'),pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]   // HDD: Relatórios de Furo e de Solda antes do As Built
 };
 const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
 const pjMapTipo=(tipo,isLine)=>isLine?'rede_vca':(PJ_TIPO_MAP[tipo]||'vrp_impl');
@@ -2191,7 +2194,7 @@ async function pjLoad(force){
   ivs.forEach(iv=>{ if(!Array.isArray(iv.arv))return;
     iv.arv=iv.arv.filter(n=>!(n&&n.k!=='doc'&&/cadastro\s*\/?\s*as-?built/i.test(n.n||'')));
     const fin=[['Cadastro do As Built','as_built'],['Relatório Técnico de Qualidade','rtq']];
-    if(iv.tipo==='rede_hdd') fin.unshift(['Relatório de Furo','rel_furo']);   // só HDD, antes do As Built (2026-10-22)
+    if(iv.tipo==='rede_hdd') fin.unshift(['Relatório de Furo','rel_furo'],['Relatório de Solda','rel_solda']);   // só HDD, antes do As Built (furo 2026-10-22, solda 2026-10-28)
     fin.forEach(([nm,dc])=>{
       const i=iv.arv.findIndex(n=>n&&n.k==='doc'&&n.doc===dc);
       if(i<0) iv.arv.push(pjDoc(nm,dc)); else iv.arv.push(iv.arv.splice(i,1)[0]);
@@ -2199,8 +2202,11 @@ async function pjLoad(force){
     // OS SIGOS (2026-10-22): garante o campo como 1ª atividade em snapshots salvos antes dele existir
     const oi=iv.arv.findIndex(n=>n&&n.os);
     if(oi<0) iv.arv.unshift(pjOS()); else if(oi>0) iv.arv.unshift(iv.arv.splice(oi,1)[0]);
+    // Autorização de Intervenção de Via (2026-10-28): garante o nó-doc logo após a OS SIGOS (snapshots antigos não o têm)
+    const ai=iv.arv.findIndex(n=>n&&n.k==='doc'&&n.doc==='alvara');
+    const aiv=ai<0?pjAIV():iv.arv.splice(ai,1)[0]; aiv.n=PJ_AIV_N; iv.arv.splice(1,0,aiv);
   });
-  await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca As-Built/RTQ já anexados (100%) em todas as intervenções
+  await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca os documentos de lançamento já anexados (100%) em todas as intervenções
   PJ_IVS=ivs; pjLoaded=true;
 }
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
@@ -2230,6 +2236,8 @@ let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (co
 let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o render da árvore
 // node tem lançamento? (subatividade %/m com avanço > 0, ou grupo com algum filho lançado) — regardless de ativo
 function pjHasAdv(node){ if(node.k==='%')return (node.p||0)>0; if(node.k==='m')return (node.exec||0)>0; if(node.f)return node.f.some(pjHasAdv); return false; }
+// documento da tela de lançamento já anexado (nó-doc = 100%)? Junto com pjHasAdv, trava a exclusão da intervenção (espelha app_proj_intervencao_excluir)
+const pjIvDocLanc=iv=>((iv&&iv.arv)||[]).some(n=>n&&n.k==='doc'&&n.done);
 // acesso à categoria Suporte: admin sempre; senão precisa de grant. Protótipo em localStorage (mini-cadeado da categoria) até haver backend (proj_acesso → ME.proj_areas).
 // acesso ao Suporte: admin sempre; senão precisa de grant persistido no banco (perfil.proj_sup_acesso → ME.proj_sup)
 const pjPodeSup=()=>!!(ME&&(ME.is_admin || ME.proj_sup));
@@ -2598,8 +2606,9 @@ function pjResumoCsv(feed){
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u; a.download='resumo_avancos_projetos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('CSV gerado'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
 // ---------- documentos da intervenção (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por tipo ----------
-const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'rel_furo',ic:'🕳️',n:'Relatório de Furo',hdd:true},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
-// documentos aplicáveis à intervenção: "Relatório de Furo" existe só em HDD (lista de documentos, relatório e PDF consolidado)
+// (2026-10-28) Licença ambiental saiu (anexos antigos ficam no banco, só não aparecem); 'alvara' = Autorização de Intervenção de Via
+const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'alvara',ic:'🚧',n:PJ_AIV_N},{t:'rel_furo',ic:'🕳️',n:'Relatório de Furo',hdd:true},{t:'rel_solda',ic:'🔥',n:'Relatório de Solda',hdd:true},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
+// documentos aplicáveis à intervenção: "Relatório de Furo" e "Relatório de Solda" existem só em HDD (lista de documentos, relatório e PDF consolidado)
 const pjDocsFor=iv=>PJ_DOCS.filter(dc=>!dc.hdd||(iv&&iv.tipo==='rede_hdd'));
 let pjDocsCur={};   // tipo -> {tipo,nome,path} da intervenção corrente
 // presença dos documentos de ENCERRAMENTO (as_built/rtq) por intervenção — marca node.done nos cards da lista sem abrir cada uma
@@ -2628,7 +2637,7 @@ async function pjDocRemover(iv,tipo){ if(!iv) return;
     delete pjDocsCur[tipo]; pjSetDocDone(iv,tipo,false); toast('Documento removido'); pjRerender();
   }catch(e){ toast('Erro ao remover: '+(e.message||e)); }
 }
-async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
+async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; const del=$('#pjCfgDel'); if(del) del.classList.add('hidden'); window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
 // Visão 3D — abre o visor externo das VRPs num overlay com iframe (?embed=1 tira cabeçalho/rodapé)
 function pjOpen3d(iv){
   let ov=document.getElementById('pj3d');
@@ -2674,8 +2683,28 @@ function pjRenderCfg(keep){
   d.querySelectorAll('[data-file]').forEach(inp=>inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) pjDocAnexar(iv,inp.dataset.file,f); });
   d.querySelectorAll('[data-open3d]').forEach(b=>b.onclick=()=>pjOpen3d(iv));
   d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>pjDocRemover(iv,b.dataset.remove));
+  // 🗑️ excluir (canto superior direito): Suporte, só sem lançamento. Bloqueada fica opaca e explica o motivo no toque (sem hover no celular)
+  const del=$('#pjCfgDel'); if(del){ const docLanc=pjIvDocLanc(iv), bloq=hasAdv||docLanc;
+    del.classList.toggle('hidden',!pjPodeSup()); del.style.opacity=bloq?'.45':''; del.title=bloq?'Tem lançamento — não pode ser excluída':'Excluir intervenção';
+    del.onclick=()=>{ if(hasAdv) toast('Intervenção com avanço lançado não pode ser excluída'); else if(docLanc) toast('Remova os documentos de execução anexados antes de excluir'); else pjExcluirConfirm(iv); }; }
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
+}
+// exclusão DEFINITIVA (Suporte, sem lançamento): ponto/traçado no schema 7 + estado + documentos; o banco revalida e grava o rastro em intervencoes_audit
+function pjExcluirConfirm(iv){ if(!iv||iv.gid==null) return;
+  const m=vmModal(`<div class="vmmcard"><div class="vmmh">🗑️ Excluir intervenção</div>
+    <div class="vmmb"><div>Excluir <b>${iv.local}</b> <span class="pjmono">(${iv.cod})</span>?</div>
+      <div style="font-size:13px;color:var(--mut);line-height:1.4">Apaga de forma <b>definitiva</b> a intervenção, o ${iv.kind==='linha'?'traçado':'ponto'} no mapa (camada de intervenções do QGIS), a configuração e os documentos anexados. <b>Não dá para desfazer.</b></div></div>
+    <div class="vmmf"><button class="vmbtn sec" id="pjDelCancel" style="flex:1">Cancelar</button><button class="vmbtn dngr" id="pjDelOk" style="flex:1">Excluir definitivamente</button></div></div>`);
+  m.querySelector('#pjDelCancel').onclick=vmModalClose;
+  const ok=m.querySelector('#pjDelOk');
+  ok.onclick=async()=>{ ok.classList.add('dis'); ok.textContent='Excluindo…';
+    clearTimeout(pjSaveT[iv.kind+'|'+iv.gid]);   // snapshot pendente não pode recriar o estado depois da exclusão
+    try{ const {data,error}=await sb.rpc('app_proj_intervencao_excluir',{p_kind:iv.kind,p_gid:iv.gid}); if(error) throw error;
+      const paths=(data&&data.paths)||[]; if(paths.length){ try{ await sb.storage.from('fotos-campo').remove(paths); }catch(_){} }
+      PJ_IVS=PJ_IVS.filter(x=>x!==iv); pjCur=null; vmModalClose(); toast('Intervenção excluída'); irPara('projeto_sup');
+    }catch(e){ ok.classList.remove('dis'); ok.textContent='Excluir definitivamente'; toast('Erro ao excluir: '+(e.message||e)); }
+  };
 }
 // snapshot não guarda histórico por lançamento — só o acumulado real da folha (sem entradas fabricadas).
 // (histórico real por lançamento seria a abordagem de "log", não adotada nesta etapa.)
@@ -2702,7 +2731,7 @@ function pjNodeHtml(node){
   if(pjMode==='campo' && inact) return '';   // no Campo, atividade fora do escopo não aparece (nem opaca)
   const cfg=pjMode==='cfg';                          // cfg = tela de configuração (Suporte); senão = campo (avanços)
   const rid='pn'+Math.random().toString(36).slice(2,8); pjReg[rid]=node;
-  // atividade de encerramento (as_built / rtq): registro único via anexo de PDF → documento final. Sem % (not aggregated).
+  // atividade-documento (Autorização de Intervenção de Via / Relatórios de Furo e Solda [HDD] / As-Built / RTQ): registro único via anexo de PDF → documento final. Conta 100% quando anexado.
   if(t==='doc'){ const doc=pjDocsCur[node.doc], ok=!!doc, canAttach=(pjMode==='campo'&&pjLocked);
     let btns=ok?`<button class="pjgo" data-docopen="${doc.path}">👁 Abrir</button>`:'';
     if(canAttach) btns+=`<button class="pjgo" data-docattach="${rid}">📎 ${ok?'Substituir':'Anexar PDF'}</button><input type="file" accept="application/pdf" hidden data-docfile="${rid}">`;
@@ -2885,7 +2914,7 @@ async function pjRel(id){
    <p class="pjhint" style="margin:2px 0 9px">Só atividades <b>com lançamento</b>. Cada subatividade abre por avanço (ordem de envio), com observação e fotos.</p>
    ${advHtml}
    <div class="sec">🖨️ Relatório consolidado (PDF)</div>
-   <p class="pjhint" style="margin:2px 0 9px">Documento único: capa + progresso + avanços com fotos + documentos (projeto executivo, licença, alvará, as-built). <b>Anexos ainda não anexados entram com nota explicativa.</b></p>
+   <p class="pjhint" style="margin:2px 0 9px">Documento único: capa + progresso + avanços com fotos + documentos (projeto executivo, autorização de intervenção de via${iv.tipo==='rede_hdd'?', relatórios de furo e de solda':''}, as-built, relatório técnico de qualidade). <b>Anexos ainda não anexados entram com nota explicativa.</b></p>
    <button class="btn" id="pjRelPdfBtn">🖨️ Gerar PDF consolidado</button>`;
   const rr=$('#pjRel');
   rr.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
@@ -2939,7 +2968,7 @@ async function pjRelPdf(iv){ if(!iv)return;
   try{ await pjRelRenderAnexos(iv); }catch(e){ const bx=document.getElementById('relAnexos'); if(bx) bx.innerHTML='<p class="relPend">Falha ao preparar anexos: '+((e&&e.message)||e)+'</p>'; }
   if(pb) pb.disabled=false;
 }
-// renderiza os anexos (PDFs do executivo/licença/alvará/as-built) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
+// renderiza os anexos (PDFs de PJ_DOCS: executivo/autorização de via/furo+solda [HDD]/as-built/RTQ) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
 async function pjRelRenderAnexos(iv){
   const box=document.getElementById('relAnexos'); if(!box) return;
   const docs=pjDocsFor(iv).map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
