@@ -365,6 +365,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeMeusColab" data-go="meus_colab"><div class="ic">📇</div><div class="nm">Meus colaboradores</div></button>
       <button class="mod hidden" id="homeQsms" data-go="qsms"><div class="ic">🦺</div><div class="nm">QSMS</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
+      <button class="mod hidden" id="homeAvisos" data-go="avisos"><div class="ic">📢</div><div class="nm">Avisos</div></button>
     </div>
     <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
     <div class="grid" style="margin-top:10px">
@@ -373,6 +374,19 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeTelemetria" data-go="telemetria"><div class="ic">📡</div><div class="nm">Telemetria (CCO)</div></button>
     </div>
   </main>
+
+  <main id="avisos" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>📢 Avisos</h1>
+    <p class="sub">Pop-ups que aparecem toda vez que a pessoa abre o app, enquanto o aviso estiver no período. Só admins.</p>
+    <div id="avView"></div>
+  </main>
+  <div id="avPop" class="hidden" style="position:fixed;inset:0;z-index:3000;background:rgba(8,15,30,.72);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--card);border-radius:18px;max-width:440px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);position:relative">
+      <button id="avPopX" title="Fechar" style="all:unset;cursor:pointer;position:absolute;top:8px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.9);color:#0b1220;text-align:center;line-height:34px;font-size:18px;z-index:2">✕</button>
+      <div id="avPopBody"></div>
+    </div>
+  </div>
 
   <main id="dev_acesso" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
@@ -1852,7 +1866,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1895,6 +1909,7 @@ function irPara(id){
   if(id==='qsms_acesso') qsmsAcInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
+  if(id==='avisos') avInit();
   if(id==='vitrine') vtInit(); else vtParar();
   if(id==='dev_acesso') devAcessoInit();
   if(id==='telemetria') telemetriaInit();
@@ -1914,7 +1929,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const hq=document.getElementById('homeQsms'); if(hq) hq.classList.toggle('hidden', !(ME&&ME.qsms)); const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const hav=document.getElementById('homeAvisos'); if(hav) hav.classList.toggle('hidden', !(ME&&ME.is_admin)); const hq=document.getElementById('homeQsms'); if(hq) hq.classList.toggle('hidden', !(ME&&ME.qsms)); const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -10030,7 +10045,7 @@ function mostrar(sess){
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
     iniciarGPS(); atualizarFila(); ntfBadge(); pushAutoSync();
-    ME=null; sb.rpc('app_me').then(({data})=>{ if(data){ ME=data; homeGate(); epiEntregaTentarRestaurar(); } }).catch(()=>{});
+    ME=null; sb.rpc('app_me').then(({data})=>{ if(data){ ME=data; homeGate(); epiEntregaTentarRestaurar(); avPopAbrir(); } }).catch(()=>{});
     if(navigator.onLine) sincronizar();
   }else{
     ME=null;
@@ -11535,6 +11550,7 @@ if($('#mcBusca')) $('#mcBusca').addEventListener('input',()=>{ mcSel=null; mcRen
 if($('#mcArea')) $('#mcArea').addEventListener('change',()=>{ mcArea=$('#mcArea').value; mcSel=null; mcRender(); });
 
 async function supGoAct(act){
+  if(act==='notificacoes'){ irPara('notificacoes'); return; }
   if(act==='seg'){ irPara('seg'); return; }
   if(act==='qsms'){ qsmsVerF='todas'; qsmsDet=null; irPara('qsms_form'); return; }
   if(act==='meus_colaboradores'||String(act||'').startsWith('pessoas_')){ irPara('meus_colab'); return; }
@@ -11677,6 +11693,89 @@ function vtShow(i){
   $('#vtPos').textContent=(vtCur+1)+' / '+vtSlides.length+(vtPaused?' · pausado (espaço continua)':'');
   clearTimeout(vtTimer); vtT0=Date.now();
   if(!vtPaused) vtTimer=setTimeout(()=>vtShow(vtCur+1), s.dur);
+}
+
+// ---------- AVISOS (pop-ups) — admin cria; usuário vê ao abrir o app ----------
+// Imagem: './...' = arquivo do site (public/), 'http...' = URL, senão = caminho no bucket fotos-campo.
+var avPopFeito=false, avLista=[], avEdit=null;
+const AV_LINKS=[['','Só fechar'],['frota_checklist','Checklist diário do veículo'],['frota_manutencao','Manutenção do veículo'],['frota_minhas_lavagens','Lavagem'],['notificacoes','Notificações']];
+const AV_LEMB_PADRAO=['🚗 Bom dia! Já fez o checklist do seu carro hoje?','⏰ Lembrete: o checklist diário do veículo ainda não foi feito.','✅ Leva menos de 2 minutos: abra o AcquaHub e faça o checklist do carro.','⚠️ Seu checklist de hoje continua pendente.','🔔 Último lembrete do dia: faça o checklist do seu veículo antes de encerrar.'];
+function avImg(x){ if(!x) return ''; return (/^https?:/.test(x)||x.startsWith('./'))?x:SBASE+x; }
+function avTexto(t){ return eoH(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
+function avCard(a){
+  return `${a.imagem?`<img src="${eoH(avImg(a.imagem))}" alt="" style="display:block;width:100%;border-radius:18px 18px 0 0">`:''}
+   <div style="padding:16px 18px 18px"><div style="font-size:21px;font-weight:700;color:var(--acc);line-height:1.2">${eoH(a.titulo)}</div>
+   ${a.texto?`<div style="margin-top:8px;font-size:15px;line-height:1.45">${avTexto(a.texto)}</div>`:''}
+   ${a.botao_texto?`<button class="btn" data-avgo="${eoH(a.botao_link||'')}" style="margin-top:14px;background:#22c55e;border-color:#22c55e">${eoH(a.botao_texto)}</button>`:''}</div>`;
+}
+async function avPopAbrir(){
+  if(avPopFeito) return; avPopFeito=true;
+  let arr=[]; try{ const {data,error}=await sb.rpc('app_avisos_ativos'); if(error) throw error; arr=data||[]; }catch(e){ return; }
+  if(!arr.length) return;
+  let i=0; const pop=$('#avPop'), body=$('#avPopBody');
+  const fechar=()=>{ i++; if(i<arr.length) mostrar1(); else pop.classList.add('hidden'); };
+  const mostrar1=()=>{ body.innerHTML=avCard(arr[i]); pop.classList.remove('hidden');
+    body.querySelectorAll('[data-avgo]').forEach(b=>b.onclick=()=>{ const lk=b.dataset.avgo; pop.classList.add('hidden'); if(lk) supGoAct(lk); }); };
+  $('#avPopX').onclick=fechar; pop.onclick=e=>{ if(e.target===pop) fechar(); };
+  mostrar1();
+}
+async function avInit(){
+  if(!(ME&&ME.is_admin)){ toast('Acesso restrito'); irPara('home'); return; }
+  $('#avView').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_avisos_admin_listar'); if(error) throw error; avLista=data||[]; }
+  catch(e){ $('#avView').innerHTML='<div class="banner bad">Erro: '+eoH(e.message||e)+'</div>'; return; }
+  const hoje=pavDiaISO(Date.now()); // dia local (toISOString é UTC: depois das 21h já seria amanhã)
+  let h='<button class="btn" id="avNovo">➕ Novo aviso</button>';
+  h+= avLista.length ? avLista.map(a=>{ const vig=a.ativo&&hoje>=a.inicio&&hoje<=a.fim;
+    return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:10px">
+     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${eoH(a.titulo)}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;background:var(${vig?'--ok-bg':'--line'});color:var(${vig?'--ok':'--mut'})">${vig?'No ar':(a.ativo?'Fora do período':'Desativado')}</span></div>
+     <div class="sub" style="margin-top:3px">${fmtData(a.inicio)} a ${fmtData(a.fim)} · ${a.publico==='condutores_vinculados'?'só quem tem carro vinculado':'todos'}${a.lembrete==='checklist_frota'?' · 🔔 5 lembretes/dia do checklist':''}</div>
+     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" data-avprev="${a.id}" style="margin:0;flex:1;padding:8px">👁 Pré-visualizar</button><button class="btn ghost" data-aved="${a.id}" style="margin:0;flex:1;padding:8px">✏️ Editar</button><button class="btn ghost" data-avtog="${a.id}" style="margin:0;flex:1;padding:8px">${a.ativo?'⏸ Desativar':'▶ Ativar'}</button></div></div>`; }).join('') : '<p class="sub" style="margin-top:10px">Nenhum aviso ainda.</p>';
+  $('#avView').innerHTML=h;
+  $('#avNovo').onclick=()=>{ avEdit=null; avForm(); };
+  $('#avView').querySelectorAll('[data-aved]').forEach(b=>b.onclick=()=>{ avEdit=avLista.find(x=>String(x.id)===b.dataset.aved); avForm(); });
+  // ativar/desativar direto da lista (mantém os demais campos)
+  $('#avView').querySelectorAll('[data-avtog]').forEach(b=>b.onclick=async()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avtog); b.disabled=true;
+    try{ const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id,p_titulo:a.titulo,p_texto:a.texto,p_imagem:null,p_botao_texto:a.botao_texto,p_botao_link:a.botao_link,
+        p_publico:a.publico,p_inicio:a.inicio,p_fim:a.fim,p_ativo:!a.ativo,p_lembrete:a.lembrete,p_lembrete_textos:a.lembrete_textos}); if(error) throw error;
+      toast(a.ativo?'Aviso desativado':'✓ Aviso ativado'); avInit(); }catch(e){ toast('Erro: '+(e.message||e)); b.disabled=false; } });
+  $('#avView').querySelectorAll('[data-avprev]').forEach(b=>b.onclick=()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avprev); const pop=$('#avPop'); $('#avPopBody').innerHTML=avCard(a); pop.classList.remove('hidden'); $('#avPopX').onclick=()=>pop.classList.add('hidden'); pop.onclick=e=>{ if(e.target===pop) pop.classList.add('hidden'); }; $('#avPopBody').querySelectorAll('[data-avgo]').forEach(x=>x.onclick=()=>pop.classList.add('hidden')); });
+}
+function avForm(){
+  const a=avEdit||{}, hoje=pavDiaISO(Date.now()), lemb=(a.lembrete_textos&&a.lembrete_textos.length)?a.lembrete_textos:AV_LEMB_PADRAO;
+  FOTO2_BLOBS['avImg']=null;
+  $('#avView').innerHTML=`<button class="btn ghost" id="avVoltar" style="margin:0 0 12px">‹ Voltar</button>
+   <div class="sec">${a.id?'✏️ Editar aviso':'➕ Novo aviso'}</div>
+   <label>Título *</label><input id="avTit" value="${eoH(a.titulo||'')}"/>
+   <label>Texto (use **negrito**)</label><textarea id="avTxt" rows="4">${eoH(a.texto||'')}</textarea>
+   ${a.imagem?`<div class="sub" style="margin-top:8px">Imagem atual:</div><img src="${eoH(avImg(a.imagem))}" style="max-width:160px;border-radius:10px;margin-top:4px"><label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="avImgRm" style="width:auto"/> Remover imagem</label>`:''}
+   ${fotoPickHtml('avImg', a.imagem?'Trocar imagem':'Imagem (opcional)')}
+   <label>Texto do botão</label><input id="avBtn" value="${eoH(a.botao_texto||'')}" placeholder="ex.: Fazer meu checklist agora"/>
+   <label>O botão leva para</label><select id="avLink">${AV_LINKS.map(([v,l])=>`<option value="${v}"${(a.botao_link||'')===v?' selected':''}>${l}</option>`).join('')}</select>
+   <label>Quem vê</label><select id="avPub"><option value="todos"${a.publico!=='condutores_vinculados'?' selected':''}>Todos os usuários</option><option value="condutores_vinculados"${a.publico==='condutores_vinculados'?' selected':''}>Só quem tem carro vinculado</option></select>
+   <div style="display:flex;gap:8px"><div style="flex:1"><label>De *</label><input id="avIni" type="date" value="${a.inicio||hoje}"/></div><div style="flex:1"><label>Até *</label><input id="avFim" type="date" value="${a.fim||''}"/></div></div>
+   <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="avAtivo" style="width:auto" ${a.ativo===false?'':'checked'}/> Aviso ativo</label>
+   <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="avLemb" style="width:auto" ${a.lembrete==='checklist_frota'?'checked':''}/> 🔔 Lembretes do checklist (08h, 10h, 12h, 14h, 16h · seg–sex · só p/ quem não fez o checklist do dia)</label>
+   <div id="avLembBox" class="${a.lembrete==='checklist_frota'?'':'hidden'}">${lemb.map((t,i)=>`<label>${['08h','10h','12h','14h','16h'][i]}</label><input class="avLembTxt" value="${eoH(t)}"/>`).join('')}</div>
+   <button class="btn" id="avSalvar" style="margin-top:14px">Salvar aviso</button>`;
+  wireFotoPick($('#avView'));
+  $('#avVoltar').onclick=avInit;
+  $('#avLemb').onchange=()=>$('#avLembBox').classList.toggle('hidden',!$('#avLemb').checked);
+  $('#avSalvar').onclick=async()=>{
+    const tit=$('#avTit').value.trim(), fim=$('#avFim').value;
+    if(!tit) return toast('Informe o título'); if(!fim) return toast('Informe até quando o aviso vale');
+    const btn=$('#avSalvar'); btn.disabled=true;
+    try{
+      const img=await uploadFoto2('avImg','avisos'), rm=$('#avImgRm');
+      const lembOn=$('#avLemb').checked;
+      // p_imagem: path novo | '-' = remover a atual | null = manter a atual
+      const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id||null,p_titulo:tit,p_texto:$('#avTxt').value||null,p_imagem:img||(rm&&rm.checked?'-':null),
+        p_botao_texto:$('#avBtn').value||null,p_botao_link:$('#avLink').value||null,p_publico:$('#avPub').value,p_inicio:$('#avIni').value||null,p_fim:fim,
+        p_ativo:$('#avAtivo').checked,p_lembrete:lembOn?'checklist_frota':null,p_lembrete_textos:lembOn?[...document.querySelectorAll('.avLembTxt')].map(x=>x.value):null});
+      if(error) throw error;
+      toast('✓ Aviso salvo'); avInit();
+    }catch(e){ toast('Erro: '+(e.message||e)); btn.disabled=false; }
+  };
 }
 const _btnNotif=$('#btnNotif'); if(_btnNotif) _btnNotif.addEventListener('click',()=>irPara('notificacoes'));
 const _ntfMk=$('#ntfMarcar'); if(_ntfMk) _ntfMk.addEventListener('click',ntfMarcarTodas);
