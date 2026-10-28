@@ -109,7 +109,8 @@ pwa/
   (= almoxarife/admin), `sup_pode_aprovar(uuid)` (= aprovador/admin).
 - **Perfil/roles:** tabela `public.perfil` (id, email, nome, cargo, **funcao**, ...). Funções:
   `admin`, `campo`, `aprovador`, `almoxarife`, `frotas`, `qsms`. O app carrega o próprio perfil via RPC
-  `app_me` (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`).
+  `app_me` (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`). `funcao='qsms'` é
+  legado e não libera nada; o acesso à gestão QSMS é `ME.qsms` (admin, `perfil.qsms_acesso` ou cargo de QSMS).
 - **Aprovação/notificação é única pro app inteiro** (não crie hierarquia paralela por módulo):
   `perfil.aprovador_uuid`/`aprovador2_uuid` (config. no ⚙️ Usuários — na home ou em Suprimentos) + `sup_aprovadores_de(uid)`
   + `sup_notificar(...)` disparado por **trigger** na tabela de negócio (nunca inline na RPC). Ver
@@ -134,7 +135,7 @@ pwa/
 **Regra de separação (2026-09):** schema define a **audiência**, não só o assunto.
 - **Geo-facing** (o time de GIS conecta o QGIS aqui): `1`–`5`, `7`, `8`, e camadas via view.
 - **App-only** (invisível ao GIS — sem `USAGE` pra papéis `gis_*`, acesso só via RPC `SECURITY DEFINER`):
-  `9`, `10`, `11`, `12`, `15`. Tabela nova = decisão explícita no PR de qual lado ela cai.
+  `9`, `10`, `11`, `12`, `15`, `16`. Tabela nova = decisão explícita no PR de qual lado ela cai.
 
 | Schema | Conteúdo |
 |---|---|
@@ -150,6 +151,7 @@ pwa/
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
+| `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento`, `qsms_tratativa`; nada pode ser apagado (trigger) — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -314,6 +316,15 @@ pwa/
   Backend: `"8 - coleta_campo".pav_recomposicao` (1 linha/tipo, geom 4326, `os_recomposicao`/`os_recomp_em`/`os_recomp_por`,
   `execucao_data`/`execucao_em`/`execucao_por`, RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) /
   `app_pav_minhas` / `app_pav_listar` / `app_pav_os_itens` / `app_pav_executar` / `app_pav_os` (admin|aux_acesso). sw v282.
+- **Segurança do Trabalho + QSMS** (2026-10-28, schema `16 - qsms`) — substitui a **APR** (modelo COPASA), a **PT**
+  de trabalho em altura (FOR_PG_22, do consórcio) e a **PET** de espaço confinado (COPASA) de papel. **Campo** (`seg`,
+  Home › 🛠️ Execução, sem gate): atividade = OS + tipo de intervenção + GPS travado + data/hora/usuário; a APR sugere
+  fases/riscos/EPIs pelo tipo, exige foto da sinalização e assinaturas; PT/PET só saem de APR que as indique, com
+  travas ("Não" impede; gás fora do limite impede/interrompe) e acompanhamento até o encerramento (`seg_acomp`);
+  offline pela fila (`item.anexos` p/ assinaturas, ids `seg-<ts>` mantêm a ordem), rascunho e cópia local em IndexedDB
+  `seg_local`, PDF fiel ao papel. **Gestão** (`qsms`, Home › 🧰 Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): painel,
+  lista/mapa/XLSX, verificação (conforme/ressalva/não conforme) e tratativas com aviso ao responsável. RPCs
+  `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
