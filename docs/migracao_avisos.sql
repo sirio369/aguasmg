@@ -64,11 +64,13 @@ begin
   if p_inicio is not null and p_fim < p_inicio then raise exception 'a data final é antes da inicial'; end if;
   if p_id is null then
     insert into public.app_aviso(titulo,texto,imagem,botao_texto,botao_link,publico,inicio,fim,ativo,lembrete,lembrete_textos,criado_por)
-    values (trim(p_titulo),p_texto,nullif(p_imagem,''),nullif(trim(coalesce(p_botao_texto,'')),''),nullif(p_botao_link,''),coalesce(p_publico,'todos'),
+    values (trim(p_titulo),p_texto,nullif(nullif(p_imagem,''),'-'),nullif(trim(coalesce(p_botao_texto,'')),''),nullif(p_botao_link,''),coalesce(p_publico,'todos'),
       coalesce(p_inicio,(now() at time zone 'America/Sao_Paulo')::date),p_fim,coalesce(p_ativo,true),nullif(p_lembrete,''),p_lembrete_textos,auth.uid())
     returning id into v_id;
   else
-    update public.app_aviso set titulo=trim(p_titulo), texto=p_texto, imagem=coalesce(nullif(p_imagem,''),imagem),
+    -- p_imagem: path novo | '-' = remover | null/'' = manter a atual
+    update public.app_aviso set titulo=trim(p_titulo), texto=p_texto,
+      imagem=case when p_imagem='-' then null else coalesce(nullif(p_imagem,''),imagem) end,
       botao_texto=nullif(trim(coalesce(p_botao_texto,'')),''), botao_link=nullif(p_botao_link,''), publico=coalesce(p_publico,publico),
       inicio=coalesce(p_inicio,inicio), fim=p_fim, ativo=coalesce(p_ativo,ativo), lembrete=nullif(p_lembrete,''), lembrete_textos=p_lembrete_textos
     where id=p_id returning id into v_id;
@@ -78,10 +80,11 @@ begin
 end; $$;
 
 -- lembretes: roda em cada horário (slot 1..5); usa o texto do slot
+-- Só o aviso de lembrete mais recente vigente: 2 avisos de checklist no ar não podem mandar 2 pushes por horário.
 create or replace function public.aviso_lembretes_run(p_slot int) returns int language plpgsql security definer set search_path to 'public' as $$
 declare a record; v_uid uuid; v_n int := 0; v_hoje date := (now() at time zone 'America/Sao_Paulo')::date; v_txt text;
 begin
-  for a in select * from public.app_aviso where ativo and lembrete='checklist_frota' and v_hoje between inicio and fim loop
+  for a in select * from public.app_aviso where ativo and lembrete='checklist_frota' and v_hoje between inicio and fim order by id desc limit 1 loop
     v_txt := coalesce(a.lembrete_textos[p_slot], 'Já fez o checklist do seu carro hoje?');
     for v_uid in
       select distinct vv.condutor_id
@@ -104,6 +107,9 @@ revoke all on function public.app_avisos_ativos() from public, anon;
 revoke all on function public.app_avisos_admin_listar() from public, anon;
 revoke all on function public.app_aviso_salvar(bigint,text,text,text,text,text,text,date,date,boolean,text,text[]) from public, anon;
 revoke all on function public.aviso_lembretes_run(int) from public, anon, authenticated;
+-- helpers internos: só são chamados de dentro das RPCs definer (o Supabase dá execute a anon/authenticated por padrão)
+revoke all on function public.aviso_eh_admin() from public, anon, authenticated;
+revoke all on function public.aviso_tem_veiculo(uuid) from public, anon, authenticated;
 grant execute on function public.app_avisos_ativos() to authenticated;
 grant execute on function public.app_avisos_admin_listar() to authenticated;
 grant execute on function public.app_aviso_salvar(bigint,text,text,text,text,text,text,date,date,boolean,text,text[]) to authenticated;

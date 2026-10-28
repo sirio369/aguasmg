@@ -11550,6 +11550,7 @@ if($('#mcBusca')) $('#mcBusca').addEventListener('input',()=>{ mcSel=null; mcRen
 if($('#mcArea')) $('#mcArea').addEventListener('change',()=>{ mcArea=$('#mcArea').value; mcSel=null; mcRender(); });
 
 async function supGoAct(act){
+  if(act==='notificacoes'){ irPara('notificacoes'); return; }
   if(act==='seg'){ irPara('seg'); return; }
   if(act==='qsms'){ qsmsVerF='todas'; qsmsDet=null; irPara('qsms_form'); return; }
   if(act==='meus_colaboradores'||String(act||'').startsWith('pessoas_')){ irPara('meus_colab'); return; }
@@ -11723,7 +11724,7 @@ async function avInit(){
   $('#avView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_avisos_admin_listar'); if(error) throw error; avLista=data||[]; }
   catch(e){ $('#avView').innerHTML='<div class="banner bad">Erro: '+eoH(e.message||e)+'</div>'; return; }
-  const hoje=new Date().toISOString().slice(0,10);
+  const hoje=pavDiaISO(Date.now()); // dia local (toISOString é UTC: depois das 21h já seria amanhã)
   let h='<button class="btn" id="avNovo">➕ Novo aviso</button>';
   h+= avLista.length ? avLista.map(a=>{ const vig=a.ativo&&hoje>=a.inicio&&hoje<=a.fim;
     return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:10px">
@@ -11741,13 +11742,13 @@ async function avInit(){
   $('#avView').querySelectorAll('[data-avprev]').forEach(b=>b.onclick=()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avprev); const pop=$('#avPop'); $('#avPopBody').innerHTML=avCard(a); pop.classList.remove('hidden'); $('#avPopX').onclick=()=>pop.classList.add('hidden'); pop.onclick=e=>{ if(e.target===pop) pop.classList.add('hidden'); }; $('#avPopBody').querySelectorAll('[data-avgo]').forEach(x=>x.onclick=()=>pop.classList.add('hidden')); });
 }
 function avForm(){
-  const a=avEdit||{}, hoje=new Date().toISOString().slice(0,10), lemb=(a.lembrete_textos&&a.lembrete_textos.length)?a.lembrete_textos:AV_LEMB_PADRAO;
+  const a=avEdit||{}, hoje=pavDiaISO(Date.now()), lemb=(a.lembrete_textos&&a.lembrete_textos.length)?a.lembrete_textos:AV_LEMB_PADRAO;
   FOTO2_BLOBS['avImg']=null;
   $('#avView').innerHTML=`<button class="btn ghost" id="avVoltar" style="margin:0 0 12px">‹ Voltar</button>
    <div class="sec">${a.id?'✏️ Editar aviso':'➕ Novo aviso'}</div>
    <label>Título *</label><input id="avTit" value="${eoH(a.titulo||'')}"/>
    <label>Texto (use **negrito**)</label><textarea id="avTxt" rows="4">${eoH(a.texto||'')}</textarea>
-   ${a.imagem?`<div class="sub" style="margin-top:8px">Imagem atual:</div><img src="${eoH(avImg(a.imagem))}" style="max-width:160px;border-radius:10px;margin-top:4px">`:''}
+   ${a.imagem?`<div class="sub" style="margin-top:8px">Imagem atual:</div><img src="${eoH(avImg(a.imagem))}" style="max-width:160px;border-radius:10px;margin-top:4px"><label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="avImgRm" style="width:auto"/> Remover imagem</label>`:''}
    ${fotoPickHtml('avImg', a.imagem?'Trocar imagem':'Imagem (opcional)')}
    <label>Texto do botão</label><input id="avBtn" value="${eoH(a.botao_texto||'')}" placeholder="ex.: Fazer meu checklist agora"/>
    <label>O botão leva para</label><select id="avLink">${AV_LINKS.map(([v,l])=>`<option value="${v}"${(a.botao_link||'')===v?' selected':''}>${l}</option>`).join('')}</select>
@@ -11765,9 +11766,10 @@ function avForm(){
     if(!tit) return toast('Informe o título'); if(!fim) return toast('Informe até quando o aviso vale');
     const btn=$('#avSalvar'); btn.disabled=true;
     try{
-      const img=await uploadFoto2('avImg','avisos');
+      const img=await uploadFoto2('avImg','avisos'), rm=$('#avImgRm');
       const lembOn=$('#avLemb').checked;
-      const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id||null,p_titulo:tit,p_texto:$('#avTxt').value||null,p_imagem:img||null,
+      // p_imagem: path novo | '-' = remover a atual | null = manter a atual
+      const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id||null,p_titulo:tit,p_texto:$('#avTxt').value||null,p_imagem:img||(rm&&rm.checked?'-':null),
         p_botao_texto:$('#avBtn').value||null,p_botao_link:$('#avLink').value||null,p_publico:$('#avPub').value,p_inicio:$('#avIni').value||null,p_fim:fim,
         p_ativo:$('#avAtivo').checked,p_lembrete:lembOn?'checklist_frota':null,p_lembrete_textos:lembOn?[...document.querySelectorAll('.avLembTxt')].map(x=>x.value):null});
       if(error) throw error;

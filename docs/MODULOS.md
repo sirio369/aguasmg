@@ -3025,9 +3025,11 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   `condutores_vinculados`), período (de/até) e ativo; na lista, botão **⏸ Desativar / ▶ Ativar** (mesma RPC, só inverte `ativo`). **Pré-visualizar** mostra o pop-up como o usuário verá.
 - **Usuário:** `avPopAbrir()` roda **1x por carregamento do app**, logo após o `app_me` (em `mostrar`), chama
   `app_avisos_ativos()` e exibe os avisos vigentes em sequência (`#avPop`, overlay com ✕; clicar fora fecha).
-- **Imagem:** `./...` = arquivo do site (`public/avisos/`), `http...` = URL, senão = caminho no bucket (`avImg`).
+- **Imagem:** `./...` = arquivo do site (`public/avisos/`), `http...` = URL, senão = caminho no bucket (`avImg`). Na edição, "Remover imagem" manda `p_imagem='-'` (null/'' = manter a atual).
+- **Destino "Notificações":** `supGoAct('notificacoes')` abre a tela `notificacoes` (antes caía no hub do Almoxarifado).
 - **Lembretes push** (`lembrete='checklist_frota'`): `aviso_lembretes_run(slot)` via **pg_cron** `aviso-lembrete-1..5`
   (08h/10h/12h/14h/16h BRT, seg–sex) — notifica **só quem tem veículo vinculado e não fez o checklist do dia**, com o texto do
-  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up.
+  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
+- **Grants:** `aviso_eh_admin()`/`aviso_tem_veiculo(uuid)` são internos (revogados de anon/authenticated); `aviso_lembretes_run` só o cron.
 - **Tabela** `public.app_aviso` (RLS ligada, sem policy — só RPC). 1º aviso (seed): "Checklist diário do veículo", até
   30/10/2026, pop-up p/ todos, imagem `./avisos/checklist-frota-2026-10.webp`.
