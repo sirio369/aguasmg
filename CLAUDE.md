@@ -326,9 +326,10 @@ pwa/
   entra/vigia); travas ("Não" impede; gás fora do limite impede); cada atividade (APR + PT/PET) é um bloco com
   **PDF único** (capa + formulários). Offline pela fila
   (`item.anexos`, ids `seg-<ts>`), rascunho e cópia local em IndexedDB `seg_local`. **Gestão** (`qsms`, Home › 🧰
-  Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): trabalha **por atividade** — painel com fila "a verificar", lista/mapa/XLSX
-  com filtros por situação da verificação, tipo, responsável e PT/PET, e **uma verificação por atividade**
-  (conforme/ressalva/não conforme, avisa o autor). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
+  Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): **hub em categorias** como o Almoxarifado — **⛑️ APR e derivados**
+  (`qsms_ind` Indicadores · `qsms_form` Formulários: por atividade, lista/mapa/XLSX, filtros por situação da verificação,
+  tipo, responsável e PT/PET, **uma verificação por atividade** que avisa o autor) e **🦺 EPI** (`qsms_epi_col` = a tela
+  "EPIs por colaborador" do Almoxarifado reaproveitada; `qsms_epi_painel` = painel de EPI, RPC `app_qsms_epi_painel`). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
