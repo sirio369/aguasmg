@@ -2902,7 +2902,7 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
 
-## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` (hub) / `qsms_ind` / `qsms_form` / `qsms_epi_col` / `qsms_epi_painel` / `qsms_acesso` (2026-10-28)
+## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` (hub) / `qsms_ind` / `qsms_form` / `qsms_epi_painel` / `qsms_cesta` / `qsms_epi_col` / `qsms_acesso` (2026-10-28)
 
 Substitui os formulários de papel **APR** (modelo COPASA PRT-CSMG-2023_003), **PT de trabalho em altura**
 (FOR_PG_22 rev 00, do consórcio — o mesmo modelo serve as duas ZAs, o PDF troca o nome do consórcio) e **PET de
@@ -2950,7 +2950,8 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
 (`"16 - qsms".qsms_pode`). ⚙️ (admin, no hub) → `qsms_acesso` (`app_qsms_acesso_listar/_set`).
 **Hub `qsms` em categorias (espelha o Almoxarifado, 2026-10-28):** **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
-`qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_col` (EPI por colaborador) e `qsms_epi_painel` (Painel de EPI). Cada
+`qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_painel` (Painel de EPI), `qsms_cesta` (Cesta de EPI) e `qsms_epi_col` (EPI
+por colaborador), nessa ordem. Cada
 tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`/`qf`/`qe`; `qsmsPeriodo`/`qsmsFiltros`/
 `qsmsArgs`). Em APR e derivados **a unidade é a atividade** (APR + PT/PET), com **uma verificação por atividade**.
 - **Indicadores** (`qsms_ind`, `qsmsIndInit`/`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida,
@@ -2966,6 +2967,10 @@ tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`
 - **EPI por colaborador** (`qsms_epi_col`, `qsmsEpiColInit`): **a mesma tela do Almoxarifado** — `supVEpiPainel(root,pre)`
   desenha em `#qcView` (no Almoxarifado continua em `#supView`); `pre={uuid,nome}` pré-seleciona (vindo do painel, inclusive
   quem nunca recebeu EPI) e o "‹ Voltar" (`#qcBack`) volta ao Painel de EPI. Ficha e comprovantes iguais.
+- **Cesta de EPI** (`qsms_cesta`, `qsmsCestaInit`): **a mesma tela da engrenagem ⚙️ "Cargos e cesta de EPI" do
+  Almoxarifado** — `supCestaEm(root)` desenha em `#qkView` (no Almoxarifado em `#supView`; `cfgCestaRoot` escopa
+  `.cfgCargos`/`#cesta-<id>`). `sup_cargos_admin` e `sup_cesta_set` passaram a aceitar `qsms_pode` além de admin
+  (migração `qsms_cesta_epi_acesso`); a engrenagem do Almoxarifado segue visível só p/ admin.
 - **Painel de EPI** (`qsms_epi_painel`, `qsmsEpiInit`/`qsmsEpiRender`, RPC `app_qsms_epi_painel(p_de,p_ate,p_consorcio)`;
   colaboradores = perfis ativos, consórcio pelo perfil): situação agora (ativos, com EPI em posse, nunca receberam, itens
   em posse/vencidos/vencem em 30 d), cesta do cargo (com cesta, completa, cargo sem cesta — **referência**, porque a cesta
@@ -2997,6 +3002,11 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   Registros de teste anteriores foram convertidos (`liberada` → `emitida`). Ainda em 28/10 a verificação saiu do
   formulário para a atividade (migração `qsms_verificacao_por_atividade`: ficou o pior resultado da atividade).
 - PT/PET **não existem sem APR** — a APR é a raiz da atividade; o app só oferece "+ PT/+ PET" a partir dela.
+- **Uma PT e uma PET por APR** (2026-10-28): "+ PT"/"+ PET" somem quando a atividade já tem uma emitida (`jaTem` em
+  `segListar`; `segNovo` confere de novo). Só uma **impedida** (trabalho não aconteceu) libera nova tentativa. Se mesmo
+  assim chegar outra emitida (dois aparelhos / lista desatualizada sem sinal), `app_seg_registrar` grava com o alerta
+  "Já existia PT/PET emitida nesta APR — duplicada" (não rejeita: a fila descartaria em silêncio). Reentrada em espaço
+  confinado depois de a equipe sair = nova APR (a PET vale para uma entrada).
 - Tipos de intervenção e sugestões estão **no código** — não há tela de configuração.
 - Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
 - `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`
