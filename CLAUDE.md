@@ -109,7 +109,8 @@ pwa/
   (= almoxarife/admin), `sup_pode_aprovar(uuid)` (= aprovador/admin).
 - **Perfil/roles:** tabela `public.perfil` (id, email, nome, cargo, **funcao**, ...). Funções:
   `admin`, `campo`, `aprovador`, `almoxarife`, `frotas`, `qsms`. O app carrega o próprio perfil via RPC
-  `app_me` (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`).
+  `app_me` (objeto `ME`: `is_admin`, `is_almoxarife`, `pode_aprovar`, `funcao`, `equipes`). `funcao='qsms'` é
+  legado e não libera nada; o acesso à gestão QSMS é `ME.qsms` (admin, `perfil.qsms_acesso` ou cargo de QSMS).
 - **Aprovação/notificação é única pro app inteiro** (não crie hierarquia paralela por módulo):
   `perfil.aprovador_uuid`/`aprovador2_uuid` (config. no ⚙️ Usuários — na home ou em Suprimentos) + `sup_aprovadores_de(uid)`
   + `sup_notificar(...)` disparado por **trigger** na tabela de negócio (nunca inline na RPC). Ver
@@ -134,7 +135,7 @@ pwa/
 **Regra de separação (2026-09):** schema define a **audiência**, não só o assunto.
 - **Geo-facing** (o time de GIS conecta o QGIS aqui): `1`–`5`, `7`, `8`, e camadas via view.
 - **App-only** (invisível ao GIS — sem `USAGE` pra papéis `gis_*`, acesso só via RPC `SECURITY DEFINER`):
-  `9`, `10`, `11`, `12`, `15`. Tabela nova = decisão explícita no PR de qual lado ela cai.
+  `9`, `10`, `11`, `12`, `15`, `16`. Tabela nova = decisão explícita no PR de qual lado ela cai.
 
 | Schema | Conteúdo |
 |---|---|
@@ -150,6 +151,7 @@ pwa/
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
+| `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); nada pode ser apagado (trigger) — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -300,15 +302,35 @@ pwa/
   paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta) e, por tipo, **dimensão + 2 fotos
   obrigatórias** (câmera **ou galeria**). Salva **1 registro por tipo** (mesmo `grupo` uuid) via a fila offline
   (`enviarOuEnfileirar`, fotos `p_foto1`/`p_foto2`). (2) **`pavprog`** (Auxiliar de Programação) = lista agrupada por
-  ponto, com cabeçalho espelhado na "abertura de serviços — ocorrências" (**tabs de status** Pendentes/OS criada/Todas +
+  ponto, com cabeçalho espelhado na "abertura de serviços — ocorrências" (**tabs de status** Pendente de criação/Pendente
+  de execução/Executada/Todas +
   **visão Lista/Mapa** Leaflet) e **controle de prazo** (aging de `created_at`, faixas **0–3/4–5/>5 dias**, chips clicáveis
   com contagem que filtram), filtros **consórcio + serviço de origem (dropdown multi-seleção `.msdd`)**, fotos
   (bucket público `fotos-campo`) e export .xlsx (gate `aux_acesso`). **Distinção OS criada × pendente** (como a ocorrência da pesquisa): o programador
-  lança a **OS SIGOS da recomposição** no card (`app_pav_os(p_grupo,p_os)`) → o relógio de pendência conta só até a OS.
-  (`os_sigos`=OS de origem, do campo; `os_recomposicao`=OS da recomposição, lançada no `pavprog`.)
+  lança a **OS SIGOS da recomposição de cada tipo** no card (**1 campo por tipo** → `app_pav_os_itens(p_itens [{id,os}])`,
+  2026-10-28) → o relógio de pendência conta até **todos** os tipos terem OS. (`os_sigos`=OS de origem, do campo, 1 por
+  registro; `os_recomposicao`=OS da recomposição, **por tipo**, lançada no `pavprog`.) `app_pav_os(p_grupo,p_os)` fica só
+  p/ app em cache (≤ v281): "A, B" numérico com nº de partes = nº de tipos é distribuído na ordem do card (alfabética do tipo).
+  **Etapa de execução** (2026-10-28): depois da OS, cada tipo tem "Executado em [data]" + "Marcar executado"
+  (`app_pav_executar(p_id,p_data)`) → etapas por tipo **criação → execução → executada**; o ponto fica na mais atrasada.
   Backend: `"8 - coleta_campo".pav_recomposicao` (1 linha/tipo, geom 4326, `os_recomposicao`/`os_recomp_em`/`os_recomp_por`,
-  RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) / `app_pav_minhas` / `app_pav_listar` / `app_pav_os`
-  (admin|aux_acesso). sw v264.
+  `execucao_data`/`execucao_em`/`execucao_por`, RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) /
+  `app_pav_minhas` / `app_pav_listar` / `app_pav_os_itens` / `app_pav_executar` / `app_pav_os` (admin|aux_acesso). sw v282.
+- **Segurança do Trabalho + QSMS** (2026-10-28, schema `16 - qsms`) — substitui a **APR** (modelo COPASA), a **PT**
+  de trabalho em altura (FOR_PG_22, do consórcio) e a **PET** de espaço confinado (COPASA) de papel. **Formulário é só
+  preenchimento: sai emitido (ou impedido) — nada fica aberto.** **Campo** (`seg`, Home › 🛠️ Execução, sem gate):
+  atividade = tipo de intervenção + OS (texto) + GPS travado + data/hora/usuário; endereço, bairro, município e
+  consórcio **pela coordenada** (`app_seg_local`/`qsms_local`); a APR sugere fases/riscos/EPIs pelo tipo, exige foto da
+  sinalização; quem preenche é o responsável (travado, só assina) e os executantes vêm da lista; PT/PET só saem de APR
+  que as indique e **reaproveitam a equipe e as assinaturas da APR** (PT: só o liberador assina; PET: papéis
+  entra/vigia); travas ("Não" impede; gás fora do limite impede); cada atividade (APR + PT/PET) é um bloco com
+  **PDF único** (capa + formulários). Offline pela fila
+  (`item.anexos`, ids `seg-<ts>`), rascunho e cópia local em IndexedDB `seg_local`. **Gestão** (`qsms`, Home › 🧰
+  Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): **hub em categorias** como o Almoxarifado — **⛑️ APR e derivados**
+  (`qsms_ind` Indicadores · `qsms_form` Formulários: por atividade, lista/mapa/XLSX, filtros por situação da verificação,
+  tipo, responsável e PT/PET, **uma verificação por atividade** que avisa o autor) e **🦺 EPI** (`qsms_epi_painel` = painel de EPI,
+  RPC `app_qsms_epi_painel`; `qsms_cesta` = a tela "Cargos e cesta de EPI" da engrenagem do Almoxarifado reaproveitada,
+  editável por quem tem QSMS; `qsms_epi_col` = a tela "EPIs por colaborador" do Almoxarifado reaproveitada). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
