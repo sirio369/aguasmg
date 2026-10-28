@@ -1909,7 +1909,7 @@ frontend:** `app_condutor_solicitar/pendentes/aprovar`, `app_frota_condutores_li
 pelo fluxo de cadastro-pelo-gestor).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
 **Segurança do Trabalho / QSMS (§18):** `app_seg_registrar`, `app_seg_local`, `app_seg_minhas`, `app_seg_ver`,
-`app_seg_pessoas`, `app_qsms_listar`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`.
+`app_seg_pessoas`, `app_qsms_listar`, `app_qsms_atividade_ver`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
 > join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1;` (via MCP).
@@ -2936,39 +2936,50 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 - **Validação ao vivo** (`segPendencias`); botão "Emitir X" só habilita sem pendência. **Rascunho** em IndexedDB
   `seg_local.draft`. **Offline:** fila (`segEnviar`, ids `seg-<timestamp>` mantêm APR antes de PT/PET), anexos em
   `item.anexos` (§1 Envio) → `p_anexos`, pasta `seg/`; cópia local em `seg_local.docs`.
-- **Minhas atividades:** cada formulário é um chip "📄 APR/PT/PET" — **tocar abre o PDF** (`segPdf`; online
-  `app_seg_ver`, sem sinal a cópia local).
-- **PDF** (`segDocHtml`, overlay `#relatorio` + `SEG_REL_CSS`): layout do papel; assinaturas reaproveitadas aparecem
-  como "assinatura dada na APR"; mostra alertas e o histórico de verificações QSMS.
+- **Minhas atividades = um bloco por atividade** (APR + PT/PET que saíram dela): chips de status (não clicáveis),
+  selo da verificação QSMS quando houver, botões **"📄 PDF da atividade"**, "+ PT", "+ PET".
+- **PDF único da atividade** (`segPdfAtividade(ids)`, overlay `#relatorio` + `REL_CSS` + `SEG_REL_CSS`): **capa**
+  (`segCapaHtml`: serviço, OS, local, responsável, tabela dos formulários com situação/alertas, equipe consolidada com
+  os papéis de cada pessoa em cada formulário, verificação QSMS + histórico) e depois cada formulário em página própria
+  (`.segPag`) no layout do papel (`segDocHtml`). Atividade só com APR = sem capa (a verificação vai no fim). Online lê
+  cada formulário por `app_seg_ver`; sem sinal usa a cópia local (avisa se faltar algum). Assinaturas reaproveitadas
+  aparecem como "assinatura dada na APR".
 
 **Gestão — `qsms` (Home › 🧰 Suporte, card 🦺, gate `ME.qsms`):** `ME.qsms` = admin **ou** engrenagem
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
-(`"16 - qsms".qsms_pode`). ⚙️ (admin) → `qsms_acesso` (`app_qsms_acesso_listar/_set`). Período + consórcio; 2 abas:
-- **Painel** (`qsmsPainel`): KPIs (APR/PT/PET, PT/PET impedidas, leituras de gás fora, com alertas, a verificar,
-  conformes, com ressalva, não conformes), APRs por dia, por tipo de intervenção, por responsável, riscos, alertas.
-- **Formulários** (`qsmsLista`): filtros tipo/status/verificação/tipo de intervenção/busca; **Lista / Mapa / XLSX**.
-  Detalhe (`qsmsDetalhe`): dados, alertas, irmãos da atividade, PDF e **verificação** Conforme/Com ressalva/Não
-  conforme (`app_qsms_verificar`; obs obrigatória fora de "conforme"; cada verificação vira evento; "não conforme"
-  avisa o autor).
+(`"16 - qsms".qsms_pode`). ⚙️ (admin) → `qsms_acesso` (`app_qsms_acesso_listar/_set`). **A unidade é a atividade**
+(APR + PT/PET), com **uma verificação por atividade** (2026-10-28). Período + consórcio no topo; 2 abas:
+- **Painel** (`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida, leituras de gás fora, com alertas,
+  a verificar, conformes, com ressalva, não conformes); **"A verificar — mais antigas primeiro"** (fila de trabalho);
+  atividades por dia, por tipo de intervenção, por responsável; riscos das APRs.
+- **Atividades** (`qsmsLista`/`qsmsCardHtml`): segmento **A verificar / Não conformes / Verificadas / Todas** (contagens
+  respeitam os demais filtros); filtros tipo de intervenção, responsável (quem preencheu), formulários (com PT / com PET
+  / só APR), "só com alerta ou impedimento", busca (OS, endereço, bairro, pessoa); **Lista / Mapa** (cor = verificação)
+  / **XLSX** (1 linha por atividade). Detalhe (`qsmsDetalhe` + `app_qsms_atividade_ver`): dados, formulários com
+  situação/alertas/leituras, **equipe consolidada** (papéis por formulário), **PDF da atividade** e **verificação**
+  Conforme/Com ressalva/Não conforme (`app_qsms_verificar(p_atividade,…)`; obs obrigatória fora de "conforme"; histórico).
 
 **Backend — schema `"16 - qsms"` (app-only, RLS deny-all, só RPC definer, nada pode ser apagado — trigger
-`qsms_sem_delete`):** `qsms_atividade` (geom 31983, `endereco`/`bairro`/`municipio`/`consorcio` pela coordenada) ·
-`qsms_formulario` (status **`emitida|impedida`**, `respostas jsonb`, `fotos`, `alertas` + `n_alertas`, `verif_*`) ·
-`qsms_participante` (papel, `pessoa_uuid`, `documento`/`funcao` do cadastro, `assinatura`, `assinatura_apr`) ·
-`qsms_medicao` · `qsms_evento` (trilha das verificações). Helpers: `qsms_pode`, `qsms_uuids`, `qsms_consorcio`,
+`qsms_sem_delete`):** `qsms_atividade` (geom 31983, `endereco`/`bairro`/`municipio`/`consorcio` pela coordenada,
+**`verif_status/obs/por/em`**) · `qsms_formulario` (status **`emitida|impedida`**, `respostas jsonb`, `fotos`, `alertas` +
+`n_alertas`) · `qsms_participante` (papel, `pessoa_uuid`, `documento`/`funcao` do cadastro, `assinatura`,
+`assinatura_apr`) · `qsms_medicao` · `qsms_evento` (trilha das verificações, por `atividade_id`). Helpers: `qsms_pode`, `qsms_uuids`, `qsms_consorcio`,
 `qsms_local` (rua ≤ 80 m + bairro + município + ZA), `qsms_gas_fora`, `qsms_pode_form`. `perfil.qsms_acesso`;
 `app_me` devolve `qsms`.
 RPCs: `app_seg_registrar(p_id, p_dados, p_anexos)` (idempotente; cria a atividade se não existe; local pela
 coordenada; matrícula/cargo do perfil; assinatura da APR quando `assinatura_apr`; **recalcula status e alertas** —
 conteúdo inválido vira alerta, não erro, porque a fila descartaria em silêncio), `app_seg_local`, `app_seg_minhas`,
-`app_seg_ver`, `app_seg_pessoas`, `app_qsms_listar`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`.
-**Avisos** (trigger → `sup_notificar`, tipo `qsms`): não conforme → autor (`seg`); PT/PET impedida → equipe QSMS
-menos o ator (`qsms`).
+`app_seg_ver` (traz `verificacoes` da atividade), `app_seg_pessoas`, `app_qsms_listar` (`{atividades:[…, forms:[…]]}`),
+`app_qsms_atividade_ver`, `app_qsms_verificar(p_atividade, p_status, p_obs)`, `app_qsms_acesso_listar/_set`.
+**Avisos** (triggers → `sup_notificar`, tipo `qsms`): atividade não conforme → quem preencheu (`seg`, trigger em
+`qsms_atividade`); PT/PET impedida → equipe QSMS menos o ator (`qsms`, trigger em `qsms_formulario`).
 
 **Cuidados:**
 - Removidos em 28/10/2026 (ajuste do usuário): tela `seg_acomp`, tratativas (tabela `qsms_tratativa` e RPCs),
   `app_seg_evento`, `app_seg_os_info`, status `liberada/encerrada/interrompida`, colunas `encerrado_*`/`encerramento`.
-  Registros de teste anteriores foram convertidos (`liberada` → `emitida`).
+  Registros de teste anteriores foram convertidos (`liberada` → `emitida`). Ainda em 28/10 a verificação saiu do
+  formulário para a atividade (migração `qsms_verificacao_por_atividade`: ficou o pior resultado da atividade).
+- PT/PET **não existem sem APR** — a APR é a raiz da atividade; o app só oferece "+ PT/+ PET" a partir dela.
 - Tipos de intervenção e sugestões estão **no código** — não há tela de configuração.
 - Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
 - `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`

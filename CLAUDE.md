@@ -323,10 +323,12 @@ pwa/
   consórcio **pela coordenada** (`app_seg_local`/`qsms_local`); a APR sugere fases/riscos/EPIs pelo tipo, exige foto da
   sinalização; quem preenche é o responsável (travado, só assina) e os executantes vêm da lista; PT/PET só saem de APR
   que as indique e **reaproveitam a equipe e as assinaturas da APR** (PT: só o liberador assina; PET: papéis
-  entra/vigia); travas ("Não" impede; gás fora do limite impede); tocar num formulário abre o PDF. Offline pela fila
+  entra/vigia); travas ("Não" impede; gás fora do limite impede); cada atividade (APR + PT/PET) é um bloco com
+  **PDF único** (capa + formulários). Offline pela fila
   (`item.anexos`, ids `seg-<ts>`), rascunho e cópia local em IndexedDB `seg_local`. **Gestão** (`qsms`, Home › 🧰
-  Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): painel, lista/mapa/XLSX e verificação (conforme/ressalva/não conforme,
-  avisa o autor). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
+  Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): trabalha **por atividade** — painel com fila "a verificar", lista/mapa/XLSX
+  com filtros por situação da verificação, tipo, responsável e PT/PET, e **uma verificação por atividade**
+  (conforme/ressalva/não conforme, avisa o autor). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.

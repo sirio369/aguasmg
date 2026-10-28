@@ -1206,7 +1206,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="seg" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>Segurança do Trabalho</h1>
-    <p class="sub">APR, PT (trabalho em altura) e PET (espaço confinado) preenchidas e assinadas no celular — com GPS, data, hora e usuário. Toque num formulário para ver o PDF. Funciona sem sinal.</p>
+    <p class="sub">APR, PT (trabalho em altura) e PET (espaço confinado) preenchidas e assinadas no celular — com GPS, data, hora e usuário. Cada atividade junta a APR e as PT/PET dela, com um PDF único. Funciona sem sinal.</p>
     <div id="segRasc"></div>
     <button class="btn" id="segNovaApr" style="margin-top:8px">⛑️ Nova APR</button>
     <div class="sec">Minhas atividades (10 dias)</div>
@@ -1225,10 +1225,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <h1>QSMS · Segurança do Trabalho</h1>
       <button id="qsCfg" class="hidden" title="Quem acessa o QSMS" style="all:unset;cursor:pointer;font-size:22px;line-height:1;padding:4px 2px;margin-top:4px">⚙️</button>
     </div>
-    <p class="sub">Verificação, gestão e consolidação das APRs, PTs e PETs preenchidas em campo.</p>
+    <p class="sub">Verificação e consolidação das atividades de campo — cada uma é a APR com as PT/PET que saíram dela.</p>
     <div class="seg" id="qsTabs" style="margin:8px 0">
       <button type="button" data-t="painel" class="sel">📊 Painel</button>
-      <button type="button" data-t="forms">📋 Formulários</button>
+      <button type="button" data-t="forms">📋 Atividades</button>
     </div>
     <div class="segfil" id="qsPeriodo">
       <input type="date" id="qsDe" title="De"/><input type="date" id="qsAte" title="Até"/>
@@ -9092,20 +9092,23 @@ async function segListar(){ const c=document.getElementById('segLista'); if(!c)r
     g.forms.set(d.id,f); }
   segLista=[...mapa.values()].sort((x,y)=>String(y.a.iniciada_em||'').localeCompare(String(x.a.iniciada_em||'')));
   if(!segLista.length){ c.innerHTML='<p class="sub">Nenhuma atividade nos últimos 10 dias. Toque em <b>Nova APR</b> para começar.</p>'; return; }
+  // um bloco por atividade (APR + PT/PET que saíram dela) e um PDF único da atividade
   c.innerHTML=segLista.map(g=>{ const a=g.a, fs=[...g.forms.values()].sort((x,y)=>String(x.emitido_em||'').localeCompare(String(y.emitido_em||'')));
     const apr=fs.find(f=>f.tipo==='APR');
     const chips=fs.map(f=>{ const cor=SEG_ST_COR[f.status]||'#888'; const extra=f.tipo==='PET'&&f.espaco?(' · '+segH(f.espaco)):(f.tipo==='PT'&&f.altura?(' · '+segH(f.altura)+' m'):'');
-      return `<button class="segfm" data-segf="${f.id}" title="Ver PDF"><span class="segdot" style="background:${cor}"></span>📄 ${f.tipo}${f.status==='impedida'?' · impedida':''}${extra}${pend.has(f.id)?' · ⏳':''}</button>`; }).join('');
-    const acts=[];
+      return `<span class="segfm" style="cursor:default"><span class="segdot" style="background:${cor}"></span>${f.tipo}${f.status==='impedida'?' · impedida':''}${extra}${pend.has(f.id)?' · ⏳':''}</span>`; }).join('');
+    const acts=[`<button class="btn" data-segpdf="${fs.map(f=>f.id).join(',')}">📄 PDF da atividade</button>`];
     if(apr&&apr.requer_pt==='S') acts.push(`<button class="btn ghost" data-segnovo="PT" data-ativ="${a.id}" data-apr="${apr.id}">+ PT (altura)</button>`);
     if(apr&&apr.requer_pet==='S') acts.push(`<button class="btn ghost" data-segnovo="PET" data-ativ="${a.id}" data-apr="${apr.id}">+ PET (espaço confinado)</button>`);
-    const local=segLocalTxt(a)||(a.local?segLocalTxt(a.local):'');
+    const local=segLocalTxt(a)||(a.local?segLocalTxt(a.local):''), vr=QSMS_VERIF[a.verif_status];
     return `<div class="segcard"><h4>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</h4>
       <div class="sub" style="margin-top:2px">${a.os_sigos?('OS '+segH(a.os_sigos)+' · '):''}${segH(local||'endereço pela coordenada ao sincronizar')}</div>
       <div class="sub" style="font-size:12px;margin-top:2px">${segFmt(a.iniciada_em)}</div>
-      <div class="segforms">${chips}</div>${acts.length?('<div class="segacts">'+acts.join('')+'</div>'):''}</div>`; }).join('')
+      <div class="segforms">${chips}</div>
+      ${vr?`<div class="sub" style="font-size:12.5px;margin-top:6px"><span class="segpill" style="background:${vr[1]}">QSMS: ${vr[0]}</span>${a.verif_obs?(' '+segH(a.verif_obs)):''}</div>`:''}
+      <div class="segacts">${acts.join('')}</div></div>`; }).join('')
     +(doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>');
-  c.querySelectorAll('[data-segf]').forEach(b=>b.onclick=()=>segPdf(b.dataset.segf));
+  c.querySelectorAll('[data-segpdf]').forEach(b=>b.onclick=()=>segPdfAtividade(b.dataset.segpdf.split(',')));
   c.querySelectorAll('[data-segnovo]').forEach(b=>b.onclick=()=>segNovo(b.dataset.segnovo,b.dataset.ativ,b.dataset.apr)); }
 
 // ===== Formulário (seg_form): estado único segD, salvo como rascunho a cada mudança =====
@@ -9415,13 +9418,13 @@ async function segDocCarregar(id){ let d=null; try{ d=await segDocGet(id); }catc
   try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=segDocDeServidor(data); try{ await segDocPut(d); }catch(e){} return d; }catch(e){ return null; } }
 function segDocDeServidor(v){ const f=v.formulario||{}, a=v.atividade||{};
   return {id:f.id,tipo:f.tipo,status:f.status,atividade:a,resp:f.respostas||{},pes:(v.participantes||[]).map(p=>Object.assign({},p,{sig:p.assinatura||null,apr:!!p.assinatura_apr})),
-    med:v.medicoes||[],fotos:f.fotos||{},eventos:(v.eventos||[]).map(e=>({tipo:e.tipo,dados:e.dados,quando:e.ocorrido_em,usuario:e.usuario_nome,descricao:e.descricao})),
-    emitido_em:f.emitido_em,alertas:f.alertas||[],verif_status:f.verif_status,verif_obs:f.verif_obs,verif_por_nome:f.verif_por_nome,verif_em:f.verif_em,
-    lat:f.lat,lon:f.lon,modelo:f.modelo,usuario_nome:f.usuario_nome,salvo_em:new Date().toISOString(),servidor:true}; }
-const SEG_EV_LBL={verificacao:'Verificação QSMS'};
-function segEvResumo(e){ const x=e.dados||{}; if(e.tipo==='verificacao') return ({conforme:'Conforme',ressalva:'Conforme com ressalva',nao_conforme:'Não conforme'}[x.status]||'')+(e.descricao?(' — '+e.descricao):''); return x.descricao||e.descricao||''; }
+    med:v.medicoes||[],fotos:f.fotos||{},verificacoes:v.verificacoes||[],
+    emitido_em:f.emitido_em,alertas:f.alertas||[],lat:f.lat,lon:f.lon,modelo:f.modelo,usuario_nome:f.usuario_nome,salvo_em:new Date().toISOString(),servidor:true}; }
+// verificação do QSMS é da atividade (APR + PT/PET); rótulo e cor
+const QSMS_VERIF={conforme:['Conforme','#1a7f4b'],ressalva:['Com ressalva','#b7791f'],nao_conforme:['Não conforme','#b3261e']};
 
-// ===== PDF (overlay #relatorio + REL_CSS) — servidor quando online, cópia local quando sem sinal =====
+// ===== PDF da atividade (overlay #relatorio + REL_CSS): capa + APR + PT/PET num documento só =====
+// Cada formulário mantém o layout do papel (página própria); a capa resume a atividade e traz a verificação QSMS.
 const SEG_REL_CSS=`
 .segT{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
 .segT th,.segT td{border:1px solid #cbd5e1;padding:4px 6px;text-align:left;vertical-align:top}
@@ -9435,23 +9438,51 @@ const SEG_REL_CSS=`
 .segAlertP{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:6px;padding:7px 10px;font-size:11.5px;margin-top:8px}
 .segNoteP{font-size:10px;color:#555;margin-top:8px;line-height:1.4}
 .segList{margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.45}
-@media print{.segT,.segSigC,.segAlertP{break-inside:avoid}.segT .ok,.segT .bad,.segAlertP{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
-async function segPdf(id){ let d=null;
-  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=segDocDeServidor(data); }catch(e){} }
-  if(!d){ try{ d=await segDocGet(id); }catch(e){} }
-  if(!d) return toast('Formulário indisponível sem conexão neste aparelho');
+.segPag{page-break-before:always;break-before:page;margin-top:18px;border-top:6px solid #e5e7eb}
+@media print{.segPag{border-top:0;margin-top:0}.segT,.segSigC,.segAlertP{break-inside:avoid}.segT .ok,.segT .bad,.segAlertP{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+// ids = formulários da atividade; online lê do servidor (fresco), sem sinal usa a cópia local
+async function segPdfAtividade(ids){ const docs=[];
+  for(const id of ids){ let d=null;
+    if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=segDocDeServidor(data); }catch(e){} }
+    if(!d){ try{ d=await segDocGet(id); }catch(e){} }
+    if(d) docs.push(d); }
+  if(!docs.length) return toast('Atividade indisponível sem conexão neste aparelho');
+  if(docs.length<ids.length) toast('Parte dos formulários não está neste aparelho — abra com conexão para o PDF completo');
+  const ord={APR:0,PT:1,PET:2}; docs.sort((x,y)=>(ord[x.tipo]-ord[y.tipo])||String(x.emitido_em||'').localeCompare(String(y.emitido_em||'')));
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   if(!document.getElementById('segRelStyle')){ const st=document.createElement('style'); st.id='segRelStyle'; st.textContent=SEG_REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+segDocHtml(d)+'</div>';
+  const corpo=(docs.length>1?segCapaHtml(docs):'')+docs.map((d,i)=>(docs.length>1||i?'<div class="segPag">':'<div>')+segDocHtml(d,docs.length===1)+'</div>').join('');
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+corpo+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print(); }
+function segVerifHtml(a,verifs){ const vr=QSMS_VERIF[a.verif_status];
+  let h='<div class="relSec"><span class="relNum">✓</span>Verificação QSMS</div>';
+  if(!vr) return h+'<div class="relPend">Ainda não verificada pelo QSMS.</div>';
+  h+='<div class="relGrid">'+relField('Resultado','<span style="color:'+vr[1]+'">'+vr[0]+'</span>')+relField('Por',segH(a.verif_por_nome||'—'))+relField('Em',segFmt(a.verif_em))+(a.verif_obs?relWide('Observação',segH(a.verif_obs)):'')+'</div>';
+  const hist=(verifs||[]).slice(0,-1); // a última é a atual
+  if(hist.length) h+='<div class="segNoteP">Verificações anteriores: '+hist.map(v=>segFmt(v.quando)+' — '+((QSMS_VERIF[v.status]||[])[0]||v.status)+(v.obs?(' ('+segH(v.obs)+')'):'')+(v.por?(' · '+segH(v.por)):'')).join(' · ')+'</div>';
+  return h; }
+function segCapaHtml(docs){ const a=docs[0].atividade||{}, apr=docs.find(d=>d.tipo==='APR')||docs[0];
+  const cons=REL_CONS[a.consorcio]||REL_CONS[(a.local||{}).consorcio]||a.consorcio||'Consórcios Águas Integradas & Eficiência Hídrica';
+  const vr=QSMS_VERIF[a.verif_status], resp=(apr.pes||[]).find(p=>p.papel==='responsavel');
+  let h=`<div class="relTop"><div><h1>Atividade — ${docs.map(d=>d.tipo).join(' + ')}</h1><div class="sub">${segH(cons)} · ${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</div></div><div class="relBadge" style="color:${vr?vr[1]:'#64748b'}">${vr?('QSMS: '+vr[0].toUpperCase()):'A VERIFICAR'}</div></div><div class="relBody">`;
+  h+='<div class="relGrid">'+relWide('Serviço',segH(a.descricao||'—'))+relField('Nº da OS',segH(a.os_sigos||'—'))+relField('Data / hora',segFmt(a.iniciada_em||apr.emitido_em))
+    +relWide('Local',segH(segLocalTxt(a)||(a.local?segLocalTxt(a.local):'')||'—'))+relField('Responsável pelos serviços',segH((resp||{}).nome||apr.usuario_nome||'—'))+relField('Consórcio',segH(CONSORCIO_NOME[a.consorcio]||a.consorcio||'—'))+'</div>';
+  h+='<div class="relSec"><span class="relNum">≡</span>Formulários desta atividade</div><table class="segT"><tr><th>Formulário</th><th>Modelo</th><th>Emitido em</th><th>Situação</th><th>Alertas</th></tr>'
+    +docs.map(d=>`<tr><td>${SEG_TITULO[d.tipo]}${d.tipo==='PT'&&d.resp.altura?(' · '+segH(d.resp.altura)+' m'):''}${d.tipo==='PET'&&d.resp.espaco_tipo?(' · '+segH(d.resp.espaco_tipo)):''}</td><td>${segH(d.modelo||SEG_MODELO[d.tipo])}</td><td>${segFmt(d.emitido_em)}</td><td class="${d.status==='impedida'?'bad':'ok'}">${(SEG_ST_LBL[d.status]||d.status)}</td><td>${(d.alertas||[]).length?segH(d.alertas.join(' · ')):'—'}</td></tr>`).join('')+'</table>';
+  const pessoas=new Map(); docs.forEach(d=>(d.pes||[]).filter(p=>p.papel!=='fora').forEach(p=>{ const k=p.pessoa_uuid||String(p.nome).toLowerCase(); const x=pessoas.get(k)||{nome:p.nome,documento:p.documento,funcao:p.funcao,papeis:[]}; x.papeis.push((SEG_PAPEL[p.papel]||p.papel)+' ('+d.tipo+')'); pessoas.set(k,x); }));
+  h+='<div class="relSec"><span class="relNum">👥</span>Equipe</div><table class="segT"><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Papéis</th></tr>'+[...pessoas.values()].map(p=>`<tr><td>${segH(p.nome)}</td><td>${segH(p.documento||'—')}</td><td>${segH(p.funcao||'—')}</td><td>${segH(p.papeis.join(' · '))}</td></tr>`).join('')+'</table>';
+  h+=segVerifHtml(a,apr.verificacoes||[]);
+  h+=`</div><div class="relFoot"><span>Documento eletrônico · AcquaHub · ${docs.every(d=>d.servidor)?'conferido no servidor':'contém cópia do aparelho (aguardando envio)'}</span><span>${String(a.id||'').slice(0,8)}</span></div>`;
+  return h; }
 function segFotosHtml(arr){ const its=arr.filter(f=>f[1]); if(!its.length) return '<div class="relPend">Sem foto.</div>';
   return '<div class="relPhotos">'+its.map(f=>'<figure><img src="'+segImg(f[1])+'" onerror="this.remove()"/><figcaption>'+f[0]+'</figcaption></figure>').join('')+'</div>'; }
 function segSigsHtml(pes){ if(!pes.length) return '<div class="relPend">—</div>';
   return '<div class="segSigs">'+pes.map(p=>`<div class="segSigC">${p.sig?`<img src="${segImg(p.sig)}"/>`:'<div style="height:58px;color:#b45309;font-style:italic;display:flex;align-items:center;justify-content:center">sem assinatura</div>'}<div class="nm">${segH(p.nome)}</div><div>${segH(SEG_PAPEL[p.papel]||p.papel)}${p.documento?(' · '+segH(p.documento)):''}</div>${p.funcao?`<div>${segH(p.funcao)}</div>`:''}<div style="color:#777">${p.apr?'assinatura dada na APR':(p.assinado_em?segFmt(p.assinado_em):'')}</div></div>`).join('')+'</div>'; }
-function segDocHtml(d){ const a=d.atividade||{}, r=d.resp||{}, pes=(d.pes||[]).filter(p=>p.papel!=='fora');
+// um formulário no layout do papel; "sozinho" = PDF de 1 formulário só (leva a verificação no fim)
+function segDocHtml(d,sozinho){ const a=d.atividade||{}, r=d.resp||{}, pes=(d.pes||[]).filter(p=>p.papel!=='fora');
   const cons=REL_CONS[a.consorcio]||REL_CONS[(a.local||{}).consorcio]||a.consorcio||'Consórcios Águas Integradas & Eficiência Hídrica', cor=SEG_ST_COR[d.status]||'#555';
   const X=v=>v?'X':''; let n=0; const sec=t=>'<div class="relSec"><span class="relNum">'+(++n)+'</span>'+t+'</div>';
   const local=segLocalTxt(a)||(a.local?segLocalTxt(a.local):'')||'(pela coordenada, ao sincronizar)';
@@ -9502,19 +9533,24 @@ function segDocHtml(d){ const a=d.atividade||{}, r=d.resp||{}, pes=(d.pes||[]).f
     h+=sec('Participantes da atividade')+segSigsHtml(part);
     h+=sec('Responsáveis')+'<div style="font-size:11px;font-weight:700;margin-top:6px">Responsável pela emissão da permissão</div>'+segSigsHtml(em)+'<div style="font-size:11px;font-weight:700;margin-top:8px">Responsável pela liberação da área ou local</div>'+segSigsHtml(lb);
   }
-  const evs=(d.eventos||[]).filter(e=>e.tipo==='verificacao');
-  if(evs.length) h+=sec('Verificações QSMS')+'<table class="segT"><tr><th>Quando</th><th>Resultado</th><th>Por</th></tr>'+evs.map(e=>`<tr><td>${segFmt(e.quando)}</td><td>${segH(segEvResumo(e))}</td><td>${segH(e.usuario||'')}</td></tr>`).join('')+'</table>';
   if((d.alertas||[]).length) h+='<div class="segAlertP"><b>Alertas:</b> '+d.alertas.map(segH).join(' · ')+'</div>';
+  if(sozinho) h+=segVerifHtml(a,d.verificacoes||[]);
   h+=`</div><div class="relFoot"><span>Documento eletrônico · AcquaHub · ${d.servidor?'conferido no servidor':'cópia do aparelho (aguardando envio)'}</span><span>${String(d.id).slice(0,8)}</span></div>`;
   return h; }
 
-// ===== QSMS — gestão (tela qsms): painel e formulários (lista/mapa/detalhe com verificação) =====
-// Nada fica "aberto" em campo: o técnico de segurança consolida e verifica o que já foi emitido (ou impedido).
-let qsmsTab='painel', qsmsDados=null, qsmsView='lista', qsmsMap=null, qsmsMk=null, qsmsDet=null, qsmsWired=false;
-const QSMS_VERIF={conforme:['Conforme','#1a7f4b'],ressalva:['Com ressalva','#b7791f'],nao_conforme:['Não conforme','#b3261e']};
+// ===== QSMS — gestão por ATIVIDADE (APR + PT/PET dela): painel e lista/mapa/detalhe com verificação =====
+// Nada fica "aberto" em campo: o técnico de segurança verifica cada atividade emitida (uma verificação por bloco).
+let qsmsTab='painel', qsmsDados=null, qsmsView='lista', qsmsMap=null, qsmsMk=null, qsmsDet=null, qsmsWired=false, qsmsVerF='pendente';
+const QSMS_PEND_COR='#64748b';
 const qsmsDia=s=>{ const d=new Date(s); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+const qsmsAt=()=>(qsmsDados&&qsmsDados.atividades)||[];
+const qsmsForm=(a,t)=>(a.forms||[]).filter(f=>f.tipo===t);
+const qsmsImpedida=a=>(a.forms||[]).some(f=>f.status==='impedida');
+const qsmsNAlert=a=>(a.forms||[]).reduce((s,f)=>s+(+f.n_alertas||0),0);
+const qsmsNFora=a=>(a.forms||[]).reduce((s,f)=>s+(+f.n_fora||0),0);
+const qsmsCor=a=>(QSMS_VERIF[a.verif_status]||[0,QSMS_PEND_COR])[1];
 function qsmsInit(){ if(!(ME&&ME.qsms)){ toast('Acesso restrito'); irPara('home'); return; }
-  segCss(); segPessoasCarregar();
+  segCss();
   const de=$('#qsDe'), ate=$('#qsAte'); if(de&&!de.value){ const h=new Date(); ate.value=qsmsDia(h); h.setDate(h.getDate()-29); de.value=qsmsDia(h); }
   const cfg=$('#qsCfg'); if(cfg) cfg.classList.toggle('hidden',!(ME&&ME.is_admin));
   if(!qsmsWired){ qsmsWired=true;
@@ -9523,7 +9559,7 @@ function qsmsInit(){ if(!(ME&&ME.qsms)){ toast('Acesso restrito'); irPara('home'
     if(cfg) cfg.onclick=()=>irPara('qsms_acesso'); }
   qsmsCarregar(); }
 async function qsmsCarregar(){ const v=$('#qsView'); if(v) v.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_qsms_listar',{p_de:$('#qsDe').value,p_ate:$('#qsAte').value,p_consorcio:$('#qsCons').value||null}); if(error)throw error; qsmsDados=data||{itens:[]}; }
+  try{ const {data,error}=await sb.rpc('app_qsms_listar',{p_de:$('#qsDe').value,p_ate:$('#qsAte').value,p_consorcio:$('#qsCons').value||null}); if(error)throw error; qsmsDados=data||{atividades:[]}; }
   catch(e){ if(v) v.innerHTML='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; return; }
   qsmsRender(); }
 function qsmsRender(){ document.querySelectorAll('#qsTabs button').forEach(b=>b.classList.toggle('sel',b.dataset.t===qsmsTab));
@@ -9531,86 +9567,108 @@ function qsmsRender(){ document.querySelectorAll('#qsTabs button').forEach(b=>b.
   if(qsmsTab==='painel') qsmsPainel(); else qsmsLista(); }
 function qsmsBars(pares,tot){ const max=Math.max(1,...pares.map(p=>p[1]));
   return pares.map(([l,v])=>`<div class="segbar" title="${segH(l)}: ${v}${tot?(' ('+Math.round(v*100/tot)+'%)'):''}"><span class="l">${segH(l)}</span><span class="b"><i style="width:${Math.max(2,Math.round(v*100/max))}%"></i></span><span class="v">${v}</span></div>`).join('')||'<p class="sub" style="font-size:12px">Sem dados no período.</p>'; }
-function qsmsPainel(){ const v=$('#qsView'), it=(qsmsDados.itens||[]);
-  const cnt=f=>it.filter(f).length;
-  const kp=[['APRs',cnt(x=>x.tipo==='APR'),''],['PTs',cnt(x=>x.tipo==='PT'),''],['PETs',cnt(x=>x.tipo==='PET'),''],['PT/PET impedidas',cnt(x=>x.status==='impedida'),'alerta'],
-    ['Leituras de gás fora',it.reduce((s,x)=>s+(+x.n_fora||0),0),'alerta'],['Com alertas',cnt(x=>x.n_alertas>0),'alerta'],
-    ['A verificar',cnt(x=>!x.verif_status),''],['Conformes',cnt(x=>x.verif_status==='conforme'),''],['Com ressalva',cnt(x=>x.verif_status==='ressalva'),''],['Não conformes',cnt(x=>x.verif_status==='nao_conforme'),'alerta']];
+// card de atividade (painel e lista)
+function qsmsCardHtml(a){ const vr=QSMS_VERIF[a.verif_status];
+  const fs=(a.forms||[]).map(f=>`<span class="segfm" style="cursor:inherit"><span class="segdot" style="background:${SEG_ST_COR[f.status]||'#888'}"></span>${f.tipo}${f.status==='impedida'?' · impedida':''}${f.tipo==='PT'&&f.altura?(' · '+segH(f.altura)+' m'):''}${f.tipo==='PET'&&f.n_fora?(' · '+f.n_fora+' leitura(s) fora'):''}</span>`).join('');
+  const na=qsmsNAlert(a);
+  return `<div class="segcard" data-qsa="${a.id}" style="cursor:pointer;border-left:4px solid ${qsmsCor(a)}">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</b><span class="sub" style="margin-left:auto;font-size:12px">${segFmt(a.iniciada_em)}</span></div>
+    <div class="sub" style="margin-top:3px">${a.os_sigos?('OS '+segH(a.os_sigos)+' · '):''}${segH(segLocalTxt(a)||'—')}</div>
+    <div class="sub" style="font-size:12px;margin-top:2px">${segH(a.usuario_nome||'')} · ${a.n_pessoas} pessoa(s)${a.consorcio?(' · '+(CONSORCIO_NOME[a.consorcio]||a.consorcio)):''}</div>
+    <div class="segforms">${fs}<span class="segpill" style="background:${qsmsCor(a)};margin-left:auto">${vr?vr[0]:'A verificar'}</span>${na?`<span class="segpill" style="background:var(--bad)">⚠ ${na}</span>`:''}</div></div>`; }
+function qsmsWireCards(root){ root.querySelectorAll('[data-qsa]').forEach(el=>el.onclick=()=>{ qsmsDet=el.dataset.qsa; qsmsRender(); }); }
+function qsmsPainel(){ const v=$('#qsView'), at=qsmsAt();
+  const cnt=f=>at.filter(f).length;
+  const kp=[['Atividades',at.length,''],['Com PT',cnt(a=>qsmsForm(a,'PT').length),''],['Com PET',cnt(a=>qsmsForm(a,'PET').length),''],['Com PT/PET impedida',cnt(qsmsImpedida),'alerta'],
+    ['Leituras de gás fora',at.reduce((s,a)=>s+qsmsNFora(a),0),'alerta'],['Com alertas',cnt(a=>qsmsNAlert(a)>0),'alerta'],
+    ['A verificar',cnt(a=>!a.verif_status),''],['Conformes',cnt(a=>a.verif_status==='conforme'),''],['Com ressalva',cnt(a=>a.verif_status==='ressalva'),''],['Não conformes',cnt(a=>a.verif_status==='nao_conforme'),'alerta']];
   let h='<div class="segkpis">'+kp.map(([l,n,c])=>`<div class="segkpi ${n&&c?c:''}"><b>${n}</b><span>${l}</span></div>`).join('')+'</div>';
+  const pend=at.filter(a=>!a.verif_status).sort((x,y)=>String(x.iniciada_em).localeCompare(String(y.iniciada_em)));
+  h+='<div class="sec">A verificar — mais antigas primeiro</div>'+(pend.length?pend.slice(0,6).map(qsmsCardHtml).join('')+(pend.length>6?`<button class="btn ghost" id="qsVerTodas" style="margin-top:4px">Ver as ${pend.length} a verificar</button>`:''):'<p class="sub">Tudo verificado no período. 👍</p>');
   // por dia (série única)
   const de=new Date($('#qsDe').value+'T12:00:00'), ate=new Date($('#qsAte').value+'T12:00:00'), dias=[];
   for(let d=new Date(de); d<=ate && dias.length<92; d.setDate(d.getDate()+1)) dias.push(qsmsDia(d));
-  const porDia=dias.map(d=>[d,it.filter(x=>x.tipo==='APR'&&qsmsDia(x.emitido_em)===d).length]); const mxD=Math.max(1,...porDia.map(x=>x[1]));
-  h+='<div class="sec">APRs por dia</div><div class="segdias">'+porDia.map(([d,n])=>`<i title="${d.split('-').reverse().join('/')}: ${n} APR(s)" style="height:${Math.round(n*100/mxD)}%"></i>`).join('')+'</div><div class="sub" style="font-size:11px;display:flex;justify-content:space-between"><span>'+(dias[0]||'').split('-').reverse().join('/')+'</span><span>'+(dias[dias.length-1]||'').split('-').reverse().join('/')+'</span></div>';
-  const agrupa=(arr,fk)=>{ const m=new Map(); arr.forEach(x=>{ const k=fk(x); if(k) m.set(k,(m.get(k)||0)+1); }); return [...m.entries()].sort((a,b)=>b[1]-a[1]); };
-  const aprs=it.filter(x=>x.tipo==='APR');
-  h+='<div class="sec">APRs por tipo de intervenção</div>'+qsmsBars(agrupa(aprs,x=>SEG_TIPO_LBL(x.tipo_intervencao)),aprs.length);
-  h+='<div class="sec">APRs por responsável (top 10)</div>'+qsmsBars(agrupa(aprs,x=>x.usuario_nome||'—').slice(0,10),aprs.length);
-  h+='<div class="sec">Riscos identificados nas APRs</div>'+qsmsBars(SEG_RISCOS.filter(r=>!r[3]).map(r=>[(s=>s.charAt(0).toUpperCase()+s.slice(1))(r[1].replace(/^Existe(m)? (o )?risco (de |na )?/i,'').replace(/^Existem pessoas trabalhando em /i,'pessoas em ').replace('?','')),aprs.filter(x=>(x.riscos||{})[r[0]]==='S').length]).sort((a,b)=>b[1]-a[1]),aprs.length);
-  const al=it.filter(x=>x.n_alertas>0).slice(0,12);
-  h+='<div class="sec">Alertas recentes</div>'+(al.length?al.map(x=>`<div class="segcard" data-qsf="${x.id}" style="cursor:pointer"><b>${x.tipo}</b> · ${segFmt(x.emitido_em)} · ${segH(x.usuario_nome||'')}<div class="sub" style="font-size:12px;color:var(--bad)">${(x.alertas||[]).map(segH).join(' · ')}</div></div>`).join(''):'<p class="sub">Sem alertas no período.</p>');
-  v.innerHTML=h; v.querySelectorAll('[data-qsf]').forEach(el=>el.onclick=()=>{ qsmsDet=el.dataset.qsf; qsmsRender(); }); }
-function qsmsFiltrados(){ const g=id=>(($('#'+id)||{}).value||''); const tp=g('qsfTipo'), st=g('qsfSt'), vf=g('qsfVer'), ti=g('qsfInt'), q=g('qsfBusca').trim().toLowerCase();
-  return (qsmsDados.itens||[]).filter(x=>(!tp||x.tipo===tp)&&(!st||x.status===st)&&(!ti||x.tipo_intervencao===ti)
-    &&(!vf||(vf==='pendente'?!x.verif_status:(vf==='alerta'?x.n_alertas>0:x.verif_status===vf)))
-    &&(!q||[x.os_sigos,x.endereco,x.bairro,x.usuario_nome,x.descricao].some(s=>String(s||'').toLowerCase().includes(q)))); }
+  const porDia=dias.map(d=>[d,at.filter(a=>qsmsDia(a.iniciada_em)===d).length]); const mxD=Math.max(1,...porDia.map(x=>x[1]));
+  h+='<div class="sec">Atividades por dia</div><div class="segdias">'+porDia.map(([d,n])=>`<i title="${d.split('-').reverse().join('/')}: ${n} atividade(s)" style="height:${Math.round(n*100/mxD)}%"></i>`).join('')+'</div><div class="sub" style="font-size:11px;display:flex;justify-content:space-between"><span>'+(dias[0]||'').split('-').reverse().join('/')+'</span><span>'+(dias[dias.length-1]||'').split('-').reverse().join('/')+'</span></div>';
+  const agrupa=fk=>{ const m=new Map(); at.forEach(x=>{ const k=fk(x); if(k) m.set(k,(m.get(k)||0)+1); }); return [...m.entries()].sort((a,b)=>b[1]-a[1]); };
+  h+='<div class="sec">Por tipo de intervenção</div>'+qsmsBars(agrupa(x=>SEG_TIPO_LBL(x.tipo_intervencao)),at.length);
+  h+='<div class="sec">Por responsável (top 10)</div>'+qsmsBars(agrupa(x=>x.usuario_nome||'—').slice(0,10),at.length);
+  h+='<div class="sec">Riscos identificados nas APRs</div>'+qsmsBars(SEG_RISCOS.filter(r=>!r[3]).map(r=>[(s=>s.charAt(0).toUpperCase()+s.slice(1))(r[1].replace(/^Existe(m)? (o )?risco (de |na )?/i,'').replace(/^Existem pessoas trabalhando em /i,'pessoas em ').replace('?','')),at.filter(x=>(x.riscos||{})[r[0]]==='S').length]).sort((a,b)=>b[1]-a[1]),at.length);
+  v.innerHTML=h; qsmsWireCards(v);
+  const vt=$('#qsVerTodas'); if(vt) vt.onclick=()=>{ qsmsTab='forms'; qsmsVerF='pendente'; qsmsRender(); }; }
+function qsmsFiltradas(ignorarVer){ const g=id=>(($('#'+id)||{}).value||''); const ti=g('qsfInt'), rs=g('qsfResp'), fm=g('qsfForm'), q=g('qsfBusca').trim().toLowerCase(), al=!!(($('#qsfAlerta')||{}).checked);
+  return qsmsAt().filter(a=>(!ti||a.tipo_intervencao===ti)&&(!rs||a.usuario_nome===rs)
+    &&(!fm||(fm==='apr'?(a.forms||[]).every(f=>f.tipo==='APR'):qsmsForm(a,fm).length>0))
+    &&(!al||qsmsImpedida(a)||qsmsNAlert(a)>0)
+    &&(ignorarVer||qsmsVerF==='todas'||(qsmsVerF==='pendente'?!a.verif_status:(qsmsVerF==='nao_conforme'?a.verif_status==='nao_conforme':!!a.verif_status)))
+    &&(!q||[a.os_sigos,a.endereco,a.bairro,a.municipio,a.usuario_nome,a.descricao].some(s=>String(s||'').toLowerCase().includes(q)))); }
 function qsmsLista(){ const v=$('#qsView');
-  if(!$('#qsfTipo')){ v.innerHTML=`<div class="segfil"><select id="qsfTipo"><option value="">APR, PT e PET</option><option>APR</option><option>PT</option><option>PET</option></select>
-    <select id="qsfSt"><option value="">Emitidas e impedidas</option>${Object.entries(SEG_ST_LBL).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
-    <select id="qsfVer"><option value="">Verificação: todas</option><option value="pendente">A verificar</option><option value="conforme">Conforme</option><option value="ressalva">Com ressalva</option><option value="nao_conforme">Não conforme</option><option value="alerta">Só com alertas</option></select>
-    <select id="qsfInt"><option value="">Todos os tipos de intervenção</option>${SEG_TIPOS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
-    <input id="qsfBusca" placeholder="Buscar OS, endereço, pessoa…" autocomplete="off"/></div>
+  if(!$('#qsfInt')){ const resp=[...new Set(qsmsAt().map(a=>a.usuario_nome).filter(Boolean))].sort((x,y)=>x.localeCompare(y));
+    v.innerHTML=`<div class="seg" id="qsVerSeg" style="margin-bottom:8px"></div>
+    <div class="segfil"><select id="qsfInt"><option value="">Todos os tipos de intervenção</option>${SEG_TIPOS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
+    <select id="qsfResp"><option value="">Todos os responsáveis</option>${resp.map(n=>`<option>${segH(n)}</option>`).join('')}</select>
+    <select id="qsfForm"><option value="">APR com ou sem PT/PET</option><option value="PT">Com PT (altura)</option><option value="PET">Com PET (espaço confinado)</option><option value="apr">Só APR</option></select>
+    <input id="qsfBusca" placeholder="Buscar OS, endereço, bairro, pessoa…" autocomplete="off"/>
+    <label style="all:unset;display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="qsfAlerta" style="width:17px;height:17px"/> Só com alerta ou impedimento</label></div>
     <div class="seg" id="qsViewSeg" style="margin-bottom:8px"><button type="button" data-v="lista" class="${qsmsView==='lista'?'sel':''}">📋 Lista</button><button type="button" data-v="mapa" class="${qsmsView==='mapa'?'sel':''}">🗺️ Mapa</button><button type="button" data-v="xlsx">⬇ XLSX</button></div>
-    <div id="qsResumo" class="sub" style="font-size:12px;margin-bottom:6px"></div><div id="qsLista"></div><div id="qsMapaWrap" class="hidden"><div id="qsMapa" style="height:60vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div><div class="sub" style="font-size:12px;margin-top:6px">${Object.entries(SEG_ST_LBL).map(([k,l])=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px"><span class="segdot" style="background:${SEG_ST_COR[k]}"></span>${l}</span>`).join('')}· ponto menor = APR</div></div>`;
-    ['qsfTipo','qsfSt','qsfVer','qsfInt'].forEach(id=>$('#'+id).onchange=qsmsListaRender); $('#qsfBusca').oninput=qsmsListaRender;
+    <div id="qsResumo" class="sub" style="font-size:12px;margin-bottom:6px"></div><div id="qsLista"></div>
+    <div id="qsMapaWrap" class="hidden"><div id="qsMapa" style="height:60vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div><div class="sub" style="font-size:12px;margin-top:6px">${[['A verificar',QSMS_PEND_COR]].concat(Object.values(QSMS_VERIF)).map(([l,c])=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px"><span class="segdot" style="background:${c}"></span>${l}</span>`).join('')}</div></div>`;
+    ['qsfInt','qsfResp','qsfForm','qsfAlerta'].forEach(id=>$('#'+id).onchange=qsmsListaRender); $('#qsfBusca').oninput=qsmsListaRender;
     document.querySelectorAll('#qsViewSeg button').forEach(b=>b.onclick=()=>{ if(b.dataset.v==='xlsx') return qsmsExport(); qsmsView=b.dataset.v; document.querySelectorAll('#qsViewSeg button').forEach(x=>x.classList.toggle('sel',x===b)); qsmsListaRender(); });
     qsmsMap=null; }
   qsmsListaRender(); }
-function qsmsListaRender(){ const arr=qsmsFiltrados(), L1=$('#qsLista'), M=$('#qsMapaWrap'); if(!L1)return;
-  $('#qsResumo').textContent=arr.length+' formulário(s) · '+arr.filter(x=>!x.verif_status).length+' a verificar';
+function qsmsListaRender(){ const L1=$('#qsLista'), M=$('#qsMapaWrap'); if(!L1)return;
+  // contagem por situação da verificação considera os demais filtros
+  const base=qsmsFiltradas(true), cont={pendente:base.filter(a=>!a.verif_status).length,nao_conforme:base.filter(a=>a.verif_status==='nao_conforme').length,verificadas:base.filter(a=>a.verif_status).length,todas:base.length};
+  const sg=$('#qsVerSeg'); if(sg){ sg.innerHTML=[['pendente','A verificar'],['nao_conforme','Não conformes'],['verificadas','Verificadas'],['todas','Todas']].map(([k,l])=>`<button type="button" data-vf="${k}" class="${qsmsVerF===k?'sel':''}">${l} (${cont[k]})</button>`).join('');
+    sg.querySelectorAll('[data-vf]').forEach(b=>b.onclick=()=>{ qsmsVerF=b.dataset.vf; qsmsListaRender(); }); }
+  const arr=qsmsFiltradas();
+  $('#qsResumo').textContent=arr.length+' atividade(s)';
   L1.classList.toggle('hidden',qsmsView!=='lista'); M.classList.toggle('hidden',qsmsView!=='mapa');
   if(qsmsView==='mapa') return qsmsMapa(arr);
-  L1.innerHTML=arr.length?arr.slice(0,300).map(x=>{ const vr=QSMS_VERIF[x.verif_status];
-    return `<div class="segcard" data-qsf="${x.id}" style="cursor:pointer"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>${x.tipo}</b><span class="segpill" style="background:${SEG_ST_COR[x.status]||'#888'}">${SEG_ST_LBL[x.status]||x.status}</span>${vr?`<span class="segpill" style="background:${vr[1]}">${vr[0]}</span>`:'<span class="segpill" style="background:#64748b">A verificar</span>'}${x.n_alertas?`<span class="segpill" style="background:var(--bad)">⚠ ${x.n_alertas}</span>`:''}<span class="sub" style="margin-left:auto;font-size:12px">${segFmt(x.emitido_em)}</span></div>
-      <div class="sub" style="margin-top:4px">${segH(SEG_TIPO_LBL(x.tipo_intervencao))} · ${x.os_sigos?('OS '+segH(x.os_sigos)+' · '):''}${segH(segLocalTxt(x))}</div>
-      <div class="sub" style="font-size:12px;margin-top:2px">${segH(x.usuario_nome||'')} · ${x.n_pessoas} pessoa(s)${x.tipo==='PET'?(' · '+x.n_medicoes+' leitura(s)'+(x.n_fora?(', '+x.n_fora+' fora'):'')):''}${x.consorcio?(' · '+(CONSORCIO_NOME[x.consorcio]||x.consorcio)):''}</div></div>`; }).join('')+(arr.length>300?'<p class="sub">Mostrando 300 — refine os filtros ou exporte.</p>':''):'<p class="sub">Nenhum formulário com esses filtros.</p>';
-  L1.querySelectorAll('[data-qsf]').forEach(el=>el.onclick=()=>{ qsmsDet=el.dataset.qsf; qsmsRender(); }); }
+  L1.innerHTML=arr.length?arr.slice(0,300).map(qsmsCardHtml).join('')+(arr.length>300?'<p class="sub">Mostrando 300 — refine os filtros ou exporte.</p>':''):'<p class="sub">Nenhuma atividade com esses filtros.</p>';
+  qsmsWireCards(L1); }
 function qsmsMapa(arr){ const el=$('#qsMapa'); if(!el||typeof L==='undefined')return;
   if(!qsmsMap){ el.innerHTML=''; qsmsMap=L.map(el); mapAddCamadaBase(qsmsMap); qsmsMap.setView([-19.94,-44.1],11); mapAddLimiteZA(qsmsMap); qsmsMk=L.layerGroup().addTo(qsmsMap); }
   setTimeout(()=>{ try{ qsmsMap.invalidateSize(); }catch(e){} },60);
   qsmsMk.clearLayers(); const b=[];
-  arr.forEach(x=>{ if(x.lat==null||x.lon==null)return; const mk=L.circleMarker([+x.lat,+x.lon],{radius:x.tipo==='APR'?6:8,color:'#fff',weight:1.5,fillColor:SEG_ST_COR[x.status]||'#888',fillOpacity:.95});
-    mk.bindPopup(`<b>${x.tipo} · ${SEG_ST_LBL[x.status]||x.status}</b><br>${segH(SEG_TIPO_LBL(x.tipo_intervencao))}<br>${x.os_sigos?('OS '+segH(x.os_sigos)+'<br>'):''}${segH(x.usuario_nome||'')} · ${segFmt(x.emitido_em)}<br><a href="#" data-qspop="${x.id}">Abrir</a>`);
-    mk.on('popupopen',e=>{ const a=e.popup.getElement().querySelector('[data-qspop]'); if(a) a.onclick=ev=>{ ev.preventDefault(); qsmsDet=x.id; qsmsRender(); }; });
-    qsmsMk.addLayer(mk); b.push([+x.lat,+x.lon]); });
+  arr.forEach(a=>{ if(a.lat==null||a.lon==null)return; const vr=QSMS_VERIF[a.verif_status];
+    const mk=L.circleMarker([+a.lat,+a.lon],{radius:8,color:'#fff',weight:1.5,fillColor:qsmsCor(a),fillOpacity:.95});
+    mk.bindPopup(`<b>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</b><br>${(a.forms||[]).map(f=>f.tipo+(f.status==='impedida'?' (impedida)':'')).join(' + ')}<br>${a.os_sigos?('OS '+segH(a.os_sigos)+'<br>'):''}${segH(a.usuario_nome||'')} · ${segFmt(a.iniciada_em)}<br>${vr?vr[0]:'A verificar'} · <a href="#" data-qspop="${a.id}">Abrir</a>`);
+    mk.on('popupopen',e=>{ const x=e.popup.getElement().querySelector('[data-qspop]'); if(x) x.onclick=ev=>{ ev.preventDefault(); qsmsDet=a.id; qsmsRender(); }; });
+    qsmsMk.addLayer(mk); b.push([+a.lat,+a.lon]); });
   if(b.length){ try{ qsmsMap.fitBounds(b,{padding:[30,30],maxZoom:16}); }catch(e){} } }
-function qsmsExport(){ const arr=qsmsFiltrados(); if(!arr.length) return toast('Nada para exportar');
-  const aoa=[['Tipo','Status','Emitido em','Consórcio','OS SIGOS','Tipo de intervenção','Serviço','Endereço','Bairro','Município','Registrado por','Pessoas','Espaço confinado','Altura (m)','Leituras de gás','Leituras fora','Requer PT','Requer PET','Alertas','Verificação','Obs. verificação','Latitude','Longitude','ID']];
-  arr.forEach(x=>aoa.push([x.tipo,SEG_ST_LBL[x.status]||x.status,x.emitido_em?new Date(x.emitido_em).toLocaleString('pt-BR'):'',CONSORCIO_NOME[x.consorcio]||x.consorcio||'',x.os_sigos||'',
-    SEG_TIPO_LBL(x.tipo_intervencao),x.descricao||'',x.endereco||'',x.bairro||'',x.municipio||'',x.usuario_nome||'',x.n_pessoas,x.espaco||'',x.altura||'',x.n_medicoes,x.n_fora,x.requer_pt||'',x.requer_pet||'',
-    (x.alertas||[]).join(' · '),x.verif_status?QSMS_VERIF[x.verif_status][0]:'A verificar',x.verif_obs||'',x.lat??'',x.lon??'',x.id]));
-  exportarXlsx('qsms_formularios_'+$('#qsDe').value+'_a_'+$('#qsAte').value+'.xlsx','Formulários',aoa); }
-async function qsmsDetalhe(id){ const v=$('#qsView'); v.innerHTML='<p class="sub">Carregando…</p>';
-  let d; try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=data; }catch(e){ v.innerHTML='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; return; }
-  const f=d.formulario||{}, a=d.atividade||{}, vr=QSMS_VERIF[f.verif_status];
+function qsmsExport(){ const arr=qsmsFiltradas(); if(!arr.length) return toast('Nada para exportar');
+  const st=(a,t)=>{ const f=qsmsForm(a,t); return f.length?f.map(x=>SEG_ST_LBL[x.status]||x.status).join(', '):''; };
+  const aoa=[['Data / hora','Consórcio','OS SIGOS','Tipo de intervenção','Serviço','Endereço','Bairro','Município','Responsável','Pessoas','APR','PT','PET','Altura PT (m)','Espaço confinado','Leituras de gás fora','Alertas','Verificação','Obs. verificação','Verificado por','Verificado em','Latitude','Longitude','ID']];
+  arr.forEach(a=>{ const pt=qsmsForm(a,'PT')[0]||{}, pet=qsmsForm(a,'PET')[0]||{};
+    aoa.push([a.iniciada_em?new Date(a.iniciada_em).toLocaleString('pt-BR'):'',CONSORCIO_NOME[a.consorcio]||a.consorcio||'',a.os_sigos||'',SEG_TIPO_LBL(a.tipo_intervencao),a.descricao||'',a.endereco||'',a.bairro||'',a.municipio||'',
+      a.usuario_nome||'',a.n_pessoas,st(a,'APR'),st(a,'PT'),st(a,'PET'),pt.altura||'',pet.espaco||'',qsmsNFora(a),(a.forms||[]).flatMap(f=>(f.alertas||[]).map(x=>f.tipo+': '+x)).join(' · '),
+      a.verif_status?QSMS_VERIF[a.verif_status][0]:'A verificar',a.verif_obs||'',a.verif_por_nome||'',a.verif_em?new Date(a.verif_em).toLocaleString('pt-BR'):'',a.lat??'',a.lon??'',a.id]); });
+  exportarXlsx('qsms_atividades_'+$('#qsDe').value+'_a_'+$('#qsAte').value+'.xlsx','Atividades',aoa); }
+async function qsmsDetalhe(id){ const v=$('#qsView'); const a=qsmsAt().find(x=>x.id===id); if(!a){ qsmsDet=null; return qsmsRender(); }
+  v.innerHTML='<p class="sub">Carregando…</p>';
+  let x={equipe:[],verificacoes:[]}; try{ const {data,error}=await sb.rpc('app_qsms_atividade_ver',{p_atividade:id}); if(error)throw error; x=data||x; }catch(e){ toast('⚠ '+(e.message||e)); }
+  const vr=QSMS_VERIF[a.verif_status];
   let h=`<button class="btn ghost" id="qsVoltar" style="margin:0 0 10px;width:auto;padding:8px 14px">‹ Voltar</button>
-    <div class="segcard"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">${f.tipo}</b><span class="segpill" style="background:${SEG_ST_COR[f.status]||'#888'}">${SEG_ST_LBL[f.status]||f.status}</span>${vr?`<span class="segpill" style="background:${vr[1]}">${vr[0]}</span>`:''}</div>
-    <div class="segkv"><b>Atividade</b><span>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</span><b>Serviço</b><span>${segH(a.descricao||'—')}</span><b>OS</b><span>${segH(a.os_sigos||'—')}</span>
-    <b>Local</b><span>${segH(segLocalTxt(a)||'—')}</span><b>Emitido</b><span>${segFmt(f.emitido_em)} · ${segH(f.usuario_nome||'')}</span><b>Consórcio</b><span>${segH(CONSORCIO_NOME[a.consorcio]||a.consorcio||'—')}</span></div>
-    ${(f.alertas||[]).length?`<div class="segerr" style="margin-top:8px"><b>Alertas:</b> ${(f.alertas||[]).map(segH).join(' · ')}</div>`:''}
-    <div class="segacts" style="margin-top:10px"><button class="btn" id="qsPdf">📄 Ver formulário completo</button>${(d.irmaos||[]).filter(x=>x.id!==f.id).map(x=>`<button class="btn ghost" data-qsirm="${x.id}">${x.tipo} · ${SEG_ST_LBL[x.status]||x.status}</button>`).join('')}</div></div>`;
-  h+=`<div class="sec">Verificação QSMS</div><div class="segcard">${f.verif_status?`<div class="sub" style="margin-bottom:6px">Atual: <b>${vr[0]}</b> — ${segH(f.verif_por_nome||'')} em ${segFmt(f.verif_em)}${f.verif_obs?('<br>'+segH(f.verif_obs)):''}</div>`:''}
-    <div class="seg" id="qsVer">${Object.entries(QSMS_VERIF).map(([k,[l]])=>`<button type="button" data-ver="${k}" class="${f.verif_status===k?'sel':''}">${l}</button>`).join('')}</div>
-    <textarea id="qsVerObs" rows="2" placeholder="Observação (obrigatória p/ ressalva ou não conformidade)" style="margin-top:8px">${segH(f.verif_obs||'')}</textarea><button class="btn" id="qsVerOk" style="margin-top:8px">Salvar verificação</button>
-    <p class="sub" style="font-size:12px;margin:6px 0 0">"Não conforme" avisa quem preencheu.</p></div>`;
+    <div class="segcard" style="border-left:4px solid ${qsmsCor(a)}"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</b><span class="segpill" style="background:${qsmsCor(a)};margin-left:auto">${vr?vr[0]:'A verificar'}</span></div>
+    <div class="segkv"><b>Serviço</b><span>${segH(a.descricao||'—')}</span><b>OS</b><span>${segH(a.os_sigos||'—')}</span><b>Local</b><span>${segH(segLocalTxt(a)||'—')}</span>
+    <b>Data</b><span>${segFmt(a.iniciada_em)}</span><b>Responsável</b><span>${segH(a.usuario_nome||'—')}</span><b>Consórcio</b><span>${segH(CONSORCIO_NOME[a.consorcio]||a.consorcio||'—')}</span></div>
+    <div class="segacts" style="margin-top:10px"><button class="btn" id="qsPdf">📄 PDF da atividade</button></div></div>`;
+  h+='<div class="sec">Formulários</div>'+(a.forms||[]).map(f=>`<div class="segcard"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>${f.tipo}</b><span class="segpill" style="background:${SEG_ST_COR[f.status]||'#888'}">${SEG_ST_LBL[f.status]||f.status}</span><span class="sub" style="font-size:12px">${segFmt(f.emitido_em)}${f.tipo==='PT'&&f.altura?(' · '+segH(f.altura)+' m'):''}${f.tipo==='PET'?(' · '+segH(f.espaco||'')+' · '+f.n_medicoes+' leitura(s)'+(f.n_fora?(', '+f.n_fora+' fora'):'')):''}</span></div>${(f.alertas||[]).length?`<div class="sub" style="font-size:12.5px;color:var(--bad);margin-top:4px">⚠ ${(f.alertas||[]).map(segH).join(' · ')}</div>`:''}</div>`).join('');
+  h+='<div class="sec">Equipe</div><div class="segcard">'+((x.equipe||[]).map(p=>`<div style="padding:5px 0;border-bottom:1px solid var(--line)"><b style="font-size:13.5px">${segH(p.nome)}</b> <span class="sub" style="font-size:12px">${segH([p.documento,p.funcao].filter(Boolean).join(' · '))}</span><div class="sub" style="font-size:12px">${(p.papeis||[]).map(s=>{ const [pp,t]=String(s).split('|'); return segH((SEG_PAPEL[pp]||pp)+' ('+t+')'); }).join(' · ')}</div></div>`).join('')||'<p class="sub">—</p>')+'</div>';
+  h+=`<div class="sec">Verificação QSMS (da atividade inteira)</div><div class="segcard">${vr?`<div class="sub" style="margin-bottom:6px">Atual: <b style="color:${vr[1]}">${vr[0]}</b> — ${segH(a.verif_por_nome||'')} em ${segFmt(a.verif_em)}${a.verif_obs?('<br>'+segH(a.verif_obs)):''}</div>`:''}
+    <div class="seg" id="qsVer">${Object.entries(QSMS_VERIF).map(([k,[l]])=>`<button type="button" data-ver="${k}" class="${a.verif_status===k?'sel':''}">${l}</button>`).join('')}</div>
+    <textarea id="qsVerObs" rows="2" placeholder="Observação (obrigatória p/ ressalva ou não conformidade)" style="margin-top:8px">${segH(a.verif_obs||'')}</textarea><button class="btn" id="qsVerOk" style="margin-top:8px">Salvar verificação</button>
+    <p class="sub" style="font-size:12px;margin:6px 0 0">"Não conforme" avisa quem preencheu.</p>
+    ${(x.verificacoes||[]).length>1?`<div class="sub" style="font-size:12px;margin-top:8px"><b>Histórico:</b> ${(x.verificacoes||[]).slice(1).map(q=>segFmt(q.quando)+' — '+((QSMS_VERIF[q.status]||[])[0]||q.status)+(q.obs?(' ('+segH(q.obs)+')'):'')+(q.por?(' · '+segH(q.por)):'')).join(' · ')}</div>`:''}</div>`;
   v.innerHTML=h;
   $('#qsVoltar').onclick=()=>{ qsmsDet=null; qsmsRender(); };
-  $('#qsPdf').onclick=()=>segPdf(id);
-  v.querySelectorAll('[data-qsirm]').forEach(b=>b.onclick=()=>{ qsmsDet=b.dataset.qsirm; qsmsRender(); });
-  let verSel=f.verif_status||''; v.querySelectorAll('[data-ver]').forEach(b=>b.onclick=()=>{ verSel=b.dataset.ver; v.querySelectorAll('[data-ver]').forEach(x=>x.classList.toggle('sel',x===b)); });
+  $('#qsPdf').onclick=()=>segPdfAtividade((a.forms||[]).map(f=>f.id));
+  let verSel=a.verif_status||''; v.querySelectorAll('[data-ver]').forEach(b=>b.onclick=()=>{ verSel=b.dataset.ver; v.querySelectorAll('[data-ver]').forEach(z=>z.classList.toggle('sel',z===b)); });
   $('#qsVerOk').onclick=async()=>{ if(!verSel) return toast('Escolha o resultado'); const obs=$('#qsVerObs').value.trim(); if(verSel!=='conforme'&&!obs) return toast('Descreva a ressalva / não conformidade');
-    try{ const {error}=await sb.rpc('app_qsms_verificar',{p_formulario:id,p_status:verSel,p_obs:obs||null}); if(error)throw error; toast('✓ Verificação salva');
-      const it=(qsmsDados.itens||[]).find(x=>x.id===id); if(it){ it.verif_status=verSel; it.verif_obs=obs; } qsmsDetalhe(id); }catch(e){ toast('⚠ '+(e.message||e)); } }; }
+    try{ const {error}=await sb.rpc('app_qsms_verificar',{p_atividade:id,p_status:verSel,p_obs:obs||null}); if(error)throw error; toast('✓ Verificação salva');
+      Object.assign(a,{verif_status:verSel,verif_obs:obs||null,verif_em:new Date().toISOString(),verif_por_nome:(ME&&ME.nome)||a.verif_por_nome}); qsmsDetalhe(id); }catch(e){ toast('⚠ '+(e.message||e)); } }; }
 // Acesso ao QSMS (engrenagem admin) — espelho do dev_acesso; cargos de QSMS e admin entram sempre
 let _qsmsAcUsers=[];
 async function qsmsAcInit(){ if(!(ME&&ME.is_admin)){ irPara('home'); return; }
