@@ -73,6 +73,14 @@
   de sobra). Testado com harness fora do app (mede `getBoundingClientRect` real, sem o `min-height:100%`
   do `.wrap` mascarar a medida) — estes valores dão ~36px de folga no mesmo 375×667.
 
+### Login — tela `#login` (redesenho 2026-10-27)
+- Ilustração de fundo escolhida pelo tamanho da tela (CSS, sem JS): **celular/estreito** = `public/login/login-celular.webp`
+  (vertical; `background-size:100% auto` ancorada embaixo + `background-attachment:local`; `.lg-box` reserva
+  `margin-bottom:calc(100vw*.78)` p/ os personagens nunca ficarem atrás do formulário — em tela baixa a página rola);
+  **notebook** (`min-width:860px` **e** `min-aspect-ratio:4/3`) = `login-notebook.webp` (cover), formulário à esquerda.
+- Campos com ícone (e-mail/cadeado) e botão 👁 `#lgOlho` (mostrar/ocultar senha). IDs `#email/#senha/#entrar/#loginErr` mantidos.
+- Login continua sempre em tema claro.
+
 ### Perfil / papéis — objeto `ME`
 - Carregado por `sb.rpc('app_me')` → `ME = {id,nome,email,cargo,funcao,is_admin,is_almoxarife,pode_aprovar,equipes[]}`.
 - `funcao ∈ {admin, campo, aprovador, almoxarife, frotas, qsms}`. `pode_aprovar` = aprovador **ou**
@@ -1689,6 +1697,11 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
   **Não** muda `frota_veiculo.status` (a data pode ser futura e travaria o checklist). INSERT preventiva → aviso ao
   colaborador + `frota_gestores_de` com a data (`frota_manutencao`). Tela `preventiva` (`frotasRenderPreventiva`, Equipe
   administrativa › "Manutenção preventiva") com o formulário + lista das preventivas.
+  **Horário/local/obs (2026-10-23, `docs/migracao_frota_preventiva_local.sql`):** igual ao agendamento de lavagem — colunas
+  `frota_manutencao.horario_agendado`/`local_agendado`/`obs_agendamento`; `app_frota_preventiva_agendar` ganhou
+  `p_horario,p_local,p_obs` (assinatura antiga **dropada**, §0.6; local obrigatório só na tela). O aviso da preventiva leva
+  data/horário/local/serviço/obs; `app_frota_manutencoes_listar`/`app_frota_minhas_manutencoes` devolvem os 3 campos
+  (`frManutAgendaInfo` mostra na lista da Frotas e na Manutenção do colaborador).
 - **Checklist** — INSERT de `frota_manutencao` com `tipo_problema='checklist'` agora avisa também `frota_responsaveis()`
   (link `frota_chk_equipe` → tela Checklists da equipe), além do gestor. **Corretiva aprovada** pelo gestor avisa
   `frota_responsaveis()` que há manutenção a agendar (link `frota_manutencao_fila`).
@@ -3020,3 +3033,20 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
 - Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
   foram testadas com rollback E2E (§4 do CLAUDE.md).
+
+## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (admin-only, 2026-10-27) — `docs/migracao_avisos.sql`
+
+- **Admin** (Home › 🧰 Suporte › 📢 Avisos, `#homeAvisos`, gate `ME.is_admin` + RPC `aviso_eh_admin()`): cria/edita aviso com
+  título, texto (`**negrito**` + quebras), imagem (upload → bucket `fotos-campo/avisos/` via `uploadFoto2`), texto do botão,
+  destino do botão (`AV_LINKS` = mesmos links de notificação, roteados por `supGoAct`), público (`todos` |
+  `condutores_vinculados`), período (de/até) e ativo; na lista, botão **⏸ Desativar / ▶ Ativar** (mesma RPC, só inverte `ativo`). **Pré-visualizar** mostra o pop-up como o usuário verá.
+- **Usuário:** `avPopAbrir()` roda **1x por carregamento do app**, logo após o `app_me` (em `mostrar`), chama
+  `app_avisos_ativos()` e exibe os avisos vigentes em sequência (`#avPop`, overlay com ✕; clicar fora fecha).
+- **Imagem:** `./...` = arquivo do site (`public/avisos/`), `http...` = URL, senão = caminho no bucket (`avImg`). Na edição, "Remover imagem" manda `p_imagem='-'` (null/'' = manter a atual).
+- **Destino "Notificações":** `supGoAct('notificacoes')` abre a tela `notificacoes` (antes caía no hub do Almoxarifado).
+- **Lembretes push** (`lembrete='checklist_frota'`): `aviso_lembretes_run(slot)` via **pg_cron** `aviso-lembrete-1..5`
+  (08h/10h/12h/14h/16h BRT, seg–sex) — notifica **só quem tem veículo vinculado e não fez o checklist do dia**, com o texto do
+  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
+- **Grants:** `aviso_eh_admin()`/`aviso_tem_veiculo(uuid)` são internos (revogados de anon/authenticated); `aviso_lembretes_run` só o cron.
+- **Tabela** `public.app_aviso` (RLS ligada, sem policy — só RPC). 1º aviso (seed): "Checklist diário do veículo", até
+  30/10/2026, pop-up p/ todos, imagem `./avisos/checklist-frota-2026-10.webp`.
