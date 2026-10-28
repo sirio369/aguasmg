@@ -1,3 +1,7 @@
+-- ⚠️ JÁ APLICADA (2026-10-01) e SUPERADA por migracao_aprovacao_por_aprovador.sql. NÃO RODAR DE NOVO:
+--    as definições abaixo usam sup_pode_aprovar/sup_epi_gestor (qualquer aprovador aprova pedido de qualquer pessoa)
+--    e desfariam a regra do Aprovador 1/2 (sup_e_aprovador_de, §5.0). O bloqueio de autoaprovação hoje mora em
+--    sup_e_aprovador_de (+ app_condutor_aprovar / app_frota_manutencao_aprovar). Fica só como histórico.
 -- Migração: bloqueia_autoaprovacao — ninguém aprova o próprio pedido (auditoria 2026-10-01: 7 autoaprovações).
 -- Aprovar: Insumos/Ferramentas (sup_aprovar), EPI (sup_epi_aprovar), Troca de EPI (sup_epi_troca_aprovar),
 -- Manutenção de frota (app_frota_manutencao_aprovar, inclusive admin) e Condutor/CNH (app_condutor_aprovar, inclusive admin).

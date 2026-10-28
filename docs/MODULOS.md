@@ -122,6 +122,12 @@
 - Bucket público **`fotos-campo`**; `fotoURL(path)` monta a URL pública (`SBASE + path`).
 - Pastas por módulo (`pasta` do item): `pressao`, `logger`, `abertura`, `captacao`, `ocorrencia`,
   `vrp` (upload direto via `vrpUpload`), `epi` (`epiUpload`). Bucket `biblioteca` é separado (PDFs).
+- **Pastas com documento pessoal não são listáveis (2026-10-28, `docs/migracao_storage_cnh_privado.sql`):** a policy
+  `fotos_campo_auth_select` deixa `cnh/` (CNH da Frota) e `pessoas/` (cartas da antiga Gestão de Pessoas) visíveis pela API
+  só para quem subiu o arquivo (`owner_id`) e admin; as demais pastas seguem legíveis por qualquer logado. Upload com
+  `upsert:true` continua funcionando (a linha nova é do próprio usuário). A exibição não muda: o app só usa a URL pública.
+  O bucket segue **público** — quem tiver o caminho exato abre a imagem (o caminho só sai pelas RPCs). **Pasta nova com
+  documento pessoal → acrescente o prefixo na policy** (ou use bucket privado + URL assinada).
 
 ### Relatórios PDF — `REL_CSS` / overlay `#relatorio`
 - Padrão: monta HTML num overlay `#relatorio` e chama `window.print()` (CSS `@media print`).
