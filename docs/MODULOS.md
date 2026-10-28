@@ -73,6 +73,14 @@
   de sobra). Testado com harness fora do app (mede `getBoundingClientRect` real, sem o `min-height:100%`
   do `.wrap` mascarar a medida) — estes valores dão ~36px de folga no mesmo 375×667.
 
+### Login — tela `#login` (redesenho 2026-10-27)
+- Ilustração de fundo escolhida pelo tamanho da tela (CSS, sem JS): **celular/estreito** = `public/login/login-celular.webp`
+  (vertical; `background-size:100% auto` ancorada embaixo + `background-attachment:local`; `.lg-box` reserva
+  `margin-bottom:calc(100vw*.78)` p/ os personagens nunca ficarem atrás do formulário — em tela baixa a página rola);
+  **notebook** (`min-width:860px` **e** `min-aspect-ratio:4/3`) = `login-notebook.webp` (cover), formulário à esquerda.
+- Campos com ícone (e-mail/cadeado) e botão 👁 `#lgOlho` (mostrar/ocultar senha). IDs `#email/#senha/#entrar/#loginErr` mantidos.
+- Login continua sempre em tema claro.
+
 ### Perfil / papéis — objeto `ME`
 - Carregado por `sb.rpc('app_me')` → `ME = {id,nome,email,cargo,funcao,is_admin,is_almoxarife,pode_aprovar,equipes[]}`.
 - `funcao ∈ {admin, campo, aprovador, almoxarife, frotas, qsms}`. `pode_aprovar` = aprovador **ou**

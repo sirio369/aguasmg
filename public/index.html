@@ -112,6 +112,26 @@ nav .ic{font-size:19px}
 /* login sempre em tema claro (logo transparente legível em qualquer aparelho) */
 body:has(#login:not(.hidden)){background:#f6f8fb}
 #login{--bg:#f6f8fb;--card:#ffffff;--ink:#15181d;--mut:#5b6472;--line:#dfe3e9;--acc:#0e639c;--acc-ink:#fff;--bad:#b3261e;--bad-bg:#fbe7e6}
+/* Login com ilustração (2026-10-27): celular = imagem vertical (formulário em cima); notebook = imagem horizontal (formulário à esquerda) */
+#login{position:fixed;inset:0;overflow:auto;display:flex;flex-direction:column;align-items:center;
+  background:#ebf8fe url('./login/login-celular.webp') center bottom/100% auto no-repeat;background-attachment:local}
+/* reserva embaixo do formulário a faixa dos personagens (~metade inferior da imagem vertical): em tela baixa a página rola em vez de sobrepor */
+#login .lg-box{width:100%;max-width:400px;padding:7vh 24px 24px;margin-bottom:calc(100vw * .78)}
+#login .logo-h{width:300px;max-width:88%;margin:0 auto 26px}
+#login label{color:#3d4a5c}
+.lg-field{position:relative}
+.lg-field input{padding-left:46px;background:rgba(232,240,252,.92);border-color:#d5e0ee}
+.lg-field input#senha{padding-right:46px}
+.lg-ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#5b6b82;display:flex;pointer-events:none}
+.lg-eye{all:unset;cursor:pointer;position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#5b6b82;display:flex;padding:4px}
+.lg-eye.on{color:var(--acc)}
+#login .btn{margin-top:18px;background:#0f6399;border-color:#0f6399;border-radius:12px}
+@media (min-width:860px) and (min-aspect-ratio:4/3){
+  #login{background-image:url('./login/login-notebook.webp');background-position:right bottom;align-items:flex-start;justify-content:center}
+  #login{background-size:cover;background-attachment:scroll}
+  #login .lg-box{max-width:460px;padding:0 0 0 clamp(32px,11vw,220px);margin-bottom:0}
+  #login .logo-h{width:340px;margin:0 0 30px}
+}
 .seg button[disabled]{opacity:.4}
 .pqlbl{background:rgba(20,24,29,.82);color:#fff;border:none;font-weight:600;font-size:12px;box-shadow:none;padding:3px 7px;border-radius:6px}
 .pqlbl:before{display:none!important}
@@ -321,14 +341,16 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 </head>
 <body>
 
-<div id="login" class="center hidden">
-  <img class="logo-h" src="./logo.png" alt="AcquaHub — Informação que conecta"/>
-  <label for="email">E-mail</label>
-  <input id="email" type="email" autocomplete="username" inputmode="email"/>
-  <label for="senha">Senha</label>
-  <input id="senha" type="password" autocomplete="current-password"/>
-  <button id="entrar" class="btn">Entrar</button>
-  <div id="loginErr" class="err"></div>
+<div id="login" class="hidden">
+  <div class="lg-box">
+    <img class="logo-h" src="./logo.png" alt="AcquaHub — Informação que conecta"/>
+    <label for="email">E-mail</label>
+    <div class="lg-field"><span class="lg-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><input id="email" type="email" autocomplete="username" inputmode="email"/></div>
+    <label for="senha">Senha</label>
+    <div class="lg-field"><span class="lg-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><input id="senha" type="password" autocomplete="current-password"/><button type="button" id="lgOlho" class="lg-eye" title="Mostrar senha" aria-label="Mostrar senha"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+    <button id="entrar" class="btn">Entrar</button>
+    <div id="loginErr" class="err"></div>
+  </div>
 </div>
 
 <div id="app" class="wrap hidden">
@@ -10028,6 +10050,9 @@ $('#entrar').addEventListener('click',async()=>{
   if(error) $('#loginErr').textContent='E-mail ou senha inválidos';
 });
 $('#senha').addEventListener('keydown',e=>{if(e.key==='Enter')$('#entrar').click();});
+// login: mostrar/ocultar senha
+if($('#lgOlho')) $('#lgOlho').addEventListener('click',()=>{ const i=$('#senha'), on=i.type==='password'; i.type=on?'text':'password'; $('#lgOlho').classList.toggle('on',on); $('#lgOlho').title=on?'Ocultar senha':'Mostrar senha'; });
+
 $('#btnSair').addEventListener('click',()=>sb.auth.signOut());
 $('#btnSync').addEventListener('click',async()=>{
   if(!navigator.onLine) return toast('Sem conexão');
