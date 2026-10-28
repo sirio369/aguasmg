@@ -1037,7 +1037,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   `sup_epi_meus`, `sup_epi_devolver`, `sup_epi_substituir`, `sup_epi_gestao_colaborador(es)`,
   `sup_epi_ficha` (ficha consolidada). Fotos via `epiUpload` (pasta `epi`).
 - **Gestão de EPI liberada também por CARGO (2026-09), não só por acesso (`funcao`).** Os cards
-  **Aprovar EPI** (`epi_aprovar`) e **EPIs por colaborador** (`epi_painel`) são liberados pra
+  **Aprovar EPI** (`epi_aprovar`) e **EPIs por colaborador** (`epi_painel`; a mesma tela também abre no QSMS › EPI —
+  `supVEpiPainel(root,pre)` desenha no container recebido, §18) são liberados pra
   aprovador/admin **ou** para quem tem o `perfil.cargo_id` de **Técnico de Segurança do Trabalho**,
   **Técnico de Qualidade** ou **Coordenador de QSMSS** — mesmo com `funcao='campo'`. Função
   `"9 - suprimentos".sup_epi_gestor(uid)` (`sup_pode_aprovar(uid) OR cargo em (...)`, casado por
@@ -1909,7 +1910,7 @@ frontend:** `app_condutor_solicitar/pendentes/aprovar`, `app_frota_condutores_li
 pelo fluxo de cadastro-pelo-gestor).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
 **Segurança do Trabalho / QSMS (§18):** `app_seg_registrar`, `app_seg_local`, `app_seg_minhas`, `app_seg_ver`,
-`app_seg_pessoas`, `app_qsms_listar`, `app_qsms_atividade_ver`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`.
+`app_seg_pessoas`, `app_qsms_listar`, `app_qsms_atividade_ver`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`, `app_qsms_epi_painel`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
 > join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1;` (via MCP).
@@ -2901,7 +2902,7 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
 
-## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` / `qsms_acesso` (2026-10-28)
+## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` (hub) / `qsms_ind` / `qsms_form` / `qsms_epi_col` / `qsms_epi_painel` / `qsms_acesso` (2026-10-28)
 
 Substitui os formulários de papel **APR** (modelo COPASA PRT-CSMG-2023_003), **PT de trabalho em altura**
 (FOR_PG_22 rev 00, do consórcio — o mesmo modelo serve as duas ZAs, o PDF troca o nome do consórcio) e **PET de
@@ -2947,17 +2948,33 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 
 **Gestão — `qsms` (Home › 🧰 Suporte, card 🦺, gate `ME.qsms`):** `ME.qsms` = admin **ou** engrenagem
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
-(`"16 - qsms".qsms_pode`). ⚙️ (admin) → `qsms_acesso` (`app_qsms_acesso_listar/_set`). **A unidade é a atividade**
-(APR + PT/PET), com **uma verificação por atividade** (2026-10-28). Período + consórcio no topo; 2 abas:
-- **Painel** (`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida, leituras de gás fora, com alertas,
-  a verificar, conformes, com ressalva, não conformes); **"A verificar — mais antigas primeiro"** (fila de trabalho);
-  atividades por dia, por tipo de intervenção, por responsável; riscos das APRs.
-- **Atividades** (`qsmsLista`/`qsmsCardHtml`): segmento **A verificar / Não conformes / Verificadas / Todas** (contagens
+(`"16 - qsms".qsms_pode`). ⚙️ (admin, no hub) → `qsms_acesso` (`app_qsms_acesso_listar/_set`).
+**Hub `qsms` em categorias (espelha o Almoxarifado, 2026-10-28):** **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
+`qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_col` (EPI por colaborador) e `qsms_epi_painel` (Painel de EPI). Cada
+tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`/`qf`/`qe`; `qsmsPeriodo`/`qsmsFiltros`/
+`qsmsArgs`). Em APR e derivados **a unidade é a atividade** (APR + PT/PET), com **uma verificação por atividade**.
+- **Indicadores** (`qsms_ind`, `qsmsIndInit`/`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida,
+  leituras de gás fora, com alertas) e verificação (a verificar, conformes, com ressalva, não conformes — **tocar num tile
+  abre Formulários já filtrado no mesmo período/consórcio**); atividades por dia, por tipo, por responsável; riscos.
+- **Formulários** (`qsms_form`, `qsmsFormInit`/`qsmsLista`/`qsmsCardHtml`; filtros guardados em `qsmsFF`, sobrevivem ao
+  trocar período/consórcio): segmento **A verificar / Não conformes / Verificadas / Todas** (contagens
   respeitam os demais filtros); filtros tipo de intervenção, responsável (quem preencheu), formulários (com PT / com PET
   / só APR), "só com alerta ou impedimento", busca (OS, endereço, bairro, pessoa); **Lista / Mapa** (cor = verificação)
   / **XLSX** (1 linha por atividade). Detalhe (`qsmsDetalhe` + `app_qsms_atividade_ver`): dados, formulários com
   situação/alertas/leituras, **equipe consolidada** (papéis por formulário), **PDF da atividade** e **verificação**
   Conforme/Com ressalva/Não conforme (`app_qsms_verificar(p_atividade,…)`; obs obrigatória fora de "conforme"; histórico).
+- **EPI por colaborador** (`qsms_epi_col`, `qsmsEpiColInit`): **a mesma tela do Almoxarifado** — `supVEpiPainel(root,pre)`
+  desenha em `#qcView` (no Almoxarifado continua em `#supView`); `pre={uuid,nome}` pré-seleciona (vindo do painel, inclusive
+  quem nunca recebeu EPI) e o "‹ Voltar" (`#qcBack`) volta ao Painel de EPI. Ficha e comprovantes iguais.
+- **Painel de EPI** (`qsms_epi_painel`, `qsmsEpiInit`/`qsmsEpiRender`, RPC `app_qsms_epi_painel(p_de,p_ate,p_consorcio)`;
+  colaboradores = perfis ativos, consórcio pelo perfil): situação agora (ativos, com EPI em posse, nunca receberam, itens
+  em posse/vencidos/vencem em 30 d), cesta do cargo (com cesta, completa, cargo sem cesta — **referência**, porque a cesta
+  lista alternativas e quase ninguém a tem completa), fluxo pendente (aguardando aprovação/separação/retirada, em falta,
+  trocas e devoluções pendentes), movimentação no período (entregas/trocas/devoluções + por dia), EPIs mais entregues,
+  itens da cesta mais faltantes, tabela por área (vencido / vence 30 d / nunca receberam) e **lista de colaboradores**
+  com chips (vencido / vence 30 d / nunca receberam / cesta faltando / todos) + busca + XLSX — tocar abre o EPI por
+  colaborador. As RPCs de leitura de EPI (`sup_epi_gestao_colaboradores`, `sup_epi_gestao_colaborador`, `sup_epi_ficha`)
+  passaram a aceitar também `qsms_pode` (quem tem a engrenagem do QSMS).
 
 **Backend — schema `"16 - qsms"` (app-only, RLS deny-all, só RPC definer, nada pode ser apagado — trigger
 `qsms_sem_delete`):** `qsms_atividade` (geom 31983, `endereco`/`bairro`/`municipio`/`consorcio` pela coordenada,
