@@ -1908,9 +1908,8 @@ treinamento_agendar/baixar, treinamentos_listar), e, **nesta rodada (2026-09, 3�
 frontend:** `app_condutor_solicitar/pendentes/aprovar`, `app_frota_condutores_listar` (substituídas
 pelo fluxo de cadastro-pelo-gestor).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
-**Segurança do Trabalho / QSMS (§18):** `app_seg_registrar`, `app_seg_evento`, `app_seg_minhas`, `app_seg_ver`,
-`app_seg_pessoas`, `app_seg_os_info`, `app_seg_tratativas`, `app_seg_tratativa_concluir`, `app_qsms_listar`,
-`app_qsms_verificar`, `app_qsms_tratativa_criar/_cancelar`, `app_qsms_tratativas`, `app_qsms_acesso_listar/_set`.
+**Segurança do Trabalho / QSMS (§18):** `app_seg_registrar`, `app_seg_local`, `app_seg_minhas`, `app_seg_ver`,
+`app_seg_pessoas`, `app_qsms_listar`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
 > join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1;` (via MCP).
@@ -2902,87 +2901,77 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
 
-## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `seg_acomp` / `qsms` / `qsms_acesso` (2026-10-28)
+## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` / `qsms_acesso` (2026-10-28)
 
 Substitui os formulários de papel **APR** (modelo COPASA PRT-CSMG-2023_003), **PT de trabalho em altura**
 (FOR_PG_22 rev 00, do consórcio — o mesmo modelo serve as duas ZAs, o PDF troca o nome do consórcio) e **PET de
-espaço confinado** (COPASA FOR-PES_131-CSMG). Dois públicos:
+espaço confinado** (COPASA FOR-PES_131-CSMG). **Formulário é só preenchimento**: sai *emitido* (ou *impedido*) e
+pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupção ou tratativas; ajuste de 28/10/2026).
 
 **Campo — `seg` (Home › 🛠️ Execução, card ⛑️, sem gate):**
-- **Atividade** = cabeçalho comum (OS SIGOS, tipo de intervenção, serviço, endereço, município, unidade, GPS,
-  data/hora, usuário). Nasce com a **APR**; **PT/PET só saem de uma APR** que tenha "requer PT/PET = Sim"
-  (botões "+ PT" / "+ PET" no card da atividade). Várias PETs por atividade (a PET vale p/ **uma** entrada).
-- **APR** (`segAprHtml`): busca da OS (`app_seg_os_info` → preenche serviço/endereço/município e mostra a
-  distância GPS × OS); **sugestões por tipo de intervenção** (`SEG_TEMPLATE`: fases, riscos já marcados "Sim",
-  EPIs — editáveis); 13 riscos (`SEG_RISCOS`) — risco "Sim" exige marcar **"Medida de controle aplicada"**;
-  `r2` (local sinalizado?) e `r6` (ferramentas ok?) são **invertidas**: "Não" **bloqueia a emissão**; EPIs;
-  requer PT/PET (Sim/Não/NA); **foto obrigatória da sinalização**; assinatura do responsável + de cada executante.
-- **PET** (`segPetHtml`): equipe herdada dos executantes da APR; 11 ações preliminares (item 1 "APR disponível"
-  já vem Sim) — **um "Não" impede a entrada**; vigia ≠ autorizado e mínimo de 2 trabalhadores; bloqueios;
-  detector (identificação + **foto obrigatória**); insuflação ≥ 10 min; **tabela de gases** P1–P3 vertical (+ H1/H2
-  horizontal opcional) com semáforo (`SEG_GAS`: O₂ >19,5 e <23% · LIE <10% · CO <39 ppm · H₂S <8 ppm). Leitura
-  fora → banner vermelho + "↻" cria nova leitura do ponto (a antiga fica como **ocorrência**). Liberação exige a
-  última leitura de cada ponto dentro do limite + assinatura de entrada do supervisor.
-- **PT** (`segPtHtml`): altura, mão de obra (consórcio/contratada), meio de acesso + sistema anti-queda (chips);
-  checklist de **42 itens** em 13 blocos (`SEG_PT_BLOCOS`) — os blocos de outro meio de acesso viram NA sozinhos
-  e somem; item p7 (análise de risco) já vem Sim; **um "Não" impede**; vistos dos participantes, emissor e liberador.
-- Com bloqueio de segurança e tudo preenchido aparece **"Registrar PT/PET impedida"** (2 toques) — fica registrado
-  e avisa o QSMS. Liberada → abre o **acompanhamento** (`seg_acomp`): medição (gás fora → **interrompe** a PET),
-  troca de vigia, direito de recusa, interromper, encerrar (PET exige assinatura de encerramento do supervisor).
-- **Validação ao vivo** (`segPendencias` → lista "Falta preencher" + "⛔ bloqueios"); botão só habilita sem pendência.
-  Nome escolhido da lista (`app_seg_pessoas`, datalist em cache) preenche matrícula/cargo; trocar o nome troca o que
-  foi preenchido automaticamente, mas mantém o que a pessoa digitou (`_autoDoc`/`_autoFun`).
-- **Rascunho** em IndexedDB `seg_local.draft` (inclui fotos como Blob e assinaturas como dataURL) — sobrevive ao
-  Android recarregar a webview na câmera; banner "Continuar / Descartar" na tela `seg`.
-- **Offline:** tudo pela fila (`enviarOuEnfileirar`/`segEnviar`). Ids de fila **`seg-<timestamp>`** mantêm a ordem
-  (a fila sai em ordem de chave: APR → PET → medição → encerramento); se já há item `seg-` na fila, o novo entra
-  atrás (`segEnviar`). Assinaturas e fotos vão no **`item.anexos`** (ver §1 Envio) → `p_anexos jsonb {chave: path}`,
-  pasta `seg/`. Cópia local de cada formulário em `seg_local.docs` → lista "Minhas atividades" (mescla servidor +
-  local; `⏳` = na fila), ações e **PDF sem sinal**.
-- **PDF** (`segPdf`/`segDocHtml`, overlay `#relatorio` + `SEG_REL_CSS`): layout fiel ao papel (checklists em tabela,
-  medições com "OCORRÊNCIA", assinaturas, fotos, eventos, alertas, verificação QSMS). Online lê `app_seg_ver`; sem
-  sinal usa a cópia local (rodapé diz "cópia do aparelho").
-- **Tratativas para você** (topo de `seg`): `app_seg_tratativas` + concluir (`app_seg_tratativa_concluir`).
+- **Atividade** = cabeçalho comum: tipo de intervenção (`SEG_TIPOS`: VRP separado em instalação/substituição/
+  manutenção; válvula limítrofe no lugar de DMC — `dmc`/`vrp` antigos só têm rótulo em `SEG_TIPO_LEGADO`), OS SIGOS
+  (texto livre, **sem busca** — a OS ainda não está na base quando o campo preenche), serviço, GPS travado, data/hora,
+  usuário. **Endereço (rua mais próxima), bairro, município e consórcio vêm da coordenada** — prévia online por
+  `app_seg_local` (card `#segLocal`), valor oficial gravado pelo servidor no registro (`qsms_local`). Sem unidade
+  organizacional no formulário (o servidor guarda `perfil.area` em `qsms_atividade.unidade`).
+- **APR** (`segAprHtml`): sugestões por tipo (`SEG_TEMPLATE`: fases, riscos marcados "Sim", EPIs — editáveis);
+  13 riscos (`SEG_RISCOS`) — risco "Sim" exige "Medida de controle aplicada"; `r2`/`r6` invertidas ("Não"
+  bloqueia); EPIs; requer PT/PET; **foto obrigatória da sinalização**. **Assinaturas:** o **responsável é quem
+  preenche** (`segEu()`: nome/matrícula/cargo do cadastro, travados — só assina); **executantes = só o nome,
+  escolhido da lista** (`app_seg_pessoas`, datalist; nome fora da lista não passa) + assinatura.
+- **PT/PET só saem de uma APR** com requer=Sim (botões "+ PT"/"+ PET" na atividade) e **reaproveitam a equipe e as
+  assinaturas da APR** (`segNovo` lê a APR por `segDocCarregar` — local ou `app_seg_ver`; sem a APR no aparelho e sem
+  sinal, não abre). Participante com `apr:true` vai com `assinatura_apr:true` e o servidor copia a assinatura da APR
+  (`qsms_participante.assinatura_apr`).
+  - **PT** (`segPtHtml`): descrição, altura, meio de acesso + sistema anti-queda, checklist de **42 itens** em 13
+    blocos (`SEG_PT_BLOCOS`; blocos de outro meio de acesso viram NA e somem; p7 já vem Sim; **um "Não" impede**).
+    Participantes = executantes da APR (só leitura, "✓ assinatura dada na APR"); emissor = quem preenche (assinatura da
+    APR); **liberador da área = escolhido da lista + assina** (única assinatura nova). Sem "mão de obra".
+  - **PET** (`segPetHtml`): cada executante da APR recebe um papel (**Entra / Vigia / Não participa** — um vigia só,
+    `segPetEquipe`); supervisor de entrada = quem preenche (assinatura da APR); 11 ações preliminares (item 1 já Sim;
+    **um "Não" impede**); bloqueios; detector (identificação + **foto obrigatória**); insuflação ≥ 10 min; gases P1–P3
+    vertical (+ H1/H2) com semáforo (`SEG_GAS`); leitura fora → "↻" nova leitura (a antiga vira ocorrência).
+- Com bloqueio de segurança e tudo preenchido aparece **"Registrar PT/PET impedida"** (2 toques) — avisa o QSMS.
+- **Validação ao vivo** (`segPendencias`); botão "Emitir X" só habilita sem pendência. **Rascunho** em IndexedDB
+  `seg_local.draft`. **Offline:** fila (`segEnviar`, ids `seg-<timestamp>` mantêm APR antes de PT/PET), anexos em
+  `item.anexos` (§1 Envio) → `p_anexos`, pasta `seg/`; cópia local em `seg_local.docs`.
+- **Minhas atividades:** cada formulário é um chip "📄 APR/PT/PET" — **tocar abre o PDF** (`segPdf`; online
+  `app_seg_ver`, sem sinal a cópia local).
+- **PDF** (`segDocHtml`, overlay `#relatorio` + `SEG_REL_CSS`): layout do papel; assinaturas reaproveitadas aparecem
+  como "assinatura dada na APR"; mostra alertas e o histórico de verificações QSMS.
 
 **Gestão — `qsms` (Home › 🧰 Suporte, card 🦺, gate `ME.qsms`):** `ME.qsms` = admin **ou** engrenagem
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
-(`"16 - qsms".qsms_pode`). ⚙️ (admin) → `qsms_acesso` (`app_qsms_acesso_listar/_set`, espelha `dev_acesso`;
-cargo/admin aparecem travados). Filtro de período + consórcio no topo; 3 abas:
-- **Painel** (`qsmsPainel`): KPIs (APR/PT/PET, abertas agora, impedidas/interrompidas, leituras fora, a verificar,
-  não conformes, tratativas abertas/atrasadas, OS não localizada, APR > 300 m da OS); **PT/PET abertas agora**
-  (> 10 h em vermelho = confirmar encerramento); APRs por dia; por tipo de intervenção; por responsável; riscos.
-- **Formulários** (`qsmsLista`): filtros tipo/status/verificação/tipo de intervenção/busca; **Lista / Mapa** (cor =
-  status, ponto menor = APR) / **XLSX**. Detalhe (`qsmsDetalhe`): OS cruzada ao vivo com a base SIGOS + distância,
-  alertas, irmãos da atividade, **verificação** Conforme/Com ressalva/Não conforme (`app_qsms_verificar`, obs
-  obrigatória fora de "conforme"; refazer pode, cada uma vira evento) e **nova tratativa** (`app_qsms_tratativa_criar`).
-- **Tratativas** (`qsmsTrat`): abertas/atrasadas/concluídas/todas (`app_qsms_tratativas`), cancelar com motivo.
+(`"16 - qsms".qsms_pode`). ⚙️ (admin) → `qsms_acesso` (`app_qsms_acesso_listar/_set`). Período + consórcio; 2 abas:
+- **Painel** (`qsmsPainel`): KPIs (APR/PT/PET, PT/PET impedidas, leituras de gás fora, com alertas, a verificar,
+  conformes, com ressalva, não conformes), APRs por dia, por tipo de intervenção, por responsável, riscos, alertas.
+- **Formulários** (`qsmsLista`): filtros tipo/status/verificação/tipo de intervenção/busca; **Lista / Mapa / XLSX**.
+  Detalhe (`qsmsDetalhe`): dados, alertas, irmãos da atividade, PDF e **verificação** Conforme/Com ressalva/Não
+  conforme (`app_qsms_verificar`; obs obrigatória fora de "conforme"; cada verificação vira evento; "não conforme"
+  avisa o autor).
 
-**Backend — schema `"16 - qsms"` (app-only, sem USAGE p/ `gis_*`, RLS deny-all, só RPC definer):**
-`qsms_atividade` (geom 31983, `os_num` gerado de `os_sigos`) · `qsms_formulario` (tipo APR/PT/PET, `modelo`,
-status `emitida|liberada|impedida|encerrada|interrompida`, `respostas jsonb` por código de item, `fotos`,
-`alertas jsonb` + `n_alertas` gerado, `encerramento`, `verif_*`) · `qsms_participante` (papel, pessoa do perfil ou
-terceiro, `assinatura` path, `desde` = troca de vigia) · `qsms_medicao` (fase entrada/monitoramento, `fora`) ·
-`qsms_evento` (trilha append-only) · `qsms_tratativa`. **Nada pode ser apagado** (trigger `qsms_sem_delete` em
-delete/truncate — NR-33 pede guarda da PET por 5 anos). Helpers: `qsms_pode`, `qsms_uuids` (equipe QSMS a avisar),
-`qsms_consorcio` (§0.11), `qsms_gas_fora`, `qsms_pode_form` (autor/participante/QSMS). Coluna nova
-`public.perfil.qsms_acesso`; `app_me` devolve `qsms`.
-RPCs campo: `app_seg_registrar(p_id, p_dados, p_anexos)` (APR/PT/PET; idempotente; cria a atividade se ainda não
-existe; **recalcula status e alertas** — conteúdo inválido não é rejeitado, vira alerta, porque a fila descartaria
-em silêncio), `app_seg_evento(p_id, p_formulario, p_tipo, p_dados, p_anexos)`, `app_seg_minhas`, `app_seg_ver`,
-`app_seg_pessoas` (sem CPF), `app_seg_os_info`, `app_seg_tratativas`, `app_seg_tratativa_concluir`.
-RPCs QSMS: `app_qsms_listar(p_de, p_ate, p_consorcio)` (itens + abertas + contagem de tratativas),
-`app_qsms_verificar`, `app_qsms_tratativa_criar/_cancelar`, `app_qsms_tratativas`, `app_qsms_acesso_listar/_set`.
-**Avisos** (triggers → `sup_notificar`, tipo `qsms`): tratativa nova → responsável (`seg_tratativas`); concluída →
-quem criou (`qsms_tratativas`); formulário não conforme → autor (`seg`); PT/PET **impedida ou interrompida** →
-equipe QSMS menos o ator (`qsms`). `supGoAct` trata `seg`/`seg_tratativas`/`qsms`/`qsms_tratativas`.
+**Backend — schema `"16 - qsms"` (app-only, RLS deny-all, só RPC definer, nada pode ser apagado — trigger
+`qsms_sem_delete`):** `qsms_atividade` (geom 31983, `endereco`/`bairro`/`municipio`/`consorcio` pela coordenada) ·
+`qsms_formulario` (status **`emitida|impedida`**, `respostas jsonb`, `fotos`, `alertas` + `n_alertas`, `verif_*`) ·
+`qsms_participante` (papel, `pessoa_uuid`, `documento`/`funcao` do cadastro, `assinatura`, `assinatura_apr`) ·
+`qsms_medicao` · `qsms_evento` (trilha das verificações). Helpers: `qsms_pode`, `qsms_uuids`, `qsms_consorcio`,
+`qsms_local` (rua ≤ 80 m + bairro + município + ZA), `qsms_gas_fora`, `qsms_pode_form`. `perfil.qsms_acesso`;
+`app_me` devolve `qsms`.
+RPCs: `app_seg_registrar(p_id, p_dados, p_anexos)` (idempotente; cria a atividade se não existe; local pela
+coordenada; matrícula/cargo do perfil; assinatura da APR quando `assinatura_apr`; **recalcula status e alertas** —
+conteúdo inválido vira alerta, não erro, porque a fila descartaria em silêncio), `app_seg_local`, `app_seg_minhas`,
+`app_seg_ver`, `app_seg_pessoas`, `app_qsms_listar`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`.
+**Avisos** (trigger → `sup_notificar`, tipo `qsms`): não conforme → autor (`seg`); PT/PET impedida → equipe QSMS
+menos o ator (`qsms`).
 
 **Cuidados:**
-- Tipos de intervenção e sugestões (`SEG_TIPOS`/`SEG_TEMPLATE`) estão **no código** — não há tela de configuração.
-- A base de OS (`"5 - info_copasa".ordens_servico`) só tem o que a carga diária trouxe: OS recente pode aparecer
-  "não localizada" e virar "localizada" depois (o cruzamento é ao vivo em `app_seg_ver`/`app_qsms_listar`).
-- O consórcio é decidido no servidor; na cópia local (antes de sincronizar) o PDF mostra os dois consórcios.
-- Itens de capacitação/ASO são declarados pela equipe (não há cadastro de aptidão NR-33/NR-35).
-- `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso a este módulo — o acesso é `ME.qsms`.
-- Tela `<main id="qsms">` reaproveita o id da antiga tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
-- Teste de UI sem login: dá para servir uma cópia de `public/` com um script que simula GPS e responde às RPCs
-  (o fluxo inteiro roda sem tocar o banco); as RPCs foram testadas com rollback E2E (§4 do CLAUDE.md).
+- Removidos em 28/10/2026 (ajuste do usuário): tela `seg_acomp`, tratativas (tabela `qsms_tratativa` e RPCs),
+  `app_seg_evento`, `app_seg_os_info`, status `liberada/encerrada/interrompida`, colunas `encerrado_*`/`encerramento`.
+  Registros de teste anteriores foram convertidos (`liberada` → `emitida`).
+- Tipos de intervenção e sugestões estão **no código** — não há tela de configuração.
+- Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
+- `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`
+  reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
+- Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
+  foram testadas com rollback E2E (§4 do CLAUDE.md).
