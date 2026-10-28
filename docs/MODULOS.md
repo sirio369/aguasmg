@@ -2936,7 +2936,10 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 - Com bloqueio de segurança e tudo preenchido aparece **"Registrar PT/PET impedida"** (2 toques) — avisa o QSMS.
 - **Validação ao vivo** (`segPendencias`); botão "Emitir X" só habilita sem pendência. **Rascunho** em IndexedDB
   `seg_local.draft`. **Offline:** fila (`segEnviar`, ids `seg-<timestamp>` mantêm APR antes de PT/PET), anexos em
-  `item.anexos` (§1 Envio) → `p_anexos`, pasta `seg/`; cópia local em `seg_local.docs`.
+  `item.anexos` (§1 Envio) → `p_anexos`, pasta `seg/`; cópia local em `seg_local.docs`. Limpeza da cópia local em
+  `segListar` (só quando a lista do servidor carregou): sai o que já está no servidor há >1 dia, tudo com >5 dias e **o que
+  não está mais no servidor** (apagado lá), desde que não esteja na fila e tenha >15 min — assim uma limpeza feita no
+  banco some também do celular.
 - **Minhas atividades = um bloco por atividade** (APR + PT/PET que saíram dela): chips de status (não clicáveis),
   selo da verificação QSMS quando houver, botões **"📄 PDF da atividade"**, "+ PT", "+ PET".
 - **PDF único da atividade** (`segPdfAtividade(ids)`, overlay `#relatorio` + `REL_CSS` + `SEG_REL_CSS`): **capa**
