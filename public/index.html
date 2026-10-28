@@ -1233,8 +1233,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div class="sec" style="margin-top:20px">🦺 EPI</div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-go="qsms_epi_col"><div class="ic">👷</div><div class="nm">EPI por colaborador</div></button>
       <button class="mod" data-go="qsms_epi_painel"><div class="ic">📈</div><div class="nm">Painel de EPI</div></button>
+      <button class="mod" data-go="qsms_cesta"><div class="ic">🧺</div><div class="nm">Cesta de EPI</div></button>
+      <button class="mod" data-go="qsms_epi_col"><div class="ic">👷</div><div class="nm">EPI por colaborador</div></button>
     </div>
   </main>
 
@@ -1259,6 +1260,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <h1>EPI por colaborador</h1>
     <p class="sub">EPIs em posse, movimentações, comprovantes e ficha de EPI de cada colaborador.</p>
     <div id="qcView"></div>
+  </main>
+
+  <main id="qsms_cesta" class="hidden">
+    <div class="bar"><button class="bk" data-go="qsms">‹ QSMS</button></div>
+    <h1>Cesta de EPI</h1>
+    <p class="sub">Cesta padrão de EPI de cada cargo: quantidade e periodicidade de troca. É o que o colaborador carrega ao solicitar EPI e a referência do Painel de EPI.</p>
+    <div id="qkView"></div>
   </main>
 
   <main id="qsms_epi_painel" class="hidden">
@@ -1844,7 +1852,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_acesso'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1883,6 +1891,7 @@ function irPara(id){
   if(id==='qsms_form') qsmsFormInit();
   if(id==='qsms_epi_col') qsmsEpiColInit();
   if(id==='qsms_epi_painel') qsmsEpiInit();
+  if(id==='qsms_cesta') qsmsCestaInit();
   if(id==='qsms_acesso') qsmsAcInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
@@ -8711,14 +8720,7 @@ function supAbrirConfig(from){
   supVConfig();
 }
 async function supVConfig(){
-  if(supCfgFrom==='epi'){
-    $('#supView').innerHTML=`
-      <div class="sec">🦺 Cargos e cesta de EPI</div>
-      <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
-      <div id="cfgCargos"></div>`;
-    supCfgCargos();
-    return;
-  }
+  if(supCfgFrom==='epi'){ supCestaEm($('#supView')); return; }
   try{
     const [u,cg]=await Promise.all([sb.rpc('sup_admin_usuarios'),sb.rpc('sup_cargos_ativos')]);
     if(u.error) throw u.error;
@@ -8752,20 +8754,28 @@ function supCfgFiltrosRender(){
   $('#cfuCo').addEventListener('change',e=>{ cfgUF.co=e.target.value; supCfgUsers(); });
   $('#cfuAp').addEventListener('change',e=>{ cfgUF.ap=e.target.value; supCfgUsers(); });
 }
+// cargos + cesta de EPI desenhados em root (Almoxarifado: #supView pela engrenagem; QSMS › EPI › Cesta de EPI: #qkView)
+let cfgCestaRoot=null;
+function supCestaEm(root){ cfgCestaRoot=root;
+  root.innerHTML=`
+      <div class="sec">🦺 Cargos e cesta de EPI</div>
+      <p class="sub" style="margin-top:2px">Cadastre os cargos e a cesta padrão de EPI de cada um. O colaborador carrega essa cesta ao solicitar EPI.</p>
+      <div class="cfgCargos"></div>`;
+  supCfgCargos(); }
 async function supCfgCargos(){
-  const c=$('#cfgCargos'); if(!c) return;
+  const c=(cfgCestaRoot||document).querySelector('.cfgCargos'); if(!c) return;
   c.innerHTML='<p class="sub">Carregando…</p>';
   try{ const [cg,ct]=await Promise.all([sb.rpc('sup_cargos_admin'),sb.rpc('sup_epi_catalogo')]); cfgCargos=cg.data||[]; cfgEpiCat=ct.data||[]; }
   catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   supCfgCargosRender();
 }
 function supCfgCargosRender(){
-  const c=$('#cfgCargos'); if(!c) return;
+  const c=(cfgCestaRoot||document).querySelector('.cfgCargos'); if(!c) return;
   c.innerHTML = cfgCargos.length? cfgCargos.map(cg=>`<div style="border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;padding:8px 0"><span style="flex:1;min-width:0;font-size:14px"><b>${cg.nome}</b> <span class="sub">· ${cg.epis} EPI(s)</span></span><button class="btn ghost" data-cesta="${cg.id}" style="margin:0;width:auto;padding:6px 10px;font-size:12px">🧺 Cesta</button></div><div id="cesta-${cg.id}"></div></div>`).join('') : '<p class="sub">Nenhum cargo cadastrado.</p>';
   c.querySelectorAll('[data-cesta]').forEach(b=>b.addEventListener('click',()=>supCfgCestaToggle(+b.dataset.cesta)));
 }
 async function supCfgCestaToggle(cargoId){
-  const box=$('#cesta-'+cargoId); if(!box) return;
+  const box=(cfgCestaRoot||document).querySelector('#cesta-'+cargoId); if(!box) return;
   if(box.innerHTML.trim()){ box.innerHTML=''; return; }
   box.innerHTML='<p class="sub" style="padding:6px 0">Carregando…</p>';
   let cesta=[];
@@ -9725,6 +9735,9 @@ async function qsmsDetalhe(id){ const v=$('#qfView'); const a=qsmsAt().find(x=>x
 function qsmsEpiColInit(){ if(!qsmsGate()) return; const pre=qsmsEpiPre; qsmsEpiPre=null;
   const bk=$('#qcBack'); if(bk){ bk.dataset.go=pre?'qsms_epi_painel':'qsms'; bk.textContent=pre?'‹ Painel de EPI':'‹ QSMS'; }
   supVEpiPainel($('#qcView'),pre); }
+
+// --- EPI › Cesta de EPI (mesma tela da engrenagem do Almoxarifado, desenhada em #qkView; RPCs aceitam qsms_pode) ---
+function qsmsCestaInit(){ if(!qsmsGate()) return; supCestaEm($('#qkView')); }
 
 // --- EPI › Painel de EPI ---
 async function qsmsEpiInit(){ if(!qsmsGate()) return; qsmsPeriodo('qe'); qsmsFiltros('qe',qsmsEpiCarregar); qsmsEpiCarregar(); }
