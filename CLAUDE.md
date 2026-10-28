@@ -240,7 +240,8 @@ pwa/
   concluído e no preview de finalização. **No PDF mora no tópico 5 · Pressão** (saiu do tópico
   1 · Localização, onde ficava sem nada pra comparar do lado).
 - **Pesquisa** (`pesquisa`/`ocorrencia`/`produtividade`) — trechos retos + ocorrências + produtividade.
-  As **ocorrências** (vazamentos) registradas aqui (`app_ocorrencia_registrar`, tabela
+  As **ocorrências** (vazamentos e, desde 2026-10-27, **fraudes** — tipos `Fraude - …`; vazamento = tudo que não é
+  fraude) registradas aqui (`app_ocorrencia_registrar`, consórcio pelo ponto, tabela
   `"8 - coleta_campo".ocorrencia` — dado geo, exposta no mapa via `0 - vitrine_gis.vw_gis_ocorrencia`)
   alimentam a fila de **Abertura de serviços** (ver Auxiliar de Programação), onde recebem nº de OS.
 - **Programação de pesquisa de vazamento** (`programacao_pesquisa`, dentro de Auxiliar de Programação;
@@ -257,7 +258,10 @@ pwa/
   "Minha produtividade" pessoal simplificada (`app_pesquisa_minha`, `auth.uid()`); time interno tem, no
   Auxiliar de Programação, **Programar** (rede colorida por nº de passadas 0×..5+×) + **Acompanhamento**
   (tela `pp_acomp`: KPIs com 2 km + vaz/km por km de rede, progresso das 5 passadas, mapa heatmap de
-  passadas + ocorrências/reporte ativáveis, resumo por colaborador). O cruzamento roda em
+  passadas + ocorrências/reporte ativáveis — ocorrência com popup e atalho p/ o card na Abertura de serviços —,
+  produtividade por colaborador com ocorrências/km = (vazamentos + fraudes) ÷ km de rede, matriz ocorrências por
+  tipo × local que abre a Abertura já filtrada; a Abertura de serviços — ocorrências filtra por tipo, local e
+  consórcio). O cruzamento roda em
   **pedaços de rede** (`"8 - coleta_campo".rede_pp_segmento`, ≤ `pp_config.seg_max_len_m`, **não** a rede
   cadastral inteira) — buffer (`pp_config.tol_m`) + alinhamento de azimute (`max_ang_deg`) + % de
   cobertura (`cov_pct`, ou `min_len_m`+herança de vizinho pra cotos curtos). Detalhe completo, incl. a
@@ -474,7 +478,7 @@ de liberação**), gateada por `pjPodeSup()` = admin **ou** grant por pessoa def
 `iv.locked`):** o Suporte configura e **libera**; enquanto em configuração os **avanços ficam bloqueados** no
 campo. **Congelamento por item (`pjHasAdv`):** mesmo com o cadeado aberto, item com lançamento não sai do escopo
 (toggle 🔒, `−` da quantidade bloqueado). Toggle **No escopo?** em toda atividade E subatividade; peça começa
-pelo **tipo de componente** (`pjSel`); toda intervenção abre com **OS SIGOS** (campo numérico, fora do avanço/escopo) e as de **HDD** têm o PDF **Relatório de Furo** antes do As Built (2026-10-22); ramal por **OS SIGOS + Hidrômetro** (+ imóvel, as-built A1/A2/A3/P1).
+pelo **tipo de componente** (`pjSel`); toda intervenção abre com **OS SIGOS** (campo numérico, fora do avanço/escopo) seguida da **Autorização de Intervenção de Via** (PDF obrigatório anexado na tela de lançamento, ex-"Alvará"; sem ela não fecha 100%) e as de **HDD** têm os PDFs **Relatório de Furo** e **Relatório de Solda** antes do As Built (2026-10-22/28); a **Licença ambiental saiu** (2026-10-28). **Excluir intervenção** (🗑️ no topo do `projeto_cfg`, Suporte, só sem lançamento → `app_proj_intervencao_excluir`, apaga geometria+estado+docs de forma definitiva, rastro em `intervencoes_audit`); ramal por **OS SIGOS + Hidrômetro** (+ imóvel, as-built A1/A2/A3/P1).
 **Documentos:** anexar/abrir/remover ficam **na configuração** (`projeto_cfg`); no `projeto_rel` é **só abrir**.
 **Importar intervenções (2026-10):** card em Projetos › 🧰 Suporte (gate `pjPodeSup`) → tela `projeto_import`
 (`pjImportInit`) que **lê um `.gpkg` no navegador via sql.js** (cdnjs, lazy), decodifica a geometria GPKG→WKT

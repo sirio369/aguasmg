@@ -47,7 +47,9 @@
 11. **Consórcio de um registro de campo não vem do `localStorage 'consorcio'`** — esse valor só é gravado
     pela tela de Pressão (quem nunca lançou pressão manda `null`). Resolva **no servidor**: ZA do ponto
     (`"1 - suporte_geografico".limite_za`) → valor do app → `perfil.consorcio` (ex.: `app_pav_registrar`, §2.6;
-    `app_abertura_servico_registrar`, §3.2). O perfil fica por último: a mesma pessoa atende as duas ZAs.
+    `app_abertura_servico_registrar`, §3.2; `app_ocorrencia_registrar`, §2.3). O perfil fica por último: a mesma
+    pessoa atende as duas ZAs. Pior que `null` é o valor **errado**: na ocorrência da pesquisa 8/19 estavam na ZA
+    oposta ao ponto (o aparelho tinha o consórcio da última Pressão).
 
 ---
 
@@ -301,6 +303,16 @@
   `consorcio`, `usuario` texto, `pesquisa_id`, `origem`). Foto obrigatória. É **dado geo**
   (movida de `"12 - retaguarda"` em 2026-09): visível no QGIS via `0 - vitrine_gis.vw_gis_ocorrencia`
   (curada — sem `foto`/`usuario`/gps cru).
+- **Tipos (`#ocTipo`, 2026-10-27):** dois grupos — **Vazamento** (visível · não visível (ruído) · extravasamento ·
+  cavalete/hidrômetro) e **Fraude** (`Fraude - Derivação de ramal` · `- Ligação clandestina` · `- Rompimento de
+  lacre` · `- Corte violado` · `- Hidrômetro violado`). **`Outro` saiu** do dropdown (3 registros antigos seguem
+  valendo). O texto do option é o valor gravado em `tipo`. **Regra única: vazamento = tipo que não começa com
+  `Fraude`** — front `ocEhFraude()` (+ `OC_TIPOS_VAZ`/`OC_TIPOS_FRAUDE`/`OC_ROT` rótulos curtos, junto da Abertura
+  de serviços) e SQL `tipo not ilike 'fraude%'` no `app_pp_acompanhamento`. Tipo novo de fraude: começar com
+  `Fraude - ` e incluir em `OC_TIPOS_FRAUDE`.
+- **Consórcio (2026-10-27):** `app_ocorrencia_registrar` grava a ZA do ponto (§0.11) — antes gravava o
+  `localStorage`, e 8/19 estavam na ZA errada; backfill feito (backup das chaves em
+  `"8 - coleta_campo"._bkp_ocorrencia_consorcio_20261027`, `docs/migracao_pesquisa_ocorrencias_fraude.sql`).
 - **Importante:** as ocorrências alimentam a **fila de Abertura de serviços** (§Auxiliar de
   Programação) via `app_ocorrencia_fila`/`app_ocorrencia_os` (colunas `os_numero/os_criada_em/os_por`).
 - **Produtividade** (`// MÓDULO PRODUTIVIDADE` ~L2200): RPCs `app_pesquisa_filtros`,
@@ -485,6 +497,19 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   filtrados** (`pgOcData`, recarregado a cada troca de filtro pendente/criada/todas); clicar no ponto
   abre um **popup com o mesmo card** (inclui input+Salvar da OS, fiado no `popupopen`). Salvar fecha o
   popup e recarrega. `pgInit` chama `pgOcRenderTabs`.
+- **Ocorrências: filtros + card compacto + deep-link (2026-10-27).** Três selects lado a lado acima do Lista/Mapa
+  (no celular o consórcio desce): **tipo** (`#pgOcFTipo` — "Todos os vazamentos"/`@vaz`, "Todas as fraudes"/`@fraude`
+  ou o tipo exato, com **contagem** em cada opção; tipo antigo fora da lista, ex. `Outro`, aparece se houver),
+  **local** (`#pgOcFLocal`, sw v278 — o **combinado tipo × local** dá o porte da equipe, ex. vazamento não visível na
+  rede; contagens de cada dropdown respeitam os outros dois filtros) e **consórcio** (`#pgOcFCons`). Filtro **no cliente** sobre `pgOcData` (`pgOcFiltrado`), vale p/ lista e mapa; estado
+  `pgOcFTipo`/`pgOcFCons` sobrevive ao Salvar OS e à troca de aba. `pgCarregarOc` só busca; quem desenha é
+  `pgOcRender`. **Card (`.occ`, CSS global):** grid de 2 colunas — esquerda: tipo (⚠️ vazamento / 🚩 fraude) +
+  tags local/consórcio, endereço, 👤 nome (`usuario_nome`, do perfil) · 📌 coordenada, 💬 obs; direita (sob a data):
+  📷 Foto/📍 Mapa, ✓ OS e o campo de OS. ≤600px e no popup (`.occ.pop`) a coluna da direita desce. Não usar
+  `.sub` dentro do card (margem inferior de 16px — era o que deixava o card alto). **Deep-link:**
+  `pgOcAbrir(id,temOs)` (chamado pelo popup do Acompanhamento, §4.3.8) abre em modo pesquisa, na aba certa
+  (pendente/OS criada), limpa os filtros, rola até o card (`data-occ`) e o destaca (`.occ.foco`); o "‹ voltar"
+  segue `pgBackTo` (volta ao Acompanhamento nesse caso). `app_ocorrencia_fila` passou a devolver `usuario_nome`.
 
 ### 4.3 Programação de pesquisa de vazamento — `// MÓDULO PROGRAMAÇÃO DE PESQUISA` (~L2438) · tela `programacao_pesquisa` (dentro de Auxiliar de Programação)
 
@@ -817,13 +842,32 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   "pesquisado"/"histórico" — eram redundantes: o heatmap de passadas **é** derivado do histórico
   (`pp_execucao`). ("Pesquisado (cadastro)" era o estado ao-vivo do ciclo atual; "histórico" é o log
   permanente — pra análise só o histórico importa, e ele já vira o heatmap.)
-- **KPIs (5):** km de rede pesquisado · km andado · vazamentos · vaz/km (por km de rede) · velocidade
-  média. (Saiu a "cobertura da programação".)
-- **Resumo por colaborador:** repete os indicadores de cima por pessoa — km rede pesquisado · km andado ·
-  vazamentos · vaz/km · velocidade. (Saíram "km programado" e "%".)
+- **KPIs (6, 2026-10-27):** km de rede pesquisado · km andado · vazamentos · **fraudes** · **ocorrências / km de
+  rede** (`ocorr_km` = (vazamentos + fraudes) ÷ km de rede — substituiu o vaz/km na tela; a RPC ainda devolve
+  `vaz_km`) · velocidade média. **Vazamentos não contam fraude** (§2.3).
+- **Popup da ocorrência no mapa (2026-10-27):** clicar no ponto abre tipo, data de envio (`data_hora` = hora em
+  que chegou ao servidor), nome de quem enviou, OS (se houver), 📷 foto, 🧭 Navegar (Google Maps) e **"Abrir na
+  abertura de serviços ›"** → `pgOcAbrir` (§4.2). `paOcPopup`; é um `L.popup().openOn(paMap)` **avulso**, não
+  `bindPopup`: o autoPan do popup dispara `moveend` → `paCarregarMapa` → `clearLayers`, que fecharia um popup
+  preso ao marcador. `app_pp_passadas_bbox` devolve `foto`, `local`, `usuario_nome` nas ocorrências.
+- **Abaixo do mapa, 2 blocos (2026-10-27, sw v278 — substituíram "Vazamentos por colaborador", "Ocorrências
+  reportadas por colaborador" e "Resumo por colaborador", que se repetiam):**
+  - **Produtividade por colaborador** (`paResumo`, colunas `PA_RES_COLS`): km andado · km de rede (com barra) ·
+    vazamentos · fraudes · ocorr./km · km/h. **Cabeçalho ordena** (`paResSort`, padrão km de rede ↓); rodapé
+    **Equipe** = os KPIs. Universo (`resumo`) = quem teve **rede executada, trecho andado ou ocorrência** no
+    filtro (antes: só quem tinha rede programada/executada em qualquer data — quem só andou/reportou sumia e quem
+    só foi programado aparecia zerado). Quem reporta sem lançar trecho aparece com km 0 e ocorr./km 0.
+  - **Ocorrências por tipo e local** (`paMatriz`, `app_pp_acompanhamento.matriz` = `[{tipo,local,n,com_os}]`):
+    linhas = tipos agrupados Vazamento / Fraude (todos os da lista, + antigos que aparecerem; subtotal no
+    cabeçalho do grupo), colunas = locais (`OC_LOCAIS`/`OC_LOC_ROT`), total por linha e coluna, célula colorida pela
+    intensidade (tooltip com com/sem OS). **Tocar na célula** → `pgOcAbrirFiltro(tipo,local,consórcio)` abre a
+    Abertura de serviços na aba **Todas** já filtrada (§4.2). Período/colaborador do Acompanhamento **não** viajam
+    (a Abertura não tem esses filtros), então lá pode haver mais cards que a célula.
+  - `app_pp_acompanhamento.ocorrencias` (nome × tipo) ficou só p/ a v277 — pode sair da RPC depois do deploy da
+    v278 (`docs/migracao_pesquisa_produtividade_matriz.sql`).
 - **RPCs (SECURITY DEFINER, gate aprovador/admin):** `app_pp_acompanhamento(p_consorcio, p_colaborador,
-  p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo` (agora com km
-  rede/andado/vaz/vaz-km/velocidade por colaborador); `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,
+  p_data_ini, p_data_fim)` → `kpis` + `progresso_passadas` (6 buckets 0..5) + `resumo` (km
+  rede/andado/vaz/fraudes/ocorr-km/vaz-km/velocidade por colaborador) + `matriz` (tipo × local); `app_pp_passadas_bbox(xmin,ymin,xmax,ymax,
   p_consorcio, p_colaborador, p_data_ini, p_data_fim)` → `passadas` (heatmap) + `reportes` + `ocorrencias`
   (as duas últimas filtradas por consórcio/colaborador/data; casamento traço↔usuário por **nome OU
   email**, mesma pegadinha da 4.3.5). O dropdown "Todos os coletores" de análise vive **aqui** (tela do
@@ -2028,6 +2072,28 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   por ligação. 4 painéis (Indicador do mês · Sazonalidade/tendência heatmap+linha · Abertura por macromedidor ·
   Detalhe do medidor), reaproveitando CSS/helpers do `mm` (`mmcard`/`mmheat`/`mmHeat`/`mmDiv`/`br1`/`mmCmp`...).
   Recarregar = refazer o INSERT em `macro_mensal` a partir das planilhas GMOA.
+  - **Medido × estimado na Abertura por macromedidor (2026-10-28):** a tabela mostra o volume **segregado** como o
+    GMOA informa — **Medido** + **Estimado** (laranja, com % do total do macro) = **Total** — e o cabeçalho soma o
+    estimado do mês ("estimado X m³ em N macros"). `app_nrw_macro_macros` passou a devolver `volume_medido` e
+    `volume_estimado` (`coalesce(...,0)`; com fator, o mesmo multiplicador do total — o fator ainda vale sobre o total,
+    não só sobre a parcela medida). No GMOA medido + estimado = total (1 linha difere 0,22 m³ por arredondamento da
+    fonte); `volume_estimado` vem **vazio** nos macros de telemetria e **0** nos de leitura — os dois contam como 0.
+    Demais painéis e o resultado seguem lendo só o total. Na tela de macromedição o conteúdo ocupa a largura toda
+    (`body:has(#s-macro.on) .wrap{max-width:none}`, como HD/Fiscalização); a barra lateral do cockpit passou de
+    224 → **248 px** (nome "Análise de macromedição" numa linha; no celular a barra fechada fica inteira fora da tela).
+  - **Bloco "Macromedidores × meses" + nova ordem (2026-10-28):** ordem dos blocos = Indicador do mês · Abertura por
+    macromedidor · Sazonalidade & tendência · **Macromedidores × meses** · Fator de correção. O bloco novo é uma matriz
+    **macro (linha) × competência (coluna)** com todos os meses e todos os macros que já apareceram no GMOA da ZA
+    (total em mil m³; cor = medido / medido+estimado / só estimado / zerado / sem registro no arquivo do mês). Coluna
+    **Situação** vs o último mês da ZA: *Medindo* · *Parou* (já mediu; no último mês saiu do GMOA, veio só estimado ou
+    zerado — mostra o último mês medido) · *Nunca medido* (só estimado); "entrou em MM/AAAA" p/ quem começou depois do
+    início da série. Filtros: Todos / Deixaram de medir / Com estimado / Entraram depois. Agrupado por ZA+função, os que
+    pararam primeiro; clique na linha abre a série no detalhe da Abertura; em tela estreita abre rolado nos meses
+    recentes (coluna do macro fixa). RPC **`app_nrw_macro_matriz(p_consorcio, p_com_fator)`** (definer, admin|`dev_acesso`,
+    execute só `authenticated`): 1 linha por consórcio×macro×competência com `vm`/`ve`/`vt` (soma dos sentidos; com
+    fator, mesmo multiplicador). Status calculado no front (`macroMatModel`). Ex. (09/2026): 4 saídas da ZA1004
+    (EMM0000383/0556535/0556538/0559170) saem do GMOA após 07/2026 e a EMM0000131 entra em 08/2026 com volume ≈ soma
+    delas; EMM0613252 (ZA0200) sai após 07/2026; EMM1697373 nunca medido.
   - **Camada `unidades_macromedicao` (view, schema 2):** ganhou 3 colunas via left join com `macro_fechamento` —
     **`fechamento_za`** (bool), **`funcao_medicao`** (entrada/saída) e **`sistema_macro`**. Marca 24 dos 37 macros
     da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
@@ -2405,7 +2471,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     `data-toggle`→`node.ativo`) em **toda atividade E subatividade mensurável** (grupos + folhas %/m; item lançado
     congela — ver `pjHasAdv` acima); **stepper Quantidade** (`data-repadd/repdel`); **select de tipo** (`sel`,
     `data-sel`) nas peças. Tudo **desabilitado quando `pjLocked`** (frozen). Abaixo do escopo, **📎 Documentos**
-    — **é AQUI que se anexa/abre/remove** projeto executivo/licença/alvará/as-built. Wiring da árvore compartilhado
+    — **é AQUI que se anexa/abre/remove** projeto executivo/autorização de via/relatórios (furo/solda [HDD])/as-built/RTQ. Wiring da árvore compartilhado
     com o campo via **`pjWireTree(d,rerender)`** + `pjSnapOpen`/`pjReopen`.
     - **Documentos REAIS (2026-09-25):** 1 arquivo (PDF) por tipo (`PJ_DOCS`: executivo/licenca/alvara/as_built).
       Upload no bucket **`fotos-campo`** (reaproveitado, prefixo `projetos/<kind>/<gid>/`), registro em
@@ -2450,6 +2516,30 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       e **`pjDocsFor(iv)`** filtra os docs aplicáveis — usada na lista de Documentos (cfg e relatório), na seção 4 do PDF e nos
       **anexos mesclados** do PDF consolidado (ordem de `PJ_DOCS`: furo antes do as-built). **Backend (migração `proj_doc_rel_furo`):**
       `app_proj_doc_set` aceita `rel_furo` e o libera ao campo (junto de `as_built`/`rtq`); `app_proj_docs_presenca` inclui `rel_furo`.
+    - **Autorização de Intervenção de Via + Relatório de Solda + sai a Licença (2026-10-28, sw v281):** (1) **Licença ambiental
+      saiu** de `PJ_DOCS` (cfg, relatório, PDF consolidado) e da whitelist do `app_proj_doc_set` — os anexos antigos (`tipo='licenca'`,
+      1 na linha 16) **ficam no banco**, só não aparecem. (2) O antigo **"Alvará de execução" virou "Autorização de Intervenção de
+      Via"** — **mesmo tipo `alvara`** (anexos existentes migram sozinhos), constante `PJ_AIV_N`/`pjAIV()`. Agora é **atividade-documento
+      obrigatória de TODA intervenção**, **logo após a OS SIGOS** (2ª atividade): anexada pelo **campo na tela de lançamento**, igual
+      ao As-Built/RTQ, e conta **100% quando anexada** → a intervenção **não chega a 100% sem ela** (não trava o lançamento de avanço).
+      Snapshots antigos ganham o nó no `pjLoad` (reconciliação: insere/move para o índice 1, renomeia). (3) **Relatório de Solda**
+      (`rel_solda`, `hdd:true`) = atividade-documento **só de `rede_hdd`**, entre Furo e As-Built (ordem HDD: … › Furo › Solda ›
+      As Built › RTQ). Os três entram no relatório consolidado e nos anexos mesclados do PDF via `pjDocsFor(iv)` (ordem de `PJ_DOCS`).
+      **Backend (migração `proj_excluir_intervencao_e_docs_aiv_solda`):** `app_proj_doc_set` aceita `rel_solda` e libera ao campo
+      `alvara`/`as_built`/`rtq`/`rel_furo`/`rel_solda`; `app_proj_docs_presenca` inclui `alvara` e `rel_solda`.
+    - **Excluir intervenção (2026-10-28, sw v281):** botão **🗑️ Excluir intervenção** no canto superior direito do `projeto_cfg`
+      (`#pjCfgDel`, na `.bar` ao lado do "‹ Suporte"; visível p/ `pjPodeSup()`). Só exclui **sem lançamento**: bloqueado (opaco, toast
+      com o motivo) se houver avanço em qualquer item (`pjHasAdv`) **ou** documento da tela de lançamento anexado (`pjIvDocLanc` —
+      nó-doc 100%; remova o anexo antes). Confirmação no modal global `vmModal` (`pjExcluirConfirm`) → RPC
+      **`app_proj_intervencao_excluir(p_kind,p_gid)`** (definer, gate admin/`proj_sup_acesso`) que **revalida** (log `intervencao_avanco`,
+      `%`/`m` > 0 no snapshot via `jsonb_path_exists`, docs `alvara/rel_furo/rel_solda/as_built/rtq`) e apaga **de forma definitiva**:
+      a linha em `"7 - setorizacao".intervencoes_pontuais|lineares` (o trigger `a_audit` grava a geometria), `intervencao_estado` e
+      `intervencao_documento`. Rastro extra em `intervencoes_audit` (`operacao='EXCLUSAO_APP'`, estado + documentos + `excluido_por`,
+      `alterado_por`=e-mail). Devolve `paths` dos arquivos → o app apaga no Storage (`storage.remove`; delete direto em `storage.objects`
+      é bloqueado pelo Supabase). **Policy nova** `fotos_campo_projetos_sup_delete` (DELETE em `fotos-campo`, prefixo `projetos/`, só
+      admin/`proj_sup_acesso`) — antes **nenhum** `storage.remove` do módulo apagava de fato (sem policy de DELETE, falhava em silêncio;
+      no campo, sem acesso ao Suporte, a troca de PDF continua deixando o arquivo antigo órfão). ⚠️ Se a camada de intervenções for
+      **reimportada do gpkg de origem**, a intervenção excluída pode voltar.
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
@@ -2463,7 +2553,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
       Por atividade) soma **só Puxamento** (`rede_hdd`) e **Assentamento de tubulação** (`rede_vca`) via
       `pjRsEhMetroRede`/`mNum` — evita dupla contagem (piloto, escavação etc. não entram). O **Por dia** passou a
       agrupar **dia → intervenção → avanços**; cada avanço individual segue mostrando seu valor real (+N m/%).
-  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = projeto executivo, licença, alvará, as-built,
+  - `projeto_rel` — **gestão, tela à parte**. **Documentos** = `pjDocsFor(iv)` (projeto executivo, autorização de intervenção de via, relatórios de furo/solda [HDD], as-built, RTQ),
     **só com botão Abrir** (arquivo real do Storage) — **anexar/remover ficam na configuração** (`projeto_cfg`).
     **Progresso por atividade (2026-10-06, era "mini-Gantt"):** AUDITORIA — o Gantt antigo plotava a barra por
     `ts` (data de **registro** do avanço), não por data de obra; sem cronograma planejado e com lançamento em
