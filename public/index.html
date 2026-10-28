@@ -9137,6 +9137,8 @@ async function segListar(){ const c=document.getElementById('segLista'); if(!c)r
     const noServ=[...mapa.values()].some(x=>x.forms.has(d.id));
     // limpeza: já no servidor há >1 dia, ou qualquer um com >5 dias (o PDF passa a vir do servidor)
     if((doServ&&noServ&&idade>1&&!pend.has(d.id))||idade>5){ segDocDel(d.id).catch(()=>{}); if(!noServ) continue; }
+    // apagado no servidor: lista do servidor carregou, não está nela, nem na fila, e já teve tempo de subir (>15 min)
+    if(doServ&&!noServ&&!pend.has(d.id)&&idade>0.01){ segDocDel(d.id).catch(()=>{}); continue; }
     let g=mapa.get(d.atividade.id); if(!g){ g={a:Object.assign({},d.atividade), forms:new Map()}; mapa.set(d.atividade.id,g); }
     const f=g.forms.get(d.id)||{id:d.id,tipo:d.tipo};
     Object.assign(f,{status:d.status,emitido_em:d.emitido_em,requer_pt:d.resp.requer_pt,requer_pet:d.resp.requer_pet,espaco:d.resp.espaco_tipo,altura:d.resp.altura,local:true});
