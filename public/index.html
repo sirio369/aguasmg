@@ -402,7 +402,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="avisos" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>📢 Avisos</h1>
-    <p class="sub">Pop-ups que aparecem toda vez que a pessoa abre o app, enquanto o aviso estiver no período. Só admins.</p>
+    <p class="sub">Pop-ups e lembretes por push para quem você escolher (consórcio, função, cargo, pessoas), enquanto o aviso estiver no período. Só admins.</p>
     <div id="avView"></div>
   </main>
   <div id="avPop" class="hidden" style="position:fixed;inset:0;z-index:3000;background:rgba(8,15,30,.72);display:flex;align-items:center;justify-content:center;padding:16px">
@@ -10092,7 +10092,7 @@ let tId; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div'
 window.toast=toast;
 
 // ---------- NOTIFICAÇÕES (inbox + badge) ----------
-const NTF_ICON={qsms:'⛑️',solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰',pronto:'🎫'};
+const NTF_ICON={aviso:'📢',qsms:'⛑️',solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰',pronto:'🎫'};
 async function ntfBadge(){
   try{ const {data}=await sb.rpc('app_notif_contador'); const n=+data||0; const b=$('#ntfBadge'); if(!b) return;
     if(n>0){ b.textContent=n>99?'99+':String(n); b.style.display='inline-block'; } else b.style.display='none';
@@ -11600,6 +11600,7 @@ async function supGoAct(act){
   if(act==='frota_registros'){ frotasTarget='registros'; irPara('frotas'); return; }
   if(act==='frota_chk_equipe'){ frotasTarget='chk_equipe'; irPara('frotas'); return; }
   if(act==='frota_manutencao_fila'){ frotasTarget='manutencao_fila'; irPara('frotas'); return; }
+  if(SCREENS.includes(act)&&act!=='suprimentos'){ irPara(act); return; }   // destino do botão/lembrete de aviso = qualquer tela do app
   try{ await supGetMe(); }catch(e){}
   SCREENS.forEach(s=>{ const el=$('#'+s); if(el) el.classList.toggle('hidden', s!=='suprimentos'); });
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.remove('on'));
@@ -11731,84 +11732,212 @@ function vtShow(i){
   if(!vtPaused) vtTimer=setTimeout(()=>vtShow(vtCur+1), s.dur);
 }
 
-// ---------- AVISOS (pop-ups) — admin cria; usuário vê ao abrir o app ----------
+// ---------- AVISOS (pop-ups) — admin monta o aviso (público, exibição, botão, lembretes); usuário vê ao abrir o app ----------
 // Imagem: './...' = arquivo do site (public/), 'http...' = URL, senão = caminho no bucket fotos-campo.
-var avPopFeito=false, avLista=[], avEdit=null;
-const AV_LINKS=[['','Só fechar'],['frota_checklist','Checklist diário do veículo'],['frota_manutencao','Manutenção do veículo'],['frota_minhas_lavagens','Lavagem'],['notificacoes','Notificações']];
-const AV_LEMB_PADRAO=['🚗 Bom dia! Já fez o checklist do seu carro hoje?','⏰ Lembrete: o checklist diário do veículo ainda não foi feito.','✅ Leva menos de 2 minutos: abra o AcquaHub e faça o checklist do carro.','⚠️ Seu checklist de hoje continua pendente.','🔔 Último lembrete do dia: faça o checklist do seu veículo antes de encerrar.'];
+// Público = filtros {consorcios,funcoes,cargos,pessoas,condicoes} combinados com E (vazio = todos); a regra mora no banco (aviso_no_publico).
+var avPopFeito=false, avLista=[], avEdit=null, avOpc=null;
+const AV_EXIB=[['sempre','Toda vez que abrir o app'],['diario','Uma vez por dia'],['uma_vez','Uma vez só'],['confirmar','Até tocar "Li e entendi"']];
+const AV_CONS=[['ZA1004','Contagem'],['ZA0200','Betim']];
+const AV_FUNC=[['campo','Campo'],['aprovador','Aprovador'],['almoxarife','Almoxarife'],['admin','Admin']];
+const AV_COND=[['tem_veiculo','Tem carro vinculado']];
+const AV_PEND=[['','Todo o público do aviso'],['nao_viu','Só quem ainda não viu o aviso'],['nao_confirmou','Só quem ainda não tocou "Li e entendi"'],['nao_fez_checklist','Só quem não fez o checklist do carro hoje']];
+const AV_DIAS=[[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[7,'Dom']];
+// destino do botão: atalhos de dentro dos módulos + todos os cards da home (lidos da própria home: módulo novo entra sozinho)
+const AV_ATALHOS=[['frota_checklist','Frota › Checklist diário do veículo'],['frota_manutencao','Frota › Manutenção do veículo'],['frota_minhas_lavagens','Frota › Lavagem'],['notificacoes','Notificações']];
+const AV_CH='display:flex;flex-wrap:wrap;gap:6px;margin-top:4px', AV_TD='padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap';
+function avDestinos(){ const home=[...document.querySelectorAll('#home .mod[data-go]')].map(b=>[b.dataset.go,b.querySelector('.nm').textContent.replace('🔒','').trim()]).filter(([g])=>g!=='avisos');
+  return [['','Só fechar'],['__url','Link externo (site)'],...AV_ATALHOS,...home]; }
 function avImg(x){ if(!x) return ''; return (/^https?:/.test(x)||x.startsWith('./'))?x:SBASE+x; }
 function avTexto(t){ return eoH(t||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
+const avLbl=(lista,v)=>{ const x=lista.find(y=>String(y[0])===String(v)); return x?x[1]:(v==null?'':String(v)); };
+const avHM=h=>String(h||'').slice(0,5);
+function avPubResumo(f){ f=f||{}; const p=[], n=k=>(f[k]||[]).length;
+  if(n('consorcios')) p.push(f.consorcios.map(c=>avLbl(AV_CONS,c)).join('/'));
+  if(n('funcoes')) p.push(f.funcoes.map(c=>avLbl(AV_FUNC,c)).join('/'));
+  if(n('cargos')) p.push(n('cargos')+(n('cargos')>1?' cargos':' cargo'));
+  if(n('pessoas')) p.push(n('pessoas')+(n('pessoas')>1?' pessoas':' pessoa'));
+  if((f.condicoes||[]).includes('tem_veiculo')) p.push('com carro vinculado');
+  return p.length?p.join(' · '):'Todos'; }
+function avDiasResumo(d){ d=(d||[]).map(Number).sort((x,y)=>x-y); const s=d.join(',');
+  if(s==='1,2,3,4,5') return 'seg–sex'; if(s==='1,2,3,4,5,6,7') return 'todos os dias'; return d.map(x=>avLbl(AV_DIAS,x).toLowerCase()).join(', '); }
 function avCard(a){
+  const conf=a.exibicao==='confirmar';
   return `${a.imagem?`<img src="${eoH(avImg(a.imagem))}" alt="" style="display:block;width:100%;border-radius:18px 18px 0 0">`:''}
    <div style="padding:16px 18px 18px"><div style="font-size:21px;font-weight:700;color:var(--acc);line-height:1.2">${eoH(a.titulo)}</div>
    ${a.texto?`<div style="margin-top:8px;font-size:15px;line-height:1.45">${avTexto(a.texto)}</div>`:''}
-   ${a.botao_texto?`<button class="btn" data-avgo="${eoH(a.botao_link||'')}" style="margin-top:14px;background:#22c55e;border-color:#22c55e">${eoH(a.botao_texto)}</button>`:''}</div>`;
+   ${a.botao_texto?`<button class="btn${conf?' ghost':''}" data-avgo="1" style="margin-top:14px;${conf?'':'background:#22c55e;border-color:#22c55e'}">${eoH(a.botao_texto)}</button>`:''}
+   ${conf?`<button class="btn" data-avok="1" style="margin-top:10px">✓ Li e entendi</button>`:''}</div>`;
 }
+function avIr(a){ if(a.botao_url) window.open(a.botao_url,'_blank','noopener'); else if(a.botao_link) supGoAct(a.botao_link); }
 async function avPopAbrir(){
   if(avPopFeito) return; avPopFeito=true;
   let arr=[]; try{ const {data,error}=await sb.rpc('app_avisos_ativos'); if(error) throw error; arr=data||[]; }catch(e){ return; }
   if(!arr.length) return;
   let i=0; const pop=$('#avPop'), body=$('#avPopBody');
   const fechar=()=>{ i++; if(i<arr.length) mostrar1(); else pop.classList.add('hidden'); };
-  const mostrar1=()=>{ body.innerHTML=avCard(arr[i]); pop.classList.remove('hidden');
-    body.querySelectorAll('[data-avgo]').forEach(b=>b.onclick=()=>{ const lk=b.dataset.avgo; pop.classList.add('hidden'); if(lk) supGoAct(lk); }); };
+  const mostrar1=()=>{ const a=arr[i]; body.innerHTML=avCard(a); pop.classList.remove('hidden');
+    sb.rpc('app_aviso_marcar',{p_id:a.id}).then(()=>{},()=>{});   // registra que viu (1x por dia / 1x só / estatística)
+    const go=body.querySelector('[data-avgo]'); if(go) go.onclick=()=>{ if(a.botao_url||a.botao_link){ pop.classList.add('hidden'); avIr(a); } else fechar(); };
+    const ok=body.querySelector('[data-avok]'); if(ok) ok.onclick=async()=>{ ok.disabled=true; try{ await sb.rpc('app_aviso_marcar',{p_id:a.id,p_confirmar:true}); }catch(e){} fechar(); }; };
   $('#avPopX').onclick=fechar; pop.onclick=e=>{ if(e.target===pop) fechar(); };
   mostrar1();
 }
+function avPreview(a){ const pop=$('#avPop'), fecha=()=>pop.classList.add('hidden'); $('#avPopBody').innerHTML=avCard(a); pop.classList.remove('hidden');
+  $('#avPopX').onclick=fecha; pop.onclick=e=>{ if(e.target===pop) fecha(); }; $('#avPopBody').querySelectorAll('[data-avgo],[data-avok]').forEach(x=>x.onclick=fecha); }
 async function avInit(){
   if(!(ME&&ME.is_admin)){ toast('Acesso restrito'); irPara('home'); return; }
   $('#avView').innerHTML='<p class="sub">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_avisos_admin_listar'); if(error) throw error; avLista=data||[]; }
   catch(e){ $('#avView').innerHTML='<div class="banner bad">Erro: '+eoH(e.message||e)+'</div>'; return; }
   const hoje=pavDiaISO(Date.now()); // dia local (toISOString é UTC: depois das 21h já seria amanhã)
+  const bt=(attr,id,txt)=>`<button class="btn ghost" ${attr}="${id}" style="margin:0;flex:1;padding:8px">${txt}</button>`;
   let h='<button class="btn" id="avNovo">➕ Novo aviso</button>';
-  h+= avLista.length ? avLista.map(a=>{ const vig=a.ativo&&hoje>=a.inicio&&hoje<=a.fim;
+  h+= avLista.length ? avLista.map(a=>{ const vig=a.ativo&&hoje>=a.inicio&&hoje<=a.fim, hs=a.lembrete_horarios||[];
+    const lemb=hs.length?`🔔 ${hs.map(avHM).join(', ')} · ${avDiasResumo(a.lembrete_dias)}${a.lembrete_pendencia?' · '+avLbl(AV_PEND,a.lembrete_pendencia).toLowerCase():''}`:'';
     return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:10px">
      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${eoH(a.titulo)}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;background:var(${vig?'--ok-bg':'--line'});color:var(${vig?'--ok':'--mut'})">${vig?'No ar':(a.ativo?'Fora do período':'Desativado')}</span></div>
-     <div class="sub" style="margin-top:3px">${fmtData(a.inicio)} a ${fmtData(a.fim)} · ${a.publico==='condutores_vinculados'?'só quem tem carro vinculado':'todos'}${a.lembrete==='checklist_frota'?' · 🔔 5 lembretes/dia do checklist':''}</div>
-     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" data-avprev="${a.id}" style="margin:0;flex:1;padding:8px">👁 Pré-visualizar</button><button class="btn ghost" data-aved="${a.id}" style="margin:0;flex:1;padding:8px">✏️ Editar</button><button class="btn ghost" data-avtog="${a.id}" style="margin:0;flex:1;padding:8px">${a.ativo?'⏸ Desativar':'▶ Ativar'}</button></div></div>`; }).join('') : '<p class="sub" style="margin-top:10px">Nenhum aviso ainda.</p>';
+     <div class="sub" style="margin-top:3px">${fmtData(a.inicio)} a ${fmtData(a.fim)} · 👥 ${eoH(avPubResumo(a.filtros))}</div>
+     <div class="sub" style="margin-top:2px">🪟 ${eoH(avLbl(AV_EXIB,a.exibicao))}${lemb?' · '+eoH(lemb):''}</div>
+     <div class="sub" style="margin-top:2px">${a.n_publico} no público · 👁 ${a.n_viram} viram${a.exibicao==='confirmar'?` · ✅ ${a.n_confirmaram} confirmaram`:''}</div>
+     <div style="display:flex;gap:8px;margin-top:8px">${bt('data-avprev',a.id,'👁 Pré-visualizar')}${bt('data-aved',a.id,'✏️ Editar')}${bt('data-avdup',a.id,'📄 Duplicar')}</div>
+     <div style="display:flex;gap:8px;margin-top:8px">${bt('data-avrel',a.id,'📊 Quem viu')}${bt('data-avtog',a.id,a.ativo?'⏸ Desativar':'▶ Ativar')}</div></div>`; }).join('') : '<p class="sub" style="margin-top:10px">Nenhum aviso ainda.</p>';
   $('#avView').innerHTML=h;
+  const acha=id=>avLista.find(x=>String(x.id)===String(id));
   $('#avNovo').onclick=()=>{ avEdit=null; avForm(); };
-  $('#avView').querySelectorAll('[data-aved]').forEach(b=>b.onclick=()=>{ avEdit=avLista.find(x=>String(x.id)===b.dataset.aved); avForm(); });
-  // ativar/desativar direto da lista (mantém os demais campos)
-  $('#avView').querySelectorAll('[data-avtog]').forEach(b=>b.onclick=async()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avtog); b.disabled=true;
-    try{ const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id,p_titulo:a.titulo,p_texto:a.texto,p_imagem:null,p_botao_texto:a.botao_texto,p_botao_link:a.botao_link,
-        p_publico:a.publico,p_inicio:a.inicio,p_fim:a.fim,p_ativo:!a.ativo,p_lembrete:a.lembrete,p_lembrete_textos:a.lembrete_textos}); if(error) throw error;
+  $('#avView').querySelectorAll('[data-aved]').forEach(b=>b.onclick=()=>{ avEdit=acha(b.dataset.aved); avForm(); });
+  // duplicar = abre o formulário com uma cópia (sem id, desativada, mesma imagem) p/ montar um aviso parecido
+  $('#avView').querySelectorAll('[data-avdup]').forEach(b=>b.onclick=()=>{ const a=acha(b.dataset.avdup); avEdit={...a,id:null,titulo:a.titulo+' (cópia)',ativo:false}; avForm(); });
+  $('#avView').querySelectorAll('[data-avtog]').forEach(b=>b.onclick=async()=>{ const a=acha(b.dataset.avtog); b.disabled=true;
+    try{ const {error}=await sb.rpc('app_aviso_ativar',{p_id:a.id,p_ativo:!a.ativo}); if(error) throw error;
       toast(a.ativo?'Aviso desativado':'✓ Aviso ativado'); avInit(); }catch(e){ toast('Erro: '+(e.message||e)); b.disabled=false; } });
-  $('#avView').querySelectorAll('[data-avprev]').forEach(b=>b.onclick=()=>{ const a=avLista.find(x=>String(x.id)===b.dataset.avprev); const pop=$('#avPop'); $('#avPopBody').innerHTML=avCard(a); pop.classList.remove('hidden'); $('#avPopX').onclick=()=>pop.classList.add('hidden'); pop.onclick=e=>{ if(e.target===pop) pop.classList.add('hidden'); }; $('#avPopBody').querySelectorAll('[data-avgo]').forEach(x=>x.onclick=()=>pop.classList.add('hidden')); });
+  $('#avView').querySelectorAll('[data-avprev]').forEach(b=>b.onclick=()=>avPreview(acha(b.dataset.avprev)));
+  $('#avView').querySelectorAll('[data-avrel]').forEach(b=>b.onclick=()=>avRelatorio(acha(b.dataset.avrel)));
 }
-function avForm(){
-  const a=avEdit||{}, hoje=pavDiaISO(Date.now()), lemb=(a.lembrete_textos&&a.lembrete_textos.length)?a.lembrete_textos:AV_LEMB_PADRAO;
+// quem viu / quem confirmou (público atual + quem já viu e saiu do público)
+async function avRelatorio(a){
+  $('#avView').innerHTML='<p class="sub">Carregando…</p>';
+  let rows=[]; try{ const {data,error}=await sb.rpc('app_aviso_relatorio',{p_id:a.id}); if(error) throw error; rows=data||[]; }
+  catch(e){ $('#avView').innerHTML='<button class="btn ghost" id="avRelVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="banner bad">Erro: '+eoH(e.message||e)+'</div>'; $('#avRelVoltar').onclick=avInit; return; }
+  const conf=a.exibicao==='confirmar', dt=x=>x?new Date(x).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+  let f='todos';
+  const tabs=[['todos','Todos',rows.length],['viram','Viram',rows.filter(r=>r.viu_em).length],['nao','Não viram',rows.filter(r=>!r.viu_em).length]].concat(conf?[['conf','Confirmaram',rows.filter(r=>r.confirmou_em).length]]:[]);
+  const render=()=>{ const l=rows.filter(r=>f==='todos'||(f==='viram'&&r.viu_em)||(f==='nao'&&!r.viu_em)||(f==='conf'&&r.confirmou_em));
+    $('#avView').innerHTML=`<button class="btn ghost" id="avRelVoltar" style="margin:0 0 12px">‹ Voltar</button>
+     <div class="sec">📊 ${eoH(a.titulo)}</div>
+     <div class="seg" id="avRelSeg" style="margin:8px 0;flex-wrap:wrap">${tabs.map(([k,t,n])=>`<button type="button" data-f="${k}" class="${f===k?'sel':''}">${t} (${n})</button>`).join('')}</div>
+     <button class="btn ghost" id="avRelXls" style="margin:0 0 8px;padding:8px">⬇ Excel</button>
+     ${l.length?`<div style="border:1px solid var(--line);border-radius:12px;overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr><th style="${AV_TD}">Nome</th><th style="${AV_TD}">Consórcio</th><th style="${AV_TD}">Viu</th>${conf?`<th style="${AV_TD}">Confirmou</th>`:''}</tr></thead><tbody>${l.map(r=>`<tr><td style="${AV_TD}">${eoH(r.nome)}</td><td style="${AV_TD}">${eoH(avLbl(AV_CONS,r.consorcio)||'—')}</td><td style="${AV_TD}">${dt(r.viu_em)}${r.vezes>1?` <span class="sub">(${r.vezes}×)</span>`:''}</td>${conf?`<td style="${AV_TD}">${dt(r.confirmou_em)}</td>`:''}</tr>`).join('')}</tbody></table></div>`:'<p class="sub">Ninguém nesse filtro.</p>'}`;
+    $('#avRelVoltar').onclick=avInit;
+    $('#avRelSeg').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ f=b.dataset.f; render(); });
+    $('#avRelXls').onclick=()=>exportarXlsx('aviso_'+a.id+'_quem_viu.xlsx','Quem viu',[['Nome','Consórcio','Viu em','Vezes','Confirmou em'],
+      ...rows.map(r=>[r.nome,avLbl(AV_CONS,r.consorcio)||'',r.viu_em?new Date(r.viu_em).toLocaleString('pt-BR'):'',r.vezes||'',r.confirmou_em?new Date(r.confirmou_em).toLocaleString('pt-BR'):''])]);
+  };
+  render();
+}
+async function avForm(){
+  const a=avEdit||{}, hoje=pavDiaISO(Date.now());
+  if(!avOpc){ try{ const {data,error}=await sb.rpc('app_aviso_opcoes'); if(error) throw error; avOpc=data||{cargos:[],pessoas:[]}; }
+    catch(e){ toast('Erro: '+(e.message||e)); return; } }
+  const f={}; ['consorcios','funcoes','cargos','pessoas','condicoes'].forEach(k=>{ f[k]=((a.filtros||{})[k]||[]).map(String); });
+  const lem=(a.lembrete_horarios||[]).map((h,i)=>({horario:avHM(h),texto:(a.lembrete_textos||[])[i]||''}));
+  const dias=(a.lembrete_dias&&a.lembrete_dias.length?a.lembrete_dias:[1,2,3,4,5]).map(Number);
+  const dest=avDestinos(), destSel=a.botao_url?'__url':(a.botao_link||'');
+  const chips=(grupo,lista)=>lista.map(([v,l])=>`<button type="button" class="fchip${f[grupo].includes(String(v))?' on':''}" style="--c:var(--acc)" data-avf="${grupo}" data-v="${eoH(String(v))}">${eoH(l)}</button>`).join('');
+  const sec=t=>`<div class="sec" style="margin-top:20px">${t}</div>`;
   FOTO2_BLOBS['avImg']=null;
   $('#avView').innerHTML=`<button class="btn ghost" id="avVoltar" style="margin:0 0 12px">‹ Voltar</button>
    <div class="sec">${a.id?'✏️ Editar aviso':'➕ Novo aviso'}</div>
+   ${sec('1 · Conteúdo')}
    <label>Título *</label><input id="avTit" value="${eoH(a.titulo||'')}"/>
    <label>Texto (use **negrito**)</label><textarea id="avTxt" rows="4">${eoH(a.texto||'')}</textarea>
    ${a.imagem?`<div class="sub" style="margin-top:8px">Imagem atual:</div><img src="${eoH(avImg(a.imagem))}" style="max-width:160px;border-radius:10px;margin-top:4px"><label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="avImgRm" style="width:auto"/> Remover imagem</label>`:''}
    ${fotoPickHtml('avImg', a.imagem?'Trocar imagem':'Imagem (opcional)')}
-   <label>Texto do botão</label><input id="avBtn" value="${eoH(a.botao_texto||'')}" placeholder="ex.: Fazer meu checklist agora"/>
-   <label>O botão leva para</label><select id="avLink">${AV_LINKS.map(([v,l])=>`<option value="${v}"${(a.botao_link||'')===v?' selected':''}>${l}</option>`).join('')}</select>
-   <label>Quem vê</label><select id="avPub"><option value="todos"${a.publico!=='condutores_vinculados'?' selected':''}>Todos os usuários</option><option value="condutores_vinculados"${a.publico==='condutores_vinculados'?' selected':''}>Só quem tem carro vinculado</option></select>
+   ${sec('2 · Quem vê')}
+   <p class="sub" style="margin:2px 0 0">Sem nenhum filtro = todos os usuários. Os filtros se somam: a pessoa precisa atender a cada um que você marcar.</p>
+   <label>Consórcio</label><div style="${AV_CH}">${chips('consorcios',AV_CONS)}</div>
+   <label>Função</label><div style="${AV_CH}">${chips('funcoes',AV_FUNC)}</div>
+   <label>Cargo</label><div style="${AV_CH};max-height:140px;overflow:auto">${chips('cargos',(avOpc.cargos||[]).map(c=>[c.id,c.nome]))}</div>
+   <label>Pessoas específicas</label><div id="avPesSel" style="${AV_CH}"></div>
+   <input id="avPesBusca" placeholder="Buscar pelo nome para adicionar…" autocomplete="off" style="margin-top:6px"/>
+   <div id="avPesLista" style="max-height:170px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:6px"></div>
+   <label>Condição</label><div style="${AV_CH}">${chips('condicoes',AV_COND)}</div>
+   <div id="avPrevia" style="margin-top:10px;padding:9px 12px;border-radius:10px;background:var(--ok-bg);color:var(--ok);font-size:14px">👥 Calculando…</div>
+   ${sec('3 · Como aparece')}
+   <div class="seg" id="avExib" style="flex-wrap:wrap">${AV_EXIB.map(([v,l])=>`<button type="button" data-v="${v}" class="${(a.exibicao||'sempre')===v?'sel':''}">${l}</button>`).join('')}</div>
+   ${sec('4 · Botão')}
+   <label>Texto do botão (vazio = sem botão)</label><input id="avBtn" value="${eoH(a.botao_texto||'')}" placeholder="ex.: Abrir agora"/>
+   <label>O botão leva para</label><select id="avLink">${dest.map(([v,l])=>`<option value="${eoH(v)}"${destSel===v?' selected':''}>${eoH(l)}</option>`).join('')}</select>
+   <div id="avUrlBox" class="${destSel==='__url'?'':'hidden'}"><label>Endereço do site *</label><input id="avUrl" type="url" placeholder="https://…" value="${eoH(a.botao_url||'')}"/></div>
+   ${sec('5 · Período')}
    <div style="display:flex;gap:8px"><div style="flex:1"><label>De *</label><input id="avIni" type="date" value="${a.inicio||hoje}"/></div><div style="flex:1"><label>Até *</label><input id="avFim" type="date" value="${a.fim||''}"/></div></div>
    <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="avAtivo" style="width:auto" ${a.ativo===false?'':'checked'}/> Aviso ativo</label>
-   <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="avLemb" style="width:auto" ${a.lembrete==='checklist_frota'?'checked':''}/> 🔔 Lembretes do checklist (08h, 10h, 12h, 14h, 16h · seg–sex · só p/ quem não fez o checklist do dia)</label>
-   <div id="avLembBox" class="${a.lembrete==='checklist_frota'?'':'hidden'}">${lemb.map((t,i)=>`<label>${['08h','10h','12h','14h','16h'][i]}</label><input class="avLembTxt" value="${eoH(t)}"/>`).join('')}</div>
-   <button class="btn" id="avSalvar" style="margin-top:14px">Salvar aviso</button>`;
+   ${sec('6 · Lembretes por push (opcional)')}
+   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="avLemb" style="width:auto" ${lem.length?'checked':''}/> Mandar lembretes por push</label>
+   <div id="avLembBox" class="${lem.length?'':'hidden'}">
+     <p class="sub" style="margin:4px 0 0">Saem em até 15 min depois de cada horário. Texto vazio = usa o do 1º horário (ou o título do aviso).</p>
+     <div id="avLembLista"></div>
+     <button type="button" class="btn ghost" id="avLembAdd" style="margin:6px 0 0;padding:8px">＋ Horário</button>
+     <label>Dias</label><div style="${AV_CH}">${AV_DIAS.map(([v,l])=>`<button type="button" class="fchip${dias.includes(v)?' on':''}" style="--c:var(--acc)" data-avdia="${v}">${l}</button>`).join('')}</div>
+     <label>Título do push</label><input id="avLembTit" value="${eoH(a.lembrete_titulo||'')}" placeholder="vazio = título do aviso"/>
+     <label>Mandar para</label><select id="avPend">${AV_PEND.map(([v,l])=>`<option value="${v}"${(a.lembrete_pendencia||'')===v?' selected':''}>${eoH(l)}</option>`).join('')}</select>
+   </div>
+   <button class="btn" id="avSalvar" style="margin-top:18px">Salvar aviso</button>`;
   wireFotoPick($('#avView'));
   $('#avVoltar').onclick=avInit;
-  $('#avLemb').onchange=()=>$('#avLembBox').classList.toggle('hidden',!$('#avLemb').checked);
+  // público: chips + pessoas + prévia de quantas pessoas recebem (com atraso p/ não chamar a cada toque)
+  const filtrosOut=()=>{ const o={}; Object.keys(f).forEach(k=>{ if(f[k].length) o[k]=f[k].slice(); }); return o; };
+  let tPrev=null;
+  const previa=()=>{ clearTimeout(tPrev); tPrev=setTimeout(async()=>{ const el=$('#avPrevia'); if(!el) return;
+    try{ const {data,error}=await sb.rpc('app_aviso_publico_previa',{p_filtros:filtrosOut()}); if(error) throw error;
+      const n=data.n||0, ex=(data.nomes||[]).join(', ');
+      el.style.background=n?'var(--ok-bg)':'var(--warn-bg)'; el.style.color=n?'var(--ok)':'inherit';
+      el.textContent=n?`👥 ${n} ${n>1?'pessoas recebem':'pessoa recebe'} este aviso${ex?' (ex.: '+ex+(n>6?'…':'')+')':''}`:'⚠️ Ninguém recebe com esses filtros';
+    }catch(e){ el.textContent='Não deu para calcular o público: '+(e.message||e); } },350); };
+  $('#avView').querySelectorAll('[data-avf]').forEach(b=>b.onclick=()=>{ const g=b.dataset.avf, v=b.dataset.v, i=f[g].indexOf(v);
+    if(i>=0) f[g].splice(i,1); else f[g].push(v); b.classList.toggle('on',i<0); previa(); });
+  const pesNome=id=>{ const p=(avOpc.pessoas||[]).find(x=>String(x.id)===String(id)); return p?p.nome:'(usuário inativo)'; };
+  const pesRender=()=>{
+    $('#avPesSel').innerHTML=f.pessoas.length?f.pessoas.map(id=>`<button type="button" class="fchip on" style="--c:var(--acc)" data-pesrm="${eoH(id)}" title="Tirar">${eoH(pesNome(id))} ✕</button>`).join(''):'<span class="sub">Nenhuma pessoa escolhida.</span>';
+    $('#avPesSel').querySelectorAll('[data-pesrm]').forEach(b=>b.onclick=()=>{ f.pessoas=f.pessoas.filter(x=>x!==b.dataset.pesrm); pesRender(); previa(); });
+    const q=$('#avPesBusca').value.trim().toLowerCase();
+    const lista=(avOpc.pessoas||[]).filter(p=>!f.pessoas.includes(String(p.id))&&(!q||String(p.nome||'').toLowerCase().includes(q))).slice(0,60);
+    $('#avPesLista').innerHTML=lista.length?lista.map(p=>`<div data-pesadd="${eoH(String(p.id))}" style="padding:8px 11px;border-bottom:1px solid var(--line);cursor:pointer">${eoH(p.nome)} <span class="sub">· ${eoH(avLbl(AV_CONS,p.consorcio)||'—')} · ${eoH(avLbl(AV_FUNC,p.funcao)||'—')}</span></div>`).join(''):'<div class="sub" style="padding:8px 11px">Ninguém encontrado.</div>';
+    $('#avPesLista').querySelectorAll('[data-pesadd]').forEach(d=>d.onclick=()=>{ f.pessoas.push(d.dataset.pesadd); pesRender(); previa(); });
+  };
+  $('#avPesBusca').oninput=pesRender; pesRender(); previa();
+  // exibição e botão
+  $('#avExib').querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ $('#avExib').querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('sel',x===b)); });
+  $('#avLink').onchange=()=>$('#avUrlBox').classList.toggle('hidden',$('#avLink').value!=='__url');
+  // lembretes: lista de horário + texto
+  const lemRender=()=>{
+    $('#avLembLista').innerHTML=lem.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="time" step="900" data-lh="${i}" value="${eoH(x.horario)}" style="width:118px;flex:none"/><input data-lt="${i}" value="${eoH(x.texto)}" placeholder="Texto do lembrete"/><button type="button" class="btn ghost" data-lrm="${i}" style="margin:0;width:auto;padding:8px 12px" title="Tirar horário">✕</button></div>`).join('')||'<p class="sub" style="margin:6px 0 0">Nenhum horário ainda.</p>';
+    $('#avLembLista').querySelectorAll('[data-lh]').forEach(el=>el.oninput=()=>{ lem[+el.dataset.lh].horario=el.value; });
+    $('#avLembLista').querySelectorAll('[data-lt]').forEach(el=>el.oninput=()=>{ lem[+el.dataset.lt].texto=el.value; });
+    $('#avLembLista').querySelectorAll('[data-lrm]').forEach(el=>el.onclick=()=>{ lem.splice(+el.dataset.lrm,1); lemRender(); });
+  };
+  lemRender();
+  $('#avLembAdd').onclick=()=>{ lem.push({horario:'',texto:''}); lemRender(); };
+  $('#avLemb').onchange=()=>{ const on=$('#avLemb').checked; $('#avLembBox').classList.toggle('hidden',!on); if(on&&!lem.length){ lem.push({horario:'08:00',texto:''}); lemRender(); } };
+  $('#avView').querySelectorAll('[data-avdia]').forEach(b=>b.onclick=()=>{ const v=+b.dataset.avdia, i=dias.indexOf(v); if(i>=0) dias.splice(i,1); else dias.push(v); b.classList.toggle('on',i<0); });
   $('#avSalvar').onclick=async()=>{
-    const tit=$('#avTit').value.trim(), fim=$('#avFim').value;
+    const tit=$('#avTit').value.trim(), fim=$('#avFim').value, lk=$('#avLink').value, url=$('#avUrl').value.trim();
+    const exib=($('#avExib .sel')||{dataset:{v:'sempre'}}).dataset.v, lembOn=$('#avLemb').checked, pend=$('#avPend').value;
+    const hs=lem.filter(x=>x.horario);
     if(!tit) return toast('Informe o título'); if(!fim) return toast('Informe até quando o aviso vale');
+    if(lk==='__url'&&!/^https?:\/\//i.test(url)) return toast('Informe o endereço do site (começando com https://)');
+    if(lembOn&&!hs.length) return toast('Informe pelo menos um horário de lembrete');
+    if(lembOn&&!dias.length) return toast('Escolha os dias dos lembretes');
+    if(lembOn&&pend==='nao_confirmou'&&exib!=='confirmar') return toast('"Só quem não tocou Li e entendi" pede o modo "Até tocar Li e entendi"');
     const btn=$('#avSalvar'); btn.disabled=true;
     try{
       const img=await uploadFoto2('avImg','avisos'), rm=$('#avImgRm');
-      const lembOn=$('#avLemb').checked;
-      // p_imagem: path novo | '-' = remover a atual | null = manter a atual
-      const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id||null,p_titulo:tit,p_texto:$('#avTxt').value||null,p_imagem:img||(rm&&rm.checked?'-':null),
-        p_botao_texto:$('#avBtn').value||null,p_botao_link:$('#avLink').value||null,p_publico:$('#avPub').value,p_inicio:$('#avIni').value||null,p_fim:fim,
-        p_ativo:$('#avAtivo').checked,p_lembrete:lembOn?'checklist_frota':null,p_lembrete_textos:lembOn?[...document.querySelectorAll('.avLembTxt')].map(x=>x.value):null});
-      if(error) throw error;
+      // imagem: path novo | '-' = remover a atual | null = manter (cópia de outro aviso leva a mesma imagem)
+      const dados={titulo:tit, texto:$('#avTxt').value||null, imagem:img||(rm&&rm.checked?'-':(a.id?null:(a.imagem||null))),
+        botao_texto:$('#avBtn').value.trim()||null, botao_link:lk==='__url'?null:(lk||null), botao_url:lk==='__url'?url:null,
+        filtros:filtrosOut(), exibicao:exib, inicio:$('#avIni').value||null, fim, ativo:$('#avAtivo').checked,
+        lembretes:lembOn?hs.map(x=>({horario:x.horario,texto:x.texto})):[], lembrete_dias:dias,
+        lembrete_titulo:$('#avLembTit').value.trim()||null, lembrete_pendencia:pend||null};
+      const {error}=await sb.rpc('app_aviso_salvar',{p_id:a.id||null,p_dados:dados}); if(error) throw error;
       toast('✓ Aviso salvo'); avInit();
     }catch(e){ toast('Erro: '+(e.message||e)); btn.disabled=false; }
   };
