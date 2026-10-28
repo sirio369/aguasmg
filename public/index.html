@@ -354,6 +354,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="projetos"><div class="ic">📐</div><div class="nm">Projetos</div></button>
       <button class="mod" data-go="vrpman"><div class="ic">🔧</div><div class="nm">VRPs – Campo</div></button>
       <button class="mod" data-go="pavimento"><div class="ic">🧱</div><div class="nm">Gestão de Pavimento</div></button>
+      <button class="mod" data-go="seg"><div class="ic">⛑️</div><div class="nm">Segurança do Trabalho</div></button>
     </div>
     <div class="sec" style="margin-top:20px">🧰 Suporte</div>
     <div class="grid" style="margin-top:10px">
@@ -362,6 +363,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
       <button class="mod hidden" id="homeAuxProg" data-go="auxiliar_programacao"><div class="ic">🗂️</div><div class="nm">Auxiliar de Programação</div></button>
       <button class="mod hidden" id="homeMeusColab" data-go="meus_colab"><div class="ic">📇</div><div class="nm">Meus colaboradores</div></button>
+      <button class="mod hidden" id="homeQsms" data-go="qsms"><div class="ic">🦺</div><div class="nm">QSMS</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
     </div>
     <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
@@ -1201,6 +1203,56 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="pavpMapa" class="hidden" style="margin-top:4px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
 
+  <main id="seg" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <h1>Segurança do Trabalho</h1>
+    <p class="sub">APR, PT (trabalho em altura) e PET (espaço confinado) preenchidas e assinadas no celular — com GPS, data, hora e usuário. Funciona sem sinal.</p>
+    <div id="segRasc"></div>
+    <button class="btn" id="segNovaApr" style="margin-top:8px">⛑️ Nova APR</button>
+    <div id="segTrat"></div>
+    <div class="sec">Minhas atividades (10 dias)</div>
+    <div id="segLista"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="seg_form" class="hidden">
+    <div class="bar"><button class="bk" id="segFormBack">‹ Segurança do Trabalho</button></div>
+    <h1 id="segFormTit">APR</h1>
+    <div id="segFormBody"></div>
+  </main>
+
+  <main id="seg_acomp" class="hidden">
+    <div class="bar"><button class="bk" data-go="seg">‹ Segurança do Trabalho</button></div>
+    <h1 id="segAcTit">PET</h1>
+    <div id="segAcBody"></div>
+  </main>
+
+  <main id="qsms" class="hidden">
+    <div class="bar"><button class="bk" data-back>‹ Início</button></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <h1>QSMS · Segurança do Trabalho</h1>
+      <button id="qsCfg" class="hidden" title="Quem acessa o QSMS" style="all:unset;cursor:pointer;font-size:22px;line-height:1;padding:4px 2px;margin-top:4px">⚙️</button>
+    </div>
+    <p class="sub">Verificação, gestão e consolidação das APRs, PTs e PETs preenchidas em campo.</p>
+    <div class="seg" id="qsTabs" style="margin:8px 0">
+      <button type="button" data-t="painel" class="sel">📊 Painel</button>
+      <button type="button" data-t="forms">📋 Formulários</button>
+      <button type="button" data-t="trat">🛠️ Tratativas</button>
+    </div>
+    <div class="segfil" id="qsPeriodo">
+      <input type="date" id="qsDe" title="De"/><input type="date" id="qsAte" title="Até"/>
+      <select id="qsCons"><option value="">Ambos os consórcios</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select>
+    </div>
+    <div id="qsView"></div>
+  </main>
+
+  <main id="qsms_acesso" class="hidden">
+    <div class="bar"><button class="bk" data-go="qsms">‹ QSMS</button></div>
+    <h1>QSMS · Acesso</h1>
+    <p class="sub">Marque quem pode acessar a gestão de QSMS. Admin e os cargos Técnico de Segurança do Trabalho, Técnico de Qualidade e Coordenador de QSMSS têm acesso sempre.</p>
+    <input id="qsmsAcBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
+    <div id="qsmsAcList"><p class="sub">Carregando…</p></div>
+  </main>
+
   <main id="matriculas" class="hidden">
     <div class="bar"><button class="bk" id="mtBack">‹ Auxiliar de Programação</button></div>
     <h1>Criação de matrículas</h1>
@@ -1475,6 +1527,18 @@ async function enviar(item){
       fields[param]=(item.fotosArray&&item.fotosArray.includes(param))?[path]:path;
     }
   }
+  // anexos (Segurança do Trabalho): n arquivos num único param jsonb {chave: path} — p/ assinaturas em número variável
+  if(item.anexos){
+    const m={};
+    for(const k in item.anexos){
+      const blob=item.anexos[k]; if(!blob) continue;
+      const path=(item.pasta||'seg')+'/'+item.id+'_'+k+'.jpg';
+      const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:'image/jpeg',upsert:true});
+      if(error) throw error;
+      m[k]=path;
+    }
+    fields[item.anexosParam||'p_anexos']=m;
+  }
   const {error}=await sb.rpc(item.rpc||'app_registrar_pressao', fields);
   if(error) throw error;
 }
@@ -1520,7 +1584,7 @@ function iniciarGPS(){
     const a=Math.round(gps.acc);
     if(gps.acc<=PRECISAO_MAX) banner('ok',`GPS ${a} m · dentro da tolerância`);
     else banner('warn',`GPS ${a} m · aguardando ≤ ${PRECISAO_MAX} m`);
-    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps(); if(typeof pavOnGps==='function') pavOnGps();
+    validar(); if(typeof lgOnGps==='function') lgOnGps(); if(typeof pqOnGps==='function') pqOnGps(); if(typeof capOnGps==='function') capOnGps(); if(typeof asOnGps==='function') asOnGps(); if(typeof eoOnGps==='function') eoOnGps(); if(typeof cadOnGps==='function') cadOnGps(); if(typeof pavOnGps==='function') pavOnGps(); if(typeof segOnGps==='function') segOnGps();
   },err=>{ banner('bad','Sem sinal de GPS — ative a localização'); },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 function banner(cls,txt){const b=$('#gpsBanner');b.className='banner '+cls;b.textContent=txt;}
@@ -1756,7 +1820,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','seg_acomp','qsms','qsms_acesso'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1788,6 +1852,11 @@ function irPara(id){
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
+  if(id==='seg') segInit();
+  if(id==='seg_form') segFormInit();
+  if(id==='seg_acomp') segAcompInit();
+  if(id==='qsms') qsmsInit();
+  if(id==='qsms_acesso') qsmsAcInit();
   if(id==='roteiro') rlInit();
   if(id==='notificacoes') ntfInit();
   if(id==='vitrine') vtInit(); else vtParar();
@@ -1809,7 +1878,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const hq=document.getElementById('homeQsms'); if(hq) hq.classList.toggle('hidden', !(ME&&ME.qsms)); const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -8803,6 +8872,874 @@ if($('#supBack')) $('#supBack').addEventListener('click',()=>{
   if(supCurrent==='home'||!supCurrent) irPara('home'); else if(supCurrent==='area') supHome(); else supArea(supAreaId);
 });
 
+// ---------- SEGURANÇA DO TRABALHO (APR · PT altura · PET espaço confinado) — campo ----------
+// Formulários digitais que substituem o papel: APR (modelo COPASA PRT-CSMG-2023_003), PT de trabalho em altura
+// (FOR_PG_22 rev 00, do consórcio) e PET de espaço confinado (COPASA FOR-PES_131-CSMG). Uma "atividade" (OS + local
+// + GPS + tipo de intervenção) nasce com a APR; PT/PET só saem de uma APR que as indique. Tudo vai pela fila offline
+// (itens 'seg-<timestamp>' → ordem garantida) e fica também numa base local (IndexedDB 'seg_local') p/ agir e gerar
+// o PDF sem sinal. Backend: schema "16 - qsms" + RPCs app_seg_*.
+const SEG_MODELO={APR:'PRT-CSMG-2023_003',PT:'FOR_PG_22 rev 00',PET:'FOR-PES_131-CSMG'};
+const SEG_TITULO={APR:'Análise Preliminar de Risco — APR',PT:'Permissão de Trabalho em Altura — PT',PET:'Permissão de Entrada e Trabalho em Espaço Confinado — PET'};
+const SEG_ST_LBL={emitida:'Emitida',liberada:'Liberada',impedida:'Impedida',encerrada:'Encerrada',interrompida:'Interrompida'};
+const SEG_ST_COR={emitida:'#0e7c86',liberada:'#1a7f4b',impedida:'#b3261e',encerrada:'#6b7280',interrompida:'#c2410c'};
+const SEG_TIPOS=[['vazamento','Reparo de vazamento (rede/ramal/cavalete)'],['ramal','Instalação/substituição de ramal'],['hidrometro','Substituição/implantação de hidrômetro'],['vrp','Instalação/manutenção de VRP'],['dmc','Implantação de DMC'],['rede_vca','Rede — vala a céu aberto (VCA)'],['rede_hdd','Rede — método não destrutivo (HDD)'],['pavimento','Recomposição de pavimento'],['pesquisa','Pesquisa de vazamento'],['logger','Instalação de logger / medição de pressão'],['fiscalizacao','Fiscalização de irregularidades'],['comercial','Serviço comercial / recadastramento'],['outro','Outro']];
+const SEG_TIPO_LBL=k=>(SEG_TIPOS.find(t=>t[0]===k)||[])[1]||k||'—';
+const SEG_RECOMENDACOES=['Os empregados devem fazer o uso do uniforme e dos EPI e EPC.','Deverá ser previsto local para as refeições, higiene pessoal e necessidades fisiológicas (quando aplicável).','Deve-se manter a ordem, organização e limpeza do local de trabalho.','Caso surja outra atividade, deverá ser avaliada a necessidade da confecção de outra APR.','Em caso de interferências (tubulações de gases, elétricas, telefônicas, dentre outras) a continuidade da atividade deverá ser definida pelos responsáveis pelo serviço em execução.'];
+// [código, pergunta, medida de controle, invertida] — nas invertidas (r2, r6) o problema é o "Não" e ele impede a emissão
+const SEG_RISCOS=[['r1','Existe risco de afogamento?','Usar colete salva-vidas.'],['r2','O local foi sinalizado/isolado?','Realizar a sinalização com cones, placas, fita zebrada e/ou tela de segurança — NT 098.',1],['r3','Existe risco de atropelamento?','Usar colete refletivo.'],['r4','Existe risco de choque e/ou contato com partes elétricas?','Desligar, isolar, inspecionar o equipamento e realizar teste de consistência, sendo profissional autorizado pela empresa.'],['r5','Existe risco de queda ou escorregamento?','Sinalizar e/ou isolar a área.'],['r6','As ferramentas que serão utilizadas estão em condições de uso?','Realizar inspeção, utilizar ferramentas em boas condições de uso, não improvisar.',1],['r7','Existe o risco de prensamento ou esmagamento?','Sistema de proteção de máquinas e equipamentos.'],['r8','Existe o risco de queimadura dos olhos?','Utilizar os equipamentos de proteção.'],['r9','Existem pessoas trabalhando em andaimes ou escadas?','Sinalizar e isolar a área.'],['r10','Existe risco de contaminação por gases?','Usar ventilação/exaustão e detector de gases.'],['r11','Existe risco de contato com óleo, graxa, solventes ou produtos químicos?','Utilizar os equipamentos de proteção.'],['r12','Existe risco de soterramento?','Providenciar escoramento e verificar a distância para depositar o material escavado — NT 014.'],['r13','Existe risco na atividade de içamento, transporte e movimentação de carga?','Os acessórios de içamento devem estar em boas condições e a área deve ser isolada.']];
+const SEG_RISCO_FLAG=(r,v)=>r[3]?v==='N':v==='S'; // resposta que indica risco/problema
+const SEG_EPIS=[['capacete','Capacete'],['perneira','Perneira de raspa'],['abafador','Abafador'],['botina','Botina de segurança'],['oculos','Óculos de segurança'],['mascara','Máscara'],['luvas','Luvas'],['avental','Avental de raspa'],['cinto','Cinto de segurança'],['mascara_solda','Máscara de solda'],['protetor_facial','Protetor facial'],['macacao','Macacão/Jardineira de saneamento']];
+const SEG_EPI_BASE=['capacete','botina','oculos','luvas','macacao'];
+// Sugestões por tipo de intervenção (editáveis no formulário): fases, riscos já marcados "Sim" e EPIs
+const SEG_TEMPLATE={
+  vazamento:{f:['Sinalizar e isolar a área (NT 098)','Localizar o vazamento e escavar','Escorar a vala quando necessário (NT 014)','Fechar o registro e isolar o trecho','Executar o reparo','Testar e restabelecer o abastecimento','Reaterrar e compactar','Limpar o local e desmobilizar'],r:['r3','r5','r12'],e:SEG_EPI_BASE.concat(['abafador'])},
+  ramal:{f:['Sinalizar e isolar a área (NT 098)','Escavar a vala do ramal','Escorar a vala quando necessário (NT 014)','Executar a instalação/substituição do ramal','Testar e restabelecer o abastecimento','Reaterrar e compactar','Limpar o local e desmobilizar'],r:['r3','r5','r12'],e:SEG_EPI_BASE.concat(['abafador'])},
+  hidrometro:{f:['Sinalizar o local','Fechar o registro do cavalete','Substituir/instalar o hidrômetro','Testar e verificar vazamentos','Registrar a leitura e lacrar','Limpar o local'],r:['r3'],e:SEG_EPI_BASE},
+  vrp:{f:['Sinalizar e isolar a área (NT 098)','Abrir a caixa e ventilar','Medir gases antes de qualquer acesso','Executar a manutenção/instalação da VRP','Ajustar e conferir as pressões','Fechar a caixa e desmobilizar'],r:['r3','r5','r10','r13'],e:SEG_EPI_BASE,pet:1},
+  dmc:{f:['Sinalizar e isolar a área (NT 098)','Escavar e escorar quando necessário (NT 014)','Instalar registro/macromedidor/VRP','Testar e conferir a estanqueidade','Reaterrar, compactar e desmobilizar'],r:['r3','r5','r12','r13'],e:SEG_EPI_BASE.concat(['abafador'])},
+  rede_vca:{f:['Sinalizar e isolar a área (NT 098)','Locar a rede e as interferências','Escavar a vala','Escorar a vala (NT 014)','Assentar a tubulação','Testar a estanqueidade','Reaterrar e compactar','Recompor e desmobilizar'],r:['r3','r5','r7','r12','r13'],e:SEG_EPI_BASE.concat(['abafador'])},
+  rede_hdd:{f:['Sinalizar e isolar a área (NT 098)','Locar as interferências (gás, elétrica, telefonia)','Abrir os poços de entrada e saída','Executar o furo piloto e o alargamento','Puxar a tubulação','Testar e interligar','Fechar os poços e desmobilizar'],r:['r3','r4','r5','r7','r12','r13'],e:SEG_EPI_BASE.concat(['abafador'])},
+  pavimento:{f:['Sinalizar e isolar a área (NT 098)','Preparar a base','Executar a recomposição','Compactar/curar','Limpar o local e desmobilizar'],r:['r3','r5','r8','r11'],e:SEG_EPI_BASE.concat(['abafador','perneira'])},
+  pesquisa:{f:['Sinalizar o ponto de trabalho','Executar a pesquisa acústica','Registrar as ocorrências','Desmobilizar'],r:['r3'],e:['capacete','botina','oculos','luvas']},
+  logger:{f:['Sinalizar o local','Instalar/retirar o logger','Conferir o funcionamento','Desmobilizar'],r:['r3','r5'],e:SEG_EPI_BASE},
+  fiscalizacao:{f:['Identificar o imóvel','Vistoriar a ligação','Registrar a irregularidade','Desmobilizar'],r:['r3'],e:['botina','luvas']},
+  comercial:{f:['Abordar o cliente','Registrar o cadastro','Desmobilizar'],r:['r3'],e:['botina']},
+  outro:{f:[],r:[],e:SEG_EPI_BASE}};
+const SEG_PET_PRELIM=['A APR (Análise Preliminar de Riscos) foi preenchida pelos empregados e está disponível no local?','Os treinamentos dos empregados estão válidos?','Os exames médicos para função estão válidos?','O estado de conservação dos equipamentos de sinalização e isolamento está em boas condições de uso?','A sinalização e o isolamento foram efetuados corretamente?','Os equipamentos de acesso estão disponíveis (escada e corda presa ao cinturão paraquedista ou tripé portátil completo)?','O insuflador está funcionando corretamente?','O detector de gases está funcionando, está calibrado e foi testado antes do início do serviço?','Há meios de contato ou comunicação permanente entre as pessoas envolvidas na atividade?','Todos os empregados autorizados conhecem os riscos e procedimentos de segurança?','Os empregados foram orientados da prerrogativa do direito de recusa para situações de riscos iminentes?'];
+const SEG_PET_ESPACOS=['Poço de visita (PV)','Caixa de VRP / registro','Reservatório','Galeria','Tanque','Poço de sucção / estação elevatória','Outro'];
+const SEG_PET_RECOM='É proibida a utilização de oxigênio puro para ventilação de espaços confinados. Se alguma ação preliminar não tiver sido realizada (resposta "não"), a entrada não deverá ocorrer. Se algum dos agentes avaliados não apresentar "condição segura" durante as medições, interromper imediatamente a entrada e o trabalho. A permissão de entrada é válida somente para uma entrada. O trabalho em espaço confinado deverá ser realizado por no mínimo 2 (dois) empregados.';
+// [campo, rótulo, unidade, limite (texto), dentro da condição segura?]
+const SEG_GAS=[['o2','O₂','%','> 19,5 e < 23%',v=>v>19.5&&v<23],['lie','Explosivos','% LIE','< 10% LIE',v=>v<10],['co','CO','ppm','< 39 ppm',v=>v<39],['h2s','H₂S','ppm','< 8 ppm',v=>v<8]];
+const SEG_PT_ACESSO=[['escada_fixa','Escada fixa'],['escada_portatil','Escada portátil'],['andaime','Andaime'],['plataforma','Plataforma elevatória'],['cesto_acoplado','Cesto acoplado'],['acesso_cordas','Acesso por cordas'],['cesto_aereo','Cesto aéreo'],['cesto_suspenso','Cesto suspenso'],['cadeira_suspensa','Cadeira suspensa'],['outro','Outro']];
+const SEG_PT_SISTEMA=[['retencao','Retenção de queda'],['restricao','Restrição de movimentação'],['posicionamento','Posicionamento no trabalho'],['cordas','Acesso por cordas']];
+// blocos do checklist da PT; "se"/"sis" = só se aplicam com aquele meio de acesso / sistema (senão viram NA)
+const SEG_PT_BLOCOS=[
+  {t:'Condição física para o trabalho em altura',i:['Todos os executantes apresentam boa condição de saúde para executar o trabalho em altura?','Nenhum dos executantes teve desmaios, tonturas, crises de labirintite ou hipertensão?','Nenhum dos executantes tem histórico de doenças neurológicas ou psiquiátricas que contraindique o trabalho em altura?']},
+  {t:'Capacitação, aptidão e autorização',i:['Os executantes do serviço foram capacitados e devidamente autorizados para executar o trabalho em altura?','Os executantes do serviço foram submetidos a exames médicos para constatação da aptidão para o trabalho em altura?']},
+  {t:'Análise de risco',i:['Foi realizada a análise de risco antes do início das atividades?','A análise de risco foi disseminada para todos os trabalhadores envolvidos com o serviço?','Foi definida a forma de supervisão do trabalho em altura?']},
+  {t:'Área de trabalho',i:['A área de trabalho está isolada e sinalizada de forma adequada?','As condições climáticas são adequadas à realização do trabalho em altura?','A iluminação do local é adequada?','Foram adotadas medidas para evitar a queda de ferramentas e materiais?']},
+  {t:'Ancoragem',i:['Os equipamentos de proteção contra quedas estão devidamente conectados a ancoragem estrutural ou temporária?','Os dispositivos de ancoragem estão íntegros e isentos de pontos de corrosão, trincas ou deformações aparentes?','A linha de vida temporária possui projeto de instalação?','O trava-queda deslizante guiado é compatível com a linha de vida utilizada?']},
+  {t:'Equipamentos de proteção',i:['Os executantes estão utilizando capacetes de proteção com jugular, óculos de segurança, luvas de proteção, calçados de segurança e protetor auditivo?','Os executantes estão utilizando cinturão de segurança do tipo paraquedista (para sistemas de retenção de queda ou de acesso por cordas) ou tipo abdominal (para sistemas de restrição de movimentação ou de posicionamento no trabalho)?','Todos os executantes certificaram-se de que os equipamentos de proteção individual estão em boas condições de uso?']},
+  {t:'Escada portátil',se:['escada_portatil'],i:['A escada portátil possui degraus e sapatas antiderrapantes?','A escada portátil está fixada impedindo seu escorregamento?']},
+  {t:'Escada fixa vertical',se:['escada_fixa'],i:['A escada está devidamente fixada em toda a sua extensão?','A escada com mais de 2,0 m de extensão possui linha de vida ou trava-quedas retrátil?','Os degraus da escada estão firmes e em boas condições de uso?']},
+  {t:'Resgate',i:['Foi estabelecido plano de resgate das pessoas envolvidas no trabalho em altura?','Os equipamentos de resgate e materiais de primeiros socorros estão disponíveis?']},
+  {t:'Andaime',se:['andaime'],i:['O andaime possui projeto de instalação?','O andaime possui fechamento com guarda-corpo e rodapé em todo o seu perímetro?','A superfície de trabalho do andaime tem forração completa e travamento que não permita seu deslocamento ou desencaixe?','O andaime com altura superior a 1,0 metro possui escada de acesso?','O andaime tubular está apoiado em sapatas com ajustes que permitam o nivelamento?','Se do tipo móvel, os rodízios do andaime possuem travas funcionando corretamente para evitar deslocamentos acidentais?']},
+  {t:'Plataforma elevatória móvel de trabalho (PEMT)',se:['plataforma','cesto_acoplado','cesto_aereo'],i:['A PEMT possui fechamento com guarda-corpo em todo o perímetro da plataforma de trabalho?','A PEMT possui ponto de ancoragem para a conexão dos cinturões de segurança?','A PEMT possui botoeira de parada de emergência e dispositivo para abaixamento da plataforma em caso de pane?','A PEMT possui alarme sonoro automático acionado durante a subida e a descida?']},
+  {t:'Cadeira suspensa',se:['cadeira_suspensa'],i:['O trabalhador dispõe de linha de vida independente da linha de sustentação da cadeira?','A cadeira possui dispositivo de movimentação vertical com dupla trava de segurança?','A cadeira possui cinto de segurança para fixar o trabalhador na mesma?','O ponto de ancoragem da linha de vida é independente do ponto de ancoragem da linha de sustentação da cadeira?']},
+  {t:'Acesso por cordas',se:['acesso_cordas'],sis:['cordas'],i:['Os executantes possuem certificação válida na aplicação da técnica de acesso por cordas?','As cordas utilizadas são adequadas a essa finalidade e estão em perfeitas condições de uso?']}];
+(()=>{ let n=0; SEG_PT_BLOCOS.forEach(b=>{ b.cods=b.i.map(()=>'p'+(++n)); }); })();
+const SEG_PT_ANALISE='p7'; // "Foi realizada a análise de risco…" — vem "Sim" porque a PT nasce de uma APR
+const segPtBlocoAplica=(b,r)=>(!b.se&&!b.sis)||(b.se||[]).some(k=>(r.acesso||[]).includes(k))||(b.sis||[]).some(k=>(r.sistema||[]).includes(k));
+const segH=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const segNum=v=>{ if(v==null||v==='') return null; const n=parseFloat(String(v).replace(',','.')); return isFinite(n)?n:null; };
+const segFmt=s=>{ if(!s) return '—'; try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } };
+const segHora=s=>{ if(!s) return '—'; try{ return new Date(s).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } };
+const segImg=v=>!v?'':(/^(data:|blob:|https?:)/.test(v)?v:fotoURL(v));
+// medição: null = incompleta · true = fora da condição segura · false = segura
+function segMedFora(m){ const v=SEG_GAS.map(g=>segNum(m[g[0]])); if(v.some(x=>x==null)) return null; return !SEG_GAS.every((g,i)=>g[4](v[i])); }
+function segCss(){ if(document.getElementById('segcss'))return; const st=document.createElement('style'); st.id='segcss'; st.textContent=`
+ .segcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:10px}
+ .segcard h4{margin:0;font-size:14px}
+ .segforms{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+ .segfm{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:12.5px;font-weight:600;background:var(--bg)}
+ .segdot{width:8px;height:8px;border-radius:50%;flex:none}
+ .segacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+ .segacts .btn{margin:0;width:auto;padding:8px 13px;font-size:13.5px}
+ .segblk{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:12px 0;background:var(--card)}
+ .segblk>h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
+ .segblk>h3 .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--acc-ink);font-size:11px;align-items:center;justify-content:center;flex:none}
+ .segq{padding:9px 0;border-top:1px solid var(--line)}
+ .segq:first-of-type{border-top:0}
+ .segq .t{font-size:14px;line-height:1.35}
+ .segyn{display:flex;gap:6px;margin-top:6px}
+ .segyn button{flex:1;font:inherit;font-size:13.5px;padding:8px 4px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--mut);cursor:pointer}
+ .segyn button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700}
+ .segyn button.on.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+ .segmed{margin-top:7px;padding:8px 10px;border-radius:9px;background:var(--warn-bg);color:var(--ink);font-size:13px}
+ .segmed.bad{background:var(--bad-bg);color:var(--bad);font-weight:600}
+ .segmed label{all:unset;display:flex;align-items:center;gap:8px;margin-top:6px;font-weight:600;cursor:pointer}
+ .segmed input{width:18px;height:18px}
+ .segsug{font-size:11px;color:var(--acc);font-weight:700;margin-left:6px}
+ .segchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+ .segchip{border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer;background:var(--card);user-select:none}
+ .segchip.on{background:#0e7c86;color:#fff;border-color:transparent}
+ .segpes{border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin-top:8px;background:var(--bg)}
+ .segpes .top{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.02em}
+ .segpes .top button{all:unset;cursor:pointer;margin-left:auto;color:var(--bad);font-size:15px;padding:0 4px}
+ .segpes input{margin-top:6px}
+ .segrow2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .segerr{background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+ .segerr li{margin:2px 0}
+ .seggas{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+ .seggas th{font-size:11px;color:var(--mut);font-weight:600;padding:3px 2px;text-align:center}
+ .seggas td{padding:3px 2px;text-align:center}
+ .seggas td:first-child{text-align:left;font-weight:700;font-size:12px;white-space:nowrap}
+ .seggas input{padding:7px 4px;font-size:15px;text-align:center}
+ .seggas input.ok{background:var(--ok-bg);border-color:var(--ok)}
+ .seggas input.bad{background:var(--bad-bg);border-color:var(--bad);color:var(--bad);font-weight:700}
+ .seggasst{font-size:12px;font-weight:700}
+ .segbig{padding:14px;border-radius:12px;font-weight:700;font-size:15px;text-align:center;margin:10px 0}
+ .segbig.bad{background:var(--bad);color:#fff}
+ .segbig.ok{background:var(--ok-bg);color:var(--ok)}
+ .segpill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;color:#fff}
+ .segkv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px;margin-top:6px}
+ .segkv b{color:var(--mut);font-weight:600}
+ .segbar{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:4px 0}
+ .segbar .l{flex:0 0 44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .segbar .b{flex:1;height:12px;background:var(--bg);border-radius:4px;overflow:hidden}
+ .segbar .b i{display:block;height:100%;background:var(--acc);border-radius:0 4px 4px 0}
+ .segbar .v{flex:0 0 auto;min-width:28px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+ .segkpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:8px 0}
+ .segkpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;cursor:default}
+ .segkpi b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+ .segkpi span{font-size:12px;color:var(--mut)}
+ .segkpi.alerta b{color:var(--bad)}
+ .segdias{display:flex;align-items:flex-end;gap:2px;height:90px;margin-top:8px;border-bottom:1px solid var(--line)}
+ .segdias i{flex:1;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}
+ .segfil{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 10px}
+ .segfil select,.segfil input{width:auto;flex:1 1 140px;font-size:14px;padding:9px 10px}`;
+ document.head.appendChild(st); }
+
+// --- base local (IndexedDB 'seg_local'): docs = formulários deste aparelho; draft = rascunho em andamento ---
+function segDb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('seg_local',1);
+  r.onupgradeneeded=()=>{ const db=r.result; if(!db.objectStoreNames.contains('docs')) db.createObjectStore('docs',{keyPath:'id'}); if(!db.objectStoreNames.contains('draft')) db.createObjectStore('draft',{keyPath:'k'}); };
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function segIdb(store,mode,fn){ const db=await segDb(); return new Promise((res,rej)=>{ const t=db.transaction(store,mode); const q=fn(t.objectStore(store)); t.oncomplete=()=>res(q?q.result:undefined); t.onerror=()=>rej(t.error); }); }
+const segDocPut=d=>segIdb('docs','readwrite',s=>s.put(d));
+const segDocGet=id=>segIdb('docs','readonly',s=>s.get(id));
+const segDocAll=()=>segIdb('docs','readonly',s=>s.getAll());
+const segDocDel=id=>segIdb('docs','readwrite',s=>s.delete(id));
+const segDraftGet=()=>segIdb('draft','readonly',s=>s.get('atual'));
+const segDraftDel=()=>segIdb('draft','readwrite',s=>s.delete('atual'));
+let segDraftT=null;
+function segDraftSave(){ clearTimeout(segDraftT); const snap=segD; segDraftT=setTimeout(()=>{ if(snap) segIdb('draft','readwrite',s=>s.put(Object.assign({k:'atual',salvo_em:new Date().toISOString()},snap))).catch(()=>{}); },350); }
+
+// --- envio: ids 'seg-<timestamp>' mantêm a ordem na fila (APR → PET → medição → encerramento) ---
+function segQid(){ return 'seg-'+String(Date.now()).padStart(15,'0')+'-'+crypto.randomUUID().slice(0,8); }
+async function segEnviar(item,msgOk){
+  let pend=false; try{ pend=(await filaAll()).some(i=>String(i.id).startsWith('seg-')); }catch(e){}
+  if(!pend) return enviarOuEnfileirar(item,msgOk);
+  // já há itens deste módulo na fila: entra atrás deles (nunca passa na frente da APR/PET que ainda não subiu)
+  try{ await filaAdd(item); await atualizarFila(); }catch(e){ toast('Erro ao salvar: '+(e.message||e)); return false; }
+  toast(navigator.onLine?msgOk:'Sem conexão — salvo na fila'); if(navigator.onLine) sincronizar().catch(()=>{});
+  return true; }
+async function segPendentes(){ try{ return new Set((await filaAll()).filter(i=>String(i.id).startsWith('seg-')).map(i=>(i.fields&&(i.fields.p_formulario||i.fields.p_id))||'')); }catch(e){ return new Set(); } }
+function segSigJpeg(dataUrl){ return new Promise(res=>{ if(!dataUrl) return res(null); const im=new Image();
+  im.onload=()=>{ const c=document.createElement('canvas'); c.width=im.naturalWidth||900; c.height=im.naturalHeight||270; const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0); c.toBlob(b=>res(b),'image/jpeg',0.85); };
+  im.onerror=()=>res(null); im.src=dataUrl; }); }
+const segBlobUrl=b=>new Promise(r=>{ if(!b) return r(null); const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.onerror=()=>r(null); fr.readAsDataURL(b); });
+
+// --- colaboradores (datalist; cache p/ offline) ---
+let segPessoas=[];
+async function segPessoasCarregar(){
+  try{ segPessoas=JSON.parse(localStorage.getItem('segPessoas')||'[]'); }catch(e){ segPessoas=[]; }
+  segPessoasDl();
+  if(!navigator.onLine) return;
+  try{ const {data,error}=await sb.rpc('app_seg_pessoas'); if(error)throw error; segPessoas=data||[]; try{ localStorage.setItem('segPessoas',JSON.stringify(segPessoas)); }catch(e){} segPessoasDl(); }catch(e){} }
+function segPessoasDl(){ let dl=document.getElementById('segPessoasDl'); if(!dl){ dl=document.createElement('datalist'); dl.id='segPessoasDl'; document.body.appendChild(dl); }
+  dl.innerHTML=segPessoas.map(p=>`<option value="${segH(p.nome)}">${segH([p.matricula,p.cargo].filter(Boolean).join(' · '))}</option>`).join(''); }
+const segPessoaPorNome=n=>{ const k=String(n||'').trim().toLowerCase(); return k?segPessoas.find(p=>String(p.nome||'').trim().toLowerCase()===k):null; };
+
+// --- GPS ---
+function segOnGps(){ const b=document.getElementById('segGps'); if(!b)return;
+  const ok=gps&&gps.acc<=PRECISAO_MAX;
+  if(ok){ b.className='banner ok'; b.textContent='📍 '+gps.lat.toFixed(6)+', '+gps.lon.toFixed(6)+' · ±'+Math.round(gps.acc)+' m — no local'; }
+  else { b.className='banner warn'; b.textContent='Fique no local do serviço para registrar a coordenada'+(gps?(' — GPS ±'+Math.round(gps.acc)+' m (aguardando ≤ '+PRECISAO_MAX+' m)'):' — obtendo GPS…'); }
+  const sf=document.getElementById('seg_form'); if(segD&&sf&&!sf.classList.contains('hidden')) segAtualizar(true); }
+
+// ===== Tela principal (seg): minhas atividades + tratativas =====
+let segLista=[];
+async function segInit(){ segCss(); segPessoasCarregar(); segRascunhoBanner(); segListar(); segTratRender(); }
+async function segRascunhoBanner(){ const c=document.getElementById('segRasc'); if(!c)return; let d=null; try{ d=await segDraftGet(); }catch(e){}
+  if(!d||!d.tipo){ c.innerHTML=''; return; }
+  c.innerHTML=`<div class="banner warn" style="flex-wrap:wrap">📝 ${d.tipo} em preenchimento desde ${segFmt(d.salvo_em)}<span style="flex:1"></span><button class="btn" id="segRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="segRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`;
+  $('#segRascCont').onclick=()=>{ segD=d; delete segD.k; delete segD.salvo_em; irPara('seg_form'); };
+  $('#segRascDesc').onclick=()=>{ const b=$('#segRascDesc'); if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } clearTimeout(segDraftT); segDraftDel().then(segRascunhoBanner).catch(()=>{}); }; }
+async function segListar(){ const c=document.getElementById('segLista'); if(!c)return;
+  let srv=null;
+  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_seg_minhas',{p_dias:10}); if(error)throw error; srv=data||[]; try{ localStorage.setItem('segMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
+  const doServ=!!srv; if(!srv){ try{ srv=JSON.parse(localStorage.getItem('segMinhas')||'[]'); }catch(e){ srv=[]; } }
+  let locais=[]; try{ locais=await segDocAll(); }catch(e){}
+  const pend=await segPendentes();
+  const mapa=new Map();
+  srv.forEach(a=>{ mapa.set(a.id,{a, forms:new Map((a.formularios||[]).map(f=>[f.id,Object.assign({},f)]))}); });
+  const agora=Date.now(), FINAL=['encerrada','interrompida','impedida','emitida'];
+  for(const d of locais){
+    const idade=(agora-new Date(d.salvo_em||d.emitido_em||0).getTime())/86400000;
+    const noServ=[...mapa.values()].some(x=>x.forms.has(d.id));
+    // limpeza: já no servidor e finalizado há >1 dia, ou qualquer um com >5 dias
+    if((doServ&&noServ&&FINAL.includes(d.status)&&idade>1&&!pend.has(d.id))||idade>5){ segDocDel(d.id).catch(()=>{}); if(!noServ) continue; }
+    let g=mapa.get(d.atividade.id); if(!g){ g={a:Object.assign({},d.atividade), forms:new Map()}; mapa.set(d.atividade.id,g); }
+    const f=g.forms.get(d.id)||{id:d.id,tipo:d.tipo};
+    Object.assign(f,{status:d.status,emitido_em:d.emitido_em,encerrado_em:d.encerrado_em,requer_pt:d.resp.requer_pt,requer_pet:d.resp.requer_pet,espaco:d.resp.espaco_tipo,altura:d.resp.altura,local:true});
+    g.forms.set(d.id,f); }
+  segLista=[...mapa.values()].sort((x,y)=>String(y.a.iniciada_em||'').localeCompare(String(x.a.iniciada_em||'')));
+  if(!segLista.length){ c.innerHTML='<p class="sub">Nenhuma atividade nos últimos 10 dias. Toque em <b>Nova APR</b> para começar.</p>'; return; }
+  c.innerHTML=segLista.map(g=>{ const a=g.a, fs=[...g.forms.values()].sort((x,y)=>String(x.emitido_em||'').localeCompare(String(y.emitido_em||'')));
+    const apr=fs.find(f=>f.tipo==='APR');
+    const chips=fs.map(f=>{ const cor=SEG_ST_COR[f.status]||'#888'; const extra=f.tipo==='PET'&&f.espaco?(' · '+segH(f.espaco)):(f.tipo==='PT'&&f.altura?(' · '+segH(f.altura)+' m'):'');
+      return `<button class="segfm" data-segf="${f.id}" title="${SEG_ST_LBL[f.status]||f.status}"><span class="segdot" style="background:${cor}"></span>${f.tipo} · ${SEG_ST_LBL[f.status]||f.status}${extra}${pend.has(f.id)?' · ⏳':''}</button>`; }).join('');
+    const acts=[];
+    if(apr&&apr.requer_pt==='S') acts.push(`<button class="btn ghost" data-segnovo="PT" data-ativ="${a.id}" data-apr="${apr.id}">+ PT (altura)</button>`);
+    if(apr&&apr.requer_pet==='S') acts.push(`<button class="btn ghost" data-segnovo="PET" data-ativ="${a.id}" data-apr="${apr.id}">+ PET (espaço confinado)</button>`);
+    return `<div class="segcard"><h4>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</h4>
+      <div class="sub" style="margin-top:2px">${a.os_sigos?('OS '+segH(a.os_sigos)+' · '):''}${segH(a.endereco||'local não informado')}</div>
+      <div class="sub" style="font-size:12px;margin-top:2px">${segFmt(a.iniciada_em)}</div>
+      <div class="segforms">${chips}</div>${acts.length?('<div class="segacts">'+acts.join('')+'</div>'):''}</div>`; }).join('')
+    +(doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>');
+  c.querySelectorAll('[data-segf]').forEach(b=>b.onclick=()=>segAbrirForm(b.dataset.segf));
+  c.querySelectorAll('[data-segnovo]').forEach(b=>b.onclick=()=>segNovo(b.dataset.segnovo,b.dataset.ativ,b.dataset.apr)); }
+function segAbrirForm(id){ let f=null; segLista.some(g=>{ f=g.forms.get(id); return !!f; });
+  if(f&&(f.tipo==='PT'||f.tipo==='PET')&&f.status==='liberada') segAcomp(id); else segPdf(id); }
+async function segTratRender(){ const c=document.getElementById('segTrat'); if(!c)return;
+  if(!navigator.onLine){ c.innerHTML=''; return; }
+  let arr=[]; try{ const {data,error}=await sb.rpc('app_seg_tratativas'); if(error)throw error; arr=data||[]; }catch(e){ c.innerHTML=''; return; }
+  const ab=arr.filter(t=>t.status==='aberta');
+  if(!ab.length){ c.innerHTML=''; return; }
+  const hoje=new Date().toISOString().slice(0,10);
+  c.innerHTML='<div class="sec">⛑️ Tratativas para você</div>'+ab.map(t=>`<div class="segcard" style="border-left:4px solid ${t.prazo<hoje?'var(--bad)':'var(--warn)'}">
+    <b style="font-size:14px">${segH(t.descricao)}</b><div class="sub" style="margin-top:3px">Ação: ${segH(t.acao)}</div>
+    <div class="sub" style="font-size:12px;margin-top:3px">${t.tipo} · ${t.os_sigos?('OS '+segH(t.os_sigos)+' · '):''}prazo ${String(t.prazo).split('-').reverse().join('/')}${t.prazo<hoje?' · <b style="color:var(--bad)">atrasada</b>':''} · por ${segH(t.criado_por_nome||'QSMS')}</div>
+    <textarea data-tcon="${t.id}" rows="2" placeholder="O que foi feito?" style="margin-top:8px"></textarea>
+    <div class="segacts"><button class="btn" data-tok="${t.id}">Concluir tratativa</button><button class="btn ghost" data-tver="${t.formulario_id}">📄 Formulário</button></div></div>`).join('');
+  c.querySelectorAll('[data-tok]').forEach(b=>b.onclick=async()=>{ const tx=(c.querySelector('[data-tcon="'+b.dataset.tok+'"]').value||'').trim(); if(!tx) return toast('Descreva o que foi feito');
+    b.disabled=true; try{ const {error}=await sb.rpc('app_seg_tratativa_concluir',{p_id:b.dataset.tok,p_conclusao:tx}); if(error)throw error; toast('✓ Tratativa concluída'); segTratRender(); }catch(e){ toast('⚠ '+(e.message||e)); b.disabled=false; } });
+  c.querySelectorAll('[data-tver]').forEach(b=>b.onclick=()=>segPdf(b.dataset.tver)); }
+
+// ===== Formulário (seg_form): estado único segD, salvo como rascunho a cada mudança =====
+let segD=null;
+function segNovoId(){ return crypto.randomUUID(); }
+async function segNovaApr(){ let d=null; try{ d=await segDraftGet(); }catch(e){}
+  if(d&&d.tipo){ toast('Há um rascunho em andamento — continue ou descarte'); const r=document.getElementById('segRasc'); if(r) r.scrollIntoView({behavior:'smooth'}); return; }
+  segD={tipo:'APR',formId:segNovoId(),atividade:{id:segNovoId(),nova:true,tipo_intervencao:'',os_sigos:'',descricao:'',endereco:'',municipio:'',unidade:'',iniciada_em:new Date().toISOString()},
+    resp:{fases:[],riscos:{},medidas:{},outros:'',epis:[],epi_outros:'',requer_pt:'',requer_pet:''},
+    pes:[{k:'p0',papel:'responsavel',nome:(ME&&ME.nome)||'',pessoa_uuid:(ME&&ME.id)||null,documento:'',funcao:'',sig:null},{k:'p1',papel:'executante',nome:'',sig:null}],
+    fotos:{},med:[]};
+  const eu=segPessoaPorNome(segD.pes[0].nome); if(eu){ segD.pes[0].documento=eu.matricula||''; segD.pes[0].funcao=eu.cargo||''; }
+  irPara('seg_form'); }
+async function segNovo(tipo,ativId,aprId){ let d=null; try{ d=await segDraftGet(); }catch(e){}
+  if(d&&d.tipo){ toast('Há um rascunho em andamento — continue ou descarte'); return; }
+  const g=segLista.find(x=>x.a.id===ativId); if(!g) return toast('Atividade não encontrada');
+  const a=Object.assign({},g.a); delete a.formularios; a.nova=false;
+  const aprDoc=await segDocCarregar(aprId); // local ou servidor (se online) — sugere a equipe
+  // equipe sugerida: executantes da APR (deste aparelho) ou da última PET/PT da atividade
+  let base=[]; if(aprDoc) base=(aprDoc.pes||[]).filter(p=>p.nome);
+  segD={tipo,formId:segNovoId(),aprId,atividade:a,fotos:{},med:[],pes:[],resp:{}};
+  if(tipo==='PET'){
+    segD.resp={espaco_tipo:'',atividade_desc:a.descricao||'',preliminares:{p1:'S'},bloqueios:[{tipo:'',resp:''},{tipo:'',resp:''}],equipamento:'',insuflacao:'',horizontal:false,tel_unidade:localStorage.getItem('segTelUnidade')||''};
+    const aut=base.filter(p=>p.papel==='executante').map((p,i)=>({k:'a'+i,papel:'autorizado',nome:p.nome,pessoa_uuid:p.pessoa_uuid||null,documento:p.documento||''}));
+    segD.pes=(aut.length?aut:[{k:'a0',papel:'autorizado',nome:''}]).concat([{k:'v0',papel:'vigia',nome:''},{k:'s0',papel:'supervisor',nome:(ME&&ME.nome)||'',pessoa_uuid:(ME&&ME.id)||null,documento:'',sig:null}]);
+    ['V1','V2','V3'].forEach(p=>segD.med.push({id:segNovoId(),plano:'V',ponto:+p[1],o2:'',lie:'',co:'',h2s:''}));
+  } else {
+    segD.resp={descricao:a.descricao||'',altura:'',endereco:a.endereco||'',municipio:a.municipio||'',mo_consorcio:true,mo_equipe:'',mo_n:'',mo_contratada:false,mo_contrato:'',mo_empresa:'',mo_n_contratada:'',acesso:[],acesso_outro:'',sistema:[],checklist:{[SEG_PT_ANALISE]:'S'}};
+    segD.pes=base.filter(p=>p.papel==='executante').map((p,i)=>({k:'x'+i,papel:'participante',nome:p.nome,pessoa_uuid:p.pessoa_uuid||null,funcao:p.funcao||'',empresa:'',sig:null}));
+    if(!segD.pes.length) segD.pes.push({k:'x0',papel:'participante',nome:'',funcao:'',empresa:'',sig:null});
+    segD.pes.push({k:'em',papel:'emissor',nome:(ME&&ME.nome)||'',pessoa_uuid:(ME&&ME.id)||null,documento:'',funcao:'',vinculo:'consorcio',sig:null},{k:'lb',papel:'liberador',nome:'',documento:'',funcao:'',vinculo:'consorcio',sig:null});
+  }
+  segD.pes.forEach(p=>{ if(!p.documento){ const x=segPessoaPorNome(p.nome); if(x){ p.documento=x.matricula||''; if(!p.funcao) p.funcao=x.cargo||''; if(!p.pessoa_uuid) p.pessoa_uuid=x.id; } } });
+  irPara('seg_form'); }
+function segFormInit(){ segCss(); if(!segD){ irPara('seg'); return; }
+  segPessoasDl(); $('#segFormTit').textContent=SEG_TITULO[segD.tipo];
+  const body=$('#segFormBody');
+  body.innerHTML=(segD.tipo==='APR'?segAprHtml():segD.tipo==='PET'?segPetHtml():segPtHtml())
+    +'<div id="segErros"></div><div id="segBtns"></div>';
+  segWire(); segOnGps(); segAtualizar(); }
+// --- blocos reutilizáveis ---
+const segBlk=(n,t,inner,id)=>`<div class="segblk"${id?(' id="'+id+'"'):''}><h3><span class="n">${n}</span>${t}</h3>${inner}</div>`;
+const segYN=(grupo,cod,val,opcoes)=>`<div class="segyn" data-yn="${grupo}" data-cod="${cod}">${(opcoes||[['S','Sim'],['N','Não']]).map(([v,l])=>`<button type="button" data-v="${v}" class="${val===v?'on'+(v==='N'?' bad':''):''}">${l}</button>`).join('')}</div>`;
+function segFotoHtml(k,rot){ return `<label>${rot} *</label><div class="photo" style="padding:10px"><div class="pick"><label class="pickb">📷 Câmera<input type="file" accept="image/*" capture="environment" data-sfoto="${k}"/></label><label class="pickb">🖼️ Galeria<input type="file" accept="image/*" data-sfoto="${k}"/></label></div><img data-sprev="${k}" class="hidden" style="width:100%;border-radius:8px;margin-top:8px"/></div>`; }
+function segSigHtml(k){ return `<div class="sigwrap" style="border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden;margin-top:6px"><canvas class="epiSig segSig" data-k="${k}" width="900" height="270" style="width:100%;height:120px;touch-action:none;display:block"></canvas></div>
+  <div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn ghost" data-sigclr="${k}" style="margin:0;flex:1;padding:7px;font-size:13px">Limpar</button><button type="button" class="btn ghost" data-sigfs="${k}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">⤢ Ampliar</button></div>`; }
+const SEG_PAPEL={responsavel:'Responsável pelos serviços',executante:'Executante',autorizado:'Trabalhador autorizado',vigia:'Vigia',supervisor:'Supervisor de entrada',participante:'Participante',emissor:'Responsável pela emissão',liberador:'Responsável pela liberação da área'};
+// cfg: {doc:'rótulo do documento', funcao:bool, empresa:bool, vinculo:bool, sig:bool, rem:bool}
+function segPesHtml(p,cfg){ return `<div class="segpes" data-pk="${p.k}"><div class="top">${SEG_PAPEL[p.papel]||p.papel}${cfg.rem?`<button type="button" data-prem="${p.k}" title="Remover">✕</button>`:''}</div>
+  <input data-pf="nome" list="segPessoasDl" placeholder="Nome (busque ou digite)" value="${segH(p.nome)}" autocomplete="off"/>
+  <div class="${cfg.funcao||cfg.empresa?'segrow2':''}"><input data-pf="documento" placeholder="${cfg.doc||'Matrícula'}" value="${segH(p.documento)}" autocomplete="off"/>${cfg.funcao?`<input data-pf="funcao" placeholder="Função / cargo" value="${segH(p.funcao)}" autocomplete="off"/>`:''}</div>
+  ${cfg.empresa?`<input data-pf="empresa" placeholder="Empresa" value="${segH(p.empresa)}" autocomplete="off"/>`:''}
+  ${cfg.vinculo?`<select data-pf="vinculo" style="margin-top:6px"><option value="consorcio" ${p.vinculo!=='terceiro'?'selected':''}>Empregado do consórcio</option><option value="terceiro" ${p.vinculo==='terceiro'?'selected':''}>Funcionário terceirizado</option></select>`:''}
+  ${cfg.sig?('<div class="sub" style="font-size:12px;margin-top:6px">Assinatura *</div>'+segSigHtml(p.k)):''}</div>`; }
+function segPesCfg(p){ const t=segD.tipo;
+  if(t==='APR') return {doc:'Matrícula',funcao:p.papel==='responsavel',sig:true,rem:p.papel==='executante'};
+  if(t==='PET') return {doc:'Matrícula / RG',sig:p.papel==='supervisor',rem:p.papel==='autorizado'};
+  if(p.papel==='participante') return {doc:'Matrícula / CPF',funcao:true,empresa:true,sig:true,rem:true};
+  return {doc:'Matrícula ou CPF',funcao:true,vinculo:true,sig:true}; }
+function segPesRender(papeis,cont){ const c=document.getElementById(cont); if(!c)return;
+  c.innerHTML=segD.pes.filter(p=>papeis.includes(p.papel)).map(p=>segPesHtml(p,segPesCfg(p))).join('');
+  segPesWire(c); }
+function segPesWire(c){
+  c.querySelectorAll('.segpes').forEach(box=>{ const p=segD.pes.find(x=>x.k===box.dataset.pk); if(!p)return;
+    box.querySelectorAll('[data-pf]').forEach(inp=>{ inp.oninput=inp.onchange=()=>{ p[inp.dataset.pf]=inp.value;
+      if(inp.dataset.pf==='nome'){ const x=segPessoaPorNome(inp.value); p.pessoa_uuid=x?x.id:null;
+        // matrícula/cargo preenchidos pela lista acompanham a troca de nome; o que a pessoa digitou à mão fica
+        [['documento','matricula','_autoDoc'],['funcao','cargo','_autoFun']].forEach(([campo,orig,marca])=>{ const el=box.querySelector('[data-pf="'+campo+'"]'); if(!el) return;
+          if(!el.value||el.value===p[marca]){ el.value=x?(x[orig]||''):''; p[campo]=el.value; p[marca]=el.value; } }); }
+      segAtualizar(); }; });
+    const cv=box.querySelector('.segSig'); if(cv){ epiSigInit(cv); if(p.sig) cv._restore(p.sig);
+      cv._onend=()=>{ try{ p.sig=cv.toDataURL(); p.assinado_em=new Date().toISOString(); }catch(e){} segAtualizar(); }; }
+    const cl=box.querySelector('[data-sigclr]'); if(cl) cl.onclick=()=>{ if(cv&&cv._clear) cv._clear(); p.sig=null; p.assinado_em=null; segAtualizar(); };
+    const fs=box.querySelector('[data-sigfs]'); if(fs) fs.onclick=()=>{ if(cv) epiSigFS(cv); };
+    const rm=box.querySelector('[data-prem]'); if(rm) rm.onclick=()=>{ const papel=p.papel; if(segD.pes.filter(x=>x.papel===papel).length<=1) return toast('Mantenha ao menos um '+(SEG_PAPEL[papel]||papel).toLowerCase());
+      segD.pes=segD.pes.filter(x=>x!==p); segPesRerender(); segAtualizar(); }; }); }
+function segPesRerender(){ const t=segD.tipo;
+  if(t==='APR'){ segPesRender(['responsavel'],'segPesResp'); segPesRender(['executante'],'segPesExec'); }
+  else if(t==='PET'){ segPesRender(['autorizado'],'segPesAut'); segPesRender(['vigia'],'segPesVig'); segPesRender(['supervisor'],'segPesSup'); }
+  else { segPesRender(['participante'],'segPesPart'); segPesRender(['emissor'],'segPesEm'); segPesRender(['liberador'],'segPesLb'); } }
+function segAddPes(papel,extra){ const k=papel.slice(0,1)+Date.now().toString(36); segD.pes.push(Object.assign({k,papel,nome:'',documento:'',sig:null},extra||{})); segPesRerender(); segAtualizar(); }
+function segCabecalhoAtiv(){ const a=segD.atividade; return `<div class="segkv"><b>Atividade</b><span>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</span><b>OS</b><span>${segH(a.os_sigos||'—')}</span><b>Local</b><span>${segH(a.endereco||'—')}</span><b>APR</b><span>${segFmt(a.iniciada_em)}</span></div>`; }
+
+// --- APR ---
+function segAprHtml(){ const a=segD.atividade, r=segD.resp;
+  const tipoSel='<select id="segTipo"><option value="">Selecione…</option>'+SEG_TIPOS.map(([k,l])=>`<option value="${k}" ${a.tipo_intervencao===k?'selected':''}>${l}</option>`).join('')+'</select>';
+  let h='<div id="segGps" class="banner warn">obtendo GPS…</div>';
+  h+=segBlk(1,'Identificação',`<label>Tipo de intervenção *</label>${tipoSel}
+    <label>Nº da OS (SIGOS)</label><div style="display:flex;gap:6px"><input id="segOs" inputmode="numeric" value="${segH(a.os_sigos)}" autocomplete="off" placeholder="nº da OS"/><button type="button" class="btn ghost" id="segOsBusca" style="margin:0;width:auto;padding:0 14px">🔍</button></div>
+    <div id="segOsInfo" class="sub" style="font-size:12px;margin-top:4px"></div>
+    <label>Serviço a ser executado *</label><textarea id="segDesc" rows="2">${segH(a.descricao)}</textarea>
+    <label>Local / endereço *</label><input id="segEnd" value="${segH(a.endereco)}" autocomplete="off"/>
+    <label>Município</label><input id="segMun" value="${segH(a.municipio)}" autocomplete="off"/>
+    <label>Unidade organizacional</label><input id="segUni" value="${segH(a.unidade)}" placeholder="em branco = sua área no cadastro" autocomplete="off"/>
+    <div class="sub" style="font-size:12px;margin-top:8px">Data e hora: ${segFmt(a.iniciada_em)} · registradas automaticamente com o seu usuário e o GPS.</div>`);
+  h+=segBlk(2,'Recomendações de segurança','<ul style="margin:4px 0 0 18px;padding:0;font-size:13px;line-height:1.45">'+SEG_RECOMENDACOES.map(t=>'<li>'+t+'</li>').join('')+'</ul>');
+  h+=segBlk(3,'Fases de execução (planejamento)','<div id="segFases"></div><button type="button" class="btn ghost" id="segFaseAdd" style="margin-top:8px;padding:9px;font-size:14px">+ fase</button>');
+  h+=segBlk(4,'Identificação dos riscos e medidas de controle','<div id="segRiscos"></div><label>Outros riscos / observações</label><textarea id="segOutros" rows="2">'+segH(r.outros)+'</textarea>');
+  h+=segBlk(5,'Equipamentos de proteção individual (EPI)','<div class="segchips" id="segEpis"></div><label>Outros</label><input id="segEpiOut" value="'+segH(r.epi_outros)+'" autocomplete="off"/>');
+  h+=segBlk(6,'Autorizações especiais',`<div class="segq"><div class="t">A atividade requer <b>PT</b> (trabalho em altura)?</div>${segYN('aut','requer_pt',r.requer_pt,[['S','Sim'],['N','Não'],['NA','Não se aplica']])}</div>
+    <div class="segq"><div class="t">A atividade requer <b>PET</b> (espaço confinado)?</div>${segYN('aut','requer_pet',r.requer_pet,[['S','Sim'],['N','Não'],['NA','Não se aplica']])}<div id="segPetDica" class="sub" style="font-size:12px;margin-top:4px"></div></div>
+    <p class="sub" style="font-size:12px;margin:6px 0 0">Com "Sim", a PT/PET é emitida logo depois, a partir desta APR.</p>`);
+  h+=segBlk(7,'Registro fotográfico',segFotoHtml('foto_sinalizacao','Foto da sinalização / isolamento do local'));
+  h+=segBlk(8,'Assinaturas dos envolvidos','<div id="segPesResp"></div><div class="sub" style="margin-top:12px;font-weight:700">Executantes dos serviços</div><div id="segPesExec"></div><button type="button" class="btn ghost" id="segExecAdd" style="margin-top:8px;padding:9px;font-size:14px">+ executante</button><p class="sub" style="font-size:11.5px;margin-top:10px">IMPORTANTE: comprometem-se o responsável pelos serviços e os executantes ao cumprimento integral de todos os procedimentos de segurança recomendados, estando sujeitos às sanções disciplinares, administrativas e legais aqueles que de alguma forma os descumprirem. (PRT-CSMG-2023_003)</p>');
+  return h; }
+function segAprFases(){ const c=$('#segFases'); if(!c)return; const f=segD.resp.fases;
+  if(!f.length){ c.innerHTML='<p class="sub" style="font-size:12px;margin:2px 0">Escolha o tipo de intervenção para sugerir as fases, ou adicione abaixo.</p>'; return; }
+  c.innerHTML=f.map((t,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><b style="width:22px;color:var(--mut)">${i+1}ª</b><input data-fase="${i}" value="${segH(t)}" autocomplete="off"/><button type="button" data-frem="${i}" style="all:unset;cursor:pointer;color:var(--bad);padding:0 6px;font-size:16px">✕</button></div>`).join('');
+  c.querySelectorAll('[data-fase]').forEach(i=>i.oninput=()=>{ segD.resp.fases[+i.dataset.fase]=i.value; segAtualizar(); });
+  c.querySelectorAll('[data-frem]').forEach(b=>b.onclick=()=>{ segD.resp.fases.splice(+b.dataset.frem,1); segAprFases(); segAtualizar(); }); }
+function segAprRiscos(){ const c=$('#segRiscos'); if(!c)return; const r=segD.resp, sug=(SEG_TEMPLATE[segD.atividade.tipo_intervencao]||{}).r||[];
+  c.innerHTML=SEG_RISCOS.map(x=>{ const v=r.riscos[x[0]]||'', flag=SEG_RISCO_FLAG(x,v);
+    let med=''; if(flag) med=x[3]?`<div class="segmed bad">⛔ ${x[2]} Faça isso antes de começar — a APR só é emitida com "Sim".</div>`
+      :`<div class="segmed">Medida de controle: ${x[2]}<label><input type="checkbox" data-medida="${x[0]}" ${r.medidas[x[0]]?'checked':''}/> Medida de controle aplicada</label></div>`;
+    return `<div class="segq" id="segQ_${x[0]}"><div class="t">${x[1]}${sug.includes(x[0])?'<span class="segsug">sugerido</span>':''}</div>${segYN('risco',x[0],v)}${med}</div>`; }).join('');
+  c.querySelectorAll('[data-medida]').forEach(ck=>ck.onchange=()=>{ segD.resp.medidas[ck.dataset.medida]=ck.checked; segAtualizar(); });
+  segWireYN(c); }
+function segAprEpis(){ const c=$('#segEpis'); if(!c)return;
+  c.innerHTML=SEG_EPIS.map(([k,l])=>`<div class="segchip ${segD.resp.epis.includes(k)?'on':''}" data-epi="${k}">${l}</div>`).join('');
+  c.querySelectorAll('[data-epi]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.epi, e=segD.resp.epis; const i=e.indexOf(k); if(i>=0) e.splice(i,1); else e.push(k); ch.classList.toggle('on',i<0); segAtualizar(); }); }
+function segAplicarTemplate(tipo){ const t=SEG_TEMPLATE[tipo]; if(!t)return; const r=segD.resp;
+  if(!r.fases.filter(Boolean).length) r.fases=t.f.slice();
+  t.r.forEach(k=>{ if(!r.riscos[k]) r.riscos[k]='S'; });
+  if(!r.epis.length) r.epis=t.e.slice();
+  segAprFases(); segAprRiscos(); segAprEpis(); }
+
+// --- PET ---
+function segPetHtml(){ const r=segD.resp;
+  let h='<div id="segGps" class="banner warn">obtendo GPS…</div>';
+  h+=segBlk(1,'Identificação',segCabecalhoAtiv()+`<label>Espaço confinado (tipo) *</label><select id="segEspaco"><option value="">Selecione…</option>${SEG_PET_ESPACOS.map(e=>`<option ${r.espaco_tipo===e?'selected':''}>${e}</option>`).join('')}</select>
+    <label>Atividade</label><input id="segAtvDesc" value="${segH(r.atividade_desc)}" autocomplete="off"/>
+    <div class="sub" style="font-size:12px;margin-top:8px">Horário de início = momento da liberação (automático). A permissão vale para <b>uma entrada</b>.</div>`);
+  h+=segBlk(2,'Equipe','<div class="sub" style="font-weight:700">Trabalhadores autorizados</div><div id="segPesAut"></div><button type="button" class="btn ghost" id="segAutAdd" style="margin-top:8px;padding:9px;font-size:14px">+ trabalhador autorizado</button><div class="sub" style="font-weight:700;margin-top:12px">Vigia</div><div id="segPesVig"></div><div class="sub" style="font-weight:700;margin-top:12px">Supervisor de entrada</div><div id="segPesSup"></div><div id="segQtd" class="sub" style="font-size:12px;margin-top:8px"></div>');
+  h+=segBlk(3,'Ações preliminares para entrada','<p class="sub" style="font-size:12px;margin:0 0 4px">Um "Não" impede a entrada.</p>'+SEG_PET_PRELIM.map((t,i)=>`<div class="segq"><div class="t">${i+1}. ${t}</div>${segYN('prel','p'+(i+1),r.preliminares['p'+(i+1)]||'')}</div>`).join(''),'segBlkPrel');
+  h+=segBlk(4,'Bloqueios hidráulico / elétrico','<p class="sub" style="font-size:12px;margin:0">Quando necessário.</p>'+r.bloqueios.map((b,i)=>`<div class="segrow2" style="margin-top:6px"><select data-bloq="${i}" data-bf="tipo"><option value="">Tipo…</option>${['Hidráulico','Elétrico','Outro'].map(x=>`<option ${b.tipo===x?'selected':''}>${x}</option>`).join('')}</select><input data-bloq="${i}" data-bf="resp" placeholder="Responsável pelo bloqueio" value="${segH(b.resp)}" list="segPessoasDl" autocomplete="off"/></div>`).join(''));
+  h+=segBlk(5,'Monitoramento ambiental',`<label>Identificação do detector de gases *</label><input id="segEquip" value="${segH(r.equipamento)}" placeholder="marca, nº de série ou patrimônio" autocomplete="off"/>
+    ${segFotoHtml('foto_detector','Foto do detector de gases')}
+    <div class="segq"><div class="t">Insuflação de ar por no mínimo <b>10 minutos</b> antes das medições (área já sinalizada e isolada — NT 098)?</div>${segYN('pet','insuflacao',r.insuflacao)}</div>
+    <p class="sub" style="font-size:12px;margin:6px 0 0">A 1ª leitura (externa) não precisa ser registrada. Plano vertical: superfície (P1), meio (P2) e fundo (P3). Não deixe a mangueira tocar substâncias no fundo.</p>
+    <div id="segGasTab"></div>
+    <label style="all:unset;display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="segHoriz" ${r.horizontal?'checked':''} style="width:18px;height:18px"/> Espaço horizontal (galeria/tanque): medir também o plano horizontal</label>
+    <div class="sub" style="font-size:11.5px;margin-top:6px">Condição segura: O₂ > 19,5 e < 23% · explosivos < 10% LIE · CO < 39 ppm · H₂S < 8 ppm</div>`);
+  h+=segBlk(6,'Telefones de emergência',`<div class="segkv"><b>Bombeiros / resgate</b><span>193</span><b>SAMU</b><span>192</span><b>PMMG</b><span>190</span></div><label>Comunicação da unidade COPASA</label><input id="segTelUni" value="${segH(r.tel_unidade)}" inputmode="tel" autocomplete="off"/>`);
+  h+=segBlk(7,'Recomendações e observações','<p style="font-size:13px;line-height:1.45;margin:0">'+SEG_PET_RECOM+'</p><label>Observações</label><textarea id="segObs" rows="2">'+segH(r.obs||'')+'</textarea>');
+  return h; }
+function segGasRender(){ const c=$('#segGasTab'); if(!c)return; const r=segD.resp;
+  const pontos=[['V',1],['V',2],['V',3]].concat(r.horizontal?[['H',1],['H',2]]:[]);
+  // linha editável = última leitura de cada ponto; as anteriores fora do limite viram "ocorrências"
+  let h='<table class="seggas"><tr><th></th>'+SEG_GAS.map(g=>`<th>${g[1]}<br>${g[2]}</th>`).join('')+'<th></th></tr>';
+  pontos.forEach(([pl,pt])=>{ const arr=segD.med.filter(m=>m.plano===pl&&m.ponto===pt); let m=arr[arr.length-1];
+    if(!m){ m={id:segNovoId(),plano:pl,ponto:pt,o2:'',lie:'',co:'',h2s:''}; segD.med.push(m); }
+    const fora=segMedFora(m);
+    h+=`<tr><td>${pl==='V'?'Vert.':'Horiz.'} P${pt}${arr.length>1?`<div style="font-size:10px;color:var(--bad)">${arr.length-1} ocorr.</div>`:''}</td>`+SEG_GAS.map(g=>{ const v=segNum(m[g[0]]); const cls=v==null?'':(g[4](v)?'ok':'bad');
+      return `<td><input data-gm="${m.id}" data-gf="${g[0]}" value="${segH(m[g[0]])}" inputmode="decimal" class="${cls}"/></td>`; }).join('')
+      +`<td>${fora===true?`<button type="button" data-gnova="${pl}${pt}" title="Ventilar e medir de novo" style="all:unset;cursor:pointer;font-size:18px">↻</button>`:(fora===false?'<span class="seggasst" style="color:var(--ok)">✓</span>':'')}</td></tr>`; });
+  h+='</table>';
+  const ocorr=segD.med.filter(m=>{ const arr=segD.med.filter(x=>x.plano===m.plano&&x.ponto===m.ponto); return arr[arr.length-1]!==m && segMedFora(m)===true; });
+  if(ocorr.length) h+='<div class="segmed bad" style="font-weight:400">Ocorrências (fora da condição segura): '+ocorr.map(m=>`${m.plano==='V'?'V':'H'}P${m.ponto} ${segHora(m.medido_em)} — `+SEG_GAS.map(g=>g[1]+' '+m[g[0]]).join(', ')).join(' · ')+'</div>';
+  if(segD.med.some(m=>segMedFora(m)===true&&(()=>{ const arr=segD.med.filter(x=>x.plano===m.plano&&x.ponto===m.ponto); return arr[arr.length-1]===m; })()))
+    h+='<div class="segbig bad">⛔ Leitura fora da condição segura — não entre. Retire o detector, insufle/exaure o ar e meça de novo (↻).</div>';
+  c.innerHTML=h;
+  c.querySelectorAll('[data-gm]').forEach(inp=>inp.oninput=()=>{ const m=segD.med.find(x=>x.id===inp.dataset.gm); if(!m)return; m[inp.dataset.gf]=inp.value;
+    const v=segNum(inp.value), g=SEG_GAS.find(x=>x[0]===inp.dataset.gf); inp.className=v==null?'':(g[4](v)?'ok':'bad');
+    if(segMedFora(m)!==null) m.medido_em=new Date().toISOString(); segAtualizar(); });
+  c.querySelectorAll('[data-gm]').forEach(inp=>inp.onblur=()=>{ const m=segD.med.find(x=>x.id===inp.dataset.gm); if(m&&segMedFora(m)!==null) segGasRender(); });
+  c.querySelectorAll('[data-gnova]').forEach(b=>b.onclick=()=>{ const pl=b.dataset.gnova[0], pt=+b.dataset.gnova.slice(1); segD.med.push({id:segNovoId(),plano:pl,ponto:pt,o2:'',lie:'',co:'',h2s:''}); segGasRender(); segAtualizar(); }); }
+// mantém só a última leitura de cada ponto como "a valer" + as anteriores completas (ocorrências); descarta linhas vazias
+function segMedValidas(){ return segD.med.filter(m=>segMedFora(m)!==null); }
+function segPetUltimasOk(){ const r=segD.resp; const pts=[['V',1],['V',2],['V',3]].concat(r.horizontal?[['H',1],['H',2]]:[]);
+  return pts.every(([pl,pt])=>{ const arr=segD.med.filter(m=>m.plano===pl&&m.ponto===pt&&segMedFora(m)!==null); const m=arr[arr.length-1]; return m&&segMedFora(m)===false; }); }
+
+// --- PT ---
+function segPtHtml(){ const r=segD.resp;
+  let h='<div id="segGps" class="banner warn">obtendo GPS…</div>';
+  h+=segBlk(1,'Dados gerais do serviço',segCabecalhoAtiv()+`<label>Descrição do serviço *</label><textarea id="segPtDesc" rows="2">${segH(r.descricao)}</textarea>
+    <label>Altura (metros) *</label><input id="segAltura" inputmode="decimal" value="${segH(r.altura)}" autocomplete="off"/>
+    <label>Identificação do local ou endereço *</label><input id="segPtEnd" value="${segH(r.endereco)}" autocomplete="off"/>
+    <label>Município</label><input id="segPtMun" value="${segH(r.municipio)}" autocomplete="off"/>
+    <div class="sub" style="font-size:12px;margin-top:8px">Data/hora de emissão e de encerramento são registradas automaticamente.</div>`);
+  h+=segBlk(2,'Mão de obra envolvida na execução',`<label style="all:unset;display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600;cursor:pointer"><input type="checkbox" id="segMoC" ${r.mo_consorcio?'checked':''} style="width:18px;height:18px"/> Empregados do consórcio</label>
+    <div class="segrow2"><input id="segMoEq" placeholder="Equipe responsável" value="${segH(r.mo_equipe)}" autocomplete="off"/><input id="segMoN" placeholder="Nº de trabalhadores" inputmode="numeric" value="${segH(r.mo_n)}" autocomplete="off"/></div>
+    <label style="all:unset;display:flex;gap:8px;align-items:center;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px"><input type="checkbox" id="segMoT" ${r.mo_contratada?'checked':''} style="width:18px;height:18px"/> Empresa contratada</label>
+    <div class="segrow2"><input id="segMoCt" placeholder="Nº do contrato" value="${segH(r.mo_contrato)}" autocomplete="off"/><input id="segMoNt" placeholder="Nº de trabalhadores" inputmode="numeric" value="${segH(r.mo_n_contratada)}" autocomplete="off"/></div>
+    <input id="segMoEmp" placeholder="Empresa contratada" value="${segH(r.mo_empresa)}" autocomplete="off" style="margin-top:6px"/>`);
+  h+=segBlk(3,'Condição do trabalho em altura',`<div class="sub" style="font-weight:700">Meio de acesso *</div><div class="segchips" id="segAcesso"></div><input id="segAcessoOut" placeholder="Qual outro meio de acesso?" value="${segH(r.acesso_outro)}" class="${r.acesso.includes('outro')?'':'hidden'}" style="margin-top:6px" autocomplete="off"/>
+    <div class="sub" style="font-weight:700;margin-top:12px">Sistema individual de proteção contra quedas *</div><div class="segchips" id="segSistema"></div>`);
+  h+=segBlk(4,'Checklist','<p class="sub" style="font-size:12px;margin:0 0 4px">Um "Não" impede o trabalho. Blocos de outros meios de acesso ficam como "não se aplica".</p><div id="segPtCheck"></div>');
+  h+=segBlk(5,'Participantes da atividade','<div id="segPesPart"></div><button type="button" class="btn ghost" id="segPartAdd" style="margin-top:8px;padding:9px;font-size:14px">+ participante</button>');
+  h+=segBlk(6,'Responsáveis','<div id="segPesEm"></div><div id="segPesLb"></div>');
+  return h; }
+function segPtChips(){ const r=segD.resp;
+  const mk=(id,lista,arr)=>{ const c=$('#'+id); if(!c)return; c.innerHTML=lista.map(([k,l])=>`<div class="segchip ${arr.includes(k)?'on':''}" data-ch="${k}">${l}</div>`).join('');
+    c.querySelectorAll('[data-ch]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.ch, i=arr.indexOf(k); if(i>=0) arr.splice(i,1); else arr.push(k); ch.classList.toggle('on',i<0);
+      const o=$('#segAcessoOut'); if(o) o.classList.toggle('hidden',!r.acesso.includes('outro')); segPtCheck(); segAtualizar(); }); };
+  mk('segAcesso',SEG_PT_ACESSO,r.acesso); mk('segSistema',SEG_PT_SISTEMA,r.sistema); }
+function segPtCheck(){ const c=$('#segPtCheck'); if(!c)return; const r=segD.resp;
+  c.innerHTML=SEG_PT_BLOCOS.map(b=>{ const ap=segPtBlocoAplica(b,r);
+    if(!ap){ b.cods.forEach(k=>{ r.checklist[k]='NA'; }); return `<div class="sub" style="font-size:12px;padding:6px 0;border-top:1px solid var(--line)"><b>${b.t}</b> — não se aplica ao meio de acesso</div>`; }
+    b.cods.forEach(k=>{ if(r.checklist[k]==='NA'&&b.se&&!r['_na_'+k]) delete r.checklist[k]; });
+    return `<div style="margin-top:10px;font-weight:700;font-size:13px;color:var(--acc)">${b.t}</div>`+b.i.map((t,i)=>`<div class="segq"><div class="t">${t}</div>${segYN('pt',b.cods[i],r.checklist[b.cods[i]]||'',[['S','Sim'],['N','Não'],['NA','N/A']])}</div>`).join(''); }).join('');
+  segWireYN(c); }
+
+// --- comportamento comum ---
+function segWireYN(root){ root.querySelectorAll('[data-yn]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  const grupo=g.dataset.yn, cod=g.dataset.cod, v=b.dataset.v, r=segD.resp;
+  if(grupo==='risco'){ r.riscos[cod]=v; if(!SEG_RISCO_FLAG(SEG_RISCOS.find(x=>x[0]===cod),v)) delete r.medidas[cod]; segAprRiscos(); }
+  else { if(grupo==='aut') r[cod]=v; else if(grupo==='prel') r.preliminares[cod]=v; else if(grupo==='pet') r[cod]=v; else if(grupo==='pt'){ r.checklist[cod]=v; if(v==='NA') r['_na_'+cod]=1; else delete r['_na_'+cod]; }
+    g.querySelectorAll('button').forEach(x=>x.className=x===b?('on'+(v==='N'?' bad':'')):''); }
+  segAtualizar(); })); }
+function segWire(){ const t=segD.tipo, a=segD.atividade, r=segD.resp;
+  const bind=(id,fn)=>{ const el=document.getElementById(id); if(el) el.oninput=el.onchange=()=>{ fn(el.value,el); segAtualizar(); }; };
+  if(t==='APR'){
+    bind('segTipo',v=>{ a.tipo_intervencao=v; segAplicarTemplate(v); const d=$('#segPetDica'); if(d) d.textContent=(SEG_TEMPLATE[v]||{}).pet?'Caixas de VRP/registro costumam ser espaço confinado.':''; });
+    bind('segOs',v=>{ a.os_sigos=v.trim(); }); bind('segDesc',v=>{ a.descricao=v; }); bind('segEnd',v=>{ a.endereco=v; }); bind('segMun',v=>{ a.municipio=v; }); bind('segUni',v=>{ a.unidade=v; });
+    bind('segOutros',v=>{ r.outros=v; }); bind('segEpiOut',v=>{ r.epi_outros=v; });
+    $('#segOsBusca').onclick=segOsBuscar; $('#segFaseAdd').onclick=()=>{ if(r.fases.length>=10) return toast('Máximo de 10 fases'); r.fases.push(''); segAprFases(); segAtualizar(); };
+    $('#segExecAdd').onclick=()=>segAddPes('executante');
+    segAprFases(); segAprRiscos(); segAprEpis(); segWireYN($('#segFormBody'));
+    if(a.os_sigos&&navigator.onLine) segOsBuscar(true);
+  } else if(t==='PET'){
+    bind('segEspaco',v=>{ r.espaco_tipo=v; }); bind('segAtvDesc',v=>{ r.atividade_desc=v; }); bind('segEquip',v=>{ r.equipamento=v; });
+    bind('segTelUni',v=>{ r.tel_unidade=v; try{ localStorage.setItem('segTelUnidade',v); }catch(e){} }); bind('segObs',v=>{ r.obs=v; });
+    document.querySelectorAll('[data-bloq]').forEach(el=>el.oninput=el.onchange=()=>{ r.bloqueios[+el.dataset.bloq][el.dataset.bf]=el.value; segAtualizar(); });
+    $('#segHoriz').onchange=e=>{ r.horizontal=e.target.checked; segGasRender(); segAtualizar(); };
+    $('#segAutAdd').onclick=()=>segAddPes('autorizado');
+    segGasRender(); segWireYN($('#segFormBody'));
+  } else {
+    bind('segPtDesc',v=>{ r.descricao=v; }); bind('segAltura',v=>{ r.altura=v; }); bind('segPtEnd',v=>{ r.endereco=v; }); bind('segPtMun',v=>{ r.municipio=v; });
+    bind('segMoEq',v=>{ r.mo_equipe=v; }); bind('segMoN',v=>{ r.mo_n=v; }); bind('segMoCt',v=>{ r.mo_contrato=v; }); bind('segMoNt',v=>{ r.mo_n_contratada=v; }); bind('segMoEmp',v=>{ r.mo_empresa=v; }); bind('segAcessoOut',v=>{ r.acesso_outro=v; });
+    $('#segMoC').onchange=e=>{ r.mo_consorcio=e.target.checked; segAtualizar(); }; $('#segMoT').onchange=e=>{ r.mo_contratada=e.target.checked; segAtualizar(); };
+    $('#segPartAdd').onclick=()=>segAddPes('participante',{funcao:'',empresa:''});
+    segPtChips(); segPtCheck();
+  }
+  segPesRerender();
+  document.querySelectorAll('[data-sfoto]').forEach(inp=>inp.onchange=async e=>{ const f=e.target.files[0], k=inp.dataset.sfoto; if(!f)return; segD.fotos[k]=await comprimir(f); segFotoPrev(); segAtualizar(); });
+  segFotoPrev(); }
+function segFotoPrev(){ document.querySelectorAll('[data-sprev]').forEach(img=>{ const b=segD.fotos[img.dataset.sprev]; if(b){ img.src=URL.createObjectURL(b); img.classList.remove('hidden'); } else img.classList.add('hidden'); }); }
+async function segOsBuscar(silencioso){ const a=segD.atividade, info=$('#segOsInfo'); if(!a.os_sigos){ if(silencioso!==true) toast('Digite o nº da OS'); return; }
+  if(!navigator.onLine){ if(info) info.textContent='Sem conexão — a OS será conferida pelo QSMS depois.'; return; }
+  if(info) info.textContent='Buscando na base SIGOS…';
+  try{ const {data,error}=await sb.rpc('app_seg_os_info',{p_os:a.os_sigos}); if(error)throw error; const d=data||{};
+    if(!d.encontrada){ if(info) info.innerHTML='⚠️ OS não localizada na base SIGOS'+(d.base_ate?(' (base até '+String(d.base_ate).split('-').reverse().join('/')+')'):'')+'. Pode seguir — o QSMS confere depois.'; return; }
+    let dist=''; if(gps&&d.lat!=null){ const R=6371000, toR=x=>x*Math.PI/180, dl=toR(d.lat-gps.lat), dn=toR(d.lon-gps.lon); const q=Math.sin(dl/2)**2+Math.cos(toR(gps.lat))*Math.cos(toR(d.lat))*Math.sin(dn/2)**2; const m=Math.round(2*R*Math.asin(Math.sqrt(q))); dist=' · você está a '+(m>=1000?(m/1000).toFixed(1).replace('.',',')+' km':m+' m')+' do ponto da OS'; }
+    if(info) info.innerHTML='✓ '+segH(d.servico||'OS localizada')+dist;
+    if(silencioso===true) return;
+    if(!a.endereco&&d.endereco){ a.endereco=d.endereco+(d.bairro?(' — '+d.bairro):''); const e=$('#segEnd'); if(e) e.value=a.endereco; }
+    if(!a.municipio&&d.municipio){ a.municipio=d.municipio; const m=$('#segMun'); if(m) m.value=a.municipio; }
+    if(!a.descricao&&d.servico){ a.descricao=d.servico; const s=$('#segDesc'); if(s) s.value=a.descricao; }
+    segAtualizar(); }catch(e){ if(info) info.textContent='Não foi possível consultar a OS agora.'; } }
+// validação (mesmas regras do servidor) → lista de pendências + botões
+function segPendencias(){ const t=segD.tipo, a=segD.atividade, r=segD.resp, P=[], B=[]; // P = falta preencher · B = bloqueio de segurança
+  const pes=papel=>segD.pes.filter(p=>p.papel===papel), nomeOk=p=>String(p.nome||'').trim().length>=3;
+  if(!(gps&&gps.acc<=PRECISAO_MAX)) P.push('GPS dentro da tolerância (fique no local)');
+  if(t==='APR'){
+    if(!a.tipo_intervencao) P.push('Tipo de intervenção'); if(!String(a.descricao||'').trim()) P.push('Serviço a ser executado'); if(!String(a.endereco||'').trim()) P.push('Local / endereço');
+    if(!r.fases.filter(x=>String(x).trim()).length) P.push('Ao menos 1 fase de execução');
+    SEG_RISCOS.forEach(x=>{ const v=r.riscos[x[0]]; if(!v) P.push('Risco '+x[0].slice(1)+': responder'); else if(SEG_RISCO_FLAG(x,v)){ if(x[3]) B.push(x[1].replace('?','')+': Não'); else if(!r.medidas[x[0]]) P.push('Confirmar medida de controle do risco '+x[0].slice(1)); } });
+    if(!r.epis.length&&!String(r.epi_outros).trim()) P.push('EPIs');
+    if(!r.requer_pt) P.push('Requer PT?'); if(!r.requer_pet) P.push('Requer PET?');
+    if(!segD.fotos.foto_sinalizacao) P.push('Foto da sinalização');
+    pes('responsavel').forEach(p=>{ if(!nomeOk(p)) P.push('Nome do responsável'); if(!p.sig) P.push('Assinatura do responsável'); });
+    const ex=pes('executante'); if(!ex.length) P.push('Ao menos 1 executante'); ex.forEach((p,i)=>{ if(!nomeOk(p)) P.push('Nome do executante '+(i+1)); if(!p.sig) P.push('Assinatura do executante '+(i+1)); });
+  } else if(t==='PET'){
+    if(!r.espaco_tipo) P.push('Tipo de espaço confinado');
+    const au=pes('autorizado'), vg=pes('vigia')[0], sp=pes('supervisor')[0];
+    au.forEach((p,i)=>{ if(!nomeOk(p)) P.push('Nome do trabalhador autorizado '+(i+1)); });
+    if(!vg||!nomeOk(vg)) P.push('Nome do vigia'); if(!sp||!nomeOk(sp)) P.push('Nome do supervisor de entrada'); if(sp&&!sp.sig) P.push('Assinatura de entrada do supervisor');
+    const nomes=new Set(au.concat(vg?[vg]:[]).map(p=>String(p.nome||'').trim().toLowerCase()).filter(Boolean));
+    if(nomes.size<2) B.push('Mínimo de 2 trabalhadores (autorizados + vigia)');
+    if(vg&&au.some(p=>String(p.nome||'').trim().toLowerCase()===String(vg.nome||'').trim().toLowerCase()&&vg.nome)) B.push('O vigia não pode ser trabalhador autorizado (fica do lado de fora)');
+    SEG_PET_PRELIM.forEach((x,i)=>{ const v=r.preliminares['p'+(i+1)]; if(!v) P.push('Ação preliminar '+(i+1)); else if(v==='N') B.push('Ação preliminar '+(i+1)+': Não'); });
+    if(!String(r.equipamento||'').trim()) P.push('Identificação do detector'); if(!segD.fotos.foto_detector) P.push('Foto do detector');
+    if(!r.insuflacao) P.push('Insuflação de 10 min'); else if(r.insuflacao==='N') B.push('Insuflação mínima de 10 min não feita');
+    const pts=[['V',1],['V',2],['V',3]].concat(r.horizontal?[['H',1],['H',2]]:[]);
+    pts.forEach(([pl,pt])=>{ const arr=segD.med.filter(m=>m.plano===pl&&m.ponto===pt&&segMedFora(m)!==null); const m=arr[arr.length-1]; if(!m) P.push('Medição '+(pl==='V'?'vertical':'horizontal')+' P'+pt); else if(segMedFora(m)) B.push('Medição '+(pl==='V'?'V':'H')+'P'+pt+' fora da condição segura'); });
+  } else {
+    if(!String(r.descricao||'').trim()) P.push('Descrição do serviço'); if(segNum(r.altura)==null) P.push('Altura (m)'); if(!String(r.endereco||'').trim()) P.push('Local / endereço');
+    if(!r.mo_consorcio&&!r.mo_contratada) P.push('Mão de obra (consórcio e/ou contratada)');
+    if(r.mo_contratada&&!String(r.mo_empresa||'').trim()) P.push('Nome da empresa contratada');
+    if(!r.acesso.length) P.push('Meio de acesso'); if(r.acesso.includes('outro')&&!String(r.acesso_outro||'').trim()) P.push('Qual outro meio de acesso'); if(!r.sistema.length) P.push('Sistema de proteção contra quedas');
+    let falta=0; SEG_PT_BLOCOS.forEach(b=>{ if(!segPtBlocoAplica(b,r)) return; b.cods.forEach((k,i)=>{ const v=r.checklist[k]; if(!v) falta++; else if(v==='N') B.push(b.t+': '+b.i[i].slice(0,60)+'… Não'); }); });
+    if(falta) P.push(falta+' item(ns) do checklist sem resposta');
+    const pa=pes('participante'); if(!pa.length) P.push('Ao menos 1 participante'); pa.forEach((p,i)=>{ if(!nomeOk(p)) P.push('Nome do participante '+(i+1)); if(!p.sig) P.push('Visto do participante '+(i+1)); });
+    ['emissor','liberador'].forEach(pp=>{ const p=pes(pp)[0]; if(!p||!nomeOk(p)) P.push('Nome — '+SEG_PAPEL[pp].toLowerCase()); if(p&&!p.sig) P.push('Visto — '+SEG_PAPEL[pp].toLowerCase()); });
+  }
+  return {P,B}; }
+function segAtualizar(soTela){ if(!segD)return; if(soTela!==true) segDraftSave();
+  if(segD.tipo==='PET'){ const q=$('#segQtd'); if(q){ const n=new Set(segD.pes.filter(p=>['autorizado','vigia','supervisor'].includes(p.papel)).map(p=>String(p.nome||'').trim().toLowerCase()).filter(Boolean)).size; q.textContent='Quantidade de trabalhadores: '+n; } }
+  const {P,B}=segPendencias(), er=$('#segErros'), bt=$('#segBtns'); if(!er||!bt)return;
+  er.innerHTML=(B.length?`<div class="segerr"><b>⛔ ${segD.tipo==='APR'?'A APR não pode ser emitida':segD.tipo==='PET'?'Entrada impedida':'Trabalho em altura impedido'}:</b><ul style="margin:4px 0 0 18px;padding:0">${B.map(x=>'<li>'+segH(x)+'</li>').join('')}</ul></div>`:'')
+    +(P.length?`<div class="segerr" style="background:var(--warn-bg);color:var(--warn)"><b>Falta preencher (${P.length}):</b><ul style="margin:4px 0 0 18px;padding:0">${P.slice(0,8).map(x=>'<li>'+segH(x)+'</li>').join('')}${P.length>8?'<li>…</li>':''}</ul></div>`:'');
+  const t=segD.tipo;
+  if(t==='APR') bt.innerHTML=`<button class="btn" id="segEmitir" ${P.length||B.length?'disabled':''}>Emitir APR</button>`;
+  else bt.innerHTML=`<button class="btn" id="segEmitir" ${P.length||B.length?'disabled':''}>${t==='PET'?'Liberar entrada':'Liberar trabalho em altura'}</button>`
+    +(B.length&&!P.length?`<button class="btn ghost" id="segImpedir" style="color:var(--bad)">Registrar ${t} impedida</button>`:'');
+  bt.insertAdjacentHTML('beforeend','<button class="btn ghost" id="segSair" style="margin-top:8px">Salvar rascunho e sair</button>');
+  const em=$('#segEmitir'); if(em) em.onclick=()=>segEmitir(t==='APR'?'emitida':'liberada');
+  const im=$('#segImpedir'); if(im) im.onclick=()=>{ if(im.dataset.ok!=='1'){ im.dataset.ok='1'; im.textContent='Toque de novo p/ registrar como impedida'; return; } segEmitir('impedida'); };
+  $('#segSair').onclick=()=>{ segDraftSave(); segD=null; irPara('seg'); }; }
+async function segEmitir(status){ const d=segD; if(!d)return; const {P,B}=segPendencias();
+  if(P.length) return toast('Falta: '+P[0]); if(status!=='impedida'&&B.length) return toast('Bloqueado: '+B[0]);
+  const btn=$('#segEmitir'); if(btn) btn.disabled=true;
+  const agora=new Date().toISOString(), a=d.atividade;
+  const atividade={id:a.id,os_sigos:a.os_sigos||null,tipo_intervencao:a.tipo_intervencao,descricao:a.descricao,endereco:a.endereco,municipio:a.municipio,unidade:a.unidade,
+    consorcio:a.consorcio||localStorage.getItem('consorcio')||null,lat:a.nova?gps.lat:a.lat,lon:a.nova?gps.lon:a.lon,precisao:a.nova?Math.round(gps.acc*10)/10:a.precisao,iniciada_em:a.nova?agora:a.iniciada_em,dispositivo:navigator.userAgent.slice(0,100)};
+  const resp=JSON.parse(JSON.stringify(d.resp)); Object.keys(resp).forEach(k=>{ if(k.startsWith('_na_')) delete resp[k]; });
+  if(d.tipo==='APR'){ resp.fases=resp.fases.filter(x=>String(x).trim()); }
+  if(d.tipo==='PET'){ resp.bloqueios=resp.bloqueios.filter(b=>b.tipo||String(b.resp||'').trim()); }
+  if(d.tipo==='PT'){ SEG_PT_BLOCOS.forEach(b=>{ if(!segPtBlocoAplica(b,resp)) b.cods.forEach(k=>{ resp.checklist[k]='NA'; }); }); }
+  const anexos={}; const pesOut=[];
+  for(const [i,p] of d.pes.filter(p=>String(p.nome||'').trim()).entries()){
+    let sig=null; if(p.sig){ const b=await segSigJpeg(p.sig); if(b){ sig='sig_'+i; anexos[sig]=b; } }
+    pesOut.push({papel:p.papel,pessoa_uuid:p.pessoa_uuid||null,nome:String(p.nome).trim(),documento:p.documento||null,funcao:p.funcao||null,empresa:p.empresa||null,vinculo:p.vinculo||(d.tipo==='PT'?'consorcio':null),sig,assinado_em:p.assinado_em||null}); }
+  Object.keys(d.fotos).forEach(k=>{ if(d.fotos[k]) anexos[k]=d.fotos[k]; });
+  const med=d.tipo==='PET'?segMedValidas().map(m=>({id:m.id,plano:m.plano,ponto:m.ponto,o2:segNum(m.o2),lie:segNum(m.lie),co:segNum(m.co),h2s:segNum(m.h2s),medido_em:m.medido_em||agora})):[];
+  const form={tipo:d.tipo,modelo:SEG_MODELO[d.tipo],status,respostas:resp,emitido_em:agora,lat:gps?gps.lat:null,lon:gps?gps.lon:null,precisao:gps?Math.round(gps.acc*10)/10:null};
+  const item={id:segQid(),tipo:'seg_'+d.tipo.toLowerCase(),rpc:'app_seg_registrar',pasta:'seg',anexos,anexosParam:'p_anexos',
+    fields:{p_id:d.formId,p_dados:{atividade,formulario:form,participantes:pesOut,medicoes:med}}};
+  // cópia local (PDF e ações sem sinal): assinaturas/fotos como dataURL
+  const fotosUrl={}; for(const k of Object.keys(d.fotos)) fotosUrl[k]=await segBlobUrl(d.fotos[k]);
+  const doc={id:d.formId,tipo:d.tipo,status:status==='emitida'?'emitida':status,atividade:Object.assign({},atividade,{nova:false}),resp,
+    pes:d.pes.filter(p=>String(p.nome||'').trim()).map(p=>({papel:p.papel,pessoa_uuid:p.pessoa_uuid||null,nome:String(p.nome).trim(),documento:p.documento||'',funcao:p.funcao||'',empresa:p.empresa||'',vinculo:p.vinculo||'',sig:p.sig||null,assinado_em:p.assinado_em||null})),
+    med:med.map(m=>Object.assign({fase:'entrada'},m)),fotos:fotosUrl,eventos:[],emitido_em:agora,encerrado_em:status==='impedida'?agora:null,lat:form.lat,lon:form.lon,salvo_em:agora};
+  const ok=await segEnviar(item,'✓ '+d.tipo+(status==='impedida'?' registrada como impedida':status==='liberada'?' liberada':' emitida'));
+  if(!ok){ if(btn) btn.disabled=false; return; }
+  try{ await segDocPut(doc); }catch(e){}
+  clearTimeout(segDraftT); try{ await segDraftDel(); }catch(e){}
+  segD=null;
+  if(d.tipo!=='APR'&&status==='liberada'){ irPara('seg'); setTimeout(()=>segAcomp(doc.id),300); }
+  else if(d.tipo==='APR'&&(resp.requer_pt==='S'||resp.requer_pet==='S')){ irPara('seg'); toast('APR emitida — agora emita a '+[resp.requer_pt==='S'?'PT':'',resp.requer_pet==='S'?'PET':''].filter(Boolean).join(' e a ')); }
+  else irPara('seg'); }
+
+// ===== Acompanhamento de PT/PET liberada: medições, troca de vigia, recusa, interrupção, encerramento =====
+let segAc=null; // doc local em acompanhamento
+async function segDocCarregar(id){ let d=null; try{ d=await segDocGet(id); }catch(e){}
+  if(d) return d;
+  if(!navigator.onLine) return null;
+  try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=segDocDeServidor(data); try{ await segDocPut(d); }catch(e){} return d; }catch(e){ return null; } }
+function segDocDeServidor(v){ const f=v.formulario||{}, a=v.atividade||{};
+  return {id:f.id,tipo:f.tipo,status:f.status,atividade:a,resp:f.respostas||{},pes:(v.participantes||[]).map(p=>Object.assign({},p,{sig:p.assinatura||null})),
+    med:v.medicoes||[],fotos:f.fotos||{},eventos:(v.eventos||[]).map(e=>({tipo:e.tipo,dados:e.dados,quando:e.ocorrido_em,usuario:e.usuario_nome,descricao:e.descricao})),
+    emitido_em:f.emitido_em,encerrado_em:f.encerrado_em,encerramento:f.encerramento,alertas:f.alertas||[],verif_status:f.verif_status,verif_obs:f.verif_obs,verif_por_nome:f.verif_por_nome,verif_em:f.verif_em,
+    tratativas:v.tratativas||[],lat:f.lat,lon:f.lon,modelo:f.modelo,usuario_nome:f.usuario_nome,salvo_em:new Date().toISOString(),servidor:true}; }
+async function segAcomp(id){ const d=await segDocCarregar(id); if(!d) return toast('Formulário indisponível sem conexão neste aparelho');
+  segAc=d; irPara('seg_acomp'); }
+function segAcompInit(){ segCss(); const d=segAc, c=$('#segAcBody'); if(!d||!c){ irPara('seg'); return; }
+  $('#segAcTit').textContent=d.tipo+' · '+(SEG_ST_LBL[d.status]||d.status);
+  const ativo=d.status==='liberada', a=d.atividade||{};
+  let h=`<div class="segcard"><span class="segpill" style="background:${SEG_ST_COR[d.status]||'#888'}">${SEG_ST_LBL[d.status]||d.status}</span>
+    <div class="segkv"><b>Atividade</b><span>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</span><b>OS</b><span>${segH(a.os_sigos||'—')}</span><b>Local</b><span>${segH(a.endereco||'—')}</span>
+    ${d.tipo==='PET'?`<b>Espaço</b><span>${segH(d.resp.espaco_tipo||'—')}</span>`:`<b>Altura</b><span>${segH(d.resp.altura||'—')} m</span>`}<b>Início</b><span>${segFmt(d.emitido_em)}</span>${d.encerrado_em?`<b>Término</b><span>${segFmt(d.encerrado_em)}</span>`:''}</div></div>`;
+  if(d.tipo==='PET'){
+    const vig=(d.pes||[]).filter(p=>p.papel==='vigia'); h+=`<div class="sub" style="font-size:12.5px">Vigia atual: <b>${segH((vig[vig.length-1]||{}).nome||'—')}</b> · Supervisor: <b>${segH(((d.pes||[]).find(p=>p.papel==='supervisor')||{}).nome||'—')}</b></div>`;
+    h+='<div class="sec">Medições</div><table class="seggas"><tr><th>Hora</th><th>Ponto</th>'+SEG_GAS.map(g=>`<th>${g[1]}</th>`).join('')+'</tr>'
+      +(d.med||[]).map(m=>{ return `<tr><td>${segHora(m.medido_em)}</td><td>${m.plano||''}P${m.ponto||''}</td>`+SEG_GAS.map(g=>{ const v=segNum(m[g[0]]); return `<td style="color:${v!=null&&!g[4](v)?'var(--bad)':'inherit'};font-weight:${v!=null&&!g[4](v)?700:400}">${v==null?'—':String(v).replace('.',',')}</td>`; }).join('')+'</tr>'; }).join('')+'</table>';
+  }
+  const evs=d.eventos||[]; if(evs.length) h+='<div class="sec">Registros</div>'+evs.map(e=>`<div class="sub" style="font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line)">${segHora(e.quando)} · <b>${segH(SEG_EV_LBL[e.tipo]||e.tipo)}</b> ${segH(segEvResumo(e))}</div>`).join('');
+  if(ativo){
+    h+='<div class="sec">Ações</div><div class="segacts">'+(d.tipo==='PET'?'<button class="btn" data-ac="medicao">🧪 Registrar medição</button><button class="btn ghost" data-ac="troca_vigia">🔁 Troca de vigia</button>':'')
+      +'<button class="btn ghost" data-ac="recusa">✋ Direito de recusa</button><button class="btn ghost" data-ac="interrupcao" style="color:var(--bad)">⛔ Interromper</button><button class="btn" data-ac="encerramento" style="background:#374151">✓ Encerrar '+d.tipo+'</button></div><div id="segAcForm"></div>';
+  } else if(d.tipo==='PET'&&d.status==='interrompida') h+='<div class="segbig bad">PET interrompida. Para voltar a entrar, emita uma nova PET a partir da APR.</div>';
+  h+='<button class="btn ghost" id="segAcPdf" style="margin-top:16px">📄 Ver formulário (PDF)</button>';
+  c.innerHTML=h;
+  c.querySelectorAll('[data-ac]').forEach(b=>b.onclick=()=>segAcForm(b.dataset.ac));
+  $('#segAcPdf').onclick=()=>segPdf(d.id); }
+const SEG_EV_LBL={medicao:'Medição',troca_vigia:'Troca de vigia',recusa:'Direito de recusa',interrupcao:'Interrupção',encerramento:'Encerramento',obs:'Observação',verificacao:'Verificação QSMS'};
+function segEvResumo(e){ const x=e.dados||{}; if(e.tipo==='troca_vigia') return '→ '+(x.nome||''); if(e.tipo==='recusa') return (x.nome||'')+(x.descricao?(' — '+x.descricao):''); if(e.tipo==='medicao') return (x.medicoes||[]).map(m=>(m.plano||'')+'P'+(m.ponto||'')).join(', ');
+  if(e.tipo==='verificacao') return ({conforme:'Conforme',ressalva:'Conforme com ressalva',nao_conforme:'Não conforme'}[x.status]||'')+(e.descricao?(' — '+e.descricao):''); return x.descricao||e.descricao||''; }
+function segAcForm(tipo){ const c=$('#segAcForm'), d=segAc; if(!c||!d)return; let h='';
+  if(tipo==='medicao') h=`<div class="segblk"><h3>Nova medição</h3><label>Ponto</label><select id="acPonto">${['V1','V2','V3','H1','H2'].map(p=>`<option value="${p}">${p[0]==='V'?'Vertical':'Horizontal'} P${p[1]}</option>`).join('')}</select>
+    <table class="seggas"><tr>${SEG_GAS.map(g=>`<th>${g[1]}<br>${g[2]}</th>`).join('')}</tr><tr>${SEG_GAS.map(g=>`<td><input data-acg="${g[0]}" inputmode="decimal"/></td>`).join('')}</tr></table><div id="acGasMsg"></div><button class="btn" id="acOk">Salvar medição</button></div>`;
+  else if(tipo==='troca_vigia') h=`<div class="segblk"><h3>Troca de vigia</h3><label>Novo vigia</label><input id="acNome" list="segPessoasDl" autocomplete="off"/><label>Matrícula / RG</label><input id="acDoc" autocomplete="off"/><button class="btn" id="acOk">Registrar troca</button></div>`;
+  else if(tipo==='recusa') h=`<div class="segblk"><h3>Direito de recusa</h3><label>Trabalhador</label><input id="acNome" list="segPessoasDl" autocomplete="off"/><label>Justificativa *</label><textarea id="acDesc" rows="2"></textarea><button class="btn" id="acOk">Registrar recusa</button></div>`;
+  else if(tipo==='interrupcao') h=`<div class="segblk"><h3>Interromper ${d.tipo}</h3><p class="sub" style="font-size:12.5px">Abandono da área por alarme, ordem do vigia ou qualquer risco. Voltar exige nova ${d.tipo}.</p><label>Motivo *</label><textarea id="acDesc" rows="2"></textarea><button class="btn" id="acOk" style="background:var(--bad)">Interromper</button></div>`;
+  else if(tipo==='encerramento') h=`<div class="segblk"><h3>Encerrar ${d.tipo}</h3><p class="sub" style="font-size:12.5px">Horário de término: agora (${segHora(new Date().toISOString())}).</p><label>Observações</label><textarea id="acDesc" rows="2"></textarea>
+    ${d.tipo==='PET'?'<div class="sub" style="font-size:12px;margin-top:8px">Assinatura de encerramento do supervisor *</div>'+segSigHtml('acSig'):''}<button class="btn" id="acOk">Encerrar</button></div>`;
+  c.innerHTML=h; c.scrollIntoView({behavior:'smooth',block:'start'});
+  const cv=c.querySelector('.segSig'); if(cv){ epiSigInit(cv); const cl=c.querySelector('[data-sigclr]'); if(cl) cl.onclick=()=>cv._clear(); const fs=c.querySelector('[data-sigfs]'); if(fs) fs.onclick=()=>epiSigFS(cv); }
+  c.querySelectorAll('[data-acg]').forEach(inp=>inp.oninput=()=>{ const v=segNum(inp.value), g=SEG_GAS.find(x=>x[0]===inp.dataset.acg); inp.className=v==null?'':(g[4](v)?'ok':'bad'); });
+  $('#acOk').onclick=()=>segAcSalvar(tipo,cv); }
+async function segAcSalvar(tipo,cv){ const d=segAc; if(!d)return; const val=id=>(($('#'+id)||{}).value||'').trim();
+  const quando=new Date().toISOString(), dados={quando}; const anexos={}; let novoStatus=null;
+  if(tipo==='medicao'){ const p=val('acPonto'); const m={id:crypto.randomUUID(),plano:p[0],ponto:+p[1],medido_em:quando};
+    document.querySelectorAll('[data-acg]').forEach(i=>{ m[i.dataset.acg]=segNum(i.value); });
+    const fora=segMedFora(m); if(fora===null) return toast('Preencha as 4 leituras');
+    dados.medicoes=[m]; if(fora) novoStatus='interrompida'; d.med=(d.med||[]).concat([Object.assign({fase:'monitoramento'},m)]); }
+  else if(tipo==='troca_vigia'){ if(val('acNome').length<3) return toast('Informe o novo vigia'); dados.nome=val('acNome'); dados.documento=val('acDoc'); const x=segPessoaPorNome(dados.nome); if(x) dados.pessoa_uuid=x.id;
+    d.pes=(d.pes||[]).concat([{papel:'vigia',nome:dados.nome,documento:dados.documento,desde:quando}]); }
+  else if(tipo==='recusa'){ if(!val('acDesc')) return toast('Descreva a justificativa'); dados.nome=val('acNome'); dados.descricao=val('acDesc'); }
+  else if(tipo==='interrupcao'){ if(!val('acDesc')) return toast('Informe o motivo'); dados.descricao=val('acDesc'); novoStatus='interrompida'; }
+  else if(tipo==='encerramento'){ dados.descricao=val('acDesc'); if(d.tipo==='PET'){ if(!cv||!cv._drawn()) return toast('Colete a assinatura do supervisor'); const sp=(d.pes||[]).find(p=>p.papel==='supervisor'); dados.assinado_por=sp?sp.nome:null; anexos.assinatura_encerramento=await segSigJpeg(cv.toDataURL()); d.encerramento={assinatura:cv.toDataURL(),obs:dados.descricao}; } novoStatus='encerrada'; }
+  const evId=crypto.randomUUID();
+  const item={id:segQid(),tipo:'seg_evento',rpc:'app_seg_evento',pasta:'seg',fields:{p_id:evId,p_formulario:d.id,p_tipo:tipo,p_dados:dados}};
+  if(Object.keys(anexos).length){ item.anexos=anexos; item.anexosParam='p_anexos'; }
+  const btn=$('#acOk'); if(btn) btn.disabled=true;
+  const ok=await segEnviar(item,'✓ '+(SEG_EV_LBL[tipo]||'Registro')+' salvo'); if(!ok){ if(btn) btn.disabled=false; return; }
+  d.eventos=(d.eventos||[]).concat([{tipo,dados,quando}]);
+  if(novoStatus&&d.status==='liberada'){ d.status=novoStatus; d.encerrado_em=quando; }
+  d.salvo_em=quando; try{ await segDocPut(d); }catch(e){}
+  if(tipo==='medicao'&&novoStatus==='interrompida') toast('⛔ Gás fora da condição segura — ABANDONE o espaço confinado. PET interrompida.');
+  segAcompInit(); }
+
+if($('#segNovaApr')) $('#segNovaApr').addEventListener('click',segNovaApr);
+if($('#segFormBack')) $('#segFormBack').addEventListener('click',()=>{ if(segD) segDraftSave(); segD=null; irPara('seg'); });
+// ===== PDF (overlay #relatorio + REL_CSS) — servidor quando online, cópia local quando sem sinal =====
+const SEG_REL_CSS=`
+.segT{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
+.segT th,.segT td{border:1px solid #cbd5e1;padding:4px 6px;text-align:left;vertical-align:top}
+.segT th{background:#f1f5f9;font-size:9.5px;text-transform:uppercase;color:#475569;letter-spacing:.02em}
+.segT td.c{text-align:center;white-space:nowrap;width:1%}
+.segT .ok{color:#0a7d5e;font-weight:700}.segT .bad{color:#b3261e;font-weight:700}
+.segSigs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.segSigC{border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:10.5px;break-inside:avoid}
+.segSigC img{width:100%;height:58px;object-fit:contain;display:block;background:#fff}
+.segSigC .nm{font-weight:700;font-size:11.5px;margin-top:3px}
+.segAlertP{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:6px;padding:7px 10px;font-size:11.5px;margin-top:8px}
+.segNoteP{font-size:10px;color:#555;margin-top:8px;line-height:1.4}
+.segList{margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.45}
+@media print{.segT,.segSigC,.segAlertP{break-inside:avoid}.segT .ok,.segT .bad,.segAlertP{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+async function segPdf(id){ let d=null;
+  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=segDocDeServidor(data); }catch(e){} }
+  if(!d){ try{ d=await segDocGet(id); }catch(e){} }
+  if(!d) return toast('Formulário indisponível sem conexão neste aparelho');
+  if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
+  if(!document.getElementById('segRelStyle')){ const st=document.createElement('style'); st.id='segRelStyle'; st.textContent=SEG_REL_CSS; document.head.appendChild(st); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+segDocHtml(d)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  document.getElementById('relPrint').onclick=()=>window.print(); }
+function segFotosHtml(arr){ const its=arr.filter(f=>f[1]); if(!its.length) return '<div class="relPend">Sem foto.</div>';
+  return '<div class="relPhotos">'+its.map(f=>'<figure><img src="'+segImg(f[1])+'" onerror="this.remove()"/><figcaption>'+f[0]+'</figcaption></figure>').join('')+'</div>'; }
+function segSigsHtml(pes){ if(!pes.length) return '<div class="relPend">—</div>';
+  return '<div class="segSigs">'+pes.map(p=>`<div class="segSigC">${p.sig?`<img src="${segImg(p.sig)}"/>`:'<div style="height:58px;color:#b45309;font-style:italic;display:flex;align-items:center;justify-content:center">sem assinatura</div>'}<div class="nm">${segH(p.nome)}</div><div>${segH(SEG_PAPEL[p.papel]||p.papel)}${p.documento?(' · '+segH(p.documento)):''}</div>${p.funcao?`<div>${segH(p.funcao)}</div>`:''}${p.empresa?`<div>${segH(p.empresa)}</div>`:''}${p.vinculo?`<div>${p.vinculo==='terceiro'?'Funcionário terceirizado':'Empregado do consórcio'}</div>`:''}<div style="color:#777">${p.assinado_em?segFmt(p.assinado_em):''}${p.desde?('desde '+segHora(p.desde)):''}</div></div>`).join('')+'</div>'; }
+function segDocHtml(d){ const a=d.atividade||{}, r=d.resp||{}, pes=d.pes||[], cons=REL_CONS[a.consorcio]||a.consorcio||'Consórcios Águas Integradas & Eficiência Hídrica', cor=SEG_ST_COR[d.status]||'#555';
+  const X=v=>v?'X':''; let n=0; const sec=t=>'<div class="relSec"><span class="relNum">'+(++n)+'</span>'+t+'</div>';
+  let h=`<div class="relTop"><div><h1>${SEG_TITULO[d.tipo]}</h1><div class="sub">${segH(cons)} · Modelo ${segH(d.modelo||SEG_MODELO[d.tipo])}</div></div><div class="relBadge" style="color:${cor}">${(SEG_ST_LBL[d.status]||d.status||'').toUpperCase()}</div></div><div class="relBody">`;
+  const osInfo=a.os_sigos?(a.os_encontrada===true?('OS localizada na base SIGOS'+(a.os_servico?(' — '+segH(a.os_servico)):'')+(a.os_dist_m!=null?(' · GPS a '+a.os_dist_m+' m do ponto da OS'):'')):(a.os_encontrada===false?'OS não localizada na base SIGOS (até a última carga)':'')):'';
+  const coord=(d.lat!=null?d.lat:a.lat)!=null?((+(d.lat!=null?d.lat:a.lat)).toFixed(6)+', '+(+(d.lon!=null?d.lon:a.lon)).toFixed(6)+(a.gps_precisao?(' (±'+a.gps_precisao+' m)'):'')):'—';
+  if(d.tipo==='APR'){
+    const resp=pes.filter(p=>p.papel==='responsavel'), exe=pes.filter(p=>p.papel==='executante');
+    h+='<div class="relGrid">'+relWide('Local',segH(a.endereco))+relWide('Serviço a ser executado',segH(a.descricao))+relField('Nº da OS',segH(a.os_sigos||'—'))+relField('Tipo de intervenção',segH(SEG_TIPO_LBL(a.tipo_intervencao)))
+      +relField('Data',d.emitido_em?new Date(d.emitido_em).toLocaleDateString('pt-BR'):'—')+relField('Hora',segHora(d.emitido_em))+relField('Unidade organizacional',segH(a.unidade||'—'))+relField('Município',segH(a.municipio||'—'))
+      +relField('Coordenadas',coord)+relField('Emitida por',segH(d.usuario_nome||a.usuario_nome||(resp[0]||{}).nome||'—'))+'</div>'+(osInfo?'<div class="segNoteP">'+osInfo+'</div>':'');
+    h+=sec('Recomendações de segurança')+'<ul class="segList">'+SEG_RECOMENDACOES.map(t=>'<li>'+t+'</li>').join('')+'</ul>';
+    h+=sec('Fases de execução (planejamento)')+'<ol class="segList">'+(r.fases||[]).map(t=>'<li>'+segH(t)+'</li>').join('')+'</ol>';
+    h+=sec('Identificação dos riscos e medidas de controle')+'<table class="segT"><tr><th>Pergunta</th><th>Resposta</th><th>Medida de controle</th></tr>'+SEG_RISCOS.map(x=>{ const v=(r.riscos||{})[x[0]], flag=SEG_RISCO_FLAG(x,v);
+      return `<tr><td>${x[1]}</td><td class="c ${flag?'bad':''}">${v==='S'?'Sim':v==='N'?'Não':'—'}</td><td>${x[2]}${flag&&!x[3]?((r.medidas||{})[x[0]]?' <span class="ok">✓ aplicada</span>':' <span class="bad">não confirmada</span>'):''}</td></tr>`; }).join('')+'</table>'
+      +(r.outros?'<div class="segNoteP"><b>Outros riscos / observações:</b> '+segH(r.outros)+'</div>':'');
+    h+=sec('Equipamento de proteção individual (EPI)')+'<table class="segT"><tr>'+SEG_EPIS.map(([k,l],i)=>(i&&i%4===0?'</tr><tr>':'')+`<td class="c">${X((r.epis||[]).includes(k))}</td><td>${l}</td>`).join('')+'</tr></table>'+(r.epi_outros?'<div class="segNoteP"><b>Outros:</b> '+segH(r.epi_outros)+'</div>':'');
+    const yn=v=>v==='S'?'Sim':v==='N'?'Não':v==='NA'?'Não se aplica':'—';
+    h+=sec('Autorizações especiais')+'<table class="segT"><tr><td>A atividade requer PT (Permissão de Trabalho em Altura)?</td><td class="c">'+yn(r.requer_pt)+'</td></tr><tr><td>A atividade requer PET (Permissão de Entrada e Trabalho em Espaço Confinado)?</td><td class="c">'+yn(r.requer_pet)+'</td></tr></table>';
+    h+=sec('Registro fotográfico')+segFotosHtml([['Sinalização / isolamento do local',(d.fotos||{}).foto_sinalizacao]]);
+    h+=sec('Assinaturas dos envolvidos no planejamento e execução dos serviços')+'<div style="font-size:11px;font-weight:700;margin-top:6px">Responsável pelos serviços</div>'+segSigsHtml(resp)+'<div style="font-size:11px;font-weight:700;margin-top:8px">Executantes dos serviços</div>'+segSigsHtml(exe)
+      +'<div class="segNoteP"><b>IMPORTANTE:</b> comprometem-se, assim, o responsável pelos serviços e os executantes ao cumprimento integral de todos os procedimentos de segurança recomendados, estando sujeitos às sanções disciplinares, administrativas e legais aqueles que de alguma forma os descumprirem. PRT-CSMG-2023_003 estabelece as diretrizes para a realização de Análise Preliminar de Risco.</div>';
+  } else if(d.tipo==='PET'){
+    const aut=pes.filter(p=>p.papel==='autorizado'), vig=pes.filter(p=>p.papel==='vigia'), sup=pes.filter(p=>p.papel==='supervisor');
+    const qtd=new Set(pes.filter(p=>['autorizado','vigia','supervisor'].includes(p.papel)&&!p.desde).map(p=>String(p.nome).toLowerCase())).size; // vigia que entrou na troca não soma
+    h+='<div class="relGrid">'+relWide('Local / endereço',segH(a.endereco))+relWide('Atividade',segH(r.atividade_desc||a.descricao))+relField('Espaço confinado (tipo)',segH(r.espaco_tipo))+relField('Nº da OS',segH(a.os_sigos||'—'))
+      +relField('Data',d.emitido_em?new Date(d.emitido_em).toLocaleDateString('pt-BR'):'—')+relField('Horário de início',segHora(d.emitido_em))+relField('Horário de término',d.encerrado_em?segHora(d.encerrado_em):'—')+relField('Quantidade de trabalhadores',qtd)+relField('Coordenadas',coord)+'</div>'+(osInfo?'<div class="segNoteP">'+osInfo+'</div>':'');
+    h+=sec('Equipe')+'<table class="segT"><tr><th>Função</th><th>Nome</th><th>Matrícula / RG</th></tr>'+aut.concat(vig,sup).map(p=>`<tr><td>${SEG_PAPEL[p.papel]}${p.desde?(' (troca às '+segHora(p.desde)+')'):''}</td><td>${segH(p.nome)}</td><td>${segH(p.documento||'—')}</td></tr>`).join('')+'</table>';
+    h+=sec('Ações preliminares para entrada')+'<table class="segT"><tr><th>Item</th><th>Sim</th><th>Não</th></tr>'+SEG_PET_PRELIM.map((t,i)=>{ const v=(r.preliminares||{})['p'+(i+1)]; return `<tr><td>${i+1}. ${t}</td><td class="c">${X(v==='S')}</td><td class="c bad">${X(v==='N')}</td></tr>`; }).join('')+'</table>';
+    const bl=(r.bloqueios||[]).filter(b=>b.tipo||b.resp);
+    h+=sec('Bloqueios hidráulico / elétrico')+(bl.length?'<table class="segT"><tr><th>Tipo</th><th>Responsável pelo bloqueio</th></tr>'+bl.map(b=>`<tr><td>${segH(b.tipo||'—')}</td><td>${segH(b.resp||'—')}</td></tr>`).join('')+'</table>':'<div class="relPend">Sem bloqueios registrados.</div>');
+    h+=sec('Monitoramento ambiental')+'<div class="relGrid">'+relField('Identificação do equipamento',segH(r.equipamento))+relField('Insuflação ≥ 10 min antes das medições',r.insuflacao==='S'?'Sim':r.insuflacao==='N'?'Não':'—')+'</div>'
+      +'<table class="segT"><tr><th>Fase</th><th>Horário</th><th>Plano / ponto</th>'+SEG_GAS.map(g=>`<th>${g[1]} (${g[2]})</th>`).join('')+'<th>Condição</th></tr>'
+      +(d.med||[]).map(m=>{ const fora=segMedFora(m); return `<tr><td>${m.fase==='monitoramento'?'Durante':'Entrada'}</td><td>${segHora(m.medido_em)}</td><td>${m.plano==='H'?'Horizontal':'Vertical'} P${m.ponto||''}</td>`+SEG_GAS.map(g=>{ const v=segNum(m[g[0]]); return `<td class="c ${v!=null&&!g[4](v)?'bad':''}">${v==null?'—':String(v).replace('.',',')}</td>`; }).join('')+`<td class="c ${fora?'bad':'ok'}">${fora?'OCORRÊNCIA':'Segura'}</td></tr>`; }).join('')
+      +'<tr><td colspan="3"><b>Condição segura</b></td>'+SEG_GAS.map(g=>`<td class="c">${g[3]}</td>`).join('')+'<td></td></tr></table>'
+      +'<div class="segNoteP">Plano vertical = medições ao longo da altura do espaço (superfície, meio e fundo). Plano horizontal = medições ao longo de galerias e tanques. Ocorrências = medidas fora da condição segura.</div>';
+    h+=segFotosHtml([['Detector de gases',(d.fotos||{}).foto_detector]]);
+    h+=sec('Telefones de emergência')+'<div class="relGrid">'+relField('Corpo de Bombeiros / resgate','193')+relField('SAMU','192')+relField('PMMG','190')+relField('Comunicação da unidade COPASA',segH(r.tel_unidade||'—'))+'</div>';
+    h+=sec('Recomendações e observações')+'<div class="segNoteP" style="font-size:11px">'+SEG_PET_RECOM+'</div>'+(r.obs?'<div class="segNoteP"><b>Observações:</b> '+segH(r.obs)+'</div>':'');
+    h+=sec('Assinaturas do supervisor de entrada')+'<div class="segSigs"><div class="segSigC"><div style="font-size:10px;color:#777">ENTRADA</div>'+((sup[0]||{}).sig?`<img src="${segImg(sup[0].sig)}"/>`:'<div style="height:58px"></div>')+`<div class="nm">${segH((sup[0]||{}).nome||'')}</div><div>${segFmt(d.emitido_em)}</div></div>`
+      +'<div class="segSigC"><div style="font-size:10px;color:#777">ENCERRAMENTO</div>'+((d.encerramento||{}).assinatura?`<img src="${segImg(d.encerramento.assinatura)}"/>`:'<div style="height:58px;color:#b45309;font-style:italic;display:flex;align-items:center;justify-content:center">'+(d.status==='liberada'?'em andamento':'—')+'</div>')+`<div class="nm">${segH((d.encerramento||{}).assinado_por||(d.status==='encerrada'?(sup[0]||{}).nome:'')||'')}</div><div>${d.encerrado_em?segFmt(d.encerrado_em):''}</div></div></div>`;
+  } else {
+    const part=pes.filter(p=>p.papel==='participante'), em=pes.filter(p=>p.papel==='emissor'), lb=pes.filter(p=>p.papel==='liberador');
+    h+='<div class="relGrid">'+relField('Data / hora de emissão',segFmt(d.emitido_em))+relField('Data / hora de encerramento',d.encerrado_em?segFmt(d.encerrado_em):'—')+relField('Nº da Ordem de Serviço',segH(a.os_sigos||'—'))+relField('Altura (metros)',segH(r.altura))
+      +relWide('Descrição do serviço',segH(r.descricao))+relWide('Identificação do local ou endereço',segH(r.endereco||a.endereco))+relField('Município',segH(r.municipio||a.municipio||'—'))+relField('Coordenadas',coord)+'</div>'+(osInfo?'<div class="segNoteP">'+osInfo+'</div>':'');
+    h+=sec('Mão de obra envolvida na execução')+'<table class="segT"><tr><td class="c">'+X(r.mo_consorcio)+'</td><td>Empregados '+segH(CONSORCIO_NOME[a.consorcio]||'do consórcio')+'</td><td>Equipe responsável: '+segH(r.mo_equipe||'—')+'</td><td>Nº de trabalhadores: '+segH(r.mo_n||'—')+'</td></tr><tr><td class="c">'+X(r.mo_contratada)+'</td><td>Empresa contratada: '+segH(r.mo_empresa||'—')+'</td><td>Nº do contrato: '+segH(r.mo_contrato||'—')+'</td><td>Nº de trabalhadores: '+segH(r.mo_n_contratada||'—')+'</td></tr></table>';
+    h+=sec('Condição do trabalho em altura')+'<div class="relGrid">'+relWide('Meio de acesso',SEG_PT_ACESSO.filter(([k])=>(r.acesso||[]).includes(k)).map(([k,l])=>k==='outro'?('Outro: '+segH(r.acesso_outro||'')):l).join(', ')||'—')
+      +relWide('Tipo de sistema individual de proteção contra quedas',SEG_PT_SISTEMA.filter(([k])=>(r.sistema||[]).includes(k)).map(x=>x[1]).join(', ')||'—')+'</div>';
+    h+=sec('Checklist')+'<table class="segT"><tr><th>Item</th><th>Sim</th><th>Não</th><th>NA</th></tr>'+SEG_PT_BLOCOS.map(b=>`<tr><th colspan="4" style="background:#e2e8f0">${b.t}</th></tr>`+b.i.map((t,i)=>{ const v=(r.checklist||{})[b.cods[i]]; return `<tr><td>${t}</td><td class="c">${X(v==='S')}</td><td class="c bad">${X(v==='N')}</td><td class="c">${X(v==='NA')}</td></tr>`; }).join('')).join('')+'</table>';
+    h+=sec('Participantes da atividade')+segSigsHtml(part);
+    h+=sec('Responsáveis')+'<div style="font-size:11px;font-weight:700;margin-top:6px">Responsável pela emissão da permissão</div>'+segSigsHtml(em)+'<div style="font-size:11px;font-weight:700;margin-top:8px">Responsável pela liberação da área ou local</div>'+segSigsHtml(lb);
+  }
+  const evs=(d.eventos||[]).filter(e=>e.tipo!=='medicao');
+  if(evs.length) h+=sec('Registros durante a atividade')+'<table class="segT"><tr><th>Horário</th><th>Registro</th><th>Detalhe</th></tr>'+evs.map(e=>`<tr><td>${segFmt(e.quando)}</td><td>${segH(SEG_EV_LBL[e.tipo]||e.tipo)}</td><td>${segH(segEvResumo(e))}${e.usuario?(' · '+segH(e.usuario)):''}</td></tr>`).join('')+'</table>';
+  if(d.encerramento&&(d.encerramento.motivo||d.encerramento.obs)) h+='<div class="segNoteP"><b>'+(d.status==='interrompida'?'Interrupção':'Encerramento')+':</b> '+segH(d.encerramento.motivo||d.encerramento.obs)+'</div>';
+  if((d.alertas||[]).length) h+='<div class="segAlertP"><b>Alertas:</b> '+d.alertas.map(segH).join(' · ')+'</div>';
+  if(d.verif_status) h+='<div class="segNoteP" style="font-size:11.5px"><b>Verificação QSMS:</b> '+({conforme:'Conforme',ressalva:'Conforme com ressalva',nao_conforme:'Não conforme'}[d.verif_status])+(d.verif_por_nome?(' — '+segH(d.verif_por_nome)):'')+(d.verif_em?(' em '+segFmt(d.verif_em)):'')+(d.verif_obs?('. '+segH(d.verif_obs)):'')+'</div>';
+  h+=`</div><div class="relFoot"><span>Documento eletrônico · AcquaHub · ${d.servidor?'conferido no servidor':'cópia do aparelho (aguardando envio)'}</span><span>${String(d.id).slice(0,8)}</span></div>`;
+  return h; }
+
+// ===== QSMS — gestão (tela qsms): painel, formulários (lista/mapa/detalhe), tratativas =====
+let qsmsTab='painel', qsmsDados=null, qsmsView='lista', qsmsMap=null, qsmsMk=null, qsmsDet=null, qsmsTratSt='aberta', qsmsWired=false;
+const QSMS_VERIF={conforme:['Conforme','#1a7f4b'],ressalva:['Com ressalva','#b7791f'],nao_conforme:['Não conforme','#b3261e']};
+const qsmsDia=s=>{ const d=new Date(s); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+function qsmsInit(){ if(!(ME&&ME.qsms)){ toast('Acesso restrito'); irPara('home'); return; }
+  segCss(); segPessoasCarregar();
+  const de=$('#qsDe'), ate=$('#qsAte'); if(de&&!de.value){ const h=new Date(); ate.value=qsmsDia(h); h.setDate(h.getDate()-29); de.value=qsmsDia(h); }
+  const cfg=$('#qsCfg'); if(cfg) cfg.classList.toggle('hidden',!(ME&&ME.is_admin));
+  if(!qsmsWired){ qsmsWired=true;
+    document.querySelectorAll('#qsTabs button').forEach(b=>b.onclick=()=>{ qsmsTab=b.dataset.t; qsmsDet=null; qsmsRender(); });
+    ['qsDe','qsAte','qsCons'].forEach(id=>{ const el=$('#'+id); if(el) el.onchange=qsmsCarregar; });
+    if(cfg) cfg.onclick=()=>irPara('qsms_acesso'); }
+  qsmsCarregar(); }
+async function qsmsCarregar(){ const v=$('#qsView'); if(v) v.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_qsms_listar',{p_de:$('#qsDe').value,p_ate:$('#qsAte').value,p_consorcio:$('#qsCons').value||null}); if(error)throw error; qsmsDados=data||{itens:[],abertas:[]}; }
+  catch(e){ if(v) v.innerHTML='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; return; }
+  qsmsRender(); }
+function qsmsRender(){ document.querySelectorAll('#qsTabs button').forEach(b=>b.classList.toggle('sel',b.dataset.t===qsmsTab));
+  if(qsmsDet) return qsmsDetalhe(qsmsDet);
+  if(qsmsTab==='painel') qsmsPainel(); else if(qsmsTab==='forms') qsmsLista(); else qsmsTrat(); }
+function qsmsBars(pares,tot){ const max=Math.max(1,...pares.map(p=>p[1]));
+  return pares.map(([l,v])=>`<div class="segbar" title="${segH(l)}: ${v}${tot?(' ('+Math.round(v*100/tot)+'%)'):''}"><span class="l">${segH(l)}</span><span class="b"><i style="width:${Math.max(2,Math.round(v*100/max))}%"></i></span><span class="v">${v}</span></div>`).join('')||'<p class="sub" style="font-size:12px">Sem dados no período.</p>'; }
+function qsmsPainel(){ const v=$('#qsView'), it=(qsmsDados.itens||[]), ab=(qsmsDados.abertas||[]), tr=qsmsDados.tratativas||{};
+  const cnt=f=>it.filter(f).length;
+  const kp=[['APRs emitidas',cnt(x=>x.tipo==='APR'),''],['PTs',cnt(x=>x.tipo==='PT'),''],['PETs',cnt(x=>x.tipo==='PET'),''],['Abertas agora',ab.length,ab.some(x=>x.horas>10)?'alerta':''],
+    ['Impedidas / interrompidas',cnt(x=>x.status==='impedida'||x.status==='interrompida'),'alerta'],['Leituras de gás fora',it.reduce((s,x)=>s+(+x.n_fora||0),0),'alerta'],
+    ['A verificar',cnt(x=>!x.verif_status),''],['Não conformes',cnt(x=>x.verif_status==='nao_conforme'),'alerta'],['Tratativas abertas',tr.abertas||0,''],['Tratativas atrasadas',tr.atrasadas||0,'alerta'],
+    ['OS não localizada',cnt(x=>x.tipo==='APR'&&x.os_encontrada===false),''],['APR > 300 m da OS',cnt(x=>x.tipo==='APR'&&x.os_dist_m>300),'']];
+  let h='<div class="segkpis">'+kp.map(([l,n,c])=>`<div class="segkpi ${n&&c?c:''}"><b>${n}</b><span>${l}</span></div>`).join('')+'</div>';
+  h+='<div class="sec">Abertas agora (PT/PET liberadas)</div>'+(ab.length?ab.map(x=>`<div class="segcard" data-qsf="${x.id}" style="cursor:pointer;${x.horas>10?'border-left:4px solid var(--bad)':''}"><b>${x.tipo}</b> · ${segH(x.usuario_nome||'')} · há ${String(x.horas).replace('.',',')} h${x.horas>10?' <b style="color:var(--bad)">— confirmar encerramento</b>':''}<div class="sub" style="font-size:12px">${x.os_sigos?('OS '+segH(x.os_sigos)+' · '):''}${segH(x.endereco||'')}${x.espaco?(' · '+segH(x.espaco)):''}${x.altura?(' · '+segH(x.altura)+' m'):''}</div></div>`).join(''):'<p class="sub">Nenhuma PT/PET aberta. 👍</p>');
+  // por dia (série única)
+  const de=new Date($('#qsDe').value+'T12:00:00'), ate=new Date($('#qsAte').value+'T12:00:00'), dias=[];
+  for(let d=new Date(de); d<=ate && dias.length<92; d.setDate(d.getDate()+1)) dias.push(qsmsDia(d));
+  const porDia=dias.map(d=>[d,it.filter(x=>x.tipo==='APR'&&qsmsDia(x.emitido_em)===d).length]); const mxD=Math.max(1,...porDia.map(x=>x[1]));
+  h+='<div class="sec">APRs por dia</div><div class="segdias">'+porDia.map(([d,n])=>`<i title="${d.split('-').reverse().join('/')}: ${n} APR(s)" style="height:${Math.round(n*100/mxD)}%"></i>`).join('')+'</div><div class="sub" style="font-size:11px;display:flex;justify-content:space-between"><span>'+(dias[0]||'').split('-').reverse().join('/')+'</span><span>'+(dias[dias.length-1]||'').split('-').reverse().join('/')+'</span></div>';
+  const agrupa=(arr,fk)=>{ const m=new Map(); arr.forEach(x=>{ const k=fk(x); if(k) m.set(k,(m.get(k)||0)+1); }); return [...m.entries()].sort((a,b)=>b[1]-a[1]); };
+  const aprs=it.filter(x=>x.tipo==='APR');
+  h+='<div class="sec">APRs por tipo de intervenção</div>'+qsmsBars(agrupa(aprs,x=>SEG_TIPO_LBL(x.tipo_intervencao)),aprs.length);
+  h+='<div class="sec">APRs por responsável (top 10)</div>'+qsmsBars(agrupa(aprs,x=>x.usuario_nome||'—').slice(0,10),aprs.length);
+  h+='<div class="sec">Riscos identificados nas APRs</div>'+qsmsBars(SEG_RISCOS.filter(r=>!r[3]).map(r=>[(s=>s.charAt(0).toUpperCase()+s.slice(1))(r[1].replace(/^Existe(m)? (o )?risco (de |na )?/i,'').replace(/^Existem pessoas trabalhando em /i,'pessoas em ').replace('?','')),aprs.filter(x=>(x.riscos||{})[r[0]]==='S').length]).sort((a,b)=>b[1]-a[1]),aprs.length);
+  const al=it.filter(x=>x.n_alertas>0).slice(0,12);
+  h+='<div class="sec">Alertas recentes</div>'+(al.length?al.map(x=>`<div class="segcard" data-qsf="${x.id}" style="cursor:pointer"><b>${x.tipo}</b> · ${segFmt(x.emitido_em)} · ${segH(x.usuario_nome||'')}<div class="sub" style="font-size:12px;color:var(--bad)">${(x.alertas||[]).map(segH).join(' · ')}</div></div>`).join(''):'<p class="sub">Sem alertas no período.</p>');
+  v.innerHTML=h; v.querySelectorAll('[data-qsf]').forEach(el=>el.onclick=()=>{ qsmsDet=el.dataset.qsf; qsmsRender(); }); }
+function qsmsFiltrados(){ const g=id=>(($('#'+id)||{}).value||''); const tp=g('qsfTipo'), st=g('qsfSt'), vf=g('qsfVer'), ti=g('qsfInt'), q=g('qsfBusca').trim().toLowerCase();
+  return (qsmsDados.itens||[]).filter(x=>(!tp||x.tipo===tp)&&(!st||x.status===st)&&(!ti||x.tipo_intervencao===ti)
+    &&(!vf||(vf==='pendente'?!x.verif_status:(vf==='alerta'?x.n_alertas>0:x.verif_status===vf)))
+    &&(!q||[x.os_sigos,x.endereco,x.usuario_nome,x.responsavel,x.descricao].some(s=>String(s||'').toLowerCase().includes(q)))); }
+function qsmsLista(){ const v=$('#qsView');
+  if(!$('#qsfTipo')){ v.innerHTML=`<div class="segfil"><select id="qsfTipo"><option value="">APR, PT e PET</option><option>APR</option><option>PT</option><option>PET</option></select>
+    <select id="qsfSt"><option value="">Todos os status</option>${Object.entries(SEG_ST_LBL).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
+    <select id="qsfVer"><option value="">Verificação: todas</option><option value="pendente">A verificar</option><option value="conforme">Conforme</option><option value="ressalva">Com ressalva</option><option value="nao_conforme">Não conforme</option><option value="alerta">Só com alertas</option></select>
+    <select id="qsfInt"><option value="">Todos os tipos de intervenção</option>${SEG_TIPOS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
+    <input id="qsfBusca" placeholder="Buscar OS, endereço, pessoa…" autocomplete="off"/></div>
+    <div class="seg" id="qsViewSeg" style="margin-bottom:8px"><button type="button" data-v="lista" class="${qsmsView==='lista'?'sel':''}">📋 Lista</button><button type="button" data-v="mapa" class="${qsmsView==='mapa'?'sel':''}">🗺️ Mapa</button><button type="button" data-v="xlsx">⬇ XLSX</button></div>
+    <div id="qsResumo" class="sub" style="font-size:12px;margin-bottom:6px"></div><div id="qsLista"></div><div id="qsMapaWrap" class="hidden"><div id="qsMapa" style="height:60vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div><div class="sub" style="font-size:12px;margin-top:6px">${Object.entries(SEG_ST_LBL).map(([k,l])=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px"><span class="segdot" style="background:${SEG_ST_COR[k]}"></span>${l}</span>`).join('')}· ponto menor = APR</div></div>`;
+    ['qsfTipo','qsfSt','qsfVer','qsfInt'].forEach(id=>$('#'+id).onchange=qsmsListaRender); $('#qsfBusca').oninput=qsmsListaRender;
+    document.querySelectorAll('#qsViewSeg button').forEach(b=>b.onclick=()=>{ if(b.dataset.v==='xlsx') return qsmsExport(); qsmsView=b.dataset.v; document.querySelectorAll('#qsViewSeg button').forEach(x=>x.classList.toggle('sel',x===b)); qsmsListaRender(); });
+    qsmsMap=null; }
+  qsmsListaRender(); }
+function qsmsListaRender(){ const arr=qsmsFiltrados(), L1=$('#qsLista'), M=$('#qsMapaWrap'); if(!L1)return;
+  $('#qsResumo').textContent=arr.length+' formulário(s) · '+arr.filter(x=>!x.verif_status).length+' a verificar';
+  L1.classList.toggle('hidden',qsmsView!=='lista'); M.classList.toggle('hidden',qsmsView!=='mapa');
+  if(qsmsView==='mapa') return qsmsMapa(arr);
+  L1.innerHTML=arr.length?arr.slice(0,300).map(x=>{ const vr=QSMS_VERIF[x.verif_status];
+    return `<div class="segcard" data-qsf="${x.id}" style="cursor:pointer"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>${x.tipo}</b><span class="segpill" style="background:${SEG_ST_COR[x.status]||'#888'}">${SEG_ST_LBL[x.status]||x.status}</span>${vr?`<span class="segpill" style="background:${vr[1]}">${vr[0]}</span>`:'<span class="segpill" style="background:#64748b">A verificar</span>'}${x.n_alertas?`<span class="segpill" style="background:var(--bad)">⚠ ${x.n_alertas}</span>`:''}${x.trat_abertas?`<span class="segpill" style="background:#7c3aed">${x.trat_abertas} tratativa(s)</span>`:''}<span class="sub" style="margin-left:auto;font-size:12px">${segFmt(x.emitido_em)}</span></div>
+      <div class="sub" style="margin-top:4px">${segH(SEG_TIPO_LBL(x.tipo_intervencao))} · ${x.os_sigos?('OS '+segH(x.os_sigos)+(x.os_encontrada===false?' (não localizada)':'')+' · '):''}${segH(x.endereco||'')}</div>
+      <div class="sub" style="font-size:12px;margin-top:2px">${segH(x.usuario_nome||'')}${x.responsavel&&x.responsavel!==x.usuario_nome?(' · resp. '+segH(x.responsavel)):''} · ${x.n_pessoas} pessoa(s)${x.tipo==='PET'?(' · '+x.n_medicoes+' leitura(s)'+(x.n_fora?(', '+x.n_fora+' fora'):'')):''}${x.consorcio?(' · '+(CONSORCIO_NOME[x.consorcio]||x.consorcio)):''}</div></div>`; }).join('')+(arr.length>300?'<p class="sub">Mostrando 300 — refine os filtros ou exporte.</p>':''):'<p class="sub">Nenhum formulário com esses filtros.</p>';
+  L1.querySelectorAll('[data-qsf]').forEach(el=>el.onclick=()=>{ qsmsDet=el.dataset.qsf; qsmsRender(); }); }
+function qsmsMapa(arr){ const el=$('#qsMapa'); if(!el||typeof L==='undefined')return;
+  if(!qsmsMap){ el.innerHTML=''; qsmsMap=L.map(el); mapAddCamadaBase(qsmsMap); qsmsMap.setView([-19.94,-44.1],11); mapAddLimiteZA(qsmsMap); qsmsMk=L.layerGroup().addTo(qsmsMap); }
+  setTimeout(()=>{ try{ qsmsMap.invalidateSize(); }catch(e){} },60);
+  qsmsMk.clearLayers(); const b=[];
+  arr.forEach(x=>{ if(x.lat==null||x.lon==null)return; const mk=L.circleMarker([+x.lat,+x.lon],{radius:x.tipo==='APR'?6:8,color:'#fff',weight:1.5,fillColor:SEG_ST_COR[x.status]||'#888',fillOpacity:.95});
+    mk.bindPopup(`<b>${x.tipo} · ${SEG_ST_LBL[x.status]||x.status}</b><br>${segH(SEG_TIPO_LBL(x.tipo_intervencao))}<br>${x.os_sigos?('OS '+segH(x.os_sigos)+'<br>'):''}${segH(x.usuario_nome||'')} · ${segFmt(x.emitido_em)}<br><a href="#" data-qspop="${x.id}">Abrir</a>`);
+    mk.on('popupopen',e=>{ const a=e.popup.getElement().querySelector('[data-qspop]'); if(a) a.onclick=ev=>{ ev.preventDefault(); qsmsDet=x.id; qsmsRender(); }; });
+    qsmsMk.addLayer(mk); b.push([+x.lat,+x.lon]); });
+  if(b.length){ try{ qsmsMap.fitBounds(b,{padding:[30,30],maxZoom:16}); }catch(e){} }
+}
+function qsmsExport(){ const arr=qsmsFiltrados(); if(!arr.length) return toast('Nada para exportar');
+  const aoa=[['Tipo','Status','Emitido em','Encerrado em','Consórcio','OS SIGOS','OS na base','Distância GPS×OS (m)','Tipo de intervenção','Serviço','Endereço','Município','Unidade','Registrado por','Responsável','Pessoas','Espaço confinado','Altura (m)','Leituras de gás','Leituras fora','Requer PT','Requer PET','Alertas','Verificação','Obs. verificação','Tratativas abertas','Latitude','Longitude','ID']];
+  arr.forEach(x=>aoa.push([x.tipo,SEG_ST_LBL[x.status]||x.status,x.emitido_em?new Date(x.emitido_em).toLocaleString('pt-BR'):'',x.encerrado_em?new Date(x.encerrado_em).toLocaleString('pt-BR'):'',CONSORCIO_NOME[x.consorcio]||x.consorcio||'',x.os_sigos||'',x.os_encontrada==null?'':(x.os_encontrada?'Sim':'Não'),x.os_dist_m??'',
+    SEG_TIPO_LBL(x.tipo_intervencao),x.descricao||'',x.endereco||'',x.municipio||'',x.unidade||'',x.usuario_nome||'',x.responsavel||'',x.n_pessoas,x.espaco||'',x.altura||'',x.n_medicoes,x.n_fora,x.requer_pt||'',x.requer_pet||'',
+    (x.alertas||[]).join(' · '),x.verif_status?QSMS_VERIF[x.verif_status][0]:'A verificar',x.verif_obs||'',x.trat_abertas,x.lat??'',x.lon??'',x.id]));
+  exportarXlsx('qsms_formularios_'+$('#qsDe').value+'_a_'+$('#qsAte').value+'.xlsx','Formulários',aoa); }
+async function qsmsDetalhe(id){ const v=$('#qsView'); v.innerHTML='<p class="sub">Carregando…</p>';
+  let d; try{ const {data,error}=await sb.rpc('app_seg_ver',{p_formulario:id}); if(error)throw error; d=data; }catch(e){ v.innerHTML='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; return; }
+  const f=d.formulario||{}, a=d.atividade||{}, vr=QSMS_VERIF[f.verif_status];
+  let h=`<button class="btn ghost" id="qsVoltar" style="margin:0 0 10px;width:auto;padding:8px 14px">‹ Voltar</button>
+    <div class="segcard"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:15px">${f.tipo}</b><span class="segpill" style="background:${SEG_ST_COR[f.status]}">${SEG_ST_LBL[f.status]||f.status}</span>${vr?`<span class="segpill" style="background:${vr[1]}">${vr[0]}</span>`:''}</div>
+    <div class="segkv"><b>Atividade</b><span>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</span><b>Serviço</b><span>${segH(a.descricao||'—')}</span><b>OS</b><span>${segH(a.os_sigos||'—')}${a.os_sigos?(a.os_encontrada?(' · ✓ na base SIGOS'+(a.os_servico?(' ('+segH(a.os_servico)+')'):'')):' · ⚠ não localizada na base'):''}</span>
+    ${a.os_dist_m!=null?`<b>GPS × OS</b><span style="${a.os_dist_m>300?'color:var(--bad);font-weight:700':''}">${a.os_dist_m} m</span>`:''}<b>Local</b><span>${segH(a.endereco||'—')}${a.municipio?(' · '+segH(a.municipio)):''}</span>
+    <b>Emitido</b><span>${segFmt(f.emitido_em)} · ${segH(f.usuario_nome||'')}</span>${f.encerrado_em?`<b>Encerrado</b><span>${segFmt(f.encerrado_em)}</span>`:''}<b>Consórcio</b><span>${segH(CONSORCIO_NOME[a.consorcio]||a.consorcio||'—')}</span></div>
+    ${(f.alertas||[]).length?`<div class="segerr" style="margin-top:8px"><b>Alertas:</b> ${(f.alertas||[]).map(segH).join(' · ')}</div>`:''}
+    <div class="segacts" style="margin-top:10px"><button class="btn" id="qsPdf">📄 Ver formulário completo</button>${(d.irmaos||[]).filter(x=>x.id!==f.id).map(x=>`<button class="btn ghost" data-qsirm="${x.id}">${x.tipo} · ${SEG_ST_LBL[x.status]||x.status}</button>`).join('')}</div></div>`;
+  h+=`<div class="sec">Verificação QSMS</div><div class="segcard">${f.verif_status?`<div class="sub" style="margin-bottom:6px">Atual: <b>${vr[0]}</b> — ${segH(f.verif_por_nome||'')} em ${segFmt(f.verif_em)}${f.verif_obs?('<br>'+segH(f.verif_obs)):''}</div>`:''}
+    <div class="seg" id="qsVer">${Object.entries(QSMS_VERIF).map(([k,[l]])=>`<button type="button" data-ver="${k}" class="${f.verif_status===k?'sel':''}">${l}</button>`).join('')}</div>
+    <textarea id="qsVerObs" rows="2" placeholder="Observação (obrigatória p/ ressalva ou não conformidade)" style="margin-top:8px">${segH(f.verif_obs||'')}</textarea><button class="btn" id="qsVerOk" style="margin-top:8px">Salvar verificação</button></div>`;
+  const trs=d.tratativas||[];
+  h+=`<div class="sec">Tratativas</div>`+trs.map(t=>`<div class="segcard" style="border-left:4px solid ${t.status==='aberta'?'var(--warn)':t.status==='concluida'?'var(--ok)':'#94a3b8'}"><b>${segH(t.descricao)}</b><div class="sub">Ação: ${segH(t.acao)}</div><div class="sub" style="font-size:12px">${segH(t.responsavel_nome||'')} · prazo ${String(t.prazo).split('-').reverse().join('/')} · ${t.status==='aberta'?'aberta':t.status==='concluida'?('concluída em '+segFmt(t.concluida_em)):'cancelada'}${t.conclusao?(' — '+segH(t.conclusao)):''}</div></div>`).join('')
+    +`<div class="segcard"><b style="font-size:14px">Nova tratativa</b><label>Não conformidade *</label><textarea id="qsTDesc" rows="2"></textarea><label>Ação corretiva *</label><textarea id="qsTAcao" rows="2"></textarea>
+    <div class="segrow2"><div><label>Responsável *</label><input id="qsTResp" list="segPessoasDl" autocomplete="off" value="${segH(f.usuario_nome||'')}"/></div><div><label>Prazo *</label><input id="qsTPrazo" type="date"/></div></div><button class="btn" id="qsTOk" style="margin-top:10px">Criar tratativa e avisar o responsável</button></div>`;
+  v.innerHTML=h;
+  $('#qsVoltar').onclick=()=>{ qsmsDet=null; qsmsRender(); };
+  $('#qsPdf').onclick=()=>segPdf(id);
+  v.querySelectorAll('[data-qsirm]').forEach(b=>b.onclick=()=>{ qsmsDet=b.dataset.qsirm; qsmsRender(); });
+  let verSel=f.verif_status||''; v.querySelectorAll('[data-ver]').forEach(b=>b.onclick=()=>{ verSel=b.dataset.ver; v.querySelectorAll('[data-ver]').forEach(x=>x.classList.toggle('sel',x===b)); });
+  $('#qsVerOk').onclick=async()=>{ if(!verSel) return toast('Escolha o resultado'); const obs=$('#qsVerObs').value.trim(); if(verSel!=='conforme'&&!obs) return toast('Descreva a ressalva / não conformidade');
+    try{ const {error}=await sb.rpc('app_qsms_verificar',{p_formulario:id,p_status:verSel,p_obs:obs||null}); if(error)throw error; toast('✓ Verificação salva');
+      const it=(qsmsDados.itens||[]).find(x=>x.id===id); if(it){ it.verif_status=verSel; it.verif_obs=obs; } qsmsDetalhe(id); }catch(e){ toast('⚠ '+(e.message||e)); } };
+  const pz=new Date(); pz.setDate(pz.getDate()+7); $('#qsTPrazo').value=qsmsDia(pz);
+  $('#qsTOk').onclick=async()=>{ const ds=$('#qsTDesc').value.trim(), ac=$('#qsTAcao').value.trim(), p=segPessoaPorNome($('#qsTResp').value), pr=$('#qsTPrazo').value;
+    if(!ds||!ac) return toast('Descreva a não conformidade e a ação'); if(!p) return toast('Escolha o responsável na lista'); if(!pr) return toast('Informe o prazo');
+    try{ const {error}=await sb.rpc('app_qsms_tratativa_criar',{p_formulario:id,p_descricao:ds,p_acao:ac,p_responsavel:p.id,p_prazo:pr}); if(error)throw error; toast('✓ Tratativa criada — responsável avisado');
+      const it=(qsmsDados.itens||[]).find(x=>x.id===id); if(it) it.trat_abertas=(+it.trat_abertas||0)+1; qsmsDetalhe(id); }catch(e){ toast('⚠ '+(e.message||e)); } }; }
+async function qsmsTrat(){ const v=$('#qsView');
+  v.innerHTML=`<div class="seg" id="qsTSt" style="margin-bottom:10px">${[['aberta','Abertas'],['atrasada','Atrasadas'],['concluida','Concluídas'],['todas','Todas']].map(([k,l])=>`<button type="button" data-st="${k}" class="${qsmsTratSt===k?'sel':''}">${l}</button>`).join('')}</div><div id="qsTLista"><p class="sub">Carregando…</p></div>`;
+  v.querySelectorAll('#qsTSt button').forEach(b=>b.onclick=()=>{ qsmsTratSt=b.dataset.st; qsmsTrat(); });
+  let arr=[]; try{ const {data,error}=await sb.rpc('app_qsms_tratativas',{p_status:qsmsTratSt,p_consorcio:$('#qsCons').value||null}); if(error)throw error; arr=data||[]; }catch(e){ $('#qsTLista').innerHTML='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; return; }
+  $('#qsTLista').innerHTML=arr.length?arr.map(t=>`<div class="segcard" style="border-left:4px solid ${t.status!=='aberta'?(t.status==='concluida'?'var(--ok)':'#94a3b8'):(t.atrasada?'var(--bad)':'var(--warn)')}">
+    <b>${segH(t.descricao)}</b><div class="sub">Ação: ${segH(t.acao)}</div>
+    <div class="sub" style="font-size:12px;margin-top:3px">${t.tipo} · ${t.os_sigos?('OS '+segH(t.os_sigos)+' · '):''}${segH(t.responsavel_nome||'')} · prazo ${String(t.prazo).split('-').reverse().join('/')}${t.atrasada?' · <b style="color:var(--bad)">atrasada</b>':''}${t.status!=='aberta'?(' · '+(t.status==='concluida'?'concluída':'cancelada')+(t.conclusao?(': '+segH(t.conclusao)):'')):''}</div>
+    <div class="segacts"><button class="btn ghost" data-tf="${t.formulario_id}">Abrir formulário</button>${t.status==='aberta'?`<button class="btn ghost" data-tcan="${t.id}" style="color:var(--bad)">Cancelar</button>`:''}</div></div>`).join(''):'<p class="sub">Nenhuma tratativa nesse filtro.</p>';
+  v.querySelectorAll('[data-tf]').forEach(b=>b.onclick=()=>{ qsmsTab='forms'; qsmsDet=b.dataset.tf; qsmsRender(); });
+  v.querySelectorAll('[data-tcan]').forEach(b=>b.onclick=async()=>{ if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ cancelar'; return; }
+    const card=b.closest('.segcard'); let inp=card.querySelector('.qsMot'); if(!inp){ card.insertAdjacentHTML('beforeend','<input class="qsMot" placeholder="Motivo do cancelamento" style="margin-top:8px"/>'); b.textContent='Confirmar cancelamento'; return; }
+    if(!inp.value.trim()) return toast('Informe o motivo');
+    try{ const {error}=await sb.rpc('app_qsms_tratativa_cancelar',{p_id:b.dataset.tcan,p_motivo:inp.value.trim()}); if(error)throw error; toast('Tratativa cancelada'); qsmsTrat(); }catch(e){ toast('⚠ '+(e.message||e)); } }); }
+// Acesso ao QSMS (engrenagem admin) — espelho do dev_acesso; cargos de QSMS e admin entram sempre
+let _qsmsAcUsers=[];
+async function qsmsAcInit(){ if(!(ME&&ME.is_admin)){ irPara('home'); return; }
+  const cont=$('#qsmsAcList'); if(cont) cont.innerHTML='<p class="sub">Carregando…</p>';
+  const bu=$('#qsmsAcBusca'); if(bu&&!bu.dataset.ready){ bu.dataset.ready='1'; bu.addEventListener('input',qsmsAcRender); }
+  try{ const {data,error}=await sb.rpc('app_qsms_acesso_listar'); if(error)throw error; _qsmsAcUsers=data||[]; }catch(e){ if(cont) cont.innerHTML='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; return; }
+  qsmsAcRender(); }
+function qsmsAcRender(){ const termo=(($('#qsmsAcBusca')||{}).value||'').trim().toLowerCase(), cont=$('#qsmsAcList'); if(!cont)return;
+  const arr=_qsmsAcUsers.filter(u=>!termo||(u.nome||'').toLowerCase().includes(termo)||(u.email||'').toLowerCase().includes(termo));
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  cont.innerHTML=arr.map(u=>{ const lock=!!u.acesso_pelo_cargo;
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><input type="checkbox" class="qsmsAcCk" data-id="${u.id}" ${u.acesso?'checked':''} ${lock?'disabled':''} style="width:auto"/><div style="flex:1;min-width:0"><div style="font-size:14px">${segH(u.nome||u.email||'—')}</div><span class="sub" style="font-size:11px">${lock?(u.funcao==='admin'?'admin — acesso sempre':'cargo de QSMS — acesso sempre'):segH(u.cargo||u.funcao||'—')}</span></div></label>`; }).join('');
+  cont.querySelectorAll('.qsmsAcCk').forEach(ck=>ck.addEventListener('change',async()=>{ const id=ck.dataset.id, on=ck.checked; ck.disabled=true;
+    try{ const {error}=await sb.rpc('app_qsms_acesso_set',{p_uuid:id,p_on:on}); if(error)throw error; const u=_qsmsAcUsers.find(x=>x.id===id); if(u) u.acesso=on; toast(on?'✓ Acesso concedido':'✓ Acesso removido'); }
+    catch(e){ toast('⚠ '+(e.message||e)); ck.checked=!on; } ck.disabled=false; })); }
+
 // ---------- MÓDULO BIBLIOTECA ----------
 const BIB_CATS=['Procedimentos (POPs)','Termo de Referência','Normas Técnicas','Formulários e Modelos','Segurança (NR)','Contrato','Outros'];
 const BIB_CONS=[['','Geral (todos os consórcios)'],['ZA1004','ZA1004 — Contagem'],['ZA0200','ZA0200 — Betim']];
@@ -9054,7 +9991,7 @@ let tId; function toast(m){let t=$('#tst');if(!t){t=document.createElement('div'
 window.toast=toast;
 
 // ---------- NOTIFICAÇÕES (inbox + badge) ----------
-const NTF_ICON={solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰',pronto:'🎫'};
+const NTF_ICON={qsms:'⛑️',solicitacao:'📩',aprovada:'✅',segregada:'📦',em_falta:'⛔',rejeitada:'🚫',troca:'🔁',devolucao:'↩️',equip:'🧰',pronto:'🎫'};
 async function ntfBadge(){
   try{ const {data}=await sb.rpc('app_notif_contador'); const n=+data||0; const b=$('#ntfBadge'); if(!b) return;
     if(n>0){ b.textContent=n>99?'99+':String(n); b.style.display='inline-block'; } else b.style.display='none';
@@ -10542,6 +11479,8 @@ if($('#mcBusca')) $('#mcBusca').addEventListener('input',()=>{ mcSel=null; mcRen
 if($('#mcArea')) $('#mcArea').addEventListener('change',()=>{ mcArea=$('#mcArea').value; mcSel=null; mcRender(); });
 
 async function supGoAct(act){
+  if(act==='seg'||act==='seg_tratativas'){ irPara('seg'); return; }
+  if(act==='qsms'||act==='qsms_tratativas'){ qsmsTab=act==='qsms_tratativas'?'trat':'painel'; qsmsDet=null; irPara('qsms'); return; }
   if(act==='meus_colaboradores'||String(act||'').startsWith('pessoas_')){ irPara('meus_colab'); return; }
   if(act==='condutor_aprovar'||act==='condutor_status'||act==='condutor_termo'||act==='frota_emprestimo'){ irPara('condutor'); return; }
   if(act==='frota_checklist'){ condTarget={sub:'situacao',act:'situacao'}; irPara('condutor'); return; }
