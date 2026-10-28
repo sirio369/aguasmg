@@ -1,3 +1,6 @@
+-- ⚠️ JÁ APLICADA (2026-10-16) e SUPERADA EM PARTE por migracao_frota_preventiva_local.sql (2026-10-23). NÃO RODAR DE NOVO:
+--    recriaria app_frota_preventiva_agendar(bigint,date,text) ao lado da versão de 6 parâmetros (overload → o PostgREST
+--    não escolhe e a chamada do app quebra) e voltaria o trg_frota_manutencao sem horário/local/obs. Fica só como histórico.
 -- Frota — ajustes de fluxo pedidos pela Amanda (e-mail de 2026-10-16).
 -- 1) Multas, ocorrências e avarias: a equipe de frotas (Lucas) cadastra; aviso SÓ ao colaborador e ao gestor dele.
 -- 2) Lavagem: fluxo igual; só corrige o aviso de "lavagem solicitada", que não chegava a quem tem a
