@@ -2997,6 +2997,11 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   Registros de teste anteriores foram convertidos (`liberada` → `emitida`). Ainda em 28/10 a verificação saiu do
   formulário para a atividade (migração `qsms_verificacao_por_atividade`: ficou o pior resultado da atividade).
 - PT/PET **não existem sem APR** — a APR é a raiz da atividade; o app só oferece "+ PT/+ PET" a partir dela.
+- **Uma PT e uma PET por APR** (2026-10-28): "+ PT"/"+ PET" somem quando a atividade já tem uma emitida (`jaTem` em
+  `segListar`; `segNovo` confere de novo). Só uma **impedida** (trabalho não aconteceu) libera nova tentativa. Se mesmo
+  assim chegar outra emitida (dois aparelhos / lista desatualizada sem sinal), `app_seg_registrar` grava com o alerta
+  "Já existia PT/PET emitida nesta APR — duplicada" (não rejeita: a fila descartaria em silêncio). Reentrada em espaço
+  confinado depois de a equipe sair = nova APR (a PET vale para uma entrada).
 - Tipos de intervenção e sugestões estão **no código** — não há tela de configuração.
 - Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
 - `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`

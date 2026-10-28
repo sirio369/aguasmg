@@ -9139,8 +9139,10 @@ async function segListar(){ const c=document.getElementById('segLista'); if(!c)r
     const chips=fs.map(f=>{ const cor=SEG_ST_COR[f.status]||'#888'; const extra=f.tipo==='PET'&&f.espaco?(' · '+segH(f.espaco)):(f.tipo==='PT'&&f.altura?(' · '+segH(f.altura)+' m'):'');
       return `<span class="segfm" style="cursor:default"><span class="segdot" style="background:${cor}"></span>${f.tipo}${f.status==='impedida'?' · impedida':''}${extra}${pend.has(f.id)?' · ⏳':''}</span>`; }).join('');
     const acts=[`<button class="btn" data-segpdf="${fs.map(f=>f.id).join(',')}">📄 PDF da atividade</button>`];
-    if(apr&&apr.requer_pt==='S') acts.push(`<button class="btn ghost" data-segnovo="PT" data-ativ="${a.id}" data-apr="${apr.id}">+ PT (altura)</button>`);
-    if(apr&&apr.requer_pet==='S') acts.push(`<button class="btn ghost" data-segnovo="PET" data-ativ="${a.id}" data-apr="${apr.id}">+ PET (espaço confinado)</button>`);
+    // uma PT e uma PET por APR; só uma impedida (trabalho não aconteceu) libera nova tentativa
+    const jaTem=t=>fs.some(f=>f.tipo===t&&f.status!=='impedida');
+    if(apr&&apr.requer_pt==='S'&&!jaTem('PT')) acts.push(`<button class="btn ghost" data-segnovo="PT" data-ativ="${a.id}" data-apr="${apr.id}">+ PT (altura)</button>`);
+    if(apr&&apr.requer_pet==='S'&&!jaTem('PET')) acts.push(`<button class="btn ghost" data-segnovo="PET" data-ativ="${a.id}" data-apr="${apr.id}">+ PET (espaço confinado)</button>`);
     const local=segLocalTxt(a)||(a.local?segLocalTxt(a.local):''), vr=QSMS_VERIF[a.verif_status];
     return `<div class="segcard"><h4>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</h4>
       <div class="sub" style="margin-top:2px">${a.os_sigos?('OS '+segH(a.os_sigos)+' · '):''}${segH(local||'endereço pela coordenada ao sincronizar')}</div>
@@ -9165,6 +9167,7 @@ async function segNovaApr(){ let d=null; try{ d=await segDraftGet(); }catch(e){}
 async function segNovo(tipo,ativId,aprId){ let d=null; try{ d=await segDraftGet(); }catch(e){}
   if(d&&d.tipo){ toast('Há um rascunho em andamento — continue ou descarte'); return; }
   const g=segLista.find(x=>x.a.id===ativId); if(!g) return toast('Atividade não encontrada');
+  if([...g.forms.values()].some(f=>f.tipo===tipo&&f.status!=='impedida')) return toast('Esta APR já tem uma '+tipo+' emitida');
   const aprDoc=await segDocCarregar(aprId); // local ou servidor (se online): equipe e assinaturas da APR
   if(!aprDoc) return toast('Abra com conexão: a equipe da APR ainda não está neste aparelho');
   const a=Object.assign({},g.a); delete a.formularios; a.nova=false;
