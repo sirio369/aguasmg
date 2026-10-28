@@ -1256,6 +1256,7 @@ function mmRenderAll(){
 }
 /* ---------- Análise de macromedição (dados REAIS via RPC — espelha a análise do micromedido) ---------- */
 let macroMensal=[], macroMacros=[], macroSel=null, macroDetSel=null, macroDetCache={}, macroSeasMet='vol_disponibilizado', macroSort={k:'vol',dir:-1};
+let macroMatriz=[], macroMatFil='todos';
 let macroComFator=false, macroFatData=null, macroFatVig=null, macroFatEdit={};
 const MACRO_SEAS_MET={
  vol_disponibilizado:{l:'Disponibilizado',u:'m³',g:p=>+p.vol_disponibilizado},
@@ -1277,22 +1278,38 @@ const MACRO_COLS=[
 ];
 const MACRO_INFO={
  kpi:{t:'Indicador de volume da ZA',h:`<p>O <b>volume disponibilizado</b> da ZA = soma dos macros de <b>entrada</b> − soma dos macros de <b>saída</b> (fonte GMOA). É a água que ficou para consumo/perda na região.</p><p><b>L/lig·dia</b> = volume disponibilizado ÷ nº de ligações ÷ 30 dias × 1000 — <b>mesma premissa do micromedido</b> (mesmo denominador de ligações), então os dois são diretamente comparáveis: disponibilizado − consumido (micromedido) ≈ <b>perda por ligação</b>.</p><p>MoM = vs mês anterior · YoY = mesmo mês do ano anterior.</p>`},
- season:{t:'Sazonalidade & tendência',h:`<p>Heatmap mês×ano da composição escolhida (mais claro = maior). A linha <b>Sazonal</b> é o desvio % de cada mês-calendário vs a média geral (laranja acima / azul abaixo). Gráfico: linha = ano mais recente, sombra = faixa mín–máx dos anos anteriores.</p><p>Troque a composição (disponibilizado / L/lig·dia / entrada / saída / ligações) para achar a origem das flutuações. ⚠️ Base = 17 meses (abr/2025–ago/2026); a sombra ano-a-ano ainda é parcial.</p>`},
- macros:{t:'Abertura por macromedidor',h:`<p>Cada macromedidor do fechamento da ZA no mês selecionado, com o volume <b>segregado</b> como o GMOA informa: <b>Medido</b> (registrado pelo medidor/telemetria) + <b>Estimado</b> (volume atribuído pela COPASA no período sem medição — falha de telemetria, medidor parado, etc.) = <b>Total</b>. O total é o que entra no volume disponibilizado e no resultado.</p><p>Estimado em <b style="color:#e6a23c">laranja</b> com a % do total do macro: quanto maior, menos o volume do mês foi de fato medido. Também: vazão média, função (entrada/saída) e variação <b>MoM</b>/<b>YoY</b> do total. Toque numa linha para a série histórica e as estatísticas do medidor.</p>`}
+ season:{t:'Sazonalidade & tendência',h:`<p>Heatmap mês×ano da composição escolhida (mais claro = maior). A linha <b>Sazonal</b> é o desvio % de cada mês-calendário vs a média geral (laranja acima / azul abaixo). Gráfico: linha = ano mais recente, sombra = faixa mín–máx dos anos anteriores.</p><p>Troque a composição (disponibilizado / L/lig·dia / entrada / saída / ligações) para achar a origem das flutuações. ⚠️ A série tem pouco mais de 1 ano; a sombra ano-a-ano ainda é parcial.</p>`},
+ macros:{t:'Abertura por macromedidor',h:`<p>Cada macromedidor do fechamento da ZA no mês selecionado, com o volume <b>segregado</b> como o GMOA informa: <b>Medido</b> (registrado pelo medidor/telemetria) + <b>Estimado</b> (volume atribuído pela COPASA no período sem medição — falha de telemetria, medidor parado, etc.) = <b>Total</b>. O total é o que entra no volume disponibilizado e no resultado.</p><p>Estimado em <b style="color:#e6a23c">laranja</b> com a % do total do macro: quanto maior, menos o volume do mês foi de fato medido. Também: vazão média, função (entrada/saída) e variação <b>MoM</b>/<b>YoY</b> do total. Toque numa linha para a série histórica e as estatísticas do medidor.</p>`},
+ matriz:{t:'Macromedidores × meses',h:`<p>Todos os meses e todos os macromedidores que já apareceram no fechamento GMOA da ZA: <b>uma linha por macro, uma coluna por mês</b>, com o volume total em mil m³. A cor mostra a qualidade do dado no mês: <b>medido</b>, <b>medido + estimado</b>, <b>só estimado</b>, <b>zerado</b> ou <b>sem registro</b> (o macro não veio no arquivo do mês).</p><p><b>Situação</b> compara com o último mês da ZA: <b>Medindo</b> (teve volume medido no último mês) · <b>Parou</b> (já mediu, mas no último mês saiu do GMOA, veio só estimado ou zerado — mostra o último mês medido) · <b>Nunca medido</b> (só volume estimado). Os que pararam aparecem primeiro em cada grupo.</p><p>Filtros: deixaram de medir, com algum mês estimado, e os que entraram depois do início da série (ex.: macro que substituiu outros no fechamento). Clique numa linha para abrir a série no detalhe do bloco "Abertura por macromedidor".</p>`}
 };
 function macroCons(){ return za==='all'?null:za; }
 function macroIB(key){ return `<button class="mminfo" data-minfo="${key}" title="Sobre este bloco">ⓘ</button>`; }
 function macroSeasNum(v){ return macroSeasMet==='lpd'?br1(v):fmt(v); }
 function macroSeasFmt(v){ return macroSeasNum(v)+' '+MACRO_SEAS_MET[macroSeasMet].u; }
 function macroInit(){ mmCss();
- if(!document.getElementById('macrocss')){ const st=document.createElement('style'); st.id='macrocss'; st.textContent='#s-macro td.r,#s-macro th.r{text-align:right;font-variant-numeric:tabular-nums}body:has(#s-macro.on) .wrap{max-width:none}'; document.head.appendChild(st); }
+ if(!document.getElementById('macrocss')){ const st=document.createElement('style'); st.id='macrocss'; st.textContent='#s-macro td.r,#s-macro th.r{text-align:right;font-variant-numeric:tabular-nums}body:has(#s-macro.on) .wrap{max-width:none}'
+  +'#s-macro .mmmat{border-collapse:separate;border-spacing:2px;font-variant-numeric:tabular-nums;font-size:11px;width:100%}'
+  +'#s-macro .mmmat th{font-size:10px;color:var(--muted);font-weight:500;padding:4px 2px;white-space:nowrap;text-align:center}'
+  +'#s-macro .mmmat td{padding:5px 4px;text-align:center;border-radius:3px;white-space:nowrap;min-width:44px}'
+  +'#s-macro .mmmat .mn{text-align:left;position:sticky;left:0;z-index:1;background:var(--surface);min-width:0;padding-right:10px}'
+  +'#s-macro .mmmat th.mn{z-index:2}'
+  +'#s-macro .mmmat tr.grp td{text-align:left;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:10px 4px 3px}'
+  +'#s-macro .mmmat tbody tr[data-cd]{cursor:pointer}#s-macro .mmmat tbody tr[data-cd]:hover .mn{color:var(--accent)}'
+  +'#s-macro .mc-med{background:rgba(var(--accent-rgb),.16);color:var(--ink)}'
+  +'#s-macro .mc-par{background:rgba(230,162,60,.32);color:var(--ink);font-weight:600}'
+  +'#s-macro .mc-est{background:#e6a23c;color:#1c1403;font-weight:600}'
+  +'#s-macro .mc-zero{background:var(--surface-2);color:var(--muted)}'
+  +'#s-macro .mc-na{background:repeating-linear-gradient(45deg,transparent 0 3px,var(--line) 3px 4px);color:var(--muted)}'
+  +'#s-macro .mmmatleg{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--muted);margin-top:8px}'
+  +'#s-macro .mmmatleg i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}'; document.head.appendChild(st); }
  const body=$('#macroBody');
  body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando análise de macromedição…</p></div></div>';
  const fc=macroCons();
- Promise.all([ sbg.rpc('app_nrw_macro_mensal',{p_consorcio:fc,p_com_fator:macroComFator}), sbg.rpc('app_nrw_macro_macros',{p_consorcio:fc,p_competencia:null,p_com_fator:macroComFator}), sbg.rpc('app_nrw_fatores',{p_consorcio:null}) ])
-  .then(([mn,mc,fa])=>{
+ Promise.all([ sbg.rpc('app_nrw_macro_mensal',{p_consorcio:fc,p_com_fator:macroComFator}), sbg.rpc('app_nrw_macro_macros',{p_consorcio:fc,p_competencia:null,p_com_fator:macroComFator}), sbg.rpc('app_nrw_fatores',{p_consorcio:null}), sbg.rpc('app_nrw_macro_matriz',{p_consorcio:fc,p_com_fator:macroComFator}) ])
+  .then(([mn,mc,fa,mz])=>{
     if(mn.error)throw mn.error; if(mc.error)throw mc.error;
     macroMensal=mn.data||[]; macroMacros=mc.data||[]; if(fa&&!fa.error) macroFatData=fa.data;
+    macroMatriz=(mz&&!mz.error&&mz.data)||[];
     if(macroSel==null || !macroMensal.some(p=>p.competencia===macroSel)) macroSel=macroMensal.length?macroMensal[macroMensal.length-1].competencia:null;
     macroDetSel=null; macroDetCache={}; macroRenderAll();
   }).catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
@@ -1352,7 +1369,7 @@ function macroSeasonPanel(){
     <svg viewBox="0 0 56 ${H}" preserveAspectRatio="none" style="width:100%;height:100%">${ylab}</svg>
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:var(--surface-2,#0f1a1f);border:1px solid var(--line);border-radius:8px">${gl}${band}${line}${dots}${xlab}</svg>
    </div>
-   <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). Base: ${S.length} meses (abr/2025–ago/2026). Composição: <b>${M.l}</b>.</p>
+   <p class="note" style="margin-top:6px;font-size:11px">Linha = <b style="color:var(--accent)">${maxYear}</b> · sombra = mín–máx dos anos anteriores (hoje só ${prior.join(', ')||'—'}). Base: ${S.length} meses (${mmCmp(S[0].competencia)}–${mmCmp(S[S.length-1].competencia)}). Composição: <b>${M.l}</b>.</p>
   </div></div>`;
 }
 /* ---- painel 3: abertura por macromedidor (lista + detalhe) ---- */
@@ -1422,6 +1439,60 @@ function macroSyncHeader(){
  mes.onchange=()=>macroSetMes(mes.value);
  if(dmc){ dmc.hidden=true; dmc.onchange=null; }
 }
+/* ---- painel 4: macromedidores × meses (quem já mediu e deixou de medir) ---- */
+const MACRO_MAT_FIL=[['todos','Todos'],['parou','Deixaram de medir'],['estimado','Com estimado'],['novos','Entraram depois']];
+const MACRO_MAT_ST={ok:{l:'Medindo',c:'#2e9e6b'},parou:{l:'Parou',c:'#e05d5d'},nunca:{l:'Nunca medido',c:'#e6a23c'}};
+function macroNextComp(c){ return c%100===12?c+89:c+1; }
+function macroMatVal(v){ const k=(+v||0)/1000; return k>=10?fmt(Math.round(k)):br1(k); }   // mil m³
+function macroMatModel(){
+ const R=macroMatriz, comps=[...new Set(R.map(r=>r.competencia))].sort((a,b)=>a-b), lastZ={}, firstZ={}, by={};
+ R.forEach(r=>{ lastZ[r.consorcio]=Math.max(lastZ[r.consorcio]||0,r.competencia); firstZ[r.consorcio]=Math.min(firstZ[r.consorcio]||999999,r.competencia);
+  const k=r.consorcio+'|'+r.cd_no_agua; (by[k]=by[k]||{consorcio:r.consorcio,cd:r.cd_no_agua,funcao:r.funcao,m:{}}).m[r.competencia]=r; });
+ const macros=Object.values(by).map(x=>{
+  const cs=Object.keys(x.m).map(Number).sort((a,b)=>a-b), L=lastZ[x.consorcio], med=cs.filter(c=>+x.m[c].vm>0);
+  const ultMed=med.length?med[med.length-1]:null, ultReg=cs[cs.length-1], nEst=cs.filter(c=>+x.m[c].ve>0).length;
+  const media=cs.reduce((a,c)=>a+(+x.m[c].vt||0),0)/cs.length, novo=cs[0]>firstZ[x.consorcio];
+  let st, txt;
+  if(ultMed===L){ st='ok'; txt=novo?'entrou em '+mmCmp(cs[0]):''; }
+  else if(ultMed==null){ st='nunca'; txt=nEst?'só volume estimado':'sem volume medido'; }
+  else { st='parou'; txt='último medido '+mmCmp(ultMed)+' · '+(ultReg<L?'saiu do GMOA':(+x.m[L].ve>0?'só estimado desde '+mmCmp(macroNextComp(ultMed)):'zerado desde '+mmCmp(macroNextComp(ultMed)))); }
+  return {...x, ultMed, nEst, media, novo, st, txt};
+ });
+ return {comps, lastZ, macros};
+}
+function macroMatrizPanel(){
+ if(!macroMatriz.length) return '';
+ const {comps, lastZ, macros}=macroMatModel(), cons=macroCons();
+ const fil={todos:()=>true, parou:x=>x.st==='parou', estimado:x=>x.nEst>0, novos:x=>x.novo};
+ const cnt=k=>macros.filter(fil[k]).length;
+ const chips=MACRO_MAT_FIL.map(([k,l])=>`<button class="mmchip ${macroMatFil===k?'on':''}" data-matfil="${k}">${l} <span style="opacity:.7">(${cnt(k)})</span></button>`).join('');
+ const ord={parou:0,nunca:1,ok:2}, sel=macroSel;
+ const arr=macros.filter(fil[macroMatFil]||fil.todos).sort((a,b)=>a.consorcio.localeCompare(b.consorcio)||(a.funcao==='entrada'?0:1)-(b.funcao==='entrada'?0:1)||ord[a.st]-ord[b.st]||b.media-a.media);
+ const ncol=comps.length+2;
+ const th=`<tr><th class="mn">Macromedidor</th><th style="text-align:left">Situação</th>${comps.map(c=>`<th class="${c===sel?'mmhsel':''}" title="${mmCmp(c)}">${MM_MES[c%100-1]}/${String(Math.floor(c/100)).slice(2)}</th>`).join('')}</tr>`;
+ let body='', grp='';
+ arr.forEach(x=>{
+  const g=x.consorcio+'|'+x.funcao;
+  if(g!==grp){ grp=g; body+=`<tr class="grp"><td colspan="${ncol}"><span style="position:sticky;left:4px">${cons?'':(x.consorcio==='ZA0200'?'Betim · ':'Contagem · ')}${x.funcao==='entrada'?'Entrada':'Saída'}</span></td></tr>`; }
+  const S=MACRO_MAT_ST[x.st];
+  const cells=comps.map(c=>{ const r=x.m[c], hs=c===sel?' mmhsel':'';
+   if(!r) return `<td class="mc-na${hs}" title="${x.cd} · ${mmCmp(c)}: sem registro no GMOA">—</td>`;
+   const vm=+r.vm||0, ve=+r.ve||0, vt=+r.vt||0;
+   const cls=vt===0?'zero':(ve>0?(vm>0?'par':'est'):'med');
+   const tt=`${x.cd} · ${mmCmp(c)}: medido ${fmt(vm)} + estimado ${fmt(ve)} = ${fmt(vt)} m³`+(ve>0&&vt?` (${br1(100*ve/vt)}% estimado)`:'');
+   return `<td class="mc-${cls}${hs}" title="${tt}">${macroMatVal(vt)}</td>`; }).join('');
+  body+=`<tr data-cd="${x.cd}" data-cons="${x.consorcio}"><td class="mn"><b>${x.cd}</b></td><td style="text-align:left;white-space:nowrap"><span class="mmtag" style="--cc:${S.c}">${S.l}</span>${x.txt?` <span class="note" style="font-size:10.5px">${x.txt}</span>`:''}</td>${cells}</tr>`;
+ });
+ if(!arr.length) body=`<tr><td colspan="${ncol}" class="note" style="text-align:left">Nenhum macromedidor neste filtro.</td></tr>`;
+ const ult=Object.keys(lastZ).map(z=>(cons?'':(z==='ZA0200'?'Betim ':'Contagem '))+mmCmp(lastZ[z])).join(' · ');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Macromedidores × meses</h3><span class="hint" style="margin-left:6px">${comps.length} meses · ${macros.length} macros</span>${macroIB('matriz')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">
+   <div class="mmfilters" style="margin:0 0 10px">${chips}</div>
+   <div style="overflow:auto"><table class="mmmat" id="macromat"><thead>${th}</thead><tbody>${body}</tbody></table></div>
+   <div class="mmmatleg"><span><i class="mc-med"></i>Medido</span><span><i class="mc-par"></i>Medido + estimado</span><span><i class="mc-est"></i>Só estimado</span><span><i class="mc-zero"></i>Zerado</span><span><i class="mc-na"></i>Sem registro no GMOA</span>
+    <span style="margin-left:auto">Total em <b>mil m³</b> · situação vs último mês (${ult}) · clique numa linha para a série no detalhe</span></div>
+  </div></div>`;
+}
 /* ---- toggle + editor do fator de correção (aferição) ---- */
 function macroFatToggle(){ return `<div class="mmfilters" style="margin:0 0 12px"><button class="mmchip ${!macroComFator?'on':''}" data-mfator="0">Volume sem fator</button><button class="mmchip ${macroComFator?'on':''}" data-mfator="1">Volume com fator de correção</button></div>`; }
 function macroFatEff(cons,cd,vig){ const L=(macroFatData&&macroFatData.lancamentos)||[]; let best=null; L.forEach(l=>{ if(l.consorcio===cons&&l.cd_no_agua===cd&&l.competencia_vigencia<=vig&&(!best||l.competencia_vigencia>best.competencia_vigencia)) best=l; }); return best?+best.fator:1; }
@@ -1458,7 +1529,7 @@ function macroFatSalvar(){
  });
 }
 function macroRenderAll(){
- $('#macroBody').innerHTML = macroFatToggle()+macroKpiPanel()+macroSeasonPanel()+macroMacrosPanel()+macroFatorPanel();
+ $('#macroBody').innerHTML = macroFatToggle()+macroKpiPanel()+macroMacrosPanel()+macroSeasonPanel()+macroMatrizPanel()+macroFatorPanel();
  macroSyncHeader();
  $('#macroBody').querySelectorAll('[data-mfator]').forEach(b=>b.onclick=()=>{ const nv=b.dataset.mfator==='1'; if(nv!==macroComFator){ macroComFator=nv; macroInit(); } });
  { const vsel=$('#macroFatVigSel'); if(vsel) vsel.onchange=()=>{ macroFatVig=+vsel.value; macroFatEdit={}; macroRenderAll(); }; }
@@ -1468,6 +1539,9 @@ function macroRenderAll(){
  $('#macroBody').querySelectorAll('[data-seas]').forEach(el=>el.onclick=()=>{ macroSeasMet=el.dataset.seas; macroRenderAll(); });
  $('#macroBody').querySelectorAll('#macrotbl th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; if(macroSort.k===k) macroSort.dir*=-1; else macroSort={k:k,dir:(MACRO_COLS.find(c=>c.k===k)||{}).num!==false?-1:1}; macroRenderAll(); });
  $('#macroBody').querySelectorAll('#macrotbl tbody tr[data-cd]').forEach(tr=>tr.onclick=()=>macroDetailFill(tr.dataset.cons,tr.dataset.cd));
+ $('#macroBody').querySelectorAll('[data-matfil]').forEach(b=>b.onclick=()=>{ macroMatFil=b.dataset.matfil; macroRenderAll(); });
+ $('#macroBody').querySelectorAll('#macromat tbody tr[data-cd]').forEach(tr=>tr.onclick=()=>{ macroDetailFill(tr.dataset.cons,tr.dataset.cd); const d=$('#macroDetail'); if(d) d.scrollIntoView({behavior:'smooth',block:'center'}); });
+ { const mt=$('#macromat'); if(mt) mt.parentElement.scrollLeft=mt.parentElement.scrollWidth; }   // tela estreita: abre nos meses mais recentes
  const box=$('#macroDetail');
  if(box){ if(macroDetSel) macroDetailFill(macroDetSel.cons,macroDetSel.cd); else if(macroMacros.length) macroDetailFill(macroMacros[0].consorcio,macroMacros[0].cd_no_agua); }
 }
