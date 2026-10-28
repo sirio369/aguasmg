@@ -1181,7 +1181,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="pavprog" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Gestão de Pavimento</h1>
-    <p class="sub">Pavimentos registrados em campo — lance o nº da OS da recomposição.</p>
+    <p class="sub">Pavimentos registrados em campo — lance o nº da OS da recomposição de cada tipo.</p>
     <div class="seg" id="pavpStatusSeg" style="margin:6px 0 8px">
       <button type="button" data-st="pendente" class="sel">Pendentes</button>
       <button type="button" data-st="criada">OS criada</button>
@@ -3870,7 +3870,9 @@ const PAV_SLA=[3,5]; // dias pendente (sem OS): 0–3 no prazo · 4–5 atençã
 function pavDias(iso){ if(!iso)return null; return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
 function pavBucket(d){ if(d==null)return{key:'',lbl:'—',c:'#8a8f98'}; if(d<=PAV_SLA[0])return{key:'ok',lbl:'No prazo',c:'#2f8b6c'}; if(d<=PAV_SLA[1])return{key:'aten',lbl:'Atenção',c:'#e6a23c'}; return{key:'atraso',lbl:'Atrasado',c:'#d6336c'}; }
 function pavDiasTxt(d){ return d==null?'—':(d<=0?'hoje':(d===1?'há 1 dia':('há '+d+' dias'))); }
-function pavEhPend(g){ return !g.os_recomposicao; }
+function pavEhPend(g){ const its=g.itens||[]; return its.length?its.some(it=>!it.os_recomposicao):!g.os_recomposicao; } // pendente = algum tipo sem OS
+function pavOsResumo(g){ const its=(g.itens||[]).filter(it=>it.os_recomposicao), u=new Set(its.map(it=>it.os_recomposicao));
+  return u.size<=1?('OS '+pavH([...u][0]||'')):its.map(it=>PAV_TIPO_LBL(it.tipo)+': OS '+pavH(it.os_recomposicao)).join(' · '); }
 function pavProgInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   pavCss(); pavpRenderOrigDd();
@@ -3918,20 +3920,21 @@ function pavProgCard(g){
   const dt=g.created_at?new Date(g.created_at).toLocaleDateString('pt-BR'):'—';
   const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
   const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
+  const nOs=new Set((g.itens||[]).map(it=>it.os_recomposicao).filter(Boolean)).size;
   const badge=pend
     ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span>`
-    : `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:#0e7c86;padding:2px 10px;border-radius:999px;white-space:nowrap">✓ OS ${pavH(g.os_recomposicao)}</span>`;
-  const osBox=pend
-    ? `<div style="display:flex;gap:6px;margin-top:8px"><input id="pavos_${g.grupo}" placeholder="nº da OS SIGOS da recomposição" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`
-    : `<div class="sub" style="margin-top:6px;font-size:12px">OS lançada${g.os_recomp_por?(' por '+pavH(g.os_recomp_por)):''}${g.os_recomp_em?(' em '+new Date(g.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`;
+    : `<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:#0e7c86;padding:2px 10px;border-radius:999px;white-space:nowrap">✓ ${nOs>1?'OS criadas':pavOsResumo(g)}</span>`;
+  // 1 OS de recomposição por tipo: cada tipo pendente tem o seu campo; "Criar OS" grava todos os campos preenchidos do ponto
   const itens=(g.itens||[]).map(it=>{ const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
-    return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div></div>`;
+    const os=it.os_recomposicao
+      ? `<div class="sub" style="margin-top:6px;font-size:12px"><b style="color:#0e7c86">✓ OS ${pavH(it.os_recomposicao)}</b>${it.os_recomp_por?(' · lançada por '+pavH(it.os_recomp_por)):''}${it.os_recomp_em?(' em '+new Date(it.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`
+      : `<div style="display:flex;gap:6px;margin-top:8px"><input class="pavosinp" data-grupo="${g.grupo}" data-id="${it.id}" placeholder="nº da OS SIGOS · ${PAV_TIPO_LBL(it.tipo)}" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`;
+    return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div>${os}</div>`;
   }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${barra};border-radius:12px;padding:12px 13px;margin-bottom:10px">
     <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
     <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
-    ${itens}
-    ${osBox}</div>`; }
+    ${itens}</div>`; }
 function pavProgSetView(v){ pavpView=v;
   document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v));
   const l=document.getElementById('pavpLista'), m=document.getElementById('pavpMapa');
@@ -3944,19 +3947,23 @@ function pavProgMapa(){ const el=document.getElementById('pavpMapa'); if(!el||ty
   pavProgFiltrado().forEach(g=>{ if(g.lat==null||g.lon==null)return; const pend=pavEhPend(g), b=pavBucket(pavDias(g.created_at)), col=pend?b.c:'#0e7c86';
     const mk=L.circleMarker([+g.lat,+g.lon],{radius:7,color:'#fff',weight:1.5,fillColor:col,fillOpacity:.95});
     const tipos=(g.itens||[]).map(it=>PAV_TIPO_LBL(it.tipo)).join(', ');
-    mk.bindPopup(`<b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><br>${pend?(b.lbl+' · '+pavDiasTxt(pavDias(g.created_at))):('✓ OS '+pavH(g.os_recomposicao))}<br><span style="font-size:11px">${pavH(tipos)}</span>`);
+    mk.bindPopup(`<b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><br>${pend?(b.lbl+' · '+pavDiasTxt(pavDias(g.created_at))):('✓ '+pavOsResumo(g))}<br><span style="font-size:11px">${pavH(tipos)}</span>`);
     pavpMarkers.addLayer(mk); bounds.push([+g.lat,+g.lon]); });
   if(bounds.length){ try{ pavpMap.fitBounds(bounds,{padding:[30,30],maxZoom:16}); }catch(e){} } }
-async function pavProgCriarOS(grupo){ const inp=document.getElementById('pavos_'+grupo); const os=(inp&&inp.value.trim())||'';
-  if(!os) return toast('Informe o número da OS SIGOS');
-  try{ const {error}=await sb.rpc('app_pav_os',{p_grupo:grupo,p_os:os}); if(error)throw error; toast('✓ OS criada');
-    const g=pavpUltimo.find(x=>x.grupo===grupo); if(g){ g.os_recomposicao=os; g.os_recomp_em=new Date().toISOString(); g.os_recomp_por=(ME&&(ME.nome||ME.email))||'—'; }
+async function pavProgCriarOS(grupo){
+  const itens=[...document.querySelectorAll('.pavosinp[data-grupo="'+grupo+'"]')].map(i=>({id:i.dataset.id,os:i.value.trim()})).filter(x=>x.os);
+  if(!itens.length) return toast('Informe o número da OS SIGOS');
+  if(itens.some(x=>/[,;]/.test(x.os))) return toast('Uma OS por tipo — use o campo de cada tipo, sem vírgula');
+  try{ const {error}=await sb.rpc('app_pav_os_itens',{p_itens:itens}); if(error)throw error; toast(itens.length>1?('✓ '+itens.length+' OS criadas'):'✓ OS criada');
+    const g=pavpUltimo.find(x=>x.grupo===grupo), em=new Date().toISOString(), por=(ME&&(ME.nome||ME.email))||'—';
+    if(g) itens.forEach(x=>{ const it=(g.itens||[]).find(i=>i.id===x.id); if(it){ it.os_recomposicao=x.os; it.os_recomp_em=em; it.os_recomp_por=por; } });
     pavProgRender();
   }catch(e){ toast('Erro ao criar OS: '+(e.message||e)); } }
 function pavProgExport(){ const arr=pavProgFiltrado(); if(!arr.length) return toast('Nada para exportar.');
   const aoa=[['Data de solicitação','Dias pendente','Faixa de prazo','Status OS','OS recomposição','Serviço de origem','OS origem','Consórcio','Solicitante','Latitude','Longitude','Tipo de pavimento','Dimensão','Foto 1','Foto 2']];
-  arr.forEach(g=>{ const pend=pavEhPend(g), d=pavDias(g.created_at), b=pavBucket(d); const ds=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
-    (g.itens||[]).forEach(it=>aoa.push([ds,pend?(d??''):'',pend?b.lbl:'',pend?'Pendente':'OS criada',g.os_recomposicao||'',PAV_ORIGEM[g.servico_origem]||g.servico_origem,g.os_sigos||'',g.consorcio||'',g.usuario||'',g.lat??'',g.lon??'',PAV_TIPO_LBL(it.tipo),it.dimensao||'',PAV_FOTO_URL(it.foto1)||'',PAV_FOTO_URL(it.foto2)||''])); });
+  arr.forEach(g=>{ const d=pavDias(g.created_at), b=pavBucket(d); const ds=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
+    (g.itens||[]).forEach(it=>{ const pend=!it.os_recomposicao; // status e OS de cada tipo
+      aoa.push([ds,pend?(d??''):'',pend?b.lbl:'',pend?'Pendente':'OS criada',it.os_recomposicao||'',PAV_ORIGEM[g.servico_origem]||g.servico_origem,g.os_sigos||'',g.consorcio||'',g.usuario||'',g.lat??'',g.lon??'',PAV_TIPO_LBL(it.tipo),it.dimensao||'',PAV_FOTO_URL(it.foto1)||'',PAV_FOTO_URL(it.foto2)||'']); }); });
   exportarXlsx('gestao_pavimento_'+new Date().toISOString().slice(0,10)+'.xlsx','Pavimento',aoa); }
 
 // ---------- REGISTRO DE OCORRÊNCIA (Entrevistadores) ----------

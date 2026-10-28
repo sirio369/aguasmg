@@ -304,11 +304,13 @@ pwa/
   **visão Lista/Mapa** Leaflet) e **controle de prazo** (aging de `created_at`, faixas **0–3/4–5/>5 dias**, chips clicáveis
   com contagem que filtram), filtros **consórcio + serviço de origem (dropdown multi-seleção `.msdd`)**, fotos
   (bucket público `fotos-campo`) e export .xlsx (gate `aux_acesso`). **Distinção OS criada × pendente** (como a ocorrência da pesquisa): o programador
-  lança a **OS SIGOS da recomposição** no card (`app_pav_os(p_grupo,p_os)`) → o relógio de pendência conta só até a OS.
-  (`os_sigos`=OS de origem, do campo; `os_recomposicao`=OS da recomposição, lançada no `pavprog`.)
+  lança a **OS SIGOS da recomposição de cada tipo** no card (**1 campo por tipo** → `app_pav_os_itens(p_itens [{id,os}])`,
+  2026-10-28) → o relógio de pendência conta até **todos** os tipos terem OS. (`os_sigos`=OS de origem, do campo, 1 por
+  registro; `os_recomposicao`=OS da recomposição, **por tipo**, lançada no `pavprog`.) `app_pav_os(p_grupo,p_os)` fica só
+  p/ app em cache (≤ v281): "A, B" numérico com nº de partes = nº de tipos é distribuído na ordem do card (alfabética do tipo).
   Backend: `"8 - coleta_campo".pav_recomposicao` (1 linha/tipo, geom 4326, `os_recomposicao`/`os_recomp_em`/`os_recomp_por`,
-  RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) / `app_pav_minhas` / `app_pav_listar` / `app_pav_os`
-  (admin|aux_acesso). sw v264.
+  RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) / `app_pav_minhas` / `app_pav_listar` / `app_pav_os_itens` /
+  `app_pav_os` (admin|aux_acesso). sw v282.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
   com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
   `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
