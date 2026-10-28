@@ -58,6 +58,28 @@ input:focus,select,textarea:focus{outline:2px solid var(--acc);outline-offset:-1
 .fchip.on::before{opacity:1}
 .kchip{display:inline-flex;align-items:baseline;gap:4px;font-size:12px;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
 .kchip b{font-size:14px;color:var(--ink)}
+/* Card de ocorrência da pesquisa (Abertura de serviços — ocorrências), compacto (2026-10-27): a coluna da direita
+   (data, links, OS) usa o espaço sob a data; no celular e no popup do mapa ela desce. Não usar .sub aqui (margem 16px). */
+.occ{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:2px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:8px;font-size:13px}
+.occ.foco{outline:2px solid var(--acc);outline-offset:1px}
+.occ-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;line-height:1.35}
+.occ-h b{font-size:14px;margin-right:2px}
+.occ-tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:0 7px;white-space:nowrap}
+.occ-l{color:var(--mut);margin-top:3px;line-height:1.35;overflow-wrap:anywhere}
+.occ-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.occ-dt{font-size:11px;color:var(--mut);white-space:nowrap}
+.occ-links{display:flex;gap:12px;font-size:12px}
+.occ-ok{background:var(--ok-bg);border-radius:8px;padding:2px 8px;font-size:12px}
+.occ-os{display:flex;gap:6px;width:100%}
+.occ-os input{flex:1;min-width:0;padding:7px 10px;font-size:14px}
+.occ-os .btn{margin:0;width:auto;padding:7px 12px;font-size:14px}
+.occ.pop{display:block;border:none;background:none;padding:2px 1px;margin:0}
+.occ.pop .occ-side{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:6px}
+@media (max-width:600px){
+  .occ{display:block}
+  .occ-side{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:6px}
+  .occ-os input{font-size:16px}
+}
 .seg button{flex:1;font:inherit;font-size:14px;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--mut)}
 .seg button.sel{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
 .banner{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:13px;margin-bottom:6px}
@@ -836,11 +858,19 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <label for="ocTipo">Tipo de ocorrência *</label>
     <select id="ocTipo">
       <option value="">Selecione…</option>
-      <option>Vazamento visível</option>
-      <option>Vazamento não visível (ruído)</option>
-      <option>Extravasamento</option>
-      <option>Cavalete / hidrômetro</option>
-      <option>Outro</option>
+      <optgroup label="Vazamento">
+        <option>Vazamento visível</option>
+        <option>Vazamento não visível (ruído)</option>
+        <option>Extravasamento</option>
+        <option>Cavalete / hidrômetro</option>
+      </optgroup>
+      <optgroup label="Fraude">
+        <option>Fraude - Derivação de ramal</option>
+        <option>Fraude - Ligação clandestina</option>
+        <option>Fraude - Rompimento de lacre</option>
+        <option>Fraude - Corte violado</option>
+        <option>Fraude - Hidrômetro violado</option>
+      </optgroup>
     </select>
     <label for="ocLocal">Local *</label>
     <select id="ocLocal">
@@ -1029,8 +1059,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button id="paTgRep" type="button" class="fchip" data-c="#d81b60">Reporte de campo</button>
     </div>
     <div id="paMapa" style="height:48vh;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
-    <div class="sec" style="margin-top:20px">Resumo por colaborador</div>
+    <div class="sec" style="margin-top:20px">Produtividade por colaborador</div>
     <div id="paResumo" style="overflow-x:auto;margin-top:8px"></div>
+    <div class="sec" style="margin-top:20px">Ocorrências por tipo e local</div>
+    <p class="sub" style="margin:6px 0 0;font-size:12px">Toque num número para ver essas ocorrências na abertura de serviços.</p>
+    <div id="paMatriz" style="overflow-x:auto;margin-top:8px"></div>
   </main>
 
   <main id="ent_ocorrencia" class="hidden">
@@ -1107,6 +1140,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="pgSecOc">
       <div class="sec">⚠️ Ocorrências — pesquisa de vazamentos</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+        <select id="pgOcFTipo" style="flex:1 1 150px;min-width:0"><option value="">Todos os tipos</option></select>
+        <select id="pgOcFLocal" style="flex:1 1 150px;min-width:0"><option value="">Todos os locais</option></select>
+        <select id="pgOcFCons" style="flex:1 1 150px;min-width:0"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
+      </div>
       <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
       <div id="pgOcLista" style="margin-top:8px"></div>
       <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
@@ -1310,7 +1348,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="projeto_cfg" class="hidden">
-    <div class="bar"><button class="bk" id="pjCfgBack">‹ Suporte</button></div>
+    <div class="bar"><button class="bk" id="pjCfgBack">‹ Suporte</button><button class="btn ghost pjmini bad hidden" id="pjCfgDel" style="margin-left:auto">🗑️ Excluir intervenção</button></div>
     <div id="pjCfg"></div>
   </main>
 
@@ -1979,8 +2017,11 @@ const pjM=(n,meta,exec,o={})=>({n,k:'m',meta,exec,un:o.un||'m',...o});
 const pjR=(n,v)=>({n,k:'reg',v});
 const PJ_PECA_TIPOS=['Válvula de manobra','Ventosa','Descarga'];
 const pjSel=(n,v,opts)=>({n,k:'sel',v:v||'',opts:opts||PJ_PECA_TIPOS});   // seleção de tipo (config): não é mensurável
-// atividade de ENCERRAMENTO: registro único via anexo de PDF (não foto); o PDF vira documento final (ver PJ_DOCS: as_built/rtq)
+// atividade-DOCUMENTO: registro único via anexo de PDF (não foto) na tela de lançamento; o PDF vira documento final (ver PJ_DOCS: alvara/rel_furo/rel_solda/as_built/rtq)
 const pjDoc=(n,doc)=>({n,k:'doc',doc});
+// Autorização de Intervenção de Via (2026-10-28; tipo 'alvara' = antigo "Alvará de execução"): obrigatória em TODA intervenção, logo após a OS SIGOS — sem ela a intervenção não chega a 100%
+const PJ_AIV_N='Autorização de Intervenção de Via';
+const pjAIV=()=>pjDoc(PJ_AIV_N,'alvara');
 // OS SIGOS da intervenção: 1ª atividade de TODA árvore. Só número (k:'reg' → fora do % de avanço) e sem toggle "No escopo?" (não é ativável/desativável)
 const pjOS=()=>({n:'OS SIGOS',k:'reg',os:true,v:'—'});
 const pjOsVal=iv=>{ const n=((iv&&iv.arv)||[]).find(x=>x&&x.os); return (n&&n.v&&n.v!=='—')?String(n.v):''; };
@@ -2053,33 +2094,33 @@ PJ_IVS.forEach(iv=>{ if(!('locked' in iv)) iv.locked = iv.status!=='new'; });
 let pjLoaded=false, PJ_LIMITES=[], PJ_DMCS=[];
 // árvores-modelo por tipo (instanciadas zeradas por intervenção). VRP/Rede seguem o padrão do protótipo; Válvula é nova.
 const PJ_ARV={
-  vrp_impl:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
+  vrp_impl:()=>[pjOS(),pjAIV(),pjP('Locação e cadastro de interferências',0),
     pjG('Câmara da VRP',[...pjOc(0,0,0,0),pjP('Execução da câmara',0)]),
     pjP('Montagem hidráulica (VRP + by-pass, registros, filtro, manômetros)',0),
     pjILrep('Interligação',2,0,0,0),pjP('Teste de estanqueidade',0),pjP('Calibração / ajuste de set point',0),
     {...pjP('Telemetria / macromedidor associado',0),ativo:true},pjP('Comissionamento',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  valvula:()=>[pjOS(),pjP('Locação e cadastro de interferências',0),
+  valvula:()=>[pjOS(),pjAIV(),pjP('Locação e cadastro de interferências',0),
     pjG('Obra civil (vala/caixa)',pjOc(0,0,0,0)),
     {...pjP('Retirada da válvula antiga (se substituição)',0),ativo:false},
     pjP('Instalação da válvula + acessórios',0),
     pjIL('Interligação / religação',0,0,0),
     pjP('Teste de estanqueidade / manobra',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
-  rede_vca:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
+  rede_vca:(ext)=>[pjOS(),pjAIV(),pjP('Locação e topografia do traçado',0),pjP('Sinalização e segurança da obra',0),
     pjP('Escavação de vala',0),pjM('Assentamento de tubulação (rede)',ext||1,0),
     pjP('Reaterro compactado',0),pjP('Recomposição de pavimento',0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
     pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')],
   // HDD = perfuração direcional (não destrutiva): sem vala/reaterro/pavimento; só valas de entrada/saída, furo piloto, alargamento e puxamento
-  rede_hdd:(ext)=>[pjOS(),pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
+  rede_hdd:(ext)=>[pjOS(),pjAIV(),pjP('Locação e topografia do traçado',0),pjP('Sondagem / investigação do subsolo',0),
     pjP('Mobilização e montagem do equipamento HDD',0),pjValas([pjVala(1,'Entrada'),pjVala(2,'Saída')]),
     pjM('Perfuração piloto (pilot bore)',ext||1,0),pjP('Alargamento (reaming)',0),
     pjM('Puxamento da tubulação (pullback)',ext||1,0),
     pjPecas([pjPeca(1,'',0,0,0,0,0)]),pjRamais([pjRamal(1,'—','—','—',0,0,0)]),
     pjILrep('Interligação (tronco)',2,0,0,0),pjP('Teste de estanqueidade / pressão',0),
-    pjDoc('Relatório de Furo','rel_furo'),pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]   // HDD: Relatório de Furo antes do As Built
+    pjDoc('Relatório de Furo','rel_furo'),pjDoc('Relatório de Solda','rel_solda'),pjDoc('Cadastro do As Built','as_built'),pjDoc('Relatório Técnico de Qualidade','rtq')]   // HDD: Relatórios de Furo e de Solda antes do As Built
 };
 const PJ_TIPO_MAP={'VRP':'vrp_impl','Valvula':'valvula'};
 const pjMapTipo=(tipo,isLine)=>isLine?'rede_vca':(PJ_TIPO_MAP[tipo]||'vrp_impl');
@@ -2131,7 +2172,7 @@ async function pjLoad(force){
   ivs.forEach(iv=>{ if(!Array.isArray(iv.arv))return;
     iv.arv=iv.arv.filter(n=>!(n&&n.k!=='doc'&&/cadastro\s*\/?\s*as-?built/i.test(n.n||'')));
     const fin=[['Cadastro do As Built','as_built'],['Relatório Técnico de Qualidade','rtq']];
-    if(iv.tipo==='rede_hdd') fin.unshift(['Relatório de Furo','rel_furo']);   // só HDD, antes do As Built (2026-10-22)
+    if(iv.tipo==='rede_hdd') fin.unshift(['Relatório de Furo','rel_furo'],['Relatório de Solda','rel_solda']);   // só HDD, antes do As Built (furo 2026-10-22, solda 2026-10-28)
     fin.forEach(([nm,dc])=>{
       const i=iv.arv.findIndex(n=>n&&n.k==='doc'&&n.doc===dc);
       if(i<0) iv.arv.push(pjDoc(nm,dc)); else iv.arv.push(iv.arv.splice(i,1)[0]);
@@ -2139,8 +2180,11 @@ async function pjLoad(force){
     // OS SIGOS (2026-10-22): garante o campo como 1ª atividade em snapshots salvos antes dele existir
     const oi=iv.arv.findIndex(n=>n&&n.os);
     if(oi<0) iv.arv.unshift(pjOS()); else if(oi>0) iv.arv.unshift(iv.arv.splice(oi,1)[0]);
+    // Autorização de Intervenção de Via (2026-10-28): garante o nó-doc logo após a OS SIGOS (snapshots antigos não o têm)
+    const ai=iv.arv.findIndex(n=>n&&n.k==='doc'&&n.doc==='alvara');
+    const aiv=ai<0?pjAIV():iv.arv.splice(ai,1)[0]; aiv.n=PJ_AIV_N; iv.arv.splice(1,0,aiv);
   });
-  await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca As-Built/RTQ já anexados (100%) em todas as intervenções
+  await pjDocsPresLoad(); ivs.forEach(pjStampDoc);   // marca os documentos de lançamento já anexados (100%) em todas as intervenções
   PJ_IVS=ivs; pjLoaded=true;
 }
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
@@ -2170,6 +2214,8 @@ let pjMode='campo';   // 'campo' (lançar avanços, só se liberada) | 'cfg' (co
 let pjLocked=true;    // reflete iv.locked da intervenção corrente durante o render da árvore
 // node tem lançamento? (subatividade %/m com avanço > 0, ou grupo com algum filho lançado) — regardless de ativo
 function pjHasAdv(node){ if(node.k==='%')return (node.p||0)>0; if(node.k==='m')return (node.exec||0)>0; if(node.f)return node.f.some(pjHasAdv); return false; }
+// documento da tela de lançamento já anexado (nó-doc = 100%)? Junto com pjHasAdv, trava a exclusão da intervenção (espelha app_proj_intervencao_excluir)
+const pjIvDocLanc=iv=>((iv&&iv.arv)||[]).some(n=>n&&n.k==='doc'&&n.done);
 // acesso à categoria Suporte: admin sempre; senão precisa de grant. Protótipo em localStorage (mini-cadeado da categoria) até haver backend (proj_acesso → ME.proj_areas).
 // acesso ao Suporte: admin sempre; senão precisa de grant persistido no banco (perfil.proj_sup_acesso → ME.proj_sup)
 const pjPodeSup=()=>!!(ME&&(ME.is_admin || ME.proj_sup));
@@ -2538,8 +2584,9 @@ function pjResumoCsv(feed){
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u; a.download='resumo_avancos_projetos.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000); toast('CSV gerado'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
 // ---------- documentos da intervenção (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por tipo ----------
-const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'licenca',ic:'📃',n:'Licença ambiental'},{t:'alvara',ic:'🏛️',n:'Alvará de execução'},{t:'rel_furo',ic:'🕳️',n:'Relatório de Furo',hdd:true},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
-// documentos aplicáveis à intervenção: "Relatório de Furo" existe só em HDD (lista de documentos, relatório e PDF consolidado)
+// (2026-10-28) Licença ambiental saiu (anexos antigos ficam no banco, só não aparecem); 'alvara' = Autorização de Intervenção de Via
+const PJ_DOCS=[{t:'executivo',ic:'📄',n:'Projeto executivo'},{t:'alvara',ic:'🚧',n:PJ_AIV_N},{t:'rel_furo',ic:'🕳️',n:'Relatório de Furo',hdd:true},{t:'rel_solda',ic:'🔥',n:'Relatório de Solda',hdd:true},{t:'as_built',ic:'📐',n:'Cadastro do As-Built'},{t:'rtq',ic:'📑',n:'Relatório Técnico de Qualidade'}];
+// documentos aplicáveis à intervenção: "Relatório de Furo" e "Relatório de Solda" existem só em HDD (lista de documentos, relatório e PDF consolidado)
 const pjDocsFor=iv=>PJ_DOCS.filter(dc=>!dc.hdd||(iv&&iv.tipo==='rede_hdd'));
 let pjDocsCur={};   // tipo -> {tipo,nome,path} da intervenção corrente
 // presença dos documentos de ENCERRAMENTO (as_built/rtq) por intervenção — marca node.done nos cards da lista sem abrir cada uma
@@ -2568,7 +2615,7 @@ async function pjDocRemover(iv,tipo){ if(!iv) return;
     delete pjDocsCur[tipo]; pjSetDocDone(iv,tipo,false); toast('Documento removido'); pjRerender();
   }catch(e){ toast('Erro ao remover: '+(e.message||e)); }
 }
-async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
+async function pjOpenCfg(id){ pjCur=id; irPara('projeto_cfg'); const el=$('#pjCfg'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; const del=$('#pjCfgDel'); if(del) del.classList.add('hidden'); window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); await pjDocsLoad(iv); if(pjCur===id) pjRenderCfg(); }
 // Visão 3D — abre o visor externo das VRPs num overlay com iframe (?embed=1 tira cabeçalho/rodapé)
 function pjOpen3d(iv){
   let ov=document.getElementById('pj3d');
@@ -2614,8 +2661,28 @@ function pjRenderCfg(keep){
   d.querySelectorAll('[data-file]').forEach(inp=>inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) pjDocAnexar(iv,inp.dataset.file,f); });
   d.querySelectorAll('[data-open3d]').forEach(b=>b.onclick=()=>pjOpen3d(iv));
   d.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>pjDocRemover(iv,b.dataset.remove));
+  // 🗑️ excluir (canto superior direito): Suporte, só sem lançamento. Bloqueada fica opaca e explica o motivo no toque (sem hover no celular)
+  const del=$('#pjCfgDel'); if(del){ const docLanc=pjIvDocLanc(iv), bloq=hasAdv||docLanc;
+    del.classList.toggle('hidden',!pjPodeSup()); del.style.opacity=bloq?'.45':''; del.title=bloq?'Tem lançamento — não pode ser excluída':'Excluir intervenção';
+    del.onclick=()=>{ if(hasAdv) toast('Intervenção com avanço lançado não pode ser excluída'); else if(docLanc) toast('Remova os documentos de execução anexados antes de excluir'); else pjExcluirConfirm(iv); }; }
   pjWireTree(d,pjRenderCfg);
   pjReopen(d,keep);
+}
+// exclusão DEFINITIVA (Suporte, sem lançamento): ponto/traçado no schema 7 + estado + documentos; o banco revalida e grava o rastro em intervencoes_audit
+function pjExcluirConfirm(iv){ if(!iv||iv.gid==null) return;
+  const m=vmModal(`<div class="vmmcard"><div class="vmmh">🗑️ Excluir intervenção</div>
+    <div class="vmmb"><div>Excluir <b>${iv.local}</b> <span class="pjmono">(${iv.cod})</span>?</div>
+      <div style="font-size:13px;color:var(--mut);line-height:1.4">Apaga de forma <b>definitiva</b> a intervenção, o ${iv.kind==='linha'?'traçado':'ponto'} no mapa (camada de intervenções do QGIS), a configuração e os documentos anexados. <b>Não dá para desfazer.</b></div></div>
+    <div class="vmmf"><button class="vmbtn sec" id="pjDelCancel" style="flex:1">Cancelar</button><button class="vmbtn dngr" id="pjDelOk" style="flex:1">Excluir definitivamente</button></div></div>`);
+  m.querySelector('#pjDelCancel').onclick=vmModalClose;
+  const ok=m.querySelector('#pjDelOk');
+  ok.onclick=async()=>{ ok.classList.add('dis'); ok.textContent='Excluindo…';
+    clearTimeout(pjSaveT[iv.kind+'|'+iv.gid]);   // snapshot pendente não pode recriar o estado depois da exclusão
+    try{ const {data,error}=await sb.rpc('app_proj_intervencao_excluir',{p_kind:iv.kind,p_gid:iv.gid}); if(error) throw error;
+      const paths=(data&&data.paths)||[]; if(paths.length){ try{ await sb.storage.from('fotos-campo').remove(paths); }catch(_){} }
+      PJ_IVS=PJ_IVS.filter(x=>x!==iv); pjCur=null; vmModalClose(); toast('Intervenção excluída'); irPara('projeto_sup');
+    }catch(e){ ok.classList.remove('dis'); ok.textContent='Excluir definitivamente'; toast('Erro ao excluir: '+(e.message||e)); }
+  };
 }
 // snapshot não guarda histórico por lançamento — só o acumulado real da folha (sem entradas fabricadas).
 // (histórico real por lançamento seria a abordagem de "log", não adotada nesta etapa.)
@@ -2642,7 +2709,7 @@ function pjNodeHtml(node){
   if(pjMode==='campo' && inact) return '';   // no Campo, atividade fora do escopo não aparece (nem opaca)
   const cfg=pjMode==='cfg';                          // cfg = tela de configuração (Suporte); senão = campo (avanços)
   const rid='pn'+Math.random().toString(36).slice(2,8); pjReg[rid]=node;
-  // atividade de encerramento (as_built / rtq): registro único via anexo de PDF → documento final. Sem % (not aggregated).
+  // atividade-documento (Autorização de Intervenção de Via / Relatórios de Furo e Solda [HDD] / As-Built / RTQ): registro único via anexo de PDF → documento final. Conta 100% quando anexado.
   if(t==='doc'){ const doc=pjDocsCur[node.doc], ok=!!doc, canAttach=(pjMode==='campo'&&pjLocked);
     let btns=ok?`<button class="pjgo" data-docopen="${doc.path}">👁 Abrir</button>`:'';
     if(canAttach) btns+=`<button class="pjgo" data-docattach="${rid}">📎 ${ok?'Substituir':'Anexar PDF'}</button><input type="file" accept="application/pdf" hidden data-docfile="${rid}">`;
@@ -2825,7 +2892,7 @@ async function pjRel(id){
    <p class="pjhint" style="margin:2px 0 9px">Só atividades <b>com lançamento</b>. Cada subatividade abre por avanço (ordem de envio), com observação e fotos.</p>
    ${advHtml}
    <div class="sec">🖨️ Relatório consolidado (PDF)</div>
-   <p class="pjhint" style="margin:2px 0 9px">Documento único: capa + progresso + avanços com fotos + documentos (projeto executivo, licença, alvará, as-built). <b>Anexos ainda não anexados entram com nota explicativa.</b></p>
+   <p class="pjhint" style="margin:2px 0 9px">Documento único: capa + progresso + avanços com fotos + documentos (projeto executivo, autorização de intervenção de via${iv.tipo==='rede_hdd'?', relatórios de furo e de solda':''}, as-built, relatório técnico de qualidade). <b>Anexos ainda não anexados entram com nota explicativa.</b></p>
    <button class="btn" id="pjRelPdfBtn">🖨️ Gerar PDF consolidado</button>`;
   const rr=$('#pjRel');
   rr.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ try{ window.open(SBASE+b.dataset.open,'_blank'); }catch(e){} });
@@ -2879,7 +2946,7 @@ async function pjRelPdf(iv){ if(!iv)return;
   try{ await pjRelRenderAnexos(iv); }catch(e){ const bx=document.getElementById('relAnexos'); if(bx) bx.innerHTML='<p class="relPend">Falha ao preparar anexos: '+((e&&e.message)||e)+'</p>'; }
   if(pb) pb.disabled=false;
 }
-// renderiza os anexos (PDFs do executivo/licença/alvará/as-built) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
+// renderiza os anexos (PDFs de PJ_DOCS: executivo/autorização de via/furo+solda [HDD]/as-built/RTQ) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
 async function pjRelRenderAnexos(iv){
   const box=document.getElementById('relAnexos'); if(!box) return;
   const docs=pjDocsFor(iv).map(dc=>({dc,doc:pjDocsCur[dc.t]})).filter(x=>x.doc);
@@ -3977,8 +4044,8 @@ const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Toda
 function apInit(){
   // acesso geral à tela (controlado pela engrenagem desta própria tela)
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('home'); return; }
-  const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; irPara('programacao_servicos'); };
-  const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; irPara('programacao_servicos'); };
+  const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; pgBackTo='auxiliar_programacao'; irPara('programacao_servicos'); };
+  const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; pgBackTo='auxiliar_programacao'; irPara('programacao_servicos'); };
   // Ferramentas migradas do cockpit NRW → abrem no perdas.html (fora do menu NRW)
   const hd=$('#apHdPri'); if(hd) hd.onclick=()=>{ location.href='perdas.html?s=hdpri'; };
   const fr=$('#apFraudePri'); if(fr) fr.onclick=()=>{ location.href='perdas.html?s=fraudepri'; };
@@ -4019,9 +4086,22 @@ function auxAcRender(){
     ck.disabled=false;
   }));
 }
+// Tipos de ocorrência da pesquisa (tela `ocorrencia`). 2026-10-27: entram as fraudes e sai o 'Outro' (registros
+// antigos com 'Outro' continuam valendo e contam como vazamento). Regra única: vazamento = tudo que não é fraude.
+const OC_TIPOS_VAZ=['Vazamento visível','Vazamento não visível (ruído)','Extravasamento','Cavalete / hidrômetro'];
+const OC_TIPOS_FRAUDE=['Fraude - Derivação de ramal','Fraude - Ligação clandestina','Fraude - Rompimento de lacre','Fraude - Corte violado','Fraude - Hidrômetro violado'];
+const OC_ROT={'Vazamento visível':'Visível','Vazamento não visível (ruído)':'Não visível','Extravasamento':'Extravas.','Cavalete / hidrômetro':'Cavalete/HD',
+  'Fraude - Derivação de ramal':'Derivação','Fraude - Ligação clandestina':'Clandestina','Fraude - Rompimento de lacre':'Lacre','Fraude - Corte violado':'Corte violado','Fraude - Hidrômetro violado':'HD violado'};
+// Locais (`#ocLocal`) — filtro da abertura e colunas da matriz tipo × local do Acompanhamento
+const OC_LOCAIS=['Rede (distribuição)','Ramal / ligação','Cavalete','Registro / válvula','Outro'];
+const OC_LOC_ROT={'Rede (distribuição)':'Rede','Ramal / ligação':'Ramal','Cavalete':'Cavalete','Registro / válvula':'Registro','Outro':'Outro'};
+function ocEhFraude(t){ return /^fraude/i.test(t||''); }
+function ocIcone(t){ return ocEhFraude(t)?'🚩':'⚠️'; }
+function ocDataCurta(iso){ return iso?new Date(iso).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}).replace(',',''):'—'; }
 // Abertura de serviços: segmentada por origem (comercial = solicitações / pesquisa = ocorrências)
-let pgModo='comercial';
+let pgModo='comercial', pgBackTo='auxiliar_programacao';
 function pgInit(){
+  const bk=$('#pgBack'); if(bk) bk.textContent = pgBackTo==='pp_acomp' ? '‹ Acompanhamento da pesquisa' : '‹ Auxiliar de Programação';
   const sol = pgModo!=='pesquisa';
   const secS=$('#pgSecSol'), secO=$('#pgSecOc');
   if(secS) secS.classList.toggle('hidden', !sol);
@@ -4033,7 +4113,7 @@ function pgInit(){
     : 'Ocorrências da pesquisa de vazamentos — lance o nº da OS criada na COPASA.';
   pgRenderFiltros();
   if(sol){ pgCarregar(); }
-  else { pgOcRenderTabs(); pgCarregarOc(); }
+  else { pgOcRenderTabs(); pgOcAplicarView(); pgCarregarOc(); }
 }
 function pgRenderFiltros(){
   const c=document.getElementById('pgFiltros'); if(!c) return;
@@ -4098,26 +4178,89 @@ function pgOcFillEnderecos(root){
   });
 }
 // --- card compartilhado entre lista e popup do mapa ---
+// Compacto (2026-10-27): à esquerda tipo+tags, endereço, quem/coordenada e obs; à direita (sob a data) links, OS e o
+// campo de OS. No celular e no popup a coluna da direita desce (CSS .occ).
 function pgOcCard(s,popup){
-  const dt=s.data_hora?new Date(s.data_hora).toLocaleString('pt-BR'):'';
-  const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto</a>`:'';
-  const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
-  const info=[s.local?('Local: '+s.local):'',s.consorcio||''].filter(Boolean).join(' · ');
-  const coord=(s.lat!=null&&s.lon!=null)?`<div class="sub" style="margin-top:3px">📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span></div>
-        <div class="sub" style="margin-top:2px"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}" style="color:var(--mut)">buscando endereço…</span></div>`:'';
-  const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
-  const wrap=popup?'padding:2px 1px':'background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px';
-  return `<div style="${wrap}">
-        <div style="display:flex;gap:8px;align-items:center"><b>⚠️ ${s.tipo||'Ocorrência'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
-        <div class="sub" style="margin-top:3px">${info}</div>
-        <div class="sub" style="margin-top:2px">Por ${s.usuario||'—'} · ${foto}${mapa}</div>
-        ${coord}
-        ${s.observacao?('<div class="sub" style="margin-top:3px">Obs: '+s.observacao+'</div>'):''}
-        ${done}
-        <div style="display:flex;gap:6px;margin-top:8px"><input class="pgOcOs" data-id="${s.id}" value="${(s.os_numero||'').replace(/"/g,'&quot;')}" placeholder="Nº da OS na COPASA" style="flex:1;min-width:0"/><button class="btn" data-ocsave="${s.id}" style="margin:0;width:auto;padding:9px 14px">Salvar</button></div>
+  const foto=s.foto?`<a href="${fotoURL(s.foto)}" target="_blank" rel="noopener">📷 Foto</a>`:'';
+  const mapa=(s.lat&&s.lon)?`<a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener">📍 Mapa</a>`:'';
+  const tags=[s.local,s.consorcio].filter(Boolean).map(t=>`<span class="occ-tag">${vEsc(t)}</span>`).join('');
+  const quem=`👤 ${vEsc(s.usuario_nome||s.usuario||'—')}`+((s.lat!=null&&s.lon!=null)?` · 📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span>`:'');
+  const end=(s.lat!=null&&s.lon!=null)?`<div class="occ-l"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}">buscando endereço…</span></div>`:'';
+  const done=s.os_numero?`<div class="occ-ok">✓ OS <b>${vEsc(s.os_numero)}</b>${s.os_por?(' · '+vEsc(s.os_por)):''}</div>`:'';
+  return `<div class="occ${popup?' pop':''}" data-occ="${s.id}">
+        <div class="occ-main">
+          <div class="occ-h"><b>${ocIcone(s.tipo)} ${vEsc(s.tipo||'Ocorrência')}</b>${tags}</div>
+          ${end}
+          <div class="occ-l">${quem}</div>
+          ${s.observacao?(`<div class="occ-l">💬 ${vEsc(s.observacao)}</div>`):''}
+        </div>
+        <div class="occ-side">
+          <div class="occ-dt">${ocDataCurta(s.data_hora)}</div>
+          <div class="occ-links">${foto}${mapa}</div>
+          ${done}
+          <div class="occ-os"><input class="pgOcOs" data-id="${s.id}" value="${vEsc(s.os_numero||'')}" placeholder="Nº da OS na COPASA"/><button class="btn" data-ocsave="${s.id}">Salvar</button></div>
+        </div>
       </div>`;
 }
 let pgOcData=[], pgOcMode='lista', pgOcMap=null, pgOcMarkers=null;
+// filtros: tipo (tipo exato | '@vaz' | '@fraude') · local (combinado tipo × local = esforço da equipe, ex. não visível
+// na rede) · consórcio; + card a destacar
+let pgOcFTipo='', pgOcFLocal='', pgOcFCons='', pgOcFoco=null;
+function pgOcFiltrado(sem){   // sem = 'tipo' | 'local' → ignora esse filtro (p/ as contagens do próprio dropdown)
+  return (pgOcData||[]).filter(o=>(!pgOcFCons||o.consorcio===pgOcFCons)
+    && (sem==='local'||!pgOcFLocal||o.local===pgOcFLocal)
+    && (sem==='tipo'||!pgOcFTipo||(pgOcFTipo==='@vaz'?!ocEhFraude(o.tipo):(pgOcFTipo==='@fraude'?ocEhFraude(o.tipo):o.tipo===pgOcFTipo))));
+}
+// dropdown de local com contagem (respeita tipo + consórcio + aba); locais fora da lista aparecem se houver
+function pgOcRenderFLocal(){
+  const s=document.getElementById('pgOcFLocal'); if(!s) return;
+  const arr=pgOcFiltrado('local'), n=l=>arr.filter(o=>o.local===l).length;
+  const locs=[...OC_LOCAIS,...[...new Set(arr.map(o=>o.local).filter(Boolean))].filter(l=>!OC_LOCAIS.includes(l)).sort()];
+  if(pgOcFLocal && !locs.includes(pgOcFLocal)) locs.push(pgOcFLocal);
+  const opt=(v,l,k)=>`<option value="${vEsc(v)}"${pgOcFLocal===v?' selected':''}>${vEsc(l)} (${k})</option>`;
+  s.innerHTML=opt('','Todos os locais',arr.length)+locs.map(l=>opt(l,l,n(l))).join('');
+}
+// dropdown de tipo com contagem (respeita local + consórcio + aba de status); tipos antigos fora da lista (ex. 'Outro') aparecem se houver
+function pgOcRenderFTipo(){
+  const s=document.getElementById('pgOcFTipo'), c=document.getElementById('pgOcFCons'); if(!s) return;
+  if(c) c.value=pgOcFCons;
+  const arr=pgOcFiltrado('tipo'), n=t=>arr.filter(o=>o.tipo===t).length;
+  const tipos=[...new Set(arr.map(o=>o.tipo).filter(Boolean))];
+  const vaz=[...OC_TIPOS_VAZ,...tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort()];
+  const fra=[...OC_TIPOS_FRAUDE,...tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort()];
+  const opt=(v,l,k)=>`<option value="${vEsc(v)}"${pgOcFTipo===v?' selected':''}>${vEsc(l)} (${k})</option>`;
+  const nV=arr.filter(o=>!ocEhFraude(o.tipo)).length;
+  s.innerHTML=opt('','Todos os tipos',arr.length)
+    +'<optgroup label="Vazamento">'+opt('@vaz','Todos os vazamentos',nV)+vaz.map(t=>opt(t,t,n(t))).join('')+'</optgroup>'
+    +'<optgroup label="Fraude">'+opt('@fraude','Todas as fraudes',arr.length-nV)+fra.map(t=>opt(t,t,n(t))).join('')+'</optgroup>';
+}
+function pgOcRender(){
+  const c=document.getElementById('pgOcLista'); if(!c) return;
+  pgOcRenderFTipo(); pgOcRenderFLocal();
+  const arr=pgOcFiltrado();
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+((pgOcFTipo||pgOcFLocal||pgOcFCons)?' no filtro':(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':'')))+'.</p>'; }
+  else {
+    c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
+    c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
+    pgOcFillEnderecos(c);
+  }
+  if(pgOcFoco){ const el=c.querySelector('[data-occ="'+pgOcFoco+'"]'); pgOcFoco=null;
+    if(el){ el.classList.add('foco'); setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),80); } }
+  if(pgOcMode==='mapa') pgOcCarregarMapa();
+}
+// atalho do popup do Acompanhamento da pesquisa → card da ocorrência (aba certa, sem filtros, rola e destaca)
+function pgOcAbrir(id,temOs){
+  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro=temOs?'criada':'pendente';
+  pgOcFTipo=''; pgOcFLocal=''; pgOcFCons=''; pgOcMode='lista'; pgOcFoco=id;
+  irPara('programacao_servicos');
+}
+// atalho da matriz tipo × local do Acompanhamento → abertura já filtrada (aba "Todas", p/ bater com a contagem da célula;
+// período/colaborador do Acompanhamento não existem aqui)
+function pgOcAbrirFiltro(tipo,local,cons){
+  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro='todas';
+  pgOcFTipo=tipo||''; pgOcFLocal=local||''; pgOcFCons=cons||''; pgOcMode='lista'; pgOcFoco=null;
+  irPara('programacao_servicos');
+}
 function pgOcRenderTabs(){
   const c=document.getElementById('pgOcTabs'); if(!c) return;
   const opts=[['lista','📋 Lista'],['mapa','🗺️ Mapa']];
@@ -4135,7 +4278,7 @@ function pgOcCarregarMapa(){
     pgOcMap.on('popupopen',ev=>{ const el=ev.popup.getElement(); if(!el)return; el.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave))); pgOcFillEnderecos(el); }); }
   setTimeout(()=>pgOcMap.invalidateSize(),0);
   pgOcMarkers.clearLayers();
-  const arr=(pgOcData||[]).filter(s=>s.lat!=null&&s.lon!=null), pts=[];
+  const arr=pgOcFiltrado().filter(s=>s.lat!=null&&s.lon!=null), pts=[];
   arr.forEach(s=>{
     const cor=s.os_numero?'#1D9E75':'#dc2626';
     const m=L.circleMarker([s.lat,s.lon],{radius:8,color:'#fff',weight:2,fillColor:cor,fillOpacity:1});
@@ -4147,12 +4290,8 @@ function pgOcCarregarMapa(){
 }
 async function pgCarregarOc(){
   const c=document.getElementById('pgOcLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; const arr=data||[]; pgOcData=arr;
-    if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':''))+'.</p>'; if(pgOcMode==='mapa') pgOcCarregarMapa(); return; }
-    c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
-    c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
-    pgOcFillEnderecos(c);
-    if(pgOcMode==='mapa') pgOcCarregarMapa();
+  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; pgOcData=data||[];
+    pgOcRender();
   }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 async function pgSalvarOcOs(id){
@@ -4160,7 +4299,10 @@ async function pgSalvarOcOs(id){
   try{ const {error}=await sb.rpc('app_ocorrencia_os',{p_id:id,p_os:os}); if(error)throw error; toast('✓ OS salva'); if(pgOcMap)pgOcMap.closePopup(); pgCarregarOc(); }
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
-if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara('auxiliar_programacao'));
+if($('#pgBack')) $('#pgBack').addEventListener('click',()=>irPara(pgBackTo));
+if($('#pgOcFTipo')) $('#pgOcFTipo').addEventListener('change',e=>{ pgOcFTipo=e.target.value; pgOcRender(); });
+if($('#pgOcFLocal')) $('#pgOcFLocal').addEventListener('change',e=>{ pgOcFLocal=e.target.value; pgOcRender(); });
+if($('#pgOcFCons')) $('#pgOcFCons').addEventListener('change',e=>{ pgOcFCons=e.target.value; pgOcRender(); });
 
 // ---------- CRIAÇÃO DE MATRÍCULAS (Retaguarda) ----------
 let mtFiltro='pendente';
@@ -5900,6 +6042,8 @@ function paInit(){
     paLayerGrp=L.layerGroup().addTo(paMap);   // 1 grupo p/ heatmap+reporte+ocorrências — clearLayers evita camada órfã
     paMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?14:11);
     paMap.on('moveend',()=>paCarregarMapa());
+    paMap.on('popupopen',ev=>{ const el=ev.popup.getElement(); if(!el)return;
+      el.querySelectorAll('.paOcAbrir').forEach(a=>a.addEventListener('click',()=>{ paMap.closePopup(); pgOcAbrir(a.dataset.id,a.dataset.os==='1'); })); });
     // filtro de passadas dentro do mapa (igual legenda-filtro da Programação): isola por categoria,
     // multi-seleção, vazio = todas — re-renderiza o viewport atual filtrado, SEM dar zoom no clique.
     const PaLg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
@@ -5944,7 +6088,7 @@ async function paAtualizar(){
   try{
     const {data,error}=await sb.rpc('app_pp_acompanhamento',paFiltros());
     if(error)throw error;
-    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paResumo(data.resumo||[]);
+    paCards(data.kpis||{}); paProgresso(data.progresso_passadas||[]); paResRows=data.resumo||[]; paResKpis=data.kpis||{}; paResumo(); paMatriz(data.matriz||[]);
   }catch(e){ toast('Erro no acompanhamento: '+(e.message||e)); }
   paCarregarMapa();
 }
@@ -5953,7 +6097,8 @@ function paCards(k){
     {lbl:'Km de rede pesquisado',val:Number(k.km_rede_pesquisado||0).toFixed(2)+' km'},
     {lbl:'Km andado (reporte)',val:Number(k.km_andado||0).toFixed(2)+' km'},
     {lbl:'Vazamentos',val:String(k.vazamentos||0)},
-    {lbl:'Vaz / km de rede',val:Number(k.vaz_km||0).toFixed(2)},
+    {lbl:'Fraudes',val:String(k.fraudes||0)},
+    {lbl:'Ocorrências / km de rede',val:Number(k.ocorr_km||0).toFixed(2)},
     {lbl:'Velocidade média',val:Number(k.velocidade_kmh||0).toFixed(1)+' km/h'}
   ];
   document.getElementById('paCards').innerHTML=cards.map(c=>'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px"><div style="font-size:12px;color:var(--mut)">'+c.lbl+'</div><div style="font-size:21px;font-weight:700;margin-top:3px">'+c.val+'</div></div>').join('');
@@ -5969,13 +6114,78 @@ function paProgresso(arr){
   }).join('');
   leg.innerHTML=arr.map(b=>'<span style="display:inline-flex;align-items:center;gap:5px"><i style="width:11px;height:11px;border-radius:3px;background:'+PA_PASS_COL[b.passada]+';display:inline-block"></i>'+(b.passada>=5?'5+':b.passada)+'× · '+Number(b.km||0).toFixed(0)+' km</span>').join('');
 }
-function paResumo(rows){
-  const el=document.getElementById('paResumo');
-  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem execução no filtro.</p>'; return; }
-  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:460px">'
-    +'<thead><tr style="color:var(--mut);text-align:right"><th style="text-align:left;font-weight:400;padding:6px 4px">Colaborador</th><th style="font-weight:400;padding:6px 4px">km rede</th><th style="font-weight:400;padding:6px 4px">km andado</th><th style="font-weight:400;padding:6px 4px">vaz.</th><th style="font-weight:400;padding:6px 4px">vaz/km</th><th style="font-weight:400;padding:6px 4px">km/h</th></tr></thead><tbody>'
-    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+(r.nome||'—')+'</td><td style="padding:7px 4px">'+Number(r.km_rede_pesquisado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.km_andado||0).toFixed(2)+'</td><td style="padding:7px 4px">'+(r.vazamentos||0)+'</td><td style="padding:7px 4px">'+Number(r.vaz_km||0).toFixed(2)+'</td><td style="padding:7px 4px">'+Number(r.velocidade_kmh||0).toFixed(1)+'</td></tr>').join('')
+// Produtividade por colaborador (2026-10-27): quem teve atividade no filtro (rede executada, trecho andado ou
+// ocorrência). Ocorr./km = (vazamentos + fraudes) ÷ km de rede pesquisada. Cabeçalho ordena; rodapé "Equipe" = KPIs.
+let paResRows=[], paResKpis={}, paResSort={k:'km_rede_pesquisado',dir:-1};
+const PA_RES_COLS=[
+  {k:'km_andado',l:'Km andado',t:'Km andado (soma dos trechos reportados)',f:v=>Number(v||0).toFixed(2)},
+  {k:'km_rede_pesquisado',l:'Km de rede',t:'Km de rede pesquisada (execução)',f:v=>Number(v||0).toFixed(2),bar:1},
+  {k:'vazamentos',l:'Vazamentos',f:v=>String(v||0)},
+  {k:'fraudes',l:'Fraudes',f:v=>String(v||0)},
+  {k:'ocorr_km',l:'Ocorr./km',t:'(Vazamentos + fraudes) ÷ km de rede pesquisada',f:v=>Number(v||0).toFixed(2)},
+  {k:'velocidade_kmh',l:'km/h',t:'Velocidade média (km andado ÷ tempo)',f:v=>Number(v||0).toFixed(1)}];
+function paResumo(){
+  const el=document.getElementById('paResumo'), rows=paResRows.slice();
+  if(!rows.length){ el.innerHTML='<p style="color:var(--mut);font-size:13px">Sem atividade no filtro.</p>'; return; }
+  const s=paResSort;
+  rows.sort((a,b)=>s.k==='nome'?s.dir*String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'):s.dir*(Number(a[s.k]||0)-Number(b[s.k]||0)));
+  const maxKm=Math.max(...rows.map(r=>Number(r.km_rede_pesquisado||0)),0.01);
+  const th='font-weight:400;padding:6px 4px;cursor:pointer;user-select:none;white-space:nowrap', td='padding:7px 4px;white-space:nowrap';
+  const seta=k=>s.k===k?(s.dir<0?' ▾':' ▴'):'';
+  const k=paResKpis;
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">'
+    +'<thead><tr style="color:var(--mut);text-align:right"><th data-ps="nome" style="text-align:left;'+th+'">Colaborador'+seta('nome')+'</th>'
+    +PA_RES_COLS.map(c=>'<th data-ps="'+c.k+'" title="'+vEsc(c.t||c.l)+'" style="'+th+(s.k===c.k?';color:var(--ink)':'')+'">'+c.l+seta(c.k)+'</th>').join('')+'</tr></thead><tbody>'
+    +rows.map(r=>'<tr style="border-top:1px solid var(--line);text-align:right"><td style="text-align:left;padding:7px 4px">'+vEsc(r.nome||'—')+'</td>'
+      +PA_RES_COLS.map(c=>'<td style="'+td+'">'+(c.bar?'<span style="display:inline-block;vertical-align:middle;height:6px;border-radius:3px;background:#1D9E75;opacity:.75;margin-right:6px;width:'+Math.round(Number(r[c.k]||0)/maxKm*48)+'px"></span>':'')+c.f(r[c.k])+'</td>').join('')+'</tr>').join('')
+    +'<tr style="border-top:2px solid var(--line);text-align:right;font-weight:700"><td style="text-align:left;'+td+'">Equipe</td>'
+    +PA_RES_COLS.map(c=>'<td style="'+td+'">'+c.f(k[c.k])+'</td>').join('')+'</tr>'
     +'</tbody></table>';
+  el.querySelectorAll('[data-ps]').forEach(h=>h.addEventListener('click',()=>{
+    const key=h.dataset.ps; paResSort = paResSort.k===key ? {k:key,dir:-paResSort.dir} : {k:key,dir:key==='nome'?1:-1}; paResumo(); }));
+}
+// Ocorrências por tipo × local (2026-10-27): app_pp_acompanhamento.matriz = [{tipo,local,n,com_os}]. Linhas agrupadas
+// Vazamento / Fraude (todos os tipos da lista, + antigos que aparecerem), colunas = locais; cor pela intensidade.
+// Célula → abertura de serviços filtrada no tipo + local (+ consórcio do topo) via pgOcAbrirFiltro.
+function paMatriz(arr){
+  const el=document.getElementById('paMatriz'); if(!el) return;
+  const cel={}; arr.forEach(r=>{ cel[r.tipo+'|'+r.local]=r; });
+  const tipos=[...new Set(arr.map(r=>r.tipo))], locs=[...new Set(arr.map(r=>r.local))];
+  const cols=[...OC_LOCAIS,...locs.filter(l=>!OC_LOCAIS.includes(l)).sort()];
+  const grupos=[['Vazamento',[...OC_TIPOS_VAZ,...tipos.filter(t=>!ocEhFraude(t)&&!OC_TIPOS_VAZ.includes(t)).sort()]],
+                ['Fraude',[...OC_TIPOS_FRAUDE,...tipos.filter(t=>ocEhFraude(t)&&!OC_TIPOS_FRAUDE.includes(t)).sort()]]];
+  const n=(t,l)=>Number((cel[t+'|'+l]||{}).n||0), nT=t=>cols.reduce((a,l)=>a+n(t,l),0);
+  const max=Math.max(1,...arr.map(r=>Number(r.n||0)));
+  const td='padding:6px 4px;text-align:right;border-top:1px solid var(--line)';
+  const celula=(t,l)=>{ const v=n(t,l); if(!v) return '<td style="'+td+';color:var(--mut)">·</td>';
+    const os=Number((cel[t+'|'+l]||{}).com_os||0);
+    return '<td data-mt="'+vEsc(t)+'" data-ml="'+vEsc(l)+'" title="'+vEsc(t+' · '+l+': '+v+' (com OS '+os+' · sem OS '+(v-os)+')')+'" style="'+td+';cursor:pointer;font-weight:700;background:color-mix(in srgb,#1D9E75 '+Math.round(14+56*v/max)+'%,transparent)">'+v+'</td>'; };
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:520px">'
+    +'<thead><tr style="color:var(--mut)"><th style="text-align:left;font-weight:400;padding:6px 4px">Tipo</th>'
+    +cols.map(l=>'<th title="'+vEsc(l)+'" style="font-weight:400;padding:6px 4px;text-align:right">'+vEsc(OC_LOC_ROT[l]||l)+'</th>').join('')
+    +'<th style="font-weight:400;padding:6px 4px;text-align:right">Total</th></tr></thead><tbody>'
+    +grupos.map(([g,ts])=>'<tr><td colspan="'+(cols.length+2)+'" style="padding:10px 4px 3px;font-size:12px;color:var(--mut)">'+g+' · '+ts.reduce((a,t)=>a+nT(t),0)+'</td></tr>'
+      +ts.map(t=>'<tr><td style="padding:6px 4px;border-top:1px solid var(--line)">'+vEsc(g==='Fraude'?t.replace(/^Fraude - /,''):t)+'</td>'
+        +cols.map(l=>celula(t,l)).join('')+'<td style="'+td+';font-weight:700">'+nT(t)+'</td></tr>').join('')).join('')
+    +'<tr style="font-weight:700"><td style="padding:7px 4px;border-top:2px solid var(--line)">Total</td>'
+    +cols.map(l=>'<td style="padding:7px 4px;text-align:right;border-top:2px solid var(--line)">'+arr.filter(r=>r.local===l).reduce((a,r)=>a+Number(r.n||0),0)+'</td>').join('')
+    +'<td style="padding:7px 4px;text-align:right;border-top:2px solid var(--line)">'+arr.reduce((a,r)=>a+Number(r.n||0),0)+'</td></tr>'
+    +'</tbody></table>';
+  el.querySelectorAll('[data-mt]').forEach(c=>c.addEventListener('click',()=>pgOcAbrirFiltro(c.dataset.mt,c.dataset.ml,document.getElementById('paCons').value||'')));
+}
+// popup da ocorrência no mapa: foto, tipo, data de envio, usuário, navegar e atalho p/ o card na abertura de serviços.
+// Popup avulso (openOn) e não bindPopup: o moveend do autoPan recarrega o mapa e limparia o marcador — e o popup junto.
+function paOcPopup(p,ll){
+  const a='display:inline-block;margin-top:5px;color:var(--acc);font-weight:600';
+  const foto=p.foto?'<a href="'+fotoURL(p.foto)+'" target="_blank" rel="noopener" style="'+a+'">📷 Ver foto</a>':'<span style="color:var(--mut)">📷 sem foto</span>';
+  return '<div style="font-size:13px;line-height:1.55;min-width:200px">'
+    +'<b style="font-size:14px">'+ocIcone(p.tipo)+' '+vEsc(p.tipo||'Ocorrência')+'</b>'
+    +'<div>📅 Enviada em '+ocDataCurta(p.data)+'</div>'
+    +'<div>👤 '+vEsc(p.usuario_nome||p.usuario||'—')+'</div>'
+    +'<div>'+(p.os?('✓ OS <b>'+vEsc(p.os)+'</b>'):'⏳ Sem OS')+'</div>'
+    +foto+'<br>'
+    +'<a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" rel="noopener" style="'+a+'">🧭 Navegar</a><br>'
+    +'<a class="paOcAbrir" data-id="'+vEsc(p.id)+'" data-os="'+(p.os?1:0)+'" style="'+a+';cursor:pointer">📋 Abrir na abertura de serviços ›</a></div>';
 }
 function paPintarToggles(){
   [['paTgOc',paShowOc],['paTgRep',paShowRep]].forEach(([id,on])=>{
@@ -6015,7 +6225,9 @@ async function paCarregarMapa(){
     }
     // ocorrências (vazamentos) — ativável
     if(paShowOc && data.ocorrencias&&(data.ocorrencias.features||[]).length){
-      L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:6,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1}).bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')}).addTo(paLayerGrp);
+      L.geoJSON(data.ocorrencias,{pointToLayer:(ft,ll)=>L.circleMarker(ll,{radius:7,color:'#fff',weight:2,fillColor:'#1565c0',fillOpacity:1})
+        .bindTooltip((ft.properties&&ft.properties.tipo)||'vazamento')
+        .on('click',()=>L.popup({minWidth:220,maxWidth:300}).setLatLng(ll).setContent(paOcPopup(ft.properties||{},ll)).openOn(paMap))}).addTo(paLayerGrp);
     }
   }catch(e){ if(gen===paGen) toast('Erro no mapa: '+(e.message||e)); }
 }
