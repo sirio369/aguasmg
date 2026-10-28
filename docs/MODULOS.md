@@ -892,6 +892,7 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
   - **`app_pav_listar`**: cada item traz `id`/`os_recomposicao`/`os_recomp_em`/`os_recomp_por`; o `os_recomposicao` do grupo continua só p/ app em cache (1 OS → ela; várias → "A, B" na ordem do card).
   - **Legado `app_pav_os(p_grupo,p_os)`** (app em cache ≤ v281): se vier "A, B" só com números e nº de partes = nº de tipos, distribui **na ordem do card** (`order by tipo_pavimento`); senão grava igual em todas (como antes).
   - **Ordem do card = alfabética pela chave do tipo** (`app_pav_listar … order by tipo_pavimento`), não a ordem dos chips nem a de criação. Era a ordem que o programador via ao digitar "OS1, OS2" — critério usado na conversão dos dados antigos.
+  - **Conversão dos dados antigos (2026-10-28, aprovada pelo usuário via planilha):** 5 grupos "OS1, OS2" → 1 OS por tipo na ordem do card (10 linhas; `os_recomp_em`/`os_recomp_por` intactos). Backup `"8 - coleta_campo"._bkp_pav_os_tipo_20261028` (12 linhas/6 grupos; reverter = `update … set os_recomposicao=b.os_recomposicao from _bkp… b where r.id=b.id`). **Pendente:** grupo `fed92e6c` (concreto + piso especial) ficou **AVALIAR** e segue com o texto antigo — a 2ª parte é a nota "não contem opção de recomposição de piso no SICOM", não uma OS. Planilha, snapshot e SQL em `COPASA/scripts/pav_os_por_tipo/` (fora do repo).
 
 ---
 
