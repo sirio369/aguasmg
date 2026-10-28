@@ -2081,6 +2081,19 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     Demais painéis e o resultado seguem lendo só o total. Na tela de macromedição o conteúdo ocupa a largura toda
     (`body:has(#s-macro.on) .wrap{max-width:none}`, como HD/Fiscalização); a barra lateral do cockpit passou de
     224 → **248 px** (nome "Análise de macromedição" numa linha; no celular a barra fechada fica inteira fora da tela).
+  - **Bloco "Macromedidores × meses" + nova ordem (2026-10-28):** ordem dos blocos = Indicador do mês · Abertura por
+    macromedidor · Sazonalidade & tendência · **Macromedidores × meses** · Fator de correção. O bloco novo é uma matriz
+    **macro (linha) × competência (coluna)** com todos os meses e todos os macros que já apareceram no GMOA da ZA
+    (total em mil m³; cor = medido / medido+estimado / só estimado / zerado / sem registro no arquivo do mês). Coluna
+    **Situação** vs o último mês da ZA: *Medindo* · *Parou* (já mediu; no último mês saiu do GMOA, veio só estimado ou
+    zerado — mostra o último mês medido) · *Nunca medido* (só estimado); "entrou em MM/AAAA" p/ quem começou depois do
+    início da série. Filtros: Todos / Deixaram de medir / Com estimado / Entraram depois. Agrupado por ZA+função, os que
+    pararam primeiro; clique na linha abre a série no detalhe da Abertura; em tela estreita abre rolado nos meses
+    recentes (coluna do macro fixa). RPC **`app_nrw_macro_matriz(p_consorcio, p_com_fator)`** (definer, admin|`dev_acesso`,
+    execute só `authenticated`): 1 linha por consórcio×macro×competência com `vm`/`ve`/`vt` (soma dos sentidos; com
+    fator, mesmo multiplicador). Status calculado no front (`macroMatModel`). Ex. (09/2026): 4 saídas da ZA1004
+    (EMM0000383/0556535/0556538/0559170) saem do GMOA após 07/2026 e a EMM0000131 entra em 08/2026 com volume ≈ soma
+    delas; EMM0613252 (ZA0200) sai após 07/2026; EMM1697373 nunca medido.
   - **Camada `unidades_macromedicao` (view, schema 2):** ganhou 3 colunas via left join com `macro_fechamento` —
     **`fechamento_za`** (bool), **`funcao_medicao`** (entrada/saída) e **`sistema_macro`**. Marca 24 dos 37 macros
     da camada; **3 macros do fechamento não têm ponto no cadastro** (`EMM0000131`/`EMM1689916` ZA1004, `EMM1697373`
