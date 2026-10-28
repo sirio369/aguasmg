@@ -80,6 +80,8 @@
   seção "Equipe administrativa" em **Frotas** (§6). `qsms` **não libera mais nada** (2026-09 — a tela
   que abria foi removida por completo, §6.3); o valor continua existindo só por compatibilidade de
   quem já tinha esse acesso configurado.
+- `ME.qsms` (2026-10-28) = acesso à gestão **QSMS · Segurança do Trabalho** (§18): admin, engrenagem
+  `perfil.qsms_acesso` ou cargo de QSMS (`"16 - qsms".qsms_pode`). Não tem relação com `funcao='qsms'`.
 - `supGetMe()` (~L2412) carrega sob demanda e faz fallback `campo` se falhar. No login (§Auth) o `ME`
   é carregado globalmente e dispara os gates.
 - **Cuidado:** `ME` pode ser `null` no início. Sempre teste `!!(ME&&ME.pode_aprovar)`.
@@ -95,6 +97,9 @@
   - `item = {id, tipo, rpc, pasta, fotos:{p_x:Blob}, fields:{...}}`. Se algum `p_x` é **array**
     (`text[]`) em vez de path escalar, acrescente `fotosArray:['p_x', ...]` — `enviar()` envolve o path
     resultante em `[path]` só para esses params (ver Frotas §6.1, primeiro uso).
+  - **Número variável de arquivos** (assinaturas): `item.anexos={chave:Blob}` + `anexosParam` (default
+    `p_anexos`) → cada Blob sobe como `<pasta>/<id>_<chave>.jpg` e a RPC recebe **um jsonb** `{chave: path}`
+    (Segurança do Trabalho §18, primeiro uso). Canvas de assinatura → JPEG com fundo branco antes (`segSigJpeg`).
 - `sincronizar()`: erros com `code` SQLSTATE (5 chars) = rejeição de negócio → descarta o item;
   erro de rede → mantém e tenta depois.
 - `comprimir(file)` (~L598): reduz p/ ~1600px/JPEG 0.7 antes do upload.
@@ -386,7 +391,7 @@
   - **Coordenada travada no GPS** (`pavOnGps`): mostra lat/lon ao vivo, **sem edição**; banner "Fique próximo ao local para salvar a coordenada" até `gps.acc ≤ PRECISAO_MAX` (15 m) — mesma trava anti-lançamento-remoto da pressão/loggers.
   - **Tipos de pavimento = multi-seleção** (chips `PAV_TIPOS`: grama/asfalto/concreto/bloquete/paralelepípedo/pedra portuguesa/piso especial/piso tátil/meio-fio/sarjeta). Cada tipo selecionado **abre um bloco** com **dimensão** + **2 fotos obrigatórias** (câmera **e galeria**, `comprimir` 1600px). Estado em `pavState={tipo:{dimensao,f1,f2}}`.
   - **Salvar:** gera um `grupo` uuid e envia **1 item por tipo** pela **fila offline** (`enviarOuEnfileirar`, `rpc:'app_pav_registrar'`, `pasta:'pavimento'`, fotos `p_foto1`/`p_foto2`). "Meus últimos registros" via `app_pav_minhas` (agrupado por grupo).
-- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`; **`consorcio` = ZA cujo `"1 - suporte_geografico".limite_za` contém o ponto → senão `p_consorcio` → senão `perfil.consorcio`** — 2026-10-27, `docs/migracao_pav_consorcio.sql`; antes vinha só do `localStorage 'consorcio'`, que **só a tela de Pressão grava**, e 22/23 registros ficaram sem consórcio — backfill feito, backup `"8 - coleta_campo"._bkp_pav_consorcio_20261027`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
+- **Backend:** tabela **`"8 - coleta_campo".pav_recomposicao`** (1 linha por **tipo**, colunas `grupo`/`servico_origem`/`os_sigos`/`tipo_pavimento`/`dimensao`/`foto1`/`foto2`/`lat`/`lon`/`gps_precisao`/`geom`(Point 4326)/`consorcio`/`usuario_*`; RLS **deny-all**, acesso só via RPC definer). RPCs: `app_pav_registrar(...)` (gate authenticated — qualquer usuário de campo; grava `usuario_uuid`/email/nome de `auth`; **`consorcio` = ZA cujo `"1 - suporte_geografico".limite_za` contém o ponto → senão `p_consorcio` → senão `perfil.consorcio`** — 2026-10-27, `docs/migracao_pav_consorcio.sql`; antes vinha só do `localStorage 'consorcio'`, que **só a tela de Pressão grava**, e 22/23 registros ficaram sem consórcio — backfill feito, backup `"8 - coleta_campo"._bkp_pav_consorcio_20261027`), `app_pav_minhas()` (do próprio usuário), `app_pav_listar(p_consorcio,p_servico_origem)` (gate **admin|aux_acesso**, agrupa por grupo → `itens[]`, cada item com `id` + a sua OS da recomposição — §4.4). Fotos no bucket **público** `fotos-campo` (pasta `pavimento/`). sw **v261**.
 
 ---
 
@@ -884,10 +889,19 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
 - Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*
-- **Cabeçalho espelhado na "abertura de serviços — ocorrências" (2026-10-21b):** **tabs de status** `.seg` (`#pavpStatusSeg`: Pendentes [default] / OS criada / Todas) + **alternância de visão** `.seg` (`#pavpViewSeg`: 📋 Lista / 🗺️ Mapa, `pavProgSetView`). **Mapa** (`#pavpMapa`, `pavProgMapa`): Leaflet (`L.map`+`mapAddCamadaBase`) com `circleMarker` colorido por faixa de prazo (pendentes) / teal (com OS), popup e `fitBounds`.
+- **Cabeçalho espelhado na "abertura de serviços — ocorrências" (2026-10-21b):** **tabs de status** `.seg` (`#pavpStatusSeg`: ~~Pendentes / OS criada~~ → desde 2026-10-28 **Pendente de criação [default] / Pendente de execução / Executada / Todas**, ver "Etapa de execução" abaixo) + **alternância de visão** `.seg` (`#pavpViewSeg`: 📋 Lista / 🗺️ Mapa, `pavProgSetView`). **Mapa** (`#pavpMapa`, `pavProgMapa`): Leaflet (`L.map`+`mapAddCamadaBase`) com `circleMarker` colorido por faixa de prazo (pendentes) / teal (com OS), popup e `fitBounds`.
 - **Filtros (client-side exceto consórcio):** consórcio (select, server-side — `app_pav_listar` filtra `consorcio = p_consorcio`, por isso o registro **precisa** ter consórcio; ver §2.6) · **serviço de origem = dropdown multi-seleção** (`.msdd`/`#pavpOrigDd` — botão + painel de checkboxes, `pavpRenderOrigDd`; fecha ao clicar fora) · **prazo = chips clicáveis com contagem** no `#pavpResumo` (🟢 no prazo / 🟡 atenção / 🔴 atrasado — cada chip mostra o nº e filtra; clicar força status=Pendentes). Removidos o select de prazo e o de ordenação (ordem fixa = mais antigos primeiro).
 - **Controle de prazo (a partir da data de solicitação `created_at`):** `pavDias`/`pavBucket` (`PAV_SLA=[3,5]` → **0–3 no prazo · 4–5 atenção · >5 atrasado**) → badge colorido "faixa · há N dias" + borda esquerda; **o relógio conta só enquanto NÃO há OS** de recomposição.
-- **Distinção OS criada × pendente (espelha a ocorrência da pesquisa):** o programador **lança a OS SIGOS da recomposição** no card pendente (input + "Criar OS" → `pavProgCriarOS` → RPC **`app_pav_os(p_grupo,p_os)`**, gate admin|aux_acesso, grava `os_recomposicao`/`os_recomp_em`/`os_recomp_por` em todas as linhas do grupo). Com OS → badge verde "✓ OS <nº>". Colunas novas na tabela `pav_recomposicao`: `os_recomposicao`/`os_recomp_em`/`os_recomp_por`. (⚠️ `os_sigos` = OS **de origem**, preenchida no campo; `os_recomposicao` = OS **da recomposição**, preenchida aqui.) sw **v264**.
+- **Distinção OS criada × pendente (espelha a ocorrência da pesquisa):** o programador **lança a OS SIGOS da recomposição** no card pendente. Colunas na tabela `pav_recomposicao`: `os_recomposicao`/`os_recomp_em`/`os_recomp_por`. (⚠️ `os_sigos` = OS **de origem**, preenchida no campo, 1 por registro; `os_recomposicao` = OS **da recomposição**, preenchida aqui, **1 por tipo**.) sw v264.
+- **OS da recomposição POR TIPO (2026-10-28, sw v282, `docs/migracao_pav_os_por_tipo.sql`):** antes havia 1 campo por grupo (`app_pav_os` gravava a mesma OS em todas as linhas) e a equipe digitava "OS1, OS2" no campo único. Agora **cada tipo pendente tem o seu campo** no card (`.pavosinp`, `data-id` = id da linha, placeholder "nº da OS SIGOS · <tipo>") + "Criar OS" → `pavProgCriarOS` grava **todos os campos preenchidos do ponto** numa chamada à RPC **`app_pav_os_itens(p_itens jsonb [{id,os}])`** (gate admin|aux_acesso; grava `os_recomposicao`/`os_recomp_em`/`os_recomp_por` **só na linha do tipo**; `os` vazio → limpa). Vírgula/ponto-e-vírgula no campo é bloqueada ("uma OS por tipo"). **Pendente = algum tipo sem OS** (`pavEhPend` olha `itens[]` → o relógio de prazo segue enquanto faltar OS em algum tipo). Tipo com OS mostra "✓ OS <nº> · lançada por X em dd/mm"; badge do card "✓ OS <nº>" (1 OS) ou "✓ OS criadas" (várias); popup do mapa lista "Tipo: OS" (`pavOsResumo`). `pavProgExport` (sem botão desde 21/10c) exporta status/OS **por tipo**.
+  - **`app_pav_listar`**: cada item traz `id`/`os_recomposicao`/`os_recomp_em`/`os_recomp_por`; o `os_recomposicao` do grupo continua só p/ app em cache (1 OS → ela; várias → "A, B" na ordem do card).
+  - **Legado `app_pav_os(p_grupo,p_os)`** (app em cache ≤ v281): se vier "A, B" só com números e nº de partes = nº de tipos, distribui **na ordem do card** (`order by tipo_pavimento`); senão grava igual em todas (como antes).
+  - **Ordem do card = alfabética pela chave do tipo** (`app_pav_listar … order by tipo_pavimento`), não a ordem dos chips nem a de criação. Era a ordem que o programador via ao digitar "OS1, OS2" — critério usado na conversão dos dados antigos.
+  - **Conversão dos dados antigos (2026-10-28, aprovada pelo usuário via planilha):** 5 grupos "OS1, OS2" → 1 OS por tipo na ordem do card (10 linhas; `os_recomp_em`/`os_recomp_por` intactos). Backup `"8 - coleta_campo"._bkp_pav_os_tipo_20261028` (12 linhas/6 grupos; reverter = `update … set os_recomposicao=b.os_recomposicao from _bkp… b where r.id=b.id`). **Pendente:** grupo `fed92e6c` (concreto + piso especial) ficou **AVALIAR** e segue com o texto antigo — a 2ª parte é a nota "não contem opção de recomposição de piso no SICOM", não uma OS. Planilha, snapshot e SQL em `COPASA/scripts/pav_os_por_tipo/` (fora do repo).
+- **Etapa de execução (2026-10-28, sw v282, `docs/migracao_pav_execucao.sql`):** o rastro não para na OS. Fluxo **por tipo**: **pendente de criação** (sem OS) → **pendente de execução** (OS lançada) → **executada** (`pavEtapaItem`). O **ponto** fica na etapa **mais atrasada** dos seus tipos (`pavEtapa`) — é ela que define a aba, a cor da borda/badge (prazo / teal `⏳ Pendente de execução` / cinza `🏁 Executada`, `PAV_ETAPA_COR`) e a cor do marcador no mapa. O **prazo** (chips + relógio) continua medindo só a **criação** da OS (`pavEhPend` = etapa criação).
+  - **Card:** tipo com OS e sem execução mostra **"Executado em [data]" + "Marcar executado"** (`.pavexdt` `type=date`, padrão = hoje, `max` = hoje, `min` = dia do registro) → `pavProgExecutar` pede `confirm()` e grava **só aquele tipo** (diferente do "Criar OS", que grava todos os campos preenchidos). Executado → "🏁 Executado em dd/mm/aaaa · marcado por X" (`pavFmtDia` formata `AAAA-MM-DD` sem passar por `Date`, p/ não voltar 1 dia no fuso). Sem botão de desfazer na tela (a RPC aceita `p_data null`).
+  - **Banco:** colunas novas em `pav_recomposicao`: `execucao_data` (date, dia informado) / `execucao_em` (timestamptz, quando marcou) / `execucao_por`. RPC **`app_pav_executar(p_id uuid, p_data date)`** (gate admin|aux_acesso; exige OS; recusa data no futuro ou anterior ao registro; `null` desfaz). `app_pav_os_itens` com `os` vazio também limpa a execução. `app_pav_listar` devolve `execucao_*` em cada item.
+  - **Export** (`pavProgExport`): coluna **Status** = etapa do tipo + **Executado em** / **Execução marcada por**.
 
 ---
 
@@ -1023,7 +1037,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   `sup_epi_meus`, `sup_epi_devolver`, `sup_epi_substituir`, `sup_epi_gestao_colaborador(es)`,
   `sup_epi_ficha` (ficha consolidada). Fotos via `epiUpload` (pasta `epi`).
 - **Gestão de EPI liberada também por CARGO (2026-09), não só por acesso (`funcao`).** Os cards
-  **Aprovar EPI** (`epi_aprovar`) e **EPIs por colaborador** (`epi_painel`) são liberados pra
+  **Aprovar EPI** (`epi_aprovar`) e **EPIs por colaborador** (`epi_painel`; a mesma tela também abre no QSMS › EPI —
+  `supVEpiPainel(root,pre)` desenha no container recebido, §18) são liberados pra
   aprovador/admin **ou** para quem tem o `perfil.cargo_id` de **Técnico de Segurança do Trabalho**,
   **Técnico de Qualidade** ou **Coordenador de QSMSS** — mesmo com `funcao='campo'`. Função
   `"9 - suprimentos".sup_epi_gestor(uid)` (`sup_pode_aprovar(uid) OR cargo em (...)`, casado por
@@ -1894,6 +1909,8 @@ treinamento_agendar/baixar, treinamentos_listar), e, **nesta rodada (2026-09, 3�
 frontend:** `app_condutor_solicitar/pendentes/aprovar`, `app_frota_condutores_listar` (substituídas
 pelo fluxo de cadastro-pelo-gestor).
 **Biblioteca:** `biblioteca_*`. **Notificações/Push:** `app_notif_*`, `app_push_*`.
+**Segurança do Trabalho / QSMS (§18):** `app_seg_registrar`, `app_seg_local`, `app_seg_minhas`, `app_seg_ver`,
+`app_seg_pessoas`, `app_qsms_listar`, `app_qsms_atividade_ver`, `app_qsms_verificar`, `app_qsms_acesso_listar/_set`, `app_qsms_epi_painel`.
 
 > Assinaturas completas: `select proname, pg_get_function_identity_arguments(oid) from pg_proc p
 > join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1;` (via MCP).
@@ -2888,3 +2905,118 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
+
+## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` (hub) / `qsms_ind` / `qsms_form` / `qsms_epi_painel` / `qsms_cesta` / `qsms_epi_col` / `qsms_acesso` (2026-10-28)
+
+Substitui os formulários de papel **APR** (modelo COPASA PRT-CSMG-2023_003), **PT de trabalho em altura**
+(FOR_PG_22 rev 00, do consórcio — o mesmo modelo serve as duas ZAs, o PDF troca o nome do consórcio) e **PET de
+espaço confinado** (COPASA FOR-PES_131-CSMG). **Formulário é só preenchimento**: sai *emitido* (ou *impedido*) e
+pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupção ou tratativas; ajuste de 28/10/2026).
+
+**Campo — `seg` (Home › 🛠️ Execução, card ⛑️, sem gate):**
+- **Atividade** = cabeçalho comum: tipo de intervenção (`SEG_TIPOS`: VRP separado em instalação/substituição/
+  manutenção; válvula limítrofe no lugar de DMC — `dmc`/`vrp` antigos só têm rótulo em `SEG_TIPO_LEGADO`), OS SIGOS
+  (texto livre, **sem busca** — a OS ainda não está na base quando o campo preenche), serviço, GPS travado, data/hora,
+  usuário. **Endereço (rua mais próxima), bairro, município e consórcio vêm da coordenada** — prévia online por
+  `app_seg_local` (card `#segLocal`), valor oficial gravado pelo servidor no registro (`qsms_local`). Sem unidade
+  organizacional no formulário (o servidor guarda `perfil.area` em `qsms_atividade.unidade`).
+- **APR** (`segAprHtml`): sugestões por tipo (`SEG_TEMPLATE`: fases, riscos marcados "Sim", EPIs — editáveis);
+  13 riscos (`SEG_RISCOS`) — risco "Sim" exige "Medida de controle aplicada"; `r2`/`r6` invertidas ("Não"
+  bloqueia); EPIs; requer PT/PET; **foto obrigatória da sinalização**. **Assinaturas:** o **responsável é quem
+  preenche** (`segEu()`: nome/matrícula/cargo do cadastro, travados — só assina); **executantes = só o nome,
+  escolhido da lista** (`app_seg_pessoas`, datalist; nome fora da lista não passa) + assinatura.
+- **PT/PET só saem de uma APR** com requer=Sim (botões "+ PT"/"+ PET" na atividade) e **reaproveitam a equipe e as
+  assinaturas da APR** (`segNovo` lê a APR por `segDocCarregar` — local ou `app_seg_ver`; sem a APR no aparelho e sem
+  sinal, não abre). Participante com `apr:true` vai com `assinatura_apr:true` e o servidor copia a assinatura da APR
+  (`qsms_participante.assinatura_apr`).
+  - **PT** (`segPtHtml`): descrição, altura, meio de acesso + sistema anti-queda, checklist de **42 itens** em 13
+    blocos (`SEG_PT_BLOCOS`; blocos de outro meio de acesso viram NA e somem; p7 já vem Sim; **um "Não" impede**).
+    Participantes = executantes da APR (só leitura, "✓ assinatura dada na APR"); emissor = quem preenche (assinatura da
+    APR); **liberador da área = escolhido da lista + assina** (única assinatura nova). Sem "mão de obra".
+  - **PET** (`segPetHtml`): cada executante da APR recebe um papel (**Entra / Vigia / Não participa** — um vigia só,
+    `segPetEquipe`); supervisor de entrada = quem preenche (assinatura da APR); 11 ações preliminares (item 1 já Sim;
+    **um "Não" impede**); bloqueios; detector (identificação + **foto obrigatória**); insuflação ≥ 10 min; gases P1–P3
+    vertical (+ H1/H2) com semáforo (`SEG_GAS`); leitura fora → "↻" nova leitura (a antiga vira ocorrência).
+- Com bloqueio de segurança e tudo preenchido aparece **"Registrar PT/PET impedida"** (2 toques) — avisa o QSMS.
+- **Validação ao vivo** (`segPendencias`); botão "Emitir X" só habilita sem pendência. **Rascunho** em IndexedDB
+  `seg_local.draft`. **Offline:** fila (`segEnviar`, ids `seg-<timestamp>` mantêm APR antes de PT/PET), anexos em
+  `item.anexos` (§1 Envio) → `p_anexos`, pasta `seg/`; cópia local em `seg_local.docs`. Limpeza da cópia local em
+  `segListar` (só quando a lista do servidor carregou): sai o que já está no servidor há >1 dia, tudo com >5 dias e **o que
+  não está mais no servidor** (apagado lá), desde que não esteja na fila e tenha >15 min — assim uma limpeza feita no
+  banco some também do celular.
+- **Minhas atividades = um bloco por atividade** (APR + PT/PET que saíram dela): chips de status (não clicáveis),
+  selo da verificação QSMS quando houver, botões **"📄 PDF da atividade"**, "+ PT", "+ PET".
+- **PDF único da atividade** (`segPdfAtividade(ids)`, overlay `#relatorio` + `REL_CSS` + `SEG_REL_CSS`): **capa**
+  (`segCapaHtml`: serviço, OS, local, responsável, tabela dos formulários com situação/alertas, equipe consolidada com
+  os papéis de cada pessoa em cada formulário, verificação QSMS + histórico) e depois cada formulário em página própria
+  (`.segPag`) no layout do papel (`segDocHtml`). Atividade só com APR = sem capa (a verificação vai no fim). Online lê
+  cada formulário por `app_seg_ver`; sem sinal usa a cópia local (avisa se faltar algum). Assinaturas reaproveitadas
+  aparecem como "assinatura dada na APR".
+
+**Gestão — `qsms` (Home › 🧰 Suporte, card 🦺, gate `ME.qsms`):** `ME.qsms` = admin **ou** engrenagem
+`perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
+(`"16 - qsms".qsms_pode`). ⚙️ (admin, no hub) → `qsms_acesso` (`app_qsms_acesso_listar/_set`).
+**Hub `qsms` em categorias (espelha o Almoxarifado, 2026-10-28):** **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
+`qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_painel` (Painel de EPI), `qsms_cesta` (Cesta de EPI) e `qsms_epi_col` (EPI
+por colaborador), nessa ordem. Cada
+tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`/`qf`/`qe`; `qsmsPeriodo`/`qsmsFiltros`/
+`qsmsArgs`). Em APR e derivados **a unidade é a atividade** (APR + PT/PET), com **uma verificação por atividade**.
+- **Indicadores** (`qsms_ind`, `qsmsIndInit`/`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida,
+  leituras de gás fora, com alertas) e verificação (a verificar, conformes, com ressalva, não conformes — **tocar num tile
+  abre Formulários já filtrado no mesmo período/consórcio**); atividades por dia, por tipo, por responsável; riscos.
+- **Formulários** (`qsms_form`, `qsmsFormInit`/`qsmsLista`/`qsmsCardHtml`; filtros guardados em `qsmsFF`, sobrevivem ao
+  trocar período/consórcio): segmento **A verificar / Não conformes / Verificadas / Todas** (contagens
+  respeitam os demais filtros); filtros tipo de intervenção, responsável (quem preencheu), formulários (com PT / com PET
+  / só APR), "só com alerta ou impedimento", busca (OS, endereço, bairro, pessoa); **Lista / Mapa** (cor = verificação)
+  / **XLSX** (1 linha por atividade). Detalhe (`qsmsDetalhe` + `app_qsms_atividade_ver`): dados, formulários com
+  situação/alertas/leituras, **equipe consolidada** (papéis por formulário), **PDF da atividade** e **verificação**
+  Conforme/Com ressalva/Não conforme (`app_qsms_verificar(p_atividade,…)`; obs obrigatória fora de "conforme"; histórico).
+- **EPI por colaborador** (`qsms_epi_col`, `qsmsEpiColInit`): **a mesma tela do Almoxarifado** — `supVEpiPainel(root,pre)`
+  desenha em `#qcView` (no Almoxarifado continua em `#supView`); `pre={uuid,nome}` pré-seleciona (vindo do painel, inclusive
+  quem nunca recebeu EPI) e o "‹ Voltar" (`#qcBack`) volta ao Painel de EPI. Ficha e comprovantes iguais.
+- **Cesta de EPI** (`qsms_cesta`, `qsmsCestaInit`): **a mesma tela da engrenagem ⚙️ "Cargos e cesta de EPI" do
+  Almoxarifado** — `supCestaEm(root)` desenha em `#qkView` (no Almoxarifado em `#supView`; `cfgCestaRoot` escopa
+  `.cfgCargos`/`#cesta-<id>`). `sup_cargos_admin` e `sup_cesta_set` passaram a aceitar `qsms_pode` além de admin
+  (migração `qsms_cesta_epi_acesso`); a engrenagem do Almoxarifado segue visível só p/ admin.
+- **Painel de EPI** (`qsms_epi_painel`, `qsmsEpiInit`/`qsmsEpiRender`, RPC `app_qsms_epi_painel(p_de,p_ate,p_consorcio)`;
+  colaboradores = perfis ativos, consórcio pelo perfil): situação agora (ativos, com EPI em posse, nunca receberam, itens
+  em posse/vencidos/vencem em 30 d), cesta do cargo (com cesta, completa, cargo sem cesta — **referência**, porque a cesta
+  lista alternativas e quase ninguém a tem completa), fluxo pendente (aguardando aprovação/separação/retirada, em falta,
+  trocas e devoluções pendentes), movimentação no período (entregas/trocas/devoluções + por dia), EPIs mais entregues,
+  itens da cesta mais faltantes, tabela por área (vencido / vence 30 d / nunca receberam) e **lista de colaboradores**
+  com chips (vencido / vence 30 d / nunca receberam / cesta faltando / todos) + busca + XLSX — tocar abre o EPI por
+  colaborador. As RPCs de leitura de EPI (`sup_epi_gestao_colaboradores`, `sup_epi_gestao_colaborador`, `sup_epi_ficha`)
+  passaram a aceitar também `qsms_pode` (quem tem a engrenagem do QSMS).
+
+**Backend — schema `"16 - qsms"` (app-only, RLS deny-all, só RPC definer, nada pode ser apagado — trigger
+`qsms_sem_delete`):** `qsms_atividade` (geom 31983, `endereco`/`bairro`/`municipio`/`consorcio` pela coordenada,
+**`verif_status/obs/por/em`**) · `qsms_formulario` (status **`emitida|impedida`**, `respostas jsonb`, `fotos`, `alertas` +
+`n_alertas`) · `qsms_participante` (papel, `pessoa_uuid`, `documento`/`funcao` do cadastro, `assinatura`,
+`assinatura_apr`) · `qsms_medicao` · `qsms_evento` (trilha das verificações, por `atividade_id`). Helpers: `qsms_pode`, `qsms_uuids`, `qsms_consorcio`,
+`qsms_local` (rua ≤ 80 m + bairro + município + ZA), `qsms_gas_fora`, `qsms_pode_form`. `perfil.qsms_acesso`;
+`app_me` devolve `qsms`.
+RPCs: `app_seg_registrar(p_id, p_dados, p_anexos)` (idempotente; cria a atividade se não existe; local pela
+coordenada; matrícula/cargo do perfil; assinatura da APR quando `assinatura_apr`; **recalcula status e alertas** —
+conteúdo inválido vira alerta, não erro, porque a fila descartaria em silêncio), `app_seg_local`, `app_seg_minhas`,
+`app_seg_ver` (traz `verificacoes` da atividade), `app_seg_pessoas`, `app_qsms_listar` (`{atividades:[…, forms:[…]]}`),
+`app_qsms_atividade_ver`, `app_qsms_verificar(p_atividade, p_status, p_obs)`, `app_qsms_acesso_listar/_set`.
+**Avisos** (triggers → `sup_notificar`, tipo `qsms`): atividade não conforme → quem preencheu (`seg`, trigger em
+`qsms_atividade`); PT/PET impedida → equipe QSMS menos o ator (`qsms`, trigger em `qsms_formulario`).
+
+**Cuidados:**
+- Removidos em 28/10/2026 (ajuste do usuário): tela `seg_acomp`, tratativas (tabela `qsms_tratativa` e RPCs),
+  `app_seg_evento`, `app_seg_os_info`, status `liberada/encerrada/interrompida`, colunas `encerrado_*`/`encerramento`.
+  Registros de teste anteriores foram convertidos (`liberada` → `emitida`). Ainda em 28/10 a verificação saiu do
+  formulário para a atividade (migração `qsms_verificacao_por_atividade`: ficou o pior resultado da atividade).
+- PT/PET **não existem sem APR** — a APR é a raiz da atividade; o app só oferece "+ PT/+ PET" a partir dela.
+- **Uma PT e uma PET por APR** (2026-10-28): "+ PT"/"+ PET" somem quando a atividade já tem uma emitida (`jaTem` em
+  `segListar`; `segNovo` confere de novo). Só uma **impedida** (trabalho não aconteceu) libera nova tentativa. Se mesmo
+  assim chegar outra emitida (dois aparelhos / lista desatualizada sem sinal), `app_seg_registrar` grava com o alerta
+  "Já existia PT/PET emitida nesta APR — duplicada" (não rejeita: a fila descartaria em silêncio). Reentrada em espaço
+  confinado depois de a equipe sair = nova APR (a PET vale para uma entrada).
+- Tipos de intervenção e sugestões estão **no código** — não há tela de configuração.
+- Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
+- `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`
+  reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
+- Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
+  foram testadas com rollback E2E (§4 do CLAUDE.md).
