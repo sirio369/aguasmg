@@ -5657,6 +5657,7 @@ function cadInit(){
     document.getElementById('cadMapa').innerHTML='';
     cadMap=L.map('cadMapa');
     cadMap.createPane('cadVocePane').style.zIndex=640;   // "Você" acima de todas as camadas (overlayPane=400) — senão VRP/unidade/rede desenhada depois no mesmo ponto cobre a bolinha
+    var mp=cadMap.createPane('cadMascaraPane'); mp.style.zIndex=250; mp.style.pointerEvents='none';   // máscara fora das ZAs: acima do mapa de fundo (tilePane=200), abaixo das camadas
     mapAddCamadaBase(cadMap);
     cadMap.setView(gps?[gps.lat,gps.lon]:[-19.93,-44.05], gps?15:12);
     cadMap.on('moveend',function(){clearTimeout(cadDeb);cadDeb=setTimeout(cadAtualizar,300);});
@@ -5673,6 +5674,13 @@ function cadIdb(){return new Promise(function(res,rej){var r=indexedDB.open('cad
 async function cadCacheGet(key){try{var db=await cadIdb();return await new Promise(function(res){var t=db.transaction('tiles','readonly');var q=t.objectStore('tiles').get(key);q.onsuccess=function(){res(q.result||null);};q.onerror=function(){res(null);};});}catch(e){return null;}}
 async function cadCachePut(key,val){try{var db=await cadIdb();await new Promise(function(res){var t=db.transaction('tiles','readwrite');t.objectStore('tiles').put(val,key);t.oncomplete=res;t.onerror=res;});}catch(e){}}
 function cadSnap(v,step,up){return (up?Math.ceil(v/step):Math.floor(v/step))*step;}
+// máscara = retângulo do mundo com todos os anéis das ZAs como furos (fillRule evenodd) → escurece só o que está fora das ZAs
+function cadMascara(gj){
+  var aneis=[[[-89,-179],[-89,179],[89,179],[89,-179]]];
+  ((gj&&gj.features)||[]).forEach(function(f){var g=f.geometry||{};var ps=g.type==='Polygon'?[g.coordinates]:(g.type==='MultiPolygon'?g.coordinates:[]);
+    ps.forEach(function(p){p.forEach(function(r){aneis.push(r.map(function(c){return [c[1],c[0]];}));});});});
+  return L.polygon(aneis,{pane:'cadMascaraPane',stroke:false,fillColor:'#1f2937',fillOpacity:.45,interactive:false});
+}
 function cadReq(d,b){
   if(d.rpc)return {key:CAD_VER+d.k+'|all',rpc:d.rpc,params:{}};
   if(d.whole)return {key:CAD_VER+d.k+'|all',params:{p_layer:d.k,p_minlon:-45.5,p_minlat:-20.6,p_maxlon:-43.5,p_maxlat:-19.0,p_limit:5000}};
@@ -5707,7 +5715,8 @@ async function cadAtualizar(){
         pointToLayer:function(f,ll){return L.circleMarker(ll,{radius:d.k==='ligacoes'?3:6,color:'#fff',weight:1,fillColor:d.cor,fillOpacity:1});},
         onEachFeature:function(f,ly){var p=f.properties||{};var ll=ly.getLatLng?ly.getLatLng():(ly.getBounds?ly.getBounds().getCenter():null);var info=Object.keys(p).map(function(k){return '<b>'+k+':</b> '+(p[k]==null?'—':p[k]);}).join('<br>');var nav=ll?('<br><a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>'):'';ly.bindPopup(info+nav);}
       }).addTo(cadMap);
-      if(d.contorno)cadCamadas[d.k].bringToBack();               // limite fica por baixo da rede/unidades
+      if(d.contorno){cadCamadas[d.k].bringToBack();               // limite fica por baixo da rede/unidades
+        cadCamadas[d.k].addLayer(cadMascara(data));}               // + máscara no mesmo grupo → some junto quando o chip desliga
       cadRendered[d.k]=rq.key;
     }
   }catch(e){toast('Erro no cadastro: '+(e.message||e));}
