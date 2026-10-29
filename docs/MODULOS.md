@@ -355,7 +355,7 @@
   `app_vrp_listar` — não precisou mudar RPC.
 
 ### 2.5 Cadastro técnico — `// CADASTRO TÉCNICO` (~L1821) · tela `cadastro`
-- Camadas PostGIS no mapa por bbox: reservatório, booster/bomba, elevatória, poço, macromedição,
+- Camadas PostGIS no mapa por bbox: **limite das ZAs**, reservatório, booster/bomba, elevatória, poço, macromedição,
   **VRPs**, **Válvulas de manobra**, **Hidrantes**, rede, ligações, **rede de gás** (`CAD_DEF`). Camadas `whole:true` baixam a ZA inteira 1x; pesadas usam
   `step` (célula de cache).
   - **Rede de gás (2026-09, `CAD_VER v5→v6`):** camada **`rede_gas`** (GASMIG, `"4 - redes_terceiros".rede_gas`,
@@ -373,6 +373,15 @@
     o branch `caixas_manobra` da RPC devolve o **ponto representativo** (`ST_PointOnSurface`) p/ render igual às demais unidades
     (circleMarker); props cd_no_agua/tipo(tipo_co)/material/cota/referencia. **Só ZA1004 tem dado** hoje (Betim = 0). `CAD_VER`
     inalterado (chave de cache nova distinta; camadas existentes não mudaram).
+  - **Limite das ZAs (2026-10-29, sw v301):** camada **`limite_za`** (1º chip, **começa ligada**) — os 2 polígonos de
+    **`"1 - suporte_geografico".limite_za`** (ZA0200 Betim, ZA1004 Contagem) desenhados só como **contorno tracejado roxo**
+    `#8e24aa` (`fill:false`, `dashArray 6,4`, mesmo visual do mapa da Estanqueidade), **sem clique** (`interactive:false`) e
+    jogado para trás (`bringToBack`) para não atrapalhar o toque nas redes/unidades. Não passa pela `app_cadastro_geojson`: a
+    entrada do `CAD_DEF` tem **`rpc:'app_limites_zas'`** (RPC já existente, sem parâmetros, simplificada a 5 m) e
+    **`contorno:true`**; `cadReq` devolve `{rpc,params:{}}` e `cadData(key,params,rpc)` chama essa RPC no lugar da padrão.
+    Cache igual às demais `whole` (chave `CAD_VER+'limite_za|all'`). `CAD_VER` inalterado (chave nova). ⚠️ **Se o
+    `limite_za` for recarregado** (`app_limite_za_set` / `12_sync_bairros_limite.py`), **suba `CAD_VER`** — senão o app
+    continua mostrando o limite antigo que está no IndexedDB.
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
