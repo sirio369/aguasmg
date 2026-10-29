@@ -2255,6 +2255,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   (fora de tudo, via `baselines.previa.excluir`). IRVP = (VPBL − VP) ÷ meta com a **VPBL preliminar sem fator** (mesma conta
   do resultado, aplicada a todos os meses). Tabela **Mês a mês** (fonte por mês) + **⭳ Exportar .xlsx**. O SVG é desenhado na
   largura real do contêiner e redesenha no `resize`. Sem toggle de fator de correção (o histórico não tem dado por macro).
+  - **Zoom no eixo Y (2026-10-29, sw v305):** controle **Eixo Y** — *A partir do zero* (padrão) × *Ajustado (zoom)* (`histEixo`): no ajustado cada gráfico ajusta o eixo ao mín–máx das variáveis ligadas **+ as referências visíveis** (VPBL / IRVP 100%), com 6% de folga, e o título ganha "eixo não começa em zero". Ligar só uma variável (ex.: só VP) dá o maior zoom. **Só vale no gráfico de linha:** em coluna o botão fica desabilitado e o eixo volta ao zero (cortar o eixo distorce o tamanho das barras); a escolha fica guardada e volta ao trocar para linha. Rótulos do eixo com casas decimais quando o passo pede (`histYLab`: 2,5% / 25 mil / 0,25 mi).
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).

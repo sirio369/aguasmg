@@ -1985,7 +1985,7 @@ function resRenderAll(){
 /* ---------- Histórico fechado por ZA — sazonalidade de macro, micro, VP, IP e IRVP (dados REAIS via RPC) ----------
    Série = histórico fechado da COPASA (historico_za, dez/23–fev/25) + meses do sistema (macro GMOA − micro), via app_nrw_historico.
    Volumes (m³) e percentuais (%) ficam em 2 gráficos empilhados com o mesmo eixo x — nunca 2 escalas no mesmo gráfico. */
-let histSerie=[], histBase={}, histVars=new Set(['vd','vc','vp']), histTipo='linha', histVisao='tempo', histAnos=null, histRz=null;
+let histSerie=[], histBase={}, histVars=new Set(['vd','vc','vp']), histTipo='linha', histVisao='tempo', histEixo='zero', histAnos=null, histRz=null;   // histEixo: 'zero' | 'ajustado' (zoom: eixo y aos dados, só em linha)
 const HIST_VAR={
  vd:{l:'Macro · VD',u:'m³',g:'vol'},
  vc:{l:'Micro · VC',u:'m³',g:'vol'},
@@ -2012,6 +2012,7 @@ function histCss(){ mmCss(); if(document.getElementById('histcss'))return; const
  .histctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:10px}
  .histgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  .histlab{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+ #s-historico .seg button:disabled{opacity:.4;cursor:not-allowed}
  .histvar{display:inline-flex;align-items:center;gap:6px}
  .histvar small{color:var(--muted);font-size:10.5px}
  .histsw{width:10px;height:10px;border-radius:3px;display:inline-block;border:2px solid var(--hc);background:var(--hc)}
@@ -2058,6 +2059,7 @@ function histRender(){
  body.innerHTML=histPanel()+histTablePanel();
  body.querySelectorAll('[data-hvar]').forEach(b=>b.onclick=()=>{ const k=b.dataset.hvar; histVars.has(k)?histVars.delete(k):histVars.add(k); histRender(); });
  body.querySelectorAll('[data-htipo]').forEach(b=>b.onclick=()=>{ histTipo=b.dataset.htipo; histRender(); });
+ body.querySelectorAll('[data-heixo]').forEach(b=>b.onclick=()=>{ histEixo=b.dataset.heixo; histRender(); });
  body.querySelectorAll('[data-hvis]').forEach(b=>b.onclick=()=>{ histVisao=b.dataset.hvis; histRender(); });
  body.querySelectorAll('[data-hano]').forEach(b=>b.onclick=()=>{ const a=+b.dataset.hano; histAnos.has(a)?histAnos.delete(a):histAnos.add(a); histRender(); });
  body.querySelectorAll('[data-hinfo]').forEach(b=>b.onclick=()=>{ const i=HIST_INFO[b.dataset.hinfo]; if(i)mmModal(i.t,i.h); });
@@ -2066,7 +2068,8 @@ function histRender(){
 }
 function histPanel(){
  const b=histBase, anos=histAnosLista(), saz=histVisao==='sazonal';
- const seg=(attr,cur,opts)=>`<div class="seg" role="group">${opts.map(([v,l])=>`<button data-${attr}="${v}" class="${cur===v?'on':''}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`;
+ const seg=(attr,cur,opts)=>`<div class="seg" role="group">${opts.map(([v,l,off])=>`<button data-${attr}="${v}" class="${cur===v?'on':''}" aria-pressed="${cur===v}"${off?` disabled title="${off}"`:''}>${l}</button>`).join('')}</div>`;   // off = motivo do botão desabilitado
+ const col=histTipo==='coluna', eixo=col?'zero':histEixo;   // coluna sempre parte do zero
  const vars=HIST_ORD.map(k=>{ const on=histVars.has(k); return `<button class="mmchip histvar${on?' on':''}" data-hvar="${k}" aria-pressed="${on}" style="--hc:var(--hv-${k})"><i class="histsw"></i>${HIST_VAR[k].l}<small>${HIST_VAR[k].u}</small></button>`; }).join('');
  const amostra=(r)=>histTipo==='coluna'
   ? `<svg width="14" height="10"><rect x="1" y="1" width="12" height="8" rx="2" style="fill:var(--ink-2);opacity:${HIST_COP[Math.min(r,3)]}"/></svg>`
@@ -2078,6 +2081,7 @@ function histPanel(){
    <div class="histctl">
     <div class="histgrp"><span class="histlab">Visão</span>${seg('hvis',histVisao,[['tempo','Linha do tempo'],['sazonal','Sazonal (jan–dez)']])}</div>
     <div class="histgrp"><span class="histlab">Gráfico</span>${seg('htipo',histTipo,[['linha','Linha'],['coluna','Coluna']])}</div>
+    <div class="histgrp"><span class="histlab">Eixo Y</span>${seg('heixo',eixo,[['zero','A partir do zero'],['ajustado','Ajustado (zoom)',col?'Colunas sempre partem do zero: cortar o eixo distorce o tamanho das barras. Use o gráfico de linha para o zoom.':'']])}</div>
    </div>
    <div class="histgrp" style="margin-bottom:10px"><span class="histlab">Variáveis</span><div class="mmfilters" style="margin:0">${vars}</div></div>
    ${anosHtml}
@@ -2096,13 +2100,14 @@ function histSeries(){
 function histNice(lo,hi){ if(hi<=lo) hi=lo+1;   // eixo y com marcas "redondas"
  const raw=(hi-lo)/5, p=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/p, st=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;
  const a=Math.floor(lo/st)*st, z=Math.ceil(hi/st)*st, t=[]; for(let v=a; v<=z+st/2; v+=st) t.push(Math.round(v*1e6)/1e6); return {lo:a,hi:z,t}; }
-function histYLab(g,v){ if(g==='pct') return fmt(v)+'%'; if(Math.abs(v)>=1e6) return br1(v/1e6).replace(',0','')+' mi'; return v===0?'0':fmt(v/1000)+' mil'; }
+function histYLab(g,v){ const n=(x,d)=>x.toLocaleString('pt-BR',{maximumFractionDigits:d});   // casas só quando a marca pede (zoom gera passos de 2,5 / 25 mil / 0,25 mi)
+ if(g==='pct') return n(v,1)+'%'; if(Math.abs(v)>=1e6) return n(v/1e6,2)+' mi'; return v===0?'0':n(v/1000,1)+' mil'; }
 function histBar(x,yv,y0,w){ const h=Math.abs(y0-yv); if(h<0.5) return ''; const r=Math.min(4,w/2,h), up=yv<y0, f=n=>n.toFixed(1);   // ponta arredondada, base reta
  return up ? `M${f(x)},${f(y0)}V${f(yv+r)}Q${f(x)},${f(yv)} ${f(x+r)},${f(yv)}H${f(x+w-r)}Q${f(x+w)},${f(yv)} ${f(x+w)},${f(yv+r)}V${f(y0)}Z`
            : `M${f(x)},${f(y0)}V${f(yv-r)}Q${f(x)},${f(yv)} ${f(x+r)},${f(yv)}H${f(x+w-r)}Q${f(x+w)},${f(yv)} ${f(x+w)},${f(yv-r)}V${f(y0)}Z`; }
 function histDraw(){
  const el=$('#histChart'), tip=$('#histTip'); if(!el)return; tip.style.display='none';
- const {n,S}=histSeries(), saz=histVisao==='sazonal', col=histTipo==='coluna', b=histBase;
+ const {n,S}=histSeries(), saz=histVisao==='sazonal', col=histTipo==='coluna', zoom=histEixo==='ajustado'&&!col, b=histBase;
  if(!S.length){ el.innerHTML='<p class="note" style="margin:6px 0">Ative ao menos uma variável (e um ano, na visão sazonal).</p>'; return; }
  const W=Math.max(320,Math.round(el.clientWidth||760)), sm=W<560, pl=sm?46:60, pr=sm?8:14, sw=(W-pl-pr)/n, xc=i=>pl+sw*(i+.5);
  const plots=[]; ['vol','pct'].forEach(g=>{ const s=S.filter(x=>HIST_VAR[x.k].g===g); if(s.length) plots.push({g,S:s,h:g==='vol'?(sm?190:240):(sm?160:190)}); });
@@ -2114,9 +2119,11 @@ function histDraw(){
   const vals=P.S.flatMap(s=>s.vals).filter(v=>v!=null), refs=[];
   if(P.g==='vol' && histVars.has('vp') && b.vpbl) refs.push({v:+b.vpbl,l:'VPBL '+fmt(b.vpbl)});
   if(P.g==='pct' && histVars.has('irvp') && b.meta_m3>0) refs.push({v:100,l:'IRVP 100% (meta)',c:'var(--good)'});
-  let lo=Math.min(0,...vals), hi=Math.max(0,...vals,...refs.map(r=>r.v)); if(P.g==='vol') lo=0; hi+= (hi-lo)*0.04; if(P.g==='pct'&&lo<0) lo-=(hi-lo)*0.03;
+  let lo, hi; const rv=refs.map(r=>r.v);
+  if(zoom){ lo=Math.min(...vals,...rv); hi=Math.max(...vals,...rv); const pad=((hi-lo)||Math.abs(hi)||1)*0.06; lo-=pad; hi+=pad; if(P.g==='vol') lo=Math.max(0,lo); }   // zoom: eixo aos dados (+ referências visíveis)
+  else { lo=Math.min(0,...vals); hi=Math.max(0,...vals,...rv); if(P.g==='vol') lo=0; hi+= (hi-lo)*0.04; if(P.g==='pct'&&lo<0) lo-=(hi-lo)*0.03; }
   const nk=histNice(lo,hi); P.Y=v=>P.bot-(v-nk.lo)/((nk.hi-nk.lo)||1)*P.h; const y0=P.Y(0);
-  svg+=`<text x="${pl}" y="${P.top-9}" style="fill:var(--ink-2);font-size:11px;font-weight:600">${P.g==='vol'?'Volumes · m³/mês':'Percentuais · %'}</text>`;
+  svg+=`<text x="${pl}" y="${P.top-9}" style="fill:var(--ink-2);font-size:11px;font-weight:600">${P.g==='vol'?'Volumes · m³/mês':'Percentuais · %'}${zoom&&nk.lo>0?'<tspan style="fill:var(--muted);font-weight:400"> · eixo não começa em zero</tspan>':''}</text>`;
   nk.t.forEach(v=>{ const yy=P.Y(v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" style="stroke:var(--line);stroke-width:${v===0?1.2:.6}"/><text x="${pl-6}" y="${(+yy+3.5).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${histYLab(P.g,v)}</text>`; });
   refs.forEach(r=>{ const yy=P.Y(r.v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke-dasharray="5 4" style="stroke:${r.c||'var(--muted)'};stroke-width:1.2"/><text x="${W-pr}" y="${(+yy-4).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${r.l}</text>`; });
   if(col){
