@@ -389,6 +389,10 @@
     incluída **só quando não-vazia** (concatenando `|| case when ... jsonb_build_object('observação',...) else '{}' end`),
     pra não poluir o popup dos 92% sem observação com uma linha `—`. **VRPs e unidades já expõem `cd_no_agua`**
     (o nó de amarração delas) — nada a fazer. Só a RPC mudou; frontend inalterado além do bump de `CAD_VER`.
+  - **VRP com pressão de projeto (2026-10-29, `CAD_VER` v7):** no popup/busca da VRP (`app_cadastro_geojson` e
+    `app_cadastro_buscar`, camada `vrps`) a chave crua `pres_saida` virou **`setpoint jusante (mca)`** e entrou
+    **`montante de projeto (mca)`** (`pres_max`) — rótulos legíveis porque o popup imprime as chaves como vêm. `CAD_VER`
+    subiu p/ `v7` porque a camada `vrps` é `whole:true` (cache eterno no IndexedDB) e os valores de Betim mudaram.
 - Marcador **"Você"** (GPS): `cadOnGps()` cria/atualiza `cadVoce` (não é apagado nos redraws de
   `cadAtualizar`, que só mexe em `cadCamadas`).
 - **Estado:** `cadMap, cadCamadas, cadOn (visibilidade por camada), cadRendered, cadMem, cadVoce`.
@@ -2773,6 +2777,15 @@ nova) + o montante de projeto como referência. Na tela Pressões o card de jusa
 obrigatória `fim_jus_motivo` (vai no `respostas` jsonb, sem mudança de banco; é descartada no envio se a jusante
 voltou p/ dentro da tolerância) e ela aparece no resumo. O `onchange` de `fim_jus` só re-renderiza quando o aviso
 aparece/some (não perde o foco ao tocar no próximo campo). O setpoint é a **pressão de projeto** (decisão confirmada em 2026-10-23); `pres_saida_campo` ("Jusante em campo") não é usada aqui.
+**Pressão de projeto de Betim (2026-10-29):** carregada da planilha do projeto hidráulico (`VRP_SANDER_ENVIADO.xlsx`,
+81 VRPs da ZA0200, casadas por `cd_no_agua`): Pressão de Entrada → `pres_max` (montante de projeto), Pressão de Saída →
+`pres_saida` (jusante = setpoint) e Diâmetro da válvula → `diametro`. 67 valores substituídos + 13 preenchidos (1 já igual);
+backup dos antigos em `"2 - infra_agua"._bkp_vrps_pressao_20261028`. Scripts `COPASA/scripts/vrp_pressao_projeto/`
+(`comparar.py` gera o xlsx de aprovação; `validar.py` confere banco × planilha). A OS lê o cadastro ao vivo
+(`app_vrp_os_header`), então OS já programadas passam a mostrar o setpoint novo sem migração. A **ficha** (`vmFichaOpen`)
+ganhou no topo o mesmo destaque **🎯 Pressão de projeto — deixar a jusante no setpoint: X mca · montante Y mca**
+(ou "não cadastrada"), e o item da grade virou "Proj. jusante (setpoint)". 26 VRPs de Betim fora da planilha e as 41
+de Contagem não foram alteradas.
 ⚠️ **Cuidados:** funções `vm*` vivem no `<script type="module">` (não globais); a OS é criada no
 `app_vrp_os_abrir` (abandonar o wizard deixa uma OS `em_execucao` — o backoffice enxerga). Base de VRPs
 = `"2 - infra_agua".vrps` (148; `atuacao` é código, ex. "AL"; `pres_max`≈montante, `pres_saida`≈jusante).
