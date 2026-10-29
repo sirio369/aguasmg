@@ -266,6 +266,7 @@ tbody tr:hover{background:var(--surface-2)}
     <nav id="nav">
       <div class="navlab">1 · Visão</div>
       <button class="navi on" data-s="resultado"><span class="ic">🎯</span>Acompanhamento do resultado</button>
+      <button class="navi" data-s="historico"><span class="ic">📈</span>Histórico por ZA</button>
       <div class="navlab">2 · Dados & diagnóstico</div>
       <button class="navi" data-s="mm"><span class="ic">🔬</span>Análise do micromedido</button>
       <button class="navi" data-s="macro"><span class="ic">🚰</span>Análise de macromedição</button>
@@ -494,6 +495,8 @@ tbody tr:hover{background:var(--surface-2)}
       <!-- CONSUMO -->
 
       <section class="screen" id="s-resultado"><div id="resBody"></div></section>
+
+      <section class="screen" id="s-historico"><div id="histBody"></div></section>
 
       <section class="screen" id="s-mm"><div id="mmBody"></div></section>
 
@@ -1776,7 +1779,7 @@ function bhSalvar(e){ e.stopPropagation();
  });
 }
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",nrw_balanco:"Balanço hídrico — rastreio dos dados",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",config:"Parâmetros & Metas"};
+const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",historico:"Histórico fechado por ZA",nrw_balanco:"Balanço hídrico — rastreio dos dados",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_contrato']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
@@ -1805,7 +1808,7 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
- if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='hdpri'||s==='fraudepri'||s==='nrw_balanco')?'none':'';   // resultado/HD/fraude/balanço não usam seletor de mês
+ if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='historico'||s==='hdpri'||s==='fraudepri'||s==='nrw_balanco')?'none':'';   // resultado/histórico/HD/fraude/balanço não usam seletor de mês
  $('#zaseg').style.display=s==='nrw_balanco'?'none':'';   // o rastreio do balanço cobre as duas ZAs juntas
  if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
  if(s!=='hdpri' && typeof hdHeaderReset==='function') hdHeaderReset();   // esconde os filtros de HD no cabeçalho
@@ -1824,6 +1827,7 @@ function go(s,dmc){
  if(s==='mm')mmInit();
  if(s==='macro')macroInit();
  if(s==='resultado')resInit();
+ if(s==='historico')histInit();
  if(s==='hdpri')hdInit();
  if(s==='fraudepri')frInit();
  if(s==='config')cfgInit();
@@ -1978,6 +1982,202 @@ function resRenderAll(){
  $('#resBody').querySelectorAll('[data-rinfo]').forEach(b=>b.onclick=()=>{ const i=RES_INFO[b.dataset.rinfo]; if(i)mmModal(i.t,i.h); });
  const dt=$('#resBody details.resderiv'); if(dt) dt.addEventListener('toggle',()=>{ resDerivOpen=dt.open; });
 }
+/* ---------- Histórico fechado por ZA — sazonalidade de macro, micro, VP, IP e IRVP (dados REAIS via RPC) ----------
+   Série = histórico fechado da COPASA (historico_za, dez/23–fev/25) + meses do sistema (macro GMOA − micro), via app_nrw_historico.
+   Volumes (m³) e percentuais (%) ficam em 2 gráficos empilhados com o mesmo eixo x — nunca 2 escalas no mesmo gráfico. */
+let histSerie=[], histBase={}, histVars=new Set(['vd','vc','vp']), histTipo='linha', histVisao='tempo', histAnos=null, histRz=null;
+const HIST_VAR={
+ vd:{l:'Macro · VD',u:'m³',g:'vol'},
+ vc:{l:'Micro · VC',u:'m³',g:'vol'},
+ vp:{l:'Volume perdido · VP',u:'m³',g:'vol'},
+ ip:{l:'Índice de perdas · IP',u:'%',g:'pct'},
+ irvp:{l:'IRVP',u:'%',g:'pct'}
+};
+const HIST_ORD=['vd','vc','vp','ip','irvp'];
+const HIST_DASH=['','7 4','3 3','1 3'], HIST_LOP=[1,.85,.7,.6], HIST_COP=[1,.72,.5,.34];   // estilo por ano (do mais recente ao mais antigo): linha = traço, coluna = opacidade
+const HIST_MES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const HIST_INFO={
+ graf:{t:'Histórico fechado por ZA',h:`<p><b>VD</b> (macro) = volume distribuído = entrada − saída dos macromedidores. <b>VC</b> (micro) = volume consumido nos hidrômetros. <b>VP</b> = VD − VC (volume perdido). <b>IP</b> = VP ÷ VD. <b>IRVP</b> = (VPBL − VP) ÷ meta — o mesmo cálculo do Acompanhamento do resultado, aplicado a todos os meses (antes do contrato ele só mostra como o mês se compara à linha de base).</p><p><b>Fontes:</b> até <b>fev/2025</b> = fechamento da COPASA (planilha de volumes por ZA); de <b>mar/2025</b> em diante = dados do sistema (macro GMOA − micromedição). O VC do sistema não é idêntico ao da COPASA, então pode haver um degrau na troca de fonte (linha tracejada no gráfico).</p><p><b>mai/2025 fica de fora</b> (arquivo de micromedição duplicado de abril), como no resto do módulo.</p><p><b>Linha do tempo</b> = todos os meses em sequência. <b>Sazonal</b> = eixo jan–dez com um traço (ou um tom de coluna) por ano, para comparar o mesmo mês entre anos. Volumes e percentuais ficam em gráficos separados, com o mesmo eixo de meses. Passe o mouse (ou toque) num mês para ver os valores.</p><p>IRVP sem fator de correção e com a <b>VPBL preliminar</b>.</p>`}
+};
+function histCons(){ return za==='all'?null:za; }
+function histCmp(c){ return MM_MES[c%100-1].toLowerCase()+'/'+String(Math.floor(c/100)).slice(2); }
+function histFmt(k,v){ if(v==null) return '—'; return HIST_VAR[k].u==='%' ? br1(v)+'%' : fmt(v)+' m³'; }
+function histIB(k){ return `<button class="mminfo" data-hinfo="${k}" title="Sobre este bloco">ⓘ</button>`; }
+function histCss(){ mmCss(); if(document.getElementById('histcss'))return; const st=document.createElement('style'); st.id='histcss'; st.textContent=`
+ #s-historico{--hv-vd:#2a78d6;--hv-vc:#1baf7a;--hv-vp:#eb6834;--hv-ip:#6250d6;--hv-irvp:#eda100}
+ @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #s-historico{--hv-vd:#3987e5;--hv-vc:#199e70;--hv-vp:#d95926;--hv-ip:#9085e9;--hv-irvp:#c98500}}
+ :root[data-theme="dark"] #s-historico{--hv-vd:#3987e5;--hv-vc:#199e70;--hv-vp:#d95926;--hv-ip:#9085e9;--hv-irvp:#c98500}
+ #s-historico td.r,#s-historico th.r{text-align:right;font-variant-numeric:tabular-nums}
+ #s-historico td.l,#s-historico th.l{text-align:left}
+ .histctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:10px}
+ .histgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ .histlab{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+ .histvar{display:inline-flex;align-items:center;gap:6px}
+ .histvar small{color:var(--muted);font-size:10.5px}
+ .histsw{width:10px;height:10px;border-radius:3px;display:inline-block;border:2px solid var(--hc);background:var(--hc)}
+ .histvar:not(.on) .histsw{background:none}
+ .histvar.on{color:var(--ink);background:var(--surface-2);border-color:var(--ink-2)}
+ .histano svg{display:block}
+ .histwrap{position:relative;margin-top:4px}
+ .histchart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+ .histtip{position:absolute;top:6px;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:8px 10px;font-size:11.5px;min-width:170px;max-width:260px;display:none;z-index:2}
+ .histtip b{font-size:12px}
+ .histtip .tr{display:flex;align-items:center;gap:6px;margin-top:3px;white-space:nowrap}
+ .histtip .tr span:last-child{margin-left:auto;padding-left:10px;font-variant-numeric:tabular-nums;font-weight:600}
+ .histtip .tg{font-size:10px;color:var(--muted);margin-left:6px}
+ .histtip .sub{color:var(--muted);font-size:10.5px;margin-top:6px}
+ .histexclb{font-size:8.5px;font-weight:700;color:#fff;background:#c0392b;border-radius:4px;padding:1px 5px;margin-left:5px;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}
+ #s-historico tr.histexcl td{color:var(--muted)}`; document.head.appendChild(st); }
+function histInit(){ histCss();
+ const body=$('#histBody');
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando histórico…</p></div></div>';
+ sbg.rpc('app_nrw_historico',{p_consorcio:histCons()}).then(r=>{
+   if(r.error)throw r.error;
+   const d=r.data||{}; histBase=(d.baselines||{}).previa||{}; histSerie=histPrep(d.serie||[]);
+   const anos=[...new Set(histSerie.map(p=>Math.floor(p.comp/100)))];
+   if(!histAnos || !anos.some(a=>histAnos.has(a))) histAnos=new Set(anos);
+   histRender();
+ }).catch(e=>{ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="color:#e05d5d">Não foi possível carregar: '+(e.message||e)+'</p></div></div>'; });
+}
+/* série contínua mês a mês (mês sem dado fica null = buraco no gráfico); mês excluído da linha de base (mai/25) também */
+function histPrep(S){ if(!S.length) return [];
+ const by=new Map(S.map(p=>[+p.competencia,p])), excl=new Set((histBase.excluir||[]).map(Number)), b=histBase, out=[];
+ const fim=+S[S.length-1].competencia;
+ for(let c=+S[0].competencia; c<=fim; c=(c%100===12)?c+89:c+1){
+  const p=by.get(c), ok=!!p && !excl.has(c), vp=ok?+p.vp:null;
+  out.push({comp:c, fonte:p?p.fonte:null, excl:!!p&&excl.has(c),
+   vd:ok?+p.vd:null, vc:ok?+p.vc:null, vp, ip:(ok&&p.ip_pct!=null)?+p.ip_pct:null,
+   irvp:(ok&&b.meta_m3>0)?(b.vpbl-vp)/b.meta_m3*100:null});
+ }
+ return out;
+}
+function histAnosLista(){ return [...new Set(histSerie.map(p=>Math.floor(p.comp/100)))].sort((a,b)=>b-a); }   // mais recente primeiro (define o estilo do ano)
+function histRender(){
+ const body=$('#histBody'); if(!body)return;
+ if(!histSerie.length){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Sem dados históricos para esta ZA.</p></div></div>'; return; }
+ body.innerHTML=histPanel()+histTablePanel();
+ body.querySelectorAll('[data-hvar]').forEach(b=>b.onclick=()=>{ const k=b.dataset.hvar; histVars.has(k)?histVars.delete(k):histVars.add(k); histRender(); });
+ body.querySelectorAll('[data-htipo]').forEach(b=>b.onclick=()=>{ histTipo=b.dataset.htipo; histRender(); });
+ body.querySelectorAll('[data-hvis]').forEach(b=>b.onclick=()=>{ histVisao=b.dataset.hvis; histRender(); });
+ body.querySelectorAll('[data-hano]').forEach(b=>b.onclick=()=>{ const a=+b.dataset.hano; histAnos.has(a)?histAnos.delete(a):histAnos.add(a); histRender(); });
+ body.querySelectorAll('[data-hinfo]').forEach(b=>b.onclick=()=>{ const i=HIST_INFO[b.dataset.hinfo]; if(i)mmModal(i.t,i.h); });
+ const xb=$('#histXlsx'); if(xb) xb.onclick=histExport;
+ histDraw();
+}
+function histPanel(){
+ const b=histBase, anos=histAnosLista(), saz=histVisao==='sazonal';
+ const seg=(attr,cur,opts)=>`<div class="seg" role="group">${opts.map(([v,l])=>`<button data-${attr}="${v}" class="${cur===v?'on':''}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`;
+ const vars=HIST_ORD.map(k=>{ const on=histVars.has(k); return `<button class="mmchip histvar${on?' on':''}" data-hvar="${k}" aria-pressed="${on}" style="--hc:var(--hv-${k})"><i class="histsw"></i>${HIST_VAR[k].l}<small>${HIST_VAR[k].u}</small></button>`; }).join('');
+ const amostra=(r)=>histTipo==='coluna'
+  ? `<svg width="14" height="10"><rect x="1" y="1" width="12" height="8" rx="2" style="fill:var(--ink-2);opacity:${HIST_COP[Math.min(r,3)]}"/></svg>`
+  : `<svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" style="stroke:var(--ink-2);stroke-width:2;opacity:${HIST_LOP[Math.min(r,3)]}" stroke-dasharray="${HIST_DASH[Math.min(r,3)]}"/></svg>`;
+ const anosHtml=saz?`<div class="histgrp" style="margin-bottom:10px"><span class="histlab">Anos</span><div class="mmfilters" style="margin:0">${anos.map((a,r)=>{ const on=histAnos.has(a); return `<button class="mmchip histvar histano${on?' on':''}" data-hano="${a}" aria-pressed="${on}">${amostra(r)}${a}</button>`; }).join('')}</div></div>`:'';
+ const ini=histSerie[0].comp, fim=histSerie[histSerie.length-1].comp, nHist=histSerie.filter(p=>p.fonte==='historico').length;
+ return `<div class="panel"><div class="phead"><h3>Comportamento sazonal — macro, micro, perdas e IRVP</h3><span class="hint" style="margin-left:6px">${mmCmp(ini)} a ${mmCmp(fim)}</span>${histIB('graf')}<span class="chip real" style="margin-left:auto">real</span></div>
+  <div class="pbody">
+   <div class="histctl">
+    <div class="histgrp"><span class="histlab">Visão</span>${seg('hvis',histVisao,[['tempo','Linha do tempo'],['sazonal','Sazonal (jan–dez)']])}</div>
+    <div class="histgrp"><span class="histlab">Gráfico</span>${seg('htipo',histTipo,[['linha','Linha'],['coluna','Coluna']])}</div>
+   </div>
+   <div class="histgrp" style="margin-bottom:10px"><span class="histlab">Variáveis</span><div class="mmfilters" style="margin:0">${vars}</div></div>
+   ${anosHtml}
+   <div class="histwrap"><div id="histChart" class="histchart"></div><div id="histTip" class="histtip"></div></div>
+   <p class="note" style="margin-top:8px;font-size:11px">${nHist?`Até <b>fev/2025</b>: fechamento da COPASA · de <b>mar/2025</b> em diante: sistema (macro GMOA − micro). `:''}<b>mai/2025</b> fora (micromedição duplicada). IRVP = (VPBL − VP) ÷ meta, com a VPBL preliminar sem fator (${b.vpbl?fmt(b.vpbl)+' m³/mês · meta '+fmt(b.meta_m3):'—'}).</p>
+  </div></div>`;
+}
+/* monta as séries do gráfico: linha do tempo = 1 por variável; sazonal = 1 por variável × ano (eixo jan–dez) */
+function histSeries(){
+ const ks=HIST_ORD.filter(k=>histVars.has(k));
+ if(histVisao!=='sazonal') return {n:histSerie.length, S:ks.map(k=>({k, vals:histSerie.map(p=>p[k])}))};
+ const anos=histAnosLista(), by=new Map(histSerie.map(p=>[p.comp,p])), S=[];
+ ks.forEach(k=>anos.forEach((a,r)=>{ if(!histAnos.has(a))return; S.push({k, ano:a, r:Math.min(r,3), vals:Array.from({length:12},(_,m)=>{ const p=by.get(a*100+m+1); return p?p[k]:null; })}); }));
+ return {n:12, S};
+}
+function histNice(lo,hi){ if(hi<=lo) hi=lo+1;   // eixo y com marcas "redondas"
+ const raw=(hi-lo)/5, p=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/p, st=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;
+ const a=Math.floor(lo/st)*st, z=Math.ceil(hi/st)*st, t=[]; for(let v=a; v<=z+st/2; v+=st) t.push(Math.round(v*1e6)/1e6); return {lo:a,hi:z,t}; }
+function histYLab(g,v){ if(g==='pct') return fmt(v)+'%'; if(Math.abs(v)>=1e6) return br1(v/1e6).replace(',0','')+' mi'; return v===0?'0':fmt(v/1000)+' mil'; }
+function histBar(x,yv,y0,w){ const h=Math.abs(y0-yv); if(h<0.5) return ''; const r=Math.min(4,w/2,h), up=yv<y0, f=n=>n.toFixed(1);   // ponta arredondada, base reta
+ return up ? `M${f(x)},${f(y0)}V${f(yv+r)}Q${f(x)},${f(yv)} ${f(x+r)},${f(yv)}H${f(x+w-r)}Q${f(x+w)},${f(yv)} ${f(x+w)},${f(yv+r)}V${f(y0)}Z`
+           : `M${f(x)},${f(y0)}V${f(yv-r)}Q${f(x)},${f(yv)} ${f(x+r)},${f(yv)}H${f(x+w-r)}Q${f(x+w)},${f(yv)} ${f(x+w)},${f(yv-r)}V${f(y0)}Z`; }
+function histDraw(){
+ const el=$('#histChart'), tip=$('#histTip'); if(!el)return; tip.style.display='none';
+ const {n,S}=histSeries(), saz=histVisao==='sazonal', col=histTipo==='coluna', b=histBase;
+ if(!S.length){ el.innerHTML='<p class="note" style="margin:6px 0">Ative ao menos uma variável (e um ano, na visão sazonal).</p>'; return; }
+ const W=Math.max(320,Math.round(el.clientWidth||760)), sm=W<560, pl=sm?46:60, pr=sm?8:14, sw=(W-pl-pr)/n, xc=i=>pl+sw*(i+.5);
+ const plots=[]; ['vol','pct'].forEach(g=>{ const s=S.filter(x=>HIST_VAR[x.k].g===g); if(s.length) plots.push({g,S:s,h:g==='vol'?(sm?190:240):(sm?160:190)}); });
+ let y=0; plots.forEach(P=>{ P.top=y+24; P.bot=P.top+P.h; y=P.bot+14; }); const H=y+16;
+ let svg='';
+ // mês excluído (mai/25): faixa apagada na linha do tempo
+ if(!saz) histSerie.forEach((p,i)=>{ if(p.excl) svg+=`<rect x="${(pl+sw*i).toFixed(1)}" y="${plots[0].top}" width="${sw.toFixed(1)}" height="${(plots[plots.length-1].bot-plots[0].top).toFixed(1)}" style="fill:var(--line);opacity:.45"/>`; });
+ plots.forEach(P=>{
+  const vals=P.S.flatMap(s=>s.vals).filter(v=>v!=null), refs=[];
+  if(P.g==='vol' && histVars.has('vp') && b.vpbl) refs.push({v:+b.vpbl,l:'VPBL '+fmt(b.vpbl)});
+  if(P.g==='pct' && histVars.has('irvp') && b.meta_m3>0) refs.push({v:100,l:'IRVP 100% (meta)',c:'var(--good)'});
+  let lo=Math.min(0,...vals), hi=Math.max(0,...vals,...refs.map(r=>r.v)); if(P.g==='vol') lo=0; hi+= (hi-lo)*0.04; if(P.g==='pct'&&lo<0) lo-=(hi-lo)*0.03;
+  const nk=histNice(lo,hi); P.Y=v=>P.bot-(v-nk.lo)/((nk.hi-nk.lo)||1)*P.h; const y0=P.Y(0);
+  svg+=`<text x="${pl}" y="${P.top-9}" style="fill:var(--ink-2);font-size:11px;font-weight:600">${P.g==='vol'?'Volumes · m³/mês':'Percentuais · %'}</text>`;
+  nk.t.forEach(v=>{ const yy=P.Y(v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" style="stroke:var(--line);stroke-width:${v===0?1.2:.6}"/><text x="${pl-6}" y="${(+yy+3.5).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${histYLab(P.g,v)}</text>`; });
+  refs.forEach(r=>{ const yy=P.Y(r.v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke-dasharray="5 4" style="stroke:${r.c||'var(--muted)'};stroke-width:1.2"/><text x="${W-pr}" y="${(+yy-4).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${r.l}</text>`; });
+  if(col){
+   const k=P.S.length, gap=k>1&&sw/k>5?2:0, bw=Math.max(1.5,Math.min(24,(sw*.84-(k-1)*gap)/k)), gw=k*bw+(k-1)*gap;
+   P.S.forEach((s,j)=>s.vals.forEach((v,i)=>{ if(v==null)return; const x=xc(i)-gw/2+j*(bw+gap); svg+=`<path d="${histBar(x,P.Y(v),y0,bw)}" style="fill:var(--hv-${s.k});opacity:${saz?HIST_COP[s.r]:1}"/>`; }));
+  } else {
+   P.S.forEach(s=>{ let seg=[]; const st=`stroke:var(--hv-${s.k});stroke-width:2;fill:none;opacity:${saz?HIST_LOP[s.r]:1}`, dash=saz?HIST_DASH[s.r]:'';
+    const flush=()=>{ if(seg.length>1) svg+=`<polyline points="${seg.map(q=>q.join(',')).join(' ')}" stroke-dasharray="${dash}" stroke-linejoin="round" style="${st}"/>`; else if(seg.length===1) svg+=`<circle cx="${seg[0][0]}" cy="${seg[0][1]}" r="3" style="fill:var(--hv-${s.k});opacity:${saz?HIST_LOP[s.r]:1}"/>`; seg=[]; };
+    s.vals.forEach((v,i)=>{ if(v==null){ flush(); return; } seg.push([xc(i).toFixed(1),P.Y(v).toFixed(1)]); }); flush(); });
+  }
+ });
+ // troca de fonte (fechamento COPASA → sistema) na linha do tempo
+ if(!saz){ const i=histSerie.findIndex((p,j)=>j>0 && p.fonte==='sistema' && histSerie[j-1].fonte==='historico');
+  if(i>0){ const x=(pl+sw*i).toFixed(1); svg+=`<line x1="${x}" y1="${plots[0].top-4}" x2="${x}" y2="${plots[plots.length-1].bot}" stroke-dasharray="2 3" style="stroke:var(--muted);stroke-width:1"/><text x="${(+x-4).toFixed(1)}" y="${plots[0].top+10}" text-anchor="end" style="fill:var(--muted);font-size:9.5px">← fechamento COPASA</text><text x="${(+x+4).toFixed(1)}" y="${plots[0].top+10}" style="fill:var(--muted);font-size:9.5px">sistema →</text>`; } }
+ // rótulos do eixo x (só embaixo do último gráfico)
+ const lb=plots[plots.length-1].bot+15, passo=saz?(sw<30?2:1):Math.max(1,Math.ceil((sm?40:46)/sw));
+ for(let i=0;i<n;i++){ if((n-1-i)%passo) continue;   // alinhado no fim: o mês mais recente sempre tem rótulo
+  const t=saz?MM_MES[i]:histCmp(histSerie[i].comp), x=xc(i), an=x+20>W?'end':(x-20<0?'start':'middle'); svg+=`<text x="${(an==='end'?W-2:x).toFixed(1)}" y="${lb}" text-anchor="${an}" style="fill:var(--muted);font-size:10px">${t}</text>`; }
+ const top=plots[0].top, bot=plots[plots.length-1].bot;
+ svg+=`<rect id="histBand" x="0" y="${top}" width="${sw.toFixed(1)}" height="${(bot-top).toFixed(1)}" style="fill:var(--accent);opacity:0;pointer-events:none"/><line id="histGuide" x1="0" x2="0" y1="${top}" y2="${bot}" style="stroke:var(--ink-2);stroke-width:1;opacity:0;pointer-events:none"/><g id="histDots" style="pointer-events:none"></g>`;
+ el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Histórico por ZA: ${S.map(s=>HIST_VAR[s.k].l+(s.ano?' '+s.ano:'')).join(', ')}">${svg}</svg>`;
+ // hover/toque: faixa do mês + pontos + tooltip com os valores
+ const sv=el.querySelector('svg'), band=sv.querySelector('#histBand'), guide=sv.querySelector('#histGuide'), dots=sv.querySelector('#histDots');
+ const hide=()=>{ tip.style.display='none'; band.style.opacity=0; guide.style.opacity=0; dots.innerHTML=''; };
+ const show=i=>{
+  band.setAttribute('x',(pl+sw*i).toFixed(1)); band.style.opacity=col?.07:0;
+  guide.setAttribute('x1',xc(i).toFixed(1)); guide.setAttribute('x2',xc(i).toFixed(1)); guide.style.opacity=col?0:.35;
+  dots.innerHTML=col?'':plots.map(P=>P.S.map(s=>{ const v=s.vals[i]; return v==null?'':`<circle cx="${xc(i).toFixed(1)}" cy="${P.Y(v).toFixed(1)}" r="4" style="fill:var(--hv-${s.k});stroke:var(--surface);stroke-width:2"/>`; }).join('')).join('');
+  tip.innerHTML=histTipHtml(i,S); tip.style.display='block';
+  const r=sv.getBoundingClientRect(), k=r.width/W, x=xc(i)*k, tw=tip.offsetWidth;
+  tip.style.left=Math.max(0,(x+14+tw>r.width)?x-14-tw:x+14)+'px';
+ };
+ sv.onpointermove=e=>{ const r=sv.getBoundingClientRect(), x=(e.clientX-r.left)*(W/r.width), i=Math.floor((x-pl)/sw); if(i<0||i>=n) hide(); else show(i); };
+ sv.onpointerleave=hide;
+}
+function histTipHtml(i,S){
+ const sw=k=>`<i class="histsw" style="--hc:var(--hv-${k})"></i>`;
+ if(histVisao!=='sazonal'){
+  const p=histSerie[i], fonte=p.fonte==='historico'?'fechamento COPASA':(p.fonte==='sistema'?'sistema':'');
+  const head=`<b>${MM_MES[p.comp%100-1]}/${Math.floor(p.comp/100)}</b>${fonte?`<span class="tg">${fonte}</span>`:''}`;
+  if(p.excl) return head+'<div class="sub">Desconsiderado — micromedição duplicada de abr/2025.</div>';
+  if(!p.fonte) return head+'<div class="sub">Sem dado neste mês.</div>';
+  return head+S.map(s=>`<div class="tr">${sw(s.k)}<span>${HIST_VAR[s.k].l}</span><span>${histFmt(s.k,s.vals[i])}</span></div>`).join('');
+ }
+ const by=new Map(), excl=new Set(histSerie.filter(p=>p.excl).map(p=>p.comp)); S.forEach(s=>{ if(!by.has(s.k)) by.set(s.k,[]); by.get(s.k).push(s); });
+ return `<b>${HIST_MES[i]}</b>`+[...by].map(([k,ss])=>`<div class="tr" style="margin-top:6px">${sw(k)}<span style="font-weight:600">${HIST_VAR[k].l}</span><span></span></div>`+ss.map(s=>{ const ex=excl.has(s.ano*100+i+1); return (!ex && s.vals[i]==null) ? '' : `<div class="tr" style="padding-left:16px"><span>${s.ano}</span><span>${ex?'desconsiderado':histFmt(k,s.vals[i])}</span></div>`; }).join('')).join('');   // ano sem dado naquele mês não aparece
+}
+function histTablePanel(){
+ const rows=histSerie.slice().reverse().map(p=>{ const fonte=p.fonte==='historico'?'Fechamento COPASA':(p.fonte==='sistema'?'Sistema':'—');
+  return `<tr${p.excl?' class="histexcl"':''}><td><b>${mmCmp(p.comp)}</b>${p.excl?'<span class="histexclb">desconsiderado</span>':''}</td><td class="l">${fonte}</td><td class="r">${histFmt('vd',p.vd).replace(' m³','')}</td><td class="r">${histFmt('vc',p.vc).replace(' m³','')}</td><td class="r"><b>${histFmt('vp',p.vp).replace(' m³','')}</b></td><td class="r">${histFmt('ip',p.ip)}</td><td class="r">${histFmt('irvp',p.irvp)}</td></tr>`; }).join('');
+ return `<div class="panel" style="margin-top:14px"><div class="phead"><h3>Mês a mês</h3><span class="hint" style="margin-left:6px">m³/mês</span><button class="btn" id="histXlsx" style="margin-left:auto;font-size:12px">⭳ Exportar .xlsx</button></div>
+  <div class="pbody"><div style="overflow:auto;max-height:460px"><table class="mmdmc"><thead><tr><th>Competência</th><th class="l">Fonte</th><th class="r">VD · macro</th><th class="r">VC · micro</th><th class="r">VP</th><th class="r">IP</th><th class="r">IRVP</th></tr></thead><tbody>${rows}</tbody></table></div></div></div>`;
+}
+function histExport(){
+ const head=['Competência','Fonte','VD macro (m³)','VC micro (m³)','VP (m³)','IP (%)','IRVP (%)'];
+ const num=v=>v==null?'':Math.round(v*10)/10;
+ const data=histSerie.map(p=>[mmCmp(p.comp), p.excl?'desconsiderado':(p.fonte==='historico'?'Fechamento COPASA':(p.fonte==='sistema'?'Sistema':'')), num(p.vd), num(p.vc), num(p.vp), num(p.ip), num(p.irvp)]);
+ const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Historico');
+ XLSX.writeFile(wb,`historico_za_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+window.addEventListener('resize',()=>{ clearTimeout(histRz); histRz=setTimeout(()=>{ if(document.querySelector('#s-historico.on')) histDraw(); },150); });
 /* ---------- limpeza/desativação: telas não-reais ficam opacas (rastreável, nada apagado) ---------- */
 /* ========== Priorização de troca de HD (dados REAIS via RPC app_nrw_hd_*) ========== */
 let hdResumo=null, hdRows=[], hdTotal=0, hdDetCache={}, hdMap=null, hdPtLayer=null;
@@ -2761,7 +2961,7 @@ function frExport(){ const btn=$('#frExport'); if(typeof XLSX==='undefined'){ if
  }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#frMapNote'))$('#frMapNote').textContent='Erro ao exportar: '+(e.message||e); });
 }
 
-const NRW_REAL=new Set(['mm','macro','resultado','hdpri','fraudepri','config','nrw_balanco']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+const NRW_REAL=new Set(['mm','macro','resultado','historico','hdpri','fraudepri','config','nrw_balanco']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
 function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
  .navi.mock{opacity:.5}
  .navi.mock:hover{opacity:.82}

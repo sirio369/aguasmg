@@ -2229,6 +2229,25 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     contrato), VC por ZA (efetivo + input), "Salvar VC" (admin), linha do tempo dos lançamentos, + painel "Outras premissas (referência)" (metas 24,5/24,2%,
     gatilhos 50/75%). `go('config')` chama `cfgInit`. Validado: reajuste vig. 202701 propaga via LOCF.
   - **Ajustes 2026-10-15:** `config` entrou em **`NRW_REAL`** → sai a opacidade/selo "exemplo" da sidebar e o banner "Em construção" (só nessa tela; as demais seguem exemplo). **VC corrigido** p/ os valores sem centavos definidos pelo usuário: **ZA1004 101.248.033 / ZA0200 101.044.138** (seed + fallback `nrw_vc` + `default_vc` + `RES_VC`). **Bloco do VC** deixou de estourar: o `.formrow` é grid com coluna de 90px; escopei `#cfgcss` (`#cfgBody .formrow{grid-template-columns:1fr minmax(160px,210px)}` + inputs `width:100%;box-sizing`) e removi o `width:160px` inline. **IRVP% (resStatus):** removidas as cores laranja/vermelho/rosa dos tiers abaixo de 75% (viram `var(--muted)`) — ficam só **azul** (≥120 teto, ≥75 Fase 2) e **verde** (≥100 meta).
+- **Histórico fechado por ZA (2026-10-29, tela REAL — `s-historico`/nav "Histórico por ZA" em 1·Visão, sw v304):**
+  comportamento sazonal de **macro (VD), micro (VC), volume perdido (VP), índice de perdas (IP = VP ÷ VD) e IRVP**
+  numa série única **dez/2023 → último mês do sistema**. **Dados:** tabela nova **`"11 - perdas_nrw".historico_za`**
+  (consorcio, competencia, vd, vc, fonte; PK consorcio+competencia; RLS ligada, sem policy — app-only) com o **fechamento
+  da COPASA de dez/2023 a fev/2025** (30 linhas, planilha "dados volume.xlsx" do usuário = aba "Macro e Micro" da
+  `Dados Indices de Perdas.xlsx`). RPC **`app_nrw_historico(p_consorcio)`** (definer; chama `app_nrw_resultado(p_consorcio,false)`
+  internamente, então herda o gate admin|`dev_acesso`, as `baselines` e a série do sistema) junta `historico_za` + série do
+  sistema, cada mês com `fonte` = `historico`|`sistema`; **o mês que existe no `macro_mensal` prevalece** sobre o histórico;
+  "Ambos" (null) soma as 2 ZAs e só usa mês histórico presente nas duas. Meses novos de fechamento COPASA **antes de mar/2025**
+  entram por INSERT em `historico_za`; de mar/2025 em diante a tela já lê o sistema (rotina mensal, sem passo extra).
+  **Front** (`hist*`): controles numa linha — **Visão** (Linha do tempo × **Sazonal jan–dez**, um traço/tom por ano + chips
+  de ano), **Gráfico** (Linha × Coluna) e **chips de variável** liga/desliga (VD/VC/VP em m³, IP/IRVP em %). **Volumes e
+  percentuais ficam em 2 gráficos empilhados com o mesmo eixo x** (nunca 2 escalas no mesmo gráfico); cada um só aparece se
+  houver variável dele ligada. Hover/toque mostra os valores do mês (sazonal: por ano). Referências: **VPBL** tracejada no de
+  volumes (com VP ligado) e **IRVP 100% (meta)** no de %. Na linha do tempo, linha pontilhada na **troca de fonte**
+  (fechamento COPASA → sistema; o VC do sistema não é idêntico ao da COPASA, pode haver degrau) e **mai/2025 apagado**
+  (fora de tudo, via `baselines.previa.excluir`). IRVP = (VPBL − VP) ÷ meta com a **VPBL preliminar sem fator** (mesma conta
+  do resultado, aplicada a todos os meses). Tabela **Mês a mês** (fonte por mês) + **⭳ Exportar .xlsx**. O SVG é desenhado na
+  largura real do contêiner e redesenha no `resize`. Sem toggle de fator de correção (o histórico não tem dado por macro).
 - **Priorização de troca de HD (2026-10-08, tela REAL — `s-hdpri`/nav "Priorização de troca de HD" na seção 4·Execução-comercial):**
   ferramenta que gera a **lista operacional priorizada de substituição de hidrômetros**, seguindo o estudo (metodologia multifator,
   NÃO "medidor velho = troca"). Funções `hd*` em `perdas.html` (bloco clássico); em `NRW_REAL` (destaque, não opaca).
@@ -2311,7 +2330,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   cadastro DMC) e `"11 - perdas_nrw"` (`parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc`).
   Reorg de 2026-09: `dmc` foi de `"6 - analises"` (aposentado) → `"7 - setorizacao"`; as tabelas de
   cálculo/config → `"11 - perdas_nrw"` (*app-only*, sem `USAGE` pra GIS).
-- **Estrutura (2026-10-05, enxugada p/ 13 itens; +Acompanhamento do resultado em 2026-10-06 = 14):** 1 Visão (Painel, **Acompanhamento do resultado**) · 2 Dados & diagnóstico (Análise do
+- **Estrutura (2026-10-05, enxugada p/ 13 itens; +Acompanhamento do resultado em 2026-10-06 = 14):** 1 Visão (Painel, **Acompanhamento do resultado**, **Histórico por ZA** — 2026-10-29) · 2 Dados & diagnóstico (Análise do
   micromedido, Análise de macromedição, Balanço) · 3 Ação (Componentes IWA, Fraude) · 4 Execução (OS;
   Parque, Fiscalização, Recuperação, Grandes) · 5 Gestão & decisão (Contrato) · 6 Configuração (Parâmetros).
   **21 telas removidas de vez** (não só opacas): DMCs, Ficha, Medições, Consumo, Vazão mínima noturna,
