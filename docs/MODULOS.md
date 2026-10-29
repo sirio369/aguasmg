@@ -382,6 +382,12 @@
     Cache igual às demais `whole` (chave `CAD_VER+'limite_za|all'`). `CAD_VER` inalterado (chave nova). ⚠️ **Se o
     `limite_za` for recarregado** (`app_limite_za_set` / `12_sync_bairros_limite.py`), **suba `CAD_VER`** — senão o app
     continua mostrando o limite antigo que está no IndexedDB.
+- **Marcador "Você" sempre por cima (2026-10-29, sw v302):** `cadVoce` (`cadOnGps`) vive num pane próprio
+  **`cadVocePane`** (zIndex 640: acima do `overlayPane` 400, abaixo de tooltip 650/popup 700), criado no `cadInit`. Antes
+  ficava no `overlayPane` junto com as camadas e era criado **antes** delas (o `cadOnGps()` do `cadInit` roda enquanto o
+  `cadAtualizar` ainda espera os dados) → qualquer VRP/unidade/hidrante/rede desenhada depois no mesmo ponto **cobria a
+  bolinha** (reproduzido com uma VRP na posição do GPS). ⚠️ Marcador/destaque novo que precise ficar visível sobre as
+  camadas → use um pane próprio, não a ordem de inserção.
 - **RPCs:** `app_cadastro_geojson` (bbox→GeoJSON, param `p_layer`), `app_cadastro_buscar`,
   `app_limites_zas`. Cache em **IndexedDB** (`cadcache`) versionado por **`CAD_VER`** (`'vN|'`) —
   **mudou dado/camada do cadastro? Suba `CAD_VER` também**, senão o usuário fica com cache velho.
