@@ -382,6 +382,13 @@
     Cache igual às demais `whole` (chave `CAD_VER+'limite_za|all'`). `CAD_VER` inalterado (chave nova). ⚠️ **Se o
     `limite_za` for recarregado** (`app_limite_za_set` / `12_sync_bairros_limite.py`), **suba `CAD_VER`** — senão o app
     continua mostrando o limite antigo que está no IndexedDB.
+  - **Máscara fora das ZAs (2026-10-29, sw v303):** junto com o contorno, `cadMascara(gj)` desenha um polígono do
+    **mundo inteiro com todos os anéis das ZAs como furos** (`fillRule` evenodd do Leaflet → buraco de ilha dentro da ZA
+    volta a escurecer), cinza `#1f2937` a **45%**, sem borda e sem clique, no pane próprio **`cadMascaraPane`** (zIndex 250:
+    acima do `tilePane` 200, abaixo do `overlayPane` 400; `pointer-events:none`) → escurece **só o mapa de fundo** (rua e
+    satélite) fora das ZAs; redes/unidades/VRPs ficam com a cor cheia mesmo fora. A máscara é adicionada **ao mesmo grupo**
+    do contorno (`cadCamadas.limite_za.addLayer(...)`), então o chip "Limite das ZAs" liga/desliga os dois juntos. Mesmo
+    dado/cache do contorno (sem RPC nova, `CAD_VER` inalterado).
 - **Marcador "Você" sempre por cima (2026-10-29, sw v302):** `cadVoce` (`cadOnGps`) vive num pane próprio
   **`cadVocePane`** (zIndex 640: acima do `overlayPane` 400, abaixo de tooltip 650/popup 700), criado no `cadInit`. Antes
   ficava no `overlayPane` junto com as camadas e era criado **antes** delas (o `cadOnGps()` do `cadInit` roda enquanto o
