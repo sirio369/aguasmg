@@ -78,6 +78,8 @@
   (vertical; `background-size:100% auto` ancorada embaixo + `background-attachment:local`; `.lg-box` reserva
   `margin-bottom:calc(100vw*.78)` p/ os personagens nunca ficarem atrás do formulário — em tela baixa a página rola);
   **notebook** (`min-width:860px` **e** `min-aspect-ratio:4/3`) = `login-notebook.webp` (cover), formulário à esquerda.
+  No notebook o recuo da esquerda é `padding-left` do `#login` (não da `.lg-box`, que antes perdia a largura e cortava o
+  e-mail) e a `.lg-box` tem 320px com `zoom:1.25` → bloco de ~400px na tela, tudo ampliado na mesma proporção (2026-10-28).
 - Campos com ícone (e-mail/cadeado) e botão 👁 `#lgOlho` (mostrar/ocultar senha). IDs `#email/#senha/#entrar/#loginErr` mantidos.
 - Login continua sempre em tema claro.
 
@@ -3034,9 +3036,9 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
 - Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
   foram testadas com rollback E2E (§4 do CLAUDE.md).
 
-## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (admin-only, 2026-10-27) — `docs/migracao_avisos.sql`
+## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (🚧 Em desenvolvimento, admin-only, 2026-10-27) — `docs/migracao_avisos.sql`
 
-- **Admin** (Home › 🧰 Suporte › 📢 Avisos, `#homeAvisos`, gate `ME.is_admin` + RPC `aviso_eh_admin()`): cria/edita aviso com
+- **Admin** (Home › 🚧 Em desenvolvimento › 📢 Avisos — mudou de 🧰 Suporte em 2026-10-28; `#homeAvisos`, gate `ME.is_admin` + RPC `aviso_eh_admin()`, igual à Telemetria: **não** usa a engrenagem `dev_acesso` da categoria): cria/edita aviso com
   título, texto (`**negrito**` + quebras), imagem (upload → bucket `fotos-campo/avisos/` via `uploadFoto2`), texto do botão,
   destino do botão (`AV_LINKS` = mesmos links de notificação, roteados por `supGoAct`), público (`todos` |
   `condutores_vinculados`), período (de/até) e ativo; na lista, botão **⏸ Desativar / ▶ Ativar** (mesma RPC, só inverte `ativo`). **Pré-visualizar** mostra o pop-up como o usuário verá.
@@ -3046,7 +3048,7 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
 - **Destino "Notificações":** `supGoAct('notificacoes')` abre a tela `notificacoes` (antes caía no hub do Almoxarifado).
 - **Lembretes push** (`lembrete='checklist_frota'`): `aviso_lembretes_run(slot)` via **pg_cron** `aviso-lembrete-1..5`
   (08h/10h/12h/14h/16h BRT, seg–sex) — notifica **só quem tem veículo vinculado e não fez o checklist do dia**, com o texto do
-  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
+  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. É o **único** lembrete de checklist do app desde 2026-10-28 (os diários antigos de 7h30/16h50 da Frota foram removidos — `docs/migracao_remove_lembretes_frota.sql`); sem aviso vigente, ninguém é lembrado. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
 - **Grants:** `aviso_eh_admin()`/`aviso_tem_veiculo(uuid)` são internos (revogados de anon/authenticated); `aviso_lembretes_run` só o cron.
 - **Tabela** `public.app_aviso` (RLS ligada, sem policy — só RPC). 1º aviso (seed): "Checklist diário do veículo", até
   30/10/2026, pop-up p/ todos, imagem `./avisos/checklist-frota-2026-10.webp`.

@@ -367,9 +367,9 @@ descrição-Nível-3, `CENTROS_CUSTO_FROTA` — subconjunto curado pelo usuário
 já existente — sem aluguel próprio). Tela de Frotas ganhou filtro (tipo/condutor) no topo da lista e
 um "Ver detalhes" por veículo que abre Editar/Vínculo(admin)/Histórico/Relatório/Devolver numa página
 só, em vez de 5 botões no card. **Colaborador**, no seu módulo: CNH (só dados de CNH, não lista mais
-veículo nenhum), **Veículos** (self-service acima), **checklist diário** (layout em cartão, lembrete
-automático 7:30 da manhã pra quem tem vínculo ativo + CNH ativa, `pg_cron` +
-`frota_checklist_lembrete_diario`), **Manutenção** e **Lavagem** — cada uma é uma tela de
+veículo nenhum), **Veículos** (self-service acima), **checklist diário** (layout em cartão; os lembretes
+diários automáticos das 7h30 e 16h50 foram **removidos** em 2026-10-28 — `docs/migracao_remove_lembretes_frota.sql`;
+lembrete de checklist hoje só pelo módulo Avisos, enquanto houver aviso vigente), **Manutenção** e **Lavagem** — cada uma é uma tela de
 **histórico + ação**, não só
 um formulário avulso (**renomeadas na 5ª rodada**, eram "Registrar problema (manutenção)"/"Solicitar
 lavagem", iam direto pro formulário sem mostrar nada do que já existia). Estes 3 últimos ficam
@@ -457,7 +457,7 @@ polígono + export .xlsx p/ SIGOS. **Fora de escopo:** priorização por DMC e e
 ⚠️ **`cd_situaca` (R/I/F/P) = situação da LIGAÇÃO** (Real/Inativo/Factível/Potencial), não da leitura — não confundir.
 **HD — recomendação e "troca efetiva" (2026-10-20d, só DB):** dimensionamento por `ref_dim = greatest(mediana, least(p90, média_4m))` (robusto a pico isolado); coluna `hd_priorizacao.media_4m`. **`cal_recomendado` só muda de calibre quando `adequacao` é sub/superdimensionado** (consumo > 1,5× máx da faixa, ou < mín) — migração de faixa que ainda cabe no calibre atual **mantém o calibre**. Flag `troca_efetiva` = `(cal_recomendado≠cap) OU (idade≥idade_alta)` esconde do radar as trocas de mesmo calibre em medidor novo (eram 64%). `app_nrw_hd_resumo/_mapa/_ranking` filtram `troca_efetiva` por padrão (ranking tem `p_incluir_sem_troca` p/ auditoria). `app_nrw_hd_rebuild` e `_rebuild_chunk` patcheados. **Situação da ligação (2026-10-22):** `situacao_lig` (filtro ativa/inativa + remanejamento) passou a vir de **`"0 - vitrine_gis".vw_gis_micromedicao_atual.situacao_ligacao`** (último mês da micromedição; `"3 - comercial".ligacoes` só fallback) — o cadastro divergia em 22% (28,6k matrículas). Mesmo ancoramento na view na Fiscalização (`app_nrw_fraude_ranking/_detalhe`, lá sem impacto: já usava o último mês via `mm_matricula_stats.situacao_atual`).
 
-**Vitrine (TV)** (`vitrine`, home › 🚧 Em desenvolvimento — gate `dev_acesso` pela engrenagem da categoria, no card e na RPC; apresentação em loop de atividades de campo + indicadores, ao vivo via `app_vitrine_dados`; ver docs/MODULOS.md §17). **Avisos** (`avisos`, admin-only — pop-ups ao abrir o app + lembretes push do checklist da frota via pg_cron; ver docs/MODULOS.md §19). **Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🚧 Em desenvolvimento — schema `15 - telemetria`) — importa os
+**Vitrine (TV)** (`vitrine`, home › 🚧 Em desenvolvimento — gate `dev_acesso` pela engrenagem da categoria, no card e na RPC; apresentação em loop de atividades de campo + indicadores, ao vivo via `app_vitrine_dados`; ver docs/MODULOS.md §17). **Avisos** (`avisos`, **admin-only**, home › 🚧 Em desenvolvimento (card só p/ admin, sem `dev_acesso`) — pop-ups ao abrir o app + lembretes push do checklist da frota via pg_cron; ver docs/MODULOS.md §19). **Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🚧 Em desenvolvimento — schema `15 - telemetria`) — importa os
 CSVs exportados do sistema CCO da COPASA (vazão/volume macro, nível reservatório, bombas/pressão booster),
 identifica a unidade pelo nome do arquivo, grava em **formato longo** (`tele_leitura`) e cruza com o cadastro
 (`tele_unidade.cadastro_tabela`). Upload por dropzone → prévia → **Processar** (lotes via `app_tele_ingest`,
