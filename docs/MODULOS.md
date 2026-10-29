@@ -373,7 +373,7 @@
     o branch `caixas_manobra` da RPC devolve o **ponto representativo** (`ST_PointOnSurface`) p/ render igual às demais unidades
     (circleMarker); props cd_no_agua/tipo(tipo_co)/material/cota/referencia. **Só ZA1004 tem dado** hoje (Betim = 0). `CAD_VER`
     inalterado (chave de cache nova distinta; camadas existentes não mudaram).
-  - **Limite das ZAs (2026-10-29, sw v300):** camada **`limite_za`** (1º chip, **começa ligada**) — os 2 polígonos de
+  - **Limite das ZAs (2026-10-29, sw v301):** camada **`limite_za`** (1º chip, **começa ligada**) — os 2 polígonos de
     **`"1 - suporte_geografico".limite_za`** (ZA0200 Betim, ZA1004 Contagem) desenhados só como **contorno tracejado roxo**
     `#8e24aa` (`fill:false`, `dashArray 6,4`, mesmo visual do mapa da Estanqueidade), **sem clique** (`interactive:false`) e
     jogado para trás (`bringToBack`) para não atrapalhar o toque nas redes/unidades. Não passa pela `app_cadastro_geojson`: a
