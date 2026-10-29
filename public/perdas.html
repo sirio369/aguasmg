@@ -1986,6 +1986,7 @@ function resRenderAll(){
    Série = histórico fechado da COPASA (historico_za, dez/23–fev/25) + meses do sistema (macro GMOA − micro), via app_nrw_historico.
    Volumes (m³) e percentuais (%) ficam em 2 gráficos empilhados com o mesmo eixo x — nunca 2 escalas no mesmo gráfico. */
 let histSerie=[], histBase={}, histVars=new Set(['vd','vc','vp']), histTipo='linha', histVisao='tempo', histEixo='zero', histAnos=null, histRz=null;   // histEixo: 'zero' | 'ajustado' (zoom: eixo y aos dados, só em linha)
+let histYwin={vol:[0,1],pct:[0,1]}, histDrag=null, histGeo=null;   // janela do slider de zoom do eixo y por gráfico (fração do eixo: 0 = base, 1 = topo)
 const HIST_VAR={
  vd:{l:'Macro · VD',u:'m³',g:'vol'},
  vc:{l:'Micro · VC',u:'m³',g:'vol'},
@@ -2013,6 +2014,12 @@ function histCss(){ mmCss(); if(document.getElementById('histcss'))return; const
  .histgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  .histlab{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
  #s-historico .seg button:disabled{opacity:.4;cursor:not-allowed}
+ #s-historico .hz{touch-action:none}
+ #s-historico .histchart svg{user-select:none;-webkit-user-select:none}
+ #s-historico .hzy{cursor:ns-resize}
+ #s-historico .hzmid{cursor:grab}
+ #s-historico .hzmid:active{cursor:grabbing}
+ #histZoomReset[hidden]{display:none}
  .histvar{display:inline-flex;align-items:center;gap:6px}
  .histvar small{color:var(--muted);font-size:10.5px}
  .histsw{width:10px;height:10px;border-radius:3px;display:inline-block;border:2px solid var(--hc);background:var(--hc)}
@@ -2057,11 +2064,13 @@ function histRender(){
  const body=$('#histBody'); if(!body)return;
  if(!histSerie.length){ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Sem dados históricos para esta ZA.</p></div></div>'; return; }
  body.innerHTML=histPanel()+histTablePanel();
- body.querySelectorAll('[data-hvar]').forEach(b=>b.onclick=()=>{ const k=b.dataset.hvar; histVars.has(k)?histVars.delete(k):histVars.add(k); histRender(); });
+ // mudar variável/ano/visão/eixo muda o eixo cheio → o zoom por arraste volta ao todo
+ body.querySelectorAll('[data-hvar]').forEach(b=>b.onclick=()=>{ const k=b.dataset.hvar; histVars.has(k)?histVars.delete(k):histVars.add(k); histZoomReset(); histRender(); });
  body.querySelectorAll('[data-htipo]').forEach(b=>b.onclick=()=>{ histTipo=b.dataset.htipo; histRender(); });
- body.querySelectorAll('[data-heixo]').forEach(b=>b.onclick=()=>{ histEixo=b.dataset.heixo; histRender(); });
- body.querySelectorAll('[data-hvis]').forEach(b=>b.onclick=()=>{ histVisao=b.dataset.hvis; histRender(); });
- body.querySelectorAll('[data-hano]').forEach(b=>b.onclick=()=>{ const a=+b.dataset.hano; histAnos.has(a)?histAnos.delete(a):histAnos.add(a); histRender(); });
+ body.querySelectorAll('[data-heixo]').forEach(b=>b.onclick=()=>{ histEixo=b.dataset.heixo; histZoomReset(); histRender(); });
+ body.querySelectorAll('[data-hvis]').forEach(b=>b.onclick=()=>{ histVisao=b.dataset.hvis; histZoomReset(); histRender(); });
+ body.querySelectorAll('[data-hano]').forEach(b=>b.onclick=()=>{ const a=+b.dataset.hano; histAnos.has(a)?histAnos.delete(a):histAnos.add(a); histZoomReset(); histRender(); });
+ const zr=$('#histZoomReset'); if(zr) zr.onclick=()=>{ histZoomReset(); histDraw(); };
  body.querySelectorAll('[data-hinfo]').forEach(b=>b.onclick=()=>{ const i=HIST_INFO[b.dataset.hinfo]; if(i)mmModal(i.t,i.h); });
  const xb=$('#histXlsx'); if(xb) xb.onclick=histExport;
  histDraw();
@@ -2082,10 +2091,12 @@ function histPanel(){
     <div class="histgrp"><span class="histlab">Visão</span>${seg('hvis',histVisao,[['tempo','Linha do tempo'],['sazonal','Sazonal (jan–dez)']])}</div>
     <div class="histgrp"><span class="histlab">Gráfico</span>${seg('htipo',histTipo,[['linha','Linha'],['coluna','Coluna']])}</div>
     <div class="histgrp"><span class="histlab">Eixo Y</span>${seg('heixo',eixo,[['zero','A partir do zero'],['ajustado','Ajustado (zoom)',col?'Colunas sempre partem do zero: cortar o eixo distorce o tamanho das barras. Use o gráfico de linha para o zoom.':'']])}</div>
+    <button class="btn" id="histZoomReset" hidden style="font-size:12px;padding:6px 10px">↺ Restaurar zoom</button>
    </div>
    <div class="histgrp" style="margin-bottom:10px"><span class="histlab">Variáveis</span><div class="mmfilters" style="margin:0">${vars}</div></div>
    ${anosHtml}
    <div class="histwrap"><div id="histChart" class="histchart"></div><div id="histTip" class="histtip"></div></div>
+   ${col?'':`<p class="note" style="margin-top:6px;font-size:11px">🔍 <b>Zoom:</b> arraste as alças da barra à direita de cada gráfico para aproximar ou afastar o eixo Y; arraste a faixa do meio para mover. Duplo clique no gráfico restaura.</p>`}
    <p class="note" style="margin-top:8px;font-size:11px">${nHist?`Até <b>fev/2025</b>: fechamento da COPASA · de <b>mar/2025</b> em diante: sistema (macro GMOA − micro). `:''}<b>mai/2025</b> fora (micromedição duplicada). IRVP = (VPBL − VP) ÷ meta, com a VPBL preliminar sem fator (${b.vpbl?fmt(b.vpbl)+' m³/mês · meta '+fmt(b.meta_m3):'—'}).</p>
   </div></div>`;
 }
@@ -2105,11 +2116,16 @@ function histYLab(g,v){ const n=(x,d)=>x.toLocaleString('pt-BR',{maximumFraction
 function histBar(x,yv,y0,w){ const h=Math.abs(y0-yv); if(h<0.5) return ''; const r=Math.min(4,w/2,h), up=yv<y0, f=n=>n.toFixed(1);   // ponta arredondada, base reta
  return up ? `M${f(x)},${f(y0)}V${f(yv+r)}Q${f(x)},${f(yv)} ${f(x+r)},${f(yv)}H${f(x+w-r)}Q${f(x+w)},${f(yv)} ${f(x+w)},${f(yv+r)}V${f(y0)}Z`
            : `M${f(x)},${f(y0)}V${f(yv-r)}Q${f(x)},${f(yv)} ${f(x+r)},${f(yv)}H${f(x+w-r)}Q${f(x+w)},${f(yv)} ${f(x+w)},${f(yv-r)}V${f(y0)}Z`; }
+function histTicks(lo,hi){ const raw=((hi-lo)||1)/5, p=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/p, st=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p, t=[];   // marcas dentro da janela (o zoom por arraste não arredonda p/ fora)
+ for(let v=Math.ceil(lo/st)*st; v<=hi+st*1e-6; v+=st) t.push(Math.round(v*1e6)/1e6); return t; }
+function histZoomed(){ return histTipo!=='coluna' && Object.values(histYwin).some(w=>w[0]>0||w[1]<1); }
+function histZoomReset(){ histYwin={vol:[0,1],pct:[0,1]}; }
 function histDraw(){
  const el=$('#histChart'), tip=$('#histTip'); if(!el)return; tip.style.display='none';
- const {n,S}=histSeries(), saz=histVisao==='sazonal', col=histTipo==='coluna', zoom=histEixo==='ajustado'&&!col, b=histBase;
+ const {n,S}=histSeries(), saz=histVisao==='sazonal', col=histTipo==='coluna', zoom=histEixo==='ajustado'&&!col, ySl=!col, b=histBase;   // ySl: slider de zoom do eixo y (só no gráfico de linha)
+ const rz=$('#histZoomReset'); if(rz) rz.hidden=!histZoomed();
  if(!S.length){ el.innerHTML='<p class="note" style="margin:6px 0">Ative ao menos uma variável (e um ano, na visão sazonal).</p>'; return; }
- const W=Math.max(320,Math.round(el.clientWidth||760)), sm=W<560, pl=sm?46:60, pr=sm?8:14, sw=(W-pl-pr)/n, xc=i=>pl+sw*(i+.5);
+ const W=Math.max(320,Math.round(el.clientWidth||760)), sm=W<560, pl=sm?46:60, pr=ySl?(sm?26:32):(sm?8:14), sw=(W-pl-pr)/n, xc=i=>pl+sw*(i+.5), tx=W-(sm?12:15);
  const plots=[]; ['vol','pct'].forEach(g=>{ const s=S.filter(x=>HIST_VAR[x.k].g===g); if(s.length) plots.push({g,S:s,h:g==='vol'?(sm?190:240):(sm?160:190)}); });
  let y=0; plots.forEach(P=>{ P.top=y+24; P.bot=P.top+P.h; y=P.bot+14; }); const H=y+16;
  let svg='';
@@ -2122,18 +2138,28 @@ function histDraw(){
   let lo, hi; const rv=refs.map(r=>r.v);
   if(zoom){ lo=Math.min(...vals,...rv); hi=Math.max(...vals,...rv); const pad=((hi-lo)||Math.abs(hi)||1)*0.06; lo-=pad; hi+=pad; if(P.g==='vol') lo=Math.max(0,lo); }   // zoom: eixo aos dados (+ referências visíveis)
   else { lo=Math.min(0,...vals); hi=Math.max(0,...vals,...rv); if(P.g==='vol') lo=0; hi+= (hi-lo)*0.04; if(P.g==='pct'&&lo<0) lo-=(hi-lo)*0.03; }
-  const nk=histNice(lo,hi); P.Y=v=>P.bot-(v-nk.lo)/((nk.hi-nk.lo)||1)*P.h; const y0=P.Y(0);
-  svg+=`<text x="${pl}" y="${P.top-9}" style="fill:var(--ink-2);font-size:11px;font-weight:600">${P.g==='vol'?'Volumes · m³/mês':'Percentuais · %'}${zoom&&nk.lo>0?'<tspan style="fill:var(--muted);font-weight:400"> · eixo não começa em zero</tspan>':''}</text>`;
-  nk.t.forEach(v=>{ const yy=P.Y(v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" style="stroke:var(--line);stroke-width:${v===0?1.2:.6}"/><text x="${pl-6}" y="${(+yy+3.5).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${histYLab(P.g,v)}</text>`; });
-  refs.forEach(r=>{ const yy=P.Y(r.v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke-dasharray="5 4" style="stroke:${r.c||'var(--muted)'};stroke-width:1.2"/><text x="${W-pr}" y="${(+yy-4).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${r.l}</text>`; });
+  const nk=histNice(lo,hi), fw=ySl?histYwin[P.g]:[0,1], yw=fw[0]>0||fw[1]<1;   // domínio cheio (nk) e janela do slider (fração: 0 = base, 1 = topo)
+  const wlo=yw?nk.lo+fw[0]*(nk.hi-nk.lo):nk.lo, whi=yw?nk.lo+fw[1]*(nk.hi-nk.lo):nk.hi, ticks=yw?histTicks(wlo,whi):nk.t;
+  P.Y=v=>P.bot-(v-wlo)/((whi-wlo)||1)*P.h; const y0=P.Y(0);
+  svg+=`<clipPath id="hcp-${P.g}"><rect x="${pl}" y="${P.top}" width="${(W-pr-pl).toFixed(1)}" height="${P.h}"/></clipPath>`;
+  svg+=`<text x="${pl}" y="${P.top-9}" style="fill:var(--ink-2);font-size:11px;font-weight:600">${P.g==='vol'?'Volumes · m³/mês':'Percentuais · %'}${(zoom||yw)&&wlo>0?'<tspan style="fill:var(--muted);font-weight:400"> · eixo não começa em zero</tspan>':''}</text>`;
+  ticks.forEach(v=>{ const yy=P.Y(v).toFixed(1); svg+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" style="stroke:var(--line);stroke-width:${v===0?1.2:.6}"/><text x="${pl-6}" y="${(+yy+3.5).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${histYLab(P.g,v)}</text>`; });
+  let mk='';
+  refs.forEach(r=>{ if(r.v<wlo||r.v>whi) return; const yy=P.Y(r.v).toFixed(1); mk+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke-dasharray="5 4" style="stroke:${r.c||'var(--muted)'};stroke-width:1.2"/><text x="${W-pr}" y="${(+yy-4).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${r.l}</text>`; });
   if(col){
    const k=P.S.length, gap=k>1&&sw/k>5?2:0, bw=Math.max(1.5,Math.min(24,(sw*.84-(k-1)*gap)/k)), gw=k*bw+(k-1)*gap;
-   P.S.forEach((s,j)=>s.vals.forEach((v,i)=>{ if(v==null)return; const x=xc(i)-gw/2+j*(bw+gap); svg+=`<path d="${histBar(x,P.Y(v),y0,bw)}" style="fill:var(--hv-${s.k});opacity:${saz?HIST_COP[s.r]:1}"/>`; }));
+   P.S.forEach((s,j)=>s.vals.forEach((v,i)=>{ if(v==null)return; const x=xc(i)-gw/2+j*(bw+gap); mk+=`<path d="${histBar(x,P.Y(v),y0,bw)}" style="fill:var(--hv-${s.k});opacity:${saz?HIST_COP[s.r]:1}"/>`; }));
   } else {
    P.S.forEach(s=>{ let seg=[]; const st=`stroke:var(--hv-${s.k});stroke-width:2;fill:none;opacity:${saz?HIST_LOP[s.r]:1}`, dash=saz?HIST_DASH[s.r]:'';
-    const flush=()=>{ if(seg.length>1) svg+=`<polyline points="${seg.map(q=>q.join(',')).join(' ')}" stroke-dasharray="${dash}" stroke-linejoin="round" style="${st}"/>`; else if(seg.length===1) svg+=`<circle cx="${seg[0][0]}" cy="${seg[0][1]}" r="3" style="fill:var(--hv-${s.k});opacity:${saz?HIST_LOP[s.r]:1}"/>`; seg=[]; };
+    const flush=()=>{ if(seg.length>1) mk+=`<polyline points="${seg.map(q=>q.join(',')).join(' ')}" stroke-dasharray="${dash}" stroke-linejoin="round" style="${st}"/>`; else if(seg.length===1) mk+=`<circle cx="${seg[0][0]}" cy="${seg[0][1]}" r="3" style="fill:var(--hv-${s.k});opacity:${saz?HIST_LOP[s.r]:1}"/>`; seg=[]; };
     s.vals.forEach((v,i)=>{ if(v==null){ flush(); return; } seg.push([xc(i).toFixed(1),P.Y(v).toFixed(1)]); }); flush(); });
   }
+  svg+=`<g clip-path="url(#hcp-${P.g})">${mk}</g>`;   // o que sai da janela de zoom é cortado
+  // slider do eixo y (como no Power BI): trilho + janela arrastável (move) + 2 alças (aproxima/afasta)
+  if(ySl){ const yf=f=>P.bot-f*P.h, y1=yf(fw[1]), y2=yf(fw[0]);
+   svg+=`<rect x="${tx-2}" y="${P.top}" width="4" height="${P.h}" rx="2" style="fill:var(--line)"/>`
+    +`<rect class="hz hzmid" data-z="${P.g}:mid" x="${tx-4}" y="${y1.toFixed(1)}" width="8" height="${(y2-y1).toFixed(1)}" rx="4" style="fill:var(--accent);opacity:.45"><title>Arraste para mover a janela do eixo</title></rect>`
+    +[['hi',y1],['lo',y2]].map(([pt,yy])=>`<g class="hz hzy" data-z="${P.g}:${pt}"><title>Arraste para ${pt==='hi'?'o topo':'a base'} do eixo</title><rect x="${tx-11}" y="${(yy-9).toFixed(1)}" width="22" height="18" style="fill:transparent"/><rect x="${tx-7}" y="${(yy-3.5).toFixed(1)}" width="14" height="7" rx="3" style="fill:var(--surface);stroke:var(--accent);stroke-width:1.5"/></g>`).join(''); }
  });
  // troca de fonte (fechamento COPASA → sistema) na linha do tempo
  if(!saz){ const i=histSerie.findIndex((p,j)=>j>0 && p.fonte==='sistema' && histSerie[j-1].fonte==='historico');
@@ -2145,20 +2171,38 @@ function histDraw(){
  const top=plots[0].top, bot=plots[plots.length-1].bot;
  svg+=`<rect id="histBand" x="0" y="${top}" width="${sw.toFixed(1)}" height="${(bot-top).toFixed(1)}" style="fill:var(--accent);opacity:0;pointer-events:none"/><line id="histGuide" x1="0" x2="0" y1="${top}" y2="${bot}" style="stroke:var(--ink-2);stroke-width:1;opacity:0;pointer-events:none"/><g id="histDots" style="pointer-events:none"></g>`;
  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Histórico por ZA: ${S.map(s=>HIST_VAR[s.k].l+(s.ano?' '+s.ano:'')).join(', ')}">${svg}</svg>`;
+ histGeo={W, h:Object.fromEntries(plots.map(P=>[P.g,P.h]))};
  // hover/toque: faixa do mês + pontos + tooltip com os valores
  const sv=el.querySelector('svg'), band=sv.querySelector('#histBand'), guide=sv.querySelector('#histGuide'), dots=sv.querySelector('#histDots');
  const hide=()=>{ tip.style.display='none'; band.style.opacity=0; guide.style.opacity=0; dots.innerHTML=''; };
  const show=i=>{
   band.setAttribute('x',(pl+sw*i).toFixed(1)); band.style.opacity=col?.07:0;
   guide.setAttribute('x1',xc(i).toFixed(1)); guide.setAttribute('x2',xc(i).toFixed(1)); guide.style.opacity=col?0:.35;
-  dots.innerHTML=col?'':plots.map(P=>P.S.map(s=>{ const v=s.vals[i]; return v==null?'':`<circle cx="${xc(i).toFixed(1)}" cy="${P.Y(v).toFixed(1)}" r="4" style="fill:var(--hv-${s.k});stroke:var(--surface);stroke-width:2"/>`; }).join('')).join('');
+  dots.innerHTML=col?'':plots.map(P=>P.S.map(s=>{ const v=s.vals[i], yy=v==null?null:P.Y(v); return (yy==null||yy<P.top||yy>P.bot)?'':`<circle cx="${xc(i).toFixed(1)}" cy="${yy.toFixed(1)}" r="4" style="fill:var(--hv-${s.k});stroke:var(--surface);stroke-width:2"/>`; }).join('')).join('');
   tip.innerHTML=histTipHtml(i,S); tip.style.display='block';
   const r=sv.getBoundingClientRect(), k=r.width/W, x=xc(i)*k, tw=tip.offsetWidth;
   tip.style.left=Math.max(0,(x+14+tw>r.width)?x-14-tw:x+14)+'px';
  };
- sv.onpointermove=e=>{ const r=sv.getBoundingClientRect(), x=(e.clientX-r.left)*(W/r.width), i=Math.floor((x-pl)/sw); if(i<0||i>=n) hide(); else show(i); };
+ sv.onpointermove=e=>{ if(histDrag||e.target.closest('.hz')){ hide(); return; } const r=sv.getBoundingClientRect(), x=(e.clientX-r.left)*(W/r.width), i=Math.floor((x-pl)/sw); if(i<0||i>=n||x>W-pr) hide(); else show(i); };
  sv.onpointerleave=hide;
+ sv.onpointerdown=histZoomDown;
+ sv.ondblclick=e=>{ if(!histZoomed())return; e.preventDefault(); histZoomReset(); histDraw(); };   // duplo clique restaura o zoom
 }
+/* arraste do slider de zoom do eixo y: os eventos ficam na janela porque o SVG é redesenhado a cada passo */
+function histZoomDown(e){ const t=e.target.closest('[data-z]'); if(!t) return; e.preventDefault();
+ const r=t.ownerSVGElement.getBoundingClientRect(), [g,part]=t.dataset.z.split(':');
+ histDrag={g,part,k:histGeo.W/r.width,h:histGeo.h[g],y0:e.clientY,win:histYwin[g].slice(),raf:0};
+ window.addEventListener('pointermove',histZoomMove); window.addEventListener('pointerup',histZoomUp); window.addEventListener('pointercancel',histZoomUp);
+}
+function histZoomMove(e){ const d=histDrag; if(!d) return;
+ const df=-(e.clientY-d.y0)*d.k/d.h, MIN=0.04; let [f0,f1]=d.win;   // arrastar p/ cima sobe a borda; janela mínima = 4% do eixo
+ if(d.part==='hi') f1=Math.min(1,Math.max(f0+MIN,f1+df));
+ else if(d.part==='lo') f0=Math.max(0,Math.min(f1-MIN,f0+df));
+ else { const w=f1-f0; f0=Math.min(1-w,Math.max(0,f0+df)); f1=f0+w; }
+ histYwin[d.g]=[f0,f1];
+ if(!d.raf) d.raf=requestAnimationFrame(()=>{ d.raf=0; histDraw(); });
+}
+function histZoomUp(){ window.removeEventListener('pointermove',histZoomMove); window.removeEventListener('pointerup',histZoomUp); window.removeEventListener('pointercancel',histZoomUp); histDrag=null; histDraw(); }
 function histTipHtml(i,S){
  const sw=k=>`<i class="histsw" style="--hc:var(--hv-${k})"></i>`;
  if(histVisao!=='sazonal'){
