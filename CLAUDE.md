@@ -331,9 +331,10 @@ pwa/
   tipo, responsável e PT/PET, **uma verificação por atividade** que avisa o autor) e **🦺 EPI** (`qsms_epi_painel` = painel de EPI,
   RPC `app_qsms_epi_painel`; `qsms_cesta` = a tela "Cargos e cesta de EPI" da engrenagem do Almoxarifado reaproveitada,
   editável por quem tem QSMS; `qsms_epi_col` = a tela "EPIs por colaborador" do Almoxarifado reaproveitada). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
-- **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**)
-  com busca + marcador "Você" (GPS, `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e
-  `app_cadastro_buscar`. Cache em IndexedDB versionado por `CAD_VER`.
+- **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**,
+  **limite das ZAs** — contorno tracejado via `app_limites_zas`, 2026-10-29) com busca + marcador "Você" (GPS,
+  `cadOnGps`). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
+  por `CAD_VER` (recarregou o `limite_za`? suba `CAD_VER`).
 - **Biblioteca** (`biblioteca`) — documentos de referência (bucket Storage `biblioteca`).
 
 **Suprimentos** (`suprimentos`) — ver §8.
