@@ -3036,19 +3036,32 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
 - Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
   foram testadas com rollback E2E (§4 do CLAUDE.md).
 
-## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (🚧 Em desenvolvimento, admin-only, 2026-10-27) — `docs/migracao_avisos.sql`
+## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (🚧 Em desenvolvimento, admin-only) — `docs/migracao_avisos.sql` + `docs/migracao_avisos_dinamicos.sql`
 
-- **Admin** (Home › 🚧 Em desenvolvimento › 📢 Avisos — mudou de 🧰 Suporte em 2026-10-28; `#homeAvisos`, gate `ME.is_admin` + RPC `aviso_eh_admin()`, igual à Telemetria: **não** usa a engrenagem `dev_acesso` da categoria): cria/edita aviso com
-  título, texto (`**negrito**` + quebras), imagem (upload → bucket `fotos-campo/avisos/` via `uploadFoto2`), texto do botão,
-  destino do botão (`AV_LINKS` = mesmos links de notificação, roteados por `supGoAct`), público (`todos` |
-  `condutores_vinculados`), período (de/até) e ativo; na lista, botão **⏸ Desativar / ▶ Ativar** (mesma RPC, só inverte `ativo`). **Pré-visualizar** mostra o pop-up como o usuário verá.
-- **Usuário:** `avPopAbrir()` roda **1x por carregamento do app**, logo após o `app_me` (em `mostrar`), chama
-  `app_avisos_ativos()` e exibe os avisos vigentes em sequência (`#avPop`, overlay com ✕; clicar fora fecha).
-- **Imagem:** `./...` = arquivo do site (`public/avisos/`), `http...` = URL, senão = caminho no bucket (`avImg`). Na edição, "Remover imagem" manda `p_imagem='-'` (null/'' = manter a atual).
-- **Destino "Notificações":** `supGoAct('notificacoes')` abre a tela `notificacoes` (antes caía no hub do Almoxarifado).
-- **Lembretes push** (`lembrete='checklist_frota'`): `aviso_lembretes_run(slot)` via **pg_cron** `aviso-lembrete-1..5`
-  (08h/10h/12h/14h/16h BRT, seg–sex) — notifica **só quem tem veículo vinculado e não fez o checklist do dia**, com o texto do
-  slot (`lembrete_textos[1..5]`), link `frota_checklist`. Independe do público do pop-up. É o **único** lembrete de checklist do app desde 2026-10-28 (os diários antigos de 7h30/16h50 da Frota foram removidos — `docs/migracao_remove_lembretes_frota.sql`); sem aviso vigente, ninguém é lembrado. Se houver mais de um aviso de lembrete vigente, vale **só o mais recente** (1 push por horário).
-- **Grants:** `aviso_eh_admin()`/`aviso_tem_veiculo(uuid)` são internos (revogados de anon/authenticated); `aviso_lembretes_run` só o cron.
-- **Tabela** `public.app_aviso` (RLS ligada, sem policy — só RPC). 1º aviso (seed): "Checklist diário do veículo", até
-  30/10/2026, pop-up p/ todos, imagem `./avisos/checklist-frota-2026-10.webp`.
+Módulo **genérico** de avisos (2026-10-28: deixou de ser feito só para o aviso do checklist da frota).
+- **Acesso:** Home › 🚧 Em desenvolvimento › 📢 Avisos (`#homeAvisos`, gate `ME.is_admin` + `aviso_eh_admin()` nas RPCs, igual à
+  Telemetria — **não** usa a engrenagem `dev_acesso`).
+- **Formulário (`avForm`) em 6 blocos:** (1) **conteúdo** — título, texto (`**negrito**` + quebras), imagem (upload → `fotos-campo/avisos/`;
+  "Remover imagem" manda `imagem:'-'`); (2) **quem vê** — `filtros` jsonb `{consorcios[], funcoes[], cargos[], pessoas[], condicoes[]}`:
+  **dentro de cada filtro qualquer valor serve, entre filtros vale E**; vazio = todos os ativos; condição hoje só `tem_veiculo`; prévia ao vivo
+  "👥 N pessoas recebem" (`app_aviso_publico_previa`); (3) **como aparece** — `exibicao` `sempre` | `diario` | `uma_vez` | `confirmar`
+  ("Li e entendi"); (4) **botão** — texto + destino: atalhos (`AV_ATALHOS`) + **todos os cards da home** lidos do DOM (`avDestinos`, módulo
+  novo entra sozinho) ou **link externo** (`botao_url`, http/https); (5) **período** de/até + ativo; (6) **lembretes por push** —
+  horários livres (cada um com seu texto), dias da semana (`lembrete_dias`, ISO 1=seg…7=dom), título do push e **para quem**
+  (`lembrete_pendencia`: todo o público | `nao_viu` | `nao_confirmou` (exige `confirmar`) | `nao_fez_checklist`).
+- **Lista:** por aviso, período, público resumido, modo, lembretes, **👁 viram / ✅ confirmaram de N no público**; ações Pré-visualizar,
+  Editar, **Duplicar** (abre cópia desativada com a mesma imagem), **📊 Quem viu** (`avRelatorio` → `app_aviso_relatorio`: abas
+  Todos/Viram/Não viram/Confirmaram + Excel) e ⏸/▶ (`app_aviso_ativar`).
+- **Usuário:** `avPopAbrir()` roda 1x por carregamento, logo após o `app_me`; `app_avisos_ativos()` já filtra público + modo de exibição;
+  cada pop-up mostrado chama `app_aviso_marcar(id)` e o "Li e entendi" `app_aviso_marcar(id,true)`. Botão: `botao_url` abre nova aba,
+  `botao_link` vai por `supGoAct` (que agora aceita **qualquer id de `SCREENS`** além dos atalhos — fallback do Almoxarifado só p/ o resto).
+- **Lembretes:** job único **`aviso-lembretes`** (pg_cron `*/15 * * * *`) → `aviso_lembretes_tick()`: manda os horários que venceram nos
+  últimos 30 min e ainda não estão em `app_aviso_envio` (não duplica); horário anterior à última edição (`atualizado_em`) não dispara.
+  Destino = público ∩ pendência; notificação tipo `aviso` (ícone 📢), título = `lembrete_titulo` ou o título, link = `botao_link` ou
+  `notificacoes`. É o **único** lembrete de checklist do app (os diários de 7h30/16h50 da Frota saíram — `docs/migracao_remove_lembretes_frota.sql`).
+- **Banco:** `public.app_aviso` (+ `filtros`, `exibicao`, `botao_url`, `lembrete_horarios time[]`, `lembrete_dias`, `lembrete_titulo`,
+  `lembrete_pendencia`, `atualizado_em`; `publico`/`lembrete` antigos removidos), `app_aviso_visto` (quem viu/confirmou) e `app_aviso_envio`
+  (lembretes enviados) — RLS sem policy, só RPC. **`app_aviso_salvar(p_id, p_dados jsonb)`**: campo novo entra no jsonb, sem mudar
+  assinatura. Internos sem grant: `aviso_no_publico`, `aviso_pendente`, `aviso_lembretes_tick`, `aviso_eh_admin`, `aviso_tem_veiculo`.
+- **Cuidados:** filtro de pessoas também é E com os outros (marcar Betim + uma pessoa de Contagem = ninguém); a prévia mostra isso.
+  O aviso do checklist (id 1) foi migrado como "com carro vinculado + 08/10/12/14/16h seg–sex, só quem não fez o checklist".
