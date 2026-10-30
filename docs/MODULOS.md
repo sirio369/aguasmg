@@ -127,7 +127,10 @@
 
 ### Relatórios PDF — `REL_CSS` / overlay `#relatorio`
 - Padrão: monta HTML num overlay `#relatorio` e chama `window.print()` (CSS `@media print`).
-  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos e relatório de veículo (§6.2).
+  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos, relatório de veículo (§6.2) e relatório diário
+  da pesquisa (§4.3.9).
+- **Mapa estático no PDF:** `relMapaCanvas(pts,W,H,desenhar,opt)` (tiles OSM num canvas → `<img>`; `desenhar(ctx,xy)`
+  pinta linhas/pontos por cima). Use-o em vez de mapa Leaflet no relatório (Leaflet não imprime bem). Opções em §4.3.9.
 
 ### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
 - **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
@@ -922,6 +925,69 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 - **Decisões do produto (2026-09-14):** passada contada **por segmento** (não rodada global
   sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
   **manual** pelo programador (nada de reabertura automática por prazo, por ora).
+
+#### 4.3.9 Relatório diário da pesquisa + OS SIGOS do dia (2026-10-30) — `pp_diario` (Auxiliar de Programação)
+
+Botão **🗓️ Relatório diário** em Auxiliar › 🎧 Pesquisa de Vazamentos. A tela é uma **lista de blocos dia × colaborador ×
+consórcio** (espelha a Gestão de Pavimento, §4.4): o campo pesquisa e reporta ocorrências; cada dia de trabalho de cada
+colaborador em cada consórcio vira um bloco (cada consórcio é um contrato → OS própria); o **backoffice lança a OS SIGOS do dia** no bloco e ele passa de **Pendente de OS → OS criada** — rastreio
+do que de fato virou OS por dia de trabalho. Cada bloco abre a **folha do dia** p/ imprimir/PDF. Módulo JS `pd*`
+(`pdInit`/`pdCarregar`/`pdRender`/`pdCard`/`pdSalvarOS`/`pdGerar`/`pdDocHtml`/`pdDesenharMapa`), logo depois do
+Acompanhamento.
+- **Lista (`app_pp_diario_lista()`):** um bloco por (colaborador, dia, consórcio) com **qualquer** atividade — trecho,
+  rede pesquisada (`pp_execucao`) ou ocorrência (vazamento ou fraude) —, com `consorcio`, km pesquisado, km andado,
+  duração/nº de trechos, vazamentos, fraudes e a OS do dia (`os_sigos`, `os_em`, `os_por` = nome). Tudo de uma vez;
+  filtros no front. Inclui os dias antigos com ocorrência solta (ex.: 14/09, 21/09, 07/10), que nascem pendentes.
+- **Cabeçalho (igual ao `pavprog`):** abas `.seg` **Pendente de OS [default] / OS criada / Todos** (`#pdStatusSeg`) ·
+  filtros de **consórcio** (`#pdCons`: Todos / Betim / Contagem), **colaborador** (montado dos próprios blocos) e **dia**
+  (date + ✕ = todos os dias) — tudo no front; os chips contam dentro dos filtros · **chips de prazo**
+  (`#pdResumo`, `.pavchip` via `pavCss()`): dias desde o **dia trabalhado** (`pdDias`, datas locais) com o mesmo
+  `PAV_SLA`/`pavBucket` da pavimentação — 🟢 0–3 no prazo · 🟡 4–5 atenção · 🔴 >5 atrasado; o relógio conta só sem OS;
+  clicar num chip filtra e força a aba Pendente. Ordem: pendentes do mais antigo p/ o mais novo; demais, mais novos primeiro.
+- **Card do bloco:** "📅 dia da semana, data" + badge (faixa de prazo · há N dias, ou ✓ OS criada) + borda colorida ·
+  colaborador · consórcio · métricas do dia · **campo "nº da OS SIGOS do dia" + Criar OS** (pendente) ou "✓ OS … · lançada
+  por … em …" + **✏️ alterar** (reabre o campo; apagar o número e salvar devolve o dia a pendente, com confirmação) ·
+  **📄 Relatório do dia ›**.
+- **OS (`app_pp_diario_os(p_colaborador, p_data, p_consorcio, p_os)`):** grava/troca em
+  `"12 - retaguarda".pesquisa_dia_os` (PK colaborador+dia+consórcio; `os_sigos` 1–40 chars, `os_em`, `os_por`); vazio
+  apaga a linha. Recusa bloco que não existe (sem pesquisa desse colaborador nesse dia e consórcio). **Tabela app-only no schema 12** (backoffice, sem geometria; RLS ligada sem policy, revogada de
+  anon/authenticated — acesso só pelas RPCs; GIS não enxerga o schema 12). A OS do dia é **independente** da OS COPASA de
+  cada ocorrência (Abertura de serviços, §4.2) — a folha mostra as duas.
+- **Folha (`app_pp_relatorio_diario(p_colaborador, p_data, p_consorcio)`):** só o que é do consórcio do bloco
+  (`p_consorcio` null = o dia inteiro, sem OS única). Cabeçalho (consórcio, data + dia da semana,
+  colaborador, período em pesquisa = 1º início → último fim dos trechos, **OS SIGOS do dia** ou "Pendente" — `os_dia`) →
+  **1 · Produção do dia** (6 cards: km pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa],
+  vazamentos, fraudes, vaz/km) → **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa,
+  vazamentos em azul e fraudes em laranja, **numerados**) → **3 · Vazamentos apontados** e **4 · Fraudes apontadas** (um
+  bloco por ocorrência, na ordem do horário, com o mesmo nº do mapa: foto, tipo, local, hora, OS COPASA, coordenada e a
+  **descrição do pesquisador** = `ocorrencia.observacao`). Numeração única (`pdOcorrencias`): vazamentos 1..n, depois
+  fraudes n+1…
+- **Mesmas definições do Acompanhamento (§4.3.8):** km pesquisado = `pp_execucao` (rede) · km andado =
+  `pesquisa_trecho` · vaz/km = vazamentos ÷ km de rede · velocidade = km andado ÷ soma de `duracao_s`. **Fraude
+  aparece à parte e não entra no vaz/km** (vazamento = tipo que não começa com "Fraude", §2.3); a RPC devolve as listas
+  `vazamentos` e `fraudes` + `kpis.fraudes`. Dia em que o traço não cruzou rede programada sai com km pesquisado 0 e
+  vaz/km 0 (o km andado aparece).
+- **Dia (fuso):** `inicio_ts`/`data_hora` (timestamp sem tz) já são Brasília → `::date`; `pp_execucao.executado_em`
+  (timestamptz) → `at time zone 'America/Sao_Paulo'` (o Acompanhamento ainda usa `executado_em::date` em UTC — rede
+  pesquisada depois das 21h cai no dia seguinte lá). Casamento traço/ocorrência ↔ usuário por **nome OU e-mail** (§4.3.5).
+- **Consórcio de cada coisa:** rede = `rede.consorcio` · ocorrência = `ocorrencia.consorcio` (pelo ponto desde 2026-10-27,
+  §2.3) · **trecho = pela geometria** (`pp_trecho_consorcio(geom, gravado)`: ZA do `limite_za` que contém
+  `st_pointonsurface` do trecho; o gravado só se cair fora das ZAs). ⚠️ `pesquisa_trecho.consorcio` vem do
+  `localStorage` do aparelho (`app_pesquisa_trecho_registrar`) e está **errado ou vazio em 190 de 299 trechos** (ex.: Marcos,
+  Betim, gravado ZA1004 → todo dia dele aparecia nos dois consórcios). Não confie nessa coluna; o Acompanhamento ainda filtra
+  km andado por ela.
+- **Mapa estático:** `relMapaCanvas(pts,W,H,desenhar,{tolerante,justo})` — o compositor OSM em canvas da ficha do
+  logger virou genérico (o `relComporMapa` do logger chama ele sem opções, comportamento igual). `justo` = zoom
+  fracionário (tiles do nível seguinte encolhidos) p/ a área encher o quadro; `tolerante` = tile que falha fica
+  cinza em vez de derrubar o mapa. A impressão só libera depois de mapa e fotos carregarem (ou 8 s).
+- **Compatibilidade com a v310:** o PR #259 entrou em produção **sem** a segregação por consórcio (v310: bloco dia ×
+  colaborador). O banco já estava segregado, então ficaram de pé, só para a v310: `app_pp_diario_os(p_colaborador,
+  p_data, p_os)` (sem consórcio → usa o consórcio do bloco do dia quando é um só; com dois, pede p/ atualizar o app),
+  `'consorcios'` (array) na lista e a OS do dia na folha chamada sem `p_consorcio`. Podem sair depois que a v311+ estiver
+  em todos os aparelhos.
+- **Gate:** tela por `aux_acesso`/admin (como o `pavprog`); as 3 RPCs aceitam admin, aprovador ou `aux_acesso`
+  (`pp_trecho_consorcio` é interna, sem execute p/ authenticated). SQL em
+  `docs/migracao_pesquisa_relatorio_diario.sql`.
 
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
 - Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*
@@ -1736,7 +1802,7 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
 - Rótulos: `TIPO_PROBLEMA_ALL` (= `TIPO_PROBLEMA` + checklist/preventiva) é o usado em `labelOf` p/ exibir; o formulário
   do colaborador continua com `TIPO_PROBLEMA` (ele não escolhe preventiva/checklist).
 
-### 6.8 Checklist sempre no veículo vinculado agora (2026-10-30, sw v310) — migração `docs/migracao_frota_checklist_vinculo.sql`
+### 6.8 Checklist sempre no veículo vinculado agora (2026-10-30, sw v313) — migração `docs/migracao_frota_checklist_vinculo.sql`
 - `app_frota_situacao_salvar` recusa (`VEICULO_TROCADO`) se quem envia não tem vínculo aberto com `p_veiculo_id`.
 - `condSalvarSituacao` consulta `app_frota_meu_veiculo` antes de subir as fotos; se o carro mudou com a tela aberta, pergunta se registra
   no carro atual (as fotos costumam ser dele) ou recarrega. Caso real: Roberto 30/10, checklist gravado no TZW8B57 com fotos do UVU2H21.
