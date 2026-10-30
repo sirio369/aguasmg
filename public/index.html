@@ -1118,6 +1118,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button type="button" data-st="todos">Todos</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center">
+      <select id="pdCons" style="flex:0 0 auto;min-width:150px"><option value="">Todos os consórcios</option><option value="ZA0200">Betim</option><option value="ZA1004">Contagem</option></select>
       <select id="pdColab" style="flex:1;min-width:170px"><option value="">Todos os colaboradores</option></select>
       <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:170px">
         <input id="pdDia" type="date" title="Filtrar por dia" style="flex:1;min-width:0"/>
@@ -6473,8 +6474,9 @@ function paToggleOc(){ paShowOc=!paShowOc; paPintarToggles(); paCarregarMapa(); 
 function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(); }
 
 // ---------- MÓDULO RELATÓRIO DIÁRIO DA PESQUISA (interno — Auxiliar de Programação) ----------
-// Lista de BLOCOS dia × colaborador (espelha a Gestão de Pavimento): abas Pendente de OS / OS criada / Todos, chips de
-// prazo (dias desde o dia trabalhado, PAV_SLA), filtro de colaborador e de dia. O backoffice lança a OS SIGOS do dia no
+// Lista de BLOCOS dia × colaborador × consórcio (espelha a Gestão de Pavimento): abas Pendente de OS / OS criada / Todos,
+// chips de prazo (dias desde o dia trabalhado, PAV_SLA), filtros de consórcio, colaborador e dia. Cada consórcio é um
+// contrato → bloco, OS e folha são por consórcio (trecho pela geometria, ver SQL). O backoffice lança a OS SIGOS do dia no
 // bloco (app_pp_diario_os) → o bloco vira "OS criada" (rastreio do que virou OS por dia de trabalho). Cada bloco abre a
 // folha do dia (overlay #relatorio + REL_CSS → imprimir/PDF): produção (km pesquisado = rede, km andado, velocidade,
 // vazamentos, fraudes, vaz/km — mesmas definições do Acompanhamento), mapa estático (rede + trajetos + ocorrências
@@ -6487,7 +6489,7 @@ function pdInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   pavCss();   // reaproveita .pavchips/.pavchip da Gestão de Pavimento
   document.querySelectorAll('#pdStatusSeg button').forEach(b=>b.onclick=()=>pdSetStatus(b.dataset.st));
-  $('#pdColab').onchange=pdRender; $('#pdDia').onchange=pdRender;
+  $('#pdCons').onchange=pdRender; $('#pdColab').onchange=pdRender; $('#pdDia').onchange=pdRender;
   $('#pdDiaLimpar').onclick=()=>{ $('#pdDia').value=''; pdRender(); };
   pdCarregar();
 }
@@ -6507,8 +6509,8 @@ async function pdCarregar(){
 function pdDias(dia){ const p=String(dia||'').split('-'); if(p.length!==3) return null; const n=new Date();
   return Math.round((new Date(n.getFullYear(),n.getMonth(),n.getDate())-new Date(+p[0],+p[1]-1,+p[2]))/86400000); }
 function pdFiltrado(semStatus){
-  const col=$('#pdColab').value, dia=$('#pdDia').value;
-  let arr=pdBlocos.filter(b=>(!col||b.colaborador_uuid===col)&&(!dia||b.dia===dia));
+  const cons=$('#pdCons').value, col=$('#pdColab').value, dia=$('#pdDia').value;
+  let arr=pdBlocos.filter(b=>(!cons||b.consorcio===cons)&&(!col||b.colaborador_uuid===col)&&(!dia||b.dia===dia));
   if(semStatus!==true){
     if(pdStatus==='pendente') arr=arr.filter(b=>!b.os_sigos); else if(pdStatus==='criada') arr=arr.filter(b=>!!b.os_sigos);
     if(pdPrazo) arr=arr.filter(b=>!b.os_sigos && pavBucket(pdDias(b.dia)).key===pdPrazo);
@@ -6534,12 +6536,12 @@ function pdRender(){
   c.querySelectorAll('.pdosalt').forEach(b=>b.onclick=()=>{ const w=c.querySelector('.pdosedit[data-k="'+b.dataset.k+'"]'); if(w) w.classList.toggle('hidden'); });
   c.querySelectorAll('.pdrel').forEach(b=>b.onclick=()=>{ const bl=pdBloco(b.dataset.k); if(bl) pdGerar(bl, b); });
 }
-const pdChave=b=>b.colaborador_uuid+'|'+b.dia;
+const pdChave=b=>b.colaborador_uuid+'|'+b.dia+'|'+(b.consorcio||'');
 function pdBloco(k){ return pdBlocos.find(b=>pdChave(b)===k); }
 function pdCard(b){
   const k=pdChave(b), d=pdDias(b.dia), bk=pavBucket(d), pend=!b.os_sigos, cor=pend?bk.c:'#0e7c86';
   const p=String(b.dia).split('-'), sem=new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
-  const cons=(b.consorcios||[]).map(c=>c==='ZA1004'?'Contagem':(c==='ZA0200'?'Betim':c)).join(' / ')||'—';
+  const cons=b.consorcio==='ZA1004'?'Contagem':(b.consorcio==='ZA0200'?'Betim':(b.consorcio||'Sem consórcio'));
   const vel=b.duracao_s>0?(Number(b.km_andado)/(b.duracao_s/3600)):0;
   const badge='<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:'+cor+';padding:2px 10px;border-radius:999px;white-space:nowrap">'+(pend?(bk.lbl+' · '+pavDiasTxt(d)):'✓ OS criada')+'</span>';
   const met=[relNum(b.km_rede,2)+' km pesquisados',relNum(b.km_andado,2)+' km andados',relNum(vel,1)+' km/h',
@@ -6562,7 +6564,7 @@ async function pdSalvarOS(k){
   const os=inp.value.trim();
   if(!os && !bl.os_sigos) return toast('Informe o número da OS SIGOS');
   if(!os && !confirm('Apagar a OS deste dia? O bloco volta a "Pendente de OS".')) return;
-  try{ const {data,error}=await sb.rpc('app_pp_diario_os',{p_colaborador:bl.colaborador_uuid,p_data:bl.dia,p_os:os}); if(error) throw error;
+  try{ const {data,error}=await sb.rpc('app_pp_diario_os',{p_colaborador:bl.colaborador_uuid,p_data:bl.dia,p_consorcio:bl.consorcio||'',p_os:os}); if(error) throw error;
     bl.os_sigos=(data&&data.os_sigos)||null; bl.os_em=(data&&data.os_em)||null; bl.os_por=(data&&data.os_por)||null;
     toast(bl.os_sigos?'✓ OS criada':'OS apagada — dia pendente'); pdRender();
   }catch(e){ toast('Erro ao salvar OS: '+(e.message||e)); }
@@ -6570,7 +6572,7 @@ async function pdSalvarOS(k){
 async function pdGerar(bl, btn){
   if(!navigator.onLine) return toast('Conecte-se para gerar o relatório');
   const old=btn&&btn.textContent; if(btn){ btn.textContent='Gerando…'; btn.style.pointerEvents='none'; }
-  let d; try{ const r=await sb.rpc('app_pp_relatorio_diario',{p_colaborador:bl.colaborador_uuid,p_data:bl.dia}); if(r.error) throw r.error; d=r.data; }
+  let d; try{ const r=await sb.rpc('app_pp_relatorio_diario',{p_colaborador:bl.colaborador_uuid,p_data:bl.dia,p_consorcio:bl.consorcio||''}); if(r.error) throw r.error; d=r.data; }
   catch(e){ toast('⚠ '+(e.message||e)); }
   if(btn){ btn.textContent=old; btn.style.pointerEvents=''; }
   if(!d) return;

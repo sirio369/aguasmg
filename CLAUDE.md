@@ -148,7 +148,7 @@ pwa/
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
 | `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09; **abastecimento removido** em 2026-10-14) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
-| `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico`, `pesquisa_dia_os` (OS SIGOS do dia de pesquisa por colaborador, §4.3.9) — *app-only* |
+| `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico`, `pesquisa_dia_os` (OS SIGOS do dia de pesquisa por colaborador × consórcio, §4.3.9) — *app-only* |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
 | `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); nada pode ser apagado (trigger) — *app-only* |
@@ -288,8 +288,8 @@ pwa/
   - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
     (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
     **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`) · **Relatório diário** (`pp_diario`, 2026-10-30: lista de
-    blocos dia × colaborador no estilo da Gestão de Pavimento — abas Pendente de OS/OS criada/Todos, chips de prazo,
-    filtro de colaborador e dia; o backoffice lança a **OS SIGOS do dia** no bloco (`"12 - retaguarda".pesquisa_dia_os`)
+    blocos dia × colaborador × consórcio no estilo da Gestão de Pavimento — abas Pendente de OS/OS criada/Todos, chips de
+    prazo, filtros de consórcio, colaborador e dia; o backoffice lança a **OS SIGOS do dia** no bloco (`"12 - retaguarda".pesquisa_dia_os`)
     e cada bloco abre a folha p/ imprimir/PDF — produção do dia, mapa estático e o detalhe de cada vazamento e de cada
     fraude com foto e descrição (fraude fora do vaz/km); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9).
   - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma

@@ -928,18 +928,19 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 
 #### 4.3.9 Relatório diário da pesquisa + OS SIGOS do dia (2026-10-30) — `pp_diario` (Auxiliar de Programação)
 
-Botão **🗓️ Relatório diário** em Auxiliar › 🎧 Pesquisa de Vazamentos. A tela é uma **lista de blocos dia × colaborador**
-(espelha a Gestão de Pavimento, §4.4): o campo pesquisa e reporta ocorrências; cada dia de trabalho de cada colaborador
-vira um bloco; o **backoffice lança a OS SIGOS do dia** no bloco e ele passa de **Pendente de OS → OS criada** — rastreio
+Botão **🗓️ Relatório diário** em Auxiliar › 🎧 Pesquisa de Vazamentos. A tela é uma **lista de blocos dia × colaborador ×
+consórcio** (espelha a Gestão de Pavimento, §4.4): o campo pesquisa e reporta ocorrências; cada dia de trabalho de cada
+colaborador em cada consórcio vira um bloco (cada consórcio é um contrato → OS própria); o **backoffice lança a OS SIGOS do dia** no bloco e ele passa de **Pendente de OS → OS criada** — rastreio
 do que de fato virou OS por dia de trabalho. Cada bloco abre a **folha do dia** p/ imprimir/PDF. Módulo JS `pd*`
 (`pdInit`/`pdCarregar`/`pdRender`/`pdCard`/`pdSalvarOS`/`pdGerar`/`pdDocHtml`/`pdDesenharMapa`), logo depois do
 Acompanhamento.
-- **Lista (`app_pp_diario_lista()`):** um bloco por (colaborador, dia) com **qualquer** atividade — trecho, rede
-  pesquisada (`pp_execucao`) ou ocorrência (vazamento ou fraude) —, com consórcio(s), km pesquisado, km andado,
+- **Lista (`app_pp_diario_lista()`):** um bloco por (colaborador, dia, consórcio) com **qualquer** atividade — trecho,
+  rede pesquisada (`pp_execucao`) ou ocorrência (vazamento ou fraude) —, com `consorcio`, km pesquisado, km andado,
   duração/nº de trechos, vazamentos, fraudes e a OS do dia (`os_sigos`, `os_em`, `os_por` = nome). Tudo de uma vez;
   filtros no front. Inclui os dias antigos com ocorrência solta (ex.: 14/09, 21/09, 07/10), que nascem pendentes.
 - **Cabeçalho (igual ao `pavprog`):** abas `.seg` **Pendente de OS [default] / OS criada / Todos** (`#pdStatusSeg`) ·
-  filtro de **colaborador** (montado dos próprios blocos) e de **dia** (date + ✕ = todos os dias) · **chips de prazo**
+  filtros de **consórcio** (`#pdCons`: Todos / Betim / Contagem), **colaborador** (montado dos próprios blocos) e **dia**
+  (date + ✕ = todos os dias) — tudo no front; os chips contam dentro dos filtros · **chips de prazo**
   (`#pdResumo`, `.pavchip` via `pavCss()`): dias desde o **dia trabalhado** (`pdDias`, datas locais) com o mesmo
   `PAV_SLA`/`pavBucket` da pavimentação — 🟢 0–3 no prazo · 🟡 4–5 atenção · 🔴 >5 atrasado; o relógio conta só sem OS;
   clicar num chip filtra e força a aba Pendente. Ordem: pendentes do mais antigo p/ o mais novo; demais, mais novos primeiro.
@@ -947,12 +948,13 @@ Acompanhamento.
   colaborador · consórcio · métricas do dia · **campo "nº da OS SIGOS do dia" + Criar OS** (pendente) ou "✓ OS … · lançada
   por … em …" + **✏️ alterar** (reabre o campo; apagar o número e salvar devolve o dia a pendente, com confirmação) ·
   **📄 Relatório do dia ›**.
-- **OS (`app_pp_diario_os(p_colaborador, p_data, p_os)`):** grava/troca em `"12 - retaguarda".pesquisa_dia_os`
-  (PK colaborador+dia; `os_sigos` 1–40 chars, `os_em`, `os_por`); vazio apaga a linha. Recusa dia em que o colaborador
-  não pesquisou. **Tabela app-only no schema 12** (backoffice, sem geometria; RLS ligada sem policy, revogada de
+- **OS (`app_pp_diario_os(p_colaborador, p_data, p_consorcio, p_os)`):** grava/troca em
+  `"12 - retaguarda".pesquisa_dia_os` (PK colaborador+dia+consórcio; `os_sigos` 1–40 chars, `os_em`, `os_por`); vazio
+  apaga a linha. Recusa bloco que não existe (sem pesquisa desse colaborador nesse dia e consórcio). **Tabela app-only no schema 12** (backoffice, sem geometria; RLS ligada sem policy, revogada de
   anon/authenticated — acesso só pelas RPCs; GIS não enxerga o schema 12). A OS do dia é **independente** da OS COPASA de
   cada ocorrência (Abertura de serviços, §4.2) — a folha mostra as duas.
-- **Folha (`app_pp_relatorio_diario(p_colaborador, p_data)`):** cabeçalho (consórcio, data + dia da semana,
+- **Folha (`app_pp_relatorio_diario(p_colaborador, p_data, p_consorcio)`):** só o que é do consórcio do bloco
+  (`p_consorcio` null = o dia inteiro, sem OS única). Cabeçalho (consórcio, data + dia da semana,
   colaborador, período em pesquisa = 1º início → último fim dos trechos, **OS SIGOS do dia** ou "Pendente" — `os_dia`) →
   **1 · Produção do dia** (6 cards: km pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa],
   vazamentos, fraudes, vaz/km) → **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa,
@@ -968,12 +970,18 @@ Acompanhamento.
 - **Dia (fuso):** `inicio_ts`/`data_hora` (timestamp sem tz) já são Brasília → `::date`; `pp_execucao.executado_em`
   (timestamptz) → `at time zone 'America/Sao_Paulo'` (o Acompanhamento ainda usa `executado_em::date` em UTC — rede
   pesquisada depois das 21h cai no dia seguinte lá). Casamento traço/ocorrência ↔ usuário por **nome OU e-mail** (§4.3.5).
-- **Consórcio:** de rede/ocorrência/trecho; trecho recente vem com `consorcio` nulo → pega o `limite_za` que o trecho cruza.
+- **Consórcio de cada coisa:** rede = `rede.consorcio` · ocorrência = `ocorrencia.consorcio` (pelo ponto desde 2026-10-27,
+  §2.3) · **trecho = pela geometria** (`pp_trecho_consorcio(geom, gravado)`: ZA do `limite_za` que contém
+  `st_pointonsurface` do trecho; o gravado só se cair fora das ZAs). ⚠️ `pesquisa_trecho.consorcio` vem do
+  `localStorage` do aparelho (`app_pesquisa_trecho_registrar`) e está **errado ou vazio em 190 de 299 trechos** (ex.: Marcos,
+  Betim, gravado ZA1004 → todo dia dele aparecia nos dois consórcios). Não confie nessa coluna; o Acompanhamento ainda filtra
+  km andado por ela.
 - **Mapa estático:** `relMapaCanvas(pts,W,H,desenhar,{tolerante,justo})` — o compositor OSM em canvas da ficha do
   logger virou genérico (o `relComporMapa` do logger chama ele sem opções, comportamento igual). `justo` = zoom
   fracionário (tiles do nível seguinte encolhidos) p/ a área encher o quadro; `tolerante` = tile que falha fica
   cinza em vez de derrubar o mapa. A impressão só libera depois de mapa e fotos carregarem (ou 8 s).
-- **Gate:** tela por `aux_acesso`/admin (como o `pavprog`); as 3 RPCs aceitam admin, aprovador ou `aux_acesso`. SQL em
+- **Gate:** tela por `aux_acesso`/admin (como o `pavprog`); as 3 RPCs aceitam admin, aprovador ou `aux_acesso`
+  (`pp_trecho_consorcio` é interna, sem execute p/ authenticated). SQL em
   `docs/migracao_pesquisa_relatorio_diario.sql`.
 
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
