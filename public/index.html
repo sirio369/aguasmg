@@ -10736,7 +10736,7 @@ function condRenderSituacao(){
   $('#sitfSalvar').addEventListener('click',condSalvarSituacao);
 }
 async function condSalvarSituacao(){
-  const v=condMeuVeiculo;
+  let v=condMeuVeiculo;
   if(!v) return toast('Você não tem veículo vinculado');
   const chk=id=>$('#sitf_'+id).checked;
   const q=sel=>$('#condView').querySelector(sel);
@@ -10748,6 +10748,13 @@ async function condSalvarSituacao(){
   }
   const btn=$('#sitfSalvar'), txt=btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
   try{
+    // a pessoa pode ter trocado de carro com esta tela aberta: o checklist vai sempre p/ o veículo vinculado AGORA
+    const {data:atual,error:eAt}=await sb.rpc('app_frota_meu_veiculo'); if(eAt) throw eAt;
+    if(!atual){ toast('Você não está mais vinculado a nenhum veículo'); condMeuVeiculo=null; condSub='home'; return condRender(); }
+    if(String(atual.id)!==String(v.id)){
+      if(!confirm('Seu veículo agora é '+atual.placa+' (esta tela foi aberta com '+v.placa+').\nAs fotos são do '+atual.placa+'? Registrar o checklist nele?')){ condSub='situacao'; return condRender(); }
+      v=atual; condMeuVeiculo=atual; frotaMeuVeiculo=atual;
+    }
     const faces=[];
     for(const [key,lbl] of FR_FACES){
       const foto=await uploadFoto2('face_'+key,'frota');
@@ -10766,7 +10773,10 @@ async function condSalvarSituacao(){
     const nocc=faces.filter(f=>f.ocorrencia).length;
     toast('✓ Checklist registrado'+(nocc?(' · '+nocc+' ocorrência(s) → manutenção gerada'):''));
     condSub='home'; condRender();
-  }catch(e){ toast('Erro ao salvar: '+(e.message||e)+' — precisa de conexão'); btn.disabled=false; btn.textContent=txt; }
+  }catch(e){
+    if(/VEICULO_TROCADO/.test(e.message||'')){ toast('Você trocou de veículo — tela recarregada com o veículo atual'); condSub='situacao'; return condRender(); }
+    toast('Erro ao salvar: '+(e.message||e)+' — precisa de conexão'); btn.disabled=false; btn.textContent=txt;
+  }
 }
 function condRenderOcorrencia(){
   const v=condMeuVeiculo||{};
