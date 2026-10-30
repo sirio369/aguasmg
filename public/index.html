@@ -10655,6 +10655,8 @@ async function condRenderVeiculos(){
       ${v.lavagem_atrasada?'<div class="banner warn" style="margin-top:6px">🧼 Sem lavagem há mais de 30 dias.</div>':''}
       <button class="btn ghost" id="condDesvincular" style="margin-top:10px;padding:8px;font-size:13px;border-color:var(--bad);color:var(--bad)">Desvincular veículo</button>
     </div>`;
+  } else if(!(condData&&condData.cnh_numero)){
+    h+='<div class="banner warn" style="margin-top:8px">🪪 Você ainda não tem CNH cadastrada. Cadastre sua CNH em <b>Frota › Colaborador</b> para ver os veículos disponíveis.</div>';
   } else {
     h+='<p class="sub" style="margin-top:2px">Você não está vinculado a nenhum veículo. Escolha um disponível abaixo:</p>';
     h+='<div id="condVeicDisp" style="margin-top:8px"><p class="sub">Carregando…</p></div>';
@@ -10666,11 +10668,11 @@ async function condRenderVeiculos(){
     try{ const {error}=await sb.rpc('app_frota_veiculo_desvincular_me'); if(error) throw error; toast('✓ Veículo desvinculado'); condSub='veiculos'; condRender(); }
     catch(e){ toast('Erro: '+(e.message||e)); }
   });
-  if(!condMeuVeiculo){
+  if(!condMeuVeiculo && $('#condVeicDisp')){
     const box=$('#condVeicDisp');
     try{
       const {data,error}=await sb.rpc('app_frota_veiculos_disponiveis'); if(error) throw error;
-      const disp=data||[];
+      const disp=(data||[]).filter(frVeicVinculavel);
       box.innerHTML = disp.length ? disp.map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px"><div><b>${v.placa}</b><div class="sub">${v.modelo||''} · ${labelOf(TIPOS_VEICULO,v.tipo)}</div></div><button class="btn" data-vincme="${v.id}" style="margin:0;width:auto;padding:8px 14px;font-size:13px">Vincular</button></div>`).join('') : '<p class="sub">Nenhum veículo disponível no momento.</p>';
       box.querySelectorAll('[data-vincme]').forEach(b=>b.addEventListener('click',async()=>{
         try{ const {error}=await sb.rpc('app_frota_veiculo_vincular_me',{p_veiculo_id:+b.dataset.vincme}); if(error) throw error; toast('✓ Veículo vinculado'); condRender(); }
@@ -10906,7 +10908,19 @@ async function condRenderCnhHistorico(){
   $('#condVoltar').addEventListener('click',()=>{condSub='home';condRender();});
 }
 
-let frotasVeiculos=[], frotasSub='home', frotasVeiculoSel=null, frVeicFiltroTipo='', frVeicFiltroCond='';
+let frotasVeiculos=[], frotasSub='home', frotasVeiculoSel=null, frVeicFiltroTipo='', frVeicFiltroCond='', frVeicFiltroTxt='', frVeicFiltroSit='ativos';
+// veículo pode receber vínculo: ativo e não baixado/devolvido
+const frVeicVinculavel=v=>!!v && v.ativo!==false && v.status!=='baixado' && !v.data_fim_real;
+// situação p/ filtro e quantitativo da lista do gestor
+const FR_VEIC_SIT=[['ativos','Ativos'],['disponivel','Disponíveis'],['em_uso','Em uso'],['manutencao','Em manutenção'],['baixado','Baixados'],['inativos','Inativos'],['todos','Todos']];
+function frVeicSitOk(v,sit){
+  const ativo=v.ativo!==false && v.status!=='baixado';
+  if(sit==='todos') return true;
+  if(sit==='ativos') return ativo;
+  if(sit==='inativos') return v.ativo===false;
+  if(sit==='baixado') return v.status==='baixado';
+  return ativo && v.status===sit;
+}
 async function frotasInit(){ frotasSub = (frotasTarget && ['condutores','painel','lavagem_fila','manutencao_fila','manutencao_aprovar','equipamentos','chk_equipe','registros','preventiva'].includes(frotasTarget)) ? frotasTarget : 'home'; frotasTarget=null; await frotasRender(); }
 // ---- Supervisão de checklists da equipe (aprovador vê sua equipe; admin/frotas veem tudo) ----
 let frChkDias=7, frChkSel=null, _frChk=null;
@@ -10995,22 +11009,32 @@ function frotasRenderHome(){
     $('#frotasView').innerHTML='<p class="sub" style="padding:24px 0;text-align:center">Nada por aqui — use <b>Frota › Colaborador</b> para suas ações, ou <b>Frota › Gestor</b> se você aprova manutenções.</p>';
     return;
   }
-  let h=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><select id="frVeicFTipo" style="flex:1;min-width:170px"><option value="">Todos os tipos</option>${TIPOS_VEICULO.map(t=>`<option value="${t[0]}"${frVeicFiltroTipo===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select><input id="frVeicFCond" placeholder="Filtrar por condutor…" value="${(frVeicFiltroCond||'').replace(/"/g,'&quot;')}" style="flex:1;min-width:160px"/></div>`;
-  h+=`<div class="sec">🚗 Veículos <button id="frVeicNovo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">➕ Novo</button></div>`;
+  const esc=x=>(x||'').replace(/"/g,'&quot;');
+  let h=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><input id="frVeicFTxt" placeholder="Placa ou modelo…" value="${esc(frVeicFiltroTxt)}" style="flex:1;min-width:160px"/><select id="frVeicFSit" style="flex:1;min-width:150px">${FR_VEIC_SIT.map(o=>`<option value="${o[0]}"${frVeicFiltroSit===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select></div>`;
+  h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><select id="frVeicFTipo" style="flex:1;min-width:170px"><option value="">Todos os tipos</option>${TIPOS_VEICULO.map(t=>`<option value="${t[0]}"${frVeicFiltroTipo===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select><input id="frVeicFCond" placeholder="Filtrar por condutor…" value="${esc(frVeicFiltroCond)}" style="flex:1;min-width:160px"/></div>`;
+  h+='<div id="frVeicQtd" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>';
+  h+=`<div class="sec">🚗 Veículos <span id="frVeicN" class="sub" style="font-weight:400"></span><button id="frVeicNovo" class="btn ghost" style="all:unset;cursor:pointer;color:var(--acc);float:right;font-size:13px">➕ Novo</button></div>`;
   h+='<div id="frVeicLista"></div>';
   $('#frotasView').innerHTML=h;
   const renderLista=()=>{
-    const t=_matNorm(frVeicFiltroCond||'').trim();
-    const arr=frotasVeiculos.filter(v=>{
+    const t=_matNorm(frVeicFiltroCond||'').trim(), q=_matNorm(frVeicFiltroTxt||'').replace(/[\s-]/g,'');
+    // quantitativo: respeita placa/modelo, tipo e condutor; a situação vem de cada chip
+    const base=frotasVeiculos.filter(v=>{
       if(frVeicFiltroTipo && v.tipo!==frVeicFiltroTipo) return false;
       if(t && !(v.vinculados||[]).some(x=>_matNorm(x.nome||'').includes(t))) return false;
+      if(q && !_matNorm((v.placa||'')+' '+(v.modelo||'')).replace(/[\s-]/g,'').includes(q)) return false;
       return true;
     });
+    $('#frVeicQtd').innerHTML=FR_VEIC_SIT.map(o=>{ const n=base.filter(v=>frVeicSitOk(v,o[0])).length, on=frVeicFiltroSit===o[0];
+      return `<button data-frsit="${o[0]}" style="all:unset;cursor:pointer;font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid ${on?'var(--acc)':'var(--line)'};background:${on?'var(--acc)':'var(--card)'};color:${on?'#fff':'var(--ink)'}">${o[1]} <b>${n}</b></button>`; }).join('');
+    $('#frVeicQtd').querySelectorAll('[data-frsit]').forEach(b=>b.addEventListener('click',()=>{frVeicFiltroSit=b.dataset.frsit;$('#frVeicFSit').value=frVeicFiltroSit;renderLista();}));
+    const arr=base.filter(v=>frVeicSitOk(v,frVeicFiltroSit));
+    $('#frVeicN').textContent='· '+arr.length+(arr.length===1?' veículo':' veículos');
     $('#frVeicLista').innerHTML = arr.length ? arr.map(v=>{
       const st=STATUS_VEICULO_LABEL[v.status]||{l:v.status||'—',bg:'--line',fg:'--mut'};
       const vinc=(v.vinculados&&v.vinculados[0])?v.vinculados[0].nome:null;
       return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px">${v.placa}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${st.bg});color:var(${st.fg})">${st.l}</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px">${v.placa}</b><span style="font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;background:var(${v.ativo===false?'--line':st.bg});color:var(${v.ativo===false?'--mut':st.fg})">${v.ativo===false?'Inativo':st.l}</span></div>
         <div class="sub" style="margin-top:3px">${v.modelo||''}${v.ano?(' '+v.ano):''} · Km ${v.km_atual||0}</div>
         <div class="sub" style="margin-top:3px">${labelOf(TIPOS_VEICULO,v.tipo)}</div>
         <div class="sub" style="margin-top:3px">${vinc?('👤 '+vinc):'Sem colaborador vinculado'}${v.ultima_lavagem_em?(' · 🧼 '+fmtData(v.ultima_lavagem_em)):' · nunca lavado'}</div>
@@ -11022,6 +11046,8 @@ function frotasRenderHome(){
   renderLista();
   $('#frVeicFTipo').addEventListener('change',e=>{frVeicFiltroTipo=e.target.value;renderLista();});
   $('#frVeicFCond').addEventListener('input',e=>{frVeicFiltroCond=e.target.value;renderLista();});
+  $('#frVeicFTxt').addEventListener('input',e=>{frVeicFiltroTxt=e.target.value;renderLista();});
+  $('#frVeicFSit').addEventListener('change',e=>{frVeicFiltroSit=e.target.value;renderLista();});
   $('#frVeicNovo').addEventListener('click',()=>{frotasVeiculoSel=null;frotasSub='veiculo_edit';frotasRender();});
 }
 function frotasRenderVeiculoDetalhe(){
@@ -11043,7 +11069,8 @@ function frotasRenderVeiculoDetalhe(){
   if(v.vinculados&&v.vinculados.length){
     h+=`<div class="sub">👤 ${v.vinculados[0].nome}</div><button class="btn ghost" id="frDetGerenciarVinc" style="margin-top:8px;padding:9px;font-size:13px;border-color:var(--bad);color:var(--bad)">Desvincular</button>`;
   } else {
-    h+='<p class="sub">Sem colaborador vinculado.</p><button class="btn ghost" id="frDetGerenciarVinc" style="margin-top:8px;padding:9px;font-size:13px">🔗 Vincular colaborador</button>';
+    h+= frVeicVinculavel(v) ? '<p class="sub">Sem colaborador vinculado.</p><button class="btn ghost" id="frDetGerenciarVinc" style="margin-top:8px;padding:9px;font-size:13px">🔗 Vincular colaborador</button>'
+      : '<p class="sub">Sem colaborador vinculado. Veículo inativo/baixado — não pode ser vinculado.</p>';
   }
   h+='<div style="display:flex;gap:6px;margin-top:16px;flex-wrap:wrap">';
   h+='<button class="btn ghost" id="frDetEditar" style="margin:0;flex:1;padding:10px;font-size:13px">✏️ Editar</button>';
@@ -11056,7 +11083,7 @@ function frotasRenderVeiculoDetalhe(){
   $('#frDetEditar').addEventListener('click',()=>{frotasSub='veiculo_edit';frotasRender();});
   $('#frDetHistorico').addEventListener('click',()=>{frHistVeiculoSel=String(v.id);frHistCondutorSel=null;frHistBackTo='veiculo_detalhe';frotasSub='historico';frotasRender();});
   $('#frDetRelatorio').addEventListener('click',()=>frotasRelatorioVeiculo(v.id));
-  $('#frDetGerenciarVinc').addEventListener('click',()=>{frotasVeiculoSel=String(v.id);frotasSub='vinculo';frotasRender();});
+  const gv=$('#frDetGerenciarVinc'); if(gv) gv.addEventListener('click',()=>{frotasVeiculoSel=String(v.id);frotasSub='vinculo';frotasRender();});
   const dev=$('#frDetDevolver'); if(dev) dev.addEventListener('click',()=>{frotasSub='veiculo_devolver';frotasRender();});
 }
 function frotasRenderVeiculoDevolver(){
@@ -11180,12 +11207,17 @@ async function frotasRenderVinculo(){
   const v=frotasVeiculos.find(x=>String(x.id)===String(frotasVeiculoSel))||{};
   const temVinc=!!(v.vinculados&&v.vinculados.length);
   if(!temVinc) await frotasCarregarColaboradores();
-  const ativos=temVinc?[]:frotasColaboradoresOrdenados().filter(c=>c.condutor_status==='ativo');
+  // quem já tem carro vinculado (em qualquer veículo) sai da lista
+  const comCarro=new Set(); frotasVeiculos.forEach(x=>(x.vinculados||[]).forEach(m=>{ if(m.condutor_id) comCarro.add(String(m.condutor_id)); if(m.nome) comCarro.add('n:'+_matNorm(m.nome)); }));
+  const podeVinc=frVeicVinculavel(v);
+  const ativos=(temVinc||!podeVinc)?[]:frotasColaboradoresOrdenados().filter(c=>c.condutor_status==='ativo' && c.cnh_numero && !comCarro.has(String(c.id)) && !comCarro.has('n:'+_matNorm(c.nome||'')));
   let h=`<button class="btn ghost" id="frVoltar" style="margin:0 0 12px">‹ Voltar</button><div class="sec">🔗 Vincular/desvincular — ${v.placa||''}</div>`;
-  h+='<p class="sub" style="margin-top:2px">Só colaboradores com termo assinado (status ativo) podem ser vinculados. Um veículo tem no máximo uma pessoa vinculada por vez.</p>';
+  h+='<p class="sub" style="margin-top:2px">Aparecem só colaboradores com CNH cadastrada, termo assinado e <b>sem carro vinculado</b>. Um veículo tem no máximo uma pessoa vinculada por vez.</p>';
+  if(!temVinc && !podeVinc) h+='<div class="banner warn" style="margin-top:8px">Veículo inativo/baixado — não pode ser vinculado.</div>';
   h+='<div id="frVincLista">'+(temVinc?v.vinculados.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-top:8px"><span>${x.nome}</span><button data-desvinc="${x.vinculo_id}" style="all:unset;cursor:pointer;color:var(--bad);font-size:13px">Desvincular</button></div>`).join('') : '<p class="sub">Nenhum colaborador vinculado.</p>')+'</div>';
-  if(!temVinc){
+  if(!temVinc && podeVinc){
     h+='<div class="sec" style="margin-top:16px">Vincular colaborador</div>';
+    if(!ativos.length) h+='<p class="sub">Nenhum colaborador com CNH cadastrada e sem carro no momento.</p>';
     h+=`<label>Colaborador *</label><select id="frVincSel"><option value="">Selecione…</option>${ativos.map(c=>`<option value="${c.id}">${c.nome||c.email}</option>`).join('')}</select>`;
     h+='<div class="sub" style="margin-top:10px">Fotos do veículo na entrega (opcional)</div>';
     h+=[1,2,3].map(n=>fotoPickHtml('frVincFoto'+n,'Foto '+n)).join('');

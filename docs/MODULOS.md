@@ -1802,6 +1802,14 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
 - Rótulos: `TIPO_PROBLEMA_ALL` (= `TIPO_PROBLEMA` + checklist/preventiva) é o usado em `labelOf` p/ exibir; o formulário
   do colaborador continua com `TIPO_PROBLEMA` (ele não escolhe preventiva/checklist).
 
+### 6.7 Vínculo só p/ quem tem CNH e está sem carro + filtros da lista (2026-10-30, sw v312) — só frontend
+- **Colaborador › Veículos:** sem CNH cadastrada (`condData.cnh_numero`) não mostra os disponíveis (aviso p/ cadastrar). A lista de
+  disponíveis passa por `frVeicVinculavel` (ativo, não baixado, não devolvido).
+- **Gestor › Vincular colaborador:** só `condutor_status='ativo'` **com `cnh_numero`** e **sem carro** em nenhum veículo (cruza
+  `frotasVeiculos[].vinculados` por `condutor_id`, fallback nome). Veículo inativo/baixado não oferece vínculo (detalhe e tela de vínculo).
+- **Lista de veículos (gestor):** filtro placa/modelo (`frVeicFiltroTxt`) e situação (`frVeicFiltroSit`: ativos [padrão], disponíveis, em uso,
+  manutenção, baixados, inativos, todos — `frVeicSitOk`) + chips de **quantitativo** por situação (respeitam os demais filtros) e total exibido.
+
 ### Tabelas (`"10 - Frotas"`)
 `frota_veiculo` (cadastro/combustível/consórcio/contrato — §6.2; **`uso_tipo`/`equipe_id`/
 `condutor_exclusivo_id` ficaram sem uso**, ninguém mais escreve neles, não foram dropados; **`status`
