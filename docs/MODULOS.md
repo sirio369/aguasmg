@@ -980,6 +980,11 @@ Acompanhamento.
   logger virou genérico (o `relComporMapa` do logger chama ele sem opções, comportamento igual). `justo` = zoom
   fracionário (tiles do nível seguinte encolhidos) p/ a área encher o quadro; `tolerante` = tile que falha fica
   cinza em vez de derrubar o mapa. A impressão só libera depois de mapa e fotos carregarem (ou 8 s).
+- **Compatibilidade com a v310:** o PR #259 entrou em produção **sem** a segregação por consórcio (v310: bloco dia ×
+  colaborador). O banco já estava segregado, então ficaram de pé, só para a v310: `app_pp_diario_os(p_colaborador,
+  p_data, p_os)` (sem consórcio → usa o consórcio do bloco do dia quando é um só; com dois, pede p/ atualizar o app),
+  `'consorcios'` (array) na lista e a OS do dia na folha chamada sem `p_consorcio`. Podem sair depois que a v311+ estiver
+  em todos os aparelhos.
 - **Gate:** tela por `aux_acesso`/admin (como o `pavprog`); as 3 RPCs aceitam admin, aprovador ou `aux_acesso`
   (`pp_trecho_consorcio` é interna, sem execute p/ authenticated). SQL em
   `docs/migracao_pesquisa_relatorio_diario.sql`.

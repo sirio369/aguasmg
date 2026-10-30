@@ -172,7 +172,7 @@ end $$;
 
 -- versões anteriores deste PR (assinaturas sem consórcio) — drop p/ não sobrar overload (§0.6)
 drop function if exists public.app_pp_diario_colabs(date);
-drop function if exists public.app_pp_diario_os(uuid, date, text);
+-- (a assinatura sem consórcio volta abaixo como compatibilidade com a v310)
 drop function if exists public.app_pp_relatorio_diario(uuid, date);
 revoke all on function public.app_pp_diario_lista() from public, anon;
 revoke all on function public.app_pp_diario_os(uuid, date, text, text) from public, anon;
@@ -180,3 +180,32 @@ revoke all on function public.app_pp_relatorio_diario(uuid, date, text) from pub
 grant execute on function public.app_pp_diario_lista() to authenticated;
 grant execute on function public.app_pp_diario_os(uuid, date, text, text) to authenticated;
 grant execute on function public.app_pp_relatorio_diario(uuid, date, text) to authenticated;
+
+-- ===== Compatibilidade com o app v310 (PR #259 entrou sem a segregação por consórcio) =====
+-- A v310 chama app_pp_diario_os sem p_consorcio, lê 'consorcios' (array) da lista e abre a folha sem p_consorcio.
+-- Pode sair quando ninguém mais estiver na v310 (sw coleta-v311+ em produção há alguns dias).
+create or replace function public.app_pp_diario_os(p_colaborador uuid, p_data date, p_os text)
+returns jsonb language plpgsql volatile security definer set search_path to 'public' as $$
+declare v_nome text; v_email text; v_cs text[];
+begin
+  if auth.uid() is null then raise exception 'nao autenticado'; end if;
+  if not exists(select 1 from public.perfil where id=auth.uid() and (funcao in ('admin','aprovador') or coalesce(aux_acesso,false))) then
+    raise exception 'sem permissão'; end if;
+  select nome, email into v_nome, v_email from public.perfil where id=p_colaborador;
+  if not found then raise exception 'colaborador não encontrado'; end if;
+  select array_agg(distinct c) into v_cs from (
+    select coalesce(public.pp_trecho_consorcio(t.geom, t.consorcio),'') c from "8 - coleta_campo".pesquisa_trecho t
+      where t.usuario in (v_nome, v_email) and t.inicio_ts::date = p_data
+    union select coalesce(r.consorcio,'') from "8 - coleta_campo".pp_execucao e left join "2 - infra_agua".rede r on r.id = e.rede_id
+      where e.colaborador_uuid = p_colaborador and (e.executado_em at time zone 'America/Sao_Paulo')::date = p_data
+    union select coalesce(o.consorcio,'') from "8 - coleta_campo".ocorrencia o
+      where o.usuario in (v_nome, v_email) and o.data_hora::date = p_data) z;
+  if v_cs is null then raise exception 'não há pesquisa desse colaborador nesse dia'; end if;
+  if array_length(v_cs,1) > 1 then raise exception 'dia com mais de um consórcio — atualize o app (recarregue a página)'; end if;
+  return public.app_pp_diario_os(p_colaborador, p_data, v_cs[1], p_os);
+end $$;
+revoke all on function public.app_pp_diario_os(uuid, date, text) from public, anon;
+grant execute on function public.app_pp_diario_os(uuid, date, text) to authenticated;
+-- + na app_pp_diario_lista: 'consorcios' = jsonb_build_array(consorcio) ao lado de 'consorcio';
+-- + na app_pp_relatorio_diario: os_dia com p_consorcio null pega a OS do dia (d.consorcio=coalesce(p_consorcio,d.consorcio)
+--   order by d.os_em desc limit 1). Aplicado no banco por replace no corpo das funções (migração pesquisa_diario_compat_v310_*).
