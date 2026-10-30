@@ -274,6 +274,7 @@ tbody tr:hover{background:var(--surface-2)}
       <div class="navlab">4 · Execução — comercial</div>
       <button class="navi" data-s="hdpri"><span class="ic">🔧</span>Priorização de troca de HD</button>
       <button class="navi" data-s="fraudepri"><span class="ic">🕵️</span>Fiscalização de irregularidades</button>
+      <button class="navi" data-s="situacao"><span class="ic">🏘️</span>Situação dos Imóveis</button>
       <div class="navlab">6 · Configuração</div>
       <button class="navi" data-s="config"><span class="ic">⚙</span>Parâmetros & Metas</button>
       <div class="navfoot">15 DMCs · 2 consórcios<br>Betim ZA0200 · Contagem ZA1004</div>
@@ -504,6 +505,7 @@ tbody tr:hover{background:var(--surface-2)}
 
       <section class="screen" id="s-hdpri"><div id="hdBody"></div></section>
       <section class="screen" id="s-fraudepri"><div id="frBody"></div></section>
+      <section class="screen" id="s-situacao"><div id="siBody"></div></section>
 
       <!-- CONFIG -->
       <section class="screen" id="s-config">
@@ -1779,7 +1781,7 @@ function bhSalvar(e){ e.stopPropagation();
  });
 }
 /* ---------- nav ---------- */
-const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",historico:"Histórico fechado por ZA",nrw_balanco:"Balanço hídrico — rastreio dos dados",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",config:"Parâmetros & Metas"};
+const TITLES={painel:"Painel de Perdas",resultado:"Acompanhamento do resultado (IRVP)",historico:"Histórico fechado por ZA",nrw_balanco:"Balanço hídrico — rastreio dos dados",nrw_contrato:"Performance contratual",nrw_os:"Gestão de OS / reparos",nrw_parque:"Parque de hidrômetros",nrw_fiscalizacao:"Fiscalização de fraudes",nrw_recuperacao:"Recuperação de faturamento",nrw_grandes:"Grandes consumidores",componentes:"Componentes IWA",fraude:"Indicativo de fraude",mm:"Análise do micromedido",macro:"Análise de macromedição",hdpri:"Priorização de troca de HD",fraudepri:"Fiscalização de irregularidades",situacao:"Situação dos Imóveis",config:"Parâmetros & Metas"};
 const COMPET=new Set(['painel','nrw_contrato']);
 function applyFocus(s){
  const scr=document.getElementById('s-'+s); if(!scr) return;
@@ -1808,7 +1810,7 @@ function go(s,dmc){
  $('#scr-title').textContent=TITLES[s];
  $('#mes').disabled=!COMPET.has(s);
  $('#mes').title=COMPET.has(s)?'':'competência não se aplica a esta tela';
- if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='historico'||s==='hdpri'||s==='fraudepri'||s==='nrw_balanco')?'none':'';   // resultado/histórico/HD/fraude/balanço não usam seletor de mês
+ if($('#mes')) $('#mes').style.display=(s==='resultado'||s==='historico'||s==='hdpri'||s==='fraudepri'||s==='situacao'||s==='nrw_balanco')?'none':'';   // resultado/histórico/HD/fraude/situação/balanço não usam seletor de mês
  $('#zaseg').style.display=s==='nrw_balanco'?'none':'';   // o rastreio do balanço cobre as duas ZAs juntas
  if(s!=='mm' && s!=='macro') mmHeaderReset();   // fora do micromedido/macromedição, restaura o #mes mock e esconde o filtro de DMC
  if(s!=='hdpri' && typeof hdHeaderReset==='function') hdHeaderReset();   // esconde os filtros de HD no cabeçalho
@@ -1830,6 +1832,7 @@ function go(s,dmc){
  if(s==='historico')histInit();
  if(s==='hdpri')hdInit();
  if(s==='fraudepri')frInit();
+ if(s==='situacao')siInit();
  if(s==='config')cfgInit();
  nrwMockBanner(s);
  applyFocus(s);
@@ -3012,7 +3015,280 @@ function frExport(){ const btn=$('#frExport'); if(typeof XLSX==='undefined'){ if
  }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#frMapNote'))$('#frMapNote').textContent='Erro ao exportar: '+(e.message||e); });
 }
 
-const NRW_REAL=new Set(['mm','macro','resultado','historico','hdpri','fraudepri','config','nrw_balanco']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
+/* ============================================================
+   SITUAÇÃO DOS IMÓVEIS — s-situacao
+   Carteira de fiscalização por situação da ligação (R/I/F/P) e por
+   desde quando ela está nessa situação (ex.: cortadas há poucos dias
+   que não se religaram). Fonte: "3 - comercial".ligacoes
+   (situacao = CD_SITUACA, situacao_desde = DT_SITUACA — carga do
+   cadastro COPASA). Mapa com limite das ZAs + seleção por polígono,
+   lista e export .xlsx. RPCs app_sit_imoveis_resumo/_lista/_mapa.
+   ============================================================ */
+let siF={sits:['I'],ini:'',fim:'',semData:false,faixa:'',busca:'',poligono:null,ordem:'recente'};
+let siResumo={}, siRows=[], siTotal=0, siPts=[], siCor='auto', siDrawing=false;
+let siMap=null, siPtLayer=null, siDrawnLayer=null, siLimGj=null;
+const SI_SIT={I:{l:'Inativa (cortada)',c:'#e03131'},F:{l:'Factível',c:'#f08c00'},P:{l:'Potencial',c:'#868e96'},R:{l:'Real / Ativa',c:'#2f9e44'}};
+const SI_SIT_ORDER=['I','F','P','R'];
+// [chave, rótulo, dias de, dias até, cor] — espelha public._sit_imoveis_faixa()
+const SI_FAIXA=[['0-7','até 7 dias',0,7,'#a61e4d'],['8-15','8 a 15 dias',8,15,'#e03131'],['16-30','16 a 30 dias',16,30,'#f76707'],['31-60','31 a 60 dias',31,60,'#f59f00'],['61-90','61 a 90 dias',61,90,'#fcc419'],['91-180','3 a 6 meses',91,180,'#82c91e'],['181-365','6 a 12 meses',181,365,'#20c997'],['1-2a','1 a 2 anos',366,730,'#1c7ed6'],['2-5a','2 a 5 anos',731,1825,'#5f3dc4'],['5a+','mais de 5 anos',1826,null,'#495057'],['sem','sem data',null,null,'#adb5bd']];
+const SI_INFO={t:'Situação dos imóveis',h:`<p>Fonte: cadastro comercial da COPASA (<code>ligacoes</code>), atualizado pela rotina de carga do cadastro. <b>Situação</b> = situação da ligação de água: <b>Real/Ativa</b>, <b>Inativa (cortada)</b>, <b>Factível</b> e <b>Potencial</b>. <b>Desde</b> = data da situação informada pela COPASA (DT_SITUACA); os dias são contados até hoje.</p><p>Uso: filtre as cortadas recentes, desenhe a área no mapa e exporte a carteira de matrículas para fiscalizar.</p><p class="note" style="margin:6px 0 0">⚠️ Vale até a última carga do cadastro: uma ligação religada depois dela ainda aparece como cortada. Nas ligações ativas a data costuma ser a da última movimentação, não necessariamente o início da situação.</p>`};
+function siCss(){ if(document.getElementById('sicss'))return; const st=document.createElement('style'); st.id='sicss'; st.textContent=`
+ body:has(#s-situacao.on) .wrap{max-width:none}
+ #s-situacao .sitop{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+ @media(max-width:1000px){#s-situacao .sitop{grid-template-columns:1fr}}
+ #s-situacao .sibottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+ @media(max-width:1200px){#s-situacao .sibottom{grid-template-columns:1fr}}
+ #s-situacao .sidist{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line-2);cursor:pointer;font-size:12px}
+ #s-situacao .sidist:hover{background:var(--surface-2)}
+ #s-situacao .sidist.on{background:rgba(var(--accent-rgb),.12);font-weight:600}
+ #s-situacao .sidist .lab{flex:1;min-width:0;line-height:1.25}
+ #s-situacao .sidist .bar{flex:0 0 56px;height:8px;border-radius:4px;background:var(--line-2);overflow:hidden}
+ #s-situacao .sidist .bar>span{display:block;height:100%}
+ #s-situacao .sidist .vv{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted);min-width:52px;text-align:right}
+ #s-situacao .sidistwrap{max-height:340px;overflow:auto}
+ #s-situacao .sibtn{font:inherit;font-size:12px;font-weight:600;padding:6px 11px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:var(--on-accent);cursor:pointer}
+ #s-situacao .sibtn.sec{background:var(--surface);color:var(--accent)}
+ #s-situacao .sibtn.on{background:var(--accent);color:var(--on-accent)}
+ #s-situacao .sibtn:disabled{opacity:.6;cursor:default}
+ #s-situacao .sipres{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+ #s-situacao .sirow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--muted)}
+ #s-situacao .sirow input{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit}
+ #s-situacao table.sit{width:100%;border-collapse:collapse;font-size:12px}
+ #s-situacao table.sit th,#s-situacao table.sit td{padding:5px 7px;border-bottom:1px solid var(--line-2);text-align:left;white-space:nowrap}
+ #s-situacao table.sit td.end{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+ #s-situacao table.sit th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);z-index:1}
+ #s-situacao table.sit th[data-k]{cursor:pointer}
+ #s-situacao table.sit td.r,#s-situacao table.sit th.r{text-align:right;font-variant-numeric:tabular-nums}
+ #s-situacao table.sit tbody tr{cursor:pointer}
+ #s-situacao table.sit tbody tr:hover{background:var(--surface-2)}
+ #s-situacao .sitwrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+ #s-situacao .sipill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;color:#fff}
+ #s-situacao #siMapDiv{height:560px;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}   /* z-index:0 prende os panes do Leaflet (400+) abaixo do cabeçalho fixo */
+ #s-situacao #siMapDiv .leaflet-container{background:var(--surface-2)}
+ #s-situacao .simaptools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+ #s-situacao .simaptools select{font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit}
+ #s-situacao .sileg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+ #s-situacao .sileg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+`; document.head.appendChild(st); }
+function siCons(){ return za==='all'?null:za; }
+function siZaNome(c){ return ({ZA0200:'Betim',ZA1004:'Contagem'})[c]||c||''; }
+function siHoje(){ return (siResumo&&siResumo.hoje)||new Date().toLocaleDateString('sv-SE'); }
+function siAddDias(iso,n){ const p=iso.split('-').map(Number), d=new Date(Date.UTC(p[0],p[1]-1,p[2])); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function siFaixaDe(d){ if(d==null)return 'sem'; for(const f of SI_FAIXA){ if(f[2]==null)continue; if(f[3]==null||d<=f[3])return f[0]; } return '5a+'; }
+function siArgs(){ return {p_consorcio:siCons(), p_situacoes:siF.sits.length?siF.sits:null, p_desde_ini:siF.semData?null:(siF.ini||null), p_desde_fim:siF.semData?null:(siF.fim||null), p_sem_data:!!siF.semData, p_poligono:siF.poligono||null, p_busca:siF.busca||null}; }
+function siListArgs(off,lim){ return Object.assign(siArgs(),{p_limit:lim||300,p_offset:off||0,p_ordem:siF.ordem}); }
+function siErr(e){ return '<div class="panel"><div class="pbody"><p class="note" style="margin:0;color:var(--crit)">Erro ao carregar: '+((e&&e.message)||e)+'</p></div></div>'; }
+
+function siInit(){ mmCss(); siCss();
+ const body=$('#siBody'); if(!body)return;
+ if(siMap){ try{siMap.remove();}catch(e){} siMap=null; siPtLayer=null; siDrawnLayer=null; }
+ body.innerHTML='<div class="panel"><div class="pbody"><p class="note" style="margin:0">Carregando situação dos imóveis…</p></div></div>';
+ Promise.all([ sbg.rpc('app_sit_imoveis_resumo',siArgs()), sbg.rpc('app_sit_imoveis_lista',siListArgs(0)) ])
+ .then(([r1,r2])=>{
+  const err=r1.error||r2.error; if(err){ body.innerHTML=siErr(err); return; }
+  siResumo=r1.data||{}; siRows=(r2.data||{}).rows||[]; siTotal=(r2.data||{}).total||0;
+  siRenderAll();
+ });
+}
+function siRenderAll(){ const body=$('#siBody');
+ const pres=[[7,'Últimos 7 dias'],[15,'15 dias'],[30,'30 dias'],[60,'60 dias'],[90,'90 dias']];
+ body.innerHTML=
+  `<div class="sitop">
+     <div class="panel" style="margin:0"><div class="phead"><h3>Situação da ligação</h3><button class="mminfo" id="siInfo" title="Sobre">ⓘ</button></div><div class="pbody"><div class="sidistwrap" id="siDistSit">${siDistSit()}</div>
+       <div class="sipres" style="margin:10px 0 0"><button class="sibtn sec" id="siSoCort">Só cortadas</button><button class="sibtn sec" id="siTodasSit">Todas as situações</button></div></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Desde quando está na situação</h3><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody"><div class="sidistwrap" id="siDistFaixa">${siDistFaixa()}</div></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Período e busca</h3></div><div class="pbody">
+       <div class="sipres" id="siPres">${pres.map(p=>`<button class="sibtn sec" data-dias="${p[0]}">${p[1]}</button>`).join('')}<button class="sibtn sec" data-dias="">Todo o período</button></div>
+       <div class="sirow"><label>Situação desde <input type="date" id="siIni" value="${siF.ini||''}"></label><label>até <input type="date" id="siFim" value="${siF.fim||''}"></label></div>
+       <div class="sirow"><input type="search" id="siBusca" placeholder="matrícula…" value="${siF.busca||''}" style="flex:1"></div>
+       <p class="note" id="siBase" style="margin:0"></p></div></div>
+   </div>
+   <div class="sibottom">
+     <div class="panel" style="margin:0"><div class="phead"><h3>Mapa</h3><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody">
+        <div class="simaptools"><label class="note" style="font-size:11.5px">Cor por <select id="siCor"><option value="auto">automático</option><option value="situacao">situação</option><option value="tempo">tempo na situação</option></select></label><button class="sibtn sec" id="siClearBtn" hidden>✕ Limpar seleção</button><span class="note" id="siDrawHint" style="font-size:11px">Desenhe um polígono ou retângulo (canto superior direito do mapa) para filtrar por área.</span></div>
+        <div id="siMapDiv"></div><div class="sileg" id="siLeg"></div><p class="note" id="siMapNote" style="margin:8px 0 0"></p></div></div>
+     <div class="panel" style="margin:0"><div class="phead"><h3>Lista de matrículas</h3><button class="sibtn" id="siExport" style="margin-left:auto">⭳ Exportar .xlsx</button></div><div class="pbody" style="padding-top:8px"><div id="siListWrap">${siListTable()}</div></div></div>
+   </div>`;
+ siBaseNote(); siWire(); siInitMap();
+}
+function siBaseNote(){ const el=$('#siBase'); if(!el)return; const r=siResumo||{};
+ el.innerHTML=`Situações registradas até <b>${sitDesde(r.ultima_data)}</b> (última carga do cadastro). Dias contados até hoje (${sitDesde(r.hoje)}) — quem foi religado depois da carga ainda aparece como cortado.`; }
+function siBars(rows){ const mx=Math.max(1,...rows.map(x=>x.n));
+ return rows.map(x=>`<div class="sidist ${x.on?'on':''}" data-k="${x.k}"><span class="lab">${x.lab}</span><div class="bar"><span style="width:${Math.round(x.n/mx*100)}%;background:${x.c}"></span></div><span class="vv">${fmt(x.n)}</span></div>`).join('')||'<p class="note" style="margin:0">—</p>'; }
+function siDistSit(){ const o=(siResumo||{}).por_situacao||{};
+ return siBars(SI_SIT_ORDER.filter(k=>o[k]!=null).map(k=>({k,n:o[k],c:SI_SIT[k].c,lab:`<span style="color:${SI_SIT[k].c}"><b>${SI_SIT[k].l}</b></span>`,on:siF.sits.includes(k)}))); }
+function siDistFaixa(){ const o=(siResumo||{}).por_faixa||{};
+ return siBars(SI_FAIXA.filter(f=>o[f[0]]!=null).map(f=>({k:f[0],n:o[f[0]],c:f[4],lab:f[1],on:siF.faixa===f[0]}))); }
+function siListTable(){
+ const cols=[['matricula','Matrícula'],['consorcio','Consórcio'],['situacao','Situação'],['situacao_desde','Desde'],['dias','Dias'],['bairro','Bairro'],['endereco','Endereço']];
+ const sortK={matricula:'matricula',situacao_desde:'data',dias:'data'};
+ const arrow=k=>{ if(k==='matricula')return siF.ordem==='matricula'?' ▴':''; if(sortK[k]==='data')return siF.ordem==='recente'?(k==='dias'?' ▴':' ▾'):siF.ordem==='antigo'?(k==='dias'?' ▾':' ▴'):''; return ''; };
+ const th=cols.map(c=>`<th class="${c[0]==='dias'?'r':''}"${sortK[c[0]]?` data-k="${c[0]}"`:''}>${c[1]}${arrow(c[0])}</th>`).join('');
+ const body=siRows.map(x=>{ const s=SI_SIT[x.situacao]||{c:'#888',l:x.situacao||'—'};
+   return `<tr data-mat="${x.matricula}"><td>${x.matricula}</td><td>${siZaNome(x.consorcio)}</td><td><span class="sipill" style="background:${s.c}">${s.l}</span></td><td>${sitDesde(x.situacao_desde)}</td><td class="r">${x.dias!=null?fmt(x.dias):'—'}</td><td>${x.bairro||'—'}</td><td class="end" title="${(x.endereco||'').replace(/"/g,'&quot;')}">${x.endereco||'—'}</td></tr>`;
+ }).join('')||'<tr><td colspan="7" class="note" style="padding:14px">Nenhuma matrícula nesse filtro.</td></tr>';
+ const selMsg=siF.poligono?' · <b style="color:var(--accent)">área selecionada no mapa</b>':'';
+ const mais=siRows.length<siTotal?`<button class="sibtn sec" id="siMais" style="margin-top:8px">Carregar mais ${fmt(Math.min(300,siTotal-siRows.length))}</button>`:'';
+ return `<div style="margin-bottom:6px"><span class="note">${fmt(siTotal)} matrícula(s)${selMsg} · exibindo ${fmt(siRows.length)}</span></div><div class="sitwrap"><table class="sit"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>${mais}`;
+}
+function siWire(){
+ const inf=$('#siInfo'); if(inf)inf.onclick=e=>{e.stopPropagation();mmModal(SI_INFO.t,SI_INFO.h);};
+ document.querySelectorAll('#siDistSit .sidist[data-k]').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; siF.sits=siF.sits.includes(k)?siF.sits.filter(x=>x!==k):siF.sits.concat(k); siReload(); });
+ const sc=$('#siSoCort'); if(sc)sc.onclick=()=>{ siF.sits=['I']; siReload(); };
+ const ts=$('#siTodasSit'); if(ts)ts.onclick=()=>{ siF.sits=[]; siReload(); };
+ document.querySelectorAll('#siDistFaixa .sidist[data-k]').forEach(el=>el.onclick=()=>siSetFaixa(el.dataset.k));
+ document.querySelectorAll('#siPres [data-dias]').forEach(b=>b.onclick=()=>{ const n=b.dataset.dias; siF.faixa=''; siF.semData=false; siF.ini=n?siAddDias(siHoje(),-(+n)):''; siF.fim=''; siReload(); });
+ const ini=$('#siIni'), fim=$('#siFim');
+ if(ini)ini.onchange=()=>{ siF.ini=ini.value; siF.faixa=''; siF.semData=false; siReload(); };
+ if(fim)fim.onchange=()=>{ siF.fim=fim.value; siF.faixa=''; siF.semData=false; siReload(); };
+ const bs=$('#siBusca'); if(bs)bs.onchange=()=>{ siF.busca=bs.value.replace(/\D/g,''); siReload(); };
+ const cor=$('#siCor'); if(cor){ cor.value=siCor; cor.onchange=()=>{ siCor=cor.value; siSortPts(); if(siPtLayer)siPtLayer.redraw(); siLegend(); }; }
+ const ex=$('#siExport'); if(ex)ex.onclick=siExport;
+ const cb=$('#siClearBtn'); if(cb){ cb.onclick=siDrawReset; cb.hidden=!siF.poligono; }
+ if(siF.poligono){ const h=$('#siDrawHint'); if(h)h.textContent='Área aplicada — a lista e o mapa mostram só as matrículas dentro dela.'; }
+ siWireList();
+}
+function siWireList(){
+ document.querySelectorAll('#siListWrap th[data-k]').forEach(th=>th.onclick=()=>{ const k=th.dataset.k;
+   siF.ordem = k==='matricula' ? 'matricula' : (siF.ordem==='recente'?'antigo':'recente'); siReloadList(); });
+ document.querySelectorAll('#siListWrap tbody tr[data-mat]').forEach(tr=>tr.onclick=()=>siFocus(+tr.dataset.mat));
+ const m=$('#siMais'); if(m)m.onclick=()=>{ m.disabled=true; m.textContent='Carregando…';
+   sbg.rpc('app_sit_imoveis_lista',siListArgs(siRows.length)).then(r=>{ if(r.error){ m.textContent='Erro: '+(r.error.message||''); return; }
+     siRows=siRows.concat((r.data||{}).rows||[]); siTotal=(r.data||{}).total||siTotal; $('#siListWrap').innerHTML=siListTable(); siWireList(); }); };
+}
+function siSetFaixa(k){
+ if(siF.faixa===k){ siF.faixa=''; siF.ini=''; siF.fim=''; siF.semData=false; siReload(); return; }
+ const f=SI_FAIXA.find(x=>x[0]===k); if(!f)return; siF.faixa=k;
+ if(k==='sem'){ siF.semData=true; siF.ini=''; siF.fim=''; }
+ else { const h=siHoje(); siF.semData=false; siF.fim=siAddDias(h,-f[2]); siF.ini=f[3]==null?'':siAddDias(h,-f[3]); }
+ siReload();
+}
+function siReloadList(){ const w=$('#siListWrap'); if(w)w.style.opacity=.55;
+ sbg.rpc('app_sit_imoveis_lista',siListArgs(0)).then(r=>{ if(w)w.style.opacity=''; if(r.error){ if(w)w.innerHTML=siErr(r.error); return; }
+  siRows=(r.data||{}).rows||[]; siTotal=(r.data||{}).total||0; if(w){ w.innerHTML=siListTable(); siWireList(); } });
+}
+function siReload(){
+ const u=(id,html)=>{ const e=$('#'+id); if(e)e.innerHTML=html; };
+ ['siDistSit','siDistFaixa','siListWrap'].forEach(id=>{ const e=$('#'+id); if(e)e.style.opacity=.55; });
+ Promise.all([ sbg.rpc('app_sit_imoveis_resumo',siArgs()), sbg.rpc('app_sit_imoveis_lista',siListArgs(0)) ])
+ .then(([r1,r2])=>{
+  ['siDistSit','siDistFaixa','siListWrap'].forEach(id=>{ const e=$('#'+id); if(e)e.style.opacity=''; });
+  if(r1.error||r2.error){ u('siListWrap',siErr(r1.error||r2.error)); return; }
+  siResumo=r1.data||{}; siRows=(r2.data||{}).rows||[]; siTotal=(r2.data||{}).total||0;
+  u('siDistSit',siDistSit()); u('siDistFaixa',siDistFaixa()); u('siListWrap',siListTable());
+  const ini=$('#siIni'), fim=$('#siFim'); if(ini)ini.value=siF.ini||''; if(fim)fim.value=siF.fim||'';
+  siBaseNote(); siWire(); siLoadMap();
+ });
+}
+/* ---- mapa: camada canvas própria (aguenta as ~135 mil ligações sem 1 objeto Leaflet por ponto) ---- */
+function siModo(){ return siCor!=='auto'?siCor:(siF.sits.length===1?'tempo':'situacao'); }
+function siPtColor(p){ if(siModo()==='tempo'){ const f=SI_FAIXA.find(x=>x[0]===siFaixaDe(p[4])); return f?f[4]:'#888'; } return (SI_SIT[p[3]]||{c:'#888'}).c; }
+function siSortPts(){   // desenha por último (por cima) o que mais interessa: cortadas / situação mais recente
+ const rkS={R:0,P:1,F:2,I:3};
+ if(siModo()==='tempo') siPts.sort((a,b)=>(b[4]==null?1e9:b[4])-(a[4]==null?1e9:a[4]));
+ else siPts.sort((a,b)=>(rkS[a[3]]||0)-(rkS[b[3]]||0));
+}
+function siCanvasLayer(){ return new (L.Layer.extend({
+ onAdd:function(map){ this._map=map; this._c=L.DomUtil.create('canvas','leaflet-zoom-hide'); this._c.style.position='absolute'; this._c.style.pointerEvents='none';
+  map.getPanes().overlayPane.appendChild(this._c); map.on('moveend zoomend resize viewreset',this._draw,this); this._draw(); },
+ onRemove:function(map){ L.DomUtil.remove(this._c); map.off('moveend zoomend resize viewreset',this._draw,this); this._map=null; },
+ redraw:function(){ this._draw(); },
+ _draw:function(){ const map=this._map, c=this._c; if(!map||!c)return; const sz=map.getSize(), dpr=window.devicePixelRatio||1;
+  L.DomUtil.setPosition(c,map.containerPointToLayerPoint([0,0]));
+  c.width=Math.round(sz.x*dpr); c.height=Math.round(sz.y*dpr); c.style.width=sz.x+'px'; c.style.height=sz.y+'px';
+  const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,sz.x,sz.y);
+  const b=map.getBounds(), s=b.getSouth(), n=b.getNorth(), w=b.getWest(), e=b.getEast(), z=map.getZoom();
+  const r=z>=17?5:z>=15?3.5:z>=13?2.4:1.6, borda=z>=15; let cor=null;
+  ctx.strokeStyle='#fff'; ctx.lineWidth=.8;
+  for(const p of siPts){ if(p[1]<s||p[1]>n||p[2]<w||p[2]>e)continue; const q=map.latLngToContainerPoint([p[1],p[2]]), k=siPtColor(p);
+   if(k!==cor){ ctx.fillStyle=k; cor=k; }
+   if(r<2.5) ctx.fillRect(q.x-r,q.y-r,2*r,2*r);
+   else { ctx.beginPath(); ctx.arc(q.x,q.y,r,0,6.2832); ctx.fill(); if(borda)ctx.stroke(); }
+  }
+ }
+}))(); }
+function siInitMap(){ const div=$('#siMapDiv'); if(!div)return;
+ if(typeof L==='undefined'){ const n=$('#siMapNote'); if(n)n.textContent='Mapa indisponível (Leaflet não carregou).'; return; }
+ if(!siMap){ siMap=L.map(div,{scrollWheelZoom:true}).setView([-19.96,-44.12],11);
+  const rua=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(siMap);
+  const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'});
+  L.control.layers({'Mapa':rua,'Satélite':sat},null,{position:'bottomleft'}).addTo(siMap);
+  const mp=siMap.createPane('siMascaraPane'); mp.style.zIndex=250; mp.style.pointerEvents='none';   // máscara fora das ZAs: acima do fundo, abaixo dos pontos
+  siPtLayer=siCanvasLayer().addTo(siMap);
+  siDrawnLayer=L.featureGroup().addTo(siMap);
+  if(L.Draw){
+   siMap.addControl(new L.Control.Draw({position:'topright',
+    draw:{polygon:{shapeOptions:{color:'#1c7ed6',weight:2,fillOpacity:.08}},rectangle:{shapeOptions:{color:'#1c7ed6',weight:2,fillOpacity:.08}},polyline:false,circle:false,marker:false,circlemarker:false},
+    edit:{featureGroup:siDrawnLayer,edit:false,remove:false}}));
+   siMap.on(L.Draw.Event.DRAWSTART,()=>{siDrawing=true;}); siMap.on(L.Draw.Event.DRAWSTOP,()=>{setTimeout(()=>{siDrawing=false;},300);});   // o clique que fecha o desenho não abre popup
+   siMap.on(L.Draw.Event.CREATED,e=>{ siDrawnLayer.clearLayers(); siDrawnLayer.addLayer(e.layer); siSelecionarGeom(e.layer.toGeoJSON().geometry); });
+  }
+  siMap.on('click',siMapClick);
+ }
+ setTimeout(()=>{ if(siMap)siMap.invalidateSize(); },80);
+ siLimites(); siLoadMap();
+}
+function siLimites(){   // contorno das ZAs (tracejado) + máscara escurecendo o fundo fora delas — mesma RPC do Cadastro técnico
+ const draw=gj=>{ if(!siMap||!gj)return;
+  const feats=(gj.features||[]).filter(f=>!siCons()||(f.properties||{}).consorcio===siCons());
+  const aneis=[[[-89,-179],[-89,179],[89,179],[89,-179]]];
+  feats.forEach(f=>{ const g=f.geometry||{}; const ps=g.type==='Polygon'?[g.coordinates]:(g.type==='MultiPolygon'?g.coordinates:[]); ps.forEach(p=>p.forEach(r=>aneis.push(r.map(c=>[c[1],c[0]])))); });
+  L.polygon(aneis,{pane:'siMascaraPane',stroke:false,fillColor:'#1f2937',fillOpacity:.45,interactive:false}).addTo(siMap);
+  const lim=L.geoJSON({type:'FeatureCollection',features:feats},{style:{color:'#8e24aa',weight:2,fill:false,dashArray:'5,4',opacity:.9},interactive:false}).addTo(siMap);
+  if(!siF.poligono){ try{ siMap.fitBounds(lim.getBounds(),{padding:[10,10]}); }catch(e){} }
+ };
+ if(siLimGj){ draw(siLimGj); return; }
+ sbg.rpc('app_limites_zas').then(r=>{ if(r.error)return; siLimGj=r.data; draw(siLimGj); });
+}
+function siLoadMap(){ if(!siMap||!siPtLayer)return; const note=$('#siMapNote'); if(note)note.textContent='Carregando pontos…';
+ sbg.rpc('app_sit_imoveis_mapa',siArgs()).then(r=>{
+  if(r.error){ if(note)note.textContent='Erro ao carregar o mapa: '+(r.error.message||''); return; }
+  siPts=r.data||[]; siSortPts(); siPtLayer.redraw(); siLegend();
+  if(note)note.textContent=fmt(siPts.length)+' ligação(ões) no mapa'+(siF.poligono?' dentro da área selecionada':'')+'. Clique num ponto para ver a matrícula.';
+ });
+}
+function siLegend(){ const el=$('#siLeg'); if(!el)return; const cnt={};
+ if(siModo()==='tempo'){ siPts.forEach(p=>{ const k=siFaixaDe(p[4]); cnt[k]=(cnt[k]||0)+1; });
+  el.innerHTML=SI_FAIXA.filter(f=>cnt[f[0]]).map(f=>`<span><i style="background:${f[4]}"></i>${f[1]} (${fmt(cnt[f[0]])})</span>`).join(''); }
+ else { siPts.forEach(p=>{ cnt[p[3]]=(cnt[p[3]]||0)+1; });
+  el.innerHTML=SI_SIT_ORDER.filter(k=>cnt[k]).map(k=>`<span><i style="background:${SI_SIT[k].c}"></i>${SI_SIT[k].l} (${fmt(cnt[k])})</span>`).join(''); }
+}
+function siPopupHtml(p){ const s=SI_SIT[p[3]]||{c:'#888',l:p[3]||'—'};
+ return `<b>Matrícula ${p[0]}</b><br><span style="color:${s.c};font-weight:700">${s.l}</span><br>${p[4]!=null?`Desde ${sitDesde(siAddDias(siHoje(),-p[4]))} · ${fmt(p[4])} dia(s)`:'Sem data de situação'}`; }
+function siMapClick(e){ if(siDrawing||!siPts.length)return;
+ const cp=e.containerPoint, b=siMap.getBounds(); let best=null, bd=64;   // raio de 8 px
+ for(const p of siPts){ if(!b.contains([p[1],p[2]]))continue; const q=siMap.latLngToContainerPoint([p[1],p[2]]), d=(q.x-cp.x)**2+(q.y-cp.y)**2; if(d<bd){bd=d;best=p;} }
+ if(best) L.popup().setLatLng([best[1],best[2]]).setContent(siPopupHtml(best)).openOn(siMap);
+}
+function siFocus(mat){ const p=siPts.find(x=>x[0]===mat); if(!p||!siMap)return;
+ siMap.setView([p[1],p[2]],Math.max(siMap.getZoom(),17)); L.popup().setLatLng([p[1],p[2]]).setContent(siPopupHtml(p)).openOn(siMap);
+ const d=$('#siMapDiv'); if(d&&window.innerWidth<1000)d.scrollIntoView({behavior:'smooth',block:'center'}); }
+function siSelecionarGeom(geom){
+ siF.poligono=JSON.stringify(geom);
+ const c=$('#siClearBtn'); if(c)c.hidden=false;
+ const h=$('#siDrawHint'); if(h)h.textContent='Área aplicada — a lista e o mapa mostram só as matrículas dentro dela.';
+ siReload();
+}
+function siDrawReset(){ if(siDrawnLayer){ try{siDrawnLayer.clearLayers();}catch(e){} }
+ const c=$('#siClearBtn'); if(c)c.hidden=true; const h=$('#siDrawHint'); if(h)h.textContent='Desenhe um polígono ou retângulo (canto superior direito do mapa) para filtrar por área.';
+ if(siF.poligono){ siF.poligono=null; siReload(); }
+}
+function siExport(){ const btn=$('#siExport'); if(typeof XLSX==='undefined'){ if(btn)btn.textContent='lib .xlsx indisponível'; return; }
+ if(btn)btn.disabled=true;
+ const all=[]; const pageN=2000;
+ function fetchPage(off){ if(btn)btn.textContent=`Gerando… ${fmt(all.length)}/${fmt(siTotal)}`;
+  return sbg.rpc('app_sit_imoveis_lista',siListArgs(off,pageN)).then(r=>{ if(r.error)throw r.error; const rows=(r.data||{}).rows||[]; all.push(...rows);
+   if(rows.length===pageN && all.length<((r.data||{}).total||0)) return fetchPage(off+pageN); }); }
+ fetchPage(0).then(()=>{
+  const head=['Matrícula','Consórcio','Situação da ligação','Situação desde','Dias na situação','Bairro','Endereço'];
+  const data=all.map(x=>[x.matricula,siZaNome(x.consorcio),(SI_SIT[x.situacao]||{l:x.situacao||''}).l,x.situacao_desde?sitDesde(x.situacao_desde):'',x.dias!=null?+x.dias:'',x.bairro||'',x.endereco||'']);
+  const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Situacao');
+  XLSX.writeFile(wb,`situacao_imoveis_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}
+ }).catch(e=>{ if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';} if($('#siMapNote'))$('#siMapNote').textContent='Erro ao exportar: '+(e.message||e); });
+}
+
+const NRW_REAL=new Set(['mm','macro','resultado','historico','hdpri','fraudepri','situacao','config','nrw_balanco']);   // únicas telas com dados ao vivo (via RPC); o resto é snapshot/exemplo
 function nrwMockCss(){ if(document.getElementById('mockcss'))return; const st=document.createElement('style'); st.id='mockcss'; st.textContent=`
  .navi.mock{opacity:.5}
  .navi.mock:hover{opacity:.82}
@@ -3052,7 +3328,7 @@ const g = document.getElementById('nrwGate'), gm = document.getElementById('gm')
 // programação (aprovador/admin) mesmo sem dev_acesso, e sem expor o resto do cockpit NRW.
 const _params = new URLSearchParams(location.search);
 const _reqS = _params.get('s');
-const AUX_TOOLS = new Set(['hdpri','mm','fraudepri']);
+const AUX_TOOLS = new Set(['hdpri','mm','fraudepri','situacao']);
 const _auxTool = !!(_reqS && AUX_TOOLS.has(_reqS));
 try{
   const { data } = await sbg.auth.getSession();
