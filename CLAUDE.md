@@ -115,6 +115,9 @@ pwa/
   `perfil.aprovador_uuid`/`aprovador2_uuid` (config. no ⚙️ Usuários — na home ou em Suprimentos) + `sup_aprovadores_de(uid)`
   + `sup_notificar(...)` disparado por **trigger** na tabela de negócio (nunca inline na RPC). Ver
   docs/MODULOS.md §0.9 e §6.4 (segundo módulo a reaproveitar isso, depois de Suprimentos).
+- **Storage:** bucket `fotos-campo` é **público** (o app lê pela URL pública). Pastas com documento pessoal (`cnh/`,
+  `pessoas/`) **não são listáveis** pela API — só o dono do arquivo e admin (`docs/migracao_storage_cnh_privado.sql`,
+  docs/MODULOS.md §1 "Fotos e Storage"). Pasta nova com documento pessoal → acrescente o prefixo na policy.
 - **Geometria:** PostGIS, **SRID 31983** (UTM, metros). Distâncias em metros direto com `ST_Distance`
   (não converta pra `geography`: dá erro "Only lon/lat supported"). Para exibir no mapa, transforme
   para 4326.
@@ -149,7 +152,7 @@ pwa/
 | `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09; **abastecimento removido** em 2026-10-14) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico` — *app-only* |
-| `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
+| `14 - pessoas` | **dropado** (2026-10, `docs/migracao_remove_gestao_pessoas.sql`) junto com as RPCs `app_pessoas_*` — era o legado da antiga Gestão de Pessoas. Sobraram 4 arquivos em `fotos-campo/pessoas/` (não listáveis, ver Storage abaixo) |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
 | `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); nada pode ser apagado (trigger) — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
