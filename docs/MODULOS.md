@@ -932,18 +932,20 @@ Botão **🗓️ Relatório diário** em Auxiliar › 🎧 Pesquisa de Vazamento
 (overlay `#relatorio` + `REL_CSS` → "Imprimir / Salvar PDF"). Módulo JS `pd*` (`pdInit`/`pdCarregarColabs`/
 `pdGerar`/`pdDocHtml`/`pdDesenharMapa`), logo depois do Acompanhamento.
 - **Filtros:** **Dia** (date + atalhos Hoje/Ontem) e **Colaborador**. O dropdown lista **só quem lançou pesquisa no
-  dia** (trecho, rede pesquisada ou vazamento), já com "km pesq. · vaz." — `app_pp_diario_colabs(p_data)`; com mais de
-  um, começa em "Escolha o colaborador (N no dia)"; com um só, já vem selecionado.
+  dia** (trecho, rede pesquisada ou ocorrência), já com "km pesq. · vaz. · fraudes" — `app_pp_diario_colabs(p_data)`; com
+  mais de um, começa em "Escolha o colaborador (N no dia)"; com um só, já vem selecionado.
 - **Folha (`app_pp_relatorio_diario(p_colaborador, p_data)`):** cabeçalho (consórcio, data + dia da semana,
-  colaborador, período em pesquisa = 1º início → último fim dos trechos) → **1 · Produção do dia** (5 cards: km
-  pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa], vazamentos, vaz/km) → **2 · Mapa da
-  pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa, vazamentos em azul **numerados**) → **3 ·
-  Vazamentos apontados** (um bloco por vazamento, na ordem do horário, com o mesmo nº do mapa: foto, tipo, local,
-  hora, OS COPASA, coordenada e a **descrição do pesquisador** = `ocorrencia.observacao`).
+  colaborador, período em pesquisa = 1º início → último fim dos trechos) → **1 · Produção do dia** (6 cards: km
+  pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa], vazamentos, fraudes, vaz/km) → **2 · Mapa
+  da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa, vazamentos em azul e fraudes em laranja,
+  **numerados**) → **3 · Vazamentos apontados** e **4 · Fraudes apontadas** (um bloco por ocorrência, na ordem do
+  horário, com o mesmo nº do mapa: foto, tipo, local, hora, OS COPASA, coordenada e a **descrição do pesquisador** =
+  `ocorrencia.observacao`). Numeração única (`pdOcorrencias`): vazamentos 1..n, depois fraudes n+1…
 - **Mesmas definições do Acompanhamento (§4.3.8):** km pesquisado = `pp_execucao` (rede) · km andado =
-  `pesquisa_trecho` · vaz/km = vazamentos ÷ km de rede · velocidade = km andado ÷ soma de `duracao_s`. **Fraude não
-  entra** (vazamento = tipo que não começa com "Fraude", §2.3). Dia em que o traço não cruzou rede programada sai com
-  km pesquisado 0 e vaz/km 0 (o km andado aparece).
+  `pesquisa_trecho` · vaz/km = vazamentos ÷ km de rede · velocidade = km andado ÷ soma de `duracao_s`. **Fraude
+  aparece à parte e não entra no vaz/km** (vazamento = tipo que não começa com "Fraude", §2.3); a RPC devolve as listas
+  `vazamentos` e `fraudes` + `kpis.fraudes`. Dia em que o traço não cruzou rede programada sai com km pesquisado 0 e
+  vaz/km 0 (o km andado aparece).
 - **Dia (fuso):** `inicio_ts`/`data_hora` (timestamp sem tz) já são Brasília → `::date`; `pp_execucao.executado_em`
   (timestamptz) → `at time zone 'America/Sao_Paulo'` (o Acompanhamento ainda usa `executado_em::date` em UTC — rede
   pesquisada depois das 21h cai no dia seguinte lá). Casamento traço/ocorrência ↔ usuário por **nome OU e-mail** (§4.3.5).

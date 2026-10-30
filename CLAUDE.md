@@ -288,8 +288,8 @@ pwa/
   - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
     (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
     **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`) · **Relatório diário** (`pp_diario`, 2026-10-30: folha
-    por dia × colaborador p/ imprimir/PDF — produção do dia, mapa estático da pesquisa e o detalhe de cada vazamento com
-    foto e descrição; `app_pp_diario_colabs`/`app_pp_relatorio_diario`, §4.3.9).
+    por dia × colaborador p/ imprimir/PDF — produção do dia, mapa estático da pesquisa e o detalhe de cada vazamento e
+    de cada fraude com foto e descrição (fraude fora do vaz/km); `app_pp_diario_colabs`/`app_pp_relatorio_diario`, §4.3.9).
   - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma
     preventivo (`vrpman_prev`) — **migradas do hub `vrpman`** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg` admin).
   - **🧱 Gestão de Pavimento:** Pavimentos a recompor (`pavprog`) — lista os registros de campo do módulo
