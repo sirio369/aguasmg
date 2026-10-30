@@ -1111,17 +1111,21 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="pp_diario" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Relatório diário da pesquisa</h1>
-    <p class="sub">Uma folha por dia e por colaborador: mapa da pesquisa, produção do dia e o detalhe de cada vazamento apontado.</p>
-    <label>Dia</label>
-    <div style="display:flex;gap:6px;align-items:center">
-      <input id="pdDia" type="date" style="flex:1;min-width:0"/>
-      <button id="pdHoje" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Hoje</button>
-      <button id="pdOntem" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Ontem</button>
+    <p class="sub">Cada bloco é um dia de pesquisa de um colaborador. Lance a OS SIGOS do dia e abra o relatório para imprimir.</p>
+    <div class="seg" id="pdStatusSeg" style="margin:6px 0 8px">
+      <button type="button" data-st="pendente" class="sel">Pendente de OS</button>
+      <button type="button" data-st="criada">OS criada</button>
+      <button type="button" data-st="todos">Todos</button>
     </div>
-    <label style="margin-top:12px">Colaborador</label>
-    <select id="pdColab"><option value="">Carregando…</option></select>
-    <p id="pdInfo" class="sub" style="margin-top:6px">Lista só quem lançou pesquisa (trecho, rede pesquisada ou vazamento) no dia.</p>
-    <button id="pdGerar" class="btn" disabled>📄 Gerar relatório</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center">
+      <select id="pdColab" style="flex:1;min-width:170px"><option value="">Todos os colaboradores</option></select>
+      <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:170px">
+        <input id="pdDia" type="date" title="Filtrar por dia" style="flex:1;min-width:0"/>
+        <button id="pdDiaLimpar" class="bk" style="padding:6px 8px" title="todos os dias">✕</button>
+      </div>
+    </div>
+    <div id="pdResumo" style="margin-bottom:10px"></div>
+    <div id="pdLista"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="ent_ocorrencia" class="hidden">
@@ -6469,52 +6473,106 @@ function paToggleOc(){ paShowOc=!paShowOc; paPintarToggles(); paCarregarMapa(); 
 function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(); }
 
 // ---------- MÓDULO RELATÓRIO DIÁRIO DA PESQUISA (interno — Auxiliar de Programação) ----------
-// Uma folha por DIA × COLABORADOR (overlay #relatorio + REL_CSS → imprimir/PDF): produção do dia (km pesquisado = rede,
-// km andado, velocidade, vazamentos, fraudes, vaz/km — mesmas definições do Acompanhamento), mapa estático (rede pesquisada +
-// trajetos + ocorrências numeradas) e o detalhe de cada vazamento e de cada fraude (foto + descrição do pesquisador).
-// Fraude fica fora do vaz/km; numeração única: vazamentos 1..n, depois fraudes n+1.. (pdOcorrencias).
-// RPCs app_pp_diario_colabs (quem lançou pesquisa no dia → filtro) / app_pp_relatorio_diario.
-let pdGen=0;
+// Lista de BLOCOS dia × colaborador (espelha a Gestão de Pavimento): abas Pendente de OS / OS criada / Todos, chips de
+// prazo (dias desde o dia trabalhado, PAV_SLA), filtro de colaborador e de dia. O backoffice lança a OS SIGOS do dia no
+// bloco (app_pp_diario_os) → o bloco vira "OS criada" (rastreio do que virou OS por dia de trabalho). Cada bloco abre a
+// folha do dia (overlay #relatorio + REL_CSS → imprimir/PDF): produção (km pesquisado = rede, km andado, velocidade,
+// vazamentos, fraudes, vaz/km — mesmas definições do Acompanhamento), mapa estático (rede + trajetos + ocorrências
+// numeradas) e o detalhe de cada vazamento e de cada fraude (foto + descrição do pesquisador). Fraude fica fora do
+// vaz/km; numeração única: vazamentos 1..n, depois fraudes n+1.. (pdOcorrencias).
+// RPCs app_pp_diario_lista / app_pp_diario_os / app_pp_relatorio_diario.
+let pdBlocos=[], pdStatus='pendente', pdPrazo='';
 const PD_COR={rede:'#1D9E75',trecho:'#d81b60',vaz:'#1565c0',fraude:'#c2410c'};
 function pdInit(){
-  const dia=$('#pdDia');
-  if(!dia.dataset.ready){
-    dia.dataset.ready='1';
-    dia.addEventListener('change',pdCarregarColabs);
-    $('#pdHoje').onclick=()=>{ dia.value=pdDiaStr(0); pdCarregarColabs(); };
-    $('#pdOntem').onclick=()=>{ dia.value=pdDiaStr(-1); pdCarregarColabs(); };
-    $('#pdColab').addEventListener('change',pdPintarBtn);
-    $('#pdGerar').onclick=pdGerar;
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  pavCss();   // reaproveita .pavchips/.pavchip da Gestão de Pavimento
+  document.querySelectorAll('#pdStatusSeg button').forEach(b=>b.onclick=()=>pdSetStatus(b.dataset.st));
+  $('#pdColab').onchange=pdRender; $('#pdDia').onchange=pdRender;
+  $('#pdDiaLimpar').onclick=()=>{ $('#pdDia').value=''; pdRender(); };
+  pdCarregar();
+}
+function pdSetStatus(st){ pdStatus=st; document.querySelectorAll('#pdStatusSeg button').forEach(x=>x.classList.toggle('sel',x.dataset.st===st)); pdRender(); }
+async function pdCarregar(){
+  const c=$('#pdLista'); c.innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_pp_diario_lista'); if(error) throw error; pdBlocos=data||[]; }
+  catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; return; }
+  const s=$('#pdColab'), ant=s.value, nomes=new Map();
+  pdBlocos.forEach(b=>nomes.set(b.colaborador_uuid,b.nome));
+  s.innerHTML='<option value="">Todos os colaboradores</option>'+[...nomes].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'pt-BR'))
+    .map(([id,n])=>'<option value="'+id+'">'+vEsc(n)+'</option>').join('');
+  if(ant && nomes.has(ant)) s.value=ant;
+  pdRender();
+}
+// dias desde o dia trabalhado (datas locais, sem passar 'AAAA-MM-DD' por Date UTC)
+function pdDias(dia){ const p=String(dia||'').split('-'); if(p.length!==3) return null; const n=new Date();
+  return Math.round((new Date(n.getFullYear(),n.getMonth(),n.getDate())-new Date(+p[0],+p[1]-1,+p[2]))/86400000); }
+function pdFiltrado(semStatus){
+  const col=$('#pdColab').value, dia=$('#pdDia').value;
+  let arr=pdBlocos.filter(b=>(!col||b.colaborador_uuid===col)&&(!dia||b.dia===dia));
+  if(semStatus!==true){
+    if(pdStatus==='pendente') arr=arr.filter(b=>!b.os_sigos); else if(pdStatus==='criada') arr=arr.filter(b=>!!b.os_sigos);
+    if(pdPrazo) arr=arr.filter(b=>!b.os_sigos && pavBucket(pdDias(b.dia)).key===pdPrazo);
   }
-  if(!dia.value) dia.value=pdDiaStr(0);
-  pdCarregarColabs();
+  // pendentes: mais antigos primeiro (o mais atrasado no topo); demais: mais recentes primeiro
+  const dir=pdStatus==='pendente'?1:-1;
+  return arr.sort((a,b)=>dir*String(a.dia).localeCompare(String(b.dia)) || String(a.nome).localeCompare(String(b.nome),'pt-BR'));
 }
-function pdDiaStr(delta){ const n=new Date(); n.setDate(n.getDate()+delta); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
-function pdPintarBtn(){ $('#pdGerar').disabled=!($('#pdColab').value && $('#pdDia').value); }
-async function pdCarregarColabs(){
-  const s=$('#pdColab'), dia=$('#pdDia').value, ant=s.value, gen=++pdGen;
-  s.innerHTML='<option value="">'+(dia?'Carregando…':'Escolha o dia')+'</option>'; pdPintarBtn();
-  if(!dia) return;
-  try{
-    const {data,error}=await sb.rpc('app_pp_diario_colabs',{p_data:dia});
-    if(error) throw error;
-    if(gen!==pdGen) return;   // trocou o dia no meio — vale a chamada mais nova
-    const arr=data||[];
-    s.innerHTML=arr.length
-      ? (arr.length>1?'<option value="">Escolha o colaborador ('+arr.length+' no dia)</option>':'')
-        +arr.map(c=>'<option value="'+c.id+'">'+vEsc(c.nome)+' · '+relNum(c.km_rede,2)+' km pesq. · '+c.vazamentos+' vaz.'+(c.fraudes?(' · '+c.fraudes+' fraude'+(c.fraudes>1?'s':'')):'')+'</option>').join('')
-      : '<option value="">Ninguém lançou pesquisa neste dia</option>';
-    if(ant && arr.some(c=>c.id===ant)) s.value=ant;
-  }catch(e){ if(gen!==pdGen) return; s.innerHTML='<option value="">Erro ao carregar</option>'; toast('Erro: '+(e.message||e)); }
-  pdPintarBtn();
+function pdResumo(){
+  const r=$('#pdResumo'), cnt={ok:0,aten:0,atraso:0};
+  pdFiltrado(true).filter(b=>!b.os_sigos).forEach(b=>{ const k=pavBucket(pdDias(b.dia)).key; if(cnt[k]!=null) cnt[k]++; });
+  const B={ok:{e:'🟢',l:'no prazo',c:'#2f8b6c'},aten:{e:'🟡',l:'atenção',c:'#e6a23c'},atraso:{e:'🔴',l:'atrasado',c:'#d6336c'}};
+  r.innerHTML='<div class="pavchips" style="margin-top:0">'+['ok','aten','atraso'].map(k=>{ const on=pdPrazo===k;
+    return '<div class="pavchip" data-prazo="'+k+'" style="'+(on?('background:'+B[k].c+';border-color:transparent;color:#fff'):'')+'">'+B[k].e+' '+cnt[k]+' '+B[k].l+'</div>'; }).join('')+'</div>';
+  r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.prazo; pdPrazo=(pdPrazo===k?'':k);
+    if(pdPrazo && pdStatus!=='pendente') pdSetStatus('pendente'); else pdRender(); });
 }
-async function pdGerar(){
-  const colab=$('#pdColab').value, dia=$('#pdDia').value; if(!colab||!dia) return;
+function pdRender(){
+  pdResumo();
+  const arr=pdFiltrado(), c=$('#pdLista');
+  c.innerHTML=arr.length?('<p class="sub" style="margin:0 0 8px">'+arr.length+' bloco(s) dia × colaborador</p>'+arr.map(pdCard).join('')):'<p class="sub">Nenhum dia de pesquisa nesse filtro.</p>';
+  c.querySelectorAll('.pdoscriar').forEach(b=>b.onclick=()=>pdSalvarOS(b.dataset.k));
+  c.querySelectorAll('.pdosalt').forEach(b=>b.onclick=()=>{ const w=c.querySelector('.pdosedit[data-k="'+b.dataset.k+'"]'); if(w) w.classList.toggle('hidden'); });
+  c.querySelectorAll('.pdrel').forEach(b=>b.onclick=()=>{ const bl=pdBloco(b.dataset.k); if(bl) pdGerar(bl, b); });
+}
+const pdChave=b=>b.colaborador_uuid+'|'+b.dia;
+function pdBloco(k){ return pdBlocos.find(b=>pdChave(b)===k); }
+function pdCard(b){
+  const k=pdChave(b), d=pdDias(b.dia), bk=pavBucket(d), pend=!b.os_sigos, cor=pend?bk.c:'#0e7c86';
+  const p=String(b.dia).split('-'), sem=new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
+  const cons=(b.consorcios||[]).map(c=>c==='ZA1004'?'Contagem':(c==='ZA0200'?'Betim':c)).join(' / ')||'—';
+  const vel=b.duracao_s>0?(Number(b.km_andado)/(b.duracao_s/3600)):0;
+  const badge='<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:'+cor+';padding:2px 10px;border-radius:999px;white-space:nowrap">'+(pend?(bk.lbl+' · '+pavDiasTxt(d)):'✓ OS criada')+'</span>';
+  const met=[relNum(b.km_rede,2)+' km pesquisados',relNum(b.km_andado,2)+' km andados',relNum(vel,1)+' km/h',
+    b.vazamentos+' vazamento'+(b.vazamentos===1?'':'s'),b.fraudes+' fraude'+(b.fraudes===1?'':'s')].join(' · ');
+  const campo=(v,bt)=>'<div style="display:flex;gap:6px;margin-top:8px"><input class="pdosinp" data-k="'+k+'" value="'+vEsc(v||'')+'" placeholder="nº da OS SIGOS do dia" autocomplete="off" style="flex:1;min-width:0"/><button class="btn pdoscriar" data-k="'+k+'" style="width:auto;margin:0;padding:8px 14px;white-space:nowrap">'+bt+'</button></div>';
+  const os=pend ? campo('','Criar OS')
+    : '<div class="sub" style="margin-top:8px;font-size:12px"><b style="color:#0e7c86">✓ OS '+vEsc(b.os_sigos)+'</b>'+(b.os_por?(' · lançada por '+vEsc(b.os_por)):'')+(b.os_em?(' em '+new Date(b.os_em).toLocaleDateString('pt-BR')):'')
+      +' · <a class="pdosalt" data-k="'+k+'" style="cursor:pointer;color:var(--acc)">✏️ alterar</a></div>'
+      +'<div class="pdosedit hidden" data-k="'+k+'">'+campo(b.os_sigos,'Salvar')+'<p class="sub" style="font-size:11px;margin:4px 0 0">Apague o número e salve para voltar o dia a pendente.</p></div>';
+  return '<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid '+cor+';border-radius:12px;padding:12px 13px;margin-bottom:10px">'
+    +'<div style="display:flex;gap:8px;align-items:center"><b>📅 '+sem+', '+pdDataBR(b.dia)+'</b>'+badge+'</div>'
+    +'<div class="sub" style="margin-top:3px">'+vEsc(b.nome)+' · '+cons+'</div>'
+    +'<div class="sub" style="margin-top:3px;font-size:12px">'+met+'</div>'
+    +os
+    +'<button class="pdrel" data-k="'+k+'" style="all:unset;cursor:pointer;display:inline-block;margin-top:10px;font-size:13px;font-weight:600;color:var(--acc)">📄 Relatório do dia ›</button></div>';
+}
+async function pdSalvarOS(k){
+  const bl=pdBloco(k), inp=document.querySelector('.pdosinp[data-k="'+k+'"]');   // 1 campo por bloco
+  if(!bl||!inp) return;
+  const os=inp.value.trim();
+  if(!os && !bl.os_sigos) return toast('Informe o número da OS SIGOS');
+  if(!os && !confirm('Apagar a OS deste dia? O bloco volta a "Pendente de OS".')) return;
+  try{ const {data,error}=await sb.rpc('app_pp_diario_os',{p_colaborador:bl.colaborador_uuid,p_data:bl.dia,p_os:os}); if(error) throw error;
+    bl.os_sigos=(data&&data.os_sigos)||null; bl.os_em=(data&&data.os_em)||null; bl.os_por=(data&&data.os_por)||null;
+    toast(bl.os_sigos?'✓ OS criada':'OS apagada — dia pendente'); pdRender();
+  }catch(e){ toast('Erro ao salvar OS: '+(e.message||e)); }
+}
+async function pdGerar(bl, btn){
   if(!navigator.onLine) return toast('Conecte-se para gerar o relatório');
-  const b=$('#pdGerar'), old=b.textContent; b.disabled=true; b.textContent='Gerando…';
-  let d; try{ const r=await sb.rpc('app_pp_relatorio_diario',{p_colaborador:colab,p_data:dia}); if(r.error) throw r.error; d=r.data; }
+  const old=btn&&btn.textContent; if(btn){ btn.textContent='Gerando…'; btn.style.pointerEvents='none'; }
+  let d; try{ const r=await sb.rpc('app_pp_relatorio_diario',{p_colaborador:bl.colaborador_uuid,p_data:bl.dia}); if(r.error) throw r.error; d=r.data; }
   catch(e){ toast('⚠ '+(e.message||e)); }
-  b.textContent=old; pdPintarBtn();
+  if(btn){ btn.textContent=old; btn.style.pointerEvents=''; }
   if(!d) return;
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
@@ -6535,7 +6593,7 @@ function pdDocHtml(d){
   const card=(t,v,u,s)=>'<div class="relCard"><div class="relCardT">'+t+'</div><div class="relCardV">'+v+(u?' <span>'+u+'</span>':'')+'</div>'+(s?'<div class="relCardS">'+s+'</div>':'')+'</div>';
   let h='<div class="relTop"><div><h1>Relatório Diário · Pesquisa de Vazamentos</h1><div class="sub">'+(cons||'Pesquisa de vazamentos')+'</div></div><div class="relBadge">'+pdDataBR(d.data)+'</div></div><div class="relBody">';
   h+='<div class="relGrid">'+relField('Colaborador',vEsc((d.colaborador||{}).nome))+relField('Data',pdDataBR(d.data)+(sem?(' · '+sem):''))
-    +relField('Período em pesquisa',k.inicio?(pdHora(k.inicio)+' às '+pdHora(k.fim)):'—')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+    +relField('Período em pesquisa',k.inicio?(pdHora(k.inicio)+' às '+pdHora(k.fim)):'—')+relField('OS SIGOS do dia',(d.os_dia&&d.os_dia.os_sigos)?vEsc(d.os_dia.os_sigos):'<span style="color:#b45309">Pendente</span>')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span> Produção do dia</div><div class="relCards c6">'
     +card('Km pesquisado',relNum(k.km_rede_pesquisado,2),'km','rede pesquisada')
     +card('Km andado',relNum(k.km_andado,2),'km',(k.n_trechos||0)+' trecho(s)')
