@@ -285,13 +285,14 @@ pwa/
     (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
     **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW) · **Situação dos Imóveis** (`perdas.html?s=situacao`, 2026-10-30: ligações por situação R/I/F/P e por **há quantos dias** estão nela — `ligacoes.situacao`/`situacao_desde` —, filtros em dropdown sobre um mapa em largura total com limite das ZAs + polígono e um botão de export .xlsx com a contagem; RPCs `app_sit_imoveis_resumo/lista/mapa`, gate `_nrw_fraude_gate`). *(Análise
     por matrícula / `?s=mm` foi removida do Auxiliar em 2026-10-20; a tela segue existindo no cockpit NRW.)*
-  - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
-    (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
+  - **🎧 Pesquisa de Vazamentos** (nesta ordem no hub, 2026-10-30): Programação de pesquisa (`programacao_pesquisa`) ·
+    **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
     **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`) · **Relatório diário** (`pp_diario`, 2026-10-30: lista de
     blocos dia × colaborador × consórcio no estilo da Gestão de Pavimento — abas Pendente de OS/OS criada/Todos, chips de
     prazo, filtros de consórcio, colaborador e dia; o backoffice lança a **OS SIGOS do dia** no bloco (`"12 - retaguarda".pesquisa_dia_os`)
     e cada bloco abre a folha p/ imprimir/PDF — produção do dia, mapa estático e o detalhe de cada vazamento e de cada
-    fraude com foto e descrição (fraude fora do vaz/km); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9).
+    fraude com foto e descrição (fraude fora do vaz/km); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9) ·
+    Acompanhamento da pesquisa (`pp_acomp`, §4.3.8).
   - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma
     preventivo (`vrpman_prev`) — **migradas do hub `vrpman`** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg` admin).
   - **🧱 Gestão de Pavimento:** Pavimentos a recompor (`pavprog`) — lista os registros de campo do módulo
