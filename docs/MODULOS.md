@@ -127,7 +127,10 @@
 
 ### Relatórios PDF — `REL_CSS` / overlay `#relatorio`
 - Padrão: monta HTML num overlay `#relatorio` e chama `window.print()` (CSS `@media print`).
-  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos e relatório de veículo (§6.2).
+  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos, relatório de veículo (§6.2) e relatório diário
+  da pesquisa (§4.3.9).
+- **Mapa estático no PDF:** `relMapaCanvas(pts,W,H,desenhar,opt)` (tiles OSM num canvas → `<img>`; `desenhar(ctx,xy)`
+  pinta linhas/pontos por cima). Use-o em vez de mapa Leaflet no relatório (Leaflet não imprime bem). Opções em §4.3.9.
 
 ### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
 - **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
@@ -922,6 +925,35 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 - **Decisões do produto (2026-09-14):** passada contada **por segmento** (não rodada global
   sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
   **manual** pelo programador (nada de reabertura automática por prazo, por ora).
+
+#### 4.3.9 Relatório diário da pesquisa (2026-10-30) — `pp_diario` (Auxiliar de Programação)
+
+Botão **🗓️ Relatório diário** em Auxiliar › 🎧 Pesquisa de Vazamentos. **Uma folha por dia × colaborador**
+(overlay `#relatorio` + `REL_CSS` → "Imprimir / Salvar PDF"). Módulo JS `pd*` (`pdInit`/`pdCarregarColabs`/
+`pdGerar`/`pdDocHtml`/`pdDesenharMapa`), logo depois do Acompanhamento.
+- **Filtros:** **Dia** (date + atalhos Hoje/Ontem) e **Colaborador**. O dropdown lista **só quem lançou pesquisa no
+  dia** (trecho, rede pesquisada ou vazamento), já com "km pesq. · vaz." — `app_pp_diario_colabs(p_data)`; com mais de
+  um, começa em "Escolha o colaborador (N no dia)"; com um só, já vem selecionado.
+- **Folha (`app_pp_relatorio_diario(p_colaborador, p_data)`):** cabeçalho (consórcio, data + dia da semana,
+  colaborador, período em pesquisa = 1º início → último fim dos trechos) → **1 · Produção do dia** (5 cards: km
+  pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa], vazamentos, vaz/km) → **2 · Mapa da
+  pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa, vazamentos em azul **numerados**) → **3 ·
+  Vazamentos apontados** (um bloco por vazamento, na ordem do horário, com o mesmo nº do mapa: foto, tipo, local,
+  hora, OS COPASA, coordenada e a **descrição do pesquisador** = `ocorrencia.observacao`).
+- **Mesmas definições do Acompanhamento (§4.3.8):** km pesquisado = `pp_execucao` (rede) · km andado =
+  `pesquisa_trecho` · vaz/km = vazamentos ÷ km de rede · velocidade = km andado ÷ soma de `duracao_s`. **Fraude não
+  entra** (vazamento = tipo que não começa com "Fraude", §2.3). Dia em que o traço não cruzou rede programada sai com
+  km pesquisado 0 e vaz/km 0 (o km andado aparece).
+- **Dia (fuso):** `inicio_ts`/`data_hora` (timestamp sem tz) já são Brasília → `::date`; `pp_execucao.executado_em`
+  (timestamptz) → `at time zone 'America/Sao_Paulo'` (o Acompanhamento ainda usa `executado_em::date` em UTC — rede
+  pesquisada depois das 21h cai no dia seguinte lá). Casamento traço/ocorrência ↔ usuário por **nome OU e-mail** (§4.3.5).
+- **Consórcio do cabeçalho:** de rede/ocorrência/trecho; trecho recente vem com `consorcio` nulo → pega o
+  `limite_za` que o trecho cruza.
+- **Mapa estático:** `relMapaCanvas(pts,W,H,desenhar,{tolerante,justo})` — o compositor OSM em canvas da ficha do
+  logger virou genérico (o `relComporMapa` do logger chama ele sem opções, comportamento igual). `justo` = zoom
+  fracionário (tiles do nível seguinte encolhidos) p/ a área encher o quadro; `tolerante` = tile que falha fica
+  cinza em vez de derrubar o mapa. A impressão só libera depois de mapa e fotos carregarem (ou 8 s).
+- **Gate:** admin, aprovador ou `aux_acesso` (nas duas RPCs). SQL em `docs/migracao_pesquisa_relatorio_diario.sql`.
 
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
 - Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*

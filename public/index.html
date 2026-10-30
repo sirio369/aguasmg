@@ -1015,6 +1015,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="programacao_pesquisa"><div class="ic">🔎</div><div class="nm">Programação de pesquisa</div></button>
       <button class="mod" data-go="pp_acomp"><div class="ic">📊</div><div class="nm">Acompanhamento da pesquisa</div></button>
       <button class="mod" id="apAbertPesq"><div class="ic">⚠️</div><div class="nm">Abertura de serviços</div></button>
+      <button class="mod" data-go="pp_diario"><div class="ic">🗓️</div><div class="nm">Relatório diário</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">🔧 Gestão de VRPs</div>
@@ -1105,6 +1106,22 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec" style="margin-top:20px">Ocorrências por tipo e local</div>
     <p class="sub" style="margin:6px 0 0;font-size:12px">Toque num número para ver essas ocorrências na abertura de serviços.</p>
     <div id="paMatriz" style="overflow-x:auto;margin-top:8px"></div>
+  </main>
+
+  <main id="pp_diario" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Relatório diário da pesquisa</h1>
+    <p class="sub">Uma folha por dia e por colaborador: mapa da pesquisa, produção do dia e o detalhe de cada vazamento apontado.</p>
+    <label>Dia</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input id="pdDia" type="date" style="flex:1;min-width:0"/>
+      <button id="pdHoje" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Hoje</button>
+      <button id="pdOntem" style="all:unset;cursor:pointer;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line)">Ontem</button>
+    </div>
+    <label style="margin-top:12px">Colaborador</label>
+    <select id="pdColab"><option value="">Carregando…</option></select>
+    <p id="pdInfo" class="sub" style="margin-top:6px">Lista só quem lançou pesquisa (trecho, rede pesquisada ou vazamento) no dia.</p>
+    <button id="pdGerar" class="btn" disabled>📄 Gerar relatório</button>
   </main>
 
   <main id="ent_ocorrencia" class="hidden">
@@ -1891,7 +1908,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -1920,6 +1937,7 @@ function irPara(id){
   if(id==='programacao_servicos') pgInit();
   if(id==='programacao_pesquisa') ppInit();
   if(id==='pp_acomp') paInit();
+  if(id==='pp_diario') pdInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
@@ -3453,6 +3471,11 @@ const REL_CSS=`
 .relCardV span{font-size:11px;font-weight:600;color:#888}
 .relCardS{font-size:11px;color:#999;margin-top:1px}
 .relFoot{margin:22px 30px 0;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#999;display:flex;justify-content:space-between}
+.relCards.c5{grid-template-columns:repeat(5,1fr)}
+.relVaz{display:grid;grid-template-columns:230px 1fr;gap:14px;margin-top:12px;padding:10px;border:1px solid #d7dde5;border-radius:8px}
+.relVaz img{width:100%;height:230px;object-fit:contain;background:#f1f5f9;border-radius:4px;display:block}
+.relVazT{display:flex;align-items:center;font-weight:700;font-size:14px;color:#111}
+@media screen and (max-width:560px){.relCards.c5{grid-template-columns:repeat(3,1fr)}.relVaz{grid-template-columns:1fr}}
 @media print{
   @page{size:A4;margin:11mm}
   body{visibility:hidden}
@@ -3461,7 +3484,7 @@ const REL_CSS=`
   #relToolbar{display:none!important}
   #relDoc{box-shadow:none!important;margin:0!important;max-width:none!important}
   .relTop,.relBadge,.relNum,.relCard,.relCardV{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .relSec,.relPhotos figure,.relMapWrap,.relCards,svg{break-inside:avoid}
+  .relSec,.relPhotos figure,.relMapWrap,.relCards,.relVaz,svg{break-inside:avoid}
 }`;
 function relFmtData(s){ if(!s) return '—'; try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } }
 function relV(v){ return (v===null||v===undefined||v==='')?'—':v; }
@@ -3692,16 +3715,30 @@ async function relDesenharMapa(p){
   catch(e){ box.innerHTML=relMapaSVG(pts); }
 }
 function relComporMapa(pts,W,H){
+  return relMapaCanvas(pts,W,H,(ctx,xy)=>{
+    if(pts.length===2){ const a=xy(pts[0].lat,pts[0].lon), b=xy(pts[1].lat,pts[1].lon); ctx.setLineDash([7,5]); ctx.strokeStyle='#111'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); ctx.setLineDash([]); }
+    pts.forEach(pt=>{ const [x,y]=xy(pt.lat,pt.lon); ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.fillStyle=pt.tipo==='inst'?'#e11d1d':'#1d6fe0'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#fff'; ctx.stroke(); });
+  });
+}
+// Mapa estático p/ PDF: fundo OSM em canvas enquadrando `pts` ({lat,lon}) + desenhar(ctx, xy(lat,lon)→[x,y]) por cima.
+// opt.tolerante: tile que falhar/demorar fica cinza e o mapa sai mesmo assim (senão rejeita → quem chama cai no esquema SVG).
+// opt.justo: zoom "fracionário" — usa os tiles do nível seguinte encolhidos (k<1) p/ a área encher o quadro (zoom inteiro
+// deixava a área em ~¼ da imagem). Sem opt = comportamento original (ficha do logger).
+function relMapaCanvas(pts,W,H,desenhar,opt){
+  opt=opt||{};
   return new Promise((resolve,reject)=>{
     const lon2px=(lon,z)=>(lon+180)/360*256*Math.pow(2,z);
     const lat2px=(lat,z)=>{ const s=Math.sin(lat*Math.PI/180); return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*256*Math.pow(2,z); };
     const lons=pts.map(p=>p.lon), lats=pts.map(p=>p.lat);
     const minLon=Math.min(...lons),maxLon=Math.max(...lons),minLat=Math.min(...lats),maxLat=Math.max(...lats);
-    let z=17;
-    if(pts.length>1){ for(z=18;z>11;z--){ const dx=Math.abs(lon2px(maxLon,z)-lon2px(minLon,z)); const dy=Math.abs(lat2px(minLat,z)-lat2px(maxLat,z)); if(dx<W-90&&dy<H-90) break; } }
-    const cx=(lon2px(minLon,z)+lon2px(maxLon,z))/2, cy=(lat2px(minLat,z)+lat2px(maxLat,z))/2;
+    const pad=opt.justo?50:90, ext=z=>[Math.abs(lon2px(maxLon,z)-lon2px(minLon,z)), Math.abs(lat2px(minLat,z)-lat2px(maxLat,z))];
+    let z=17, k=1;
+    if(pts.length>1){ for(z=18;z>11;z--){ const [dx,dy]=ext(z); if(dx<W-pad&&dy<H-pad) break; } }
+    if(opt.justo && pts.length>1 && z<18){ const [dx,dy]=ext(z+1); z++; k=Math.min((W-pad)/dx,(H-pad)/dy,1); }
+    const X=lon=>lon2px(lon,z)*k, Y=lat=>lat2px(lat,z)*k, ts=256*k;
+    const cx=(X(minLon)+X(maxLon))/2, cy=(Y(minLat)+Y(maxLat))/2;
     const ox=cx-W/2, oy=cy-H/2, n=Math.pow(2,z);
-    const tx0=Math.floor(ox/256), tx1=Math.floor((ox+W)/256), ty0=Math.floor(oy/256), ty1=Math.floor((oy+H)/256);
+    const tx0=Math.floor(ox/ts), tx1=Math.floor((ox+W)/ts), ty0=Math.floor(oy/ts), ty1=Math.floor((oy+H)/ts);
     const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
     ctx.fillStyle='#e8edf2'; ctx.fillRect(0,0,W,H);
     const jobs=[];
@@ -3710,19 +3747,18 @@ function relComporMapa(pts,W,H){
       const xx=((tx%n)+n)%n;
       jobs.push(new Promise((res,rej)=>{
         const im=new Image(); im.crossOrigin='anonymous';
-        im.onload=()=>{ try{ ctx.drawImage(im, Math.round(tx*256-ox), Math.round(ty*256-oy)); }catch(_){} res(); };
-        im.onerror=()=>rej(new Error('tile'));
+        im.onload=()=>{ try{ if(k===1) ctx.drawImage(im, Math.round(tx*256-ox), Math.round(ty*256-oy)); else ctx.drawImage(im, Math.floor(tx*ts-ox), Math.floor(ty*ts-oy), Math.ceil(ts)+1, Math.ceil(ts)+1); }catch(_){} res(); };
+        im.onerror=()=>opt.tolerante?res():rej(new Error('tile'));
         im.src='https://tile.openstreetmap.org/'+z+'/'+xx+'/'+ty+'.png';
       }));
     }
-    const fail=setTimeout(()=>reject(new Error('timeout')),7000);
-    Promise.all(jobs).then(()=>{
-      clearTimeout(fail);
-      if(pts.length===2){ ctx.setLineDash([7,5]); ctx.strokeStyle='#111'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(lon2px(pts[0].lon,z)-ox,lat2px(pts[0].lat,z)-oy); ctx.lineTo(lon2px(pts[1].lon,z)-ox,lat2px(pts[1].lat,z)-oy); ctx.stroke(); ctx.setLineDash([]); }
-      pts.forEach(pt=>{ const x=lon2px(pt.lon,z)-ox, y=lat2px(pt.lat,z)-oy; ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.fillStyle=pt.tipo==='inst'?'#e11d1d':'#1d6fe0'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#fff'; ctx.stroke(); });
+    let feito=false;
+    const fechar=()=>{ if(feito) return; feito=true; clearTimeout(fail);
+      desenhar(ctx,(lat,lon)=>[X(lon)-ox, Y(lat)-oy]);
       ctx.font='10px Arial'; ctx.fillStyle='rgba(255,255,255,.82)'; ctx.fillRect(0,H-15,132,15); ctx.fillStyle='#333'; ctx.fillText('© OpenStreetMap',4,H-4);
-      try{ resolve(cv.toDataURL('image/png')); }catch(e){ reject(e); }
-    }).catch(e=>{ clearTimeout(fail); reject(e); });
+      try{ resolve(cv.toDataURL('image/png')); }catch(e){ reject(e); } };
+    const fail=setTimeout(()=>{ if(opt.tolerante) fechar(); else { feito=true; reject(new Error('timeout')); } },opt.tolerante?10000:7000);
+    Promise.all(jobs).then(fechar).catch(e=>{ if(feito) return; feito=true; clearTimeout(fail); reject(e); });
   });
 }
 function relMapaSVG(pts){
@@ -6431,6 +6467,127 @@ async function paCarregarMapa(){
 }
 function paToggleOc(){ paShowOc=!paShowOc; paPintarToggles(); paCarregarMapa(); }
 function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(); }
+
+// ---------- MÓDULO RELATÓRIO DIÁRIO DA PESQUISA (interno — Auxiliar de Programação) ----------
+// Uma folha por DIA × COLABORADOR (overlay #relatorio + REL_CSS → imprimir/PDF): produção do dia (km pesquisado = rede,
+// km andado, velocidade, vazamentos, vaz/km — mesmas definições do Acompanhamento), mapa estático (rede pesquisada +
+// trajetos + vazamentos numerados) e o detalhe de cada vazamento (foto + descrição do pesquisador). Fraude não entra.
+// RPCs app_pp_diario_colabs (quem lançou pesquisa no dia → filtro) / app_pp_relatorio_diario.
+let pdGen=0;
+const PD_COR={rede:'#1D9E75',trecho:'#d81b60',vaz:'#1565c0'};
+function pdInit(){
+  const dia=$('#pdDia');
+  if(!dia.dataset.ready){
+    dia.dataset.ready='1';
+    dia.addEventListener('change',pdCarregarColabs);
+    $('#pdHoje').onclick=()=>{ dia.value=pdDiaStr(0); pdCarregarColabs(); };
+    $('#pdOntem').onclick=()=>{ dia.value=pdDiaStr(-1); pdCarregarColabs(); };
+    $('#pdColab').addEventListener('change',pdPintarBtn);
+    $('#pdGerar').onclick=pdGerar;
+  }
+  if(!dia.value) dia.value=pdDiaStr(0);
+  pdCarregarColabs();
+}
+function pdDiaStr(delta){ const n=new Date(); n.setDate(n.getDate()+delta); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+function pdPintarBtn(){ $('#pdGerar').disabled=!($('#pdColab').value && $('#pdDia').value); }
+async function pdCarregarColabs(){
+  const s=$('#pdColab'), dia=$('#pdDia').value, ant=s.value, gen=++pdGen;
+  s.innerHTML='<option value="">'+(dia?'Carregando…':'Escolha o dia')+'</option>'; pdPintarBtn();
+  if(!dia) return;
+  try{
+    const {data,error}=await sb.rpc('app_pp_diario_colabs',{p_data:dia});
+    if(error) throw error;
+    if(gen!==pdGen) return;   // trocou o dia no meio — vale a chamada mais nova
+    const arr=data||[];
+    s.innerHTML=arr.length
+      ? (arr.length>1?'<option value="">Escolha o colaborador ('+arr.length+' no dia)</option>':'')
+        +arr.map(c=>'<option value="'+c.id+'">'+vEsc(c.nome)+' · '+relNum(c.km_rede,2)+' km pesq. · '+c.vazamentos+' vaz.</option>').join('')
+      : '<option value="">Ninguém lançou pesquisa neste dia</option>';
+    if(ant && arr.some(c=>c.id===ant)) s.value=ant;
+  }catch(e){ if(gen!==pdGen) return; s.innerHTML='<option value="">Erro ao carregar</option>'; toast('Erro: '+(e.message||e)); }
+  pdPintarBtn();
+}
+async function pdGerar(){
+  const colab=$('#pdColab').value, dia=$('#pdDia').value; if(!colab||!dia) return;
+  if(!navigator.onLine) return toast('Conecte-se para gerar o relatório');
+  const b=$('#pdGerar'), old=b.textContent; b.disabled=true; b.textContent='Gerando…';
+  let d; try{ const r=await sb.rpc('app_pp_relatorio_diario',{p_colaborador:colab,p_data:dia}); if(r.error) throw r.error; d=r.data; }
+  catch(e){ toast('⚠ '+(e.message||e)); }
+  b.textContent=old; pdPintarBtn();
+  if(!d) return;
+  if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pdDocHtml(d)+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  const pb=document.getElementById('relPrint'); pb.onclick=()=>window.print();
+  await pdDesenharMapa(d);
+  await pdEsperarFotos(8000);   // libera a impressão só com mapa e fotos carregados (ou após 8 s)
+  pb.disabled=false;
+}
+function pdDataBR(s){ const p=String(s||'').split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:'—'; }
+function pdHora(s){ return s?String(s).slice(11,16):'—'; }   // timestamps do schema 8 já vêm no horário de Brasília
+function pdDuracao(seg){ seg=Number(seg||0); const h=Math.floor(seg/3600), m=Math.round(seg%3600/60); return h?(h+' h '+String(m).padStart(2,'0')+' min'):(m+' min'); }
+function pdDocHtml(d){
+  const k=d.kpis||{}, vaz=d.vazamentos||[], cons=(d.consorcios||[]).map(c=>REL_CONS[c]||c).join(' · ');
+  const p=String(d.data||'').split('-'), sem=p.length===3?new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString('pt-BR',{weekday:'long'}):'';
+  const card=(t,v,u,s)=>'<div class="relCard"><div class="relCardT">'+t+'</div><div class="relCardV">'+v+(u?' <span>'+u+'</span>':'')+'</div>'+(s?'<div class="relCardS">'+s+'</div>':'')+'</div>';
+  let h='<div class="relTop"><div><h1>Relatório Diário · Pesquisa de Vazamentos</h1><div class="sub">'+(cons||'Pesquisa de vazamentos')+'</div></div><div class="relBadge">'+pdDataBR(d.data)+'</div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('Colaborador',vEsc((d.colaborador||{}).nome))+relField('Data',pdDataBR(d.data)+(sem?(' · '+sem):''))
+    +relField('Período em pesquisa',k.inicio?(pdHora(k.inicio)+' às '+pdHora(k.fim)):'—')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  h+='<div class="relSec"><span class="relNum">1</span> Produção do dia</div><div class="relCards c5">'
+    +card('Km pesquisado',relNum(k.km_rede_pesquisado,2),'km','rede pesquisada')
+    +card('Km andado',relNum(k.km_andado,2),'km',(k.n_trechos||0)+' trecho(s)')
+    +card('Velocidade',relNum(k.velocidade_kmh,1),'km/h',k.duracao_s?('em '+pdDuracao(k.duracao_s)):'')
+    +card('Vazamentos',String(k.vazamentos||0),'','apontados')
+    +card('Vaz/km',relNum(k.vaz_km,2),'','por km pesquisado')+'</div>';
+  h+='<div class="relSec"><span class="relNum">2</span> Mapa da pesquisa</div><div id="pdMapa" class="relMapWrap"><div class="relMapPh">Preparando mapa…</div></div>';
+  h+='<div class="relLeg"><span><i style="display:inline-block;width:18px;height:4px;background:'+PD_COR.rede+';vertical-align:middle;margin-right:4px"></i>Rede pesquisada</span>'
+    +'<span><i style="display:inline-block;width:18px;border-top:3px dashed '+PD_COR.trecho+';vertical-align:middle;margin-right:4px"></i>Trajeto andado</span>'
+    +'<span><span class="relDot" style="background:'+PD_COR.vaz+'"></span>Vazamento (nº = detalhe abaixo)</span></div>';
+  h+='<div class="relSec"><span class="relNum">3</span> Vazamentos apontados ('+vaz.length+')</div>';
+  h+=vaz.length?vaz.map(pdVazHtml).join(''):'<div class="relPend">Nenhum vazamento apontado neste dia.</div>';
+  h+='</div><div class="relFoot"><span>AcquaHub · relatório diário da pesquisa</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
+  return h;
+}
+function pdVazHtml(v,i){
+  const foto=v.foto?'<img src="'+fotoURL(v.foto)+'" onerror="this.style.display=\'none\'"/>':'<div class="relMapPh">Sem foto</div>';
+  const coord=(v.lat!=null&&v.lon!=null)?(Number(v.lat).toFixed(6)+', '+Number(v.lon).toFixed(6)):'—';
+  return '<div class="relVaz"><div>'+foto+'</div><div>'
+    +'<div class="relVazT"><span class="relNum" style="background:'+PD_COR.vaz+'">'+(i+1)+'</span>'+vEsc(v.tipo||'Vazamento')+'</div>'
+    +'<div class="relGrid">'+relField('Local',vEsc(v.local))+relField('Hora do apontamento',pdHora(v.data_hora))+relField('OS COPASA',vEsc(v.os))
+    +relField('Coordenada',coord)+relWide('Descrição do pesquisador',vEsc(v.observacao))+'</div></div></div>';
+}
+function pdLinhas(g){ if(!g) return []; if(g.type==='LineString') return [g.coordinates]; if(g.type==='MultiLineString') return g.coordinates; return []; }
+async function pdDesenharMapa(d){
+  const box=document.getElementById('pdMapa'); if(!box) return;
+  const rede=((d.rede||{}).features||[]).flatMap(f=>pdLinhas(f.geometry));
+  const tr=((d.trechos||{}).features||[]).flatMap(f=>pdLinhas(f.geometry));
+  const vaz=d.vazamentos||[];
+  const pts=rede.flat().concat(tr.flat()).map(c=>({lat:c[1],lon:c[0]}))
+    .concat(vaz.filter(v=>v.lat!=null&&v.lon!=null).map(v=>({lat:+v.lat,lon:+v.lon})));
+  if(!pts.length){ box.innerHTML='<div class="relMapPh">Sem pesquisa georreferenciada neste dia.</div>'; return; }
+  const linha=(ctx,xy,ls,cor,larg,traco)=>{ ctx.strokeStyle=cor; ctx.lineWidth=larg; ctx.lineCap='round'; ctx.setLineDash(traco||[]);
+    ls.forEach(l=>{ ctx.beginPath(); l.forEach((c,j)=>{ const [x,y]=xy(c[1],c[0]); if(j) ctx.lineTo(x,y); else ctx.moveTo(x,y); }); ctx.stroke(); });
+    ctx.setLineDash([]); };
+  try{
+    const url=await relMapaCanvas(pts,760,440,(ctx,xy)=>{
+      linha(ctx,xy,rede,PD_COR.rede,5);
+      linha(ctx,xy,tr,PD_COR.trecho,2.5,[6,5]);
+      vaz.forEach((v,i)=>{ if(v.lat==null||v.lon==null) return; const [x,y]=xy(+v.lat,+v.lon);
+        ctx.beginPath(); ctx.arc(x,y,10,0,Math.PI*2); ctx.fillStyle=PD_COR.vaz; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(i+1),x,y+1);
+        ctx.textAlign='left'; ctx.textBaseline='alphabetic'; });
+    },{tolerante:true,justo:true});
+    box.innerHTML='<img class="relMap" src="'+url+'"/>';
+  }catch(e){ box.innerHTML='<div class="relMapPh">Não foi possível montar o mapa ('+vEsc(e.message||e)+').</div>'; }
+}
+function pdEsperarFotos(ms){
+  const ims=[...document.querySelectorAll('#relDoc img')].filter(im=>!im.complete);
+  if(!ims.length) return Promise.resolve();
+  return Promise.race([Promise.all(ims.map(im=>new Promise(r=>{ im.addEventListener('load',r,{once:true}); im.addEventListener('error',r,{once:true}); }))),
+    new Promise(r=>setTimeout(r,ms))]);
+}
 
 // ---------- MÓDULO PROGRAMAÇÃO DE PESQUISA ----------
 let ppMap=null, ppRedeLayer=null, ppSelLayer=null, ppDrawnLayer=null, ppDrawCtl=null, ppClearCtl=null;
