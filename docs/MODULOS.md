@@ -1736,6 +1736,11 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
 - Rótulos: `TIPO_PROBLEMA_ALL` (= `TIPO_PROBLEMA` + checklist/preventiva) é o usado em `labelOf` p/ exibir; o formulário
   do colaborador continua com `TIPO_PROBLEMA` (ele não escolhe preventiva/checklist).
 
+### 6.8 Checklist sempre no veículo vinculado agora (2026-10-30, sw v310) — migração `docs/migracao_frota_checklist_vinculo.sql`
+- `app_frota_situacao_salvar` recusa (`VEICULO_TROCADO`) se quem envia não tem vínculo aberto com `p_veiculo_id`.
+- `condSalvarSituacao` consulta `app_frota_meu_veiculo` antes de subir as fotos; se o carro mudou com a tela aberta, pergunta se registra
+  no carro atual (as fotos costumam ser dele) ou recarrega. Caso real: Roberto 30/10, checklist gravado no TZW8B57 com fotos do UVU2H21.
+
 ### Tabelas (`"10 - Frotas"`)
 `frota_veiculo` (cadastro/combustível/consórcio/contrato — §6.2; **`uso_tipo`/`equipe_id`/
 `condutor_exclusivo_id` ficaram sem uso**, ninguém mais escreve neles, não foram dropados; **`status`
