@@ -283,7 +283,7 @@ pwa/
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
     (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
-    **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW) · **Situação dos Imóveis** (`perdas.html?s=situacao`, 2026-10-30: ligações por situação R/I/F/P e por desde quando — `ligacoes.situacao`/`situacao_desde` —, mapa com limite das ZAs + polígono e export .xlsx; RPCs `app_sit_imoveis_resumo/lista/mapa`, gate `_nrw_fraude_gate`). *(Análise
+    **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW) · **Situação dos Imóveis** (`perdas.html?s=situacao`, 2026-10-30: ligações por situação R/I/F/P e por **há quantos dias** estão nela — `ligacoes.situacao`/`situacao_desde` —, filtros em dropdown sobre um mapa em largura total com limite das ZAs + polígono e um botão de export .xlsx com a contagem; RPCs `app_sit_imoveis_resumo/lista/mapa`, gate `_nrw_fraude_gate`). *(Análise
     por matrícula / `?s=mm` foi removida do Auxiliar em 2026-10-20; a tela segue existindo no cockpit NRW.)*
   - **🎧 Pesquisa de Vazamentos:** Programação de pesquisa (`programacao_pesquisa`) · Acompanhamento da pesquisa
     (`pp_acomp`, §4.3.8) · **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
