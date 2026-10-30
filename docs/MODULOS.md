@@ -127,7 +127,10 @@
 
 ### Relatórios PDF — `REL_CSS` / overlay `#relatorio`
 - Padrão: monta HTML num overlay `#relatorio` e chama `window.print()` (CSS `@media print`).
-  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos e relatório de veículo (§6.2).
+  Usado por loggers (§Loggers), VRP, comprovantes de suprimentos, relatório de veículo (§6.2) e relatório diário
+  da pesquisa (§4.3.9).
+- **Mapa estático no PDF:** `relMapaCanvas(pts,W,H,desenhar,opt)` (tiles OSM num canvas → `<img>`; `desenhar(ctx,xy)`
+  pinta linhas/pontos por cima). Use-o em vez de mapa Leaflet no relatório (Leaflet não imprime bem). Opções em §4.3.9.
 
 ### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
 - **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
@@ -922,6 +925,69 @@ Cinco blocos: **filtros** (consórcio · colaborador · período) → **KPIs** �
 - **Decisões do produto (2026-09-14):** passada contada **por segmento** (não rodada global
   sincronizada — "fechar rodada 1 antes da 2" é meta de rastreio, **sem trava**); próxima passada aberta
   **manual** pelo programador (nada de reabertura automática por prazo, por ora).
+
+#### 4.3.9 Relatório diário da pesquisa + OS SIGOS do dia (2026-10-30) — `pp_diario` (Auxiliar de Programação)
+
+Botão **🗓️ Relatório diário** em Auxiliar › 🎧 Pesquisa de Vazamentos. A tela é uma **lista de blocos dia × colaborador ×
+consórcio** (espelha a Gestão de Pavimento, §4.4): o campo pesquisa e reporta ocorrências; cada dia de trabalho de cada
+colaborador em cada consórcio vira um bloco (cada consórcio é um contrato → OS própria); o **backoffice lança a OS SIGOS do dia** no bloco e ele passa de **Pendente de OS → OS criada** — rastreio
+do que de fato virou OS por dia de trabalho. Cada bloco abre a **folha do dia** p/ imprimir/PDF. Módulo JS `pd*`
+(`pdInit`/`pdCarregar`/`pdRender`/`pdCard`/`pdSalvarOS`/`pdGerar`/`pdDocHtml`/`pdDesenharMapa`), logo depois do
+Acompanhamento.
+- **Lista (`app_pp_diario_lista()`):** um bloco por (colaborador, dia, consórcio) com **qualquer** atividade — trecho,
+  rede pesquisada (`pp_execucao`) ou ocorrência (vazamento ou fraude) —, com `consorcio`, km pesquisado, km andado,
+  duração/nº de trechos, vazamentos, fraudes e a OS do dia (`os_sigos`, `os_em`, `os_por` = nome). Tudo de uma vez;
+  filtros no front. Inclui os dias antigos com ocorrência solta (ex.: 14/09, 21/09, 07/10), que nascem pendentes.
+- **Cabeçalho (igual ao `pavprog`):** abas `.seg` **Pendente de OS [default] / OS criada / Todos** (`#pdStatusSeg`) ·
+  filtros de **consórcio** (`#pdCons`: Todos / Betim / Contagem), **colaborador** (montado dos próprios blocos) e **dia**
+  (date + ✕ = todos os dias) — tudo no front; os chips contam dentro dos filtros · **chips de prazo**
+  (`#pdResumo`, `.pavchip` via `pavCss()`): dias desde o **dia trabalhado** (`pdDias`, datas locais) com o mesmo
+  `PAV_SLA`/`pavBucket` da pavimentação — 🟢 0–3 no prazo · 🟡 4–5 atenção · 🔴 >5 atrasado; o relógio conta só sem OS;
+  clicar num chip filtra e força a aba Pendente. Ordem: pendentes do mais antigo p/ o mais novo; demais, mais novos primeiro.
+- **Card do bloco:** "📅 dia da semana, data" + badge (faixa de prazo · há N dias, ou ✓ OS criada) + borda colorida ·
+  colaborador · consórcio · métricas do dia · **campo "nº da OS SIGOS do dia" + Criar OS** (pendente) ou "✓ OS … · lançada
+  por … em …" + **✏️ alterar** (reabre o campo; apagar o número e salvar devolve o dia a pendente, com confirmação) ·
+  **📄 Relatório do dia ›**.
+- **OS (`app_pp_diario_os(p_colaborador, p_data, p_consorcio, p_os)`):** grava/troca em
+  `"12 - retaguarda".pesquisa_dia_os` (PK colaborador+dia+consórcio; `os_sigos` 1–40 chars, `os_em`, `os_por`); vazio
+  apaga a linha. Recusa bloco que não existe (sem pesquisa desse colaborador nesse dia e consórcio). **Tabela app-only no schema 12** (backoffice, sem geometria; RLS ligada sem policy, revogada de
+  anon/authenticated — acesso só pelas RPCs; GIS não enxerga o schema 12). A OS do dia é **independente** da OS COPASA de
+  cada ocorrência (Abertura de serviços, §4.2) — a folha mostra as duas.
+- **Folha (`app_pp_relatorio_diario(p_colaborador, p_data, p_consorcio)`):** só o que é do consórcio do bloco
+  (`p_consorcio` null = o dia inteiro, sem OS única). Cabeçalho (consórcio, data + dia da semana,
+  colaborador, período em pesquisa = 1º início → último fim dos trechos, **OS SIGOS do dia** ou "Pendente" — `os_dia`) →
+  **1 · Produção do dia** (6 cards: km pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa],
+  vazamentos, fraudes, vaz/km) → **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa,
+  vazamentos em azul e fraudes em laranja, **numerados**) → **3 · Vazamentos apontados** e **4 · Fraudes apontadas** (um
+  bloco por ocorrência, na ordem do horário, com o mesmo nº do mapa: foto, tipo, local, hora, OS COPASA, coordenada e a
+  **descrição do pesquisador** = `ocorrencia.observacao`). Numeração única (`pdOcorrencias`): vazamentos 1..n, depois
+  fraudes n+1…
+- **Mesmas definições do Acompanhamento (§4.3.8):** km pesquisado = `pp_execucao` (rede) · km andado =
+  `pesquisa_trecho` · vaz/km = vazamentos ÷ km de rede · velocidade = km andado ÷ soma de `duracao_s`. **Fraude
+  aparece à parte e não entra no vaz/km** (vazamento = tipo que não começa com "Fraude", §2.3); a RPC devolve as listas
+  `vazamentos` e `fraudes` + `kpis.fraudes`. Dia em que o traço não cruzou rede programada sai com km pesquisado 0 e
+  vaz/km 0 (o km andado aparece).
+- **Dia (fuso):** `inicio_ts`/`data_hora` (timestamp sem tz) já são Brasília → `::date`; `pp_execucao.executado_em`
+  (timestamptz) → `at time zone 'America/Sao_Paulo'` (o Acompanhamento ainda usa `executado_em::date` em UTC — rede
+  pesquisada depois das 21h cai no dia seguinte lá). Casamento traço/ocorrência ↔ usuário por **nome OU e-mail** (§4.3.5).
+- **Consórcio de cada coisa:** rede = `rede.consorcio` · ocorrência = `ocorrencia.consorcio` (pelo ponto desde 2026-10-27,
+  §2.3) · **trecho = pela geometria** (`pp_trecho_consorcio(geom, gravado)`: ZA do `limite_za` que contém
+  `st_pointonsurface` do trecho; o gravado só se cair fora das ZAs). ⚠️ `pesquisa_trecho.consorcio` vem do
+  `localStorage` do aparelho (`app_pesquisa_trecho_registrar`) e está **errado ou vazio em 190 de 299 trechos** (ex.: Marcos,
+  Betim, gravado ZA1004 → todo dia dele aparecia nos dois consórcios). Não confie nessa coluna; o Acompanhamento ainda filtra
+  km andado por ela.
+- **Mapa estático:** `relMapaCanvas(pts,W,H,desenhar,{tolerante,justo})` — o compositor OSM em canvas da ficha do
+  logger virou genérico (o `relComporMapa` do logger chama ele sem opções, comportamento igual). `justo` = zoom
+  fracionário (tiles do nível seguinte encolhidos) p/ a área encher o quadro; `tolerante` = tile que falha fica
+  cinza em vez de derrubar o mapa. A impressão só libera depois de mapa e fotos carregarem (ou 8 s).
+- **Compatibilidade com a v310:** o PR #259 entrou em produção **sem** a segregação por consórcio (v310: bloco dia ×
+  colaborador). O banco já estava segregado, então ficaram de pé, só para a v310: `app_pp_diario_os(p_colaborador,
+  p_data, p_os)` (sem consórcio → usa o consórcio do bloco do dia quando é um só; com dois, pede p/ atualizar o app),
+  `'consorcios'` (array) na lista e a OS do dia na folha chamada sem `p_consorcio`. Podem sair depois que a v311+ estiver
+  em todos os aparelhos.
+- **Gate:** tela por `aux_acesso`/admin (como o `pavprog`); as 3 RPCs aceitam admin, aprovador ou `aux_acesso`
+  (`pp_trecho_consorcio` é interna, sem execute p/ authenticated). SQL em
+  `docs/migracao_pesquisa_relatorio_diario.sql`.
 
 ### 4.4 Gestão de Pavimento — `// --- Auxiliar de Programação: Gestão de Pavimento` · tela `pavprog` (2026-10-21)
 - Categoria **🧱 Gestão de Pavimento** no hub do Auxiliar → card `data-go="pavprog"` (gate `aux_acesso`). Espelha a "abertura de serviços" da pesquisa: lista os registros do módulo de campo (`pavimento`, §2.6) **agrupados por ponto** (grupo), miniaturas das fotos (URL pública `fotos-campo`) e link de mapa. RPC `app_pav_listar` (gate admin|aux_acesso). *(2026-10-21c: botão Exportar removido; `pavpCons` select enxuto + `#pavpOrigDd` lado a lado, mesma pegada visual `.pavddsel`/`.msdd-btn`.)*
@@ -1736,7 +1802,7 @@ emprestados por termo de responsabilidade). Isso aqui é um cadastro de acervo d
 - Rótulos: `TIPO_PROBLEMA_ALL` (= `TIPO_PROBLEMA` + checklist/preventiva) é o usado em `labelOf` p/ exibir; o formulário
   do colaborador continua com `TIPO_PROBLEMA` (ele não escolhe preventiva/checklist).
 
-### 6.7 Vínculo só p/ quem tem CNH e está sem carro + filtros da lista (2026-10-30, sw v307) — só frontend
+### 6.7 Vínculo só p/ quem tem CNH e está sem carro + filtros da lista (2026-10-30, sw v312) — só frontend
 - **Colaborador › Veículos:** sem CNH cadastrada (`condData.cnh_numero`) não mostra os disponíveis (aviso p/ cadastrar). A lista de
   disponíveis passa por `frVeicVinculavel` (ativo, não baixado, não devolvido).
 - **Gestor › Vincular colaborador:** só `condutor_status='ativo'` **com `cnh_numero`** e **sem carro** em nenhum veículo (cruza
@@ -2330,6 +2396,11 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   - **⚠️ Situação da ligação pela micromedição atual (2026-10-22):** a **"situação atual" exibida** (ranking + detalhe) passou a vir de **`"0 - vitrine_gis".vw_gis_micromedicao_atual.situacao_ligacao`** (último mês) via `coalesce(mv.situacao_ligacao, s.situacao_atual)` — ancorando na view a fonte canônica. Na prática **0 divergências** hoje (o `mm_matricula_stats.situacao_atual` já era o cd_situaca do último mês), mas garante robustez se a última competência da matrícula for < o mês global da base. (O mesmo ajuste foi feito, com impacto real, no HD — ver §1 troca de HD.)
   - **Frontend** (`fr*` em `perdas.html`, bloco clássico): 3 distribuições no topo (**Classes de suspeita** · **Lentes** · **Por consórcio**), cross-filter por clique; **mapa Leaflet + L.Control.Draw** (polígono/retângulo, cor #d6336c) que filtra espacialmente a **fila operacional** e o mapa; **export .xlsx** p/ SIGOS (matrícula, consórcio, bairro, endereço, DMC, classe, score, média, último vol, slope, zeros, meses s/ ligação ativa, meses leitura estimada, % vizinhança, situação da ligação). **Assinatura de fraude** no popup (`frDetailHtml`): sparkline de 18m com ● por situação da ligação (I/F/P) e ◯ nos meses de leitura estimada + bloco de estatísticas. Reusa libs já carregadas (Leaflet/Leaflet.draw/SheetJS). **Não há** priorização por DMC nem estimativa de recuperação de volume (fora de escopo por decisão do usuário).
   - **Gate do `perdas.html` alinhado:** a liberação das ferramentas aux (`AUX_TOOLS`) passou a aceitar também **`me.aux_acesso`** (além de `is_admin`/`pode_aprovar`) — consistente com o controle de acesso do próprio Auxiliar de Programação (a ⚙️ geral).
+- **Situação dos Imóveis (2026-10-30, tela REAL — `s-situacao`, sw v308):** carteira de fiscalização por **situação da ligação** e por **desde quando** ela está nessa situação — objetivo do usuário: enxergar **onde estão as ligações cortadas e há quanto tempo**, p/ fiscalizar quem foi cortado recentemente e não se religou (provável rompimento do corte). **Dois caminhos de acesso** (igual à Fiscalização): menu do cockpit NRW (*4 · Execução — comercial*, `data-s="situacao"`, dev_acesso) e **Auxiliar de Programação › Serviços comerciais** (`#apSitImoveis` em `index.html` → `perdas.html?s=situacao`, aux-solo p/ aux_acesso/aprovador/admin). Em `AUX_TOOLS` e `NRW_REAL`.
+  - **Fonte única:** `"3 - comercial".ligacoes` — `situacao` (CD_SITUACA: R=Real/Ativa, I=Inativa/cortada, F=Factível, P=Potencial) e `situacao_desde` (DT_SITUACA), vindas da carga do cadastro COPASA (`9_sync_ligacoes.py`). **Sem micromedição e sem OS** (decisão do usuário: só situação + data). Universo = todas as ligações (135 mil); as 488 que só existem no banco não têm data (faixa "sem data"). **Dias** = hoje (America/Sao_Paulo) − `situacao_desde`. ⚠️ O dado vale até a última carga: quem foi religado depois ainda aparece cortado — a tela mostra "situações registradas até dd/mm" (`max(situacao_desde)`). Nas ativas (R) a data costuma ser a da última movimentação, não o início da situação.
+  - **RPCs** (definer, gate `_nrw_fraude_gate()` = admin|dev_acesso|aux_acesso; migração `sit_imoveis_rpcs`): filtros comuns `p_consorcio`, `p_situacoes text[]` (null/vazio = todas), `p_desde_ini`/`p_desde_fim` (date, inclusivo), `p_sem_data` (só sem data), `p_poligono` (GeoJSON 4326 → `st_contains` em `ligacoes.geom` 31983), `p_busca` (prefixo da matrícula). `app_sit_imoveis_resumo` → `total`, `por_situacao` (ignora o filtro de situação), `por_faixa` (ignora o filtro de data; faixas `0-7`, `8-15`, `16-30`, `31-60`, `61-90`, `91-180`, `181-365`, `1-2a`, `2-5a`, `5a+`, `sem` — helper `_sit_imoveis_faixa(dias)`), `por_consorcio`, `hoje`, `ultima_data`. `app_sit_imoveis_lista(..., p_limit≤2000, p_offset, p_ordem recente|antigo|matricula)` → `{total, rows:[matricula, consorcio, situacao, situacao_desde, dias, bairro, endereco]}` (bairro/endereço via lateral em `vw_gis_cadastro_comercial`). `app_sit_imoveis_mapa(..., p_limit≤150000)` → **array compacto** `[matricula, lat, lon, situacao, dias]` (todas as ligações ≈ 6 MB, ~0,7 s). Helper interno `_sit_imoveis_base(...)` (sem execute p/ anon/authenticated). Tempos medidos: resumo ~1,6 s (4 varreduras), lista ~0,5 s.
+  - **Frontend — v2 enxuta (2026-10-30, sw v309, pedido do usuário: "o foco tem que ser no mapa")** (`si*` em `perdas.html`, bloco clássico): **uma barra de filtros** em dropdowns (`<details class="sidd">`, fecham ao clicar fora) acima de um **mapa em largura total** (`height:calc(100vh - 200px)`). **Situação** = caixas de seleção com a contagem de cada situação (`por_situacao`) + "Só cortadas"/"Todas" (padrão `['I']`). **Dias na situação** = "Nessa situação há [X] a [Y] dias" (qualquer um vazio = sem limite; ex.: 5 a 30) + atalhos por faixa com contagem (`por_faixa`) + "sem data"; o front converte dias em datas (`siArgs`: X → `p_desde_fim = hoje−X`, Y → `p_desde_ini = hoje−Y`), **sem mudança nas RPCs**. Busca por matrícula (1 resultado → centraliza e abre o popup), seletor de cor (automática/situação/dias), ⓘ e **um só botão "⭳ Exportar N matrículas"** (N = `total` do resumo; "da área" com polígono). **Sem lista na tela** — `app_sit_imoveis_lista` só é usada pelo export (páginas de 2.000). Pelo Auxiliar (`body.aux-solo`) a coluna lateral some nesta tela e o "‹ AcquaHub" vai para a barra. Mapa: limite das ZAs (`app_limites_zas`, contorno + máscara), mapa/satélite, **L.Control.Draw** (polígono/retângulo filtra tudo), **camada canvas própria** (`siCanvasLayer`, aguenta as 135 mil; redesenho ~350 ms com tudo na tela). Cor automática: 1 situação → por dias na situação; várias → pela situação; cortadas/mais recentes por cima. Clique no ponto = popup (matrícula, situação, há N dias, desde). **Export .xlsx** (`siExport`): Matrícula, Consórcio, Situação da ligação, Situação desde, Dias na situação, Bairro, Endereço.
+  - **Cuidado:** `#siMapDiv` tem `position:relative;z-index:0` para os panes do Leaflet (400+) não passarem por cima do cabeçalho fixo `.top` (z-index 5) ao rolar a página — o HD e a Fiscalização ainda têm esse defeito.
 - **Balanço hídrico — rastreio dos dados (2026-10-22, tela REAL — `s-nrw_balanco`, sw v270):** a antiga folha mock (proxy do cadastro, `balancoSheet()` removida) virou o **checklist dinâmico de dados do Balanço Hídrico IWA**, escopo **ZA inteira** (sem DMC, sem benchmarking, sem valor/cenários — decisão do usuário). Plano completo: Artifact "Balanço Hídrico IWA" + memória `copasa-nrw-balanco-iwa-plano`.
   - **Tabelas** (`"11 - perdas_nrw"`, RLS sem policy, app-only): `bh_checklist_item` (34 itens A1–F1: grupo, item, `componentes text[]` = células IWA que alimenta, fase, fornecedor, necessidade, **origem** (tabela de origem), **tela** do cockpit, `status_base`/`nota_base` de partida, `status_manual`/`nota`/`atualizado_por`/`atualizado_em` do ajuste) + `bh_checklist_log` (histórico append-only de ajustes). Helpers `"11 - perdas_nrw".bh_fmt(numeric)` (número BR) e `bh_comp(int)` (AAAAMM→MM/AAAA).
   - **RPCs:** `app_nrw_checklist()` (definer, gate admin|dev_acesso) **verifica cada item ao vivo** na tabela de origem (macro_mensal, macro_fechamento, fator_correcao_macro, mm_mensal, hd_cadastro, hd_modelo, mm_matricula_stats, rede, ligacoes, vrps, vw_loggers, mapeamento_pressao, curvas_nivel, ordens_servico [148xxxx/149xxxx], ocorrencia, pesquisa_trecho, linha_base, premissa_contrato) e devolve `status_auto` + `evidencia` (+ `frescor`) por item; **status final = ajuste manual > verificação automática > status de partida**. `app_nrw_checklist_salvar(p_id,p_status,p_nota)` (admin; `p_status null` = volta ao automático; **nota obrigatória**; grava no log). Para incluir verificação automática num item novo: acrescente o bloco no `app_nrw_checklist` e semeie o item.
@@ -2337,7 +2408,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 - **Desativação visual do que não é real (2026-10-05):** só **`mm`** (micromedido) e **`macro`** (macromedição)
   têm dados ao vivo via RPC. As outras **11 telas** restantes (após a remoção abaixo) ficam **opacas + selo "exemplo"** no menu
   (`.navi.mock`) e com **banner "🚧 dados de exemplo"** no topo da tela (`.mockbanner`) — **nada apagado, só
-  sinalizado/rastreável**. Controle num só ponto: `const NRW_REAL=new Set(['mm','macro','resultado','hdpri','fraudepri','config','nrw_balanco'])` + `nrwMarkMocks()`
+  sinalizado/rastreável**. Controle num só ponto: `const NRW_REAL=new Set(['mm','macro','resultado','historico','hdpri','fraudepri','situacao','config','nrw_balanco'])` + `nrwMarkMocks()`
   (marca o menu no load) + `nrwMockBanner(s)` (injeta o banner por tela dentro do `go()`). **Para promover uma
   tela a "real", adicione o `data-s` dela ao `NRW_REAL`** (sai da opacidade e perde o banner automaticamente).
 - **Dados (resto):** ainda **snapshot estático** embutido no HTML (15 DMCs, VRPs projetadas, OS por causa,
