@@ -498,12 +498,15 @@ popup), **Cronograma preventivo** (`vrpman_prev`: farol + resumo). OS SIGOS edit
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
 `projeto_acesso`/`projeto_resumo`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes
-VCA/HDD). **Pipeline Engenharia → Qualidade → Obras (banco 2026-11-02, `docs/migracao_proj_pipeline.sql`; front nos
-PRs seguintes):** 5 fases (Projeto → Aprovação → Pré-obra → Execução → Encerramento) com etapas por tipo em
-`etapa_modelo`, aprovação da Qualidade com comentário e aviso, prazos por etapa, legado sem portões; **lançar avanço e
-salvar a árvore agora exigem ator** (Obras = admin ou cargo Supervisor de Produção/Coordenador de Serviços/Gestor de
-Obras; Engenharia = `proj_sup_acesso`) e só a Engenharia mexe no cadeado; `situacao_atual` saiu do schema 7 — detalhe
-em `docs/MODULOS.md §8`. Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
+VCA/HDD). **Pipeline Engenharia → Qualidade → Obras (2026-11-02; banco `docs/migracao_proj_pipeline.sql`, front sw
+v317):** 5 fases (Projeto → Aprovação → Pré-obra → Execução → Encerramento) com etapas por tipo em `etapa_modelo`
+(5 tipos: Rede HDD/VCA, Instalação de VRP/macromedidor/registro), aprovação da Qualidade com comentário e aviso, prazos
+por etapa, legado sem portões. **Hub em 3 atores** (🏗️ Obras · 📐 Engenharia [ex-Suporte] · ✅ Qualidade → tela
+`projeto_qual`); lista/mapa com status do pipeline, "com quem está" e chips de prazo; **Etapas** em acordeão na
+configuração (No escopo?, Liberar) e no detalhe (anexar com folha A0–A4, link da vistoria, OS, aprovar/reprovar); a
+árvore ficou só com a execução (chave estável `c` por etapa de topo). **Lançar avanço e salvar a árvore exigem ator**
+(Obras = admin ou cargo Supervisor de Produção/Coordenador de Serviços/Gestor de Obras; Engenharia = `proj_sup_acesso`)
+e só a Engenharia mexe no cadeado; `situacao_atual` saiu do schema 7 — detalhe em `docs/MODULOS.md §8`. Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
 KPIs+timeline por dia/intervenção/atividade+CSV, sobre o feed `pjAllAvancos`). ⚠️ **Protótipo:** avanços não são
 gravados (`pjLeafHist` é mock) e nada persiste — ver fragilidades em `docs/MODULOS.md §8`. **Card em 🛠️ Execução
 (2026-09-29)** — Projetos **saiu de "Em desenvolvimento"**: `data-go="projetos"` **visível a todos**, sem gate de
