@@ -1251,11 +1251,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button type="button" data-v="lista" class="sel">📋 Lista</button>
       <button type="button" data-v="mapa">🗺️ Mapa</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center">
+    <div class="pavfiltros">
       <select id="pavpCons" class="pavddsel"><option value="">Todos</option><option value="ZA0200">Betim</option><option value="ZA1004">Contagem</option></select>
       <div class="msdd" id="pavpOrigDd"><button type="button" class="msdd-btn" id="pavpOrigBtn">Serviço de origem ▾</button><div class="msdd-panel hidden" id="pavpOrigPanel"></div></div>
+      <div id="pavpResumo" class="pavresumo"></div>
     </div>
-    <div id="pavpResumo" style="margin-bottom:10px"></div>
     <div id="pavpLista"></div>
     <div id="pavpMapa" class="hidden" style="margin-top:4px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
@@ -1268,10 +1268,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button type="button" data-v="lista" class="sel">📋 Lista</button>
       <button type="button" data-v="mapa">🗺️ Mapa</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center">
+    <div class="pavfiltros">
       <select id="pqlCons" class="pavddsel"><option value="">Todos</option><option value="ZA0200">Betim</option><option value="ZA1004">Contagem</option></select>
+      <div id="pqlResumo" class="pavresumo"></div>
     </div>
-    <div id="pqlResumo" style="margin-bottom:10px"></div>
     <div id="pqlLista"></div>
     <div id="pqlMapa" class="hidden" style="margin-top:4px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
   </main>
@@ -4052,6 +4052,11 @@ function pavCss(){ if(document.getElementById('pavcss'))return; const st=documen
  #pavpEsteira{align-items:center;gap:6px}
  #pavpEsteira .pavchip{font-size:12.5px;padding:7px 11px}
  .pavseta{color:var(--mut);font-size:15px}
+ .pavfiltros{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+ .pavresumo{margin-left:auto}
+ .pavresumo .pavchips{margin-top:0;justify-content:flex-end}
+ .pavfx{opacity:.65;font-size:11.5px;margin-left:2px}
+ @media (max-width:640px){ .pavresumo{margin-left:0;flex-basis:100%} .pavresumo .pavchips{justify-content:flex-start} }
  .pavetq{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
  #pavimento .pavblk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:12px 0;background:var(--card)}
  #pavimento .pavblk h4{margin:0 0 6px;font-size:14px}
@@ -4141,7 +4146,7 @@ function pavDiasEtapa(g,et){ let m=null; (g.itens||[]).forEach(it=>{ if(pavEtapa
 function pavCardEtapa(g){ return (pavpStatus!=='todos'&&pavTemEtapa(g,pavpStatus))?pavpStatus:pavEtapa(g); }
 function pavEtapaVisual(g,et){ const sla=PAV_SLA_ETAPA[et]; // cor + texto do badge do ponto na etapa
   if(!sla) return {c:PAV_ETAPA_COR[et],txt:et==='execucao'?'⏳ Pendente de execução':'🏁 Executada'};
-  const d=pavDiasEtapa(g,et), b=pavBucket(d,sla); return {c:b.c,txt:PAV_ETAPA_LBL[et]+' · '+b.lbl+' · '+pavDiasTxt(d)}; }
+  const d=pavDiasEtapa(g,et), b=pavBucket(d,sla); return {c:b.c,txt:(pavpStatus==='todos'?PAV_ETAPA_LBL[et]+' · ':'')+b.lbl+' · '+pavDiasTxt(d)}; } // nome da etapa só em Todas (na etapa aberta é redundante)
 const pavDiaISO=t=>{ const d=new Date(t); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }; // dia local
 const pavFmtDia=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):''; // 'AAAA-MM-DD' sem passar por Date (fuso)
 const pavFmtEm=t=>t?new Date(t).toLocaleDateString('pt-BR'):'';
@@ -4196,15 +4201,16 @@ function pavProgEsteira(){ const el=document.getElementById('pavpEsteira'); if(!
   el.innerHTML=PAV_ETAPAS.map(et=>`<div class="pavchip${pavpStatus===et?' on':''}" data-st="${et}">${PAV_ETAPA_LBL[et]} <b>${base.filter(g=>pavTemEtapa(g,et)).length}</b></div>`).join('<span class="pavseta">›</span>')
     +`<div class="pavchip${pavpStatus==='todos'?' on':''}" data-st="todos" style="margin-left:4px">Todas <b>${base.length}</b></div>`;
   el.querySelectorAll('[data-st]').forEach(ch=>ch.onclick=()=>{ pavpStatus=ch.dataset.st; pavpPrazo=''; pavProgRender(); }); }
+// chips de prazo com contagem + a faixa de dias de cada um (clicáveis; filtram) — Gestão de Pavimento e Ensaio de reaterro
+function pavPrazoChips(cnt,sla,sel,dica){
+  const B={ok:{e:'🟢',l:'no prazo',c:'#2f8b6c',f:'até '+sla[0]+'d'},aten:{e:'🟡',l:'atenção',c:'#e6a23c',f:(sla[1]>sla[0]+1?(sla[0]+1)+'–':'')+sla[1]+'d'},atraso:{e:'🔴',l:'atrasado',c:'#d6336c',f:'>'+sla[1]+'d'}};
+  return `<div class="pavchips" title="${pavH(dica||'')}">`+['ok','aten','atraso'].map(k=>`<div class="pavchip" data-prazo="${k}" style="${sel===k?('background:'+B[k].c+';border-color:transparent;color:#fff'):''}">${B[k].e} ${cnt[k]} ${B[k].l} <span class="pavfx">${B[k].f}</span></div>`).join('')+'</div>'; }
 // chips de prazo da etapa aberta (somem nas etapas sem prazo)
 function pavProgResumo(){ const r=document.getElementById('pavpResumo'); if(!r)return; const sla=PAV_SLA_ETAPA[pavpStatus];
   if(!sla){ r.innerHTML=''; return; }
   const base=pavProgFiltrado(true).filter(g=>pavTemEtapa(g,pavpStatus)), cnt={ok:0,aten:0,atraso:0};
   base.forEach(g=>{ const b=pavBucket(pavDiasEtapa(g,pavpStatus),sla); if(cnt[b.key]!=null)cnt[b.key]++; });
-  const B={ok:{e:'🟢',l:'no prazo',c:'#2f8b6c'},aten:{e:'🟡',l:'atenção',c:'#e6a23c'},atraso:{e:'🔴',l:'atrasado',c:'#d6336c'}};
-  r.innerHTML='<div class="pavchips" style="margin-top:0">'+['ok','aten','atraso'].map(k=>{ const on=pavpPrazo===k;
-    return `<div class="pavchip" data-prazo="${k}" style="${on?('background:'+B[k].c+';border-color:transparent;color:#fff'):''}">${B[k].e} ${cnt[k]} ${B[k].l}</div>`; }).join('')+'</div>'
-    +`<p class="sub" style="font-size:11.5px;margin:6px 0 0">Prazo da etapa: no prazo até ${sla[0]} dia(s) · atenção até ${sla[1]} · atrasado depois</p>`;
+  r.innerHTML=pavPrazoChips(cnt,sla,pavpPrazo,'Dias nesta etapa: no prazo até '+sla[0]+' · atenção até '+sla[1]+' · atrasado depois');
   r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.prazo; pavpPrazo=(pavpPrazo===k?'':k); pavProgRender(); }); }
 function pavProgRender(){ pavProgEsteira(); pavProgResumo();
   const arr=pavProgFiltrado(), c=document.getElementById('pavpLista');
@@ -4234,7 +4240,7 @@ function pavProgCard(g){
     return `<div style="border-top:1px dashed var(--line);padding:8px 0"><div style="display:flex;gap:6px;align-items:center"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?('<span style="font-size:13px">· '+pavH(it.dimensao)+'</span>'):''}<span class="pavetq">${PAV_ETAPA_LBL[et]}</span></div><div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div>${pavReatHtml(g,it,et)}${os}${ex}</div>`;
   }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${v.c};border-radius:12px;padding:12px 13px;margin-bottom:10px">
-    <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
     <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
     ${itens}</div>`; }
 function pavProgSetView(v){ pavpView=v;
@@ -4312,9 +4318,7 @@ function pavQualFiltrado(){ let arr=pqlUltimo.slice(); if(pqlPrazo) arr=arr.filt
   return arr.sort((a,b)=>(pqlDias(b)??-1)-(pqlDias(a)??-1)); } // há mais tempo na fila primeiro
 function pavQualRender(){ const r=$('#pqlResumo'), sla=PAV_SLA_ETAPA.ensaio;
   if(r){ const cnt={ok:0,aten:0,atraso:0}; pqlUltimo.forEach(g=>{ const k=pavBucket(pqlDias(g),sla).key; if(cnt[k]!=null)cnt[k]++; });
-    const B={ok:{e:'🟢',l:'no prazo',c:'#2f8b6c'},aten:{e:'🟡',l:'atenção',c:'#e6a23c'},atraso:{e:'🔴',l:'atrasado',c:'#d6336c'}};
-    r.innerHTML='<div class="pavchips" style="margin-top:0">'+['ok','aten','atraso'].map(k=>`<div class="pavchip" data-prazo="${k}" style="${pqlPrazo===k?('background:'+B[k].c+';border-color:transparent;color:#fff'):''}">${B[k].e} ${cnt[k]} ${B[k].l}</div>`).join('')+'</div>'
-      +`<p class="sub" style="font-size:11.5px;margin:6px 0 0">Prazo do ensaio: ${sla[1]} dias desde o pedido (ou desde o reaterro refeito).</p>`;
+    r.innerHTML=pavPrazoChips(cnt,sla,pqlPrazo,'Prazo do ensaio: '+sla[1]+' dias desde o pedido (ou desde o reaterro refeito)');
     r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ pqlPrazo=(pqlPrazo===ch.dataset.prazo?'':ch.dataset.prazo); pavQualRender(); }); }
   const arr=pavQualFiltrado(), c=$('#pqlLista');
   if(c){ c.innerHTML=arr.length?('<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(pavQualCard).join('')):'<p class="sub">Nenhum ensaio pendente.</p>';
@@ -4328,7 +4332,7 @@ function pavQualCard(g){ const d=pqlDias(g), b=pavBucket(d,PAV_SLA_ETAPA.ensaio)
     const ant=u?`<div class="sub" style="font-size:12px;margin-top:4px">🔁 ${u.tentativa+1}º ensaio — o anterior foi reprovado em ${pavFmtEm(u.em)}${u.obs?(' (“'+pavH(u.obs)+'”)'):''}${rf?(' · reaterro refeito em '+pavFmtDia(rf.data)):''}</div>`:'';
     return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div class="sub" style="font-size:12px;margin-top:2px">Pedido por ${pavH(it.reaterro_resp_por||'—')} em ${pavFmtEm(it.reaterro_resp_em)} · na fila ${pavDiasTxt(pavDias(it.reaterro_status_em))}</div>${ant}<div style="display:flex;gap:6px;margin-top:6px">${fotos}</div><button class="btn pqlabrir" data-grupo="${g.grupo}" data-id="${it.id}" style="margin-top:8px">🧪 Registrar ensaio</button></div>`; }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${b.c};border-radius:12px;padding:12px 13px;margin-bottom:10px">
-    <div style="display:flex;gap:8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b><span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span></div>
     <div class="sub" style="margin-top:3px">${g.os_sigos?('OS origem '+pavH(g.os_sigos)+' · '):''}${cUf} · registrado por ${pavH(g.usuario||'—')} ${mapa}</div>
     ${itens}</div>`; }
 function pavQualSetView(v){ pqlView=v;
