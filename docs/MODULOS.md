@@ -2587,6 +2587,11 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     (1.1) e a OS SIGOS vem da etapa.
   - **Avisos:** `supGoAct('pj:<kind>:<gid>')` recarrega e abre a intervenção; `projeto_qual` está em `SCREENS`;
     `NTF_ICON.projetos='📐'`.
+- **🔁 Pipeline — PR 3 (2026-11-02, sw v319).** **Importar** lê linhas e pontos do mesmo .gpkg (`pjGpkgWKT` decodifica POINT; ponto exige tipo
+  VRP/Macromedidor/Registro; sem `situacao_atual`; mostra `erros`/`tipo_mantido`) + **templates .gpkg** lineares/pontuais (`pjImpTemplateGpkg`,
+  sql.js, SRID 31983). **⏱️ Prazos das etapas** (`projeto_prazos`; admin/Engenharia editam via `app_proj_prazo_set`, histórico `app_proj_prazo_log`;
+  tela mostra prazo_aten+1/prazo_atraso+1). **Resumo**: filtro de ator, 📌 Situação atual (status × tipo + pendências por ator), 🔁 Pipeline no
+  período (`app_proj_eventos`), CSV com coluna Registro. Etapa em correção mostra o motivo da reprovação na linha do documento.
 
 - **⭐ Reground nos dados reais (2026-09-25):** `PJ_IVS` deixou de ser mock — agora é **carregado do banco** por
   **`pjLoad()`** (RPC **`app_proj_intervencoes`**, gated admin/`dev_acesso`) a partir das tabelas-base
