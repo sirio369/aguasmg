@@ -144,7 +144,7 @@ pwa/
 | `3 - comercial` | ligações |
 | `4 - redes_terceiros`, `5 - info_copasa` | apoio/cadastro |
 | `7 - setorizacao` | **setorização**: `dmc_projetado`/`vrp_projetada` (WaterGEMS), `dmc` (dimensão versionada vigente), `dmc_ligacao`, `dmc_resumo` |
-| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`), **programação de pesquisa** (`programacao_pesquisa`, `rede_pp_segmento`/`_fonte`, `pp_config` — app-only mesmo estando neste schema geo, sem policy pra `gis_*`) + views |
+| `8 - coleta_campo` | **coleta de campo geo**: pressão (`mapeamento_pressao`), loggers (`instalacao_logger_calibracao`, `logger_pressao`), pesquisa (`pesquisa_trecho`), **ocorrências da pesquisa** (`ocorrencia`), estanqueidade (`ponto_estanqueidade`), visita a VRP (`vrp_visita`), **pavimento a recompor** (`pav_recomposicao` + ensaio de reaterro `pav_reaterro_ensaio`/`pav_reaterro_evento`, app-only, RLS deny-all), **programação de pesquisa** (`programacao_pesquisa`, `rede_pp_segmento`/`_fonte`, `pp_config` — app-only mesmo estando neste schema geo, sem policy pra `gis_*`) + views |
 | `9 - suprimentos` | almoxarifado (insumos, EPI, equipamentos, notificações) — *app-only* |
 | `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09; **abastecimento removido** em 2026-10-14) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
@@ -318,9 +318,18 @@ pwa/
   p/ app em cache (≤ v281): "A, B" numérico com nº de partes = nº de tipos é distribuído na ordem do card (alfabética do tipo).
   **Etapa de execução** (2026-10-28): depois da OS, cada tipo tem "Executado em [data]" + "Marcar executado"
   (`app_pav_executar(p_id,p_data)`) → etapas por tipo **criação → execução → executada**; o ponto fica na mais atrasada.
+  **Ensaio de reaterro (2026-11-02, sw v314):** antes da OS o programador responde por tipo "Necessita ensaio de compactação
+  do reaterro?" (`app_pav_reaterro_decidir`); Sim → fila da **Qualidade** (tela `pavqual`, Home › 🛠️ Execução, gate
+  `ME.qualidade` = admin/engrenagem `qualidade_acesso`/cargo Téc. Qualidade ou Coord. QSMSS) que registra o ensaio em campo
+  (GPS travado, resultado, método, GC, laudo PDF/foto, fotos — `app_pav_reaterro_ensaio`, fila offline); reprovado → "Reaterro
+  refeito em [data]" (`app_pav_reaterro_refeito`) → novo ensaio; aprovado/Não → criação da OS. A pavprog virou uma **esteira**
+  (Análise › Ensaio › Refazer › Criação de OS › Execução › Executada, com contagem; o ponto aparece em cada etapa onde tem tipo)
+  com **relógio e prazo por etapa** (ensaio = 2 dias). Tabelas append-only `pav_reaterro_ensaio`/`pav_reaterro_evento`;
+  avisos por trigger (fila → Qualidade; resultado → só quem pediu); trava no banco em `docs/migracao_pav_reaterro_trava.sql`.
   Backend: `"8 - coleta_campo".pav_recomposicao` (1 linha/tipo, geom 4326, `os_recomposicao`/`os_recomp_em`/`os_recomp_por`,
-  `execucao_data`/`execucao_em`/`execucao_por`, RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) /
-  `app_pav_minhas` / `app_pav_listar` / `app_pav_os_itens` / `app_pav_executar` / `app_pav_os` (admin|aux_acesso). sw v282.
+  `execucao_data`/`execucao_em`/`execucao_por`, `reaterro_*`, RLS deny-all) + RPCs definer `app_pav_registrar` (authenticated) /
+  `app_pav_minhas` / `app_pav_listar` / `app_pav_os_itens` / `app_pav_executar` / `app_pav_os` / `app_pav_reaterro_decidir` /
+  `app_pav_reaterro_refeito` (admin|aux_acesso) / `app_pav_qual_listar` / `app_pav_reaterro_ensaio` (Qualidade). sw v314.
 - **Segurança do Trabalho + QSMS** (2026-10-28, schema `16 - qsms`) — substitui a **APR** (modelo COPASA), a **PT**
   de trabalho em altura (FOR_PG_22, do consórcio) e a **PET** de espaço confinado (COPASA) de papel. **Formulário é só
   preenchimento: sai emitido (ou impedido) — nada fica aberto.** **Campo** (`seg`, Home › 🛠️ Execução, sem gate):
