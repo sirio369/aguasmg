@@ -2474,7 +2474,7 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ---
 
-## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel`
+## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel` / `projeto_import` / `projeto_qual`
 
 - **Indicadores (2026-10-27):** card **📊 Indicadores** no bloco 🏗️ Campo do hub (`pjHub`, `#pjIndicadores`) abre o painel
   externo `https://indicadores-aguas-mg-v2.vercel.app/#resumo` em **nova aba** (`window.open`, `noopener`). Visível a quem
@@ -2535,6 +2535,57 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     status 14 configuração / 18 em andamento / 29 não iniciadas, ciclo completo num ponto novo (recusas de ator, folha,
     justificativa, escopo travado, reprovação+aviso, reenvio, aprovação, fases 3/4/5 com avisos, OS só dígitos),
     importação de ponto e de linha, prazos.
+- **🔁 Pipeline — FRONT (2026-11-02, sw v317).** Depende de `docs/migracao_proj_pipeline.sql` aplicado (sem ele
+  `app_proj_pipeline_resumo` falha e toda intervenção aparece como "Em configuração").
+  - **Hub em 3 atores:** 🏗️ **Obras** (Intervenções · Resumo · Indicadores) · 📐 **Engenharia** (ex-"Suporte":
+    Configuração · Importar · 🔐 acesso) · ✅ **Qualidade** (gate `ME.qualidade`: **Aprovações** = tela nova `projeto_qual` ·
+    Ensaios de reaterro → `pavqual`). Gates no front: `pjPodeEng` (= `pjPodeSup`), `pjPodeObras` (`ME.proj_obras`),
+    `pjPodeQual`, `pjPodeAtor(ator)`.
+  - **Carga (`pjLoad`):** além de intervenções + estados, busca `app_proj_pipeline_resumo` (→ `iv.pipe`: status, fase,
+    `atores` com dias/faixa, `prog`, `exec_pct`, `legado`, `aberta`) e `app_proj_modelo` (→ `PJ_MODELO`, 1x por sessão).
+    `iv.ptipo` = tipo do pipeline (`PJ_PTIPO`: rede_hdd→hdd, rede_vca→vca, vrp_impl→vrp, valvula→registro, macro_impl→macro).
+    **Sem dados de exemplo:** o mock `PJ_IVS` saiu (offline/erro = lista vazia). Tipos do módulo agora são só os 5
+    (`PJ_TIPOS`: Rede HDD, Rede VCA, Instalação de VRP / de macromedidor / de registro); `PJ_TIPO_MAP` aceita
+    `Registro`/`Macromedidor`.
+  - **Árvores (`PJ_ARV`) = só a EXECUÇÃO (fase 4):** OS SIGOS, Autorização de Via e todos os nós-documento saíram (viraram
+    etapas). Cada etapa de topo tem a chave estável **`c`** (`pjC(c,nó)`) = `etapa_modelo.chave`. HDD com os rótulos da
+    planilha (Mobilização e montagem **de** equipamento HDD · Perfuração **de** piloto · Teste de **E**stanqueidade; sem
+    Locação/Sondagem); **macromedidor** (`macro_impl`, árvore nova com Caixa do macromedidor); VRP com "Execução da câmara"
+    antes do reaterro. **`pjReconcilia(iv)`** ajusta os snapshots salvos: tira OS/doc nodes, tira Locação/Sondagem do HDD
+    só se sem avanço, dá a chave `c` casando rótulo com `nome`/`aliases` do modelo (e troca o rótulo pelo do modelo),
+    reordena a câmara da VRP.
+  - **Histórico de avanço por chave:** `pjAvancosCur` é indexado por **`pjAvKey(top,caminho)`** = chave da etapa de topo +
+    resto do caminho (log: `pjAvKeyLog(e)` usa `intervencao_avanco.etapa`); `pjNodeKey(iv,nó)` p/ a árvore. Renomear o
+    rótulo de topo não perde mais o vínculo. Gantt do relatório casa por `e.etapa===n.c`.
+  - **% de execução:** `pjPct` não conta documento e **limita metro a 100%**; nó com exec > meta mostra o selo "acima da
+    meta". `pjStatusLegacy` (cfg/new/run/done) só alimenta a coluna `intervencao_estado.status` (compatibilidade).
+  - **Lista/mapa (`projeto_campo`/`projeto_sup`):** status geral = `PJ_PST` (7 status, cor por fase); select **Status**
+    (montado em `pjInit`; a lista geral não mostra "Em configuração"), select novo **Com quem está** (`pjFator`), chips de
+    **prazo** (`pjRenderPrazo`, pior faixa — reaproveita `.pavchip`), legenda de status sob o mapa. Card: pílula do status,
+    chips do ator com dias (`pjAtorChips`), progresso da fase ("Pré-obra 4/6"), selo legado, % de execução. Mapa: cor do
+    marcador/traçado = status (a paleta por gid saiu).
+  - **Etapas (`pjEtapasHtml(iv,ctx)` + `pjWireEtapas`):** fases 1–5 em acordeão (`details.pjfase`, abre a fase atual); cada
+    etapa mostra ator, situação (`pjEtapaSit`), relógio/faixa, selo "pendência do legado", info (arquivo + folha, link,
+    OS, comentário, justificativa) e histórico (eventos). Ações por permissão + etapa aberta: documento = **folha A0–A4**
+    (`PJ_FOLHAS`, obrigatória quando `pede_folha`) + PDF (`pjEtapaAnexar` → `fotos-campo/projetos/<kind>/<gid>/<chave>_<uuid>.pdf`
+    → `app_proj_etapa_enviar`, apaga o arquivo antigo); link da vistoria e OS SIGOS (`pjEtapaValor`); Aprovar/Reprovar
+    (`pjAvaliarModal`, motivo obrigatório na reprovação). Na configuração (`ctx='cfg'`) cada documento/link/OS tem o
+    toggle **No escopo?** (`pjEtapaEscopo`; justificativa em modal quando o documento tem aprovação; travado com histórico
+    ou depois de liberar).
+  - **Configuração (`pjRenderCfg`):** cartão **Liberar** (`pjLiberar` → `app_proj_liberar` com a árvore; desabilitado
+    enquanto faltar documento da fase 1 com folha, exceto legado) / **Reabrir configuração** (2º toque se houver avanço) ·
+    Etapas · Projeto 3D (VRP) · Escopo da execução (árvore). A seção antiga "Documentos" (`PJ_DOCS`) saiu.
+  - **Detalhe (`pjRenderDet`):** anel com % de execução, pílula de status + chips do ator, **Etapas** e a árvore de
+    **Execução**. Lançar avanço = **`pjExecOk`** (fase 4 aberta **e** responsável de obras) — substitui o antigo `pjLocked`
+    no modo campo. `pjOpen`/`pjOpenCfg` carregam `pjPipeLoad` (→ `pjPipeCur` = itens + eventos).
+  - **Qualidade (`projeto_qual`, `pjQualInit`/`pjQualRender`):** fila de `app_proj_fila('qual', legado)` — card com
+    intervenção, etapa, relógio, Abrir documento (com folha)/vistoria, Aprovar/Reprovar e "Intervenção ›"; checkbox
+    "Mostrar também as pendências do legado"; lista dos documentos tirados do escopo com a justificativa.
+  - **Relatório:** seção **Etapas e aprovações** (`pjRelEtapasHtml`, última avaliação com quem/quando/comentário);
+    documentos = etapas de documento (`pjPipeDocs`) com situação e folha; PDF consolidado ganha a tabela de etapas
+    (1.1) e a OS SIGOS vem da etapa.
+  - **Avisos:** `supGoAct('pj:<kind>:<gid>')` recarrega e abre a intervenção; `projeto_qual` está em `SCREENS`;
+    `NTF_ICON.projetos='📐'`.
 
 - **⭐ Reground nos dados reais (2026-09-25):** `PJ_IVS` deixou de ser mock — agora é **carregado do banco** por
   **`pjLoad()`** (RPC **`app_proj_intervencoes`**, gated admin/`dev_acesso`) a partir das tabelas-base
