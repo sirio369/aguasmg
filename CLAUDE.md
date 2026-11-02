@@ -149,6 +149,7 @@ pwa/
 | `10 - Frotas` | veículos, condutores/CNH, termo de responsabilidade, vínculos (self-service), lavagem, manutenção — *app-only* (QSMS/treinamento, Equipes, Ocorrência e empréstimo **removidos por completo** em 2026-09; **abastecimento removido** em 2026-10-14) |
 | `11 - perdas_nrw` | analítico/config do módulo de Perdas: `parametros_nrw`, `linha_base`, `medicao_entrada`, `consumo_dmc` — *app-only* |
 | `12 - retaguarda` | registros de campo que viram processo (Auxiliar de Programação): `captacao_cliente` (PII: CPF/fotos), `abertura_servico` + `vw_captacao`/`vw_abertura_servico`, `pesquisa_dia_os` (OS SIGOS do dia de pesquisa por colaborador × consórcio, §4.3.9) — *app-only* |
+| `13 - projetos_obra` | **Projetos**: árvore de avanço (`intervencao_estado`), log de avanço, documentos e o **pipeline Engenharia → Qualidade → Obras** (`etapa_modelo`, `intervencao_etapa`, `intervencao_etapa_evento` append-only, view `vw_iv`) — *app-only*; a geometria das intervenções fica no `7` |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
 | `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); nada pode ser apagado (trigger) — *app-only* |
@@ -497,7 +498,12 @@ popup), **Cronograma preventivo** (`vrpman_prev`: farol + resumo). OS SIGOS edit
 
 **Projetos · Intervenções** (`projetos` hub → `projeto_campo`/`projeto_det`/`projeto_sup`/`projeto_cfg`/
 `projeto_acesso`/`projeto_resumo`/`projeto_rel`) — acompanhamento diário de obra (macromedidores, VRPs, redes
-VCA/HDD). Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
+VCA/HDD). **Pipeline Engenharia → Qualidade → Obras (banco 2026-11-02, `docs/migracao_proj_pipeline.sql`; front nos
+PRs seguintes):** 5 fases (Projeto → Aprovação → Pré-obra → Execução → Encerramento) com etapas por tipo em
+`etapa_modelo`, aprovação da Qualidade com comentário e aviso, prazos por etapa, legado sem portões; **lançar avanço e
+salvar a árvore agora exigem ator** (Obras = admin ou cargo Supervisor de Produção/Coordenador de Serviços/Gestor de
+Obras; Engenharia = `proj_sup_acesso`) e só a Engenharia mexe no cadeado; `situacao_atual` saiu do schema 7 — detalhe
+em `docs/MODULOS.md §8`. Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
 KPIs+timeline por dia/intervenção/atividade+CSV, sobre o feed `pjAllAvancos`). ⚠️ **Protótipo:** avanços não são
 gravados (`pjLeafHist` é mock) e nada persiste — ver fragilidades em `docs/MODULOS.md §8`. **Card em 🛠️ Execução
 (2026-09-29)** — Projetos **saiu de "Em desenvolvimento"**: `data-go="projetos"` **visível a todos**, sem gate de
