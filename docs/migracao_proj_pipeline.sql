@@ -39,7 +39,7 @@ revoke all on table "13 - projetos_obra"._bkp_proj_estado_20261102, "13 - projet
 
 -- 1) atores
 create or replace function "13 - projetos_obra".proj_obras_cargos()
-returns text[] language sql immutable as $f$
+returns text[] language sql immutable set search_path to 'public' as $f$
   select array['Supervisor de Produção','Coordenador de Serviços','Gestor de Obras'];
 $f$;
 create or replace function "13 - projetos_obra".proj_eng_pode(p_uid uuid)
@@ -231,7 +231,7 @@ alter table "13 - projetos_obra".intervencao_etapa_evento enable row level secur
 revoke all on table "13 - projetos_obra".etapa_modelo, "13 - projetos_obra".etapa_modelo_log,
   "13 - projetos_obra".intervencao_etapa, "13 - projetos_obra".intervencao_etapa_evento from public, anon, authenticated;
 
-create or replace function "13 - projetos_obra".proj_sem_alterar() returns trigger language plpgsql as $f$
+create or replace function "13 - projetos_obra".proj_sem_alterar() returns trigger language plpgsql set search_path to 'public' as $f$
 begin raise exception 'O histórico do pipeline de Projetos não pode ser alterado nem apagado'; end $f$;
 drop trigger if exists proj_evento_imutavel on "13 - projetos_obra".intervencao_etapa_evento;
 create trigger proj_evento_imutavel before update or delete on "13 - projetos_obra".intervencao_etapa_evento
@@ -249,7 +249,7 @@ create trigger proj_modelo_log_sem_truncate before truncate on "13 - projetos_ob
 -- 6) cálculo
 -- % de execução de um nó da árvore (espelha pjPct do app, mas: metro limitado a 100% e documento fora — documento agora é etapa)
 create or replace function "13 - projetos_obra".proj_no_pct(n jsonb)
-returns numeric language plpgsql immutable as $f$
+returns numeric language plpgsql immutable set search_path to 'public' as $f$
 declare k text; s numeric := 0; c int := 0; x numeric; f jsonb;
 begin
   if n is null or jsonb_typeof(n) <> 'object' then return null; end if;
@@ -269,7 +269,7 @@ begin
   return null;   -- reg / sel / doc
 end $f$;
 create or replace function "13 - projetos_obra".proj_arv_pct(p_arv jsonb)
-returns numeric language sql immutable as $f$
+returns numeric language sql immutable set search_path to 'public' as $f$
   select coalesce(round(avg(x), 1), 0) from (
     select "13 - projetos_obra".proj_no_pct(v) x
     from jsonb_array_elements(case when jsonb_typeof(p_arv) = 'array' then p_arv else '[]'::jsonb end) v) t

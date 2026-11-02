@@ -2482,8 +2482,8 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD, **válvulas**).
 
-- **🔁 Pipeline Engenharia → Qualidade → Obras — BANCO (2026-11-02, `docs/migracao_proj_pipeline.sql`; o front vem nos PRs
-  seguintes).** Cada intervenção passa por 5 fases, e cada uma só abre quando a anterior fecha:
+- **🔁 Pipeline Engenharia → Qualidade → Obras — BANCO (2026-11-02, `docs/migracao_proj_pipeline.sql`, APLICADA em produção
+  em 02/11/2026 — migrações `proj_pipeline` + `proj_pipeline_search_path`; o front vem nos PRs seguintes).** Cada intervenção passa por 5 fases, e cada uma só abre quando a anterior fecha:
   **1 Projeto** (Engenharia insere, liga/desliga etapas, anexa Projeto Executivo/Mapeamento/[HDD] Plano de furo **com
   folha A0–A4** e **Libera**) → **2 Aprovação** (Qualidade aprova/reprova cada documento; reprovação exige comentário,
   volta o documento para quem anexou e avisa essa pessoa) → **3 Pré-obra** (Obras: vistoria cautelar = **link do
