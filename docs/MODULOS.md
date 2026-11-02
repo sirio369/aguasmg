@@ -2560,7 +2560,8 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   - **% de execução:** `pjPct` não conta documento e **limita metro a 100%**; nó com exec > meta mostra o selo "acima da
     meta". `pjStatusLegacy` (cfg/new/run/done) só alimenta a coluna `intervencao_estado.status` (compatibilidade).
   - **Lista/mapa (`projeto_campo`/`projeto_sup`):** status geral = `PJ_PST` (7 status, cor por fase); select **Status**
-    (montado em `pjInit`; a lista geral não mostra "Em configuração"), select novo **Com quem está** (`pjFator`), chips de
+    (montado em `pjInit`; a lista geral não mostra "Em configuração"), select novo **Com quem está** (`pjFator`; padrão
+    "Todos os atores" — v318, rótulo curto p/ não cortar; os 5 filtros quebram em 2–3 linhas no celular), chips de
     **prazo** (`pjRenderPrazo`, pior faixa — reaproveita `.pavchip`), legenda de status sob o mapa. Card: pílula do status,
     chips do ator com dias (`pjAtorChips`), progresso da fase ("Pré-obra 4/6"), selo legado, % de execução. Mapa: cor do
     marcador/traçado = status (a paleta por gid saiu).
