@@ -2482,6 +2482,60 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD, **válvulas**).
 
+- **🔁 Pipeline Engenharia → Qualidade → Obras — BANCO (2026-11-02, `docs/migracao_proj_pipeline.sql`; o front vem nos PRs
+  seguintes).** Cada intervenção passa por 5 fases, e cada uma só abre quando a anterior fecha:
+  **1 Projeto** (Engenharia insere, liga/desliga etapas, anexa Projeto Executivo/Mapeamento/[HDD] Plano de furo **com
+  folha A0–A4** e **Libera**) → **2 Aprovação** (Qualidade aprova/reprova cada documento; reprovação exige comentário,
+  volta o documento para quem anexou e avisa essa pessoa) → **3 Pré-obra** (Obras: vistoria cautelar = **link do
+  SharePoint** aprovado pela Qualidade, Liberação prefeitura [ex-Autorização de Intervenção de Via], GASMIG, Transcon,
+  Licença ambiental, OS SIGOS) → **4 Execução** (a árvore de avanço de sempre) → **5 Encerramento** (relatórios de Obras
+  e As built, **todos aprovados pela Qualidade**, + Relatório de Qualidade da Pavimentação anexado pela Qualidade; abre
+  com a execução em 100%). Tipos do pipeline (`vw_iv.tipo`): linha `HDD`→`hdd`, outras linhas→`vca`, ponto
+  `VRP`→`vrp`, `Valvula`/`Registro`→`registro`, `Macromedidor`→`macro`.
+  - **Atores:** Engenharia = admin/`proj_sup_acesso` (`proj_eng_pode`) · Qualidade = `pav_qualidade_pode` (a mesma do
+    ensaio de reaterro) · **Obras = admin ou cargo Supervisor de Produção / Coordenador de Serviços / Gestor de Obras**
+    (`proj_obras_pode`, `app_me.proj_obras`). Quem não é ator só consulta.
+  - **Tabelas novas (schema 13, RLS deny-all):** `etapa_modelo` (etapas por tipo: fase, ator, natureza
+    doc|aprovacao|link|os|avanco|ensaio, `aprova`, `pede_folha`, `padrao_ativo`, **`prazo_aten`/`prazo_atraso`** em
+    dias corridos — ≤aten no prazo, ≤atraso atenção, > atrasado; `aliases` = rótulos antigos do avanço) +
+    `etapa_modelo_log` (histórico de prazo) · `intervencao_etapa` (estado atual por etapa: `ativo` = "No escopo?",
+    status pendente|enviado|correcao|aguardando|aprovado|reprovado, valor, folha, justificativa, comentário,
+    `enviado_por`) · `intervencao_etapa_evento` (append-only: liberado/reaberto/enviado/aprovado/reprovado/removido/
+    escopo/legado/fase). Colunas novas: `intervencao_estado.legado`/`liberado_em`/`fase3_em`/`fase4_em`/`fase5_em`/
+    `concluida_em`/**`exec_pct`** (gravado por trigger quando a árvore é salva; metro limitado a 100%, documento fora),
+    `intervencao_documento.folha`, `intervencao_avanco.etapa` (chave estável da etapa de topo, preenchida por trigger
+    a partir do rótulo — renomear rótulo não quebra mais o vínculo).
+  - **Tudo derivado na leitura** por `"13 - projetos_obra".proj_calc(kind,gid)`: status geral (`configuracao` ·
+    `aprovacao` · `preobra` · `exec_nao_iniciada` · `exec_andamento` · `encerramento` · `concluida`), fases abertas,
+    itens acionáveis, **com quem está** (+ pior prazo por ator), progresso da fase, documentos desligados.
+    `proj_fase_sync` marca a fase que acabou de abrir (1 vez só) e gera o evento `fase` → aviso.
+  - **RPCs novas:** `app_proj_modelo` · `app_proj_pipeline(kind,gid)` (+ histórico) · `app_proj_pipeline_resumo`
+    (lista/mapa, sem itens) · `app_proj_fila(ator, legado)` · `app_proj_eventos(de,ate)` (Resumo) ·
+    `app_proj_etapa_escopo` (Engenharia, só em configuração; desligar documento que tem aprovação **exige justificativa**,
+    que aparece para a Qualidade; etapa com histórico não sai) · `app_proj_liberar(kind,gid,on,arv)` (Engenharia; exige os
+    documentos ativos da fase 1 com folha) · `app_proj_etapa_enviar` (documento/link/OS; confere ator e fase) ·
+    `app_proj_etapa_avaliar` (Qualidade) · `app_proj_prazo_set`/`app_proj_prazo_log` (admin/Engenharia).
+  - **Avisos (trigger em `intervencao_etapa_evento`, tipo `projetos`):** documento com aprovação enviado / projeto
+    liberado → Qualidade (`projeto_qual`); reprovado → só quem enviou (`pj:<kind>:<gid>`); Pré-obra e Execução abertas →
+    responsáveis de obras (`proj_obras_uuids`); Encerramento aberto → Engenharia (`proj_eng_uuids`).
+  - **Mudou para o app em cache (mesma assinatura):** `app_proj_avanco_registrar` exige **responsável de obras** e
+    Execução aberta · `app_proj_estado_set` exige Engenharia ou Obras e **só a Engenharia mexe no cadeado** (liberar pela
+    árvore segue a regra do Liberar) · `app_proj_doc_set` (tipos de campo: Obras ou Engenharia) registra o envio quando o
+    tipo é etapa · `app_proj_doc_remover` recusa documento já aprovado · `app_proj_intervencao_excluir` recusa se a
+    Qualidade já avaliou algo · **`app_proj_intervencao_importar` aceita pontos** (`POINT` → `intervencoes_pontuais`, tipo
+    obrigatório VRP/Macromedidor/Registro; linha HDD/VCA) e não troca o tipo de intervenção já liberada; devolve
+    `erros`/`tipo_mantido` · **`situacao_atual` saiu** das duas tabelas do schema 7 (sem uso; backup
+    `"13 - projetos_obra"._bkp_proj_situacao_atual_20261102`) e da `app_proj_intervencoes`.
+  - **Legado:** as 47 intervenções que estavam liberadas viraram `legado=true` — pulam os portões de antes da obra
+    (fases 2 e 3); o Encerramento abre em 100% como para todas. Documentos já anexados e a OS SIGOS da árvore viraram
+    etapas enviadas (evento `legado`). O que faltou antes da obra fica como **pendência do legado** (`pend_legado`): aparece
+    na intervenção, mas fica fora das filas e do "com quem está" (`app_proj_fila(…, true)` lista). Sem relógio no legado.
+    Backups `_bkp_proj_estado|documento|avanco_20261102`.
+  - **Testado com rollback (02/11/2026):** contagens intactas (estado 51, avanço 161, documento 55, 19+42 geometrias),
+    status 14 configuração / 18 em andamento / 29 não iniciadas, ciclo completo num ponto novo (recusas de ator, folha,
+    justificativa, escopo travado, reprovação+aviso, reenvio, aprovação, fases 3/4/5 com avisos, OS só dígitos),
+    importação de ponto e de linha, prazos.
+
 - **⭐ Reground nos dados reais (2026-09-25):** `PJ_IVS` deixou de ser mock — agora é **carregado do banco** por
   **`pjLoad()`** (RPC **`app_proj_intervencoes`**, gated admin/`dev_acesso`) a partir das tabelas-base
   **`"7 - setorizacao".intervencoes_pontuais`** (21: VRP 16, Valvula 5) e **`intervencoes_lineares`** (1 rede),
