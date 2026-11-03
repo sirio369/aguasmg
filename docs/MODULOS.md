@@ -3254,7 +3254,9 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
   13 riscos (`SEG_RISCOS`) — risco "Sim" exige "Medida de controle aplicada"; `r2`/`r6` invertidas ("Não"
   bloqueia); EPIs; requer PT/PET; **foto obrigatória da sinalização**. **Assinaturas:** o **responsável é quem
   preenche** (`segEu()`: nome/matrícula/cargo do cadastro, travados — só assina); **executantes = só o nome,
-  escolhido da lista** (`app_seg_pessoas`, datalist; nome fora da lista não passa) + assinatura.
+  escolhido da lista** (`app_seg_pessoas`, datalist; nome fora da lista não passa) + assinatura. A lista acha a
+  pessoa pelo nome **ou pelo e-mail** (2026-11-03, sw v323): cada opção tem o rótulo "cargo · e-mail" e o navegador
+  busca no rótulo; e-mail digitado inteiro é trocado pelo nome (`segPessoaPorNome` casa nome ou e-mail).
 - **PT/PET só saem de uma APR** com requer=Sim (botões "+ PT"/"+ PET" na atividade) e **reaproveitam a equipe e as
   assinaturas da APR** (`segNovo` lê a APR por `segDocCarregar` — local ou `app_seg_ver`; sem a APR no aparelho e sem
   sinal, não abre). Participante com `apr:true` vai com `assinatura_apr:true` e o servidor copia a assinatura da APR
@@ -3349,6 +3351,11 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   "Já existia PT/PET emitida nesta APR — duplicada" (não rejeita: a fila descartaria em silêncio). Reentrada em espaço
   confinado depois de a equipe sair = nova APR (a PET vale para uma entrada).
 - Tipos de intervenção e sugestões estão **no código** — não há tela de configuração.
+- **Lista de pessoas** (`app_seg_pessoas`): todos os perfis **ativos**, sem filtro de consórcio/área/equipe, com
+  `email` desde 2026-11-03 (`docs/migracao_seg_pessoas_email.sql`). O app guarda uma cópia em `localStorage.segPessoas`
+  e só a renova ao abrir a tela `seg` com sinal — colaborador cadastrado depois da última renovação não aparece em
+  aparelho sem sinal. O `<datalist>` do Chrome casa cada palavra digitada por trecho, no valor (nome) e no rótulo
+  (cargo · e-mail); "Ana Souza" acha "Ana da Silva de Souza".
 - **Quem preenche em dois papéis** (2026-11-03): o supervisor que entra (PET) e o emissor que participa (PT) são uma
   **linha à parte** em `segD.pes` (`euDup`, `segEuDup()`; nasce `papel:'fora'`) → o servidor recebe 2 linhas da mesma
   pessoa em `qsms_participante` (supervisor + autorizado / emissor + participante — não há índice único) e a capa junta
