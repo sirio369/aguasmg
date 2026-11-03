@@ -2618,6 +2618,13 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     aprovado com laudo. Sem aprovação o "＋ Lançar" da Recomposição some. Na `pavqual` os pedidos de projeto viram "pontos"
     (`pqlProjGrupo`) com título **📐 HDD <id> · Vala 1**; o formulário grava por `app_proj_reaterro_ensaio` (fila offline). Se a
     RPC nova falhar, a fila cai para `app_pav_qual_listar`.
+  - **Complemento (2026-11-03, sw v322, `docs/migracao_proj_reaterro_resumo.sql`, achados do QA em produção):** a trava também
+    vale ao **gravar a árvore** — `app_proj_estado_set` (mesma assinatura) recusa subir o % da Recomposição de um bloco com Reaterro
+    no escopo sem pedido `aprovado`/`legado` (compara com a árvore gravada via `proj_reat_blocos(tipo,arv)`; antes só o
+    `app_proj_avanco_registrar` barrava, e uma chamada direta à API passava). **Resumo:** `app_proj_eventos` traz também os
+    eventos do ensaio de projeto (natureza `ensaio`: `ensaio_pedido`, `reaterro_refeito`, `ensaio_aprovado`, `ensaio_reprovado` —
+    nomes próprios p/ não somar com aprovação de documento); a tela ganhou os KPIs "ensaios de reaterro pedidos / aprovados /
+    reprovados" e o CSV marca esses registros como **Ensaio**.
 - **🔁 Pipeline — PR 5: tamanho da folha (2026-11-02, sw v321, só front).** **No anexo** (`pjEtapaAnexar`) com folha escolhida,
   `pjFolhaConfere` lê as páginas pelo pdf.js e compara com `PJ_FOLHA_MM` (ISO A0–A4, ±5 mm, qualquer orientação, `pjFolhaDe`);
   se alguma página não bate, pede confirmação (diz o tamanho real e a folha que ele parece ser). Sem pdf.js/PDF ilegível não bloqueia.
