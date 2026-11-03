@@ -435,7 +435,7 @@
 ### 2.7 Ensaio de reaterro (Qualidade) — `// --- Qualidade: ensaio de compactação do reaterro` · telas `pavqual` / `pavqual_ens` / `pavqual_acesso` (2026-11-02, sw v314)
 - **Objetivo:** a equipe de Qualidade faz em campo o **ensaio de compactação do reaterro** dos pavimentos que o programador marcou "Sim" na Gestão de Pavimento (§4.4) e anexa o laudo; o resultado libera a OS da recomposição ou devolve o reaterro para ser refeito.
 - **Acesso:** card 🧪 **Ensaio de reaterro** em Home › 🛠️ Execução, visível só com **`ME.qualidade`** = `"8 - coleta_campo".pav_qualidade_pode(uid)` = admin **ou** engrenagem **`perfil.qualidade_acesso`** **ou** cargo **Técnico de Qualidade / Coordenador de QSMSS** (por nome do cargo, como o QSMS). ⚙️ no topo da tela (admin) → `pavqual_acesso` (`pqlAc*`, RPCs `app_pav_qual_acesso_listar`/`_set`, espelham o `qsms_acesso`).
-- **Fila `pavqual`** (`pavQualInit`/`pavQualRender`/`pavQualCard`): pontos com tipo **aguardando ensaio** (`app_pav_qual_listar(p_consorcio)`, só esses tipos), visão **Lista/Mapa** (Leaflet, cor pela faixa de prazo), filtro de consórcio e **chips de prazo** na mesma linha (`pavPrazoChips`; `PAV_SLA_ETAPA.ensaio` = 2 dias, contados de `reaterro_status_em` = pedido ou "refeito"; há mais tempo na fila primeiro). Cada tipo mostra quem pediu, há quanto tempo, fotos do pavimento, "📍 Como chegar" e, se for 2º ensaio em diante, o motivo da reprovação anterior + data do refeito. Offline: mostra a última lista carregada.
+- **Fila `pavqual`** (`pavQualInit`/`pavQualRender`/`pavQualCard`): pontos com tipo **aguardando ensaio** (`app_pav_qual_listar(p_consorcio)`, só esses tipos; desde a v320 pela `app_qual_reaterro_fila`, que junta os **blocos de obra dos Projetos** — §8 PR 4), visão **Lista/Mapa** (Leaflet, cor pela faixa de prazo), filtro de consórcio e **chips de prazo** na mesma linha (`pavPrazoChips`; `PAV_SLA_ETAPA.ensaio` = 2 dias, contados de `reaterro_status_em` = pedido ou "refeito"; há mais tempo na fila primeiro). Cada tipo mostra quem pediu, há quanto tempo, fotos do pavimento, "📍 Como chegar" e, se for 2º ensaio em diante, o motivo da reprovação anterior + data do refeito. Offline: mostra a última lista carregada.
 - **Formulário `pavqual_ens`** (`pqe*`, estado `pqe={g,it,id,res,laudo,f1,f2}`): **GPS travado** (≤ `PRECISAO_MAX`, `pqeOnGps` na cadeia do `iniciarGPS`, mostra a distância até o ponto do pavimento) · **Resultado** Aprovado/Reprovado · **Método** (frasco de areia, cilindro de cravação, densímetro nuclear, penetrômetro DCP, outro) · **GC medido / mínimo exigido (%)** opcionais (0–200) · **Observação** (obrigatória na reprovação) · **Laudo** obrigatório (PDF ≤ 10 MB ou foto) · **fotos** (1ª obrigatória, 2ª opcional). Salva pela **fila offline** (`enviarOuEnfileirar`, `rpc:'app_pav_reaterro_ensaio'`, `pasta:'pavimento-ensaio'`, fotos `p_laudo`/`p_foto1`/`p_foto2`, `id` gerado no app).
 - **Backend:** **`app_pav_reaterro_ensaio(p_id,p_pav_id,p_resultado,p_metodo,p_gc_medido,p_gc_exigido,p_obs,p_laudo,p_foto1,p_foto2,p_lat,p_lon,p_precisao,p_dispositivo)`** (gate `pav_qualidade_pode`; **idempotente por `p_id`**; exige tipo `aguardando` e sem OS; recusa GPS > 15 m; grava `tentativa` = anterior + 1 e `dist_ponto_m`; muda `reaterro_status` p/ o resultado). Tabelas/avisos/trava em §4.4.
 - **Cuidados:** a fila `enviar` agora sobe **PDF** quando o blob é `application/pdf` (extensão `.pdf` + contentType); o resto continua `.jpg`. Ensaio rejeitado pelo servidor (ex.: o programador tirou da fila antes de sincronizar) é descartado da fila como qualquer erro de negócio.
@@ -2592,6 +2592,32 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   sql.js, SRID 31983). **⏱️ Prazos das etapas** (`projeto_prazos`; admin/Engenharia editam via `app_proj_prazo_set`, histórico `app_proj_prazo_log`;
   tela mostra prazo_aten+1/prazo_atraso+1). **Resumo**: filtro de ator, 📌 Situação atual (status × tipo + pendências por ator), 🔁 Pipeline no
   período (`app_proj_eventos`), CSV com coluna Registro. Etapa em correção mostra o motivo da reprovação na linha do documento.
+- **🔁 Pipeline — PR 4: ensaio de reaterro no projeto (2026-11-02, sw v320, `docs/migracao_proj_reaterro.sql`).** Todo **bloco**
+  ativo da execução com `Reaterro…` + `Recomposição de pavimento` (Vala N, Câmara da VRP, Caixa do macromedidor, Obra civil,
+  Peça N, Obra civil da caixa da interligação; na VCA o bloco é a **raiz**) só libera a Recomposição com o **ensaio de
+  compactação aprovado pela Qualidade** — mesma fila/formulário do pavimento (`pavqual`/`pavqual_ens`).
+  - **Banco:** `"13 - projetos_obra".proj_reaterro` (1 pedido por `kind,gid,bloco`; `bloco` = chave da etapa de topo + resto do
+    caminho do grupo, `''` = raiz; `rotulo` = caminho legível; status `aguardando|aprovado|reprovado|legado`; `pedido_por`/
+    `ult_por`). `pav_reaterro_ensaio`/`pav_reaterro_evento` ganharam **`proj_reaterro_id`** (`pav_id` aceita nulo; check
+    exatamente um dos dois; evento `pedido` novo). Helpers `proj_reat_bloco_key`/`proj_reat_filhos`/`proj_reat_no`/
+    `proj_reat_hist`/`proj_reat_lbl`.
+  - **RPCs:** `app_proj_reaterro_listar(kind,gid)` (leitura) · `app_proj_reaterro_solicitar(kind,gid,bloco_caminho,lat,lon,precisao)`
+    (Obras; Execução aberta; confere na **árvore gravada** reaterro ativo em 100% — o front grava a árvore pendente antes) ·
+    `app_proj_reaterro_refeito(id,data)` (Obras) · `app_proj_reaterro_ensaio(...)` (Qualidade; igual ao do pavimento com
+    `p_req_id`; distância até a geometria da intervenção) · `app_qual_reaterro_fila(consorcio)` = `{pav: app_pav_qual_listar,
+    proj: [...]}` (a `app_pav_qual_listar` não mudou). **Trava no servidor:** `app_proj_avanco_registrar` (mesma assinatura)
+    recusa `<bloco> › Recomposição de pavimento` sem pedido `aprovado`/`legado` quando o Reaterro do bloco está no escopo.
+  - **Avisos (trigger em `proj_reaterro`, tipo `projetos`):** na fila (pedido ou refeito) → Qualidade (`pav_qualidade_uuids`,
+    link `pavqual`); resultado → quem pediu e quem devolveu (`pj:<kind>:<gid>`). O trigger de resultado do pavimento ignora as
+    linhas de projeto.
+  - **Legado:** na virada, os 29 blocos de intervenção legado com Recomposição lançada (12) ou Reaterro 100% (17) viraram
+    `legado` (não travam); os 7 reaterros parciais seguem a regra nova.
+  - **Front:** `projeto_det` carrega `pjReatCur` (`pjReatLoad`); `pjReatBloco(iv,nó)` acha o bloco da Recomposição e
+    `pjReatBox` mostra embaixo dela: 🔒 travada (reaterro < 100%) · **🧪 Solicitar ensaio de compactação** (Obras, GPS se ≤ 50 m) ·
+    aguardando com prazo (`etapa_modelo` `ensaio_reaterro`, 1/2 dias) · reprovado com motivo + **Reaterro refeito em [data]** ·
+    aprovado com laudo. Sem aprovação o "＋ Lançar" da Recomposição some. Na `pavqual` os pedidos de projeto viram "pontos"
+    (`pqlProjGrupo`) com título **📐 HDD <id> · Vala 1**; o formulário grava por `app_proj_reaterro_ensaio` (fila offline). Se a
+    RPC nova falhar, a fila cai para `app_pav_qual_listar`.
 
 - **⭐ Reground nos dados reais (2026-09-25):** `PJ_IVS` deixou de ser mock — agora é **carregado do banco** por
   **`pjLoad()`** (RPC **`app_proj_intervencoes`**, gated admin/`dev_acesso`) a partir das tabelas-base
