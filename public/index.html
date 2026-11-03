@@ -3000,6 +3000,18 @@ async function pjPipeRefresh(iv){ await pjDocsLoad(iv); await pjPipeLoad(iv); pj
 const pjPipeDocs=()=>((pjPipeCur&&pjPipeCur.itens)||[]).filter(x=>x.natureza==='doc'&&x.ativo);
 const pjPipeItem=ch=>((pjPipeCur&&pjPipeCur.itens)||[]).find(x=>x.chave===ch);
 const PJ_FOLHAS=['A0','A1','A2','A3','A4'];
+const PJ_FOLHA_MM={A0:[841,1189],A1:[594,841],A2:[420,594],A3:[297,420],A4:[210,297]};   // retrato (largura × altura)
+// folha ISO A que bate com a página (±5 mm, em qualquer orientação); null = fora do padrão
+const pjFolhaDe=(w,h)=>PJ_FOLHAS.find(f=>{ const [a,b]=PJ_FOLHA_MM[f]; return Math.abs(Math.min(w,h)-a)<=5&&Math.abs(Math.max(w,h)-b)<=5; })||null;
+// lê as páginas do PDF (pdf.js) e devolve a pergunta de confirmação se alguma não for da folha escolhida; null = bate ou não deu p/ ler (não bloqueia)
+async function pjFolhaConfere(file,folha){ if(!folha||!PJ_FOLHA_MM[folha]) return null;
+  try{ const lib=await pjLoadPdfJs(), pdf=await lib.getDocument({data:await file.arrayBuffer()}).promise, n=pdf.numPages, ruins=[];
+    for(let pg=1;pg<=Math.min(n,60);pg++){ const v=(await pdf.getPage(pg)).getViewport({scale:1}), w=v.width*25.4/72, h=v.height*25.4/72, f=pjFolhaDe(w,h); if(f!==folha) ruins.push({pg,w,h,f}); }
+    try{ pdf.destroy(); }catch(_){}
+    if(!ruins.length) return null;
+    const r=ruins[0], tam=Math.round(Math.min(r.w,r.h))+' × '+Math.round(Math.max(r.w,r.h))+' mm '+(r.f?('('+r.f+')'):'(fora do padrão A0–A4)');
+    return 'A folha escolhida é '+folha+', mas '+(n>1?(ruins.length+' de '+n+' página(s) não batem — a página '+r.pg+' tem '):'o PDF tem ')+tam+'.\n\nNo PDF consolidado a prancha sai ajustada à folha '+folha+'. Anexar mesmo assim?'; }
+  catch(_){ return null; } }
 // rótulo/classe da situação de uma etapa
 function pjEtapaSit(it){ if(!it.ativo) return ['fora do escopo',''];
   const ap=it.natureza!=='aprovacao'?((pjPipeCur&&pjPipeCur.itens)||[]).find(x=>x.natureza==='aprovacao'&&x.aprova===it.chave&&x.ativo):null;
@@ -3080,6 +3092,7 @@ function pjWireEtapas(d,iv){
 }
 async function pjEtapaAnexar(iv,chave,file,folha){ if(!iv||!file) return;
   if(file.type&&file.type!=='application/pdf'){ toast('Envie um arquivo PDF'); return; }
+  if(folha){ const q=await pjFolhaConfere(file,folha); if(q&&!confirm(q)){ toast('Anexo cancelado — confira a folha'); return; } }
   toast('Enviando documento…');
   const path='projetos/'+iv.kind+'/'+iv.gid+'/'+chave+'_'+crypto.randomUUID()+'.pdf';
   try{ const up=await sb.storage.from('fotos-campo').upload(path,file,{contentType:'application/pdf',upsert:true}); if(up.error) throw up.error;
@@ -3467,27 +3480,61 @@ function pjLoadPdfJs(){ return new Promise((res,rej)=>{ if(window.pdfjsLib){res(
 async function pjRelPdf(iv){ if(!iv)return;
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pjRelDocHtml(iv)+'</div>';
+  pjFolhaCss(); pjRelPranchas=[];
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pjRelDocHtml(iv)+'</div><div id="relFolhas"></div>';
   ov.style.display='block';
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   const pb=document.getElementById('relPrint'); if(pb) pb.onclick=()=>window.print();
   try{ await pjRelRenderAnexos(iv); }catch(e){ const bx=document.getElementById('relAnexos'); if(bx) bx.innerHTML='<p class="relPend">Falha ao preparar anexos: '+((e&&e.message)||e)+'</p>'; }
+  ov.querySelectorAll('[data-relprancha]').forEach(b=>b.onclick=()=>pjImprimirPrancha(pjRelPranchas[+b.dataset.relprancha]));
   if(pb) pb.disabled=false;
 }
+// pranchas com folha (A0–A4): cada página num @page nomeado do tamanho da folha, sem margem, no fim do documento (#relFolhas)
+let pjRelPranchas=[];   // [doc] → [{src,W,H,nm}] (para o "Imprimir prancha")
+function pjFolhaCss(){ if(document.getElementById('pjFolhaCss')) return; const st=document.createElement('style'); st.id='pjFolhaCss';
+  st.textContent=Object.entries(PJ_FOLHA_MM).map(([f,[a,b]])=>`@page pjf_${f}_P{size:${a}mm ${b}mm;margin:0}\n@page pjf_${f}_L{size:${b}mm ${a}mm;margin:0}`).join('\n')+`
+#relFolhas{max-width:820px;margin:0 auto 24px}
+.relFolhaCab{font:600 13px Arial,sans-serif;color:#333;margin:14px 0 4px;display:flex;align-items:center;gap:8px}
+.relFolhaCab button{margin-left:auto;padding:6px 10px;border:0;border-radius:6px;background:#0aa07a;color:#fff;cursor:pointer;font-weight:600}
+.relFolha{background:#fff;break-before:page;page-break-before:always;overflow:hidden}
+.relFolha img{width:100%;height:100%;object-fit:contain;display:block}
+@media screen{.relFolha{width:100%!important;height:auto!important;aspect-ratio:var(--ar);margin:6px 0 12px;box-shadow:0 2px 10px rgba(0,0,0,.15)}}
+@media print{#relFolhas{margin:0!important;max-width:none!important}.relFolhaCab{display:none!important}}`;
+  document.head.appendChild(st); }
+// plano B: imprime só a prancha numa janela própria (1 folha por página) — se o "Salvar PDF" não mantiver folhas de tamanhos diferentes
+function pjImprimirPrancha(imgs){ if(!imgs||!imgs.length) return; const w=window.open('','_blank'); if(!w){ toast('Libere as janelas pop-up para imprimir a prancha'); return; }
+  const css=[...new Set(imgs.map(i=>i.nm))].map(n=>{ const i=imgs.find(x=>x.nm===n); return '@page '+n+'{size:'+i.W+'mm '+i.H+'mm;margin:0}'; }).join('');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Prancha</title><style>'+css+'html,body{margin:0}div{overflow:hidden;break-after:page}div:last-child{break-after:auto}img{width:100%;height:100%;object-fit:contain;display:block}</style></head><body>'
+    +imgs.map(i=>'<div style="page:'+i.nm+';width:'+i.W+'mm;height:'+(i.H-0.5)+'mm"><img src="'+i.src+'"></div>').join('')+'</body></html>');
+  w.document.close(); setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){} },500); }
 // renderiza os anexos (PDFs das etapas de documento do pipeline) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
 async function pjRelRenderAnexos(iv){
   const box=document.getElementById('relAnexos'); if(!box) return;
   const docs=pjPipeDocs().map(it=>({dc:{t:it.chave,n:it.nome},doc:pjDocsCur[it.chave]})).filter(x=>x.doc);
   if(!docs.length){ box.innerHTML='<p class="relPend">Nenhum documento anexado para incluir ao final. Anexe nas Etapas da intervenção antes da emissão.</p>'; return; }
   box.innerHTML='<p class="relPend" id="relAnexProg">⏳ Renderizando anexos (0/'+docs.length+')… aguarde antes de salvar o PDF.</p>';
-  const prog=document.getElementById('relAnexProg');
+  const prog=document.getElementById('relAnexProg'), fbox=document.getElementById('relFolhas');
   let lib=null; try{ lib=await pjLoadPdfJs(); }catch(e){ lib=null; }
   let done=0;
   for(const {dc,doc} of docs){
     let seg='<div class="relSec" style="break-before:page;page-break-before:always"><span class="relNum">📎</span> Anexo — '+dc.n+'</div>'+(doc.nome?'<div style="font-size:11px;color:#777;margin:4px 0 8px">'+doc.nome+'</div>':'');
     const url=fotoURL(doc.path), isPdf=/\.pdf(\?|$)/i.test(doc.path||'');
     try{
-      if(isPdf && lib){
+      if(isPdf && lib && fbox && PJ_FOLHA_MM[doc.folha]){
+        // prancha com folha: ~150 dpi (teto ~16 MP por página, limite de canvas do celular), página na orientação do próprio PDF
+        const pdf=await lib.getDocument(url).promise, imgs=[], [fa,fb]=PJ_FOLHA_MM[doc.folha];
+        for(let pg=1; pg<=pdf.numPages; pg++){
+          const page=await pdf.getPage(pg), v1=page.getViewport({scale:1}), sc=Math.min(150/72,Math.sqrt(16e6/((v1.width*v1.height)||1))), vp=page.getViewport({scale:sc}), land=v1.width>v1.height;
+          const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+          await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+          imgs.push({src:cv.toDataURL('image/jpeg',0.85),W:land?fb:fa,H:land?fa:fb,nm:'pjf_'+doc.folha+'_'+(land?'L':'P')});
+          cv.width=cv.height=0;
+        }
+        const ix=pjRelPranchas.push(imgs)-1;
+        seg+='<p class="relPend">📐 '+imgs.length+' prancha(s) no fim deste documento, cada uma em folha <b>'+doc.folha+'</b> (escala da folha).</p>';
+        fbox.insertAdjacentHTML('beforeend','<div class="relFolhaCab">📐 '+dc.n+' · folha '+doc.folha+' · '+imgs.length+' pág.<button type="button" data-relprancha="'+ix+'">🖨️ Imprimir prancha</button></div>'
+          +imgs.map(i=>'<div class="relFolha" style="page:'+i.nm+';width:'+i.W+'mm;height:'+(i.H-0.5)+'mm;--ar:'+i.W+'/'+i.H+'"><img src="'+i.src+'" alt=""></div>').join(''));
+      } else if(isPdf && lib){
         const pdf=await lib.getDocument(url).promise;
         for(let pg=1; pg<=pdf.numPages; pg++){
           const page=await pdf.getPage(pg), v1=page.getViewport({scale:1}), scale=Math.min(2,1600/(v1.width||1600)), vp=page.getViewport({scale});
