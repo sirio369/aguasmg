@@ -9963,7 +9963,7 @@ function segSigJpeg(dataUrl){ return new Promise(res=>{ if(!dataUrl) return res(
   im.onerror=()=>res(null); im.src=dataUrl; }); }
 const segBlobUrl=b=>new Promise(r=>{ if(!b) return r(null); const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.onerror=()=>r(null); fr.readAsDataURL(b); });
 
-// --- colaboradores (datalist; cache p/ offline) ---
+// --- colaboradores (datalist; cache p/ offline; rótulo "cargo · e-mail" → a busca do navegador acha também pelo e-mail) ---
 let segPessoas=[];
 async function segPessoasCarregar(){
   try{ segPessoas=JSON.parse(localStorage.getItem('segPessoas')||'[]'); }catch(e){ segPessoas=[]; }
@@ -9971,8 +9971,8 @@ async function segPessoasCarregar(){
   if(!navigator.onLine) return;
   try{ const {data,error}=await sb.rpc('app_seg_pessoas'); if(error)throw error; segPessoas=data||[]; try{ localStorage.setItem('segPessoas',JSON.stringify(segPessoas)); }catch(e){} segPessoasDl(); }catch(e){} }
 function segPessoasDl(){ let dl=document.getElementById('segPessoasDl'); if(!dl){ dl=document.createElement('datalist'); dl.id='segPessoasDl'; document.body.appendChild(dl); }
-  dl.innerHTML=segPessoas.map(p=>`<option value="${segH(p.nome)}">${segH(p.cargo||'')}</option>`).join(''); }
-const segPessoaPorNome=n=>{ const k=String(n||'').trim().toLowerCase(); return k?segPessoas.find(p=>String(p.nome||'').trim().toLowerCase()===k):null; };
+  dl.innerHTML=segPessoas.map(p=>`<option value="${segH(p.nome)}">${segH([p.cargo,p.email].filter(Boolean).join(' · '))}</option>`).join(''); }
+const segPessoaPorNome=n=>{ const k=String(n||'').trim().toLowerCase(); return k?segPessoas.find(p=>String(p.nome||'').trim().toLowerCase()===k||String(p.email||'').toLowerCase()===k):null; };
 // o próprio usuário (travado nos formulários: nome/matrícula/cargo do cadastro, só assina)
 function segEu(){ const x=(ME&&segPessoas.find(p=>p.id===ME.id))||{};
   return {pessoa_uuid:(ME&&ME.id)||null,nome:x.nome||(ME&&ME.nome)||'',documento:x.matricula||'',funcao:x.cargo||'',eu:true}; }
@@ -10109,7 +10109,7 @@ function segPesRender(papeis,cont){ const c=document.getElementById(cont); if(!c
 function segPesWire(c){
   c.querySelectorAll('.segpes').forEach(box=>{ const p=segD.pes.find(x=>x.k===box.dataset.pk); if(!p)return;
     const inp=box.querySelector('[data-pf="nome"]');
-    if(inp) inp.oninput=inp.onchange=()=>{ p.nome=inp.value; const x=segPessoaPorNome(inp.value);
+    if(inp) inp.oninput=inp.onchange=()=>{ const x=segPessoaPorNome(inp.value); if(x&&inp.value!==x.nome) inp.value=x.nome; p.nome=inp.value;
       p.pessoa_uuid=x?x.id:null; p.documento=x?(x.matricula||''):''; p.funcao=x?(x.cargo||''):'';
       const fx=box.querySelector('[data-pfx]'); if(fx) fx.textContent=x?(x.cargo||''):(inp.value.trim()?'⚠ escolha um nome da lista':'');
       segAtualizar(); };
