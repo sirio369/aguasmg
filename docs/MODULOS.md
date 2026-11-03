@@ -3263,10 +3263,14 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
   (`qsms_participante.assinatura_apr`).
   - **PT** (`segPtHtml`): descrição, altura, meio de acesso + sistema anti-queda, checklist de **42 itens** em 13
     blocos (`SEG_PT_BLOCOS`; blocos de outro meio de acesso viram NA e somem; p7 já vem Sim; **um "Não" impede**).
-    Participantes = executantes da APR (só leitura, "✓ assinatura dada na APR"); emissor = quem preenche (assinatura da
-    APR); **liberador da área = escolhido da lista + assina** (única assinatura nova). Sem "mão de obra".
+    **Participantes** (`segPtEquipe`, 2026-11-03): os executantes da APR **e o emissor** marcam **Participa / Não
+    participa** (executantes já vêm "Participa", o emissor "Não participa"; ao menos 1 participante; "✓ assinatura dada
+    na APR"); emissor = quem preenche (assinatura da APR); **liberador da área = escolhido da lista + assina** (única
+    assinatura nova). Mínimo = 2 pessoas (emissor participando + liberador). Sem "mão de obra".
   - **PET** (`segPetHtml`): cada executante da APR recebe um papel (**Entra / Vigia / Não participa** — um vigia só,
-    `segPetEquipe`); supervisor de entrada = quem preenche (assinatura da APR); 11 ações preliminares (item 1 já Sim;
+    `segPetEquipe`); supervisor de entrada = quem preenche (assinatura da APR) e **também pode entrar** ("Você também
+    entra?", 2026-11-03) — mínimo = 2 pessoas (supervisor que entra + vigia; o vigia sempre é um executante da APR e
+    fica fora); 11 ações preliminares (item 1 já Sim;
     **um "Não" impede**); bloqueios; detector (identificação + **foto obrigatória**); insuflação ≥ 10 min; gases P1–P3
     vertical (+ H1/H2) com semáforo (`SEG_GAS`); leitura fora → "↻" nova leitura (a antiga vira ocorrência).
 - Com bloqueio de segurança e tudo preenchido aparece **"Registrar PT/PET impedida"** (2 toques) — avisa o QSMS.
@@ -3352,6 +3356,11 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   e só a renova ao abrir a tela `seg` com sinal — colaborador cadastrado depois da última renovação não aparece em
   aparelho sem sinal. O `<datalist>` do Chrome casa cada palavra digitada por trecho, no valor (nome) e no rótulo
   (cargo · e-mail); "Ana Souza" acha "Ana da Silva de Souza".
+- **Quem preenche em dois papéis** (2026-11-03): o supervisor que entra (PET) e o emissor que participa (PT) são uma
+  **linha à parte** em `segD.pes` (`euDup`, `segEuDup()`; nasce `papel:'fora'`) → o servidor recebe 2 linhas da mesma
+  pessoa em `qsms_participante` (supervisor + autorizado / emissor + participante — não há índice único) e a capa junta
+  os papéis por pessoa. Contagens de pessoas (mínimo de 2 da PET, "Quantidade de trabalhadores") são por pessoa distinta
+  (`pessoa_uuid`/nome), no app e no `app_seg_registrar` (alerta "Menos de 2 trabalhadores").
 - Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
 - `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`
   reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.

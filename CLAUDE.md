@@ -337,8 +337,8 @@ pwa/
   atividade = tipo de intervenção + OS (texto) + GPS travado + data/hora/usuário; endereço, bairro, município e
   consórcio **pela coordenada** (`app_seg_local`/`qsms_local`); a APR sugere fases/riscos/EPIs pelo tipo, exige foto da
   sinalização; quem preenche é o responsável (travado, só assina) e os executantes vêm da lista; PT/PET só saem de APR
-  que as indique e **reaproveitam a equipe e as assinaturas da APR** (PT: só o liberador assina; PET: papéis
-  entra/vigia); travas ("Não" impede; gás fora do limite impede); cada atividade (APR + PT/PET) é um bloco com
+  que as indique e **reaproveitam a equipe e as assinaturas da APR** (PT: só o liberador assina, executantes e
+  emissor marcam se participam; PET: papéis entra/vigia, o supervisor também pode entrar — mínimo de 2 pessoas nas duas); travas ("Não" impede; gás fora do limite impede); cada atividade (APR + PT/PET) é um bloco com
   **PDF único** (capa + formulários). Offline pela fila
   (`item.anexos`, ids `seg-<ts>`), rascunho e cópia local em IndexedDB `seg_local`. **Gestão** (`qsms`, Home › 🧰
   Suporte, gate `ME.qsms` + ⚙️ `qsms_acesso`): **hub em categorias** como o Almoxarifado — **⛑️ APR e derivados**

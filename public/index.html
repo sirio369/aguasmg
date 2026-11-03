@@ -9979,6 +9979,10 @@ function segEu(){ const x=(ME&&segPessoas.find(p=>p.id===ME.id))||{};
 // assinatura que a pessoa já deu na APR da atividade (reaproveitada na PT/PET)
 function segSigApr(aprDoc,p){ if(!aprDoc) return null; const k=String(p.nome||'').trim().toLowerCase();
   const x=(aprDoc.pes||[]).find(q=>q.sig&&((p.pessoa_uuid&&q.pessoa_uuid===p.pessoa_uuid)||String(q.nome||'').trim().toLowerCase()===k)); return x?x.sig:null; }
+// você também na equipe (PET: supervisor que entra · PT: emissor que participa) — linha à parte, nasce "fora"
+function segEuDup(){ let p=segD.pes.find(x=>x.euDup); if(p) return p; const s=segD.pes.find(x=>x.eu); if(!s) return null;
+  const pt=segD.tipo==='PT'; p={k:'eu2',papel:'fora',euDup:true,pessoa_uuid:s.pessoa_uuid,nome:s.nome,documento:s.documento,funcao:s.funcao,sig:pt?s.sig:null,apr:pt&&!!s.apr};
+  segD.pes.unshift(p); return p; }
 
 // --- GPS + local pela coordenada (rua/bairro/município/consórcio vêm do servidor) ---
 let segLocalT=null;
@@ -10071,14 +10075,16 @@ async function segNovo(tipo,ativId,aprId){ let d=null; try{ d=await segDraftGet(
   segD={tipo,formId:segNovoId(),aprId,atividade:a,fotos:{},med:[],pes:[],resp:{}};
   if(tipo==='PET'){
     segD.resp={espaco_tipo:'',atividade_desc:a.descricao||'',preliminares:{p1:'S'},bloqueios:[{tipo:'',resp:''},{tipo:'',resp:''}],equipamento:'',insuflacao:'',horizontal:false,tel_unidade:localStorage.getItem('segTelUnidade')||''};
-    // equipe da APR: cada executante recebe um papel (entra / vigia / não participa); o supervisor é quem preenche
+    // equipe da APR: cada executante recebe um papel (entra / vigia / não participa); o supervisor é quem preenche e também pode entrar
     segD.pes=equipe.map(p=>Object.assign(p,{papel:'autorizado',sig:null})).concat([Object.assign({k:'eu',papel:'supervisor',sig:euSig,apr:!!euSig},eu)]);
+    segEuDup();
     ['V1','V2','V3'].forEach(p=>segD.med.push({id:segNovoId(),plano:'V',ponto:+p[1],o2:'',lie:'',co:'',h2s:''}));
   } else {
     segD.resp={descricao:a.descricao||'',altura:'',acesso:[],acesso_outro:'',sistema:[],checklist:{[SEG_PT_ANALISE]:'S'}};
-    // participantes = executantes da APR (com o visto dado na APR); emissor = quem preenche; liberador = escolhido + assina
+    // participantes = executantes da APR e o emissor, cada um marca se participa (visto dado na APR); emissor = quem preenche; liberador = escolhido + assina
     segD.pes=equipe.map(p=>Object.assign(p,{papel:'participante',apr:!!p.sig}))
       .concat([Object.assign({k:'eu',papel:'emissor',sig:euSig,apr:!!euSig},eu),{k:'lb',papel:'liberador',nome:'',pessoa_uuid:null,sig:null}]);
+    segEuDup();
   }
   irPara('seg_form'); }
 function segFormInit(){ segCss(); if(!segD){ irPara('seg'); return; }
@@ -10122,7 +10128,7 @@ function segPesWire(c){
 function segPesRerender(){ const t=segD.tipo;
   if(t==='APR'){ segPesRender(['responsavel'],'segPesResp'); segPesRender(['executante'],'segPesExec'); }
   else if(t==='PET'){ segPetEquipe(); segPesRender(['supervisor'],'segPesSup'); }
-  else { segPesRender(['participante'],'segPesPart'); segPesRender(['emissor'],'segPesEm'); segPesRender(['liberador'],'segPesLb'); } }
+  else { segPtEquipe(); segPesRender(['emissor'],'segPesEm'); segPesRender(['liberador'],'segPesLb'); } }
 function segCabecalhoAtiv(){ const a=segD.atividade; return `<div class="segkv"><b>Atividade</b><span>${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</span><b>OS</b><span>${segH(a.os_sigos||'—')}</span><b>Local</b><span>${segH(segLocalTxt(a)||(a.local?segLocalTxt(a.local):'')||'pela coordenada da APR')}</span><b>APR</b><span>${segFmt(a.iniciada_em)}</span></div>`; }
 
 // --- APR ---
@@ -10171,7 +10177,7 @@ function segPetHtml(){ const r=segD.resp;
   h+=segBlk(1,'Identificação',segCabecalhoAtiv()+`<label>Espaço confinado (tipo) *</label><select id="segEspaco"><option value="">Selecione…</option>${SEG_PET_ESPACOS.map(e=>`<option ${r.espaco_tipo===e?'selected':''}>${e}</option>`).join('')}</select>
     <label>Atividade</label><input id="segAtvDesc" value="${segH(r.atividade_desc)}" autocomplete="off"/>
     <div class="sub" style="font-size:12px;margin-top:8px">Horário de início = momento da emissão (automático). A permissão vale para <b>uma entrada</b>.</div>`);
-  h+=segBlk(2,'Equipe (da APR)','<p class="sub" style="font-size:12px;margin:0">Para cada executante da APR, diga quem entra e quem é o vigia (fica do lado de fora).</p><div id="segPetEq"></div><div class="sub" style="font-weight:700;margin-top:12px">Supervisor de entrada</div><div id="segPesSup"></div><div id="segQtd" class="sub" style="font-size:12px;margin-top:8px"></div>');
+  h+=segBlk(2,'Equipe (da APR)','<p class="sub" style="font-size:12px;margin:0">Para cada executante da APR, diga quem entra e quem é o vigia (fica do lado de fora). O supervisor também pode entrar.</p><div id="segPetEq"></div><div class="sub" style="font-weight:700;margin-top:12px">Supervisor de entrada</div><div id="segPesSup"></div><div id="segPetEu"></div><div id="segQtd" class="sub" style="font-size:12px;margin-top:8px"></div>');
   h+=segBlk(3,'Ações preliminares para entrada','<p class="sub" style="font-size:12px;margin:0 0 4px">Um "Não" impede a entrada.</p>'+SEG_PET_PRELIM.map((t,i)=>`<div class="segq"><div class="t">${i+1}. ${t}</div>${segYN('prel','p'+(i+1),r.preliminares['p'+(i+1)]||'')}</div>`).join(''),'segBlkPrel');
   h+=segBlk(4,'Bloqueios hidráulico / elétrico','<p class="sub" style="font-size:12px;margin:0">Quando necessário.</p>'+r.bloqueios.map((b,i)=>`<div class="segrow2" style="margin-top:6px"><select data-bloq="${i}" data-bf="tipo"><option value="">Tipo…</option>${['Hidráulico','Elétrico','Outro'].map(x=>`<option ${b.tipo===x?'selected':''}>${x}</option>`).join('')}</select><input data-bloq="${i}" data-bf="resp" placeholder="Responsável pelo bloqueio" value="${segH(b.resp)}" list="segPessoasDl" autocomplete="off"/></div>`).join(''));
   h+=segBlk(5,'Monitoramento ambiental',`<label>Identificação do detector de gases *</label><input id="segEquip" value="${segH(r.equipamento)}" placeholder="marca, nº de série ou patrimônio" autocomplete="off"/>
@@ -10184,7 +10190,9 @@ function segPetHtml(){ const r=segD.resp;
   h+=segBlk(6,'Telefones de emergência',`<div class="segkv"><b>Bombeiros / resgate</b><span>193</span><b>SAMU</b><span>192</span><b>PMMG</b><span>190</span></div><label>Comunicação da unidade COPASA</label><input id="segTelUni" value="${segH(r.tel_unidade)}" inputmode="tel" autocomplete="off"/>`);
   h+=segBlk(7,'Recomendações e observações','<p style="font-size:13px;line-height:1.45;margin:0">'+SEG_PET_RECOM+'</p><label>Observações</label><textarea id="segObs" rows="2">'+segH(r.obs||'')+'</textarea>');
   return h; }
-function segPetEquipe(){ const c=$('#segPetEq'); if(!c)return; const eq=segD.pes.filter(p=>!p.eu);
+function segPetEquipe(){ const c=$('#segPetEq'); if(!c)return; const eq=segD.pes.filter(p=>!p.eu&&!p.euDup), eu=segEuDup(), ce=$('#segPetEu');
+  if(ce&&eu){ ce.innerHTML=`<div class="sub" style="font-size:12.5px;margin-top:8px">Você também entra no espaço confinado?</div><div class="segpapel">${[['autorizado','Sim, também entro'],['fora','Não, só supervisiono']].map(([v,l])=>`<button type="button" data-eupapel="${v}" class="${eu.papel===v?'on':''}">${l}</button>`).join('')}</div>`;
+    ce.querySelectorAll('[data-eupapel]').forEach(b=>b.onclick=()=>{ eu.papel=b.dataset.eupapel; segPetEquipe(); segAtualizar(); }); }
   if(!eq.length){ c.innerHTML='<p class="sub" style="font-size:12.5px;color:var(--bad)">A APR não tem executantes — emita uma nova APR com a equipe.</p>'; return; }
   c.innerHTML=eq.map(p=>`<div class="segpes" data-pk="${p.k}"><b style="font-size:14px">${segH(p.nome)}</b>${p.funcao?`<span class="sub" style="font-size:12px"> · ${segH(p.funcao)}</span>`:''}
     <div class="segpapel">${[['autorizado','Entra'],['vigia','Vigia'],['fora','Não participa']].map(([v,l])=>`<button type="button" data-ppapel="${v}" class="${p.papel===v?'on':''}">${l}</button>`).join('')}</div></div>`).join('');
@@ -10223,7 +10231,7 @@ function segPtHtml(){ const r=segD.resp;
   h+=segBlk(2,'Condição do trabalho em altura',`<div class="sub" style="font-weight:700">Meio de acesso *</div><div class="segchips" id="segAcesso"></div><input id="segAcessoOut" placeholder="Qual outro meio de acesso?" value="${segH(r.acesso_outro)}" class="${r.acesso.includes('outro')?'':'hidden'}" style="margin-top:6px" autocomplete="off"/>
     <div class="sub" style="font-weight:700;margin-top:12px">Sistema individual de proteção contra quedas *</div><div class="segchips" id="segSistema"></div>`);
   h+=segBlk(3,'Checklist','<p class="sub" style="font-size:12px;margin:0 0 4px">Um "Não" impede o trabalho. Blocos de outros meios de acesso ficam como "não se aplica".</p><div id="segPtCheck"></div>');
-  h+=segBlk(4,'Participantes da atividade (da APR)','<div id="segPesPart"></div>');
+  h+=segBlk(4,'Participantes da atividade','<p class="sub" style="font-size:12px;margin:0">Marque quem participa do trabalho em altura: os executantes da APR e você (emissor). Ao menos 1.</p><div id="segPesPart"></div>');
   h+=segBlk(5,'Responsáveis','<div id="segPesEm"></div><div id="segPesLb"></div>');
   return h; }
 function segPtChips(){ const r=segD.resp;
@@ -10231,6 +10239,14 @@ function segPtChips(){ const r=segD.resp;
     c.querySelectorAll('[data-ch]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.ch, i=arr.indexOf(k); if(i>=0) arr.splice(i,1); else arr.push(k); ch.classList.toggle('on',i<0);
       const o=$('#segAcessoOut'); if(o) o.classList.toggle('hidden',!r.acesso.includes('outro')); segPtCheck(); segAtualizar(); }); };
   mk('segAcesso',SEG_PT_ACESSO,r.acesso); mk('segSistema',SEG_PT_SISTEMA,r.sistema); }
+// participantes da PT: executantes da APR + você (emissor), cada um participa ou não (assinatura = a dada na APR)
+function segPtEquipe(){ const c=$('#segPesPart'); if(!c)return; segEuDup();
+  const eq=segD.pes.filter(p=>p.euDup||(!p.eu&&['participante','fora'].includes(p.papel)));
+  c.innerHTML=eq.map(p=>`<div class="segpes" data-pk="${p.k}"><b style="font-size:14px">${segH(p.nome)}</b><span class="sub" style="font-size:12px"> · ${p.euDup?'você (emissor)':segH(p.funcao||'executante da APR')}</span>
+    ${p.apr?'<div class="ok">✓ assinatura dada na APR</div>':''}
+    <div class="segpapel">${[['participante','Participa'],['fora','Não participa']].map(([v,l])=>`<button type="button" data-ppapel="${v}" class="${p.papel===v?'on':''}">${l}</button>`).join('')}</div></div>`).join('');
+  c.querySelectorAll('.segpes').forEach(box=>box.querySelectorAll('[data-ppapel]').forEach(b=>b.onclick=()=>{ const p=segD.pes.find(x=>x.k===box.dataset.pk); if(!p)return;
+    p.papel=b.dataset.ppapel; segPtEquipe(); segAtualizar(); })); }
 function segPtCheck(){ const c=$('#segPtCheck'); if(!c)return; const r=segD.resp;
   c.innerHTML=SEG_PT_BLOCOS.map(b=>{ const ap=segPtBlocoAplica(b,r);
     if(!ap){ b.cods.forEach(k=>{ r.checklist[k]='NA'; }); return `<div class="sub" style="font-size:12px;padding:6px 0;border-top:1px solid var(--line)"><b>${b.t}</b> — não se aplica ao meio de acesso</div>`; }
@@ -10289,7 +10305,7 @@ function segPendencias(){ const t=segD.tipo, a=segD.atividade, r=segD.resp, P=[]
     if(!r.espaco_tipo) P.push('Tipo de espaço confinado');
     const au=pes('autorizado'), vg=pes('vigia');
     if(!au.length) B.push('Ninguém marcado para entrar'); if(!vg.length) P.push('Escolha o vigia');
-    if(au.length+vg.length<2) B.push('Mínimo de 2 trabalhadores (quem entra + vigia)');
+    if(new Set(au.concat(vg).map(p=>p.pessoa_uuid||String(p.nome).toLowerCase())).size<2) B.push('Mínimo de 2 trabalhadores (quem entra + vigia)');
     pes('supervisor').forEach(p=>assin(p,'supervisor (você)'));
     SEG_PET_PRELIM.forEach((x,i)=>{ const v=r.preliminares['p'+(i+1)]; if(!v) P.push('Ação preliminar '+(i+1)); else if(v==='N') B.push('Ação preliminar '+(i+1)+': Não'); });
     if(!String(r.equipamento||'').trim()) P.push('Identificação do detector'); if(!segD.fotos.foto_detector) P.push('Foto do detector');
@@ -10301,14 +10317,14 @@ function segPendencias(){ const t=segD.tipo, a=segD.atividade, r=segD.resp, P=[]
     if(!r.acesso.length) P.push('Meio de acesso'); if(r.acesso.includes('outro')&&!String(r.acesso_outro||'').trim()) P.push('Qual outro meio de acesso'); if(!r.sistema.length) P.push('Sistema de proteção contra quedas');
     let falta=0; SEG_PT_BLOCOS.forEach(b=>{ if(!segPtBlocoAplica(b,r)) return; b.cods.forEach((k,i)=>{ const v=r.checklist[k]; if(!v) falta++; else if(v==='N') B.push(b.t+': '+b.i[i].slice(0,60)+'… Não'); }); });
     if(falta) P.push(falta+' item(ns) do checklist sem resposta');
-    if(!pes('participante').length) P.push('A APR não tem executantes');
+    if(!pes('participante').length) P.push('Marque ao menos 1 participante');
     pes('participante').forEach(p=>{ if(!p.sig) P.push('Participante sem assinatura na APR: '+p.nome); });
     pes('emissor').forEach(p=>assin(p,'emissão (você)'));
     pes('liberador').forEach(p=>{ daLista(p,'liberação da área'); assin(p,'liberação da área'); });
   }
   return {P,B}; }
 function segAtualizar(soTela){ if(!segD)return; if(soTela!==true) segDraftSave();
-  if(segD.tipo==='PET'){ const q=$('#segQtd'); if(q){ const n=segD.pes.filter(p=>['autorizado','vigia','supervisor'].includes(p.papel)).length; q.textContent='Quantidade de trabalhadores: '+n; } }
+  if(segD.tipo==='PET'){ const q=$('#segQtd'); if(q){ const n=new Set(segD.pes.filter(p=>['autorizado','vigia','supervisor'].includes(p.papel)).map(p=>p.pessoa_uuid||String(p.nome).toLowerCase())).size; q.textContent='Quantidade de trabalhadores: '+n; } }
   const {P,B}=segPendencias(), er=$('#segErros'), bt=$('#segBtns'); if(!er||!bt)return;
   er.innerHTML=(B.length?`<div class="segerr"><b>⛔ ${segD.tipo==='APR'?'A APR não pode ser emitida':segD.tipo==='PET'?'Entrada impedida':'Trabalho em altura impedido'}:</b><ul style="margin:4px 0 0 18px;padding:0">${B.map(x=>'<li>'+segH(x)+'</li>').join('')}</ul></div>`:'')
     +(P.length?`<div class="segerr" style="background:var(--warn-bg);color:var(--warn)"><b>Falta preencher (${P.length}):</b><ul style="margin:4px 0 0 18px;padding:0">${P.slice(0,8).map(x=>'<li>'+segH(x)+'</li>').join('')}${P.length>8?'<li>…</li>':''}</ul></div>`:'');
