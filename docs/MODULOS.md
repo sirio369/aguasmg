@@ -2229,8 +2229,8 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
   - **Medido × estimado na Abertura por macromedidor (2026-10-28):** a tabela mostra o volume **segregado** como o
     GMOA informa — **Medido** + **Estimado** (laranja, com % do total do macro) = **Total** — e o cabeçalho soma o
     estimado do mês ("estimado X m³ em N macros"). `app_nrw_macro_macros` passou a devolver `volume_medido` e
-    `volume_estimado` (`coalesce(...,0)`; com fator, o mesmo multiplicador do total — o fator ainda vale sobre o total,
-    não só sobre a parcela medida). No GMOA medido + estimado = total (1 linha difere 0,22 m³ por arredondamento da
+    `volume_estimado` (`coalesce(...,0)`; com fator, só o medido é multiplicado e o estimado vem como está — ver
+    "Fator só na parcela medida", 2026-11-03). No GMOA medido + estimado = total (1 linha difere 0,22 m³ por arredondamento da
     fonte); `volume_estimado` vem **vazio** nos macros de telemetria e **0** nos de leitura — os dois contam como 0.
     Demais painéis e o resultado seguem lendo só o total. Na tela de macromedição o conteúdo ocupa a largura toda
     (`body:has(#s-macro.on) .wrap{max-width:none}`, como HD/Fiscalização); a barra lateral do cockpit passou de
@@ -2323,6 +2323,16 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
     no painel da Linha de base (resultado, `resComFator`→refetch) com nota que troca de cor; e na *Análise do macromedido* um toggle **Volume sem/com fator**
     + painel **editor "Fator de correção (aferição)"** (`macroFatorPanel`): seletor de vigência + tabela de macros com fator efetivo e input por macro,
     "Salvar fatores" (admin). `sem fator` = idêntico ao anterior (validado: ZA1004 1.003.269 / ZA0200 836.312). Sistema do 202503 normalizado (rtrim).
+  - **Fatores da aferição lançados + fator só na parcela medida (2026-11-03, só banco + nota do editor):** 18 lançamentos em
+    `fator_correcao_macro` com **vigência 202503** (1ª competência dos dados → valem na janela da linha de base e em tudo depois):
+    ZA1004 11 macros, ZA0200 7, F = 1/(1 + erro%) do certificado mais recente de cada TAG (Anexo B.3 dos relatórios de Linha de
+    Base R01); os 9 macros sem certificado seguem com 1,0. **Regra do relatório (cap. 10.2):** o fator corrige **só o volume
+    medido**; o estimado entra sem correção. Helper novo `"11 - perdas_nrw".nrw_vol_corr(cons,cd,comp,medido,total)` = total +
+    medido × (F − 1), usado por `app_nrw_macro_mensal/_macros/_matriz/_serie` e `app_nrw_resultado` (assinaturas iguais); nas
+    parcelas, `volume_medido` × F e `volume_estimado` sem fator; vazão média acompanha a correção do volume do macro. Antes o
+    fator multiplicava o total — na ZA1004 isso dava 7.551 m³/mês a menos de VPBL por causa do estimado da EMM0784128 na janela.
+    Com fator: **VPBL ZA1004 1.088.796 (meta 263.489) · ZA0200 890.882 (meta 218.266)** = relatório; sem fator, saídas idênticas
+    às de antes (md5 conferido nos 5 RPCs).
   - **Engrenagem de Premissas → Valor do Contrato mês a mês (2026-10-15, tela `config` "Parâmetros & Metas"):** a tela `s-config` (antes mock)
     virou real. Tabela **`"11 - perdas_nrw".premissa_contrato`** (consorcio, **competencia_vigencia**, valor_contrato) versionada por vigência com
     **carry-forward** (p/ reajustes), seed 202606 = VC assinado. Função `"11 - perdas_nrw".nrw_vc(cons,comp)` = LOCF (último lançamento ≤ comp,
