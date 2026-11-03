@@ -121,6 +121,7 @@ returns text language sql stable security definer set search_path to 'public' as
                      when position(' › ' in p_rotulo) > 0 then substr(p_rotulo, position(' › ' in p_rotulo) + 3) else p_rotulo end
   from "13 - projetos_obra".vw_iv v where v.kind = p_kind and v.gid = p_gid;
 $f$;
+alter function "13 - projetos_obra".proj_reat_no(jsonb,text) set search_path to 'public';   -- advisor (migração proj_reaterro_search_path)
 revoke all on function "13 - projetos_obra".proj_reat_bloco_key(text,text[]), "13 - projetos_obra".proj_reat_filhos(text,jsonb,text[]),
   "13 - projetos_obra".proj_reat_no(jsonb,text), "13 - projetos_obra".proj_reat_hist(uuid),
   "13 - projetos_obra".proj_reat_lbl(text,bigint,text) from public, anon, authenticated;
