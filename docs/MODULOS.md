@@ -3347,7 +3347,7 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   `email` desde 2026-11-03 (`docs/migracao_seg_pessoas_email.sql`). O app guarda uma cópia em `localStorage.segPessoas`
   e só a renova ao abrir a tela `seg` com sinal — colaborador cadastrado depois da última renovação não aparece em
   aparelho sem sinal. O `<datalist>` do Chrome casa cada palavra digitada por trecho, no valor (nome) e no rótulo
-  (cargo · e-mail); "Mateus Souza" acha "Mateus da Silva de Souza".
+  (cargo · e-mail); "Ana Souza" acha "Ana da Silva de Souza".
 - Itens de capacitação/ASO são declarados pela equipe (sem cadastro de aptidão NR-33/NR-35).
 - `perfil.funcao='qsms'` (legado de §6.3) **não** dá acesso — o acesso é `ME.qsms`. A tela `<main id="qsms">`
   reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
