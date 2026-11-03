@@ -2625,6 +2625,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     eventos do ensaio de projeto (natureza `ensaio`: `ensaio_pedido`, `reaterro_refeito`, `ensaio_aprovado`, `ensaio_reprovado` —
     nomes próprios p/ não somar com aprovação de documento); a tela ganhou os KPIs "ensaios de reaterro pedidos / aprovados /
     reprovados" e o CSV marca esses registros como **Ensaio**.
+- **Mapeamento de interferências só no HDD (2026-11-03, `docs/migracao_proj_mapeamento_hdd.sql`, só banco):** a etapa
+  `mapeamento` e a aprovação `aprov_mapeamento` saíram do `etapa_modelo` de VCA, VRP, registro e macromedidor (nenhuma
+  intervenção desses tipos tinha usado). Nesses tipos a fase 1 é só o **Projeto Executivo** (Liberar pede só ele) e a fase 2 só
+  a aprovação dele; o HDD segue com Executivo + Mapeamento + Plano de furo. O seed do `migracao_proj_pipeline.sql` já está com `{hdd}`.
 - **🔁 Pipeline — PR 5: tamanho da folha (2026-11-02, sw v321, só front).** **No anexo** (`pjEtapaAnexar`) com folha escolhida,
   `pjFolhaConfere` lê as páginas pelo pdf.js e compara com `PJ_FOLHA_MM` (ISO A0–A4, ±5 mm, qualquer orientação, `pjFolhaDe`);
   se alguma página não bate, pede confirmação (diz o tamanho real e a folha que ele parece ser). Sem pdf.js/PDF ilegível não bloqueia.

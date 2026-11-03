@@ -115,11 +115,12 @@ select t, s.chave, s.ordem, s.fase, s.ator, s.natureza, s.nome, s.aprova, s.pede
 from (values
   -- F1 Projeto (Engenharia) — prazo só na correção de documento reprovado
   ('{hdd,vca,vrp,registro,macro}'::text[], 'executivo'::text, 10, 1::smallint, 'eng'::text, 'doc'::text, 'Projeto Executivo'::text, null::text, true, true, 3, 5, '{}'::text[]),
-  ('{hdd,vca,vrp,registro,macro}', 'mapeamento', 20, 1, 'eng', 'doc', 'Mapeamento de interferências', null, true, true, 3, 5, '{}'),
+  -- mapeamento de interferências: só HDD (2026-11-03, docs/migracao_proj_mapeamento_hdd.sql)
+  ('{hdd}', 'mapeamento', 20, 1, 'eng', 'doc', 'Mapeamento de interferências', null, true, true, 3, 5, '{}'),
   ('{hdd}', 'plano_furo', 30, 1, 'eng', 'doc', 'Plano de furo', null, true, true, 3, 5, '{}'),
   -- F2 Aprovação (Qualidade)
   ('{hdd,vca,vrp,registro,macro}', 'aprov_executivo', 110, 2, 'qual', 'aprovacao', 'Aprovar Projeto Executivo', 'executivo', false, true, 3, 5, '{}'),
-  ('{hdd,vca,vrp,registro,macro}', 'aprov_mapeamento', 120, 2, 'qual', 'aprovacao', 'Aprovar Mapeamento de interferências', 'mapeamento', false, true, 3, 5, '{}'),
+  ('{hdd}', 'aprov_mapeamento', 120, 2, 'qual', 'aprovacao', 'Aprovar Mapeamento de interferências', 'mapeamento', false, true, 3, 5, '{}'),
   ('{hdd}', 'aprov_plano_furo', 130, 2, 'qual', 'aprovacao', 'Aprovar Plano de furo', 'plano_furo', false, true, 3, 5, '{}'),
   -- F3 Pré-obra (Obras; vistoria aprovada pela Qualidade). Liberações e licença dependem de terceiros: sem prazo.
   ('{hdd,vca,vrp}', 'vistoria', 210, 3, 'obra', 'link', 'Vistoria cautelar', null, false, true, null, null, '{}'),
