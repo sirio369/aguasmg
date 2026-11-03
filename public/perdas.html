@@ -1991,7 +1991,7 @@ function resRenderAll(){
 let histSerie=[], histBase={}, histVars=new Set(['vd','vc','vp']), histTipo='linha', histVisao='tempo', histEixo='zero', histAnos=null, histRz=null;   // histEixo: 'zero' | 'ajustado' (zoom: eixo y aos dados, só em linha)
 let histYwin={vol:[0,1],pct:[0,1]}, histDrag=null, histGeo=null;   // janela do slider de zoom do eixo y por gráfico (fração do eixo: 0 = base, 1 = topo)
 let histPrev=false, histFc=null;   // botão "Adicionar previsão" (liga/desliga) · previsão calculada dos próprios dados a cada carga (histFcBuild)
-const HIST_FC_H=24, HIST_FC_Z=1.2816;   // horizonte da previsão (meses) · z da faixa central de 80%
+const HIST_FC_H=12, HIST_FC_Z=1.2816;   // horizonte da previsão (meses; 12 = o mesmo do backtest, decisão do usuário 03/11/2026) · z da faixa central de 80%
 const HIST_VAR={
  vd:{l:'Macro · VD',u:'m³',g:'vol'},
  vc:{l:'Micro · VC',u:'m³',g:'vol'},
@@ -2004,7 +2004,7 @@ const HIST_DASH=['','7 4','3 3','1 3'], HIST_LOP=[1,.85,.7,.6], HIST_COP=[1,.72,
 const HIST_MES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const HIST_INFO={
  graf:{t:'Histórico fechado por ZA',h:`<p><b>VD</b> (macro) = volume distribuído = entrada − saída dos macromedidores. <b>VC</b> (micro) = volume consumido nos hidrômetros. <b>VP</b> = VD − VC (volume perdido). <b>IP</b> = VP ÷ VD. <b>IRVP</b> = (VPBL − VP) ÷ meta — o mesmo cálculo do Acompanhamento do resultado, aplicado a todos os meses (antes do contrato ele só mostra como o mês se compara à linha de base).</p><p><b>Fontes:</b> até <b>fev/2025</b> = fechamento da COPASA (planilha de volumes por ZA); de <b>mar/2025</b> em diante = dados do sistema (macro GMOA − micromedição). O VC do sistema não é idêntico ao da COPASA, então pode haver um degrau na troca de fonte (linha tracejada no gráfico).</p><p><b>mai/2025 fica de fora</b> (arquivo de micromedição duplicado de abril), como no resto do módulo.</p><p><b>Linha do tempo</b> = todos os meses em sequência. <b>Sazonal</b> = eixo jan–dez com um traço (ou um tom de coluna) por ano, para comparar o mesmo mês entre anos. Volumes e percentuais ficam em gráficos separados, com o mesmo eixo de meses. Passe o mouse (ou toque) num mês para ver os valores.</p><p>IRVP sem fator de correção e com a <b>VPBL preliminar</b>.</p>`},
- prev:{t:'Previsão — como é calculada',h:`<p>A previsão é <b>calculada na hora, a partir dos próprios dados da tela</b>, e se refaz sozinha quando um mês novo fecha: são sempre os <b>24 meses seguintes</b> ao último mês com macro e micro lançados.</p><p><b>Método</b> (decomposição sazonal aditiva, sem tendência — o que menos errou no teste com os dados reais): <b>VD</b> e <b>VC</b> são previstos separadamente como <b>nível + índice sazonal do mês</b>. <b>Nível</b> = média, já sem a sazonalidade, dos <b>últimos 12 meses</b>. <b>Índice sazonal</b> = quanto cada mês (jan…dez) fica acima ou abaixo da média, em toda a série (mai/2025 fora). <b>VP</b> = VD − VC, <b>IP</b> = VP ÷ VD e <b>IRVP</b> = (VPBL − VP) ÷ meta, com a VPBL preliminar sem fator, como no resto da tela.</p><p><b>Faixa de 80%</b> (sombreado do VP e do IRVP) = VP ± 1,28 × o erro do teste: o modelo é ajustado só com os meses até 12 meses antes do último, prevê os 12 seguintes e o VP previsto é comparado com o real. O 2º ano não tem como ser testado, então ali a incerteza real tende a ser maior que a faixa.</p><p>É uma previsão <b>inercial</b>: mostra a ZA seguindo o comportamento do histórico e <b>não inclui o efeito das ações do contrato</b> (pesquisa de vazamento, VRPs, troca de HD). Sem tendência, a média de cada ano previsto repete a dos últimos 12 meses — o que a previsão acrescenta é o perfil mês a mês e a incerteza.</p><p>A previsão aparece na <b>Linha do tempo</b> (na visão sazonal o botão fica desligado), na tabela Mês a mês e no .xlsx exportado.</p>`}
+ prev:{t:'Previsão — como é calculada',h:`<p>A previsão é <b>calculada na hora, a partir dos próprios dados da tela</b>, e se refaz sozinha quando um mês novo fecha: são sempre os <b>12 meses seguintes</b> ao último mês com macro e micro lançados.</p><p><b>Método</b> (decomposição sazonal aditiva, sem tendência — o que menos errou no teste com os dados reais): <b>VD</b> e <b>VC</b> são previstos separadamente como <b>nível + índice sazonal do mês</b>. <b>Nível</b> = média, já sem a sazonalidade, dos <b>últimos 12 meses</b>. <b>Índice sazonal</b> = quanto cada mês (jan…dez) fica acima ou abaixo da média, em toda a série (mai/2025 fora). <b>VP</b> = VD − VC, <b>IP</b> = VP ÷ VD e <b>IRVP</b> = (VPBL − VP) ÷ meta, com a VPBL preliminar sem fator, como no resto da tela.</p><p><b>Faixa de 80%</b> (sombreado do VP e do IRVP) = VP ± 1,28 × o erro do teste: o modelo é ajustado só com os meses até 12 meses antes do último, prevê os 12 seguintes (o mesmo horizonte da previsão) e o VP previsto é comparado com o real.</p><p>É uma previsão <b>inercial</b>: mostra a ZA seguindo o comportamento do histórico e <b>não inclui o efeito das ações do contrato</b> (pesquisa de vazamento, VRPs, troca de HD). Sem tendência, a média dos 12 meses previstos repete a dos últimos 12 meses — o que a previsão acrescenta é o perfil mês a mês e a incerteza.</p><p>Aparece nas duas visões: na <b>Linha do tempo</b> continua a série depois do último mês; na <b>Sazonal</b> é uma linha a mais no eixo jan–dez (tracejada, com pontos vazados), cada mês previsto no seu mês do calendário, para comparar com os anos anteriores. Também entra na tabela Mês a mês e no .xlsx exportado.</p>`}
 };
 function histCons(){ return za==='all'?null:za; }
 function histCmp(c){ return MM_MES[c%100-1].toLowerCase()+'/'+String(Math.floor(c/100)).slice(2); }
@@ -2094,14 +2094,14 @@ function histFcBuild(serie,b){
  if(MT){ let se=0, ap=0; P.filter(p=>histMi(p.comp)>M.last-12).forEach(p=>{ const e=p.vp-histFcAt(MT,p.comp).vp; se+=e*e; if(p.vp>0) ap+=Math.abs(e)/p.vp; nbt++; });
   if(nbt){ sig=Math.sqrt(se/nbt); mape=ap/nbt*100; } }
  const irvp=vp=>b.meta_m3>0?(b.vpbl-vp)/b.meta_m3*100:null, d=sig==null?null:HIST_FC_Z*sig, meses=[];
- const nH=histMi(serie[serie.length-1].comp)-M.last+HIST_FC_H;   // último mês da série só com macro? estende p/ sempre sobrar 24 meses depois dele
+ const nH=histMi(serie[serie.length-1].comp)-M.last+HIST_FC_H;   // último mês da série só com macro? estende p/ sempre sobrarem HIST_FC_H meses depois dele
  for(let h=1; h<=nH; h++){ const comp=histMc(M.last+h), f=histFcAt(M,comp);
   meses.push({comp, vd:f.vd, vc:f.vc, vp:f.vp, ip:f.vd?f.vp/f.vd*100:null, irvp:irvp(f.vp),
    vpLo:d==null?null:f.vp-d, vpHi:d==null?null:f.vp+d, irvpLo:d==null?null:irvp(f.vp+d), irvpHi:d==null?null:irvp(f.vp-d)}); }
  return {meses, sig, mape, nbt, nivelDe:M.de, nivelAte:histMc(M.last), serieDe:P[0].comp};
 }
 /* meses previstos que entram no gráfico/tabela: só depois do último mês da série (se o último mês tiver só macro, a previsão começa depois dele) */
-function histFcList(){ if(!histPrev||!histFc||!histSerie.length||histVisao==='sazonal') return []; const u=histSerie[histSerie.length-1].comp; return histFc.meses.filter(m=>m.comp>u); }   // só na linha do tempo (na sazonal o botão fica desligado)
+function histFcList(){ if(!histPrev||!histFc||!histSerie.length) return []; const u=histSerie[histSerie.length-1].comp; return histFc.meses.filter(m=>m.comp>u); }   // vale nas 2 visões (na sazonal vira 1 linha a mais no eixo jan–dez)
 function histFcOn(){ return histFcList().length>0; }   // previsão ligada e com meses a mostrar (gráfico, tabela e export)
 function histRng(k,m){ const lo=m[k+'Lo'], hi=m[k+'Hi']; if(lo==null) return ''; return HIST_VAR[k].u==='%' ? br1(lo)+'% a '+br1(hi)+'%' : fmt(lo)+' a '+fmt(hi); }
 function histAnosLista(){ return [...new Set(histSerie.map(p=>Math.floor(p.comp/100)))].sort((a,b)=>b-a); }   // mais recente primeiro (define o estilo do ano)
@@ -2129,10 +2129,13 @@ function histPanel(){
  const amostra=(r)=>histTipo==='coluna'
   ? `<svg width="14" height="10"><rect x="1" y="1" width="12" height="8" rx="2" style="fill:var(--ink-2);opacity:${HIST_COP[Math.min(r,3)]}"/></svg>`
   : `<svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" style="stroke:var(--ink-2);stroke-width:2;opacity:${HIST_LOP[Math.min(r,3)]}" stroke-dasharray="${HIST_DASH[Math.min(r,3)]}"/></svg>`;
- const anosHtml=saz?`<div class="histgrp" style="margin-bottom:10px"><span class="histlab">Anos</span><div class="mmfilters" style="margin:0">${anos.map((a,r)=>{ const on=histAnos.has(a); return `<button class="mmchip histvar histano${on?' on':''}" data-hano="${a}" aria-pressed="${on}">${amostra(r)}${a}</button>`; }).join('')}</div></div>`:'';
+ const Fs=saz?histFcList():[], amostraFc=histTipo==='coluna'   // legenda da linha prevista ao lado dos anos (só legenda: liga/desliga é o botão Previsão)
+  ? `<svg width="14" height="10"><rect x="1" y="1" width="12" height="8" rx="2" style="fill:var(--ink-2);fill-opacity:.32;stroke:var(--ink-2);stroke-width:1.2" stroke-dasharray="3 2"/></svg>`
+  : `<svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" style="stroke:var(--ink-2);stroke-width:2" stroke-dasharray="6 4"/><circle cx="11" cy="5" r="2.6" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.5"/></svg>`;
+ const anosHtml=saz?`<div class="histgrp" style="margin-bottom:10px"><span class="histlab">Anos</span><div class="mmfilters" style="margin:0">${anos.map((a,r)=>{ const on=histAnos.has(a); return `<button class="mmchip histvar histano${on?' on':''}" data-hano="${a}" aria-pressed="${on}">${amostra(r)}${a}</button>`; }).join('')}${Fs.length?`<span class="mmchip histvar histano on" style="cursor:default" title="Liga/desliga pelo botão Previsão">${amostraFc}Previsão ${histCmp(Fs[0].comp)}–${histCmp(Fs[Fs.length-1].comp)}</span>`:''}</div></div>`:'';
  const ini=histSerie[0].comp, fim=histSerie[histSerie.length-1].comp, nHist=histSerie.filter(p=>p.fonte==='historico').length;
  const F=histFcList(), fcOn=histFcOn();
- const pOff=!histFc?'Histórico curto para prever: é preciso ao menos 1 ano com todos os meses (jan–dez) com macro e micro.':(saz?'A previsão aparece na Linha do tempo.':'');
+ const pOff=!histFc?'Histórico curto para prever: é preciso ao menos 1 ano com todos os meses (jan–dez) com macro e micro.':'';
  const prevBtn=`<div class="histgrp"><span class="histlab">Previsão</span><button class="btn${histPrev&&!pOff?' pri':''}" id="histPrevBtn" aria-pressed="${histPrev}"${pOff?` disabled title="${pOff}"`:` title="${histPrev?'Tirar a previsão do gráfico e da tabela':'Prever os próximos 24 meses a partir dos próprios dados'}"`}>${histPrev&&!pOff?'✕ Remover previsão':'📈 Adicionar previsão'}</button>${histIB('prev')}</div>`;
  return `<div class="panel"><div class="phead"><h3>Comportamento sazonal — macro, micro, perdas e IRVP</h3><span class="hint" style="margin-left:6px">${mmCmp(ini)} a ${mmCmp(fim)}${fcOn?` · previsão até ${mmCmp(F[F.length-1].comp)}`:''}</span>${histIB('graf')}<span class="chip real" style="margin-left:auto">real</span></div>
   <div class="pbody">
@@ -2153,7 +2156,8 @@ function histPanel(){
 }
 /* resumo da previsão embaixo do gráfico: médias do horizonte, base do cálculo e erro do teste */
 function histFcNote(F,col){ const f=histFc, av=k=>F.reduce((a,m)=>a+m[k],0)/F.length, faixa=F[0].irvpLo!=null;
- return `<p class="note histfcnote">📈 <b>Previsão ${mmCmp(F[0].comp)} a ${mmCmp(F[F.length-1].comp)}</b> — refeita sozinha a cada mês fechado, a partir dos próprios dados (${col?'barras mais claras':'linha tracejada'}${faixa&&!col?'; sombreado = faixa de 80%':''}). `
+ const saz=histVisao==='sazonal', marca=col?'barras claras com contorno tracejado':(saz?'linha tracejada com pontos vazados, cada mês no seu mês do calendário':'linha tracejada');
+ return `<p class="note histfcnote">📈 <b>Previsão ${mmCmp(F[0].comp)} a ${mmCmp(F[F.length-1].comp)}</b> — refeita sozinha a cada mês fechado, a partir dos próprios dados (${marca}${faixa&&!col?'; sombreado = faixa de 80%':''}). `
   +`Média mensal prevista: VD ${fmt(av('vd'))} · VC ${fmt(av('vc'))} · <b>VP ${fmt(av('vp'))}</b> m³ · <b>IRVP ${br1(av('irvp'))}%</b>${faixa?` (faixa de 80%: ${br1(av('irvpLo'))}% a ${br1(av('irvpHi'))}%)`:''}. `
   +`Nível de ${mmCmp(f.nivelDe)} a ${mmCmp(f.nivelAte)} + sazonalidade de ${mmCmp(f.serieDe)} em diante. `
   +(f.mape!=null?`No teste (prevendo os últimos ${f.nbt} meses com os dados de antes), o VP errou em média ${br1(f.mape)}%. `:'Sem faixa de incerteza: ainda não há histórico para testar a previsão. ')
@@ -2173,9 +2177,14 @@ function histSeries(){
    S.push(s); });
   return {n, nR, X, F, S};
  }
- const anos=histAnosLista(), by=new Map(histSerie.map(p=>[p.comp,p])), S=[];
+ const anos=histAnosLista(), by=new Map(histSerie.map(p=>[p.comp,p])), S=[], F=histFcList();
  ks.forEach(k=>anos.forEach((a,r)=>{ if(!histAnos.has(a))return; S.push({k, ano:a, r:Math.min(r,3), vals:Array.from({length:12},(_,m)=>{ const p=by.get(a*100+m+1); return p?p[k]:null; })}); }));
- return {n:12, S};
+ // previsão (12 meses) = 1 linha a mais no eixo jan–dez: cada mês previsto cai no seu mês do calendário (comp guarda o mês/ano de verdade)
+ if(F.length) ks.forEach(k=>{ const s={k, fc:true, r:0, vals:Array(12).fill(null), comp:Array(12).fill(null)};
+  F.forEach(m=>{ const i=m.comp%100-1; s.vals[i]=m[k]; s.comp[i]=m.comp; });
+  if(F[0][k+'Lo']!=null){ s.lo=Array(12).fill(null); s.hi=Array(12).fill(null); F.forEach(m=>{ const i=m.comp%100-1; s.lo[i]=m[k+'Lo']; s.hi[i]=m[k+'Hi']; }); }
+  S.push(s); });
+ return {n:12, F, S};
 }
 function histNice(lo,hi){ if(hi<=lo) hi=lo+1;   // eixo y com marcas "redondas"
  const raw=(hi-lo)/5, p=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/p, st=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;
@@ -2220,15 +2229,18 @@ function histDraw(){
   refs.forEach(r=>{ if(r.v<wlo||r.v>whi) return; const yy=P.Y(r.v).toFixed(1); mk+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke-dasharray="5 4" style="stroke:${r.c||'var(--muted)'};stroke-width:1.2"/><text x="${W-pr}" y="${(+yy-4).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${r.l}</text>`; });
   if(col){
    const k=P.S.length, gap=k>1&&sw/k>5?2:0, bw=Math.max(1.5,Math.min(24,(sw*.84-(k-1)*gap)/k)), gw=k*bw+(k-1)*gap;
-   P.S.forEach((s,j)=>s.vals.forEach((v,i)=>{ if(v==null)return; const x=xc(i)-gw/2+j*(bw+gap); mk+=`<path d="${histBar(x,P.Y(v),y0,bw)}" style="fill:var(--hv-${s.k});opacity:${saz?HIST_COP[s.r]:(i>=nR?.42:1)}"/>`; }));   // mês previsto = barra mais clara
+   P.S.forEach((s,j)=>s.vals.forEach((v,i)=>{ if(v==null)return; const x=xc(i)-gw/2+j*(bw+gap), fcb=s.fc||(!saz&&i>=nR);   // mês previsto = barra clara com contorno tracejado
+    mk+=`<path d="${histBar(x,P.Y(v),y0,bw)}" style="fill:var(--hv-${s.k});${fcb?`fill-opacity:.32;stroke:var(--hv-${s.k});stroke-width:1.2;stroke-dasharray:3 2`:`opacity:${saz?HIST_COP[s.r]:1}`}"/>`; }));
   } else {
    // faixa de 80% da previsão (VP e IRVP): área sombreada atrás das linhas
-   P.S.forEach(s=>{ if(!s.lo) return; const ii=[]; for(let i=nR;i<n;i++) if(s.lo[i]!=null) ii.push(i); if(ii.length<2) return;
+   P.S.forEach(s=>{ if(!s.lo) return; const ii=[]; for(let i=0;i<n;i++) if(s.lo[i]!=null) ii.push(i); if(ii.length<2) return;
     const pt=(i,v)=>xc(i).toFixed(1)+','+P.Y(v).toFixed(1);
     mk+=`<polygon points="${ii.map(i=>pt(i,s.hi[i])).concat(ii.slice().reverse().map(i=>pt(i,s.lo[i]))).join(' ')}" style="fill:var(--hv-${s.k});opacity:.15"/>`; });
-   P.S.forEach(s=>{ let seg=[]; const st=`stroke:var(--hv-${s.k});stroke-width:2;fill:none;opacity:${saz?HIST_LOP[s.r]:1}`, dash=saz?HIST_DASH[s.r]:(s.fc?'6 4':'');   // previsão tracejada
-    const flush=()=>{ if(seg.length>1) mk+=`<polyline points="${seg.map(q=>q.join(',')).join(' ')}" stroke-dasharray="${dash}" stroke-linejoin="round" style="${st}"/>`; else if(seg.length===1) mk+=`<circle cx="${seg[0][0]}" cy="${seg[0][1]}" r="3" style="fill:var(--hv-${s.k});opacity:${saz?HIST_LOP[s.r]:1}"/>`; seg=[]; };
-    s.vals.forEach((v,i)=>{ if(v==null){ flush(); return; } seg.push([xc(i).toFixed(1),P.Y(v).toFixed(1)]); }); flush(); });
+   P.S.forEach(s=>{ let seg=[]; const op=(saz&&!s.fc)?HIST_LOP[s.r]:1, st=`stroke:var(--hv-${s.k});stroke-width:2;fill:none;opacity:${op}`, dash=s.fc?'6 4':(saz?HIST_DASH[s.r]:'');   // previsão tracejada
+    const flush=()=>{ if(seg.length>1) mk+=`<polyline points="${seg.map(q=>q.join(',')).join(' ')}" stroke-dasharray="${dash}" stroke-linejoin="round" style="${st}"/>`; else if(seg.length===1) mk+=`<circle cx="${seg[0][0]}" cy="${seg[0][1]}" r="3" style="fill:var(--hv-${s.k});opacity:${op}"/>`; seg=[]; };
+    s.vals.forEach((v,i)=>{ if(v==null){ flush(); return; } seg.push([xc(i).toFixed(1),P.Y(v).toFixed(1)]); }); flush();
+    if(saz&&s.fc) s.vals.forEach((v,i)=>{ if(v!=null) mk+=`<circle cx="${xc(i).toFixed(1)}" cy="${P.Y(v).toFixed(1)}" r="2.6" style="fill:var(--surface);stroke:var(--hv-${s.k});stroke-width:1.5"/>`; });   // sazonal: pontos vazados separam a previsão dos tracejados dos anos
+   });
   }
   svg+=`<g clip-path="url(#hcp-${P.g})">${mk}</g>`;   // o que sai da janela de zoom é cortado
   // slider do eixo y (como no Power BI): trilho + janela arrastável (move) + 2 alças (aproxima/afasta)
@@ -2293,7 +2305,10 @@ function histTipHtml(i,S,nR,F){
   return head+S.filter(s=>!s.fc).map(s=>`<div class="tr">${sw(s.k)}<span>${HIST_VAR[s.k].l}</span><span>${histFmt(s.k,s.vals[i])}</span></div>`).join('');   // a série tracejada repete o último mês real
  }
  const by=new Map(), excl=new Set(histSerie.filter(p=>p.excl).map(p=>p.comp)); S.forEach(s=>{ if(!by.has(s.k)) by.set(s.k,[]); by.get(s.k).push(s); });
- return `<b>${HIST_MES[i]}</b>`+[...by].map(([k,ss])=>`<div class="tr" style="margin-top:6px">${sw(k)}<span style="font-weight:600">${HIST_VAR[k].l}</span><span></span></div>`+ss.map(s=>{ const ex=excl.has(s.ano*100+i+1); return (!ex && s.vals[i]==null) ? '' : `<div class="tr" style="padding-left:16px"><span>${s.ano}</span><span>${ex?'desconsiderado':histFmt(k,s.vals[i])}</span></div>`; }).join('')).join('');   // ano sem dado naquele mês não aparece
+ return `<b>${HIST_MES[i]}</b>`+[...by].map(([k,ss])=>`<div class="tr" style="margin-top:6px">${sw(k)}<span style="font-weight:600">${HIST_VAR[k].l}</span><span></span></div>`+ss.map(s=>{
+  if(s.fc){ if(s.vals[i]==null) return ''; const lo=s.lo?s.lo[i]:null;   // previsão: mês/ano de verdade + faixa de 80%
+   return `<div class="tr" style="padding-left:16px"><span>Previsão · ${histCmp(s.comp[i])}</span><span>${histFmt(k,s.vals[i])}</span></div>`+(lo!=null?`<div class="tr" style="padding-left:28px;color:var(--muted)"><span>faixa 80%</span><span style="font-weight:400">${histRng(k,{[k+'Lo']:lo,[k+'Hi']:s.hi[i]})}</span></div>`:''); }
+  const ex=excl.has(s.ano*100+i+1); return (!ex && s.vals[i]==null) ? '' : `<div class="tr" style="padding-left:16px"><span>${s.ano}</span><span>${ex?'desconsiderado':histFmt(k,s.vals[i])}</span></div>`; }).join('')).join('');   // ano sem dado naquele mês não aparece
 }
 function histTablePanel(){
  const F=histFcList(), rg=(k,m)=>m[k+'Lo']!=null?`<small class="histrng">${histRng(k,m)}</small>`:'';   // previsão (se ligada) no topo, com a faixa de 80% embaixo do VP/IRVP
