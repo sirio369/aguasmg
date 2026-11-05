@@ -3495,10 +3495,10 @@ nas views curadas dele e `grant bi_<area>_leitura to bi_leitura` — nunca dar `
 
 **Fonte do BI publicado = API HTTPS (2026-11-05, `docs/migracao_bi_api.sql`).** O serviço do Power BI recusa o certificado do
 Postgres do Supabase (CA própria) — DirectQuery/5432 exigiria gateway. O `QSMS.pbip` passou a ler em **Import** pela API:
-`GET {SbUrl}rest/v1/rpc/bi_dados?p_view=bi_sst_x&apikey={anon}&p_chave={chave}` (M: `Json.Document(Web.Contents(SbUrl,
-[RelativePath, Query, ApiKeyName="p_chave"]))` + `Table.FromRecords(…, colunas, MissingField.UseNull)` + tipos). `bi_dados` é
+`GET {SbUrl}rest/v1/rpc/bi_dados?p_view=bi_sst_x&apikey={SbAnon}&p_chave={SbChave}` (M: `Json.Document(Web.Contents(SbUrl,
+[RelativePath, Query]))` + `Table.FromRecords(…, colunas, MissingField.UseNull)` + tipos). `bi_dados` é
 definer, executável só por `anon`, e só devolve views de um schema + prefixo ligados à chave (`public.bi_api_chave`, só hash
-sha256, RLS sem policy). A chave fica na credencial **"Chave da API Web"** do Desktop/serviço, nunca no M. Criar/girar (SQL
+sha256, RLS sem policy). A chave fica no **parâmetro `SbChave`** do modelo, com credencial **Anônimo** e "Ignorar conexão de teste". O serviço não oferece o método "Chave" para fontes Web (só Anônimo/Básico/OAuth2; com `ApiKeyName` dá `DMTS_OAuthFailedToGetResourceIdError`). O valor é editado em Configurações › Parâmetros do modelo semântico. Quem acessa a pasta do .pbip vê a chave, que só lê as views do BI. Criar/girar (SQL
 Editor, mostra uma vez): `select public.bi_chave_criar('qsms', '16 - qsms', 'bi_sst_');`; revogar: `ativo = false`. BI novo =
 outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo para quem lê pelo Postgres (Desktop, gateway).
 - GET do PostgREST roda em transação **read-only** → `bi_dados` é `stable` e não grava nada (sem "último uso").
