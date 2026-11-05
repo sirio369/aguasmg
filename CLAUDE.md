@@ -152,7 +152,7 @@ pwa/
 | `13 - projetos_obra` | **Projetos**: árvore de avanço (`intervencao_estado`), log de avanço, documentos e o **pipeline Engenharia → Qualidade → Obras** (`etapa_modelo`, `intervencao_etapa`, `intervencao_etapa_evento` append-only, view `vw_iv`) — *app-only*; a geometria das intervenções fica no `7` |
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
-| `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); nada pode ser apagado (trigger) — *app-only* |
+| `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); **Indicadores SST** (2026-11-05): `sst_*` (inspeção, DDS, ocorrência + ação, ASO, treinamento, CIPA) + views `bi_sst_*` lidas pelo BI QSMS via login `bi_qsms_leitura`; nada pode ser apagado (trigger) — *app-only* |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -345,7 +345,7 @@ pwa/
   (`qsms_ind` Indicadores · `qsms_form` Formulários: por atividade, lista/mapa/XLSX, filtros por situação da verificação,
   tipo, responsável e PT/PET, **uma verificação por atividade** que avisa o autor) e **🦺 EPI** (`qsms_epi_painel` = painel de EPI,
   RPC `app_qsms_epi_painel`; `qsms_cesta` = a tela "Cargos e cesta de EPI" da engrenagem do Almoxarifado reaproveitada,
-  editável por quem tem QSMS; `qsms_epi_col` = a tela "EPIs por colaborador" do Almoxarifado reaproveitada). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`.
+  editável por quem tem QSMS; `qsms_epi_col` = a tela "EPIs por colaborador" do Almoxarifado reaproveitada). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`. **Indicadores SST** (2026-11-05, banco pronto; telas nos próximos PRs): card próprio **QSMS campo** para os TSTs (gate `ME.qsms_campo`, separado do `seg`), categoria "📊 Indicadores SST" no hub `qsms` e views `bi_sst_*` como fonte do BI QSMS (substitui a planilha) — RPCs `app_sst_*`, ver `docs/MODULOS.md §20`.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**,
   **limite das ZAs** — contorno tracejado via `app_limites_zas` + máscara escurecendo o fundo fora das ZAs, 2026-10-29)
   com busca + marcador "Você" (GPS, `cadOnGps`, pane próprio sempre por cima). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
