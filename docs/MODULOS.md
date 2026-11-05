@@ -3408,15 +3408,30 @@ Módulo **genérico** de avisos (2026-10-28: deixou de ser feito só para o avis
 - **Cuidados:** filtro de pessoas também é E com os outros (marcar Betim + uma pessoa de Contagem = ninguém); a prévia mostra isso.
   O aviso do checklist (id 1) foi migrado como "com carro vinculado + 08/10/12/14/16h seg–sex, só quem não fez o checklist".
 
-## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05, PR-A: só banco)
+## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05; banco = PR-A, campo = PR-B)
 
 Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e passa a ser a fonte do **BI QSMS**
-(`15 - Planejamento\1.0 Biblioteca\2 - Dashboards Ativos\QSMS.pbip`). **Este PR é só o banco**; as telas vêm nos próximos PRs:
+(`15 - Planejamento\1.0 Biblioteca\2 - Dashboards Ativos\QSMS.pbip`). O banco veio no PR-A e o campo no PR-B; a gestão vem no PR-C:
 - **Campo — card novo "QSMS campo" (PR-B), só da equipe de segurança (TSTs).** **Não é** o card ⛑️ `seg` (APR/PT/PET),
   que continua sendo das equipes de execução. Gate `ME.qsms_campo` = `"16 - qsms".sst_campo_pode` = `qsms_pode` (gestão)
   **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
-  Telas previstas: inspeção (checklist, NC com foto/prazo, GPS), DDS (presença com assinatura), ocorrência
-  (acidente / quase acidente / incidente).
+  **Telas (PR-B, sw v328):** `sst` (Home › 🛠️ Execução › 🦺 QSMS campo; card escondido sem `ME.qsms_campo`) com os
+  3 lançamentos + "Meus lançamentos (30 dias)" (`app_sst_minhas` + itens ainda na fila, cache em `localStorage.sstMinhas`)
+  e `sst_form` (um formulário por vez, estado `sstD`, rascunho no IndexedDB `seg_local` store `draft` chave `sst`, com fotos
+  e assinaturas):
+  - **Inspeção:** data, área (lista de `perfil.area` + Geral), local, papel (TST/Supervisor/Coordenador/Gerente, sugerido
+    pelo cargo), checklist do `app_sst_modelo_listar` (cache `localStorage.sstModelo`) agrupado, C / NC / N/A por item e
+    "marcar os sem resposta como Conforme". **NC exige descrição + foto + prazo**, ou "corrigida na hora" + como.
+  - **DDS:** data, duração, área (padrão Geral), tema, participantes da lista `app_seg_pessoas` (acha também pelo
+    e-mail; fora da lista entra só com o nome) com assinatura cada, sem repetir pessoa, e foto da roda obrigatória.
+  - **Ocorrência:** natureza (Acidente/Quase acidente/Incidente), data, hora, área, local, descrição (obrigatória),
+    causa; só no **Acidente**: tipo, vínculo Próprio (colaborador da lista) ou Terceiro (nome + empresa) e parte do corpo.
+    Classificação, gravidade, CAT e dias ficam para a validação da gestão. 2 fotos opcionais.
+  - **GPS travado (≤ `PRECISAO_MAX`) obrigatório na inspeção e no DDS**; opcional na ocorrência (vai se estiver travado).
+  - Envio: `enviarOuEnfileirar` com ids `sst-<ts>`, `pasta:'sst'` (`fotos-campo/sst/<id>_<chave>.jpg`), `anexos` =
+    `nc_<i>` (foto da NC), `foto_1/foto_2`, `sig_<i>` (assinatura jpeg) → `p_anexos`.
+  - Engrenagem ⚙️ `qsms_acesso` ganhou a coluna **Campo** (`app_qsms_campo_set`); quem tem Gestão já lança em campo
+    (caixa travada marcada).
 - **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C):** painel, tratativa de NC, validação de ocorrência +
   ações corretivas, ASO, treinamentos (tipos + matriz), CIPA, anulação.
 
