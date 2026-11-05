@@ -3408,10 +3408,10 @@ Módulo **genérico** de avisos (2026-10-28: deixou de ser feito só para o avis
 - **Cuidados:** filtro de pessoas também é E com os outros (marcar Betim + uma pessoa de Contagem = ninguém); a prévia mostra isso.
   O aviso do checklist (id 1) foi migrado como "com carro vinculado + 08/10/12/14/16h seg–sex, só quem não fez o checklist".
 
-## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05; banco = PR-A, campo = PR-B)
+## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05; banco = PR-A, campo = PR-B, gestão = PR-C)
 
 Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e passa a ser a fonte do **BI QSMS**
-(`15 - Planejamento\1.0 Biblioteca\2 - Dashboards Ativos\QSMS.pbip`). O banco veio no PR-A e o campo no PR-B; a gestão vem no PR-C:
+(`15 - Planejamento\1.0 Biblioteca\2 - Dashboards Ativos\QSMS.pbip`). Banco no PR-A, campo no PR-B, gestão no PR-C:
 - **Campo — card novo "QSMS campo" (PR-B), só da equipe de segurança (TSTs).** **Não é** o card ⛑️ `seg` (APR/PT/PET),
   que continua sendo das equipes de execução. Gate `ME.qsms_campo` = `"16 - qsms".sst_campo_pode` = `qsms_pode` (gestão)
   **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
@@ -3432,8 +3432,24 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     `nc_<i>` (foto da NC), `foto_1/foto_2`, `sig_<i>` (assinatura jpeg) → `p_anexos`.
   - Engrenagem ⚙️ `qsms_acesso` ganhou a coluna **Campo** (`app_qsms_campo_set`); quem tem Gestão já lança em campo
     (caixa travada marcada).
-- **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C):** painel, tratativa de NC, validação de ocorrência +
-  ações corretivas, ASO, treinamentos (tipos + matriz), CIPA, anulação.
+- **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C, sw v329, gate `ME.qsms`):** 6 telas, código `sg*`.
+  - `sst_painel` — `app_sst_painel` (mesmas views do BI): acidentes/ocorrências, inspeções, DDS, produção por responsável e
+    por semana, ASO, treinamentos por tipo, CIPA. Cada número abre a lista certa (NC pendente/vencida, ocorrência a validar
+    e ação aberta abrem com 1 ano para trás, porque não dependem do período).
+  - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
+    acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com **tratativa de NC**
+    (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
+    presença e assinaturas; ocorrência com **validação** (`app_sst_ocorrencia_validar`; acidente exige classificação e
+    gravidade) e **ações corretivas** (`app_sst_acao_salvar`: nova, editar, concluir, anular). Anular qualquer registro
+    com motivo (`app_sst_anular`).
+  - `sst_aso` — situação atual (exame mais recente por pessoa), sem ASO, histórico; lançar/corrigir exame
+    (`app_sst_aso_salvar`, vencimento vazio = +12 meses), anular, XLSX.
+  - `sst_trein` — **matriz** pessoa × tipo (`app_sst_trein_matriz`; célula colorida pela situação, toque = registrar
+    realização ou anular o registro atual), **lançar turma** (vários colaboradores, mesmo treinamento/data), **tipos**
+    (`app_sst_trein_tipo_salvar`) e **sem vínculo** (registro da planilha sem pessoa → vincular ou anular). Editar = novo
+    registro (vale o mais recente), não sobrescreve o anterior. XLSX.
+  - `sst_cipa` — membros e reuniões (`app_sst_cipa_*`), editar/anular; total de membros sugerido = titulares ativos.
+  - `sst_modelo` — checklist da inspeção (`app_sst_modelo_salvar`): grupo, item, ordem, ativo.
 
 **Tabelas (schema `"16 - qsms"`, RLS deny-all, só RPC definer, `qsms_sem_delete` em todas, update → `sst_evento`):**
 `sst_inspecao` (+ `sst_inspecao_item`: C/NC/NA, foto, prazo, `trat_status` pendente/tratada; checklist-modelo em
