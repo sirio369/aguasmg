@@ -3487,9 +3487,11 @@ inválido vira **alerta**, não erro): `app_sst_modelo_listar`, `app_sst_inspeca
 (natureza = Acidente), `bi_sst_acidentes_vinculo` (1 linha por acidente, ações consolidadas), `bi_sst_saude` (ASO mais
 recente de cada colaborador ativo), `bi_sst_treinamentos` (registro mais recente por colaborador ativo × tipo),
 `bi_sst_cipa_membros`, `bi_sst_cipa_reunioes`, `bi_sst_area`, `bi_sst_info`. Situações calculadas com `sst_hoje()` (data de
-hoje em BRT); anulados ficam de fora. Leitura pelo login **`bi_qsms_leitura`** (só `SELECT` nas 10 views, read-only,
-timeout 60 s; **criado sem senha** — o dono do projeto define com `alter role bi_qsms_leitura password '…'` no SQL editor;
-pelo pooler o usuário é `bi_qsms_leitura.lwttadkctfznidzvmury`).
+hoje em BRT); anulados ficam de fora. Leitura pelo **login genérico dos BIs `bi_leitura`** (`docs/migracao_bi_leitura.sql`, 2026-11-05: read-only, timeout 60 s,
+**criado sem senha** — o dono do projeto define com `alter role bi_leitura password '…'` no SQL Editor do Supabase; pelo pooler o
+usuário é `bi_leitura.lwttadkctfznidzvmury`). As permissões ficam em **grupos por área sem login**: `bi_qsms_leitura` = só
+`SELECT` nas 10 views `bi_sst_*` (era login até 2026-11-05). **BI novo:** criar `bi_<area>_leitura` (nologin) com `SELECT` só
+nas views curadas dele e `grant bi_<area>_leitura to bi_leitura` — nunca dar `SELECT` em tabela crua nem em `perfil`.
 
 **Cuidados:**
 - **Aplicado em 05/11/2026** (migrações `sst_indicadores` + `sst_searchpath`, esta fixa `search_path` de `sst_hoje`/`sst_consorcio_nome`
