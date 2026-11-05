@@ -3408,7 +3408,7 @@ Módulo **genérico** de avisos (2026-10-28: deixou de ser feito só para o avis
 - **Cuidados:** filtro de pessoas também é E com os outros (marcar Betim + uma pessoa de Contagem = ninguém); a prévia mostra isso.
   O aviso do checklist (id 1) foi migrado como "com carro vinculado + 08/10/12/14/16h seg–sex, só quem não fez o checklist".
 
-## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05; banco = PR-A, campo = PR-B, gestão = PR-C)
+## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05; banco = PR-A, campo = PR-B, gestão = PR-C; ajustes do campo em `docs/migracao_sst_campo_ajustes.sql`, sw v330)
 
 Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e passa a ser a fonte do **BI QSMS**
 (`15 - Planejamento\1.0 Biblioteca\2 - Dashboards Ativos\QSMS.pbip`). Banco no PR-A, campo no PR-B, gestão no PR-C:
@@ -3419,17 +3419,29 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   3 lançamentos + "Meus lançamentos (30 dias)" (`app_sst_minhas` + itens ainda na fila, cache em `localStorage.sstMinhas`)
   e `sst_form` (um formulário por vez, estado `sstD`, rascunho no IndexedDB `seg_local` store `draft` chave `sst`, com fotos
   e assinaturas):
-  - **Inspeção:** data, área (lista de `perfil.area` + Geral), local, papel (TST/Supervisor/Coordenador/Gerente, sugerido
-    pelo cargo), checklist do `app_sst_modelo_listar` (cache `localStorage.sstModelo`) agrupado, C / NC / N/A por item e
-    "marcar os sem resposta como Conforme". **NC exige descrição + foto + prazo**, ou "corrigida na hora" + como.
-  - **DDS:** data, duração, área (padrão Geral), tema, participantes da lista `app_seg_pessoas` (acha também pelo
-    e-mail; fora da lista entra só com o nome) com assinatura cada, sem repetir pessoa, e foto da roda obrigatória.
-  - **Ocorrência:** natureza (Acidente/Quase acidente/Incidente), data, hora, área, local, descrição (obrigatória),
-    causa; só no **Acidente**: tipo, vínculo Próprio (colaborador da lista) ou Terceiro (nome + empresa) e parte do corpo.
+  - **Área / frente** (inspeção e ocorrência) = lista fixa `SST_AREAS`: HDD, VCA, Instalação/substituição de ramal,
+    Instalação/substituição de hidrômetro, Fiscalização de irregularidades, Recadastramento comercial, Substituição de
+    VRP/macromedidor/registro, Instalação de VRP/macromedidor/registro, Reparo de vazamento (v330).
+  - **Inspeção:** data, área, local, **OS da intervenção** (opcional, `sst_inspecao.os`), **responsável pela intervenção**
+    (pessoa da lista `app_seg_pessoas` + assinatura, obrigatórios → `interv_resp_uuid/_nome/_assinatura/_assinado_em`,
+    anexo `sig_resp`), checklist do `app_sst_modelo_listar` (cache `localStorage.sstModelo`) agrupado, C / NC / N/A por
+    item — **todos os itens respondidos um a um** (o botão "marcar os sem resposta como Conforme" saiu na v330). **NC exige
+    descrição + foto + prazo**, ou "corrigida na hora" + como. O papel no indicador (TST/Supervisor/Coordenador/Gerente)
+    **não é mais perguntado**: vem do cargo de quem inspeciona (`sst_cargo_ind`: gerente/coordenador/supervisor no nome do
+    cargo, senão TST); app antigo que ainda manda `cargo` continua valendo.
+  - **DDS:** data, duração, tema, **nº de participantes** + **foto da lista de presença** (câmera ou galeria; a lista é feita
+    no papel) e foto da roda, todos obrigatórios. Sem área no formulário (grava `Geral`). `participantes_qtd` vai para o BI
+    (`bi_sst_dds."Participantes"` = importado › informado › contagem de `sst_dds_presenca` do app antigo).
+  - **Ocorrência:** natureza (Acidente/Quase acidente/Incidente), data, hora, área, descrição (obrigatória), causa (o campo
+    local/setor saiu na v330); só no **Acidente**: tipo (lista `SST_TIPOS_OC` por mecanismo: queda de altura, queda no
+    mesmo nível, atingido por objeto, batida contra, prensagem, corte, esforço excessivo, eletricidade, químico/temperatura,
+    soterramento, trânsito, animal, trajeto, doença ocupacional, outro), vínculo Próprio (colaborador da lista) ou Terceiro
+    (nome + empresa) e parte do corpo.
     Classificação, gravidade, CAT e dias ficam para a validação da gestão. 2 fotos opcionais.
   - **GPS travado (≤ `PRECISAO_MAX`) obrigatório na inspeção e no DDS**; opcional na ocorrência (vai se estiver travado).
   - Envio: `enviarOuEnfileirar` com ids `sst-<ts>`, `pasta:'sst'` (`fotos-campo/sst/<id>_<chave>.jpg`), `anexos` =
-    `nc_<i>` (foto da NC), `foto_1/foto_2`, `sig_<i>` (assinatura jpeg) → `p_anexos`.
+    `nc_<i>` (foto da NC), `foto_1/foto_2`, `foto_lista` (DDS), `sig_resp` (assinatura do responsável pela intervenção)
+    → `p_anexos`. Rascunho de DDS no formato antigo (com lista) é convertido ao abrir: nº = pessoas da lista.
   - Engrenagem ⚙️ `qsms_acesso` ganhou a coluna **Campo** (`app_qsms_campo_set`); quem tem Gestão já lança em campo
     (caixa travada marcada).
 - **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C, sw v329, gate `ME.qsms`):** 6 telas, código `sg*`.
@@ -3437,8 +3449,8 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     por semana, ASO, treinamentos por tipo, CIPA. Cada número abre a lista certa (NC pendente/vencida, ocorrência a validar
     e ação aberta abrem com 1 ano para trás, porque não dependem do período).
   - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
-    acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com **tratativa de NC**
-    (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
+    acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com OS + responsável pela
+    intervenção e assinatura, e **tratativa de NC** (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
     presença e assinaturas; ocorrência com **validação** (`app_sst_ocorrencia_validar`; acidente exige classificação e
     gravidade) e **ações corretivas** (`app_sst_acao_salvar`: nova, editar, concluir, anular). Anular qualquer registro
     com motivo (`app_sst_anular`).
