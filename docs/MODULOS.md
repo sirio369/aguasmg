@@ -3407,3 +3407,50 @@ Módulo **genérico** de avisos (2026-10-28: deixou de ser feito só para o avis
   assinatura. Internos sem grant: `aviso_no_publico`, `aviso_pendente`, `aviso_lembretes_tick`, `aviso_eh_admin`, `aviso_tem_veiculo`.
 - **Cuidados:** filtro de pessoas também é E com os outros (marcar Betim + uma pessoa de Contagem = ninguém); a prévia mostra isso.
   O aviso do checklist (id 1) foi migrado como "com carro vinculado + 08/10/12/14/16h seg–sex, só quem não fez o checklist".
+
+## 20. Indicadores SST (QSMS campo + gestão + BI) — `docs/migracao_sst_indicadores.sql` (2026-11-05, PR-A: só banco)
+
+Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e passa a ser a fonte do **BI QSMS**
+(`15 - Planejamento\1.0 Biblioteca\2 - Dashboards Ativos\QSMS.pbip`). **Este PR é só o banco**; as telas vêm nos próximos PRs:
+- **Campo — card novo "QSMS campo" (PR-B), só da equipe de segurança (TSTs).** **Não é** o card ⛑️ `seg` (APR/PT/PET),
+  que continua sendo das equipes de execução. Gate `ME.qsms_campo` = `"16 - qsms".sst_campo_pode` = `qsms_pode` (gestão)
+  **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
+  Telas previstas: inspeção (checklist, NC com foto/prazo, GPS), DDS (presença com assinatura), ocorrência
+  (acidente / quase acidente / incidente).
+- **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C):** painel, tratativa de NC, validação de ocorrência +
+  ações corretivas, ASO, treinamentos (tipos + matriz), CIPA, anulação.
+
+**Tabelas (schema `"16 - qsms"`, RLS deny-all, só RPC definer, `qsms_sem_delete` em todas, update → `sst_evento`):**
+`sst_inspecao` (+ `sst_inspecao_item`: C/NC/NA, foto, prazo, `trat_status` pendente/tratada; checklist-modelo em
+`sst_inspecao_modelo`, 10 itens genéricos de partida) · `sst_dds` (+ `sst_dds_presenca`, 1 linha por pessoa;
+`efetivo` = foto do efetivo no dia por `sst_efetivo(consórcio, área, data)` — área que existe em `perfil.area` conta só ela,
+senão o consórcio inteiro) · `sst_ocorrencia` (natureza Acidente/Quase acidente/Incidente; classificação, gravidade, dias,
+CAT validados pela gestão, `status` registrada→validada) + `sst_acao` · `sst_aso` · `sst_treinamento_tipo` (4 da planilha:
+DD 24m, NR-35 24m, NR-33 trabalhador 12m, NR-33 supervisor 12m) + `sst_treinamento` (1 registro por realização; data nula =
+exigido sem data) · `sst_cipa_membro` · `sst_cipa_reuniao`. Todas têm `origem` app|planilha + `origem_ref` (carga idempotente
+da planilha) e **anulação** (`anulado_em/por/motivo`) no lugar de apagar.
+
+**RPCs de campo** (gate `sst_campo_pode`, idempotentes por `p_id`, `p_anexos` = {chave: caminho no Storage}, conteúdo
+inválido vira **alerta**, não erro): `app_sst_modelo_listar`, `app_sst_inspecao_registrar`, `app_sst_dds_registrar`,
+`app_sst_ocorrencia_registrar`, `app_sst_minhas(p_dias)`. Local/consórcio pela coordenada (`qsms_local`).
+**RPCs de gestão** (gate `qsms_pode`): `app_sst_painel(de, ate, consorcio)` (lê as views do BI — mesma regra no app e no BI),
+`app_sst_listar(tipo, de, ate, consorcio)`, `app_sst_ver(tipo, id)` (autor também vê o seu), `app_sst_nc_tratar`,
+`app_sst_ocorrencia_validar`, `app_sst_acao_salvar`, `app_sst_anular(tipo, id, motivo)`, `app_sst_aso_listar/_salvar`
+(vencimento vazio = exame + 12 meses, exceto demissional), `app_sst_trein_tipos/_tipo_salvar/_matriz/_salvar`,
+`app_sst_cipa_listar/_membro_salvar/_reuniao_salvar`, `app_sst_modelo_salvar`.
+
+**Views do BI (`bi_sst_*`)** — mesmos nomes e tipos de coluna que as consultas M do `QSMS.SemanticModel` entregam hoje
+(+ `Consórcio`), para o modelo trocar só a fonte (DirectQuery): `bi_sst_inspecoes`, `bi_sst_dds`, `bi_sst_acidentes`
+(natureza = Acidente), `bi_sst_acidentes_vinculo` (1 linha por acidente, ações consolidadas), `bi_sst_saude` (ASO mais
+recente de cada colaborador ativo), `bi_sst_treinamentos` (registro mais recente por colaborador ativo × tipo),
+`bi_sst_cipa_membros`, `bi_sst_cipa_reunioes`, `bi_sst_area`, `bi_sst_info`. Situações calculadas com `sst_hoje()` (data de
+hoje em BRT); anulados ficam de fora. Leitura pelo login **`bi_qsms_leitura`** (só `SELECT` nas 10 views, read-only,
+timeout 60 s; **criado sem senha** — o dono do projeto define com `alter role bi_qsms_leitura password '…'` no SQL editor;
+pelo pooler o usuário é `bi_qsms_leitura.lwttadkctfznidzvmury`).
+
+**Cuidados:**
+- `postgres` no Supabase não pode `SET ROLE` para o papel do BI — o smoke test (`qa/smoke_test_sst.sql`) confere os
+  privilégios com `has_table_privilege`.
+- Os nomes das colunas das views são o contrato com o BI: renomear uma coluna quebra o relatório.
+- O `Área` mistura áreas do cadastro (`perfil.area`, em ASO/treinamentos) e as escolhidas no campo (inspeção/DDS/ocorrência) —
+  o app de campo deve oferecer a lista de `perfil.area` + "Geral" para não espalhar grafias.
