@@ -1369,7 +1369,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sst" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>QSMS campo</h1>
-    <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist, DDS com lista de presença assinada e registro de acidente, quase acidente ou incidente. Funciona sem sinal — sobe quando houver conexão.</p>
+    <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist e assinatura do responsável pela intervenção, DDS com foto da lista de presença e registro de acidente, quase acidente ou incidente. Funciona sem sinal — sobe quando houver conexão.</p>
     <div id="sstRasc"></div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Nova inspeção</div></button>
@@ -10791,9 +10791,13 @@ if($('#segFormBack')) $('#segFormBack').addEventListener('click',()=>{ if(segD) 
 const SST_TIPO={insp:{t:'Inspeção de segurança',ic:'🔍',rpc:'app_sst_inspecao_registrar',ok:'✓ Inspeção enviada',btn:'Enviar inspeção'},
   dds:{t:'DDS',ic:'🗣️',rpc:'app_sst_dds_registrar',ok:'✓ DDS enviado',btn:'Enviar DDS'},
   oc:{t:'Ocorrência',ic:'🚨',rpc:'app_sst_ocorrencia_registrar',ok:'✓ Ocorrência registrada',btn:'Registrar ocorrência'}};
-const SST_CARGOS=['TST','Supervisor','Coordenador','Gerente'];
+// áreas/frentes de serviço (inspeção e ocorrência)
+const SST_AREAS=['HDD','VCA','Instalação/substituição de ramal','Instalação/substituição de hidrômetro','Fiscalização de irregularidades',
+  'Recadastramento comercial','Substituição de VRP/macromedidor/registro','Instalação de VRP/macromedidor/registro','Reparo de vazamento'];
 const SST_NATUREZA=['Acidente','Quase acidente','Incidente'];
-const SST_TIPOS_OC=['Típico','Trajeto','Doença ocupacional'];
+const SST_TIPOS_OC=['Queda de pessoa de altura','Queda de pessoa no mesmo nível','Atingido por objeto (queda, projeção, desmoronamento)','Batida contra objeto',
+  'Prensagem / aprisionamento','Corte / perfuração','Esforço excessivo / movimento inadequado','Contato com eletricidade','Contato com produto químico ou temperatura extrema',
+  'Soterramento','Atropelamento / acidente de trânsito','Ataque de animal (cão, inseto, cobra)','Acidente de trajeto','Doença ocupacional','Outro'];
 const SST_PARTES=['Cabeça','Olhos','Face','Pescoço','Ombro','Tronco','Costas','Braço','Mão','Dedos da mão','Perna','Joelho','Pé','Dedos do pé','Múltiplas partes','Outra'];
 let sstD=null, sstModelo=[], sstDraftT=null;
 const sstHoje=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
@@ -10812,10 +10816,7 @@ function sstCss(){ if(document.getElementById('sstcss'))return; const st=documen
  .sstck{all:unset;display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;font-weight:600;cursor:pointer}
  .sstck input{width:18px;height:18px;margin:0}`;
  document.head.appendChild(st); }
-function sstAreas(){ const s=new Set(segPessoas.map(p=>p.area).filter(Boolean)); if(sstD&&sstD.area) s.add(sstD.area); s.delete('Geral');
-  return ['Geral',...[...s].sort((a,b)=>a.localeCompare(b,'pt-BR'))]; }
-function sstCargoPadrao(){ const c=String(((ME&&segPessoas.find(p=>p.id===ME.id))||{}).cargo||(ME&&ME.cargo)||'').toLowerCase();
-  return c.includes('gerente')?'Gerente':c.includes('coordenador')?'Coordenador':c.includes('supervisor')?'Supervisor':'TST'; }
+const sstAreas=()=>SST_AREAS.concat(sstD&&sstD.area&&!SST_AREAS.includes(sstD.area)?[sstD.area]:[]);
 async function sstModeloCarregar(){ try{ sstModelo=JSON.parse(localStorage.getItem('sstModelo')||'[]'); }catch(e){ sstModelo=[]; }
   if(!navigator.onLine) return;
   try{ const {data,error}=await sb.rpc('app_sst_modelo_listar'); if(error)throw error; sstModelo=(data||[]).filter(m=>m.ativo!==false); try{ localStorage.setItem('sstModelo',JSON.stringify(sstModelo)); }catch(e){} }catch(e){} }
@@ -10827,14 +10828,13 @@ async function sstRascunho(){ const c=document.getElementById('sstRasc'); if(!c)
   c.innerHTML=`<div class="banner warn" style="flex-wrap:wrap">📝 ${SST_TIPO[r.tipo].t} em preenchimento desde ${segFmt(r.salvo_em)}<span style="flex:1"></span><button class="btn" id="sstRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="sstRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`;
   $('#sstRascCont').onclick=()=>{ sstD=r; delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); };
   $('#sstRascDesc').onclick=()=>{ const b=$('#sstRascDesc'); if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } clearTimeout(sstDraftT); sstDraftDel().then(sstRascunho).catch(()=>{}); }; }
-const sstPesNovo=()=>({k:'p'+Date.now()+Math.random().toString(36).slice(2,6),nome:'',pessoa_uuid:null,funcao:'',sig:null,assinado_em:null});
 async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){}
   if(r&&SST_TIPO[r.tipo]){ toast('Há um lançamento em andamento — continue ou descarte'); const b=document.getElementById('sstRasc'); if(b) b.scrollIntoView({behavior:'smooth'}); return; }
   const d={tipo,id:crypto.randomUUID(),data:sstHoje(),area:'',observacoes:'',fotos:{}};
   if(tipo==='insp'){ if(!sstModelo.length) await sstModeloCarregar();
-    Object.assign(d,{cargo:sstCargoPadrao(),local:'',itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
-  if(tipo==='dds') Object.assign(d,{area:'Geral',tema:'',duracao_min:'',pes:[sstPesNovo()]});
-  if(tipo==='oc') Object.assign(d,{natureza:'Acidente',hora:'',setor_local:'',tipo_oc:'',descricao:'',causa:'',vinculo:'',vitima_uuid:null,vitima_nome:'',empresa:'',parte_corpo:''});
+    Object.assign(d,{local:'',os:'',resp_uuid:null,resp_nome:'',resp_sig:null,resp_em:null,itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
+  if(tipo==='dds') Object.assign(d,{area:'Geral',tema:'',duracao_min:'',qtd:''});
+  if(tipo==='oc') Object.assign(d,{natureza:'Acidente',hora:'',tipo_oc:'',descricao:'',causa:'',vinculo:'',vitima_uuid:null,vitima_nome:'',empresa:'',parte_corpo:''});
   sstD=d; irPara('sst_form'); }
 async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)return; let srv=null;
   if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_sst_minhas',{p_dias:30}); if(error)throw error; srv=data||{}; try{ localStorage.setItem('sstMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
@@ -10855,7 +10855,8 @@ async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)r
     ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}</div>`).join('')+rod; }
 
 // ===== Formulário (sst_form): estado único sstD, salvo como rascunho a cada mudança =====
-function sstFormInit(){ segCss(); sstCss(); if(!sstD){ irPara('sst'); return; } segPessoasDl(); $('#sstFormTit').textContent=SST_TIPO[sstD.tipo].ic+' '+SST_TIPO[sstD.tipo].t; sstRender(); }
+function sstFormInit(){ segCss(); sstCss(); if(!sstD){ irPara('sst'); return; }
+  if(sstD.tipo==='dds'&&sstD.qtd==null){ sstD.qtd=(sstD.pes||[]).filter(p=>String(p.nome||'').trim()).length||''; delete sstD.pes; sstD.area='Geral'; } segPessoasDl(); $('#sstFormTit').textContent=SST_TIPO[sstD.tipo].ic+' '+SST_TIPO[sstD.tipo].t; sstRender(); }
 function sstRender(){ const body=document.getElementById('sstFormBody'); if(!body||!sstD) return; const se=document.scrollingElement||document.documentElement, y=se.scrollTop;
   body.innerHTML='<div id="sstGps" class="banner warn"></div>'+(sstD.tipo==='insp'?sstInspHtml():sstD.tipo==='dds'?sstDdsHtml():sstOcHtml())
     +'<div id="sstErros"></div><button class="btn" id="sstEnviar" style="margin-top:12px">Enviar</button>';
@@ -10878,36 +10879,22 @@ function sstInspHtml(){ const d=sstD, grupos=[];
   d.itens.forEach((it,i)=>{ const k=it.grupo||'Geral'; let g=grupos.find(x=>x.g===k); if(!g){ g={g:k,l:[]}; grupos.push(g); } g.l.push(sstItemHtml(it,i)); });
   return segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Área / frente *</label>${sstSel('sstArea',sstAreas(),d.area,'Escolha…')}</div></div>
       <label>Local / referência</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="Rua, obra, frente de serviço…"/>
-      <label>Você inspeciona como</label>${sstChips('cargo',SST_CARGOS,d.cargo)}`)
-    +segBlk(2,'Checklist',(d.itens.length?grupos.map(g=>`<div class="sstgr">${segH(g.g)}</div>`+g.l.join('')).join('')
+      <label>OS da intervenção</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="Nº da OS SIGOS"/>`)
+    +segBlk(2,'Responsável pela intervenção',`<label>Responsável *</label><input id="sstResp" list="segPessoasDl" value="${segH(d.resp_nome||'')}" placeholder="Nome (escolha da lista)" autocomplete="off"/><div class="sub" id="sstRespX" style="font-size:12px;margin-top:2px"></div>
+      <div class="sub" style="font-size:12px;margin-top:8px">Assinatura do responsável *</div>${segSigHtml('resp')}`)
+    +segBlk(3,'Checklist',(d.itens.length?grupos.map(g=>`<div class="sstgr">${segH(g.g)}</div>`+g.l.join('')).join('')
         +`<div class="sub" id="sstResumo" style="font-size:12.5px;margin-top:10px">${sstResumoInsp()}</div>`
-        +`<button type="button" class="btn ghost" id="sstMarcarC" style="margin-top:8px">✓ Marcar os itens sem resposta como Conforme</button>`
       :'<p class="sub">O checklist ainda não está neste aparelho — abra o QSMS campo uma vez com conexão.</p>'))
-    +segBlk(3,'Observações',`<textarea id="sstObs" rows="3" placeholder="Opcional">${segH(d.observacoes||'')}</textarea>`); }
+    +segBlk(4,'Observações',`<textarea id="sstObs" rows="3" placeholder="Opcional">${segH(d.observacoes||'')}</textarea>`); }
 // --- DDS ---
-function sstPesHtml(p){ return `<div class="segpes" data-pk="${p.k}"><div class="top">Participante<button type="button" data-prem="${p.k}" title="Remover">✕</button></div>
-  <input data-pf="nome" list="segPessoasDl" value="${segH(p.nome||'')}" placeholder="Nome (escolha da lista)" autocomplete="off"/><div class="sub" data-pfx style="font-size:12px;margin-top:2px"></div>
-  <div class="sub" style="font-size:12px;margin-top:6px">Assinatura *</div>${segSigHtml(p.k)}</div>`; }
+// a lista de presença é feita no papel: registra só o nº de participantes e a foto da lista
 function sstDdsHtml(){ const d=sstD;
   return segBlk(1,'DDS',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Duração (min) *</label><input type="number" inputmode="numeric" min="1" max="240" id="sstDur" value="${segH(d.duracao_min||'')}"/></div></div>
-      <label>Área *</label>${sstSel('sstArea',sstAreas(),d.area)}
       <label>Tema *</label><input id="sstTema" value="${segH(d.tema||'')}" placeholder="Ex.: Proteção das mãos"/>`)
-    +segBlk(2,'Participantes (<span id="sstPesN">0</span>)',`<div id="sstPes">${d.pes.map(sstPesHtml).join('')}</div><button type="button" class="btn ghost" id="sstPesAdd" style="margin-top:8px">+ Participante</button>`)
+    +segBlk(2,'Participantes',`<label>Nº de participantes *</label><input type="number" inputmode="numeric" min="1" max="999" id="sstQtd" value="${segH(d.qtd||'')}"/>
+      ${segFotoHtml('foto_lista','Foto da lista de presença')}`)
     +segBlk(3,'Foto do DDS',segFotoHtml('foto_1','Foto da roda'))
     +segBlk(4,'Observações',`<textarea id="sstObs" rows="3" placeholder="Opcional">${segH(d.observacoes||'')}</textarea>`); }
-function sstPesRender(){ const c=document.getElementById('sstPes'); if(!c)return; c.innerHTML=sstD.pes.map(sstPesHtml).join(''); sstPesWire(); }
-function sstPesWire(){ const c=document.getElementById('sstPes'); if(!c)return;
-  c.querySelectorAll('.segpes').forEach(box=>{ const p=sstD.pes.find(x=>x.k===box.dataset.pk); if(!p)return;
-    const inp=box.querySelector('[data-pf="nome"]'), fx=box.querySelector('[data-pfx]');
-    const upd=()=>{ const x=segPessoaPorNome(inp.value); if(x&&inp.value!==x.nome) inp.value=x.nome; p.nome=inp.value; p.pessoa_uuid=x?x.id:null; p.funcao=x?(x.cargo||''):'';
-      fx.textContent=x?(x.cargo||''):(inp.value.trim()?'⚠ fora da lista — entra só com o nome (terceiro/visitante)':''); };
-    inp.oninput=inp.onchange=()=>{ upd(); sstDraftSave(); sstAtualizar(); }; upd();
-    const cv=box.querySelector('.segSig'); epiSigInit(cv); if(p.sig) cv._restore(p.sig);
-    // o mouseup é ouvido na janela inteira: só grava se este quadro está na tela e tem traço
-    cv._onend=()=>{ if(!cv.isConnected||!cv._drawn()) return; try{ p.sig=cv.toDataURL(); p.assinado_em=new Date().toISOString(); }catch(e){} sstDraftSave(); sstAtualizar(); };
-    box.querySelector('[data-sigclr]').onclick=()=>{ cv._clear(); p.sig=null; p.assinado_em=null; sstDraftSave(); sstAtualizar(); };
-    box.querySelector('[data-sigfs]').onclick=()=>epiSigFS(cv);
-    box.querySelector('[data-prem]').onclick=()=>{ sstD.pes=sstD.pes.filter(x=>x!==p); if(!sstD.pes.length) sstD.pes.push(sstPesNovo()); sstPesRender(); sstDraftSave(); sstAtualizar(); }; }); }
 // --- ocorrência ---
 function sstOcHtml(){ const d=sstD, ac=d.natureza==='Acidente';
   const vit=d.vinculo==='Próprio'?`<label>Colaborador *</label><input id="sstVit" list="segPessoasDl" value="${segH(d.vitima_nome||'')}" placeholder="Nome (escolha da lista)" autocomplete="off"/><div class="sub" id="sstVitX" style="font-size:12px;margin-top:2px"></div>`
@@ -10915,7 +10902,6 @@ function sstOcHtml(){ const d=sstD, ac=d.natureza==='Acidente';
   return segBlk(1,'O que aconteceu',`<label>Natureza *</label>${sstChips('natureza',SST_NATUREZA,d.natureza)}
       <div class="segrow2"><div>${sstDataHtml()}</div><div><label>Hora</label><input type="time" id="sstHora" value="${segH(d.hora||'')}"/></div></div>
       <label>Área *</label>${sstSel('sstArea',sstAreas(),d.area,'Escolha…')}
-      <label>Local / setor</label><input id="sstSetor" value="${segH(d.setor_local||'')}" placeholder="Onde aconteceu"/>
       ${ac?`<label>Tipo de acidente</label>${sstSel('sstTipo',SST_TIPOS_OC,d.tipo_oc,'—')}`:''}
       <label>Descrição *</label><textarea id="sstDesc" rows="3" placeholder="O que aconteceu, com quem, como">${segH(d.descricao||'')}</textarea>
       <label>Causa provável</label><textarea id="sstCausa" rows="2">${segH(d.causa||'')}</textarea>`)
@@ -10926,7 +10912,7 @@ function sstOcHtml(){ const d=sstD, ac=d.natureza==='Acidente';
 // --- ligação dos campos ---
 function sstWire(){ const d=sstD, root=document.getElementById('sstFormBody');
   const bind=(id,k)=>{ const el=document.getElementById(id); if(el) el.oninput=el.onchange=()=>{ d[k]=el.value; sstDraftSave(); sstAtualizar(); }; };
-  [['sstData','data'],['sstArea','area'],['sstLocal','local'],['sstObs','observacoes'],['sstDur','duracao_min'],['sstTema','tema'],['sstHora','hora'],['sstSetor','setor_local'],
+  [['sstData','data'],['sstArea','area'],['sstLocal','local'],['sstObs','observacoes'],['sstDur','duracao_min'],['sstTema','tema'],['sstHora','hora'],['sstOs','os'],['sstQtd','qtd'],
    ['sstTipo','tipo_oc'],['sstDesc','descricao'],['sstCausa','causa'],['sstVitNome','vitima_nome'],['sstEmp','empresa'],['sstParte','parte_corpo']].forEach(([id,k])=>bind(id,k));
   root.querySelectorAll('[data-sch]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const k=g.dataset.sch; if(d[k]===b.dataset.v) return;
     d[k]=b.dataset.v; if(k==='vinculo'){ d.vitima_uuid=null; d.vitima_nome=''; d.empresa=''; } sstDraftSave(); sstRender(); }));
@@ -10937,10 +10923,16 @@ function sstWire(){ const d=sstD, root=document.getElementById('sstFormBody');
   root.querySelectorAll('[data-if]').forEach(el=>{ const it=d.itens[+el.dataset.i], k=el.dataset.if;
     if(el.type==='checkbox') el.onchange=()=>{ it[k]=el.checked; sstDraftSave(); sstRender(); };
     else el.oninput=el.onchange=()=>{ it[k]=el.value; sstDraftSave(); sstAtualizar(); }; });
-  const mc=document.getElementById('sstMarcarC'); if(mc) mc.onclick=()=>{ d.itens.forEach(it=>{ if(!it.resultado) it.resultado='C'; }); sstDraftSave(); sstRender(); };
+  const ri=document.getElementById('sstResp'); if(ri){ const upd=()=>{ const x=segPessoaPorNome(ri.value); if(x&&ri.value!==x.nome) ri.value=x.nome; d.resp_nome=ri.value; d.resp_uuid=x?x.id:null;
+      $('#sstRespX').textContent=x?[x.cargo,CONSORCIO_NOME[x.consorcio]||x.consorcio].filter(Boolean).join(' · '):(ri.value.trim()?'⚠ escolha um nome da lista':''); };
+    ri.oninput=ri.onchange=()=>{ upd(); sstDraftSave(); sstAtualizar(); }; upd();
+    const cv=root.querySelector('.segSig[data-k="resp"]'); epiSigInit(cv); if(d.resp_sig) cv._restore(d.resp_sig);
+    // o mouseup é ouvido na janela inteira: só grava se este quadro está na tela e tem traço
+    cv._onend=()=>{ if(!cv.isConnected||!cv._drawn()) return; try{ d.resp_sig=cv.toDataURL(); d.resp_em=new Date().toISOString(); }catch(e){} sstDraftSave(); sstAtualizar(); };
+    root.querySelector('[data-sigclr="resp"]').onclick=()=>{ cv._clear(); d.resp_sig=null; d.resp_em=null; sstDraftSave(); sstAtualizar(); };
+    root.querySelector('[data-sigfs="resp"]').onclick=()=>epiSigFS(cv); }
   root.querySelectorAll('[data-sfoto]').forEach(inp=>inp.onchange=async e=>{ const f=e.target.files[0], k=inp.dataset.sfoto; if(!f)return; d.fotos[k]=await comprimir(f); sstDraftSave(); sstFotoPrev(); sstAtualizar(); });
   sstFotoPrev();
-  if(d.tipo==='dds'){ sstPesWire(); const a=document.getElementById('sstPesAdd'); if(a) a.onclick=()=>{ d.pes.push(sstPesNovo()); sstPesRender(); sstDraftSave(); sstAtualizar(); }; }
   const env=document.getElementById('sstEnviar'); if(env) env.onclick=sstEnviar;
   sstAtualizar(); }
 function sstFotoPrev(){ document.querySelectorAll('#sstFormBody [data-sprev]').forEach(img=>{ const b=sstD&&sstD.fotos[img.dataset.sprev]; if(b){ img.src=URL.createObjectURL(b); img.classList.remove('hidden'); } else img.classList.add('hidden'); }); }
@@ -10953,15 +10945,14 @@ function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
   if(!d.data) P.push('Data'); else if(d.data>sstHoje()) P.push('Data no futuro');
   if(!d.area) P.push('Área');
   if(d.tipo!=='oc'&&!sstGpsOk()) P.push('GPS travado no local (≤ '+PRECISAO_MAX+' m)');
-  if(d.tipo==='insp'){ if(!d.itens.length) P.push('Checklist (abra com conexão uma vez)');
+  if(d.tipo==='insp'){ if(!d.resp_uuid) P.push('Responsável pela intervenção (escolha da lista)'); else if(!d.resp_sig) P.push('Assinatura do responsável pela intervenção');
+    if(!d.itens.length) P.push('Checklist (abra com conexão uma vez)');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
     d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; const n='NC "'+it.item+'"';
       if(!txt(it.descricao)) P.push(n+': o que está errado'); if(!d.fotos['nc_'+i]) P.push(n+': foto');
       if(it.tratada_no_local){ if(!txt(it.tratativa)) P.push(n+': como foi corrigida'); } else if(!it.prazo) P.push(n+': prazo'); }); }
   if(d.tipo==='dds'){ if(!txt(d.tema)) P.push('Tema'); if(!(parseInt(d.duracao_min)>0)) P.push('Duração');
-    const pes=d.pes.filter(p=>txt(p.nome)); if(!pes.length) P.push('Pelo menos 1 participante');
-    pes.forEach(p=>{ if(!p.sig) P.push('Assinatura — '+txt(p.nome)); });
-    const ids=pes.map(p=>p.pessoa_uuid).filter(Boolean); if(new Set(ids).size<ids.length) P.push('Participante repetido na lista');
+    if(!(parseInt(d.qtd)>0)) P.push('Nº de participantes'); if(!d.fotos.foto_lista) P.push('Foto da lista de presença');
     if(!d.fotos.foto_1) P.push('Foto do DDS'); }
   if(d.tipo==='oc'){ if(!txt(d.descricao)) P.push('Descrição');
     if(d.natureza==='Acidente'){ if(!d.vinculo) P.push('Vínculo do acidentado');
@@ -10973,20 +10964,19 @@ function sstAtualizar(){ if(!sstD) return; const P=sstPend(), e=document.getElem
   if(e) e.innerHTML=P.length?'<div class="segerr"><b>Falta preencher:</b><ul style="margin:4px 0 0;padding-left:18px">'+P.map(x=>'<li>'+segH(x)+'</li>').join('')+'</ul></div>':'';
   if(b&&!b.dataset.env){ b.disabled=!!P.length; b.textContent=P.length?'Complete os itens acima':SST_TIPO[sstD.tipo].btn; }
   const r=document.getElementById('sstResumo'); if(r) r.textContent=sstResumoInsp();
-  const n=document.getElementById('sstPesN'); if(n&&sstD.pes) n.textContent=sstD.pes.filter(p=>String(p.nome||'').trim()).length; }
+}
 async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const btn=document.getElementById('sstEnviar'); btn.disabled=true; btn.dataset.env='1'; btn.textContent='Enviando…';
   const g=sstGpsOk()?gps:null, anexos={}, nul=v=>{ const s=String(v==null?'':v).trim(); return s||null; };
   const dados={data:d.data,area:d.area,observacoes:nul(d.observacoes),lat:g?g.lat:null,lon:g?g.lon:null,precisao:g?Math.round(g.acc*10)/10:null,dispositivo:navigator.userAgent.slice(0,100)};
-  if(d.tipo==='insp'){ Object.assign(dados,{local:nul(d.local),cargo:d.cargo,itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null;
+  if(d.tipo==='insp'){ const sig=await segSigJpeg(d.resp_sig); if(sig) anexos.sig_resp=sig;
+    Object.assign(dados,{local:nul(d.local),os:nul(d.os),resp_interv_uuid:d.resp_uuid,resp_interv_nome:nul(d.resp_nome),resp_interv_sig:sig?'sig_resp':null,resp_interv_assinado_em:sig?d.resp_em:null,itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null;
       if(nc&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
       return {modelo_id:it.modelo_id||null,grupo:nul(it.grupo),item:it.item,resultado:it.resultado,descricao:nc?nul(it.descricao):null,foto,
         prazo:nc&&!it.tratada_no_local?it.prazo:null,tratada_no_local:nc&&!!it.tratada_no_local,tratativa:nc&&it.tratada_no_local?nul(it.tratativa):null}; })}); }
-  else if(d.tipo==='dds'){ const parts=[];
-    for(const [i,p] of d.pes.filter(p=>String(p.nome||'').trim()).entries()){ let sig=null; const b=await segSigJpeg(p.sig); if(b){ sig='sig_'+i; anexos[sig]=b; }
-      parts.push({pessoa_uuid:p.pessoa_uuid||null,nome:p.nome.trim(),sig,assinado_em:p.assinado_em||null}); }
-    anexos.foto_1=d.fotos.foto_1; Object.assign(dados,{tema:d.tema.trim(),duracao_min:parseInt(d.duracao_min),participantes:parts}); }
+  else if(d.tipo==='dds'){ anexos.foto_lista=d.fotos.foto_lista; anexos.foto_1=d.fotos.foto_1;
+    Object.assign(dados,{area:'Geral',tema:d.tema.trim(),duracao_min:parseInt(d.duracao_min),participantes_qtd:parseInt(d.qtd)}); }
   else { ['foto_1','foto_2'].forEach(k=>{ if(d.fotos[k]) anexos[k]=d.fotos[k]; }); const ac=d.natureza==='Acidente';
-    Object.assign(dados,{natureza:d.natureza,hora:d.hora||null,tipo:ac?nul(d.tipo_oc):null,setor_local:nul(d.setor_local),descricao:d.descricao.trim(),causa:nul(d.causa),
+    Object.assign(dados,{natureza:d.natureza,hora:d.hora||null,tipo:ac?nul(d.tipo_oc):null,descricao:d.descricao.trim(),causa:nul(d.causa),
       vinculo:ac?d.vinculo:null,vitima_uuid:ac&&d.vinculo==='Próprio'?d.vitima_uuid:null,vitima_nome:ac?nul(d.vitima_nome):null,
       empresa:ac&&d.vinculo==='Terceiro'?nul(d.empresa):null,parte_corpo:ac?d.parte_corpo:null}); }
   const item={id:sstQid(),tipo:'sst_'+d.tipo,rpc:SST_TIPO[d.tipo].rpc,pasta:'sst',anexos,anexosParam:'p_anexos',fields:{p_id:d.id,p_dados:dados}};
@@ -11165,7 +11155,9 @@ function sgDetInsp(r,cab,al){ const hoje=sstHoje(), its=r.itens||[];
             <div class="sgacts"><button class="btn" data-ntok="${x.id}">✓ Marcar como tratada</button></div>`}</div>`; }
     return s+'</div>'; };
   const n=v=>its.filter(x=>x.resultado===v).length;
-  return `<div class="segblk"><h3>🔍 Inspeção · ${segH(r.responsavel_nome||'')}${r.responsavel_cargo?(' ('+segH(r.responsavel_cargo)+')'):''}</h3>${cab}${r.observacoes?sgKv([['Observações',segH(r.observacoes)]]):''}${sgFotos(r.fotos)}${al}</div>
+  const rsp=(r.os||r.interv_resp_nome)?sgKv([['OS da intervenção',segH(r.os||'')],['Responsável pela intervenção',segH(r.interv_resp_nome||'')+(r.interv_resp_assinado_em?(' <span class="sub" style="font-size:11px">assinou '+segFmt(r.interv_resp_assinado_em)+'</span>'):'')]])
+    +(r.interv_resp_assinatura?`<img class="sgsig" src="${fotoURL(r.interv_resp_assinatura)}" loading="lazy" style="margin-top:4px"/>`:''):'';
+  return `<div class="segblk"><h3>🔍 Inspeção · ${segH(r.responsavel_nome||'')}${r.responsavel_cargo?(' ('+segH(r.responsavel_cargo)+')'):''}</h3>${cab}${rsp}${r.observacoes?sgKv([['Observações',segH(r.observacoes)]]):''}${sgFotos(r.fotos)}${al}</div>
     <div class="segblk"><h3>Checklist · ${n('C')} C · ${n('NC')} NC · ${n('NA')} N/A</h3>${its.length?its.map(lin).join(''):(r.origem==='planilha'?`<p class="sub">Importada da planilha (só totais): ${r.itens_imp??'—'} itens, ${r.ncs_imp??'—'} NCs, ${r.tratadas_imp??'—'} tratadas.</p>`:'<p class="sub">Sem itens.</p>')}</div>`; }
 function sgDetInspWire(){ const v=$('#slView');
   v.querySelectorAll('[data-ntok]').forEach(b=>b.onclick=async()=>{ const id=b.dataset.ntok, obs=(v.querySelector(`[data-ntobs="${id}"]`).value||'').trim();
@@ -11180,7 +11172,7 @@ async function sgLancRecarregarSilencioso(){ try{ const a=qsmsArgs('sl'); const 
 // --- DDS ---
 function sgDetDds(r,cab,al){ const pr=r.presenca||[];
   return `<div class="segblk"><h3>🗣️ DDS · ${segH(r.tema||'')}</h3>${cab}${sgKv([['Aplicado por',segH(r.responsavel_nome||'')],['Duração',r.duracao_min?(r.duracao_min+' min'):''],['Efetivo da área',r.efetivo!=null?String(r.efetivo):''],['Observações',segH(r.observacoes||'')]])}${sgFotos(r.fotos)}${al}</div>
-    <div class="segblk"><h3>Presença (${pr.length||r.participantes_imp||0})</h3>${pr.length?`<table class="sgtab"><tr><th>Nome</th><th>Função</th><th>Assinatura</th></tr>${pr.map(p=>`<tr><td>${segH(p.nome)}${p.matricula?(' <span class="sub" style="font-size:11px">'+segH(p.matricula)+'</span>'):''}</td><td>${segH(p.funcao||'—')}</td><td>${p.assinatura?`<img class="sgsig" src="${fotoURL(p.assinatura)}" loading="lazy"/>`:'<span class="sub" style="color:var(--bad)">sem assinatura</span>'}</td></tr>`).join('')}</table>`
+    <div class="segblk"><h3>Presença (${pr.length||r.participantes_qtd||r.participantes_imp||0})</h3>${r.participantes_qtd!=null&&!pr.length?`<p class="sub">${r.participantes_qtd} participante(s) — lista no papel (foto acima).</p>`:pr.length?`<table class="sgtab"><tr><th>Nome</th><th>Função</th><th>Assinatura</th></tr>${pr.map(p=>`<tr><td>${segH(p.nome)}${p.matricula?(' <span class="sub" style="font-size:11px">'+segH(p.matricula)+'</span>'):''}</td><td>${segH(p.funcao||'—')}</td><td>${p.assinatura?`<img class="sgsig" src="${fotoURL(p.assinatura)}" loading="lazy"/>`:'<span class="sub" style="color:var(--bad)">sem assinatura</span>'}</td></tr>`).join('')}</table>`
       :(r.origem==='planilha'?`<p class="sub">Importado da planilha: ${r.participantes_imp??'—'} participante(s), sem lista.</p>`:'<p class="sub">Sem participantes.</p>')}</div>`; }
 // --- ocorrência: validação + ações corretivas ---
 const SG_SIM=(v)=>`<option value=""${v==null?' selected':''}>—</option><option value="true"${v===true?' selected':''}>Sim</option><option value="false"${v===false?' selected':''}>Não</option>`;
