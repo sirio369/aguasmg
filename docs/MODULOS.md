@@ -3480,6 +3480,8 @@ timeout 60 s; **criado sem senha** — o dono do projeto define com `alter role 
 pelo pooler o usuário é `bi_qsms_leitura.lwttadkctfznidzvmury`).
 
 **Cuidados:**
+- **Aplicado em 05/11/2026** (migrações `sst_indicadores` + `sst_searchpath`, esta fixa `search_path` de `sst_hoje`/`sst_consorcio_nome`
+  — `docs/migracao_sst_searchpath.sql`). Base começa vazia; a carga da planilha vem depois.
 - `postgres` no Supabase não pode `SET ROLE` para o papel do BI — o smoke test (`qa/smoke_test_sst.sql`) confere os
   privilégios com `has_table_privilege`.
 - Os nomes das colunas das views são o contrato com o BI: renomear uma coluna quebra o relatório.
