@@ -115,6 +115,9 @@ pwa/
   `perfil.aprovador_uuid`/`aprovador2_uuid` (config. no ⚙️ Usuários — na home ou em Suprimentos) + `sup_aprovadores_de(uid)`
   + `sup_notificar(...)` disparado por **trigger** na tabela de negócio (nunca inline na RPC). Ver
   docs/MODULOS.md §0.9 e §6.4 (segundo módulo a reaproveitar isso, depois de Suprimentos).
+- **Storage:** `fotos-campo` é **público** (só foto operacional); foto/documento com **dado pessoal** (`cnh/`, `pessoas/`,
+  `epi/`, `seg/`, `sst/`) vai no **privado `fotos-privadas`** — upload por `fotosBucket(path)`, exibição por URL assinada
+  automática (LGPD, 2026-11-06; ver `docs/MODULOS.md §0.12`). `biblioteca` é público (documentos de referência).
 - **Geometria:** PostGIS, **SRID 31983** (UTM, metros). Distâncias em metros direto com `ST_Distance`
   (não converta pra `geography`: dá erro "Only lon/lat supported"). Para exibir no mapa, transforme
   para 4326.
