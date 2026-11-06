@@ -20,8 +20,13 @@ $pastas  = @('cnh', 'pessoas', 'epi', 'seg', 'sst')
 $sec = Read-Host -AsSecureString 'Cole a chave service_role (secret) e tecle Enter'
 $key = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
 if (-not $key) { Write-Host 'Nenhuma chave informada — nada foi feito.'; exit 1 }
-$h = @{ apikey = $key }
-if ($key.StartsWith('eyJ')) { $h['Authorization'] = "Bearer $key" }   # chave antiga (JWT) vai também no Authorization
+# Chave vai no apikey E no Authorization (como o supabase-js faz). Sem o Authorization a chave nova (sb_secret_…)
+# vira "anônimo" no Storage e a listagem volta VAZIA sem erro nenhum (bug da 1ª versão: contou 0 em tudo).
+$h = @{ apikey = $key; Authorization = "Bearer $key" }
+
+# Confere se a chave foi aceita como service_role: o bucket privado só aparece para ela.
+try { Invoke-RestMethod -Method Get -Uri "$base/bucket/$destino" -Headers $h | Out-Null }
+catch { Write-Host "A chave não foi aceita como service_role (não enxerga o bucket privado). Nada foi feito.`n$($_.Exception.Message)"; exit 1 }
 
 function Listar($pasta) {
   $tudo = @(); $off = 0
