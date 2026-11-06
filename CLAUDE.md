@@ -309,7 +309,7 @@ pwa/
     `17 - sigos` — ver `docs/MODULOS.md §4.5` e `§21`.
     **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333) — carteira aberta no mapa (polígono, CSV, tempo corrido,
     atividade × faixa, prazo, "já executada?", 2+ OS na matrícula, fila sem localização); ponto = cadastro > manual >
-    OpenStreetMap (Edge Function `sigos-geocode`, cache `geo_endereco`) — ver `docs/MODULOS.md §21.1`.
+    OpenStreetMap (consultado pelo navegador, cache `geo_endereco`) — ver `docs/MODULOS.md §21.1`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**

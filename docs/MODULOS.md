@@ -3601,7 +3601,7 @@ oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem no
   "UPDATE requires a WHERE clause". Testes pela Management API/MCP **não** pegam isso (a extensão não carrega lá).
   Corrigido em 06/11/2026 (migração `sigos_processar_safeupdate`: `where true` no update da tabela temporária).
 
-### 21.1 Tela "OS não executadas" (`sigos_abertas`) · `docs/migracao_sigos_abertas.sql` · Edge Function `sigos-geocode` (2026-11-06, sw v333)
+### 21.1 Tela "OS não executadas" (`sigos_abertas`) · `docs/migracao_sigos_abertas.sql` (2026-11-06, sw v333; geocodificação pelo navegador na v334)
 
 Auxiliar de Programação › 📥 Relatórios SIGOS › **🗺️ OS não executadas**. Mesmo acesso do Auxiliar: `aux_acesso` ou admin,
 com o gate do banco em `public.sigos_pode_ver`. Serve para o time de programação olhar a carteira aberta (a última Relação de
@@ -3628,17 +3628,24 @@ Serviços de cada ZA) no mapa e montar a programação.
 **Localização das OS.** O relatório Relação **não traz coordenada**. A ordem de prioridade é:
 1. **cadastro**: ponto da matrícula em `"3 - comercial".ligacoes` (80% da carteira em 06/11/2026);
 2. **manual**: o programador clica em "📍 Posicionar/Ajustar" e depois no mapa;
-3. **osm**: o endereço é geocodificado no **Nominatim/OpenStreetMap** pela Edge Function `sigos-geocode`.
+3. **osm**: o endereço é geocodificado no **Nominatim/OpenStreetMap** pelo **navegador** de quem está com a tela aberta
+   (`oaGeoRodar`).
 
 Detalhes:
 - **Cache:** fica em `"17 - sigos".geo_endereco`, com chave = endereço normalizado (`end_chave`: tipo|rua|nº|bairro|cidade,
   sem complemento/CEP). Um endereço achado nunca é consultado de novo. "Não achou" tenta de novo após 7 dias, no máximo 3 vezes.
   O ponto manual nunca é sobrescrito.
-- **Disparo:** quem dispara a geocodificação é a **própria tela**. Ao abrir, ela chama `sigos-geocode` em laço (20 endereços por
-  chamada, 1 req/s, ~25 s), enquanto houver fila e a tela estiver aberta. Não há cron.
+- **Disparo:** quem dispara a geocodificação é a **própria tela**. Ao abrir, ela pega a fila em lotes de 10
+  (`app_sigos_geo_pendentes`), consulta o Nominatim (1 req/s, até 2 consultas por endereço) e grava o lote
+  (`app_sigos_geo_gravar`), enquanto houver fila e a tela estiver aberta. Não há cron. A faixa amarela mostra o andamento
+  e qualquer erro.
+- **Por que não é Edge Function:** a primeira versão (Edge Function `sigos-geocode`, v1 publicada em 06/11/2026) recebia
+  recusa do Nominatim (IP compartilhado das Edge Functions do Supabase); do banco (pg_net) e do navegador funciona. A
+  função publicada ficou sem uso (pode ser apagada no painel); o fonte saiu do repo.
 - **Validação:** o resultado só vale se a **cidade** bater (Contagem/Betim) e o estado for MG. Entre os candidatos, prefere o que
   cita o bairro. Precisão `numero` (achou o nº) ou `rua` (ponto da rua, aproximado).
-- **Privacidade:** só o **endereço** sai do banco. Não vão matrícula, nome nem nº da OS. O User-Agent identifica o app.
+- **Privacidade:** só o **endereço** sai do banco. Não vão matrícula, nome nem nº da OS. O navegador manda o Referer do
+  app (o Nominatim aceita isso como identificação de apps web).
 - **Por que falta ponto:** as OS sem ponto no cadastro são quase todas de Contagem (CONF. INFRAÇÃO VIOL. TAMP.), em bairros
   fora da base de ligações/logradouros da ZA (Ressaca, Nacional, Tijuco…).
 

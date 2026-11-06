@@ -5,8 +5,8 @@
 -- Localização de cada OS aberta (o relatório Relação NÃO traz coordenada), em ordem de prioridade:
 --   1. cadastro  — ponto da matrícula em "3 - comercial".ligacoes
 --   2. manual    — ponto fixado à mão pelo programador na tela (vale p/ o endereço em todas as cargas)
---   3. osm       — geocodificação do endereço no OpenStreetMap (Nominatim) pela Edge Function
---                  `sigos-geocode`; só o endereço sai do banco (sem nome/matrícula). Cache por endereço.
+--   3. osm       — geocodificação do endereço no OpenStreetMap (Nominatim) feita pelo NAVEGADOR da tela
+--                  (o Nominatim recusa as Edge Functions); só o endereço sai (sem nome/matrícula). Cache por endereço.
 --   sem ponto    — vai p/ a "Fila sem localização" da tela.
 -- O cache `geo_endereco` é por ENDEREÇO normalizado (tipo|rua|nº|bairro|cidade, sem complemento/CEP),
 -- então uma nova carga da Relação reaproveita tudo o que já foi localizado.
@@ -156,6 +156,7 @@ begin
 end $$;
 
 -- ---------- geocodificação: grava resultados da Edge Function ----------
+-- (chamada pelo app depois de consultar o Nominatim)
 -- p_itens: [{chave, za, endereco, lat, lon, precisao:'numero'|'rua', detalhe} | {chave, za, endereco, nao_achou:true}]
 -- Nunca sobrescreve ponto 'manual'.
 create or replace function public.app_sigos_geo_gravar(p_itens jsonb)

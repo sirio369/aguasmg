@@ -7395,8 +7395,8 @@ async function sgcProcessar(id,k){
 
 // ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
 // (docs/migracao_sigos_abertas.sql, MODULOS §21.1). Uma RPC traz a carteira inteira (≈3,3 mil OS) e
-// filtros/polígono/CSV rodam no app. Ponto: cadastro (matrícula) > manual > OpenStreetMap (Edge
-// Function sigos-geocode, chamada em laço enquanto a tela está aberta). Sem ponto → "Sem localização".
+// filtros/polígono/CSV rodam no app. Ponto: cadastro (matrícula) > manual > OpenStreetMap (consultado pelo
+// navegador, em laço enquanto a tela está aberta). Sem ponto → "Sem localização".
 let oaDados=[], oaCart={}, oaMap=null, oaPtsLayer=null, oaDrawn=null, oaPoly=null, oaPin=null, oaGeoBusy=false, oaLimite=150;
 const oaF={za:'',cls:'',st:'',vis:'',q:'',ativ:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
 const OA_FAIXAS=[['f1','0–7 dias','#1a7f4b'],['f2','8–30 dias','#d49b00'],['f3','31–90 dias','#ea6a12'],['f4','> 90 dias','#b3261e']];
@@ -7645,26 +7645,61 @@ async function oaPinSalvar(lat,lon){
   oaDados.forEach(x=>{ if(x.chave===o.chave&&x.gf!=='cadastro'){ x.lat=+lat.toFixed(6); x.lon=+lon.toFixed(6); x.gf='manual'; x.gp='manual'; } });
   toast('Ponto salvo — vale para este endereço nas próximas cargas.'); oaRender();
 }
-// geocodificação automática (OpenStreetMap) enquanto a tela está aberta
+// geocodificação automática (OpenStreetMap/Nominatim) enquanto a tela está aberta — feita pelo NAVEGADOR
+// de quem abre a tela (o Nominatim recusa as Edge Functions do Supabase: IP compartilhado). 1 consulta/s,
+// conforme a política de uso; só o endereço sai (sem matrícula/nome/OS). Resultado só vale se a cidade bater.
+// Fila e gravação pelas RPCs app_sigos_geo_pendentes / app_sigos_geo_gravar (cache "17 - sigos".geo_endereco).
+const OA_TIPO={R:'Rua',AV:'Avenida',AL:'Alameda',TV:'Travessa',PC:'Praça',PCA:'Praça',ROD:'Rodovia',EST:'Estrada',BC:'Beco',LG:'Largo',VIA:'Via',PRQ:'Parque',ANEL:'Anel'};
+const oaNorm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+let oaNomUlt=0;
+async function oaNominatim(params){
+  const esp=1100-(Date.now()-oaNomUlt); if(esp>0) await new Promise(r=>setTimeout(r,esp));
+  oaNomUlt=Date.now();
+  const u='https://nominatim.openstreetmap.org/search?'+new URLSearchParams(Object.assign({},params,{format:'jsonv2',addressdetails:'1',limit:'5',countrycodes:'br','accept-language':'pt-BR'}));
+  const r=await fetch(u);
+  if(r.status===429||r.status===403) throw new Error('o OpenStreetMap recusou as consultas ('+r.status+')');
+  if(!r.ok) return [];
+  return await r.json();
+}
+function oaGeoEscolher(res,p){
+  const cid=oaNorm(p.cidade), bai=oaNorm(p.bairro);
+  const ok=(res||[]).filter(x=>{ const a=x.address||{}; return oaNorm(a.city||a.town||a.municipality||a.village)===cid && /MINAS/.test(oaNorm(a.state)); });
+  if(!ok.length) return null;
+  return ok.find(x=>{ const a=x.address||{}; return [a.suburb,a.neighbourhood,a.quarter,a.city_district].some(v=>v&&(oaNorm(v).includes(bai)||bai.includes(oaNorm(v)))); })||ok[0];
+}
+async function oaGeoLocalizar(p){
+  const rua=((OA_TIPO[p.tipo]||p.tipo||'')+' '+(p.rua||'')).trim(), base={city:p.cidade||'',state:'Minas Gerais'};
+  let r=p.num?oaGeoEscolher(await oaNominatim(Object.assign({},base,{street:p.num+' '+rua})),p):null;
+  if(!r) r=oaGeoEscolher(await oaNominatim(Object.assign({},base,{street:rua})),p);
+  if(!r) return null;
+  return {lat:+r.lat,lon:+r.lon,precisao:(r.address&&r.address.house_number)?'numero':'rua',detalhe:String(r.display_name||'').slice(0,300)};
+}
 async function oaGeoRodar(){
   if(oaGeoBusy) return; oaGeoBusy=true;
-  const box=$('#oaGeo'); let achados=0, feitos=0, lotes=0;
+  const box=$('#oaGeo'); let achados=0, feitos=0, lotes=0, total=null;
+  const aberta=()=>!document.getElementById('sigos_abertas').classList.contains('hidden');
+  const mostra=h=>{ box.classList.remove('hidden'); box.innerHTML=h; };
   try{
-    for(let i=0;i<60;i++){
-      if(document.getElementById('sigos_abertas').classList.contains('hidden')) break;
-      const {data,error}=await sb.functions.invoke('sigos-geocode',{body:{}});
-      if(error){ let m=error.message; try{ const j=await error.context.json(); m=j.erro||j.message||m; }catch(_){} throw new Error(m); }
-      if(!data||!data.feitos){ break; }
-      feitos+=data.feitos; achados+=data.achados||0; lotes++;
-      box.classList.remove('hidden');
-      box.innerHTML='🔎 Localizando endereços sem cadastro pelo OpenStreetMap… '+oaN(achados)+' de '+oaN(feitos)+' achados · '+oaN(data.restantes)+' na fila. Pode usar a tela normalmente.';
-      if(data.erro){ throw new Error(data.erro); }
-      if(lotes%3===0) await oaCarregar();
-      if(!data.restantes) break;
+    while(aberta()){
+      const {data:pend,error}=await sb.rpc('app_sigos_geo_pendentes',{p_limite:10}); if(error) throw error;
+      const itens=(pend&&pend.itens)||[]; if(total==null) total=pend.total||0;
+      if(!itens.length) break;
+      const out=[];
+      for(const it of itens){
+        if(!aberta()) break;
+        mostra('🔎 Localizando pelo OpenStreetMap os endereços que não estão no cadastro… '+oaN(achados)+' de '+oaN(feitos)+' achados · '+oaN(Math.max(0,(pend.total||0)-out.length))+' na fila (~'+Math.max(1,Math.round((pend.total||0)*1.6/60))+' min). Pode usar a tela normalmente; se fechar, continua na próxima vez.');
+        const p=it.partes;
+        const g=(p&&p.rua&&p.cidade)?await oaGeoLocalizar(p):null;
+        feitos++; if(g) achados++;
+        out.push(Object.assign({chave:it.chave,za:it.za,endereco:it.endereco},g||{nao_achou:true}));
+      }
+      if(out.length){ const {error:e2}=await sb.rpc('app_sigos_geo_gravar',{p_itens:out}); if(e2) throw e2; }
+      lotes++; if(lotes%5===0) await oaCarregar();
     }
-    if(lotes){ await oaCarregar(); box.innerHTML='✅ Localização por endereço concluída: '+oaN(achados)+' de '+oaN(feitos)+' achados. Os que não foram achados aparecem em “📍 Sem localização” para posicionar à mão.'; setTimeout(()=>box.classList.add('hidden'),12000); }
+    if(feitos){ await oaCarregar(); mostra('✅ Localização por endereço: '+oaN(achados)+' de '+oaN(feitos)+' achados'+(aberta()?'':' (pausada — continua na próxima vez)')+'. Os não achados ficam em “📍 Sem localização” para posicionar à mão.'); setTimeout(()=>box.classList.add('hidden'),15000); }
   }catch(e){
-    box.classList.remove('hidden'); box.innerHTML='⚠️ Localização automática parou: '+vEsc((e&&e.message)||e)+'. Tenta de novo na próxima vez que abrir a tela.';
+    if(feitos) await oaCarregar();
+    mostra('⚠️ Localização automática parou: '+vEsc((e&&e.message)||e)+'. Tenta de novo na próxima vez que abrir a tela.');
   }finally{ oaGeoBusy=false; }
 }
 function oaCsv(){
