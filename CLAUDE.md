@@ -303,6 +303,10 @@ pwa/
   - **🧱 Gestão de Pavimento:** Pavimentos a recompor (`pavprog`) — lista os registros de campo do módulo
     **Gestão de Pavimento** (`pavimento`, na Home › 🛠️ Execução) agrupados por ponto, com filtro por **consórcio** e
     **serviço de origem**, fotos e export .xlsx. Ver módulo Gestão de Pavimento abaixo.
+  - **📥 Relatórios SIGOS:** **Carga SIGOS** (`sigos_carga`, 2026-11-06, sw v332) — 4 campos de envio (Relação de Serviços /
+    Encerradas × ZA1004 / ZA0200) dos relatórios exportados do SIGOS; Relação substitui a carteira da ZA, Encerradas acumula
+    OS novas; arquivo no campo errado é recusado. Bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` + schema
+    `17 - sigos` — ver `docs/MODULOS.md §4.5` e `§21`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**

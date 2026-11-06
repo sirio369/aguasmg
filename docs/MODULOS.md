@@ -1036,6 +1036,20 @@ Acompanhamento.
   - **Avisos (trigger, `sup_notificar`, tipo `pavimento`):** `reaterro_status` vira `aguardando` (Sim ou refeito) → **equipe da Qualidade** (`pav_qualidade_uuids` = engrenagem `qualidade_acesso` ou cargo Técnico de Qualidade/Coordenador de QSMSS; admin só se tiver um dos dois; exceto o ator), link `pavqual`; ensaio inserido → **só quem pediu** (`reaterro_resp_uuid`), link `pavprog_criacao` (aprovado) / `pavprog_refazer` (reprovado, com a obs) — `supGoAct` abre a pavprog já na etapa.
   - **Export** (`pavProgExport`, sem botão): Etapa · Dias na etapa · Faixa de prazo · Ensaio de reaterro (Sim/Não) · Situação do reaterro · Ensaios feitos · Último laudo + colunas de antes.
 
+
+### 4.5 Carga SIGOS — `// ---------- CARGA SIGOS` · tela `sigos_carga` (2026-11-06, sw v332)
+
+Card **📥 Carga SIGOS** na seção **📥 Relatórios SIGOS** do hub (gate da tela = o do Auxiliar, `aux_acesso`/admin; o banco
+usa `sigos_pode_carregar`, hoje qualquer logado). Backend, regras e tabelas em **§21**.
+- Grade 2×2 de campos (`SGC_SLOTS`: Relação/Encerradas × ZA1004/ZA0200; 1 coluna no celular). Cada campo mostra a última carga
+  (`app_sigos_slots`: status, resumo, arquivo, quando/quem) e o que está no banco (carteira aberta ou encerradas + período de
+  execução), com **📤 Enviar arquivo** (seletor ou arrastar e soltar no campo) e **↻ Reprocessar** quando a última carga não
+  ficou `ok`.
+- `sgcEnviar(tipo, za, file)`: só online e `.csv` ≤ 20 MB → upload em `sigos-relatorios/<tipo>/<za>/<AAAA-MM-DD>/<uuid>_<nome>`
+  → `app_sigos_registrar` → `sgcProcessar(id)` = `sb.functions.invoke('sigos-ingest', {arquivo_id})` → toast com o resumo
+  (ou o motivo da recusa) e recarrega. Lista **Últimas cargas** = `app_sigos_cargas_listar(40)`.
+- Prefixo `sgc*`/`SGC_*` (o `sg*` já é da Segurança do Trabalho).
+
 ---
 
 ## 5. Almoxarifado — `// MÓDULO SUPRIMENTOS` (~L2403) · tela `suprimentos` (schema `"9 - suprimentos"`)

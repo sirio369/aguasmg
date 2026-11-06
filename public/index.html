@@ -1060,6 +1060,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="pavprog"><div class="ic">🧱</div><div class="nm">Pavimentos a recompor</div></button>
     </div>
+
+    <div class="sec" style="margin-top:20px">📥 Relatórios SIGOS</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="sigos_carga"><div class="ic">📥</div><div class="nm">Carga SIGOS</div></button>
+    </div>
   </main>
 
   <main id="aux_acesso" class="hidden">
@@ -1162,6 +1167,17 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="pdResumo" style="margin-bottom:10px"></div>
     <div id="pdLista"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="sigos_carga" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Carga SIGOS</h1>
+    <p class="sub">Envie cada relatório exportado do SIGOS no campo dele. <b>Relação de Serviços</b> substitui a carteira inteira da ZA;
+      <b>Encerradas</b> só acrescenta as OS novas (as já gravadas ficam). Arquivo no campo errado é recusado sem mexer no banco.</p>
+    <div id="sgcSlots" class="sggrid"><p class="sub">Carregando…</p></div>
+    <div class="sec" style="margin-top:20px">Últimas cargas</div>
+    <div id="sgcHist"><p class="sub">Carregando…</p></div>
+    <input type="file" id="sgcFile" accept=".csv,text/csv,application/vnd.ms-excel" class="hidden"/>
   </main>
 
   <main id="ent_ocorrencia" class="hidden">
@@ -2086,7 +2102,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -2116,6 +2132,7 @@ function irPara(id){
   if(id==='programacao_pesquisa') ppInit();
   if(id==='pp_acomp') paInit();
   if(id==='pp_diario') pdInit();
+  if(id==='sigos_carga') sgcInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
@@ -7214,6 +7231,137 @@ function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(
 // RPCs app_pp_diario_lista / app_pp_diario_os / app_pp_relatorio_diario.
 let pdBlocos=[], pdStatus='pendente', pdPrazo='';
 const PD_COR={rede:'#1D9E75',trecho:'#d81b60',vaz:'#1565c0',fraude:'#c2410c'};
+// ---------- CARGA SIGOS (Auxiliar de Programação) ----------
+// 4 campos (Relação/Encerradas × ZA1004/ZA0200). Upload → bucket privado sigos-relatorios/<tipo>/<ZA>/<dia>/… →
+// app_sigos_registrar → Edge Function sigos-ingest (lê o CSV UTF-16 e chama sigos_processar). Regra toda no banco
+// (docs/migracao_sigos_carga.sql, MODULOS §21): Relação substitui a carteira da ZA; Encerradas acumula.
+const SGC_SLOTS=[['relacao','ZA1004'],['relacao','ZA0200'],['encerradas','ZA1004'],['encerradas','ZA0200']];
+const SGC_TIPO={relacao:'Relação de Serviços',encerradas:'Encerradas'};
+const SGC_TIPO_SUB={relacao:'OS não executadas · substitui a carteira inteira da ZA',encerradas:'OS executadas · só acrescenta OS novas'};
+const SGC_ZA={ZA1004:'Contagem',ZA0200:'Betim'};
+let sgcSlotsDados=[], sgcHistDados=[], sgcOcupado={}, sgcAlvo=null;
+function sgcCss(){
+  if(document.getElementById('sgcCss')) return;
+  const st=document.createElement('style'); st.id='sgcCss';
+  st.textContent=`#sigos_carga .sggrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+@media(max-width:640px){#sigos_carga .sggrid{grid-template-columns:1fr}}
+#sigos_carga .sgslot{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+#sigos_carga .sgslot.drag{outline:2px dashed var(--acc);outline-offset:-2px}
+#sigos_carga .sgh{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+#sigos_carga .sgza{font-size:12px;font-weight:700;color:var(--acc)}
+#sigos_carga .sgsub{font-size:12px;color:var(--mut)}
+#sigos_carga .sgst{font-size:13px;border-radius:8px;padding:8px 10px;background:var(--bg);line-height:1.4;overflow-wrap:anywhere}
+#sigos_carga .sgst.ok{background:var(--ok-bg)} #sigos_carga .sgst.erro{background:var(--bad-bg)} #sigos_carga .sgst.wait{background:var(--warn-bg)}
+#sigos_carga .sgbanco{font-size:12px;color:var(--mut)}
+#sigos_carga .sgbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+#sigos_carga .sgbtns .btn{margin:0;width:auto;flex:1;min-width:130px;padding:10px 12px;font-size:14px}
+#sigos_carga .sgrow{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
+#sigos_carga .sgrow .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:600}
+#sigos_carga .sgrow .m{color:var(--mut);font-size:12px;margin-top:2px}`;
+  document.head.appendChild(st);
+}
+function sgcInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  sgcCss();
+  const f=$('#sgcFile');
+  if(f && !f.dataset.ready){ f.dataset.ready='1'; f.onchange=()=>{ const file=f.files&&f.files[0]; f.value=''; if(file&&sgcAlvo) sgcEnviar(sgcAlvo[0],sgcAlvo[1],file); }; }
+  sgcCarregar();
+}
+async function sgcCarregar(){
+  try{
+    const [a,b]=await Promise.all([sb.rpc('app_sigos_slots'), sb.rpc('app_sigos_cargas_listar',{p_limite:40})]);
+    if(a.error) throw a.error; if(b.error) throw b.error;
+    sgcSlotsDados=a.data||[]; sgcHistDados=b.data||[];
+  }catch(e){
+    $('#sgcSlots').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; $('#sgcHist').innerHTML=''; return;
+  }
+  sgcRender();
+}
+const sgcDH=ts=>{ if(!ts) return '—'; try{ return new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(ts); } };
+const sgcN=n=>(n==null?'—':Number(n).toLocaleString('pt-BR'));
+// Resumo de uma carga (usado no campo e no histórico)
+function sgcResumo(f,tipo){
+  if(!f) return '';
+  if(f.status==='erro') return '⚠️ '+vEsc(f.erro||'Erro no processamento.');
+  if(f.status==='pendente') return '⏳ Enviado, ainda não processado.';
+  const base=sgcN(f.linhas)+' OS no arquivo · ';
+  const r=tipo==='relacao' ? base+'carteira substituída ('+sgcN(f.removidas)+' → '+sgcN(f.inseridas)+')'
+                           : base+sgcN(f.inseridas)+' novas · '+sgcN(f.ja_existentes)+' já existentes';
+  return '✅ '+r+(f.aviso?'<br>ℹ️ '+vEsc(f.aviso):'');
+}
+function sgcRender(){
+  const box=$('#sgcSlots'); if(!box) return;
+  const porK=new Map(sgcSlotsDados.map(s=>[s.tipo+'|'+s.za,s]));
+  box.innerHTML=SGC_SLOTS.map(([tipo,za])=>{
+    const k=tipo+'|'+za, s=porK.get(k)||{}, u=s.ultima, busy=sgcOcupado[k];
+    let st, cls;
+    if(busy){ st='⏳ '+vEsc(busy); cls='wait'; }
+    else if(!u){ st='Nenhum arquivo enviado ainda.'; cls=''; }
+    else{
+      st=sgcResumo(u,tipo)+'<div class="sgbanco" style="margin-top:4px">'+vEsc(u.nome||'')+' · '+sgcDH(u.enviado_em)+(u.por?' · '+vEsc(u.por):'')+'</div>';
+      cls=u.status==='ok'?'ok':(u.status==='erro'?'erro':'wait');
+    }
+    const banco=tipo==='relacao'
+      ? 'Carteira no banco: <b>'+sgcN(s.no_banco)+'</b> OS abertas'+(s.ultima_ok_em?' (de '+sgcDH(s.ultima_ok_em)+')':'')
+      : 'No banco: <b>'+sgcN(s.no_banco)+'</b> OS encerradas'+(s.exec_min?' · execução de '+fmtData(s.exec_min)+' a '+fmtData(s.exec_max):'');
+    const re=(!busy && u && u.status!=='ok') ? '<button class="btn ghost" data-re="'+vEsc(u.id)+'">↻ Reprocessar</button>' : '';
+    return '<div class="sgslot" data-k="'+k+'">'
+      +'<div class="sgh"><b>'+SGC_TIPO[tipo]+'</b><span class="sgza">'+za+' · '+SGC_ZA[za]+'</span></div>'
+      +'<div class="sgsub">'+SGC_TIPO_SUB[tipo]+'</div>'
+      +'<div class="sgst '+cls+'">'+st+'</div>'
+      +'<div class="sgbanco">'+banco+'</div>'
+      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo</button>'+re+'</div></div>';
+  }).join('');
+  box.querySelectorAll('.sgslot').forEach(el=>{
+    const [tipo,za]=el.dataset.k.split('|');
+    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ sgcAlvo=[tipo,za]; $('#sgcFile').click(); };
+    const re=el.querySelector('[data-re]'); if(re) re.onclick=()=>sgcProcessar(re.dataset.re, el.dataset.k);
+    el.ondragover=ev=>{ ev.preventDefault(); el.classList.add('drag'); };
+    el.ondragleave=()=>el.classList.remove('drag');
+    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); const file=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(file && !sgcOcupado[el.dataset.k]) sgcEnviar(tipo,za,file); };
+  });
+  const h=$('#sgcHist');
+  h.innerHTML=sgcHistDados.length ? sgcHistDados.map(f=>'<div class="sgrow"><div class="t"><span>'+SGC_TIPO[f.tipo]+' · '+f.za+' · '+SGC_ZA[f.za]+'</span><span>'+sgcDH(f.enviado_em)+'</span></div>'
+      +'<div>'+sgcResumo(f,f.tipo)+'</div><div class="m">'+vEsc(f.nome||'')+(f.por?' · '+vEsc(f.por):'')+'</div></div>').join('')
+    : '<p class="sub">Nenhuma carga ainda.</p>';
+}
+async function sgcEnviar(tipo,za,file){
+  const k=tipo+'|'+za;
+  if(!navigator.onLine){ toast('Sem internet — a carga precisa estar online.'); return; }
+  if(!/\.csv$/i.test(file.name||'')){ toast('Envie o arquivo .csv exportado do SIGOS.'); return; }
+  if(file.size>20*1024*1024){ toast('Arquivo maior que 20 MB.'); return; }
+  sgcOcupado[k]='Enviando '+(file.name||'arquivo')+'…'; sgcRender();
+  try{
+    const d=new Date(), p2=n=>String(n).padStart(2,'0');
+    const dia=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+    const nome=String(file.name||'arquivo.csv').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.\-]+/g,'_').slice(-120);
+    const path=tipo+'/'+za+'/'+dia+'/'+crypto.randomUUID()+'_'+nome;
+    const up=await sb.storage.from('sigos-relatorios').upload(path,file,{contentType:file.type||'text/csv',upsert:false});
+    if(up.error) throw up.error;
+    const {data:id,error}=await sb.rpc('app_sigos_registrar',{p_slot_tipo:tipo,p_slot_za:za,p_path:path,p_nome:file.name||nome,p_tamanho:file.size});
+    if(error) throw error;
+    await sgcProcessar(id,k);
+  }catch(e){
+    delete sgcOcupado[k]; toast('Falha no envio: '+((e&&e.message)||e)); sgcCarregar();
+  }
+}
+async function sgcProcessar(id,k){
+  const tipo=k.split('|')[0];
+  sgcOcupado[k]='Processando…'; sgcRender();
+  let r=null;
+  try{
+    const {data,error}=await sb.functions.invoke('sigos-ingest',{body:{arquivo_id:id}});
+    if(error){ let m=error.message; try{ const j=await error.context.json(); m=j.erro||j.message||m; }catch(_){} throw new Error(m); }
+    r=data;
+  }catch(e){ toast('Não processou: '+((e&&e.message)||e)+' — use Reprocessar.'); }
+  delete sgcOcupado[k];
+  if(r){
+    if(r.ok) toast(tipo==='relacao' ? 'Carteira '+r.za+' atualizada: '+sgcN(r.inseridas)+' OS abertas.' : sgcN(r.inseridas)+' OS novas · '+sgcN(r.ja_existentes)+' já existentes.');
+    else toast(r.erro||'Arquivo recusado.');
+  }
+  sgcCarregar();
+}
+
 function pdInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   pavCss();   // reaproveita .pavchips/.pavchip da Gestão de Pavimento
