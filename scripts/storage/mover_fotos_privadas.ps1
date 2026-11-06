@@ -20,9 +20,26 @@ $pastas  = @('cnh', 'pessoas', 'epi', 'seg', 'sst')
 $sec = Read-Host -AsSecureString 'Cole a chave service_role (secret) e tecle Enter'
 $key = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
 if (-not $key) { Write-Host 'Nenhuma chave informada — nada foi feito.'; exit 1 }
-$h = @{ apikey = $key }
-if ($key.StartsWith('eyJ')) { $h['Authorization'] = "Bearer $key" }   # chave antiga (JWT) vai também no Authorization
+# Tipo da chave (só o prefixo — o conteúdo nunca é impresso).
+if     ($key.StartsWith('sb_publishable_')) { Write-Host 'Essa é a chave PUBLISHABLE (pública). Use a SECRET (sb_secret_…) ou a service_role antiga (eyJ…). Nada foi feito.'; exit 1 }
+elseif ($key.StartsWith('sb_secret_'))      { $tipo = 'secret (nova)' }
+elseif ($key.StartsWith('eyJ'))             { $tipo = 'JWT (antiga)' }
+else                                        { Write-Host "Formato de chave não reconhecido ($($key.Length) caracteres, começa com '$($key.Substring(0,[Math]::Min(3,$key.Length)))…'). Nada foi feito."; exit 1 }
+Write-Host "Chave: $tipo"
 
+# JWT antiga vai no apikey E no Authorization. A secret nova vai SÓ no apikey: o gateway troca por um token
+# service_role; no Authorization ela é recusada (400 "Invalid Compact JWS").
+$h = @{ apikey = $key }
+if ($key.StartsWith('eyJ')) { $h['Authorization'] = "Bearer $key" }
+
+# Confere se a chave foi aceita como service_role: o bucket privado só aparece para ela. Sem essa trava a listagem
+# volta VAZIA sem erro quando a chave cai como anônima (foi o que deu "0 em tudo" na 1ª execução).
+try { Invoke-RestMethod -Method Get -Uri "$base/bucket/$destino" -Headers $h | Out-Null }
+catch {
+  $det = if ($_.ErrorDetails) { $_.ErrorDetails.Message } else { $_.Exception.Message }
+  Write-Host "A chave não foi aceita como service_role (não enxerga o bucket privado). Nada foi feito.`nResposta: $det"; exit 1
+}
+Write-Host 'Chave aceita (enxerga o bucket privado).'
 function Listar($pasta) {
   $tudo = @(); $off = 0
   while ($true) {
