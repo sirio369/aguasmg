@@ -256,7 +256,8 @@ begin
   update _sigos_l set
     ger    = upper(case when v_tipo = 'relacao' then "17 - sigos".val(o, 'unidade')
                         else coalesce("17 - sigos".val(o, 'gerencia'), "17 - sigos".val(o, 'escritorio_local')) end),
-    numero = "17 - sigos".val(o, case when v_tipo = 'relacao' then 'os' else 'numero' end);
+    numero = "17 - sigos".val(o, case when v_tipo = 'relacao' then 'os' else 'numero' end)
+   where true;  -- pg_safeupdate (carregado nas sessões do PostgREST) recusa UPDATE sem WHERE
   delete from _sigos_l where numero is null;   -- linhas vazias / rodapé
   update _sigos_l l set za = g.consorcio from "17 - sigos".gerencia_za g where g.gerencia = l.ger;
   select count(*) into v_n from _sigos_l;

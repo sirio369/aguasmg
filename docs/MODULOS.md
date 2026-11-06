@@ -3597,3 +3597,6 @@ oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem no
 - `sigos_processar` nunca levanta erro de validação: grava `status='erro'` + mensagem e devolve `{ok:false}`; erro inesperado
   na gravação desfaz só os dados (subbloco) e também vira `erro` no log.
 - Carga concorrente no mesmo campo é serializada por `pg_advisory_xact_lock`.
+- **pg_safeupdate**: nas chamadas do app (PostgREST) todo `UPDATE`/`DELETE` precisa de `WHERE` — senão dá
+  "UPDATE requires a WHERE clause". Testes pela Management API/MCP **não** pegam isso (a extensão não carrega lá).
+  Corrigido em 06/11/2026 (migração `sigos_processar_safeupdate`: `where true` no update da tabela temporária).
