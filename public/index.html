@@ -1063,6 +1063,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
     <div class="sec" style="margin-top:20px">📥 Relatórios SIGOS</div>
     <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="sigos_abertas"><div class="ic">🗺️</div><div class="nm">OS não executadas</div></button>
       <button class="mod" data-go="sigos_carga"><div class="ic">📥</div><div class="nm">Carga SIGOS</div></button>
     </div>
   </main>
@@ -1167,6 +1168,35 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="pdResumo" style="margin-bottom:10px"></div>
     <div id="pdLista"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="sigos_abertas" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>OS não executadas</h1>
+    <p class="sub" id="oaSub">Carregando a carteira…</p>
+    <div id="oaGeo" class="oageo hidden"></div>
+    <div id="oaCards" class="oacards"></div>
+    <div class="oafilt">
+      <select id="oaZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
+      <select id="oaCls"><option value="">Todas as classificações</option></select>
+      <select id="oaSt"><option value="">Todos os status SIGOS</option></select>
+      <select id="oaVis"><option value="">Visitas: todas</option><option value="0">Sem visita</option><option value="1">1 visita</option><option value="2">2 visitas</option><option value="3">3 ou mais</option></select>
+      <input type="search" id="oaQ" placeholder="Buscar OS, matrícula, rua ou bairro"/>
+    </div>
+    <div id="oaChips" class="oachips"></div>
+    <div id="oaMapa"></div>
+    <div class="oabar">
+      <div id="oaResumo" class="sub" style="margin:0"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn ghost hidden" id="oaPolyLimpar">✕ Limpar polígono</button>
+        <button type="button" class="btn ghost" id="oaLimpar">Limpar filtros</button>
+        <button type="button" class="btn" id="oaCsv">⬇️ Exportar CSV</button>
+      </div>
+    </div>
+    <div class="sec" style="margin-top:14px">Por atividade</div>
+    <div id="oaAtiv" style="margin-top:8px"></div>
+    <div class="sec" style="margin-top:18px">Ordens de serviço <span style="font-weight:400;color:var(--mut)">(mais antigas primeiro)</span></div>
+    <div id="oaLista" style="margin-top:8px"></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2102,7 +2132,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -2133,6 +2163,7 @@ function irPara(id){
   if(id==='pp_acomp') paInit();
   if(id==='pp_diario') pdInit();
   if(id==='sigos_carga') sgcInit();
+  if(id==='sigos_abertas') oaInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
@@ -7360,6 +7391,294 @@ async function sgcProcessar(id,k){
     else toast(r.erro||'Arquivo recusado.');
   }
   sgcCarregar();
+}
+
+// ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
+// (docs/migracao_sigos_abertas.sql, MODULOS §21.1). Uma RPC traz a carteira inteira (≈3,3 mil OS) e
+// filtros/polígono/CSV rodam no app. Ponto: cadastro (matrícula) > manual > OpenStreetMap (Edge
+// Function sigos-geocode, chamada em laço enquanto a tela está aberta). Sem ponto → "Sem localização".
+let oaDados=[], oaCart={}, oaMap=null, oaPtsLayer=null, oaDrawn=null, oaPoly=null, oaPin=null, oaGeoBusy=false, oaLimite=150;
+const oaF={za:'',cls:'',st:'',vis:'',q:'',ativ:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
+const OA_FAIXAS=[['f1','0–7 dias','#1a7f4b'],['f2','8–30 dias','#d49b00'],['f3','31–90 dias','#ea6a12'],['f4','> 90 dias','#b3261e']];
+const OA_PRAZOS=[['vencida','Vencidas'],['vence7','Vencem em 7 dias'],['prazo','No prazo'],['sem','Sem prazo']];
+const oaFaixa=o=>{ const d=o.idade??0; return d<=7?'f1':d<=30?'f2':d<=90?'f3':'f4'; };
+const oaCor=o=>(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[2]||'#888';
+function oaPrazo(o){
+  if(!o.lim) return 'sem';
+  const t=new Date(o.lim).getTime(), now=Date.now();
+  return t<now?'vencida':(t<now+7*864e5?'vence7':'prazo');
+}
+const oaAlerta=o=>!!(o.exec_sigos||o.enc_depois);
+const oaN=n=>Number(n||0).toLocaleString('pt-BR');
+function oaCss(){
+  if(document.getElementById('oaCss')) return;
+  const st=document.createElement('style'); st.id='oaCss';
+  st.textContent=`#sigos_abertas .oacards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0}
+@media(max-width:640px){#sigos_abertas .oacards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#sigos_abertas .oacard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;font:inherit;color:inherit;cursor:pointer;min-width:0}
+#sigos_abertas .oacard b{display:block;font-size:22px;line-height:1.1}
+#sigos_abertas .oacard span{font-size:12px;color:var(--mut)}
+#sigos_abertas .oacard.on{outline:2px solid var(--acc);outline-offset:-2px}
+#sigos_abertas .oacard i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#sigos_abertas .oafilt{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+#sigos_abertas .oafilt select,#sigos_abertas .oafilt input[type=search]{flex:1 1 150px;min-width:0;font-size:14px;padding:9px 10px}
+#sigos_abertas .oachips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+#sigos_abertas .oachip{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#sigos_abertas .oachip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+#sigos_abertas .oachip.al{border-color:var(--bad);color:var(--bad)} #sigos_abertas .oachip.al.on{background:var(--bad);color:#fff}
+#sigos_abertas #oaMapa{height:min(62vh,540px);border-radius:12px;border:1px solid var(--line);margin-top:8px;position:relative}
+#sigos_abertas .oabar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:10px 0}
+#sigos_abertas .oabar .btn{margin:0;width:auto;padding:9px 14px;font-size:14px}
+#sigos_abertas .oageo{font-size:13px;border-radius:10px;padding:8px 10px;background:var(--warn-bg);margin:8px 0}
+#sigos_abertas .oapin{position:absolute;z-index:500;left:50%;top:10px;transform:translateX(-50%);background:#111827;color:#fff;border-radius:10px;padding:8px 12px;font-size:13px;display:flex;gap:10px;align-items:center;max-width:92%}
+#sigos_abertas .oapin button{font:inherit;font-size:13px;background:#fff;color:#111827;border:none;border-radius:6px;padding:4px 8px;cursor:pointer}
+#sigos_abertas .oatab{width:100%;border-collapse:collapse;font-size:13px}
+#sigos_abertas .oatab th,#sigos_abertas .oatab td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+#sigos_abertas .oatab th:first-child,#sigos_abertas .oatab td:first-child{text-align:left;white-space:normal}
+#sigos_abertas .oatab tr.on td{background:var(--ok-bg)}
+#sigos_abertas .oatab tbody tr{cursor:pointer}
+#sigos_abertas .oatabw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 8px}
+#sigos_abertas .oarow{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
+#sigos_abertas .oarow .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:600}
+#sigos_abertas .oarow .m{color:var(--mut);font-size:12px;margin-top:2px}
+#sigos_abertas .oarow .a{color:var(--bad);font-size:12px;margin-top:3px}
+#sigos_abertas .oarow .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+#sigos_abertas .oarow .acts button{font:inherit;font-size:12.5px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}`;
+  document.head.appendChild(st);
+}
+function oaInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  oaCss();
+  const bind=(id,k)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(el.tagName==='INPUT'&&el.type==='search'?'input':'change',()=>{ oaF[k]=el.value.trim(); oaLimite=150; oaRender(); }); } };
+  bind('#oaZa','za'); bind('#oaCls','cls'); bind('#oaSt','st'); bind('#oaVis','vis'); bind('#oaQ','q');
+  const csv=$('#oaCsv'); if(csv&&!csv.dataset.ready){ csv.dataset.ready='1'; csv.onclick=oaCsv; }
+  const lp=$('#oaLimpar'); if(lp&&!lp.dataset.ready){ lp.dataset.ready='1'; lp.onclick=oaLimparFiltros; }
+  oaMapaInit();
+  oaCarregar().then(()=>oaGeoRodar());
+}
+async function oaCarregar(){
+  if(!oaDados.length) $('#oaLista').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_sigos_abertas'); if(error) throw error;
+    oaDados=(data&&data.itens)||[]; oaCart=(data&&data.carteiras)||{};
+  }catch(e){ $('#oaLista').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; return; }
+  oaOpcoes(); oaRender();
+}
+function oaOpcoes(){
+  const cont=(k)=>{ const m=new Map(); oaDados.forEach(o=>{ const v=o[k]||''; if(v) m.set(v,(m.get(v)||0)+1); }); return [...m.entries()].sort((a,b)=>b[1]-a[1]); };
+  const fill=(id,arr,lbl)=>{ const el=$(id); if(!el) return; const cur=el.value;
+    el.innerHTML='<option value="">'+lbl+'</option>'+arr.map(([v,n])=>'<option value="'+vEsc(v)+'">'+vEsc(v)+' ('+oaN(n)+')</option>').join('');
+    el.value=arr.some(a=>a[0]===cur)?cur:''; };
+  fill('#oaCls',cont('cls'),'Todas as classificações');
+  fill('#oaSt',cont('st'),'Todos os status SIGOS');
+  const sub=$('#oaSub'); if(sub){
+    const dh=ts=>ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    sub.innerHTML='Carteira da última <b>Relação de Serviços</b> carregada — ZA1004: '+dh(oaCart.ZA1004)+' · ZA0200: '+dh(oaCart.ZA0200)+'. Desenhe um polígono no mapa para selecionar uma área.';
+  }
+}
+// filtros "de base" (tudo menos faixa/atividade, que são os painéis clicáveis — contam sobre a base)
+function oaBase(o){
+  if(oaF.za&&o.za!==oaF.za) return false;
+  if(oaF.cls&&o.cls!==oaF.cls) return false;
+  if(oaF.st&&o.st!==oaF.st) return false;
+  if(oaF.vis){ const v=o.vis||0; if(oaF.vis==='3'?v<3:v!==+oaF.vis) return false; }
+  if(oaF.prazo.size&&!oaF.prazo.has(oaPrazo(o))) return false;
+  if(oaF.reinc&&!((o.nmat||1)>1)) return false;
+  if(oaF.exec&&!oaAlerta(o)) return false;
+  if(oaF.semloc&&o.lat!=null) return false;
+  if(oaF.q){ const q=oaF.q.toUpperCase(); if(!((o.n||'').includes(q)||String(o.mat||'').includes(q)||(o.end||'').toUpperCase().includes(q)||(o.bai||'').toUpperCase().includes(q))) return false; }
+  return true;
+}
+const oaPassa=o=>oaBase(o)&&(!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)))&&(!oaF.ativ.size||oaF.ativ.has(o.srv));
+function oaNoPoly(o){
+  if(!oaPoly) return true; if(o.lat==null) return false;
+  const x=o.lon, y=o.lat; let dentro=false;
+  for(const ring of oaPoly){ for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const [xi,yi]=ring[i],[xj,yj]=ring[j];
+    if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi)) dentro=!dentro; } }
+  return dentro;
+}
+function oaRender(){
+  const base=oaDados.filter(oaBase).filter(oaNoPoly);
+  const vis=base.filter(o=>(!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)))&&(!oaF.ativ.size||oaF.ativ.has(o.srv)));
+  // cards de envelhecimento (sobre a base + atividade)
+  const bA=base.filter(o=>!oaF.ativ.size||oaF.ativ.has(o.srv));
+  const nF=k=>bA.filter(o=>oaFaixa(o)===k).length;
+  $('#oaCards').innerHTML='<div class="oacard" style="cursor:default"><b>'+oaN(bA.length)+'</b><span>OS em aberto · '+oaN(bA.filter(o=>oaPrazo(o)==='vencida').length)+' vencidas</span></div>'
+    +OA_FAIXAS.map(([k,l,c])=>'<button type="button" class="oacard'+(oaF.faixa.has(k)?' on':'')+'" data-f="'+k+'"><b>'+oaN(nF(k))+'</b><span><i style="background:'+c+'"></i>'+l+'</span></button>').join('');
+  $('#oaCards').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ const k=b.dataset.f; oaF.faixa.has(k)?oaF.faixa.delete(k):oaF.faixa.add(k); oaLimite=150; oaRender(); });
+  // chips: prazo + destaques
+  const nAl=base.filter(oaAlerta).length, nRe=base.filter(o=>(o.nmat||1)>1).length, nSl=base.filter(o=>o.lat==null).length;
+  $('#oaChips').innerHTML=OA_PRAZOS.map(([k,l])=>'<button type="button" class="oachip'+(oaF.prazo.has(k)?' on':'')+'" data-p="'+k+'">'+l+'</button>').join('')
+    +'<button type="button" class="oachip al'+(oaF.exec?' on':'')+'" data-x="exec">⚠️ Já executada? ('+oaN(nAl)+')</button>'
+    +'<button type="button" class="oachip'+(oaF.reinc?' on':'')+'" data-x="reinc">🔁 2+ OS na matrícula ('+oaN(nRe)+')</button>'
+    +'<button type="button" class="oachip'+(oaF.semloc?' on':'')+'" data-x="semloc">📍 Sem localização ('+oaN(nSl)+')</button>';
+  $('#oaChips').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ const k=b.dataset.p; oaF.prazo.has(k)?oaF.prazo.delete(k):oaF.prazo.add(k); oaLimite=150; oaRender(); });
+  $('#oaChips').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ const k=b.dataset.x; oaF[k]=!oaF[k]; oaLimite=150; oaRender(); });
+  // tabela atividade × faixa (sobre a base + faixa) — clique filtra (várias)
+  const bF=base.filter(o=>!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)));
+  const porA=new Map(); bF.forEach(o=>{ const k=o.srv||'—'; let r=porA.get(k); if(!r){ r={t:0,f1:0,f2:0,f3:0,f4:0,v:0,id:0}; porA.set(k,r); } r.t++; r[oaFaixa(o)]++; if(oaPrazo(o)==='vencida') r.v++; r.id+=(o.idade||0); });
+  const linhas=[...porA.entries()].sort((a,b)=>b[1].t-a[1].t);
+  $('#oaAtiv').innerHTML=linhas.length?'<div class="oatabw"><table class="oatab"><thead><tr><th>Atividade'+(oaF.ativ.size?' <a href="#" id="oaAtivLimpar" style="font-weight:400;color:var(--acc)">(limpar)</a>':' <span style="font-weight:400;color:var(--mut)">— clique para filtrar</span>')+'</th><th>Total</th>'
+    +OA_FAIXAS.map(f=>'<th title="'+f[1]+'"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+f[2]+'"></i> '+f[1].replace(' dias','')+'</th>').join('')+'<th>Vencidas</th><th>Média (dias)</th></tr></thead><tbody>'
+    +linhas.map(([k,r])=>'<tr data-a="'+vEsc(k)+'" class="'+(oaF.ativ.has(k)?'on':'')+'"><td>'+vEsc(k)+'</td><td><b>'+oaN(r.t)+'</b></td><td>'+oaN(r.f1)+'</td><td>'+oaN(r.f2)+'</td><td>'+oaN(r.f3)+'</td><td>'+oaN(r.f4)+'</td><td>'+oaN(r.v)+'</td><td>'+Math.round(r.id/r.t)+'</td></tr>').join('')
+    +'</tbody></table></div>':'';
+  $('#oaAtiv').querySelectorAll('tr[data-a]').forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.a; oaF.ativ.has(k)?oaF.ativ.delete(k):oaF.ativ.add(k); oaLimite=150; oaRender(); });
+  const al=$('#oaAtivLimpar'); if(al) al.onclick=(e)=>{ e.preventDefault(); oaF.ativ.clear(); oaRender(); };
+  // barra
+  const comPt=vis.filter(o=>o.lat!=null).length;
+  $('#oaResumo').innerHTML='<b>'+oaN(vis.length)+'</b> OS'+(oaPoly?' <b>no polígono</b>':' no filtro')+' · '+oaN(comPt)+' no mapa'+(vis.length-comPt?' · '+oaN(vis.length-comPt)+' sem localização':'');
+  $('#oaPolyLimpar').classList.toggle('hidden',!oaPoly);
+  oaMapaRender(vis);
+  oaLista(vis);
+}
+function oaLimparFiltros(){
+  Object.assign(oaF,{za:'',cls:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.ativ.clear(); oaF.faixa.clear(); oaF.prazo.clear();
+  ['#oaZa','#oaCls','#oaSt','#oaVis','#oaQ'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  oaLimite=150; oaRender();
+}
+function oaDescr(o){
+  const pz=oaPrazo(o), lim=o.lim?fmtData(o.lim):'—';
+  return { pz:pz==='vencida'?'vencida desde '+lim:pz==='vence7'?'vence em '+lim:pz==='prazo'?'prazo '+lim:'sem prazo',
+    loc:o.gf==='cadastro'?'cadastro (matrícula)':o.gf==='manual'?'posicionado à mão':o.gf==='osm'?('endereço · OpenStreetMap'+(o.gp==='rua'?' (só a rua — aproximado)':'')):'sem localização',
+    al:[o.exec_sigos?'consta executada no SIGOS ('+vEsc(o.st)+(o.encr?', encerr. '+fmtData(o.encr):'')+')':'',
+        o.enc_depois?'OS '+vEsc(o.enc_depois.os)+' encerrada na matrícula em '+fmtData(o.enc_depois.em)+' ('+vEsc(o.enc_depois.srv)+')':''].filter(Boolean) };
+}
+function oaLista(vis){
+  const box=$('#oaLista'); if(!box) return;
+  if(!vis.length){ box.innerHTML='<p class="sub">Nenhuma OS com esses filtros.</p>'; return; }
+  const arr=vis.slice(0,oaLimite);
+  box.innerHTML=arr.map(o=>{ const d=oaDescr(o);
+    return '<div class="oarow" style="border-left-color:'+oaCor(o)+'" data-n="'+vEsc(o.n)+'"><div class="t"><span>'+vEsc(o.srv)+'</span><span style="color:'+oaCor(o)+'">há '+oaN(o.idade)+' dias</span></div>'
+      +'<div class="m">OS '+vEsc(o.n)+' · '+vEsc(o.za)+' · '+vEsc(o.st||'—')+' · '+d.pz+' · '+oaN(o.vis)+' visita(s)'+(o.eq?' · equipe '+vEsc(o.eq):'')+'</div>'
+      +'<div class="m">'+vEsc(o.end||'—')+(o.mat?' · matr. '+vEsc(o.mat):'')+((o.nmat||1)>1?' · <b>'+o.nmat+' OS nesta matrícula</b>':'')+'</div>'
+      +(d.al.length?'<div class="a">⚠️ '+d.al.join(' · ')+'</div>':'')
+      +'<div class="acts">'+(o.lat!=null?'<button type="button" data-ver>🗺️ Ver no mapa</button>':'')
+      +(o.gf!=='cadastro'?'<button type="button" data-pin>📍 '+(o.lat!=null?'Ajustar ponto':'Posicionar no mapa')+'</button>':'')+'</div></div>'; }).join('')
+    +(vis.length>oaLimite?'<button type="button" class="btn ghost" id="oaMais">Mostrar mais ('+oaN(vis.length-oaLimite)+' restantes)</button>':'');
+  box.querySelectorAll('.oarow').forEach(r=>{ const o=oaDados.find(x=>x.n===r.dataset.n); if(!o) return;
+    const v=r.querySelector('[data-ver]'); if(v) v.onclick=()=>oaVer(o);
+    const p=r.querySelector('[data-pin]'); if(p) p.onclick=()=>oaPinIniciar(o); });
+  const m=$('#oaMais'); if(m) m.onclick=()=>{ oaLimite+=300; oaLista(vis); };
+}
+function oaMapaInit(){
+  const cont=document.getElementById('oaMapa'); if(!cont) return;
+  if(!window.L){ cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>'; return; }
+  if(oaMap){ setTimeout(()=>oaMap.invalidateSize(),60); return; }
+  cont.innerHTML='';
+  oaMap=L.map('oaMapa',{preferCanvas:true}).setView([-19.93,-44.08],12);
+  mapAddCamadaBase(oaMap,{opacity:.6},'topleft'); mapAddLimiteZA(oaMap);
+  oaPtsLayer=L.layerGroup().addTo(oaMap);
+  oaDrawn=L.featureGroup().addTo(oaMap);
+  if(L.Draw){
+    try{ L.Draw.Polyline.prototype._onTouch=L.Util.falseFn; }catch(e){}
+    oaMap.addControl(new L.Control.Draw({position:'topright',
+      draw:{polygon:{shapeOptions:{color:'#ff6d00',weight:2,fillOpacity:.06}},rectangle:{shapeOptions:{color:'#ff6d00',weight:2,fillOpacity:.06}},
+            polyline:false,circle:false,marker:false,circlemarker:false},
+      edit:{featureGroup:oaDrawn,edit:false,remove:false}}));
+    oaMap.on(L.Draw.Event.CREATED,e=>{ oaDrawn.clearLayers(); oaDrawn.addLayer(e.layer);
+      const g=e.layer.toGeoJSON().geometry; oaPoly=g.type==='Polygon'?g.coordinates:[].concat(...(g.coordinates||[])); oaLimite=150; oaRender(); });
+  }
+  const pl=$('#oaPolyLimpar'); if(pl) pl.onclick=()=>{ oaDrawn.clearLayers(); oaPoly=null; oaRender(); };
+  const Lg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+    const d=L.DomUtil.create('div'); d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.5 system-ui,sans-serif;color:#333';
+    d.innerHTML='<b>Tempo corrido</b><br>'+OA_FAIXAS.map(f=>'<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f[2]+';margin-right:5px"></i>'+f[1]).join('<br>')
+      +'<br><i style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px dashed #333;margin-right:5px"></i>ponto aproximado';
+    L.DomEvent.disableClickPropagation(d); return d; }});
+  oaMap.addControl(new Lg());
+  oaMap.on('click',oaPinClique);
+  setTimeout(()=>oaMap.invalidateSize(),60);
+}
+let oaFitFeito=false;
+function oaMapaRender(vis){
+  if(!oaMap||!oaPtsLayer) return;
+  oaPtsLayer.clearLayers();
+  const pts=[];
+  vis.forEach(o=>{ if(o.lat==null) return;
+    const aprox=o.gf==='osm'&&o.gp==='rua';
+    const m=L.circleMarker([o.lat,o.lon],{radius:6,color:o.gf==='manual'?'#7c3aed':(aprox?'#111':'#fff'),weight:aprox?1.5:1,dashArray:aprox?'3 2':null,fillColor:oaCor(o),fillOpacity:.9});
+    m.bindPopup(()=>oaPopup(o),{minWidth:220,maxWidth:300});
+    m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const b=el&&el.querySelector('.oaPopPin'); if(b) b.onclick=()=>{ oaMap.closePopup(); oaPinIniciar(o); }; });
+    oaPtsLayer.addLayer(m); pts.push([o.lat,o.lon]); });
+  if(!oaFitFeito&&pts.length){ oaFitFeito=true; try{ oaMap.fitBounds(L.latLngBounds(pts),{padding:[20,20]}); }catch(e){} }
+}
+function oaPopup(o){
+  const d=oaDescr(o);
+  return '<div style="font-size:12.5px;line-height:1.45"><b>'+vEsc(o.srv)+'</b><br>OS '+vEsc(o.n)+' · '+vEsc(o.za)+'<br>'
+    +'<b style="color:'+oaCor(o)+'">há '+oaN(o.idade)+' dias</b> · '+d.pz+'<br>'+vEsc(o.st||'—')+' · '+oaN(o.vis)+' visita(s)'+(o.eq?'<br>Equipe '+vEsc(o.eq):'')
+    +'<br>'+vEsc(o.end||'')+(o.mat?'<br>Matrícula '+vEsc(o.mat):'')+((o.nmat||1)>1?' · <b>'+o.nmat+' OS</b>':'')
+    +(d.al.length?'<br><span style="color:#b3261e">⚠️ '+d.al.join('<br>⚠️ ')+'</span>':'')
+    +'<br><span style="color:#666">Local: '+d.loc+'</span>'
+    +'<br><a href="https://www.google.com/maps/dir/?api=1&destination='+o.lat+','+o.lon+'" target="_blank" rel="noopener">🧭 Navegar</a>'
+    +(o.gf!=='cadastro'?' · <a href="#" class="oaPopPin" onclick="return false">📍 Ajustar ponto</a>':'')+'</div>';
+}
+function oaVer(o){
+  if(!oaMap||o.lat==null) return;
+  document.getElementById('oaMapa').scrollIntoView({behavior:'smooth',block:'center'});
+  oaMap.setView([o.lat,o.lon],18);
+  oaPtsLayer.eachLayer(l=>{ const p=l.getLatLng(); if(Math.abs(p.lat-o.lat)<1e-7&&Math.abs(p.lng-o.lon)<1e-7) l.openPopup(); });
+}
+// posicionar à mão: clica no botão, depois clica no mapa
+function oaPinIniciar(o){
+  if(!oaMap) return;
+  oaPin=o;
+  let b=document.getElementById('oaPinBar');
+  if(!b){ b=document.createElement('div'); b.id='oaPinBar'; b.className='oapin'; document.getElementById('oaMapa').appendChild(b); L.DomEvent.disableClickPropagation(b); }
+  b.innerHTML='<span>📍 Clique no mapa onde fica: <b>'+vEsc((o.end||'').split(' - ')[0])+'</b></span><button type="button" id="oaPinCancel">Cancelar</button>'
+    +(o.gf==='manual'?'<button type="button" id="oaPinDel">Remover ponto manual</button>':'');
+  b.style.display='flex';
+  $('#oaPinCancel').onclick=oaPinFim;
+  const del=$('#oaPinDel'); if(del) del.onclick=()=>oaPinSalvar(null,null);
+  document.getElementById('oaMapa').scrollIntoView({behavior:'smooth',block:'center'});
+  if(o.lat!=null) oaMap.setView([o.lat,o.lon],17);
+  document.getElementById('oaMapa').style.cursor='crosshair';
+}
+function oaPinFim(){ oaPin=null; const b=document.getElementById('oaPinBar'); if(b) b.style.display='none'; const m=document.getElementById('oaMapa'); if(m) m.style.cursor=''; }
+function oaPinClique(e){ if(!oaPin) return; oaPinSalvar(e.latlng.lat,e.latlng.lng); }
+async function oaPinSalvar(lat,lon){
+  const o=oaPin; if(!o) return;
+  try{
+    const {error}=await sb.rpc('app_sigos_geo_manual',{p_chave:o.chave,p_lat:lat,p_lon:lon,p_za:o.za,p_endereco:o.end});
+    if(error) throw error;
+  }catch(e){ toast('Não salvou: '+((e&&e.message)||e)); return; }
+  oaPinFim();
+  if(lat==null){ toast('Ponto manual removido — o endereço volta para a busca automática.'); await oaCarregar(); return; }
+  oaDados.forEach(x=>{ if(x.chave===o.chave&&x.gf!=='cadastro'){ x.lat=+lat.toFixed(6); x.lon=+lon.toFixed(6); x.gf='manual'; x.gp='manual'; } });
+  toast('Ponto salvo — vale para este endereço nas próximas cargas.'); oaRender();
+}
+// geocodificação automática (OpenStreetMap) enquanto a tela está aberta
+async function oaGeoRodar(){
+  if(oaGeoBusy) return; oaGeoBusy=true;
+  const box=$('#oaGeo'); let achados=0, feitos=0, lotes=0;
+  try{
+    for(let i=0;i<60;i++){
+      if(document.getElementById('sigos_abertas').classList.contains('hidden')) break;
+      const {data,error}=await sb.functions.invoke('sigos-geocode',{body:{}});
+      if(error){ let m=error.message; try{ const j=await error.context.json(); m=j.erro||j.message||m; }catch(_){} throw new Error(m); }
+      if(!data||!data.feitos){ break; }
+      feitos+=data.feitos; achados+=data.achados||0; lotes++;
+      box.classList.remove('hidden');
+      box.innerHTML='🔎 Localizando endereços sem cadastro pelo OpenStreetMap… '+oaN(achados)+' de '+oaN(feitos)+' achados · '+oaN(data.restantes)+' na fila. Pode usar a tela normalmente.';
+      if(data.erro){ throw new Error(data.erro); }
+      if(lotes%3===0) await oaCarregar();
+      if(!data.restantes) break;
+    }
+    if(lotes){ await oaCarregar(); box.innerHTML='✅ Localização por endereço concluída: '+oaN(achados)+' de '+oaN(feitos)+' achados. Os que não foram achados aparecem em “📍 Sem localização” para posicionar à mão.'; setTimeout(()=>box.classList.add('hidden'),12000); }
+  }catch(e){
+    box.classList.remove('hidden'); box.innerHTML='⚠️ Localização automática parou: '+vEsc((e&&e.message)||e)+'. Tenta de novo na próxima vez que abrir a tela.';
+  }finally{ oaGeoBusy=false; }
+}
+function oaCsv(){
+  const vis=oaDados.filter(oaPassa).filter(oaNoPoly);
+  if(!vis.length){ toast('Nada para exportar.'); return; }
+  const cab=['OS','ZA','Cod. serviço','Atividade','Classificação','Status SIGOS','Tipo atendimento','Equipe','Matrícula','Endereço','Bairro','Setor','Rota','Abertura','Limite','Dias corridos','Faixa','Prazo','Visitas','OS na matrícula','Consta executada (SIGOS)','OS encerrada depois (matrícula)','Latitude','Longitude','Fonte da localização'];
+  const c=v=>{ const s=v==null?'':String(v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const num=v=>v==null?'':String(v).replace('.',',');
+  const dt=v=>v?String(v).replace('T',' ').slice(0,16):'';
+  const lin=vis.map(o=>[o.n,o.za,o.cod,o.srv,o.cls,o.st,o.ta,o.eq,o.mat,o.end,o.bai,o.setor,o.rota,dt(o.ab),dt(o.lim),o.idade,(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[1],(OA_PRAZOS.find(p=>p[0]===oaPrazo(o))||[])[1],o.vis,o.nmat,o.exec_sigos?'sim':'',o.enc_depois?(o.enc_depois.os+' em '+fmtData(o.enc_depois.em)):'',num(o.lat),num(o.lon),oaDescr(o).loc].map(c).join(';'));
+  const csv=cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n';
+  try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
+    a.download='os_nao_executadas_'+new Date().toISOString().slice(0,10)+(oaPoly?'_poligono':'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
+    toast(oaN(vis.length)+' OS exportadas.'); }catch(e){ toast('Não consegui gerar o CSV'); }
 }
 
 function pdInit(){
