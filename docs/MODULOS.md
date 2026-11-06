@@ -3527,3 +3527,58 @@ outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo par
 - Os nomes das colunas das views são o contrato com o BI: renomear uma coluna quebra o relatório.
 - O `Área` mistura áreas do cadastro (`perfil.area`, em ASO/treinamentos) e as escolhidas no campo (inspeção/DDS/ocorrência) —
   o app de campo deve oferecer a lista de `perfil.area` + "Geral" para não espalhar grafias.
+
+---
+
+## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
+
+Ponto único de entrada dos relatórios de OS exportados à mão do **SIGOS** da COPASA, para servir de base a outras telas,
+BI e cruzamentos (ligações, pavimento, pesquisa, fraude). São **4 campos de envio** (tipo × ZA):
+
+| | ZA1004 — Contagem (GRCN) | ZA0200 — Betim (GRMS/ELBE) |
+|---|---|---|
+| **Relação de Serviços** (OS não executadas, sem limite de dias; 21 colunas, "Abertura OS") | `relacao/ZA1004` | `relacao/ZA0200` |
+| **Encerradas** (executadas, janela de 30 dias; 40 colunas, "Data de Execução") | `encerradas/ZA1004` | `encerradas/ZA0200` |
+
+**Regras (decididas pelo usuário):**
+- **Relação = substituição**: o arquivo novo apaga a carteira inteira **daquela ZA** (`os_aberta where consorcio = ZA`) e grava o
+  novo. Contagem nunca apaga Betim. Uma Relação mais antiga que a última carregada no campo é recusada (não regride a carteira).
+- **Encerradas = acumulativa**: `insert … on conflict (numero) do nothing` — só entra OS nova; nada é apagado. Como o SIGOS
+  limita a 30 dias, os envios se sobrepõem e o resumo mostra inseridas × já existentes.
+- **Conferência do campo**: o tipo vem do cabeçalho e a ZA da Gerência/Unidade das linhas (de-para editável
+  `"17 - sigos".gerencia_za`: GRCN→ZA1004, GRMS/ELBE→ZA0200). Não bateu com o campo → recusado com mensagem, banco intacto.
+- Mesmo arquivo de novo (sha256) não é recusado — só gera **aviso** "idêntico ao já enviado em …" (reprocessar é inofensivo).
+
+**Fluxo:** app sobe o `.csv` em `sigos-relatorios/<tipo>/<ZA>/<AAAA-MM-DD>/<uuid>_<nome>` → `app_sigos_registrar` (linha
+`pendente` em `arquivo`) → `functions.invoke('sigos-ingest', {arquivo_id})`. A função roda **com o JWT do usuário** (sem
+service role): baixa do bucket, decodifica (o SIGOS exporta **UTF-16 LE sem BOM**; cai para UTF-8/Windows-1252), lê o CSV
+(`;`, aspas RFC 4180 — as coordenadas vêm como `"=""-19.93"""`) e chama `sigos_processar(arquivo, cabeçalho, linhas, sha256,
+tamanho)`. **Toda a regra está no SQL**; a função é só leitor. Falha de leitura → `app_sigos_falha` grava o erro e o campo
+oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem novo upload). Não há rotina agendada: envio só pelo app.
+
+**Banco (`"17 - sigos"`, app-only, RLS sem policy):**
+- `arquivo` — log de cargas (nunca apaga): campo (`slot_tipo`/`slot_za`), path, nome, sha256, tipo/ZA detectados, período
+  (das Encerradas, lido do nome `EncerradasAAAAMMDDaAAAAMMDD…`), linhas/inseridas/já existentes/removidas, status
+  `pendente|ok|erro`, erro, aviso, quem/quando.
+- `os_aberta` (PK `numero`) — carteira atual = última Relação de cada ZA. `equipe` e `responsavel` saem de "Equipe e Responsável".
+- `os_encerrada` (PK `numero`) — histórico acumulado; `geom_imovel`/`geom_foto` (Point 31983, de lat/lon WGS84; 0,0 → null).
+- Views `vw_os_aberta` (+ `idade_dias`, `vencida`, `carteira_de`), `vw_os_encerrada` (+ `no_prazo`, `dist_foto_m`,
+  `foto_sem_gps`, `foto_longe` > 200 m), `vw_os_ligacao` (abertas + encerradas ligadas a `"3 - comercial".ligacoes` pela matrícula).
+- BI: grupo `bi_sigos_leitura` (só as 3 views) concedido a `bi_leitura`. **Sem acesso GIS** (schema app-only; se for ao QGIS,
+  criar view curada na vitrine).
+- RPCs (definer, `authenticated`): `app_sigos_registrar(tipo, za, path, nome, tamanho)`, `app_sigos_arquivo_info(id)`,
+  `app_sigos_falha(id, erro)`, `sigos_processar(…)`, `app_sigos_slots()` (os 4 campos: última carga + quantas OS no banco),
+  `app_sigos_cargas_listar(limite)`.
+- **Acesso:** helper único `public.sigos_pode_carregar(uid)` usado nas RPCs e nas policies do bucket. **Por ora = qualquer
+  usuário logado e ativo** (o usuário vai definir a regra); para restringir, trocar só essa função.
+- Bucket **`sigos-relatorios`** privado (20 MB): insert/select para `sigos_pode_carregar`, só nas 4 pastas; sem update/delete
+  (o arquivo bruto fica como prova de cada carga).
+
+**Cuidados:**
+- **LGPD**: "Responsável" das Encerradas vem `CPF - NOME` → `sem_cpf()` grava só o nome. **Não são gravados**: Identificador do
+  Cliente (11 dígitos, pode ser CPF), Telefone Solicitante (`0 - 0`) e Placa (`SEMPLACA`).
+- Os cabeçalhos são casados por chave normalizada (`norm_cab`: minúsculo, sem acento, `_`). Se o SIGOS renomear uma coluna,
+  o campo vem vazio sem erro — conferir o resumo da primeira carga depois de qualquer mudança no SIGOS.
+- `sigos_processar` nunca levanta erro de validação: grava `status='erro'` + mensagem e devolve `{ok:false}`; erro inesperado
+  na gravação desfaz só os dados (subbloco) e também vira `erro` no log.
+- Carga concorrente no mesmo campo é serializada por `pg_advisory_xact_lock`.
