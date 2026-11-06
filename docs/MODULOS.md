@@ -3512,3 +3512,8 @@ outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo par
 - Os nomes das colunas das views são o contrato com o BI: renomear uma coluna quebra o relatório.
 - O `Área` mistura áreas do cadastro (`perfil.area`, em ASO/treinamentos) e as escolhidas no campo (inspeção/DDS/ocorrência) —
   o app de campo deve oferecer a lista de `perfil.area` + "Geral" para não espalhar grafias.
+
+### 6.9 Terceiros não acessam alguns módulos (2026-11-06, sw v331) — migração `docs/migracao_bloqueio_terceiros.sql`
+- `app_me` devolve `terceiro` (`perfil.modalidade = 'TERCEIRO'`). Rodar a migração **antes** do deploy do app; sem ela nada é escondido.
+- Para terceiros, a tela inicial esconde Mapeamento de pressão, Loggers, Pesquisa, Entrevistadores, VRPs – Campo e Frota, e `irPara()` bloqueia as telas desses módulos (`TERC_BLOQ` + `vrpman*`) com o aviso "Módulo não disponível para terceiros".
+- Só frontend: as RPCs/tabelas não validam a modalidade. Um terceiro que chame o banco direto ainda consegue; blindagem no servidor fica como evolução.
