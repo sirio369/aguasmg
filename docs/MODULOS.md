@@ -3546,7 +3546,8 @@ outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo par
 
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
-Ponto único de entrada dos relatórios de OS exportados à mão do **SIGOS** da COPASA, para servir de base a outras telas,
+**Aplicado em 06/11/2026** (migrações `sigos_carga` + `sigos_searchpath`; Edge Function `sigos-ingest` v1 publicada,
+verify_jwt=true). Ponto único de entrada dos relatórios de OS exportados à mão do **SIGOS** da COPASA, para servir de base a outras telas,
 BI e cruzamentos (ligações, pavimento, pesquisa, fraude). São **4 campos de envio** (tipo × ZA):
 
 | | ZA1004 — Contagem (GRCN) | ZA0200 — Betim (GRMS/ELBE) |
