@@ -3600,3 +3600,58 @@ oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem no
 - **pg_safeupdate**: nas chamadas do app (PostgREST) todo `UPDATE`/`DELETE` precisa de `WHERE` — senão dá
   "UPDATE requires a WHERE clause". Testes pela Management API/MCP **não** pegam isso (a extensão não carrega lá).
   Corrigido em 06/11/2026 (migração `sigos_processar_safeupdate`: `where true` no update da tabela temporária).
+
+### 21.1 Tela "OS não executadas" (`sigos_abertas`) · `docs/migracao_sigos_abertas.sql` · Edge Function `sigos-geocode` (2026-11-06, sw v333)
+
+Auxiliar de Programação › 📥 Relatórios SIGOS › **🗺️ OS não executadas**. Mesmo acesso do Auxiliar: `aux_acesso` ou admin,
+com o gate do banco em `public.sigos_pode_ver`. Serve para o time de programação olhar a carteira aberta (a última Relação de
+Serviços de cada ZA) no mapa e montar a programação.
+
+- **Uma RPC só**, `app_sigos_abertas()`, traz a carteira inteira (≈3,3 mil OS, ~2 MB, < 1 s). Filtros, polígono, tabela e
+  CSV rodam no app.
+- **Painéis clicáveis (filtram):**
+  - cartões de **tempo corrido**: dias desde a abertura, faixas 0–7 / 8–30 / 31–90 / > 90;
+  - tabela **atividade × faixa**, com total, vencidas e média de dias; dá para marcar várias atividades.
+- **Filtros:** ZA, classificação, status SIGOS, visitas (0/1/2/3+), busca (OS, matrícula, rua, bairro).
+- **Chips:**
+  - **prazo:** vencida / vence em 7 dias / no prazo / sem prazo;
+  - **⚠️ Já executada?:** status `EXECUTADA(E)` ou encerramento realizado preenchido, ou outra OS **encerrada** na mesma
+    matrícula depois da abertura (`os_encerrada`);
+  - **🔁 2+ OS na matrícula:** uma ida resolve várias;
+  - **📍 Sem localização.**
+- **Mapa:**
+  - a cor do ponto é a faixa de tempo corrido;
+  - borda tracejada = ponto aproximado (só a rua); borda roxa = posicionado à mão;
+  - polígono ou retângulo (Leaflet.draw) seleciona a área, e lista, tabela e CSV passam a valer só para ela.
+- **CSV:** `;`, BOM, decimal com vírgula (abre direto no Excel). Exporta o filtro atual ∩ polígono.
+
+**Localização das OS.** O relatório Relação **não traz coordenada**. A ordem de prioridade é:
+1. **cadastro**: ponto da matrícula em `"3 - comercial".ligacoes` (80% da carteira em 06/11/2026);
+2. **manual**: o programador clica em "📍 Posicionar/Ajustar" e depois no mapa;
+3. **osm**: o endereço é geocodificado no **Nominatim/OpenStreetMap** pela Edge Function `sigos-geocode`.
+
+Detalhes:
+- **Cache:** fica em `"17 - sigos".geo_endereco`, com chave = endereço normalizado (`end_chave`: tipo|rua|nº|bairro|cidade,
+  sem complemento/CEP). Um endereço achado nunca é consultado de novo. "Não achou" tenta de novo após 7 dias, no máximo 3 vezes.
+  O ponto manual nunca é sobrescrito.
+- **Disparo:** quem dispara a geocodificação é a **própria tela**. Ao abrir, ela chama `sigos-geocode` em laço (20 endereços por
+  chamada, 1 req/s, ~25 s), enquanto houver fila e a tela estiver aberta. Não há cron.
+- **Validação:** o resultado só vale se a **cidade** bater (Contagem/Betim) e o estado for MG. Entre os candidatos, prefere o que
+  cita o bairro. Precisão `numero` (achou o nº) ou `rua` (ponto da rua, aproximado).
+- **Privacidade:** só o **endereço** sai do banco. Não vão matrícula, nome nem nº da OS. O User-Agent identifica o app.
+- **Por que falta ponto:** as OS sem ponto no cadastro são quase todas de Contagem (CONF. INFRAÇÃO VIOL. TAMP.), em bairros
+  fora da base de ligações/logradouros da ZA (Ressaca, Nacional, Tijuco…).
+
+**RPCs**
+- `app_sigos_abertas()`
+- `app_sigos_geo_pendentes(p_limite)`
+- `app_sigos_geo_gravar(p_itens jsonb)`
+- `app_sigos_geo_manual(p_chave, p_lat, p_lon, p_za, p_endereco)`: lat/lon nulos removem o ponto manual.
+
+**View** `"17 - sigos".vw_os_aberta_local`: carteira com `geom`, `geo_fonte` e `geo_precisao`, para QGIS/BI
+(`bi_sigos_leitura`).
+
+**Cuidados:**
+- `end_partes`/`end_chave` são **plpgsql**. Em SQL com `SET search_path` elas não são "inlinadas" e são replanejadas a cada
+  linha (~3 ms cada → 20 s na carteira toda, estourando os 8 s do PostgREST).
+- Se a Relação mudar o formato do endereço, a chave muda e o cache "esquece". Conferir o `end_partes` com uma amostra.

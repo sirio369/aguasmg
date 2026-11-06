@@ -156,7 +156,7 @@ pwa/
 | `14 - pessoas` | **legado** da antiga Gestão de Pessoas (removida do app em 2026-10): candidatos (PII), admissão, checklist, desligamento — *app-only*; pode ser dropado com `docs/migracao_remove_gestao_pessoas.sql` |
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
 | `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); **Indicadores SST** (2026-11-05): `sst_*` (inspeção, DDS, ocorrência + ação, ASO, treinamento, CIPA) + views `bi_sst_*` lidas pelo BI QSMS via o login genérico dos BIs `bi_leitura` (grupo `bi_qsms_leitura`; BI novo = grupo `bi_<area>_leitura` + `grant … to bi_leitura`); o BI publicado lê em Import pela API HTTPS (`rpc/bi_dados` + chave por BI em `public.bi_api_chave`, `docs/migracao_bi_api.sql`) porque o serviço não aceita o certificado do Postgres; nada pode ser apagado (trigger) — *app-only* |
-| `17 - sigos` | **Carga SIGOS** (2026-11-06): relatórios de OS do SIGOS enviados pelo Auxiliar de Programação — `arquivo` (log de cargas), `os_aberta` (carteira: Relação substitui por ZA), `os_encerrada` (Encerradas acumula), views `vw_os_*` (BI via `bi_sigos_leitura`); bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` — *app-only*, ver `docs/MODULOS.md §21` |
+| `17 - sigos` | **Carga SIGOS** (2026-11-06): relatórios de OS do SIGOS enviados pelo Auxiliar de Programação — `arquivo` (log de cargas), `os_aberta` (carteira: Relação substitui por ZA), `os_encerrada` (Encerradas acumula), views `vw_os_*` (BI via `bi_sigos_leitura`), `geo_endereco` (cache de localização da tela OS não executadas); bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` — *app-only*, ver `docs/MODULOS.md §21` |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -307,6 +307,9 @@ pwa/
     Encerradas × ZA1004 / ZA0200) dos relatórios exportados do SIGOS; Relação substitui a carteira da ZA, Encerradas acumula
     OS novas; arquivo no campo errado é recusado. Bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` + schema
     `17 - sigos` — ver `docs/MODULOS.md §4.5` e `§21`.
+    **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333) — carteira aberta no mapa (polígono, CSV, tempo corrido,
+    atividade × faixa, prazo, "já executada?", 2+ OS na matrícula, fila sem localização); ponto = cadastro > manual >
+    OpenStreetMap (Edge Function `sigos-geocode`, cache `geo_endereco`) — ver `docs/MODULOS.md §21.1`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**
