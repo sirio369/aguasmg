@@ -463,3 +463,13 @@ end $$;
 grant usage on schema "17 - sigos" to bi_sigos_leitura;
 grant select on "17 - sigos".vw_os_aberta, "17 - sigos".vw_os_encerrada, "17 - sigos".vw_os_ligacao to bi_sigos_leitura;
 grant bi_sigos_leitura to bi_leitura;
+
+-- search_path fixo nos helpers (advisor function_search_path_mutable) — migração `sigos_searchpath`
+alter function "17 - sigos".norm_cab(text) set search_path = pg_catalog;
+alter function "17 - sigos".val(jsonb, text) set search_path = pg_catalog;
+alter function "17 - sigos".ts(text) set search_path = pg_catalog;
+alter function "17 - sigos".num(text) set search_path = pg_catalog;
+alter function "17 - sigos".inteiro(text) set search_path = pg_catalog;
+alter function "17 - sigos".matric(text) set search_path = pg_catalog;
+alter function "17 - sigos".sem_cpf(text) set search_path = pg_catalog;
+alter function "17 - sigos".ponto(numeric, numeric) set search_path = pg_catalog, public;
