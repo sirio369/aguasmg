@@ -50,6 +50,20 @@
     `app_abertura_servico_registrar`, §3.2; `app_ocorrencia_registrar`, §2.3). O perfil fica por último: a mesma
     pessoa atende as duas ZAs. Pior que `null` é o valor **errado**: na ocorrência da pesquisa 8/19 estavam na ZA
     oposta ao ponto (o aparelho tinha o consórcio da última Pressão).
+12. **Foto/documento com dado pessoal vai no bucket PRIVADO `fotos-privadas` (LGPD, 2026-11-06, sw v331,
+    `docs/migracao_fotos_privadas.sql`).** O `fotos-campo` é **público** (link abre sem login — exportações de
+    pavimento e outras usam isso), então só recebe foto operacional. Pastas privadas: `cnh/`, `pessoas/`, `epi/`
+    (foto do colaborador e assinaturas, inclusive `termo_frota`), `seg/` (APR/PT/PET) e `sst/` (QSMS campo) — regex
+    `PRIV_RE` no `index.html`. **Upload:** sempre `sb.storage.from(fotosBucket(path)).upload(path,…)` (escolhe pelo
+    prefixo; o caminho gravado no banco não muda). **Exibição:** continue montando `SBASE+caminho`/`fotoURL()`: um
+    `MutationObserver` global troca em `<img>/<a>/<iframe>` o link dessas pastas por URL assinada de 1 h
+    (`privAssinar`, cache 50 min); `window.open` e `window.print` foram embrulhados para esperar a assinatura (e as
+    imagens do `#relatorio`). Sem a assinatura (offline, sem permissão, arquivo ainda não movido) cai no link público.
+    **Quem lê** = `public.fotos_priv_pode_ler(name, owner)` na policy `fotos_priv_select`: CNH → dono do upload, o
+    próprio condutor (`frota_condutor`/`_cnh_historico`), `frota_responsaveis()` e admin; `pessoas/` → admin;
+    `epi/`/`seg/`/`sst/` → qualquer logado. **Pasta nova com dado pessoal:** acrescente no `PRIV_RE`, no `case` da
+    função e no `with check` de `fotos_priv_insert`. Arquivos antigos: `scripts/storage/mover_fotos_privadas.ps1`
+    (Storage API `object/move`, service_role digitada na hora; idempotente — rode de novo p/ pegar envio de app antigo).
 
 ---
 

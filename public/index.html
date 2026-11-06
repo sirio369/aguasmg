@@ -1788,7 +1788,7 @@ async function enviar(item){
       const blob=fotos[param]; if(!blob) continue;
       const pdf=blob.type==='application/pdf'; // laudo do ensaio de reaterro pode vir em PDF; o resto é foto comprimida (jpeg)
       const path=(item.pasta||'pressao')+'/'+item.id+'_'+param+(pdf?'.pdf':'.jpg');
-      const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:pdf?'application/pdf':'image/jpeg',upsert:true});
+      const {error}=await sb.storage.from(fotosBucket(path)).upload(path,blob,{contentType:pdf?'application/pdf':'image/jpeg',upsert:true});
       if(error) throw error;
       fields[param]=(item.fotosArray&&item.fotosArray.includes(param))?[path]:path;
     }
@@ -1799,7 +1799,7 @@ async function enviar(item){
     for(const k in item.anexos){
       const blob=item.anexos[k]; if(!blob) continue;
       const path=(item.pasta||'seg')+'/'+item.id+'_'+k+'.jpg';
-      const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:'image/jpeg',upsert:true});
+      const {error}=await sb.storage.from(fotosBucket(path)).upload(path,blob,{contentType:'image/jpeg',upsert:true});
       if(error) throw error;
       m[k]=path;
     }
@@ -3534,6 +3534,55 @@ const LG_SIT={
 };
 const SBASE='https://lwttadkctfznidzvmury.supabase.co/storage/v1/object/public/fotos-campo/';
 function fotoURL(p){return p?SBASE+p:'';}
+// ---------- FOTOS PRIVADAS (LGPD, 2026-11-06) ----------
+// Pastas com dado pessoal ficam no bucket PRIVADO `fotos-privadas`: CNH, legado de pessoas, EPI (foto do colaborador e
+// assinaturas, inclusive do termo de frota), APR/PT/PET (seg/) e QSMS campo (sst/). O caminho gravado no banco NÃO muda
+// ('cnh/…', 'epi/…'): o bucket sai do prefixo (fotosBucket). As telas seguem montando SBASE+caminho; o observador abaixo
+// troca, em qualquer <img>/<a>/<iframe>, o link público dessas pastas por uma URL assinada (1 h), e window.open/print
+// esperam a assinatura. Arquivo ainda não movido (antes do scripts/storage/mover_fotos_privadas.ps1) cai no link público.
+const PRIV_BUCKET='fotos-privadas', PRIV_RE=/^(cnh|pessoas|epi|seg|sst)\//;
+function fotosBucket(path){ return PRIV_RE.test(path||'')?PRIV_BUCKET:'fotos-campo'; }
+function privPath(url){ if(typeof url!=='string'||!url.startsWith(SBASE)) return null;
+  let p=url.slice(SBASE.length).split(/[?#]/)[0]; try{ p=decodeURIComponent(p); }catch(_){} return PRIV_RE.test(p)?p:null; }
+const _privUrl=new Map(), _privPend=new Map(), _privHidr=new Set();   // cache caminho→{u,t} · assinaturas em voo · hidratações em voo
+async function privAssinar(paths){
+  const agora=Date.now(), falta=[...new Set(paths)].filter(p=>{ const c=_privUrl.get(p); return !(c&&c.t>agora)&&!_privPend.has(p); });
+  if(falta.length){
+    const job=(async()=>{ let out=[]; try{ const r=await sb.storage.from(PRIV_BUCKET).createSignedUrls(falta,3600); out=(r&&r.data)||[]; }catch(_){}
+      const m=new Map(out.filter(x=>x&&x.signedUrl&&!x.error).map(x=>[x.path,x.signedUrl]));
+      falta.forEach(p=>{ const u=m.get(p); _privUrl.set(p,u?{u,t:Date.now()+50*60e3}:{u:SBASE+p,t:Date.now()+5*60e3}); _privPend.delete(p); }); })();
+    falta.forEach(p=>_privPend.set(p,job));
+  }
+  await Promise.all(paths.map(p=>_privPend.get(p)).filter(Boolean));
+  return Object.fromEntries(paths.map(p=>[p,(_privUrl.get(p)||{}).u]));
+}
+const PRIV_SEL='img[src],a[href],iframe[src],embed[src],object[data]';
+function privHidratar(root){
+  if(!root||root.nodeType!==1) return;
+  const els=[...root.querySelectorAll(PRIV_SEL)]; if(root.matches(PRIV_SEL)) els.push(root);
+  const alvo=[];
+  els.forEach(el=>{ const at=el.tagName==='A'?'href':(el.tagName==='OBJECT'?'data':'src'); const v=el.getAttribute(at);
+    if(!v||v===el.dataset.privSrc) return; const p=privPath(v); if(!p) return;
+    alvo.push([el,at,p]); if(el.tagName==='IMG'){ el.dataset.privSrc=''; el.removeAttribute('src'); } });   // sem src até assinar (evita pedir o link público)
+  if(!alvo.length) return;
+  const pr=privAssinar(alvo.map(x=>x[2])).then(m=>alvo.forEach(([el,at,p])=>{ const u=m[p]; if(!u) return; el.dataset.privSrc=u; el.setAttribute(at,u); }));
+  _privHidr.add(pr); pr.finally(()=>_privHidr.delete(pr));
+}
+new MutationObserver(ms=>{ for(const m of ms){ if(m.type==='attributes') privHidratar(m.target); else m.addedNodes.forEach(privHidratar); } })
+  .observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','href','data']});
+// link clicado antes de assinar → abre pela assinatura
+document.addEventListener('click',e=>{ const a=e.target&&e.target.closest&&e.target.closest('a[href]'); if(!a) return;
+  const h=a.getAttribute('href'); if(h===a.dataset.privSrc||!privPath(h)) return; e.preventDefault(); window.open(h,'_blank'); },true);
+// window.open(SBASE+caminho) → abre a janela já (não cai no bloqueio de pop-up) e navega quando a URL assinada chegar
+{ const _open=window.open.bind(window);
+  window.open=function(url,alvo,...r){ const p=privPath(url); if(!p) return _open(url,alvo,...r);
+    const w=_open('',alvo||'_blank'); privAssinar([p]).then(m=>{ const u=m[p]||url; if(w){ try{ w.opener=null; }catch(_){} w.location.href=u; } else _open(u,alvo||'_blank'); }); return w; }; }
+// window.print() espera as assinaturas e as imagens do relatório carregarem
+{ const _print=window.print.bind(window);
+  window.print=async function(){ privHidratar(document.body); await Promise.all([..._privHidr]);
+    await Promise.all([...document.querySelectorAll('#relatorio img')].filter(i=>!i.complete)
+      .map(i=>new Promise(r=>{ i.addEventListener('load',r,{once:true}); i.addEventListener('error',r,{once:true}); setTimeout(r,8000); })));
+    _print(); }; }
 // ----- Relatório consolidado da intervenção (Projetos) -----
 // agrupa avanços por atividade (nível 1) → subatividade, SÓ o que tem lançamento de fato, em ordem de execução; cada sub em ordem de envio (ts asc)
 function pjRelGrupos(iv){ const grupos=[], byAtiv={};
@@ -9293,7 +9342,7 @@ function epiSigFSclose(){
   if(cv) requestAnimationFrame(()=>epiSigResize(cv,900,270,snap));
 }
 function epiCanvasBlob(cv){ return new Promise(r=>cv.toBlob(r,'image/png')); }
-async function epiUpload(blob,sufixo){ const path='epi/'+crypto.randomUUID()+'_'+sufixo; const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:blob.type||'image/png',upsert:true}); if(error) throw error; return path; }
+async function epiUpload(blob,sufixo){ const path='epi/'+crypto.randomUUID()+'_'+sufixo; const {error}=await sb.storage.from(fotosBucket(path)).upload(path,blob,{contentType:blob.type||'image/png',upsert:true}); if(error) throw error; return path; }
 function epiCapturaWire(){
   $('#supView').querySelectorAll('.epiFoto').forEach(inp=>inp.addEventListener('change',async ev=>{
     const id=inp.dataset.cap, f=ev.target.files[0]; if(!f) return;
@@ -11163,7 +11212,7 @@ function sgDetInspWire(){ const v=$('#slView');
   v.querySelectorAll('[data-ntok]').forEach(b=>b.onclick=async()=>{ const id=b.dataset.ntok, obs=(v.querySelector(`[data-ntobs="${id}"]`).value||'').trim();
     if(!obs) return toast('Descreva a tratativa'); b.disabled=true;
     try{ let foto=null; const f=v.querySelector(`[data-ntfoto="${id}"]`).files[0];
-      if(f){ const blob=await comprimir(f); foto='sst/trat_'+id+'_'+Date.now()+'.jpg'; const {error}=await sb.storage.from('fotos-campo').upload(foto,blob,{contentType:'image/jpeg',upsert:true}); if(error) throw error; }
+      if(f){ const blob=await comprimir(f); foto='sst/trat_'+id+'_'+Date.now()+'.jpg'; const {error}=await sb.storage.from(fotosBucket(foto)).upload(foto,blob,{contentType:'image/jpeg',upsert:true}); if(error) throw error; }
       await sgRpc('app_sst_nc_tratar',{p_item:id,p_status:'tratada',p_obs:obs,p_foto:foto}); toast('✓ NC tratada'); sgDetalhe(); sgLancRecarregarSilencioso(); }
     catch(e){ toast('⚠ '+(e.message||e)); b.disabled=false; } });
   v.querySelectorAll('[data-ntre]').forEach(b=>b.onclick=async()=>{ if(!confirm('Reabrir esta NC? Ela volta a contar como pendente.')) return;
@@ -11848,7 +11897,7 @@ function wireFotoPick(root){ root.querySelectorAll('.fFoto2').forEach(fi=>fi.add
 async function uploadFoto2(alvo,pasta){ const b=FOTO2_BLOBS[alvo]; if(!b) return null;
   const pdf=foto2EhPdf(b); const ext=pdf?'pdf':'jpg', ct=pdf?'application/pdf':'image/jpeg';
   const path=pasta+'/'+crypto.randomUUID()+'.'+ext;
-  const {error}=await sb.storage.from('fotos-campo').upload(path,b,{contentType:ct,upsert:true}); if(error) throw error; return path; }
+  const {error}=await sb.storage.from(fotosBucket(path)).upload(path,b,{contentType:ct,upsert:true}); if(error) throw error; return path; }
 
 // ----- HUB da Frota (estilo Suprimentos: seções -> botões -> abre o fluxo que já existe) -----
 let frotaCur='home', frotaMeuVeiculo=null;
