@@ -3662,3 +3662,59 @@ Detalhes:
 - `end_partes`/`end_chave` são **plpgsql**. Em SQL com `SET search_path` elas não são "inlinadas" e são replanejadas a cada
   linha (~3 ms cada → 20 s na carteira toda, estourando os 8 s do PostgREST).
 - Se a Relação mudar o formato do endereço, a chave muda e o cache "esquece". Conferir o `end_partes` com uma amostra.
+
+### 21.2 Vínculo das OS com o SIGOS · `docs/migracao_sigos_vinculo.sql` (2026-11-09, sw v335)
+
+Liga **todo campo de OS do app** à base dos relatórios SIGOS e mostra a situação de cada OS: executada / encerrada sem
+execução / pendente / aguardando relatório / suspeita de erro / formato inválido.
+
+**Regra de casamento.** O número SIGOS tem 14 dígitos = `00` + **base de 10** + sufixo de 2 (01/02/03). A base é **única** na
+base SIGOS (conferido em 09/11/2026: 6.657 OS, nenhuma base repetida entre abertas e encerradas). `public.sigos_os_base(text)`
+tira não-dígitos e zeros à esquerda; 12 dígitos → corta o sufixo; 10 → já é a base; qualquer outro tamanho = inválido.
+Assim "00127516560801" e "1275165608" (como os Projetos guardam) acham a mesma OS. Índices de expressão nas duas tabelas.
+
+**Peças no banco:**
+- `"17 - sigos".vw_os_situacao` — 1 linha por base; a encerrada vence a aberta. Encerrada `EXECUTADA` → `executada`; encerrada
+  `NÃO EXEC. …` → `encerrada_sem_execucao`; aberta com `EXECUTADA(E)` + encerramento realizado → `executada`; resto → `pendente`.
+- `"17 - sigos".vw_carga_cobertura` — por ZA: quando chegou a última Relação, até quando vão as Encerradas e desde quando.
+- `"17 - sigos".vw_os_vinculo` — **todos os campos de OS do app** (pavimento origem + recomposição, etapa `os_sigos` dos Projetos,
+  `vrp_os.os_sigos`, `ocorrencia.os_numero`, `abertura_servico.os_numero`, `pesquisa_dia_os.os_sigos`, `qsms_atividade.os_sigos`,
+  `sst_inspecao.os`, `sup_movimento.os`, as 4 OS dos loggers) com a situação, `vinculo`, `divergencia` e `dias`.
+  Campo novo de OS no app = acrescentar um `union all` aqui.
+- **Suspeita de erro:** a Relação **substitui** a carteira e as Encerradas **acumulam**. Se depois do lançamento (+2 dias)
+  chegou Relação nova da ZA **e** as Encerradas cobrem até ela (±2 dias), a OS que não aparece em nenhuma das duas não existe →
+  `suspeita`. Enquanto as cargas não cobrem o lançamento → `aguardando` (absorve o atraso dos relatórios). Lançada antes do
+  início das Encerradas carregadas → `fora_janela`.
+- **Divergência com o app:** recomposição executada no app mas pendente/encerrada sem execução no SIGOS; SIGOS executou a OS de um
+  projeto que não concluiu no AcquaHub; SIGOS executou a OS de uma VRP cuja OS interna não está concluída.
+
+**Avanço automático (decisão do usuário 09/11/2026) — só no pavimento.** É a única etapa "foi executada?" sem evidência de campo.
+Quando a OS da recomposição aparece **EXECUTADA** no SIGOS, `public.sigos_pav_auto()` marca `execucao_data` com a data do SIGOS,
+`execucao_por = 'SIGOS (automático)'` e a coluna nova `execucao_fonte = 'sigos'` (manual = null). Dispara:
+- depois de cada carga (trigger statement-level `pos_carga_pav` em `os_encerrada` e `os_aberta`);
+- quando alguém lança a OS da recomposição de uma OS que o SIGOS já executou (trigger `pav_os_sigos`).
+Nunca marca execução anterior ao registro do pavimento. VRP (checklist + fotos), Projetos (a OS só fecha no fim do pipeline),
+APR, Almoxarifado e Pesquisa **só mostram** a situação — não há etapa a avançar sem evidência de campo.
+
+**RPCs:**
+- `app_sigos_os_status(p_os text[])` — qualquer usuário ativo; devolve por texto digitado `{base, sit, n, za, st, srv, ab, ex, res}`
+  (`sit` = executada | encerrada_sem_execucao | pendente | nao_encontrada | invalida) + cobertura das cargas. Sem cliente,
+  endereço ou responsável. Até 500 por chamada.
+- `app_sigos_vinculos()` — gate `sigos_pode_ver` (aux/admin); a `vw_os_vinculo` inteira para o painel.
+
+**No app (sem mexer na lógica de cada módulo):**
+- **Selo:** `sgxS(v)` devolve `<span data-sgx="v">`; um `MutationObserver` (`sgxBoot`, ligado no login) preenche sozinho qualquer
+  selo que aparecer, em lote (1 RPC a cada 250 ms) e com cache por texto. Hoje nos cards da Gestão de Pavimento (origem e
+  recomposição), etapa OS dos Projetos, OS de VRP (lista e detalhe), Abertura de serviços (solicitações e ocorrências) e
+  Relatório diário da pesquisa.
+- **Aviso ao digitar:** os inputs listados em `SGX_INPUTS` ganham uma linha abaixo com a situação (700 ms após parar de digitar).
+  Input novo de OS = acrescentar o seletor ali.
+- **Painel** `sigos_vinculo` (Auxiliar › 📥 Relatórios SIGOS › 🔗 Vínculo das OS, `svInit`): chips por situação (abre em
+  suspeita + inválida + encerrada sem execução), chip de divergência, filtros módulo/ZA/busca, CSV.
+
+**Cuidados:**
+- O sufixo (01/02/03) é ignorado no casamento. Se um dia a base repetir com sufixos diferentes, a `vw_os_situacao` pega a
+  encerrada; revisar a regra.
+- `execucao_por = 'SIGOS (automático)'` é o que o trigger `pav_exec_manual` usa para manter `execucao_fonte`; se o
+  `app_pav_executar` mudar o texto gravado, revisar.
+- Desmarcar à mão uma execução automática não "pega": a próxima carga marca de novo (o SIGOS é a fonte).
