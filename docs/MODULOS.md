@@ -1053,6 +1053,7 @@ Acompanhamento.
   - **Ordem do card = alfabética pela chave do tipo** (`app_pav_listar … order by tipo_pavimento`), não a ordem dos chips nem a de criação. Era a ordem que o programador via ao digitar "OS1, OS2" — critério usado na conversão dos dados antigos.
   - **Conversão dos dados antigos (2026-10-28, aprovada pelo usuário via planilha):** 5 grupos "OS1, OS2" → 1 OS por tipo na ordem do card (10 linhas; `os_recomp_em`/`os_recomp_por` intactos). Backup `"8 - coleta_campo"._bkp_pav_os_tipo_20261028` (12 linhas/6 grupos; reverter = `update … set os_recomposicao=b.os_recomposicao from _bkp… b where r.id=b.id`). **Pendente:** grupo `fed92e6c` (concreto + piso especial) ficou **AVALIAR** e segue com o texto antigo — a 2ª parte é a nota "não contem opção de recomposição de piso no SICOM", não uma OS. Planilha, snapshot e SQL em `COPASA/scripts/pav_os_por_tipo/` (fora do repo).
 - **Etapa de execução (2026-10-28, sw v282, `docs/migracao_pav_execucao.sql`):** o rastro não para na OS. Fluxo **por tipo**: **pendente de criação** (sem OS) → **pendente de execução** (OS lançada) → **executada** (`pavEtapaItem`). O **ponto** fica na etapa **mais atrasada** dos seus tipos (`pavEtapa`) — é ela que define a aba, a cor da borda/badge (prazo / teal `⏳ Pendente de execução` / cinza `🏁 Executada`, `PAV_ETAPA_COR`) e a cor do marcador no mapa. O **prazo** (chips + relógio) continua medindo só a **criação** da OS (`pavEhPend` = etapa criação).
+  - **(2026-11-09, sw v342) "Marcar executado" REMOVIDO da tela:** a execução vem só do SIGOS (`sigos_pav_auto`, §21.2); o card mostra "⏳ Aguardando execução no SIGOS". `app_pav_executar` continua no banco, sem uso na tela. Texto original abaixo, para histórico.
   - **Card:** tipo com OS e sem execução mostra **"Executado em [data]" + "Marcar executado"** (`.pavexdt` `type=date`, padrão = hoje, `max` = hoje, `min` = dia do registro) → `pavProgExecutar` pede `confirm()` e grava **só aquele tipo** (diferente do "Criar OS", que grava todos os campos preenchidos). Executado → "🏁 Executado em dd/mm/aaaa · marcado por X" (`pavFmtDia` formata `AAAA-MM-DD` sem passar por `Date`, p/ não voltar 1 dia no fuso). Sem botão de desfazer na tela (a RPC aceita `p_data null`).
   - **Banco:** colunas novas em `pav_recomposicao`: `execucao_data` (date, dia informado) / `execucao_em` (timestamptz, quando marcou) / `execucao_por`. RPC **`app_pav_executar(p_id uuid, p_data date)`** (gate admin|aux_acesso; exige OS; recusa data no futuro ou anterior ao registro; `null` desfaz). `app_pav_os_itens` com `os` vazio também limpa a execução. `app_pav_listar` devolve `execucao_*` em cada item.
   - **Export** (`pavProgExport`): coluna **Status** = etapa do tipo + **Executado em** / **Execução marcada por**. *(2026-11-02: abas, "ponto na etapa mais atrasada" e prazo só da criação foram substituídos pela esteira — ver abaixo.)*
@@ -3312,6 +3313,11 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
+- **RDO na Vitrine (2026-11-09, sw v342, `docs/migracao_rdo_ajustes.sql`):** a TV busca também `app_vitrine_rdo(desde)` (mesmo
+  gate e mesmo período padrão do `app_vitrine_dados`) = `public.rdo_periodo` → linhas do RDO **já revisadas** (dia fechado =
+  snapshot; senão rascunho com a revisão aplicada; ocultas fora). Depois do slide "mapa + linha do tempo" de cada dia entra
+  o slide **"RDO · dia"** com Contagem e Betim lado a lado (`vtRdoSlide`, até 11 linhas por ZA + "+N"); dia só com RDO
+  (sem atividade com GPS) ganha só o slide do RDO. Se a RPC falhar, a Vitrine segue sem esses slides.
 
 ## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` (hub) / `qsms_ind` / `qsms_form` / `qsms_epi_painel` / `qsms_cesta` / `qsms_epi_col` / `qsms_acesso` (2026-10-28)
 
@@ -3756,6 +3762,17 @@ APR, Almoxarifado e Pesquisa **só mostram** a situação — não há etapa a a
   `app_pav_executar` mudar o texto gravado, revisar.
 - Desmarcar à mão uma execução automática não "pega": a próxima carga marca de novo (o SIGOS é a fonte).
 
+**Correção da OS (2026-11-09, sw v342, `docs/migracao_rdo_ajustes.sql`):** cada linha do painel que não está executada tem
+**✏️ Corrigir OS** → número novo (com o selo do SIGOS ao digitar, `.svcorinp` em `SGX_INPUTS`) + motivo →
+`app_sigos_os_corrigir(mod, campo, ref, os_antes, os_nova, motivo)` (gate `sigos_pode_ver`):
+- grava **só os dígitos** no campo de origem do registro (`mod`/`campo`/`ref` = o que `app_sigos_vinculos` devolve); recusa
+  formato inválido e recusa se o valor gravado já não é `os_antes` (outra pessoa mudou → recarregar);
+- pavimento **OS de origem** corrige todos os tipos do mesmo ponto (grupo) com o número antigo; **OS da recomposição**
+  limpa a execução que tinha vindo do SIGOS (`execucao_fonte='sigos'`) e o gatilho `pav_os_sigos` remarca se a OS nova já
+  estiver executada; projetos = `intervencao_etapa` chave `os_sigos`; loggers = coluna do campo;
+- histórico em `"17 - sigos".os_correcao` (antes, depois, motivo, quem, quando); `app_sigos_os_correcoes()` alimenta a
+  linha "✏️ Corrigida de X para Y por Fulano" no painel.
+
 ### 21.3 Tela "Programação do recadastramento" (`recad_prog`) · `docs/migracao_recad_programacao.sql` (2026-11-09, sw v336)
 
 Auxiliar de Programação › 🧾 Serviços comerciais › **📝 Programação do recadastramento**. Mesmo acesso do Auxiliar
@@ -3827,6 +3844,13 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
 - RPCs (gate `sigos_pode_ver` = `aux_acesso` ou admin): `app_rdo_mes(mes, za)`, `app_rdo_dia(dia, za)`,
   `app_rdo_item_salvar(dia, za, chave, id, tipo, descricao, oculto)`, `app_rdo_item_excluir(dia, za, chave, id)`,
   `app_rdo_fechar(dia, za)`, `app_rdo_reabrir(dia, za)`. Dia fechado não aceita edição (reabrir descarta o fechamento).
+
+**Consórcios e cópia (2026-11-09, sw v342):** os consórcios são chips de **seleção múltipla** (padrão: os dois). O calendário
+junta as ZAs escolhidas (qualquer uma desatualizada → desatualizado; todas as com registro fechadas → fechado) e o dia mostra
+uma seção por ZA, cada uma com o seu Fechar/Reabrir. **📋 Copiar RDO** (`rdoTexto`) copia o texto revisado de todas as ZAs
+escolhidas, num formato fixo:
+`RDO — <dia da semana, dd/mm/aaaa>` / em branco / `<ZA — cidade> — rascunho|fechado por X` / tipo (`Execução`,
+`Em andamento`, `Ocorrência`, `Pendência`, `Observações`) / itens numerados `1. …`. Fechado = como foi fechado; ocultas não entram.
 
 **Tela:** ZA + mês (‹ ›, mínimo set/2026) → calendário colorido → painel do dia com linhas numeradas (ocultas ficam riscadas,
 sem número), ▾ abre o detalhe (OS do SIGOS, loggers, itens do projeto…), ✏️ editar, 🚫 ocultar, ↺ voltar ao automático,

@@ -314,7 +314,8 @@ pwa/
     almoxarifado, loggers…) conferido contra o SIGOS pela base de 10 dígitos: selo de situação em qualquer `<span data-sgx>`, aviso
     ao digitar e painel com **suspeita de erro** (chegou relatório novo e a OS não aparece); a **recomposição de pavimento é marcada
     executada sozinha** quando o SIGOS a executa — ver `docs/MODULOS.md §21.2`.
-    **RDO diário** (`rdo`, 2026-11-09, sw v339) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
+    **RDO diário** (`rdo`, 2026-11-09, sw v339; v342 = seleção múltipla de ZA + 📋 Copiar RDO; correção de OS no Vínculo;
+    Vitrine com slide do RDO via `app_vitrine_rdo` — `docs/migracao_rdo_ajustes.sql`) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
     lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
     linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
@@ -335,8 +336,9 @@ pwa/
   2026-10-28) → o relógio de pendência conta até **todos** os tipos terem OS. (`os_sigos`=OS de origem, do campo, 1 por
   registro; `os_recomposicao`=OS da recomposição, **por tipo**, lançada no `pavprog`.) `app_pav_os(p_grupo,p_os)` fica só
   p/ app em cache (≤ v281): "A, B" numérico com nº de partes = nº de tipos é distribuído na ordem do card (alfabética do tipo).
-  **Etapa de execução** (2026-10-28): depois da OS, cada tipo tem "Executado em [data]" + "Marcar executado"
-  (`app_pav_executar(p_id,p_data)`) → etapas por tipo **criação → execução → executada**; o ponto fica na mais atrasada.
+  **Etapa de execução** (2026-10-28): etapas por tipo **criação → execução → executada**; o ponto fica na mais atrasada.
+  Desde 2026-11-09 (sw v342) **não há mais "Marcar executado" na tela**: a execução vem só do SIGOS (`sigos_pav_auto`);
+  `app_pav_executar(p_id,p_data)` segue no banco sem uso.
   **Ensaio de reaterro (2026-11-02, sw v314):** antes da OS o programador responde por tipo "Necessita ensaio de compactação
   do reaterro?" (`app_pav_reaterro_decidir`); Sim → fila da **Qualidade** (tela `pavqual`, Home › 🛠️ Execução, gate
   `ME.qualidade` = admin/engrenagem `qualidade_acesso`/cargo Téc. Qualidade ou Coord. QSMSS) que registra o ensaio em campo
