@@ -310,6 +310,10 @@ pwa/
     **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333) — carteira aberta no mapa (polígono, CSV, tempo corrido,
     atividade × faixa, prazo, "já executada?", 2+ OS na matrícula, fila sem localização); ponto = cadastro > manual >
     OpenStreetMap (consultado pelo navegador, cache `geo_endereco`) — ver `docs/MODULOS.md §21.1`.
+    **Vínculo das OS** (`sigos_vinculo`, 2026-11-09, sw v335) — todo campo de OS do app (pavimento, projetos, VRP, pesquisa, APR,
+    almoxarifado, loggers…) conferido contra o SIGOS pela base de 10 dígitos: selo de situação em qualquer `<span data-sgx>`, aviso
+    ao digitar e painel com **suspeita de erro** (chegou relatório novo e a OS não aparece); a **recomposição de pavimento é marcada
+    executada sozinha** quando o SIGOS a executa — ver `docs/MODULOS.md §21.2`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**

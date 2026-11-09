@@ -1065,6 +1065,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="sigos_abertas"><div class="ic">🗺️</div><div class="nm">OS não executadas</div></button>
       <button class="mod" data-go="sigos_carga"><div class="ic">📥</div><div class="nm">Carga SIGOS</div></button>
+      <button class="mod" data-go="sigos_vinculo"><div class="ic">🔗</div><div class="nm">Vínculo das OS</div></button>
     </div>
   </main>
 
@@ -1197,6 +1198,22 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="oaAtiv" style="margin-top:8px"></div>
     <div class="sec" style="margin-top:18px">Ordens de serviço <span style="font-weight:400;color:var(--mut)">(mais antigas primeiro)</span></div>
     <div id="oaLista" style="margin-top:8px"></div>
+  </main>
+
+  <main id="sigos_vinculo" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Vínculo das OS com o SIGOS</h1>
+    <p class="sub">Toda OS digitada no AcquaHub (pavimento, projetos, VRP, pesquisa, APR, almoxarifado…) conferida contra os relatórios SIGOS carregados.
+      <b>Suspeita de erro</b> = já chegou relatório novo da ZA depois do lançamento e a OS não aparece. A recomposição de pavimento é marcada como executada sozinha quando o SIGOS a dá como executada.</p>
+    <p class="sub" id="svSub">Carregando…</p>
+    <div class="oafilt">
+      <select id="svMod"><option value="">Todos os módulos</option></select>
+      <select id="svZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
+      <input type="search" id="svQ" placeholder="Buscar OS, contexto ou serviço"/>
+    </div>
+    <div id="svChips" class="oachips"></div>
+    <div class="oabar"><div id="svResumo" class="sub" style="margin:0"></div><button type="button" class="btn" id="svCsv" style="width:auto">⬇️ Exportar CSV</button></div>
+    <div id="svLista"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2132,7 +2149,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','sigos_vinculo','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -2164,6 +2181,7 @@ function irPara(id){
   if(id==='pp_diario') pdInit();
   if(id==='sigos_carga') sgcInit();
   if(id==='sigos_abertas') oaInit();
+  if(id==='sigos_vinculo') svInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
@@ -3180,7 +3198,7 @@ function pjEtapaRow(iv,it,ctx,ev){ const cfg=ctx==='cfg', P=pjPipeCur||{}, lib=!
   const info=[];
   if(it.natureza==='doc'&&doc) info.push(`📄 ${String(doc.nome||'documento').slice(0,40)}${doc.folha?' · folha <b>'+doc.folha+'</b>':''}`);
   if(it.natureza==='link'&&it.valor) info.push(`🔗 <a href="${it.valor}" target="_blank" rel="noopener">abrir pasta do SharePoint</a>`);
-  if(it.natureza==='os'&&it.valor) info.push(`OS SIGOS <b class="pjmono">${it.valor}</b>`);
+  if(it.natureza==='os'&&it.valor) info.push(`OS SIGOS <b class="pjmono">${it.valor}</b>${sgxS(it.valor)}`);
   if(it.comentario) info.push(`💬 ${it.comentario}${it.por_nome?' — '+it.por_nome:''}`);
   if(!it.ativo&&it.justificativa) info.push(`Fora do escopo: <i>${it.justificativa}</i>`);
   const apsDoc=it.natureza!=='aprovacao'?(P.itens||[]).filter(x=>x.natureza==='aprovacao'&&x.aprova===it.chave):[];
@@ -4535,7 +4553,7 @@ async function asRenderLista(){
   try{ const {data,error}=await sb.rpc('app_abertura_servico_minhas'); if(error)throw error; const arr=data||[];
     c.innerHTML = arr.length? arr.map(s=>{ const dt=s.data_hora?new Date(s.data_hora).toLocaleDateString('pt-BR'):'';
       const sub=[s.matricula?('Matrícula '+s.matricula):'',s.numero_hd?('HD '+s.numero_hd):'',dt].filter(Boolean).join(' · ');
-      const os=s.os_numero?`<div style="margin-top:4px;font-size:12px;color:var(--ok)">✓ OS ${s.os_numero}</div>`:'<div class="sub" style="margin-top:4px;font-size:12px">⏳ aguardando OS</div>';
+      const os=s.os_numero?`<div style="margin-top:4px;font-size:12px;color:var(--ok)">✓ OS ${s.os_numero}${sgxS(s.os_numero)}</div>`:'<div class="sub" style="margin-top:4px;font-size:12px">⏳ aguardando OS</div>';
       return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><b style="font-size:14px">${s.tipo||'—'}</b><div class="sub" style="margin-top:2px">${sub}</div>${os}</div>`;
     }).join('') : '<p class="sub">Você ainda não solicitou serviços.</p>';
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar suas solicitações.</p>'; }
@@ -4765,7 +4783,7 @@ function pavProgCard(g){
   const itens=(g.itens||[]).map(it=>{ const et=pavEtapaItem(it);
     const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
     const os=it.os_recomposicao
-      ? `<div class="sub" style="margin-top:6px;font-size:12px"><b style="color:#0e7c86">✓ OS ${pavH(it.os_recomposicao)}</b>${it.os_recomp_por?(' · lançada por '+pavH(it.os_recomp_por)):''}${it.os_recomp_em?(' em '+new Date(it.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`
+      ? `<div class="sub" style="margin-top:6px;font-size:12px"><b style="color:#0e7c86">✓ OS ${pavH(it.os_recomposicao)}</b>${sgxS(it.os_recomposicao)}${it.os_recomp_por?(' · lançada por '+pavH(it.os_recomp_por)):''}${it.os_recomp_em?(' em '+new Date(it.os_recomp_em).toLocaleDateString('pt-BR')):''}</div>`
       : (et!=='criacao' ? '' : `<div style="display:flex;gap:6px;margin-top:8px"><input class="pavosinp" data-grupo="${g.grupo}" data-id="${it.id}" placeholder="nº da OS SIGOS · ${PAV_TIPO_LBL(it.tipo)}" autocomplete="off" style="flex:1"/><button class="btn pavoscriar" data-grupo="${g.grupo}" style="width:auto;padding:8px 14px;white-space:nowrap">Criar OS</button></div>`);
     const ex=!it.os_recomposicao ? ''
       : it.execucao_data
@@ -4775,7 +4793,7 @@ function pavProgCard(g){
   }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${v.c};border-radius:12px;padding:12px 13px;margin-bottom:10px">
     <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center"><b>${PAV_ORIGEM[g.servico_origem]||g.servico_origem}</b>${badge}</div>
-    <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
+    <div class="sub" style="margin-top:3px">Solicitado em ${dt}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)+sgxS(g.os_sigos)):''} · ${cUf} · por ${pavH(g.usuario||'—')} ${mapa}</div>
     ${itens}</div>`; }
 function pavProgSetView(v){ pavpView=v;
   document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v));
@@ -4875,7 +4893,7 @@ function pavQualCard(g){ const d=pqlDias(g), b=pavBucket(d,PAV_SLA_ETAPA.ensaio)
     return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${pqlItLbl(it)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div class="sub" style="font-size:12px;margin-top:2px">Pedido por ${pavH(it.reaterro_resp_por||'—')} em ${pavFmtEm(it.reaterro_resp_em)} · na fila ${pavDiasTxt(pavDias(it.reaterro_status_em))}</div>${ant}<div style="display:flex;gap:6px;margin-top:6px">${fotos}</div><button class="btn pqlabrir" data-grupo="${g.grupo}" data-id="${it.id}" style="margin-top:8px">🧪 Registrar ensaio</button></div>`; }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${b.c};border-radius:12px;padding:12px 13px;margin-bottom:10px">
     <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center"><b>${pqlTit(g)}</b><span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span></div>
-    <div class="sub" style="margin-top:3px">${g.proj?(pavH(g.proj.projeto||'')+' · '):''}${g.os_sigos?('OS origem '+pavH(g.os_sigos)+' · '):''}${cUf} · ${g.proj?'pedido':'registrado'} por ${pavH(g.usuario||'—')} ${mapa}</div>
+    <div class="sub" style="margin-top:3px">${g.proj?(pavH(g.proj.projeto||'')+' · '):''}${g.os_sigos?('OS origem '+pavH(g.os_sigos)+sgxS(g.os_sigos)+' · '):''}${cUf} · ${g.proj?'pedido':'registrado'} por ${pavH(g.usuario||'—')} ${mapa}</div>
     ${itens}</div>`; }
 function pavQualSetView(v){ pqlView=v;
   document.querySelectorAll('#pqlViewSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v));
@@ -4894,7 +4912,7 @@ function pavQualAbrir(grupo,id){ const g=pqlUltimo.find(x=>x.grupo===grupo), it=
   pqe={g,it,id:crypto.randomUUID(),res:'',laudo:null,f1:null,f2:null}; irPara('pavqual_ens'); }
 function pqeInit(){ if(!pqe){ irPara('pavqual'); return; } pavCss();
   const {g,it}=pqe, u=pavUltEnsaio(it), cab=$('#pqeCab');
-  if(cab) cab.innerHTML=`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:4px 0 10px"><b>${pqlItLbl(it)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div class="sub" style="margin-top:2px">${pqlTit(g)}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)):''} · ${(u?u.tentativa:0)+1}º ensaio</div></div>`;
+  if(cab) cab.innerHTML=`<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:4px 0 10px"><b>${pqlItLbl(it)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div class="sub" style="margin-top:2px">${pqlTit(g)}${g.os_sigos?(' · OS origem '+pavH(g.os_sigos)+sgxS(g.os_sigos)):''} · ${(u?u.tentativa:0)+1}º ensaio</div></div>`;
   ['pqeMetodo','pqeGcMed','pqeGcExi','pqeObs'].forEach(k=>{ const el=$('#'+k); if(el) el.value=''; });
   document.querySelectorAll('#pavqual_ens input[type=file]').forEach(i=>i.value='');
   ['1','2'].forEach(n=>{ const img=$('#pqePrev'+n); if(img) img.classList.add('hidden'); });
@@ -5126,7 +5144,7 @@ async function pgCarregar(){
       const foto=s.foto_hd?`<a href="${fotoURL(s.foto_hd)}" target="_blank" rel="noopener" style="font-size:12px">📷 Foto do HD</a>`:'';
       const mapa=(s.lat&&s.lon)?` · <a href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
       const info=[s.matricula?('Matrícula '+s.matricula):'',s.numero_hd?('HD '+s.numero_hd):'',s.consorcio||''].filter(Boolean).join(' · ');
-      const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${s.os_por?(' · por '+s.os_por):''}</div>`:'';
+      const done=s.os_numero?`<div style="margin-top:6px;background:var(--ok-bg);border-radius:8px;padding:6px 9px;font-size:13px">✓ OS <b>${s.os_numero}</b>${sgxS(s.os_numero)}${s.os_por?(' · por '+s.os_por):''}</div>`:'';
       return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px">
         <div style="display:flex;gap:8px;align-items:center"><b>${s.tipo||'—'}</b><span class="sub" style="margin-left:auto;font-size:11px;white-space:nowrap">${dt}</span></div>
         <div class="sub" style="margin-top:3px">${info}</div>
@@ -5183,7 +5201,7 @@ function pgOcCard(s,popup){
   const tags=[s.local,s.consorcio].filter(Boolean).map(t=>`<span class="occ-tag">${vEsc(t)}</span>`).join('');
   const quem=`👤 ${vEsc(s.usuario_nome||s.usuario||'—')}`+((s.lat!=null&&s.lon!=null)?` · 📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span>`:'');
   const end=(s.lat!=null&&s.lon!=null)?`<div class="occ-l"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}">buscando endereço…</span></div>`:'';
-  const done=s.os_numero?`<div class="occ-ok">✓ OS <b>${vEsc(s.os_numero)}</b>${s.os_por?(' · '+vEsc(s.os_por)):''}</div>`:'';
+  const done=s.os_numero?`<div class="occ-ok">✓ OS <b>${vEsc(s.os_numero)}</b>${sgxS(s.os_numero)}${s.os_por?(' · '+vEsc(s.os_por)):''}</div>`:'';
   return `<div class="occ${popup?' pop':''}" data-occ="${s.id}">
         <div class="occ-main">
           <div class="occ-h"><b>${ocIcone(s.tipo)} ${vEsc(s.tipo||'Ocorrência')}</b>${tags}</div>
@@ -6018,7 +6036,7 @@ async function vmFichaOpen(vrpId){
   visitas.forEach(x=>items.push({t:'vis',d:x.visitado_em,x}));
   items.sort((a,b)=>String(b.d||'').localeCompare(String(a.d||'')));
   const histHtml=items.length?items.map(it=>{
-    if(it.t==='os'){ const o=it.o; return `<button class="vmfhist" data-os="${o.os_id}"><div style="min-width:0"><span style="font-family:ui-monospace,monospace;font-size:11.5px">${o.os_numero}</span> <span class="vmst ${o.status}">${VM_STLBL[o.status]||o.status}</span><div class="vl">${o.executado_em?relFmtData(o.executado_em):(o.programada_para?('programada '+vmFmtDate(o.programada_para)):'')} · ${o.origem}${o.os_sigos?(' · SIGOS '+o.os_sigos):''}</div></div><span class="sub">ver ›</span></button>`; }
+    if(it.t==='os'){ const o=it.o; return `<button class="vmfhist" data-os="${o.os_id}"><div style="min-width:0"><span style="font-family:ui-monospace,monospace;font-size:11.5px">${o.os_numero}</span> <span class="vmst ${o.status}">${VM_STLBL[o.status]||o.status}</span><div class="vl">${o.executado_em?relFmtData(o.executado_em):(o.programada_para?('programada '+vmFmtDate(o.programada_para)):'')} · ${o.origem}${o.os_sigos?(' · SIGOS '+o.os_sigos+sgxS(o.os_sigos)):''}</div></div><span class="sub">ver ›</span></button>`; }
     const x=it.x; const sl=(typeof VRP_SIT!=='undefined'&&VRP_SIT[x.situacao])?VRP_SIT[x.situacao].lbl:(x.situacao||'visita');
     return `<button class="vmfhist" data-vis="${x.id}"><div style="min-width:0"><span class="vmst" style="background:var(--acc);color:var(--acc-ink)">Visita primária</span><div class="vl">${x.visitado_em?relFmtData(x.visitado_em):''}${x.visitado_por?(' · '+vEsc(x.visitado_por)):''} · ${vEsc(sl)}</div></div><span class="sub">ver ›</span></button>`;
   }).join(''):'<p class="sub">Sem serviços registrados.</p>';
@@ -6241,7 +6259,7 @@ function vmGOsCard(o){
   return `<div style="border:1px solid var(--line);border-radius:12px;margin-bottom:7px;background:var(--card);overflow:hidden">
     <div class="vmosmain" data-os="${o.os_id}" title="${stage}" style="cursor:pointer;padding:10px 12px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)">${o.os_numero}</span><b style="font-size:15px">${vEsc(o.num_vrp||'VRP')}</b><span class="vmst ${o.status}" title="${stage}" style="margin-left:auto">${VM_STLBL[o.status]||o.status} ⓘ</span></div>
-      <div style="font-size:11.5px;color:var(--mut);margin-top:3px">${vmConsLbl(o.consorcio)}${o.dmc?(' · DMC '+o.dmc):''} · ${o.origem}${o.os_sigos?(' · SIGOS '+o.os_sigos):''}</div>
+      <div style="font-size:11.5px;color:var(--mut);margin-top:3px">${vmConsLbl(o.consorcio)}${o.dmc?(' · DMC '+o.dmc):''} · ${o.origem}${o.os_sigos?(' · SIGOS '+o.os_sigos+sgxS(o.os_sigos)):''}</div>
       <div style="font-size:11.5px;color:var(--mut);margin-top:2px">${prog?'Programado para':'Executado por'}: <b>${quem}</b>${prog&&o.programada_para?(' · '+vmFmtFullDate(o.programada_para)):''}</div>
     </div>
     ${prog?`<div style="padding:0 12px 10px"><button class="vmtbtn" data-desprog="${o.os_id}" style="border-color:var(--bad);color:var(--bad)">✕ Desprogramar</button></div>`:''}
@@ -6274,7 +6292,7 @@ async function vmOsView(osId){
   let h=`<h1 style="margin-bottom:2px">${vEsc(d.num_vrp||'VRP')} — ${d.os_numero}</h1>
    <div class="sub" style="margin-top:0">${vmConsLbl(d.consorcio)}${d.dmc?(' · DMC '+d.dmc):''} · ${d.origem} · ${d.executor?vEsc(d.executor):'—'}</div>
    <span class="vmst ${d.status}">${VM_STLBL[d.status]||d.status}</span>
-   <div class="vmsigrow"><span class="k">OS SIGOS</span><b>${d.os_sigos||'—'}</b><button class="vmtbtn" id="vmSigBtn" style="margin-left:auto">${d.os_sigos?'Editar':'＋ Adicionar'}</button></div>
+   <div class="vmsigrow"><span class="k">OS SIGOS</span><b>${d.os_sigos||'—'}</b>${sgxS(d.os_sigos)}<button class="vmtbtn" id="vmSigBtn" style="margin-left:auto">${d.os_sigos?'Editar':'＋ Adicionar'}</button></div>
    <button class="vmtbtn" id="vmFichaBtn2" style="margin-bottom:6px">📋 Ver ficha da VRP</button>`;
   if(d.corrige){ h+=`<div style="margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--warn-bg);color:var(--warn);font-size:12.5px">🔧 Esta é uma OS corretiva de: <b>${vEsc(d.corrige.descricao||d.corrige.tipo||'pendência')}</b>${d.corrige.os_pai_id?` · <a class="vmoslink" data-os="${d.corrige.os_pai_id}">abrir OS pai ${vEsc(d.corrige.os_pai_numero||'')} ›</a>`:''}</div>`; }
   h+=vmDsec('1','Chegada')+kv('VRP localizada',r.localizada)+kv('Caixa acessível',r.acessivel)+kv('Água / alagamento',r.agua);
@@ -7393,6 +7411,161 @@ async function sgcProcessar(id,k){
   sgcCarregar();
 }
 
+// ---------- VÍNCULO OS SIGOS (selo de situação em todo campo de OS do app) ----------
+// Todo número de OS digitado no app é conferido contra a base dos relatórios SIGOS (schema 17).
+// Casamento pela BASE de 10 dígitos (o número SIGOS é '00'+base+sufixo de 2): "00127516560801" e "1275165608"
+// são a mesma OS. Duas peças genéricas, sem mexer na lógica de cada módulo:
+//  · selo: qualquer <span data-sgx="nº"> que aparecer na tela é preenchido sozinho (MutationObserver + 1 RPC em lote);
+//  · aviso ao digitar: os inputs de OS listados em SGX_INPUTS ganham uma linha abaixo com a situação.
+// RPC app_sigos_os_status(p_os text[]) — qualquer usuário ativo; devolve só serviço/status/datas.
+const SGX_CACHE=new Map();          // texto digitado → info (ou Promise)
+let sgxFila=new Set(), sgxTimer=null;
+const SGX_INPUTS='#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial';
+function sgxS(v){ v=(v==null?'':String(v)).trim(); return v?'<span class="sgx" data-sgx="'+vEsc(v)+'"></span>':''; }
+function sgxCss(){
+  if(document.getElementById('sgxCss')) return;
+  const st=document.createElement('style'); st.id='sgxCss';
+  st.textContent=`.sgx{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;line-height:1.3;padding:1px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;white-space:nowrap;border:1px solid transparent}
+.sgx:empty{display:none}
+.sgx.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.sgx.pe{background:var(--warn-bg);color:#92400e;border-color:#f59e0b}
+.sgx.bad{background:#fee2e2;color:#b91c1c;border-color:#fca5a5}
+.sgx.nf{background:var(--bg);color:var(--mut);border-color:var(--line)}
+.sgxhint{font-size:12px;margin:4px 0 2px;color:var(--mut)} .sgxhint .sgx{margin-left:0;white-space:normal}
+#sigos_vinculo .oafilt{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+#sigos_vinculo .oafilt select,#sigos_vinculo .oafilt input[type=search]{flex:1 1 150px;min-width:0;font-size:14px;padding:9px 10px}
+#sigos_vinculo .oachips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+#sigos_vinculo .oachip{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#sigos_vinculo .oachip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+#sigos_vinculo .oachip.al{border-color:var(--bad);color:var(--bad)} #sigos_vinculo .oachip.al.on{background:var(--bad);color:#fff}
+#sigos_vinculo .oabar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+#sigos_vinculo .oarow{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
+#sigos_vinculo .oarow .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:600}
+#sigos_vinculo .oarow .m{color:var(--mut);font-size:12px;margin-top:2px}
+#sigos_vinculo .oarow .a{color:var(--bad);font-size:12px;margin-top:3px}
+#sigos_vinculo .oarow .sgx{white-space:normal}`;
+  document.head.appendChild(st);
+}
+function sgxDt(v){ return v?String(v).slice(8,10)+'/'+String(v).slice(5,7)+'/'+String(v).slice(2,4):''; }
+function sgxInfoHtml(i, longo){
+  if(!i) return '';
+  const tip=vEsc([i.n?('OS '+i.n):'', i.srv||'', i.st?('Status: '+i.st):'', i.ab?('Aberta em '+sgxDt(i.ab)):'', i.ex?('Executada em '+sgxDt(i.ex)):'', i.res||''].filter(Boolean).join(' · '));
+  const sp=(cls,txt)=>'<span class="sgx '+cls+'" title="'+tip+'">'+txt+'</span>';
+  switch(i.sit){
+    case 'executada': return sp('ok','✅ SIGOS: executada'+(i.ex?' '+sgxDt(i.ex):'')+(longo&&i.srv?' · '+vEsc(i.srv):''));
+    case 'encerrada_sem_execucao': return sp('bad','⛔ SIGOS: encerrada sem execução'+(longo&&i.st?' ('+vEsc(i.st)+')':''));
+    case 'pendente': return sp('pe','⏳ SIGOS: '+vEsc((i.st||'pendente').replace(/\s*\([A-Z]+\)\s*$/,'').toLowerCase())+(longo&&i.srv?' · '+vEsc(i.srv):''));
+    case 'nao_encontrada': return sp('nf','🔎 ainda não aparece nos relatórios SIGOS'+(longo?' — confira o número se a OS não for de hoje':''));
+    case 'invalida': return sp('bad','❌ número fora do padrão SIGOS (14 dígitos, ex.: 00127516560801)');
+  }
+  return '';
+}
+// busca em lote (debounce) — devolve Promise da info de um texto
+function sgxGet(v){
+  v=(v||'').trim(); if(!v) return Promise.resolve(null);
+  const c=SGX_CACHE.get(v); if(c) return c instanceof Promise?c:Promise.resolve(c);
+  let res; const p=new Promise(r=>res=r); p._res=res; SGX_CACHE.set(v,p); sgxFila.add(v);
+  clearTimeout(sgxTimer); sgxTimer=setTimeout(sgxFlush,250);
+  return p;
+}
+async function sgxFlush(){
+  const lote=[...sgxFila]; sgxFila=new Set(); if(!lote.length) return;
+  let map={};
+  try{ const {data,error}=await sb.rpc('app_sigos_os_status',{p_os:lote}); if(!error&&data) map=data.os||{}; }catch(e){}
+  lote.forEach(v=>{ const p=SGX_CACHE.get(v), i=map[v]||null;
+    if(i) SGX_CACHE.set(v,i); else SGX_CACHE.delete(v);   // falhou (offline/RPC) → tenta de novo depois
+    if(p&&p._res) p._res(i); });
+}
+function sgxPreencher(raiz){
+  const els=(raiz.matches&&raiz.matches('[data-sgx]'))?[raiz]:[...(raiz.querySelectorAll?raiz.querySelectorAll('[data-sgx]:not([data-sgxok])'):[])];
+  els.forEach(el=>{ el.dataset.sgxok='1'; sgxGet(el.dataset.sgx).then(i=>{ el.outerHTML=sgxInfoHtml(i,false)||''; }); });
+}
+async function sgxHint(inp){
+  let hint=inp._sgxHint;
+  if(!hint||!hint.isConnected){
+    hint=document.createElement('div'); hint.className='sgxhint'; inp._sgxHint=hint;
+    const ref=(getComputedStyle(inp.parentElement).display==='flex')?inp.parentElement:inp;   // input + botão na mesma linha
+    ref.insertAdjacentElement('afterend',hint);
+  }
+  const v=inp.value.trim(); if(!v){ hint.innerHTML=''; return; }
+  hint.innerHTML='<span class="sgx nf">conferindo no SIGOS…</span>';
+  const i=await sgxGet(v); if(inp.value.trim()!==v) return;
+  hint.innerHTML=i?sgxInfoHtml(i,true):'';
+}
+function sgxBoot(){
+  sgxCss();
+  let tDig=null;
+  document.addEventListener('input',e=>{ const t=e.target; if(t&&t.matches&&t.matches(SGX_INPUTS)){ clearTimeout(tDig); tDig=setTimeout(()=>sgxHint(t),700); } });
+  document.addEventListener('focusin',e=>{ const t=e.target; if(t&&t.matches&&t.matches(SGX_INPUTS)&&t.value.trim()&&!t._sgxHint) sgxHint(t); });
+  new MutationObserver(ms=>{ for(const m of ms) m.addedNodes.forEach(n=>{ if(n.nodeType===1) sgxPreencher(n); }); })
+    .observe(document.body,{childList:true,subtree:true});
+  sgxPreencher(document.body);
+}
+
+// ---------- VÍNCULOS OS SIGOS — painel no Auxiliar de Programação (tela sigos_vinculo) ----------
+// Lista toda OS lançada no app (vw_os_vinculo) com a situação no SIGOS. "Suspeita" = já chegou Relação nova da ZA
+// depois do lançamento (e as Encerradas cobrem até ela) e a OS não aparece em nenhuma das duas → digitação/ZA errada.
+const SV_SIT=[['suspeita','⚠️ Suspeita de erro','bad'],['invalida','❌ Formato inválido','bad'],['encerrada_sem_execucao','⛔ Encerrada sem execução','bad'],
+  ['aguardando','🔎 Aguardando relatório','nf'],['fora_janela','🗄️ Anterior aos relatórios','nf'],['pendente','⏳ Pendente','pe'],['executada','✅ Executada','ok']];
+let svDados=[], svCob={}, svF={sit:new Set(['suspeita','invalida','encerrada_sem_execucao']), mod:'', za:'', q:'', div:false};
+function svInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  sgxCss();
+  const bind=(id,k,ev)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(ev||'change',()=>{ svF[k]=el.value.trim(); svRender(); }); } };
+  bind('#svMod','mod'); bind('#svZa','za'); bind('#svQ','q','input');
+  const csv=$('#svCsv'); if(csv&&!csv.dataset.ready){ csv.dataset.ready='1'; csv.onclick=svCsv; }
+  svCarregar();
+}
+async function svCarregar(){
+  $('#svLista').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_sigos_vinculos'); if(error) throw error; svDados=(data&&data.itens)||[]; svCob=(data&&data.cobertura)||{}; }
+  catch(e){ $('#svLista').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; return; }
+  const mods=[...new Set(svDados.map(d=>d.mod))].sort(), sel=$('#svMod'), cur=sel.value;
+  sel.innerHTML='<option value="">Todos os módulos</option>'+mods.map(m=>'<option'+(m===cur?' selected':'')+'>'+vEsc(m)+'</option>').join('');
+  const dh=ts=>ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+  $('#svSub').innerHTML='Relação de Serviços carregada — ZA1004: '+dh((svCob.ZA1004||{}).relacao_em)+' · ZA0200: '+dh((svCob.ZA0200||{}).relacao_em)
+    +'. Encerradas até '+fmtData((svCob.ZA1004||{}).encerradas_ate)+' / '+fmtData((svCob.ZA0200||{}).encerradas_ate)+'.';
+  svRender();
+}
+function svBase(d){
+  if(svF.mod&&d.mod!==svF.mod) return false;
+  if(svF.za&&(d.za||d.zas)!==svF.za) return false;
+  if(svF.div&&!d.div) return false;
+  if(svF.q){ const q=svF.q.toUpperCase(); if(!((d.os||'').toUpperCase().includes(q)||(d.ctx||'').toUpperCase().includes(q)||(d.srv||'').toUpperCase().includes(q))) return false; }
+  return true;
+}
+function svRender(){
+  const base=svDados.filter(svBase), cnt={}; base.forEach(d=>cnt[d.v]=(cnt[d.v]||0)+1);
+  const ndiv=svDados.filter(d=>d.div).length;
+  $('#svChips').innerHTML=SV_SIT.map(([k,l,c])=>'<button type="button" class="oachip'+(c==='bad'?' al':'')+(svF.sit.has(k)?' on':'')+'" data-sv="'+k+'">'+l+' · '+(cnt[k]||0)+'</button>').join('')
+    +'<button type="button" class="oachip al'+(svF.div?' on':'')+'" data-svdiv="1">↔️ Divergência com o app · '+ndiv+'</button>';
+  $('#svChips').querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{ const k=b.dataset.sv; svF.sit.has(k)?svF.sit.delete(k):svF.sit.add(k); svRender(); });
+  $('#svChips').querySelector('[data-svdiv]').onclick=()=>{ svF.div=!svF.div; svRender(); };
+  const vis=base.filter(d=>!svF.sit.size||svF.sit.has(d.v)||(svF.div&&d.div));
+  $('#svResumo').textContent=vis.length+' de '+svDados.length+' OS lançadas no app';
+  const lbl=k=>(SV_SIT.find(s=>s[0]===k)||[])[1]||k, cls=k=>(SV_SIT.find(s=>s[0]===k)||[])[2]||'nf';
+  const cor={bad:'var(--bad)',pe:'#f59e0b',ok:'var(--ok)',nf:'var(--line)'};
+  $('#svLista').innerHTML=vis.length?vis.slice(0,400).map(d=>'<div class="oarow" style="border-left-color:'+cor[cls(d.v)]+'">'
+      +'<div class="t"><span>'+vEsc(d.mod)+' · '+vEsc(d.campo)+' — <span class="pjmono">'+vEsc(d.os)+'</span></span><span class="sgx '+cls(d.v)+'" style="margin:0">'+lbl(d.v)+'</span></div>'
+      +'<div class="m">'+[d.za||d.zas, d.ctx, 'lançada em '+fmtData(String(d.em||'').slice(0,10))+(d.dias!=null?' (há '+d.dias+' dia'+(d.dias==1?'':'s')+')':'')].filter(Boolean).map(vEsc).join(' · ')+'</div>'
+      +(d.n?'<div class="m">SIGOS '+vEsc(d.n)+' · '+vEsc(d.srv||'')+' · '+vEsc(d.st||'')+(d.ex?' · executada em '+fmtData(String(d.ex).slice(0,10)):'')+(d.res?' · '+vEsc(d.res):'')+'</div>':'')
+      +(d.div?'<div class="a">↔️ '+vEsc(d.div)+'</div>':'')
+      +(d.v==='suspeita'?'<div class="a">Já chegou relatório novo da ZA depois do lançamento e esta OS não aparece — confira o número.</div>':'')
+      +'</div>').join('')+(vis.length>400?'<p class="sub">Mostrando 400 — use os filtros ou exporte o CSV.</p>':'')
+    :'<p class="sub">Nenhuma OS nesse filtro.</p>';
+}
+function svCsv(){
+  const vis=svDados.filter(svBase).filter(d=>!svF.sit.size||svF.sit.has(d.v)||(svF.div&&d.div));
+  if(!vis.length){ toast('Nada para exportar.'); return; }
+  const c=v=>{ const s=v==null?'':String(v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const lbl=k=>((SV_SIT.find(s=>s[0]===k)||[])[1]||k).replace(/^\S+\s/,'');
+  const cab=['Módulo','Campo','OS digitada','ZA','Contexto','Lançada em','Dias','Vínculo','Divergência','OS SIGOS','Serviço SIGOS','Status SIGOS','Abertura SIGOS','Execução SIGOS','Resultado'];
+  const lin=vis.map(d=>[d.mod,d.campo,d.os,d.za||d.zas,d.ctx,String(d.em||'').slice(0,16).replace('T',' '),d.dias,lbl(d.v),d.div,d.n,d.srv,d.st,String(d.ab||'').slice(0,10),String(d.ex||'').slice(0,10),d.res].map(c).join(';'));
+  try{ const u=URL.createObjectURL(new Blob(['﻿'+cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
+    a.download='vinculos_os_sigos_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
+    toast(vis.length+' OS exportadas.'); }catch(e){ toast('Não consegui gerar o CSV'); }
+}
+
 // ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
 // (docs/migracao_sigos_abertas.sql, MODULOS §21.1). Uma RPC traz a carteira inteira (≈3,3 mil OS) e
 // filtros/polígono/CSV rodam no app. Ponto: cadastro (matrícula) > manual > OpenStreetMap (consultado pelo
@@ -7779,7 +7952,7 @@ function pdCard(b){
     b.vazamentos+' vazamento'+(b.vazamentos===1?'':'s'),b.fraudes+' fraude'+(b.fraudes===1?'':'s')].join(' · ');
   const campo=(v,bt)=>'<div style="display:flex;gap:6px;margin-top:8px"><input class="pdosinp" data-k="'+k+'" value="'+vEsc(v||'')+'" placeholder="nº da OS SIGOS do dia" autocomplete="off" style="flex:1;min-width:0"/><button class="btn pdoscriar" data-k="'+k+'" style="width:auto;margin:0;padding:8px 14px;white-space:nowrap">'+bt+'</button></div>';
   const os=pend ? campo('','Criar OS')
-    : '<div class="sub" style="margin-top:8px;font-size:12px"><b style="color:#0e7c86">✓ OS '+vEsc(b.os_sigos)+'</b>'+(b.os_por?(' · lançada por '+vEsc(b.os_por)):'')+(b.os_em?(' em '+new Date(b.os_em).toLocaleDateString('pt-BR')):'')
+    : '<div class="sub" style="margin-top:8px;font-size:12px"><b style="color:#0e7c86">✓ OS '+vEsc(b.os_sigos)+'</b>'+sgxS(b.os_sigos)+(b.os_por?(' · lançada por '+vEsc(b.os_por)):'')+(b.os_em?(' em '+new Date(b.os_em).toLocaleDateString('pt-BR')):'')
       +' · <a class="pdosalt" data-k="'+k+'" style="cursor:pointer;color:var(--acc)">✏️ alterar</a></div>'
       +'<div class="pdosedit hidden" data-k="'+k+'">'+campo(b.os_sigos,'Salvar')+'<p class="sub" style="font-size:11px;margin:4px 0 0">Apague o número e salve para voltar o dia a pendente.</p></div>';
   return '<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid '+cor+';border-radius:12px;padding:12px 13px;margin-bottom:10px">'
@@ -12225,6 +12398,7 @@ function mostrar(sess){
     $('#cons').textContent='Águas Integradas & Eficiência Hídrica';
     screens.login.classList.add('hidden'); screens.app.classList.remove('hidden');
     iniciarGPS(); atualizarFila(); ntfBadge(); pushAutoSync();
+    if(!window.__sgxOn){ window.__sgxOn=1; sgxBoot(); }
     ME=null; sb.rpc('app_me').then(({data})=>{ if(data){ ME=data; homeGate(); epiEntregaTentarRestaurar(); avPopAbrir(); } }).catch(()=>{});
     if(navigator.onLine) sincronizar();
   }else{
