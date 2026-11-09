@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Programação do recadastramento comercial (Auxiliar de Programação › Serviços comerciais)
--- Tela `recad_prog` do index.html — docs/MODULOS.md §21.2 (2026-11-09)
+-- Tela `recad_prog` do index.html — docs/MODULOS.md §21.3 (2026-11-09)
 --
 -- Recadastramento = serviço SIGOS 1990100 "PDC REVISAO CADASTRO CONTRATADA".
 -- Fontes (só leitura): "3 - comercial".ligacoes (todas as matrículas = o "todo"),

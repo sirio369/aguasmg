@@ -288,7 +288,7 @@ pwa/
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
     (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
-    **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW) · **Situação dos Imóveis** (`perdas.html?s=situacao`, 2026-10-30: ligações por situação R/I/F/P e por **há quantos dias** estão nela — `ligacoes.situacao`/`situacao_desde` —, filtros em dropdown sobre um mapa em largura total com limite das ZAs + polígono e um botão de export .xlsx com a contagem; RPCs `app_sit_imoveis_resumo/lista/mapa`, gate `_nrw_fraude_gate`). · **Programação do recadastramento** (`recad_prog`, 2026-11-09, sw v335: todas as matrículas no mapa × OS SIGOS 1990100 de recadastramento — recadastrada / status da carteira por colaborador / encerrada sem execução / sem OS —, visitas, % recadastrado, polígono e export CSV; RPCs `app_recad_dados`/`app_recad_export`, `docs/MODULOS.md §21.2`). *(Análise
+    **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW) · **Situação dos Imóveis** (`perdas.html?s=situacao`, 2026-10-30: ligações por situação R/I/F/P e por **há quantos dias** estão nela — `ligacoes.situacao`/`situacao_desde` —, filtros em dropdown sobre um mapa em largura total com limite das ZAs + polígono e um botão de export .xlsx com a contagem; RPCs `app_sit_imoveis_resumo/lista/mapa`, gate `_nrw_fraude_gate`). · **Programação do recadastramento** (`recad_prog`, 2026-11-09, sw v336: todas as matrículas no mapa × OS SIGOS 1990100 de recadastramento — recadastrada / status da carteira por colaborador / encerrada sem execução / sem OS —, visitas, % recadastrado, polígono e export CSV; RPCs `app_recad_dados`/`app_recad_export`, `docs/MODULOS.md §21.3`). *(Análise
     por matrícula / `?s=mm` foi removida do Auxiliar em 2026-10-20; a tela segue existindo no cockpit NRW.)*
   - **🎧 Pesquisa de Vazamentos** (nesta ordem no hub, 2026-10-30): Programação de pesquisa (`programacao_pesquisa`) ·
     **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
@@ -310,6 +310,10 @@ pwa/
     **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333) — carteira aberta no mapa (polígono, CSV, tempo corrido,
     atividade × faixa, prazo, "já executada?", 2+ OS na matrícula, fila sem localização); ponto = cadastro > manual >
     OpenStreetMap (consultado pelo navegador, cache `geo_endereco`) — ver `docs/MODULOS.md §21.1`.
+    **Vínculo das OS** (`sigos_vinculo`, 2026-11-09, sw v335) — todo campo de OS do app (pavimento, projetos, VRP, pesquisa, APR,
+    almoxarifado, loggers…) conferido contra o SIGOS pela base de 10 dígitos: selo de situação em qualquer `<span data-sgx>`, aviso
+    ao digitar e painel com **suspeita de erro** (chegou relatório novo e a OS não aparece); a **recomposição de pavimento é marcada
+    executada sozinha** quando o SIGOS a executa — ver `docs/MODULOS.md §21.2`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**
