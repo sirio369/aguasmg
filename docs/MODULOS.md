@@ -384,12 +384,16 @@
     camada PostGIS key=`id`/srid 31983). Branch `hidrantes` na RPC `app_cadastro_geojson`
     (props cd_no_agua/nome/funcao/cota/referencia) — popup genérico. `CAD_VER` inalterado (a chave de cache da
     camada nova já é distinta; camadas existentes não mudaram de dado).
-  - **Válvulas de manobra (2026-10-15, sw v249):** camada **`caixas_manobra`** — tabela **`"2 - infra_agua".caixas_manobra`**
-    (448 caixas de manobra = **válvulas/registros de abre-fecha** do sistema; blue-grey `#455a64`, `whole:true`, **começa desligada**
-    — chip que o usuário liga para ver todas). **Exclui VRP** (tabela própria `vrps`, chip próprio). Geom é **MultiPolygon** →
-    o branch `caixas_manobra` da RPC devolve o **ponto representativo** (`ST_PointOnSurface`) p/ render igual às demais unidades
-    (circleMarker); props cd_no_agua/tipo(tipo_co)/material/cota/referencia. **Só ZA1004 tem dado** hoje (Betim = 0). `CAD_VER`
-    inalterado (chave de cache nova distinta; camadas existentes não mudaram).
+  - **Válvulas de manobra (2026-11-09, sw v336 — refeita):** camada **`valvulas_manobra`** — view
+    **`"2 - infra_agua".unidades_valvulas_manobra`** = `nos_agua` com prefixo **REG, RGF, ALM ou VBO** (2.405 nós: ZA0200 1.304,
+    ZA1004 1.101). Mesmo padrão dos hidrantes: acompanha sozinha a carga diária de nós (`10_sync_nos.py`), sem tabela própria.
+    Blue-grey `#455a64`, `whole:true` (`p_limit` 5000), **começa desligada**. Branch `valvulas_manobra` da RPC
+    `app_cadastro_geojson` → props cd_no_agua/**tipo** (prefixo)/**situacao** (`estado` A→Aberta, F→Fechada; 396 fechadas)/
+    diametro/material/cota/referencia — popup genérico. Migração `docs/migracao_valvulas_manobra.sql` (aplicada 09/11/2026).
+    **Antes** (2026-10-15, sw v249) a camada lia `"2 - infra_agua".caixas_manobra` = 448 **polígonos de caixa** (tipo_co
+    12201/12202, só ZA1004), que não casam com nenhum nó — mostrava as caixas, não as válvulas. A tabela e o branch
+    `caixas_manobra` da RPC **continuam** (app em cache ≤ v335 ainda pede); podem sair depois. Chave de cache nova →
+    `CAD_VER` inalterado. Exclui VRP (tabela própria `vrps`, chip próprio).
   - **Limite das ZAs (2026-10-29, sw v301):** camada **`limite_za`** (1º chip, **começa ligada**) — os 2 polígonos de
     **`"1 - suporte_geografico".limite_za`** (ZA0200 Betim, ZA1004 Contagem) desenhados só como **contorno tracejado roxo**
     `#8e24aa` (`fill:false`, `dashArray 6,4`, mesmo visual do mapa da Estanqueidade), **sem clique** (`interactive:false`) e
