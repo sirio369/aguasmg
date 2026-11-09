@@ -314,6 +314,9 @@ pwa/
     almoxarifado, loggers…) conferido contra o SIGOS pela base de 10 dígitos: selo de situação em qualquer `<span data-sgx>`, aviso
     ao digitar e painel com **suspeita de erro** (chegou relatório novo e a OS não aparece); a **recomposição de pavimento é marcada
     executada sozinha** quando o SIGOS a executa — ver `docs/MODULOS.md §21.2`.
+    **RDO diário** (`rdo`, 2026-11-09, sw v339) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
+    lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
+    linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**

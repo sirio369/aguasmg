@@ -3771,3 +3771,38 @@ cada colaborador.
   antes disso aparece como "Sem OS" até alguém carregar Encerradas mais antigas. A tela mostra essas datas no subtítulo.
 - A carteira vale até a última **Relação de Serviços** carregada (substitui por ZA); uma OS encerrada depois dela só sai da
   carteira quando entrar a próxima Relação ou a Encerradas.
+
+### 21.4 RDO diário (`rdo`) · `docs/migracao_rdo_diario.sql` (2026-11-09, sw v339)
+
+Auxiliar de Programação › 📋 RDO › **RDO diário**. Mostra, por **dia × ZA**, só o que foi **executado** ou está **em andamento**
+(decisão do usuário: sem efetivo, sem equipamentos, sem documento — é consulta no app). Desde **01/09/2026**.
+
+**Fonte única de eventos:** `public.rdo_eventos(de, ate)` → `dia, za, chave, tipo, fonte, ordem, descricao, qtd, detalhe`.
+A `chave` é estável (é nela que a revisão se prende). A Vitrine vai passar a usar a mesma função (PR seguinte).
+
+| Linha | Fonte | Regra |
+|---|---|---|
+| `sigos:exec:<serviço>` | SIGOS | `vw_os_situacao` executada, por `data_execucao` e serviço — "N OS executadas" (detalhe: OS, matrícula, endereço, resultado) |
+| `sigos:nexec:<serviço>` | SIGOS | encerrada sem execução, com/sem visita → **Pendência** |
+| `app:pesquisa` | AcquaHub | km de `pesquisa_trecho` (ZA pela `limite_za` quando vazia) + ocorrências (vazamento × `Fraude…`) |
+| `app:pressao` | AcquaHub | leituras de `mapeamento_pressao` |
+| `app:loggers` | AcquaHub | instalados / removidos / dados concluídos, cada etapa na sua data |
+| `app:vrp_visita`, `app:vrp_os` | AcquaHub | visita primária; OS de VRP concluída / com pendência / improdutiva (anota quantas também estão executadas no SIGOS) |
+| `app:pav_lev`, `app:pav_exec`, `app:reaterro` | AcquaHub | pontos levantados (por grupo); recomposição executada **que o SIGOS não executou no mesmo dia** (`execucao_fonte<>'sigos'`) — senão ela já está na linha do SIGOS; ensaios de reaterro |
+| `app:projeto:<kind>:<gid>` | AcquaHub | avanço lançado no dia por intervenção (último valor de cada item) → **Em andamento**; vira **Execução** se `concluida_em` cai no dia |
+| `app:atendimento` | AcquaHub | captações, solicitações (abertura_servico) e ocorrências de entrevistadores |
+
+Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do schema 8 e `execucao` do SIGOS já estão em Brasília.
+
+**Revisão e fechamento** (`"12 - retaguarda"`):
+- `rdo_item` — revisão de linha automática (`chave`: texto, tipo, `oculto`) ou linha **manual** (`chave` null).
+- `rdo_dia` — fechamento (PK dia+za): quem/quando, `snapshot` das linhas e `hash` (md5 das linhas automáticas).
+- Status do dia (`app_rdo_mes`): **vazio**, **rascunho**, **fechado**, **desatualizado** (hash atual ≠ hash do fechamento —
+  típico de carga SIGOS que chegou depois). O calendário marca ⏳ quando as Encerradas da ZA ainda não cobrem o dia.
+- RPCs (gate `sigos_pode_ver` = `aux_acesso` ou admin): `app_rdo_mes(mes, za)`, `app_rdo_dia(dia, za)`,
+  `app_rdo_item_salvar(dia, za, chave, id, tipo, descricao, oculto)`, `app_rdo_item_excluir(dia, za, chave, id)`,
+  `app_rdo_fechar(dia, za)`, `app_rdo_reabrir(dia, za)`. Dia fechado não aceita edição (reabrir descarta o fechamento).
+
+**Tela:** ZA + mês (‹ ›, mínimo set/2026) → calendário colorido → painel do dia com linhas numeradas (ocultas ficam riscadas,
+sem número), ▾ abre o detalhe (OS do SIGOS, loggers, itens do projeto…), ✏️ editar, 🚫 ocultar, ↺ voltar ao automático,
+➕ linha manual, 🔒 Fechar / 🔓 Reabrir. Dia fechado mostra o que foi fechado; "Ver versão atual" compara com o banco.
