@@ -3854,6 +3854,14 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
   `app_rdo_item_salvar(dia, za, chave, id, tipo, descricao, oculto)`, `app_rdo_item_excluir(dia, za, chave, id)`,
   `app_rdo_fechar(dia, za)`, `app_rdo_reabrir(dia, za)`. Dia fechado não aceita edição (reabrir descarta o fechamento).
 
+**Bloco único SIGOS+AcquaHub e tipo do serviço no título (2026-11-09, sw v345, `docs/migracao_rdo_bloco_unico.sql`):**
+- Título da linha do SIGOS sempre diz o tipo, em nome legível (`public.sigos_servico_nome`): "VRP — 2 OS executadas: 2 manutenção",
+  "Manobra de registro — 4 OS executadas: 2 abertura de registro, 2 fechamento de registro", "Loggers de pressão — 3 OS executadas:
+  2 instalação de logger, 1 retirada de logger". Serviço sem regra cai no nome curto do SIGOS em minúsculas.
+- Manutenção de VRP do app cuja OS SIGOS já está executada sai da linha do AcquaHub e entra no bloco do SIGOS, com a VRP ao lado
+  da OS no detalhe ("1637900: 00127848460901 (VRP024), …"). A linha do app fica só com o resto e diz por quê ("sem OS SIGOS
+  informada" / "aguardando execução no SIGOS"). Pavimento já seguia essa regra; loggers do app não têm OS SIGOS.
+
 **Detalhe enxuto e título curto de projetos (2026-11-09, sw v344, `docs/migracao_rdo_detalhe_enxuto.sql`):**
 - Detalhe das linhas do SIGOS = um item por **código de serviço** com todas as OS separadas por vírgula
   (`{cod, oss}` → "5418000: 00127842988401, 00127849823901"); matrícula/endereço/equipe saíram do detalhe.
