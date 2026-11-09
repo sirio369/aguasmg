@@ -394,6 +394,10 @@
     12201/12202, só ZA1004), que não casam com nenhum nó — mostrava as caixas, não as válvulas. A tabela e o branch
     `caixas_manobra` da RPC **continuam** (app em cache ≤ v335 ainda pede); podem sair depois. Chave de cache nova →
     `CAD_VER` inalterado. Exclui VRP (tabela própria `vrps`, chip próprio).
+  - **Busca "Válvula · código" (2026-11-09, sw v337):** opção `valvulas_manobra` no `#cadBuscaCamada` → branch
+    `valvulas_manobra` da `app_cadastro_buscar`: procura em `unidades_valvulas_manobra` por `cd_no_agua` (aceita só o número,
+    ex. `1249821`, ou o prefixo, ex. `VBO`) ou `referencia`, 25 resultados, rótulo "Válvula RGF… · DN 75 · Aberta".
+    `cadIrPara` liga o chip da camada sozinho (`cadOn[layer]=true`). Migração `docs/migracao_busca_valvula.sql` (aplicada).
   - **Limite das ZAs (2026-10-29, sw v301):** camada **`limite_za`** (1º chip, **começa ligada**) — os 2 polígonos de
     **`"1 - suporte_geografico".limite_za`** (ZA0200 Betim, ZA1004 Contagem) desenhados só como **contorno tracejado roxo**
     `#8e24aa` (`fill:false`, `dashArray 6,4`, mesmo visual do mapa da Estanqueidade), **sem clique** (`interactive:false`) e
