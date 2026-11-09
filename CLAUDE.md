@@ -362,6 +362,7 @@ pwa/
   RPC `app_qsms_epi_painel`; `qsms_cesta` = a tela "Cargos e cesta de EPI" da engrenagem do Almoxarifado reaproveitada,
   editável por quem tem QSMS; `qsms_epi_col` = a tela "EPIs por colaborador" do Almoxarifado reaproveitada). RPCs `app_seg_*`/`app_qsms_*`. Detalhe em `docs/MODULOS.md §18`. **Indicadores SST** (2026-11-05): card próprio **🦺 QSMS campo** para os TSTs (`sst`/`sst_form`, Home › 🛠️ Execução, gate `ME.qsms_campo`, separado do `seg`; inspeção (com OS + responsável pela intervenção que assina), DDS (nº de participantes + foto da lista no papel) e ocorrência pela fila offline, pasta `sst/`, sw v328/v330; liberado na ⚙️ `qsms_acesso`, coluna Campo), categoria "📊 Indicadores SST" no hub `qsms` (sw v329: `sst_painel`, `sst_lanc` com tratativa de NC/validação/ações, `sst_aso`, `sst_trein` matriz + turma, `sst_cipa`, `sst_modelo`) e views `bi_sst_*` como fonte do BI QSMS (substitui a planilha) — RPCs `app_sst_*`, ver `docs/MODULOS.md §20`.
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**,
+  **válvulas de manobra** — nós REG/RGF/ALM/VBO via view `unidades_valvulas_manobra`, 2026-11-09,
   **limite das ZAs** — contorno tracejado via `app_limites_zas` + máscara escurecendo o fundo fora das ZAs, 2026-10-29)
   com busca + marcador "Você" (GPS, `cadOnGps`, pane próprio sempre por cima). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
   por `CAD_VER` (recarregou o `limite_za`? suba `CAD_VER`).
