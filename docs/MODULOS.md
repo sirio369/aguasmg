@@ -3313,6 +3313,15 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
+- **SIGOS na Vitrine (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):** a TV busca também `app_vitrine_sigos(desde)`
+  (gate e período da Vitrine): famílias de serviço (`sigos_servico_grupo`) × ZA no período e no mês (executadas / encerradas sem
+  execução), série de 30 dias, pontos das OS executadas (coordenada da foto, senão do imóvel; desde o mais cedo entre "desde" e
+  7 dias; até 5 mil, em canvas), carteira aberta por família (tira o que já está nas Encerradas; vencidas = `limite` passado;
+  idade média) e equipes do mês. Slides novos logo depois da capa: **Serviços executados** (período — só se houver),
+  **Quantitativos do mês**, **OS executadas por dia** (30 dias, Contagem × Betim), **Onde executamos** (2 mapas, cor =
+  família), **Carteira aberta** e **Equipes**. O slide de cada dia passou a juntar pinos do AcquaHub + pontos do SIGOS no
+  mesmo mapa, com o resumo do SIGOS por família ao lado; dias recentes só com SIGOS (o relatório chega com atraso) também
+  entram. Rodapé mostra até quando vão as Encerradas. Se a RPC falhar, a Vitrine segue sem os slides do SIGOS.
 - **RDO na Vitrine (2026-11-09, sw v342, `docs/migracao_rdo_ajustes.sql`):** a TV busca também `app_vitrine_rdo(desde)` (mesmo
   gate e mesmo período padrão do `app_vitrine_dados`) = `public.rdo_periodo` → linhas do RDO **já revisadas** (dia fechado =
   snapshot; senão rascunho com a revisão aplicada; ocultas fora). Depois do slide "mapa + linha do tempo" de cada dia entra
@@ -3844,6 +3853,19 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
 - RPCs (gate `sigos_pode_ver` = `aux_acesso` ou admin): `app_rdo_mes(mes, za)`, `app_rdo_dia(dia, za)`,
   `app_rdo_item_salvar(dia, za, chave, id, tipo, descricao, oculto)`, `app_rdo_item_excluir(dia, za, chave, id)`,
   `app_rdo_fechar(dia, za)`, `app_rdo_reabrir(dia, za)`. Dia fechado não aceita edição (reabrir descarta o fechamento).
+
+**Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
+- O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";
+  RECOMPOSICAO PASSEIO/ASFALTO + REATERRO → "Recomposição de pavimento"; SUBST.HIDROMETRO (todas as capacidades) → "Troca de
+  hidrômetro". Serviço novo que não casa com nenhuma regra fica com o próprio nome. Chave da linha = `sigos:exec:<família>`.
+  Quando a família junta serviços diferentes, o texto traz a quebra ("4 OS executadas (2 ABERTURA REGISTRO EXT, 2 FECHAMENTO
+  REGISTRO EXT)", nome curto = `sigos_servico_curto`) e o detalhe de cada OS traz serviço e equipe.
+- Ordem (`rdo_familia_ordem`): cada família do SIGOS e logo depois a linha do AcquaHub da mesma família (ex.: VRP do SIGOS →
+  VRP do app; loggers do SIGOS → loggers do app).
+- **📋 Copiar RDO** copia em dois formatos no mesmo clique — **HTML** (cola formatado no Word/e-mail/Teams: título, ZA,
+  seções, lista numerada e sub-lista) e **texto simples** — com o **detalhe de cada linha** (`rdoDetLinha`, o mesmo texto da
+  tela): OS do SIGOS (nº · serviço · matrícula · endereço · equipe · resultado), itens do projeto ("Alargamento (reaming):
+  100%"), loggers, ocorrências, ensaios etc. Fonte entre colchetes no texto simples.
 
 **Consórcios e cópia (2026-11-09, sw v342):** os consórcios são chips de **seleção múltipla** (padrão: os dois). O calendário
 junta as ZAs escolhidas (qualquer uma desatualizada → desatualizado; todas as com registro fechadas → fechado) e o dia mostra
