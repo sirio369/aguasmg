@@ -276,7 +276,7 @@ pwa/
 - **Entrevistadores** (`entrevistadores`) → só o que é de campo do entrevistador: **Captação de clientes**
   (`captacao`, view `vw_captacao`), **Solicitação de serviços** de campo (`abertura_servicos`) e
   **Registro de ocorrência** (`ent_ocorrencia`). **Ocorrências registradas** (`ent_oc_gestao`) e
-  **Roteiro de leitura** (`roteiro`) **saíram daqui** (2026-10 reorg) e vivem agora no Auxiliar de Programação.
+  **Roteiro de leitura** (`roteiro`) **saíram daqui** (2026-10 reorg) para o Auxiliar de Programação (o Roteiro de leitura foi **removido do app** em 2026-11-09).
 - **Auxiliar de Programação** (`auxiliar_programacao`, na Home › 🧰 Suporte) — **acesso geral próprio da tela**
   (reorg 2026-10): gate `homeGate()` por **`ME.aux_acesso`** (= `perfil.aux_acesso`, admin sempre), controlado por
   uma **⚙️ engrenagem geral** (`#apCfg`, admin) que abre a tela **`aux_acesso`** (lista de usuários com toggle,
@@ -287,7 +287,7 @@ pwa/
   **3 categorias**:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
-    (`ent_oc_gestao`) · Roteiro de leitura (`roteiro`, `app_roteiro_*`) · **Priorização de troca de HD** e
+    (`ent_oc_gestao`) · ~~Roteiro de leitura~~ (removido em 2026-11-09, sw v338; RPCs `app_roteiro_*` e views seguem no banco) · **Priorização de troca de HD** e
     **Fiscalização de irregularidades** (abrem `perdas.html?s=hdpri` / `?s=fraudepri` — ver Perdas/NRW) · **Situação dos Imóveis** (`perdas.html?s=situacao`, 2026-10-30: ligações por situação R/I/F/P e por **há quantos dias** estão nela — `ligacoes.situacao`/`situacao_desde` —, filtros em dropdown sobre um mapa em largura total com limite das ZAs + polígono e um botão de export .xlsx com a contagem; RPCs `app_sit_imoveis_resumo/lista/mapa`, gate `_nrw_fraude_gate`). · **Programação do recadastramento** (`recad_prog`, 2026-11-09, sw v336: todas as matrículas no mapa × OS SIGOS 1990100 de recadastramento — recadastrada / status da carteira por colaborador / encerrada sem execução / sem OS —, visitas, % recadastrado, polígono e export CSV; RPCs `app_recad_dados`/`app_recad_export`, `docs/MODULOS.md §21.3`). *(Análise
     por matrícula / `?s=mm` foi removida do Auxiliar em 2026-10-20; a tela segue existindo no cockpit NRW.)*
   - **🎧 Pesquisa de Vazamentos** (nesta ordem no hub, 2026-10-30): Programação de pesquisa (`programacao_pesquisa`) ·

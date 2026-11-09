@@ -148,7 +148,7 @@
 
 ### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
 - **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
-  Cadastro técnico `cadMap`, Roteiro de leitura `rlMap`, Pesquisa `pqMap`, Produtividade `prodMap`,
+  Cadastro técnico `cadMap`, Pesquisa `pqMap`, Produtividade `prodMap`,
   Programação de pesquisa `ppMap`, Produtividade de pressão `prpMap`) passou a chamar essa função em
   vez de montar seu próprio `L.tileLayer(...).addTo(map)` — antes só existia OpenStreetMap, sem opção
   de satélite. A função cria as duas camadas (`rua` = OpenStreetMap, `sat` = Esri World Imagery,
@@ -502,7 +502,11 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   **não** serve de fonte principal: entrevistadores atendem as duas ZAs (4/7 divergiam); o ponto bateu com o
   consórcio da matrícula em `"3 - comercial".ligacoes` em 7/7.
 
-### 3.3 Roteiro de leitura (Suporte) — `// SUPORTE › ROTEIRO DE LEITURA` (~L1926) · tela `roteiro`
+### 3.3 Roteiro de leitura — ⛔ **tela removida do app em 2026-11-09 (sw v338)**
+> A tela `roteiro` (card no Auxiliar › Serviços comerciais) e todo o código `rl*` saíram do `index.html` a pedido do usuário.
+> **O banco ficou como estava:** as RPCs `app_roteiro_*` (agora sem uso no app) e as views `vw_roteiro_leitura`/`_linha`
+> (usadas no QGIS) não foram apagadas. Abaixo, o registro de como a tela era.
+
 - Mapa por **percurso/trecho** sobre `"8 - coleta_campo".vw_roteiro_leitura` (pontos, 133k) e
   `vw_roteiro_leitura_linha` (linhas). Carrega **1 percurso por vez** (nunca os 133k).
 - **RPCs:** `app_roteiro_percursos()` (585, p/ dropdown), `app_roteiro_pontos(p_percurso,p_trecho)`
@@ -2039,7 +2043,7 @@ na UI desde 2026-10-14).
 `app_ocorrencia_fila`, `app_ocorrencia_os` (registro via `app_ocorrencia_registrar`).
 **VRP:** `app_vrp_listar`, `app_vrp_visita_registrar`, `app_vrp_visita_ver`.
 **Cadastro:** `app_cadastro_geojson`, `app_cadastro_buscar`.
-**Roteiro:** `app_roteiro_percursos/pontos/linhas/matricula`.
+**Roteiro:** `app_roteiro_percursos/pontos/linhas/matricula` (sem uso no app desde 2026-11-09 — tela removida).
 **Entrevistadores/Retaguarda:** `app_abertura_fila`, `app_abertura_os`,
 `app_abertura_servico_minhas`, `app_captacao_fila`, `app_captacao_matricula`
 (registro via `app_abertura_servico_registrar`, `app_captacao_registrar`),
