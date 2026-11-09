@@ -904,6 +904,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="cadFiltros" style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;margin-bottom:8px;"></div>
     <div id="cadHint" style="font-size:12px;color:var(--mut);margin-bottom:6px;min-height:16px"></div>
     <div id="cadMapa" style="height:64vh;min-height:360px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
+    <p class="sub" style="margin:6px 0 0">🚱 Vazamento? Ligue a camada <b>Rede</b>, toque no trecho e use <b>Isolar este trecho</b> para ver quais válvulas fechar.</p>
+    <div id="isoPainel" style="display:none;margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45"></div>
   </main>
 
   <main id="pesquisa" class="hidden">
@@ -6571,7 +6573,13 @@ async function cadAtualizar(){
         style:d.contorno?{color:d.cor,weight:2.5,fill:false,dashArray:'6,4',opacity:.9}:{color:d.cor,weight:3},
         interactive:!d.contorno,
         pointToLayer:function(f,ll){return L.circleMarker(ll,{radius:d.k==='ligacoes'?3:6,color:'#fff',weight:1,fillColor:d.cor,fillOpacity:1});},
-        onEachFeature:function(f,ly){var p=f.properties||{};var ll=ly.getLatLng?ly.getLatLng():(ly.getBounds?ly.getBounds().getCenter():null);var info=Object.keys(p).map(function(k){return '<b>'+k+':</b> '+(p[k]==null?'—':p[k]);}).join('<br>');var nav=ll?('<br><a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>'):'';ly.bindPopup(info+nav);}
+        onEachFeature:function(f,ly){var p=f.properties||{};var ll=ly.getLatLng?ly.getLatLng():(ly.getBounds?ly.getBounds().getCenter():null);var info=Object.keys(p).map(function(k){return '<b>'+k+':</b> '+(p[k]==null?'—':p[k]);}).join('<br>');var nav=ll?('<br><a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>'):'';
+          // rede: botão de isolamento — usa o ponto tocado p/ escolher o lado quando há válvula no meio do trecho
+          var iso=(d.k==='rede'&&p.trecho!=null)?'<br><button type="button" class="isoBtn" style="all:unset;cursor:pointer;margin-top:7px;background:var(--bad);color:#fff;padding:6px 11px;border-radius:8px;font-weight:600;font-size:13px">🚱 Isolar este trecho</button>':'';
+          ly.bindPopup(info+nav+iso);
+          if(iso){var clk=null; ly.on('click',function(e){clk=e.latlng;});
+            ly.on('popupopen',function(e){var b=e.popup.getElement().querySelector('.isoBtn'); if(b)b.onclick=function(){cadMap.closePopup(); isoRodar(p.trecho, clk, []);};});}
+        }
       }).addTo(cadMap);
       if(d.contorno){cadCamadas[d.k].bringToBack();               // limite fica por baixo da rede/unidades
         cadCamadas[d.k].addLayer(cadMascara(data));}               // + máscara no mesmo grupo → some junto quando o chip desliga
@@ -6611,7 +6619,78 @@ function cadIrPara(x,layer){
   const info=Object.keys(props).map(function(k){return '<b>'+k+':</b> '+(props[k]==null?'—':props[k]);}).join('<br>');
   const nav='<a href="https://www.google.com/maps/dir/?api=1&destination='+x.lat+','+x.lon+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>';
   cadDestaque=L.circleMarker([x.lat,x.lon],{radius:11,color:'#ff6d00',weight:3,fillColor:'#ff9800',fillOpacity:.5}).addTo(cadMap);
-  cadDestaque.bindPopup((info?info+'<br>':'')+nav).openPopup();
+  const tr=layer==='rede'?(props.nu_trecho!=null?props.nu_trecho:props.trecho):null;   // busca "Rede · trecho" → mesmo botão do popup da camada
+  const iso=tr!=null?'<br><button type="button" class="isoBtn" style="all:unset;cursor:pointer;margin-top:7px;background:var(--bad);color:#fff;padding:6px 11px;border-radius:8px;font-weight:600;font-size:13px">🚱 Isolar este trecho</button>':'';
+  if(iso) cadDestaque.on('popupopen',function(e){var b=e.popup.getElement().querySelector('.isoBtn'); if(b)b.onclick=function(){cadMap.closePopup(); isoRodar(tr, null, []);};});
+  cadDestaque.bindPopup((info?info+'<br>':'')+nav+iso).openPopup();
+}
+
+// ---- ISOLAMENTO DE TRECHO (vazamento → quais válvulas fechar) ----
+// RPC app_isolamento_trecho percorre o grafo "2 - infra_agua".isolamento_aresta a partir do trecho e para em cada
+// válvula (REG/ALM/RGF/VBO/RGA/RGD) → as da borda são as que fecham a água no vazamento. "Não opera" passa a
+// válvula como tubo e o isolamento cresce até a próxima. Válvula F no cadastro entra na lista p/ confirmar em campo.
+let isoLayer=null, isoUlt=null;   // camada no mapa / último resultado {trecho, ll, falhas, r}
+async function isoRodar(trecho, ll, falhas){
+  if(!navigator.onLine){toast('⚠ Sem conexão — o isolamento precisa de internet.');return;}
+  const box=document.getElementById('isoPainel'); box.style.display='block';
+  box.innerHTML='<p class="sub" style="margin:0">Calculando isolamento do trecho '+vEsc(trecho)+'…</p>';
+  try{
+    const {data,error}=await sb.rpc('app_isolamento_trecho',{p_nu_trecho:trecho,p_lat:ll?ll.lat:null,p_lon:ll?ll.lng:null,p_falhas:falhas||[]});
+    if(error)throw error;
+    isoUlt={trecho:trecho,ll:ll,falhas:falhas||[],r:data};
+    isoDesenhar(true); isoPainelRender();
+  }catch(e){box.innerHTML='<p style="margin:0;color:var(--bad)">Erro: '+vEsc(e.message||e)+'</p>';}
+}
+function isoIcone(n,cor){return L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],
+  html:'<div style="width:26px;height:26px;border-radius:50%;background:'+cor+';color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font:700 12px system-ui">'+n+'</div>'});}
+function isoDesenhar(ajustar){
+  if(isoLayer){cadMap.removeLayer(isoLayer);isoLayer=null;}
+  if(!isoUlt)return;
+  const r=isoUlt.r; isoLayer=L.featureGroup();
+  L.geoJSON(r.area,{style:{color:'#ff6d00',weight:7,opacity:.75},interactive:false}).addTo(isoLayer);
+  (r.pontas_soltas||[]).forEach(function(p){L.circleMarker([p.lat,p.lon],{radius:8,color:'#f9a825',weight:3,fillColor:'#fff59d',fillOpacity:.9}).bindPopup('⚠ Ponta solta encostada em outra rede ('+vEsc(p.no)+') — confirme em campo se há ligação.').addTo(isoLayer);});
+  (r.valvulas_fora||[]).forEach(function(v){L.circleMarker([v.lat,v.lon],{radius:6,color:'#455a64',weight:2,fillColor:'#b0bec5',fillOpacity:.9}).bindPopup(vEsc(v.codigo)+' — válvula sem rede cadastrada a até 3 m (não entrou no cálculo).').addTo(isoLayer);});
+  (r.valvulas||[]).forEach(function(v,i){
+    const nav='<a href="https://www.google.com/maps/dir/?api=1&destination='+v.lat+','+v.lon+'" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a>';
+    L.marker([v.lat,v.lon],{icon:isoIcone(i+1,v.estado==='F'?'#757575':'#d32f2f'),zIndexOffset:1000})
+      .bindPopup('<b>'+(i+1)+'. '+vEsc(v.codigo)+'</b>'+(v.diametro?' · DN '+v.diametro:'')+'<br>'+(v.estado==='F'?'Fechada no cadastro — confirmar em campo':'Fechar')+'<br>'+nav).addTo(isoLayer);
+  });
+  isoLayer.addTo(cadMap);
+  if(ajustar){try{cadMap.fitBounds(isoLayer.getBounds(),{padding:[30,30],maxZoom:18});}catch(e){}}
+}
+function isoPainelRender(){
+  const box=document.getElementById('isoPainel'); const u=isoUlt; if(!u){box.style.display='none';return;}
+  const r=u.r, vs=r.valvulas||[], abrir=vs.filter(function(v){return v.estado!=='F';}).length;
+  let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><b>🚱 Isolamento do trecho '+vEsc(r.trecho)+'</b>'
+    +'<div class="sub" style="margin:2px 0 0">'+vs.length+' válvula(s) · '+(r.metros||0).toLocaleString('pt-BR')+' m de rede ficam sem água ('+(r.n_trechos||0)+' trecho(s), em laranja no mapa)</div></div>'
+    +'<button type="button" id="isoFechar" style="all:unset;cursor:pointer;font-size:18px;padding:0 4px" title="Limpar">✕</button></div>';
+  if(!vs.length) h+='<div class="banner warn" style="margin:8px 0">Nenhuma válvula encontrada. A rede cadastrada deste trecho não se liga ao resto por nenhuma válvula (ex.: rede em construção ou falha de cadastro) — verifique em campo de onde vem a água.</div>';
+  vs.forEach(function(v,i){
+    h+='<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)">'
+      +'<div style="flex:0 0 26px;height:26px;border-radius:50%;background:'+(v.estado==='F'?'#757575':'#d32f2f')+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">'+(i+1)+'</div>'
+      +'<div style="flex:1;min-width:0"><b>'+vEsc(v.codigo)+'</b>'+(v.diametro?' · DN '+v.diametro:'')
+      +'<div class="sub" style="margin:0">'+(v.estado==='F'?'⚠ Fechada no cadastro — confirmar em campo':'Fechar')+' · a '+v.dist_m+' m do trecho</div></div>'
+      +'<a href="https://www.google.com/maps/dir/?api=1&destination='+v.lat+','+v.lon+'" target="_blank" title="Navegar" style="text-decoration:none;font-size:18px">🧭</a>'
+      +'<button type="button" class="isoFalha" data-c="'+vEsc(v.codigo)+'" style="all:unset;cursor:pointer;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;white-space:nowrap">Não opera</button></div>';
+  });
+  if(u.falhas.length) h+='<div style="padding:8px 0;border-top:1px solid var(--line);font-size:13px">Não operam (tratadas como tubo): '
+    +u.falhas.map(function(c){return '<span style="display:inline-block;background:var(--warn-bg);border-radius:8px;padding:2px 8px;margin:2px">'+vEsc(c)+' <a href="#" class="isoDesf" data-c="'+vEsc(c)+'" style="color:var(--acc)">desfazer</a></span>';}).join('')+'</div>';
+  if((r.pontas_soltas||[]).length) h+='<div class="banner warn" style="margin:8px 0 0">⚠ '+r.pontas_soltas.length+' ponta(s) de rede encostada(s) em outra rede sem válvula cadastrada (amarelo no mapa) — pode haver entrada de água por ali; confirme em campo.</div>';
+  if((r.valvulas_fora||[]).length) h+='<div class="sub" style="margin:8px 0 0">'+r.valvulas_fora.length+' válvula(s) perto da área sem rede cadastrada (cinza no mapa) não entraram no cálculo.</div>';
+  if(vs.length) h+='<button type="button" id="isoShare" style="margin-top:10px;width:100%">📤 Compartilhar lista de manobra</button>';
+  box.innerHTML=h;
+  box.querySelector('#isoFechar').onclick=function(){isoUlt=null;isoDesenhar();isoPainelRender();};
+  box.querySelectorAll('.isoFalha').forEach(function(b){b.onclick=function(){isoRodar(u.trecho,u.ll,u.falhas.concat([b.dataset.c]));};});
+  box.querySelectorAll('.isoDesf').forEach(function(a){a.onclick=function(ev){ev.preventDefault();isoRodar(u.trecho,u.ll,u.falhas.filter(function(c){return c!==a.dataset.c;}));};});
+  const sh=box.querySelector('#isoShare'); if(sh) sh.onclick=isoCompartilhar;
+}
+function isoCompartilhar(){
+  const r=isoUlt&&isoUlt.r; if(!r)return;
+  const txt='🚱 Manobra p/ isolar o trecho '+r.trecho+' ('+r.consorcio+')\n'
+    +(r.valvulas||[]).map(function(v,i){return (i+1)+'. '+v.codigo+(v.diametro?' DN '+v.diametro:'')+(v.estado==='F'?' (fechada no cadastro — confirmar)':' — fechar')+'\n   https://www.google.com/maps/search/?api=1&query='+v.lat+','+v.lon;}).join('\n')
+    +(isoUlt.falhas.length?'\nNão operam: '+isoUlt.falhas.join(', '):'');
+  if(navigator.share){navigator.share({text:txt}).catch(function(){});}
+  else window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
 }
 
 // ---------- MÓDULO PESQUISA (trechos retos + ocorrência) ----------

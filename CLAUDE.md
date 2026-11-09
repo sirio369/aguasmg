@@ -367,7 +367,9 @@ pwa/
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**,
   **válvulas de manobra** — nós REG/RGF/ALM/VBO via view `unidades_valvulas_manobra`, 2026-11-09,
   **limite das ZAs** — contorno tracejado via `app_limites_zas` + máscara escurecendo o fundo fora das ZAs, 2026-10-29)
-  com busca + marcador "Você" (GPS, `cadOnGps`, pane próprio sempre por cima). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
+  com busca + marcador "Você" (GPS, `cadOnGps`, pane próprio sempre por cima). **Isolamento de trecho** (2026-11-09, sw v340):
+  botão "🚱 Isolar este trecho" no popup da rede → `app_isolamento_trecho` devolve as válvulas a fechar (grafo
+  `"2 - infra_agua".isolamento_aresta`/`_valvula`; **rodar `isolamento_recalcular()` após carga de rede/nós**) — `docs/MODULOS.md §2.5`. RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
   por `CAD_VER` (recarregou o `limite_za`? suba `CAD_VER`).
 - **Biblioteca** (`biblioteca`) — documentos de referência (bucket Storage `biblioteca`).
 

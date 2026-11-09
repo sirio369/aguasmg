@@ -398,6 +398,24 @@
     `valvulas_manobra` da `app_cadastro_buscar`: procura em `unidades_valvulas_manobra` por `cd_no_agua` (aceita só o número,
     ex. `1249821`, ou o prefixo, ex. `VBO`) ou `referencia`, 25 resultados, rótulo "Válvula RGF… · DN 75 · Aberta".
     `cadIrPara` liga o chip da camada sozinho (`cadOn[layer]=true`). Migração `docs/migracao_busca_valvula.sql` (aplicada).
+  - **Isolamento de trecho (2026-11-09, sw v340):** "vazamento no trecho X → quais válvulas fechar". No popup de um
+    trecho da camada **Rede** (e no popup da busca "Rede · trecho", sem ponto → parte de todos os pedaços do trecho) há o botão **🚱 Isolar este trecho** → `isoRodar(trecho, ponto tocado, falhas)` chama
+    **`app_isolamento_trecho(p_nu_trecho, p_lat, p_lon, p_falhas text[])`** (authenticated = todo mundo) e mostra no mapa
+    (`isoLayer`) a **área que fica sem água** (laranja), as **válvulas numeradas** (vermelho = fechar; cinza = já F no
+    cadastro → "confirmar em campo"), **pontas soltas** (amarelo) e válvulas fora do grafo (cinza claro); painel `#isoPainel`
+    abaixo do mapa com a lista (🧭 navegar, **Não opera** → recalcula tratando a válvula como tubo, "desfazer"), avisos e
+    **📤 Compartilhar** (Web Share ou WhatsApp, com link do Maps de cada válvula). Só online.
+    **Banco** (`docs/migracao_isolamento_valvulas.sql`, aplicada 09/11/2026): grafo próprio, derivado — não altera `rede`:
+    `"2 - infra_agua".isolamento_valvula` (como cada válvula foi encaixada) + `isolamento_aresta` (trechos, pedaços de trecho,
+    pontes), refeitos por **`"2 - infra_agua".isolamento_recalcular()`** (só postgres; ~segundos). Válvulas: **REG, ALM, RGF, VBO,
+    RGA, RGD** (fora VRP e DSC); trechos `situacao='D'` (desativados) fora, `C` (em construção) dentro. Encaixe: REG/ALM já são
+    nós dos trechos (`no`); RGF/RGA/RGD/VBO quase nunca são — ~1.070 ficam no **vão entre duas pontas de rede** não ligadas
+    (`ponte`: a válvula é a única ligação entre os lados), ~130 sobre um trecho (`corte`: o trecho vira pedaços a–válvula–b; o
+    ponto tocado escolhe o pedaço), 127 sem rede a ≤3 m (`fora`, ignoradas). A RPC é uma busca em largura (CTE recursiva) a
+    partir das pontas do trecho que para em toda válvula: as alcançadas são as que fecham. 10–160 ms; mediana 2 válvulas / 1,4 km.
+    0 válvula = rede sem ligação cadastrada com o resto (ex.: rede em construção) → aviso na tela.
+    ⚠️ **Rodar `select "2 - infra_agua".isolamento_recalcular();` depois de toda carga de rede/nós** (`10_sync_nos.py` e
+    recarga da rede) — senão o isolamento usa o grafo velho. Não calcula quem fica sem água além da área (fora do escopo).
   - **Limite das ZAs (2026-10-29, sw v301):** camada **`limite_za`** (1º chip, **começa ligada**) — os 2 polígonos de
     **`"1 - suporte_geografico".limite_za`** (ZA0200 Betim, ZA1004 Contagem) desenhados só como **contorno tracejado roxo**
     `#8e24aa` (`fill:false`, `dashArray 6,4`, mesmo visual do mapa da Estanqueidade), **sem clique** (`interactive:false`) e
