@@ -3854,6 +3854,12 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
   `app_rdo_item_salvar(dia, za, chave, id, tipo, descricao, oculto)`, `app_rdo_item_excluir(dia, za, chave, id)`,
   `app_rdo_fechar(dia, za)`, `app_rdo_reabrir(dia, za)`. Dia fechado não aceita edição (reabrir descarta o fechamento).
 
+**Detalhe enxuto e título curto de projetos (2026-11-09, sw v344, `docs/migracao_rdo_detalhe_enxuto.sql`):**
+- Detalhe das linhas do SIGOS = um item por **código de serviço** com todas as OS separadas por vírgula
+  (`{cod, oss}` → "5418000: 00127842988401, 00127849823901"); matrícula/endereço/equipe saíram do detalhe.
+- Título da linha de projeto = **código da intervenção — tipo (HDD…) — descrição/local — avanço total X%** (ou "concluída
+  (100%)"); as atividades lançadas no dia ficam só no detalhe. Dia já fechado mantém o snapshot antigo (reabrir e fechar atualiza).
+
 **Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
 - O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";
   RECOMPOSICAO PASSEIO/ASFALTO + REATERRO → "Recomposição de pavimento"; SUBST.HIDROMETRO (todas as capacidades) → "Troca de
