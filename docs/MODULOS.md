@@ -3662,3 +3662,42 @@ Detalhes:
 - `end_partes`/`end_chave` são **plpgsql**. Em SQL com `SET search_path` elas não são "inlinadas" e são replanejadas a cada
   linha (~3 ms cada → 20 s na carteira toda, estourando os 8 s do PostgREST).
 - Se a Relação mudar o formato do endereço, a chave muda e o cache "esquece". Conferir o `end_partes` com uma amostra.
+
+### 21.2 Tela "Programação do recadastramento" (`recad_prog`) · `docs/migracao_recad_programacao.sql` (2026-11-09, sw v335)
+
+Auxiliar de Programação › 🧾 Serviços comerciais › **📝 Programação do recadastramento**. Mesmo acesso do Auxiliar
+(`aux_acesso` ou admin; gate do banco `public.sigos_pode_ver`). Serve para o programador ver, no mapa, o que já foi
+recadastrado, o que está em carteira (e com quem) e as matrículas que **ainda não têm OS**, e montar/completar a rota de
+cada colaborador.
+
+- **Recadastramento = serviço SIGOS `1990100` "PDC REVISAO CADASTRO CONTRATADA"** (fixo nas RPCs).
+- **Universo ("o todo") = todas as matrículas de `"3 - comercial".ligacoes`** (≈135 mil), cada uma um ponto do cadastro.
+- **Uma RPC só**, `app_recad_dados()`, traz `pts` (`[matrícula, lat, lon, ZA 1=ZA1004/0=ZA0200, situação R/I/F/P]` de todas as
+  ligações) + `os` (por matrícula: `a` = OS da carteira atual, `e` = OS encerradas, com status, equipe, responsável, datas,
+  visitas e motivo/ocorrência) + datas das cargas. ~6 MB, ~2 s. Status, %, filtros, polígono e tabela rodam no app.
+- **Status atual da matrícula** (`rcClassificar`), nesta ordem:
+  1. **Recadastrada (executada)**: alguma Encerrada com status `EXECUTADA` **ou** OS da carteira com `EXECUTADA(E)`;
+  2. senão, a OS mais recente da carteira: **Programada (PR)**, **Recebida pela equipe (RE)**, **Não programada (NP)**,
+     **Pendente (PE)**, **Agendamento vencido (AV)**, **Não exec. c/ visita (N)**; outro código → "Outro status em carteira";
+  3. senão, a Encerrada mais recente: **Encerrada sem execução (c/ visita)** ou **(s/ visita)** — com o motivo (`ocorrencia`,
+     ex.: `S05-PT.FECHADO`, `S04-IMPED. CLIENTE`);
+  4. senão, **Sem OS de recadastramento**.
+- **Visitas** = soma das visitas de todas as OS 1990100 da matrícula (carteira + encerradas).
+- **Colaborador/equipe** = responsável (ou equipe) da OS atual da matrícula; OS sem equipe aparecem como "(OS sem equipe)".
+- **Cartões** (sobre ZA ∩ polígono = o "todo" do %): matrículas, recadastradas, em carteira, encerradas sem execução, sem OS
+  (clicar filtra o grupo) e visitas realizadas; barra de progresso com o **% recadastrado** e o % que já teve OS.
+- **Filtros:** ZA, colaborador, visitas (0/1/2/3+), busca por matrícula ou nº da OS (1 resultado → centraliza e abre o
+  popup) e chips de status (vários). O polígono/retângulo (Leaflet.draw) muda o universo.
+- **Mapa:** camada canvas própria (mesma técnica da Situação dos Imóveis); sem OS = ponto cinza pequeno, por baixo;
+  recadastradas por cima. Clique abre o popup com todas as OS da matrícula e "🧭 Navegar".
+- **Por colaborador:** tabela (matrículas, programadas/recebidas, não programadas, pendentes, agend. vencido, não executadas,
+  recadastradas, % feito, visitas); clicar filtra o colaborador.
+- **Exportar:** CSV (`;`, BOM, decimal com vírgula) do filtro atual ∩ polígono — inclusive as **sem OS**, para abrir no SIGOS.
+  O endereço/bairro/setor/rota/roteiro vêm de `app_recad_export(p_matriculas)` (lê `vw_gis_cadastro_comercial`) em lotes de
+  20 mil (máx. 50 mil por chamada).
+
+**Cuidados:**
+- **Executadas só desde a 1ª Encerrada carregada** (Betim 22/09/2026, Contagem 11/09/2026). Recadastramento executado
+  antes disso aparece como "Sem OS" até alguém carregar Encerradas mais antigas. A tela mostra essas datas no subtítulo.
+- A carteira vale até a última **Relação de Serviços** carregada (substitui por ZA); uma OS encerrada depois dela só sai da
+  carteira quando entrar a próxima Relação ou a Encerradas.

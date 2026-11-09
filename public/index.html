@@ -1043,6 +1043,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" id="apHdPri"><div class="ic">🔧</div><div class="nm">Priorização de troca de HD</div></button>
       <button class="mod" id="apFraudePri"><div class="ic">🕵️</div><div class="nm">Fiscalização de irregularidades</div></button>
       <button class="mod" id="apSitImoveis"><div class="ic">🏘️</div><div class="nm">Situação dos Imóveis</div></button>
+      <button class="mod" data-go="recad_prog"><div class="ic">📝</div><div class="nm">Programação do recadastramento</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">🎧 Pesquisa de Vazamentos</div>
@@ -1197,6 +1198,32 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="oaAtiv" style="margin-top:8px"></div>
     <div class="sec" style="margin-top:18px">Ordens de serviço <span style="font-weight:400;color:var(--mut)">(mais antigas primeiro)</span></div>
     <div id="oaLista" style="margin-top:8px"></div>
+  </main>
+
+  <main id="recad_prog" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Programação do recadastramento</h1>
+    <p class="sub" id="rcSub">Carregando…</p>
+    <div id="rcCards" class="rccards"></div>
+    <div id="rcProg" class="rcprog"></div>
+    <div class="rcfilt">
+      <select id="rcZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
+      <select id="rcCol"><option value="">Todos os colaboradores</option></select>
+      <select id="rcVis"><option value="">Visitas: todas</option><option value="0">Sem visita</option><option value="1">1 visita</option><option value="2">2 visitas</option><option value="3">3 ou mais</option></select>
+      <input type="search" id="rcQ" placeholder="Buscar matrícula ou nº da OS"/>
+    </div>
+    <div id="rcChips" class="rcchips"></div>
+    <div id="rcMapa"></div>
+    <div class="rcbar">
+      <div id="rcResumo" class="sub" style="margin:0"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn ghost hidden" id="rcPolyLimpar">✕ Limpar polígono</button>
+        <button type="button" class="btn ghost" id="rcLimpar">Limpar filtros</button>
+        <button type="button" class="btn" id="rcCsv">⬇️ Exportar</button>
+      </div>
+    </div>
+    <div class="sec" style="margin-top:14px">Por colaborador <span style="font-weight:400;color:var(--mut)">(equipe da OS atual de cada matrícula — clique para filtrar)</span></div>
+    <div id="rcColab" style="margin-top:8px"></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2132,7 +2159,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','matriculas','roteiro','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -2164,6 +2191,7 @@ function irPara(id){
   if(id==='pp_diario') pdInit();
   if(id==='sigos_carga') sgcInit();
   if(id==='sigos_abertas') oaInit();
+  if(id==='recad_prog') rcInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
@@ -7714,6 +7742,288 @@ function oaCsv(){
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
     a.download='os_nao_executadas_'+new Date().toISOString().slice(0,10)+(oaPoly?'_poligono':'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
     toast(oaN(vis.length)+' OS exportadas.'); }catch(e){ toast('Não consegui gerar o CSV'); }
+}
+
+// ---------- PROGRAMAÇÃO DO RECADASTRAMENTO (OS SIGOS 1990100 × todas as matrículas) — Auxiliar de Programação ----------
+// (docs/migracao_recad_programacao.sql, MODULOS §21.2). Uma RPC traz o ponto de TODAS as ligações (≈135 mil, o "todo")
+// e as OS de recadastramento (carteira aberta + encerradas) por matrícula; status atual, visitas, % e filtros rodam no app.
+// Mapa em camada canvas própria (135 mil pontos sem 1 objeto Leaflet por ponto). Export pede o endereço em lotes.
+let rcPts=[], rcVis=[], rcMeta={}, rcMap=null, rcLayer=null, rcDrawn=null, rcPoly=null, rcBBox=null, rcDrawing=false, rcFitFeito=false;
+const rcF={za:'',col:'',vis:'',q:'',st:new Set()};
+// [chave, rótulo, cor] — ordem = ordem dos chips/legenda; status da carteira vêm do código entre parênteses do SIGOS
+const RC_ST=[['EXEC','Recadastrada (executada)','#1a7f4b'],['PR','Programada','#1c7ed6'],['RE','Recebida pela equipe','#15aabf'],
+  ['NP','Não programada','#f59f00'],['PE','Pendente','#7048e8'],['AV','Agendamento vencido','#e03131'],
+  ['N','Não exec. c/ visita (em carteira)','#c2255c'],['OUT','Outro status em carteira','#495057'],
+  ['ENC_CV','Encerrada sem execução (c/ visita)','#8d6e63'],['ENC_SV','Encerrada sem execução (s/ visita)','#bcaaa4'],
+  ['SEM','Sem OS de recadastramento','#9aa5b1']];
+const RC_GRUPO={EXEC:'feito',PR:'cart',RE:'cart',NP:'cart',PE:'cart',AV:'cart',N:'cart',OUT:'cart',ENC_CV:'enc',ENC_SV:'enc',SEM:'sem'};
+const RC_SIT={R:'Real/Ativa',I:'Inativa (cortada)',F:'Factível',P:'Potencial'};
+const rcStInfo=k=>RC_ST.find(s=>s[0]===k)||[k,k,'#888'];
+const rcN=n=>Number(n||0).toLocaleString('pt-BR');
+const rcPct=(a,b)=>b?(100*a/b).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%':'—';
+const rcCod=st=>{ const m=/\(([A-Z]+)\)\s*$/.exec(st||''); return m?m[1]:''; };
+function rcCss(){
+  if(document.getElementById('rcCss')) return;
+  const st=document.createElement('style'); st.id='rcCss';
+  st.textContent=`#recad_prog .rccards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:10px 0 6px}
+@media(max-width:760px){#recad_prog .rccards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#recad_prog .rccard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;font:inherit;color:inherit;min-width:0}
+#recad_prog button.rccard{cursor:pointer}
+#recad_prog .rccard b{display:block;font-size:21px;line-height:1.15}
+#recad_prog .rccard span{font-size:12px;color:var(--mut)}
+#recad_prog .rccard.on{outline:2px solid var(--acc);outline-offset:-2px}
+#recad_prog .rccard i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#recad_prog .rcprog{margin:4px 0 10px;font-size:12.5px;color:var(--mut)}
+#recad_prog .rcprog .tr{height:12px;border-radius:999px;background:var(--line);overflow:hidden;display:flex;margin-bottom:4px}
+#recad_prog .rcprog .tr span{display:block;height:100%}
+#recad_prog .rcfilt{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+#recad_prog .rcfilt select,#recad_prog .rcfilt input[type=search]{flex:1 1 160px;min-width:0;font-size:14px;padding:9px 10px}
+#recad_prog .rcchips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+#recad_prog .rcchip{font:inherit;font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+#recad_prog .rcchip i{display:inline-block;width:10px;height:10px;border-radius:50%}
+#recad_prog .rcchip.on{border-color:var(--acc);background:var(--ok-bg);font-weight:600}
+#recad_prog .rcchip.off{opacity:.45}
+#recad_prog #rcMapa{height:min(66vh,600px);border-radius:12px;border:1px solid var(--line);margin-top:8px;position:relative;z-index:0}
+#recad_prog .rcbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:10px 0}
+#recad_prog .rcbar .btn{margin:0;width:auto;padding:9px 14px;font-size:14px}
+#recad_prog .rctab{width:100%;border-collapse:collapse;font-size:13px}
+#recad_prog .rctab th,#recad_prog .rctab td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+#recad_prog .rctab th:first-child,#recad_prog .rctab td:first-child{text-align:left;white-space:normal}
+#recad_prog .rctab tbody tr{cursor:pointer}
+#recad_prog .rctab tr.on td{background:var(--ok-bg)}
+#recad_prog .rctabw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 8px}`;
+  document.head.appendChild(st);
+}
+function rcInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  rcCss();
+  const bind=(id,k)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(el.type==='search'?'input':'change',()=>{ rcF[k]=el.value.trim(); rcRender(k==='q'); }); } };
+  bind('#rcZa','za'); bind('#rcCol','col'); bind('#rcVis','vis'); bind('#rcQ','q');
+  const csv=$('#rcCsv'); if(csv&&!csv.dataset.ready){ csv.dataset.ready='1'; csv.onclick=rcExport; }
+  const lp=$('#rcLimpar'); if(lp&&!lp.dataset.ready){ lp.dataset.ready='1'; lp.onclick=rcLimparFiltros; }
+  rcMapaInit();
+  rcCarregar();
+}
+// status atual da matrícula: executada (em qualquer OS) > OS mais recente da carteira > encerrada mais recente > sem OS
+function rcClassificar(d){
+  const a=(d&&d.a)||[], e=(d&&d.e)||[];
+  const vis=a.reduce((s,x)=>s+(x.vis||0),0)+e.reduce((s,x)=>s+(x.vis||0),0);
+  const exE=e.find(x=>x.st==='EXECUTADA'), exA=a.find(x=>rcCod(x.st)==='E');
+  let s, cur, ex=null;
+  if(exE||exA){ s='EXEC'; cur=exE||exA; ex=exE?exE.ex:(exA.encr||null); }
+  else if(a.length){ cur=a[0]; const c=rcCod(cur.st); s=['PR','RE','NP','PE','AV','N'].includes(c)?c:'OUT'; }
+  else if(e.length){ cur=e[0]; s=/S\/\s*VISITA/.test(cur.st||'')?'ENC_SV':'ENC_CV'; }
+  else { s='SEM'; cur=null; }
+  return {s,cur,vis,ex,nos:a.length+e.length};
+}
+const rcColDe=p=>!p.cur?'':(p.cur.resp||(p.cur.eq?'Equipe '+p.cur.eq:'__sem'));
+const rcColNome=k=>k==='__sem'?'(OS sem equipe)':k;
+async function rcCarregar(){
+  $('#rcSub').textContent='Carregando as matrículas e as OS de recadastramento…';
+  let data;
+  try{ const r=await sb.rpc('app_recad_dados'); if(r.error) throw r.error; data=r.data||{}; }
+  catch(e){ $('#rcSub').textContent='Não foi possível carregar (acesso ou rede).'; return; }
+  const os=data.os||{};
+  const ordem=Object.fromEntries(RC_ST.map((s,i)=>[s[0],s[0]==='SEM'?-1:RC_ST.length-i]));   // sem OS embaixo; executadas por cima
+  rcPts=(data.pts||[]).map(t=>{ const d=os[t[0]], c=rcClassificar(d);
+    const p={m:t[0],lat:t[1],lon:t[2],za:t[3]?'ZA1004':'ZA0200',sit:t[4],d:d||null,s:c.s,cur:c.cur,vis:c.vis,ex:c.ex,nos:c.nos,inP:true};
+    p.col=rcColDe(p); return p; });
+  rcPts.sort((a,b)=>ordem[a.s]-ordem[b.s]);
+  rcMeta=data;
+  const dh=ts=>ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+  const ca=data.carteiras||{}, ed=data.encerradas_desde||{}, ea=data.encerradas_ate||{};
+  $('#rcSub').innerHTML='Recadastramento = OS SIGOS <b>1990100 · PDC Revisão Cadastro Contratada</b>. Carteira da última Relação — ZA1004: '+dh(ca.ZA1004)+' · ZA0200: '+dh(ca.ZA0200)
+    +'. Executadas pelas Encerradas carregadas — ZA1004: '+fmtData(ed.ZA1004)+' a '+fmtData(ea.ZA1004)+' · ZA0200: '+fmtData(ed.ZA0200)+' a '+fmtData(ea.ZA0200)
+    +' (o que foi executado antes disso não aparece). Desenhe um polígono no mapa para selecionar uma área.';
+  rcRender();
+}
+const rcUniv=p=>(!rcF.za||p.za===rcF.za)&&(!rcPoly||p.inP);
+function rcPassa(p){
+  if(rcF.st.size&&!rcF.st.has(p.s)) return false;
+  if(rcF.col&&p.col!==rcF.col) return false;
+  if(rcF.vis){ const v=p.vis||0; if(rcF.vis==='3'?v<3:v!==+rcF.vis) return false; }
+  if(rcF.q){ const q=rcF.q.replace(/\s/g,'');
+    if(!(String(p.m).includes(q)||(p.d&&[...(p.d.a||[]),...(p.d.e||[])].some(o=>String(o.n||'').includes(q))))) return false; }
+  return true;
+}
+function rcRender(focar){
+  const U=rcPts.filter(rcUniv);
+  rcVis=U.filter(rcPassa);
+  // cartões (sobre ZA ∩ polígono — o "todo" do %); clicar filtra o grupo
+  const cnt={}; let visT=0; U.forEach(p=>{ cnt[p.s]=(cnt[p.s]||0)+1; visT+=p.vis||0; });
+  const g=k=>RC_ST.filter(s=>RC_GRUPO[s[0]]===k).reduce((n,s)=>n+(cnt[s[0]]||0),0);
+  const tot=U.length, feito=g('feito'), cart=g('cart'), enc=g('enc'), sem=g('sem');
+  const grpOn=k=>{ const ks=RC_ST.filter(s=>RC_GRUPO[s[0]]===k).map(s=>s[0]); return rcF.st.size===ks.length&&ks.every(x=>rcF.st.has(x)); };
+  const card=(k,n,l,c)=>'<button type="button" class="rccard'+(grpOn(k)?' on':'')+'" data-g="'+k+'"><b>'+rcN(n)+'</b><span><i style="background:'+c+'"></i>'+l+' · '+rcPct(n,tot)+'</span></button>';
+  $('#rcCards').innerHTML='<div class="rccard"><b>'+rcN(tot)+'</b><span>matrículas'+(rcPoly?' no polígono':rcF.za?' na '+rcF.za:' (todo o cadastro)')+'</span></div>'
+    +card('feito',feito,'Recadastradas','#1a7f4b')+card('cart',cart,'OS em carteira','#1c7ed6')+card('enc',enc,'Encerradas sem execução','#8d6e63')
+    +card('sem',sem,'Sem OS de recadastramento','#9aa5b1')
+    +'<div class="rccard"><b>'+rcN(visT)+'</b><span>visitas realizadas'+(feito+cart+enc?' · '+(visT/(feito+cart+enc)).toLocaleString('pt-BR',{maximumFractionDigits:2})+' por matrícula c/ OS':'')+'</span></div>';
+  $('#rcCards').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ const k=b.dataset.g, on=grpOn(k); rcF.st.clear();
+    if(!on) RC_ST.filter(s=>RC_GRUPO[s[0]]===k).forEach(s=>rcF.st.add(s[0])); rcRender(); });
+  const w=n=>tot?(100*n/tot)+'%':'0';
+  $('#rcProg').innerHTML='<div class="tr"><span style="width:'+w(feito)+';background:#1a7f4b"></span><span style="width:'+w(cart)+';background:#1c7ed6"></span><span style="width:'+w(enc)+';background:#8d6e63"></span></div>'
+    +'<b style="color:var(--ink)">'+rcPct(feito,tot)+' recadastrado</b> ('+rcN(feito)+' de '+rcN(tot)+') · '+rcPct(feito+cart+enc,tot)+' já tiveram OS de recadastramento';
+  // chips de status (vários)
+  $('#rcChips').innerHTML=RC_ST.map(([k,l,c])=>'<button type="button" class="rcchip'+(rcF.st.has(k)?' on':(rcF.st.size?' off':''))+'" data-s="'+k+'"><i style="background:'+c+'"></i>'+l+' <b>'+rcN(cnt[k]||0)+'</b></button>').join('')
+    +(rcF.st.size?'<button type="button" class="rcchip" data-s="">✕ todos os status</button>':'');
+  $('#rcChips').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ const k=b.dataset.s; if(!k) rcF.st.clear(); else rcF.st.has(k)?rcF.st.delete(k):rcF.st.add(k); rcRender(); });
+  rcColabOpcoes(U);
+  rcColabTab(U);
+  const nOS=rcVis.filter(p=>p.s!=='SEM').length;
+  $('#rcResumo').innerHTML='<b>'+rcN(rcVis.length)+'</b> matrículas'+(rcPoly?' <b>no polígono</b>':' no filtro')+' · '+rcN(nOS)+' com OS · '+rcN(rcVis.reduce((s,p)=>s+(p.vis||0),0))+' visitas';
+  $('#rcPolyLimpar').classList.toggle('hidden',!rcPoly);
+  const ex=$('#rcCsv'); if(ex){ ex.disabled=!rcVis.length; ex.textContent='⬇️ Exportar '+rcN(rcVis.length)+' matrícula'+(rcVis.length===1?'':'s'); }
+  if(rcLayer) rcLayer.redraw();
+  if(rcMap){ rcMap.invalidateSize(); rcFit(); }
+  if(focar&&rcF.q&&rcVis.length===1) rcFoco(rcVis[0]);
+}
+function rcColabOpcoes(U){
+  const el=$('#rcCol'); if(!el) return;
+  const m=new Map(); U.forEach(p=>{ if(p.col) m.set(p.col,(m.get(p.col)||0)+1); });
+  const arr=[...m.entries()].sort((a,b)=>a[0]==='__sem'?1:b[0]==='__sem'?-1:String(a[0]).localeCompare(String(b[0]),'pt-BR'));
+  const cur=rcF.col;
+  el.innerHTML='<option value="">Todos os colaboradores</option>'+arr.map(([k,n])=>'<option value="'+vEsc(k)+'">'+vEsc(rcColNome(k))+' ('+rcN(n)+')</option>').join('');
+  el.value=m.has(cur)?cur:''; if(!m.has(cur)) rcF.col='';
+}
+function rcColabTab(U){
+  const box=$('#rcColab'); if(!box) return;
+  const m=new Map();
+  U.forEach(p=>{ if(!p.col) return; let r=m.get(p.col); if(!r){ r={t:0,prog:0,np:0,av:0,pe:0,feito:0,nao:0,vis:0,eq:new Map()}; m.set(p.col,r); }
+    r.t++; r.vis+=p.vis||0; const s=p.s;
+    if(s==='EXEC') r.feito++; else if(s==='PR'||s==='RE') r.prog++; else if(s==='NP') r.np++; else if(s==='AV') r.av++; else if(s==='PE') r.pe++; else r.nao++;
+    const eq=p.cur&&p.cur.eq; if(eq) r.eq.set(eq,(r.eq.get(eq)||0)+1); });
+  const linhas=[...m.entries()].sort((a,b)=>b[1].t-a[1].t);
+  if(!linhas.length){ box.innerHTML='<p class="sub">Nenhuma OS de recadastramento nesta seleção.</p>'; return; }
+  box.innerHTML='<div class="rctabw"><table class="rctab"><thead><tr><th>Colaborador'+(rcF.col?' <a href="#" id="rcColLimpar" style="font-weight:400;color:var(--acc)">(limpar)</a>':'')+'</th><th>Equipe</th><th>Matrículas</th><th>Programadas / recebidas</th><th>Não programadas</th><th>Pendentes</th><th>Agend. vencido</th><th>Não executadas</th><th>Recadastradas</th><th>% feito</th><th>Visitas</th></tr></thead><tbody>'
+    +linhas.map(([k,r])=>{ const eq=[...r.eq.entries()].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+      return '<tr data-c="'+vEsc(k)+'" class="'+(rcF.col===k?'on':'')+'"><td>'+vEsc(rcColNome(k))+'</td><td>'+vEsc(eq.slice(0,2).join(', ')+(eq.length>2?' +'+(eq.length-2):''))+'</td><td><b>'+rcN(r.t)+'</b></td><td>'+rcN(r.prog)+'</td><td>'+rcN(r.np)+'</td><td>'+rcN(r.pe)+'</td><td>'+rcN(r.av)+'</td><td>'+rcN(r.nao)+'</td><td>'+rcN(r.feito)+'</td><td>'+rcPct(r.feito,r.t)+'</td><td>'+rcN(r.vis)+'</td></tr>'; }).join('')
+    +'</tbody></table></div>';
+  box.querySelectorAll('tr[data-c]').forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.c; rcF.col=rcF.col===k?'':k; $('#rcCol').value=rcF.col; rcRender(); });
+  const cl=$('#rcColLimpar'); if(cl) cl.onclick=e=>{ e.preventDefault(); e.stopPropagation(); rcF.col=''; $('#rcCol').value=''; rcRender(); };
+}
+function rcLimparFiltros(){
+  Object.assign(rcF,{za:'',col:'',vis:'',q:''}); rcF.st.clear();
+  ['#rcZa','#rcCol','#rcVis','#rcQ'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  rcRender();
+}
+// ---- mapa: camada canvas (mesma técnica da Situação dos Imóveis no perdas.html)
+function rcCanvasLayer(){ return new (L.Layer.extend({
+  onAdd:function(map){ this._map=map; this._c=L.DomUtil.create('canvas','leaflet-zoom-hide'); this._c.style.position='absolute'; this._c.style.pointerEvents='none';
+    map.getPanes().overlayPane.appendChild(this._c); map.on('moveend zoomend resize viewreset',this._draw,this); this._draw(); },
+  onRemove:function(map){ L.DomUtil.remove(this._c); map.off('moveend zoomend resize viewreset',this._draw,this); this._map=null; },
+  redraw:function(){ this._draw(); },
+  _draw:function(){ const map=this._map, c=this._c; if(!map||!c) return; const sz=map.getSize(), dpr=window.devicePixelRatio||1;
+    L.DomUtil.setPosition(c,map.containerPointToLayerPoint([0,0]));
+    c.width=Math.round(sz.x*dpr); c.height=Math.round(sz.y*dpr); c.style.width=sz.x+'px'; c.style.height=sz.y+'px';
+    const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,sz.x,sz.y);
+    const b=map.getBounds(), s=b.getSouth(), n=b.getNorth(), w=b.getWest(), e=b.getEast(), z=map.getZoom();
+    const r=z>=17?5.5:z>=15?3.8:z>=13?2.6:1.8, rs=z>=17?3.5:z>=15?2.2:z>=13?1.4:1, borda=z>=15; let cor=null;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=.8;
+    for(const p of rcVis){ if(p.lat<s||p.lat>n||p.lon<w||p.lon>e) continue; const q=map.latLngToContainerPoint([p.lat,p.lon]), k=rcStInfo(p.s)[2];
+      if(k!==cor){ ctx.fillStyle=k; cor=k; }
+      const rr=p.s==='SEM'?rs:r;
+      if(rr<2.5) ctx.fillRect(q.x-rr,q.y-rr,2*rr,2*rr);
+      else { ctx.beginPath(); ctx.arc(q.x,q.y,rr,0,6.2832); ctx.fill(); if(borda&&p.s!=='SEM') ctx.stroke(); }
+    }
+  }
+}))(); }
+function rcMapaInit(){
+  const cont=document.getElementById('rcMapa'); if(!cont) return;
+  if(!window.L){ cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>'; return; }
+  if(rcMap){ setTimeout(()=>rcMap.invalidateSize(),60); return; }
+  cont.innerHTML='';
+  rcMap=L.map('rcMapa').setView([-19.93,-44.08],12);
+  mapAddCamadaBase(rcMap,{opacity:.6},'topleft'); mapAddLimiteZA(rcMap);
+  rcLayer=rcCanvasLayer().addTo(rcMap);
+  rcDrawn=L.featureGroup().addTo(rcMap);
+  if(L.Draw){
+    try{ L.Draw.Polyline.prototype._onTouch=L.Util.falseFn; }catch(e){}
+    rcMap.addControl(new L.Control.Draw({position:'topright',
+      draw:{polygon:{shapeOptions:{color:'#ff6d00',weight:2,fillOpacity:.06}},rectangle:{shapeOptions:{color:'#ff6d00',weight:2,fillOpacity:.06}},
+            polyline:false,circle:false,marker:false,circlemarker:false},
+      edit:{featureGroup:rcDrawn,edit:false,remove:false}}));
+    rcMap.on(L.Draw.Event.DRAWSTART,()=>{ rcDrawing=true; }); rcMap.on(L.Draw.Event.DRAWSTOP,()=>{ setTimeout(()=>{ rcDrawing=false; },300); });
+    rcMap.on(L.Draw.Event.CREATED,e=>{ rcDrawn.clearLayers(); rcDrawn.addLayer(e.layer);
+      const gm=e.layer.toGeoJSON().geometry; rcSetPoly(gm.type==='Polygon'?gm.coordinates:[].concat(...(gm.coordinates||[]))); });
+  }
+  const pl=$('#rcPolyLimpar'); if(pl) pl.onclick=()=>{ rcDrawn.clearLayers(); rcSetPoly(null); };
+  const Lg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
+    const d=L.DomUtil.create('div'); d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.5 system-ui,sans-serif;color:#333;max-width:230px';
+    d.innerHTML='<details'+(window.innerWidth>760?' open':'')+'><summary style="cursor:pointer;font-weight:700">Legenda</summary>'+RC_ST.map(f=>'<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f[2]+';margin-right:5px"></i>'+f[1]).join('<br>')+'</details>';
+    L.DomEvent.disableClickPropagation(d); return d; }});
+  rcMap.addControl(new Lg());
+  rcMap.on('click',rcMapClick);
+  setTimeout(()=>{ rcMap.invalidateSize(); rcFit(); },80);
+}
+// enquadra as ligações uma vez (só quando o mapa já tem tamanho — a tela abre escondida)
+function rcFit(){
+  if(rcFitFeito||!rcMap||!rcPts.length) return;
+  const sz=rcMap.getSize(); if(!sz.x||!sz.y) return;
+  let s=90,n=-90,w=180,e=-180; rcPts.forEach(p=>{ if(p.lat<s)s=p.lat; if(p.lat>n)n=p.lat; if(p.lon<w)w=p.lon; if(p.lon>e)e=p.lon; });
+  rcFitFeito=true; try{ rcMap.fitBounds([[s,w],[n,e]],{padding:[12,12]}); }catch(err){}
+}
+function rcSetPoly(poly){
+  rcPoly=poly;
+  if(poly){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; poly.forEach(r=>r.forEach(([x,y])=>{ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; })); rcBBox=[x0,y0,x1,y1];
+    rcPts.forEach(p=>{ p.inP=rcNoPoly(p); }); }
+  else rcPts.forEach(p=>{ p.inP=true; });
+  rcRender();
+}
+function rcNoPoly(p){
+  const x=p.lon, y=p.lat; if(x<rcBBox[0]||x>rcBBox[2]||y<rcBBox[1]||y>rcBBox[3]) return false;
+  let dentro=false;
+  for(const ring of rcPoly){ for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const [xi,yi]=ring[i],[xj,yj]=ring[j];
+    if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi)) dentro=!dentro; } }
+  return dentro;
+}
+function rcMapClick(e){
+  if(rcDrawing||!rcVis.length) return;
+  const cp=e.containerPoint, b=rcMap.getBounds(); let best=null, bd=81;   // raio de 9 px; o de cima (desenhado por último) ganha no empate
+  for(const p of rcVis){ if(!b.contains([p.lat,p.lon])) continue; const q=rcMap.latLngToContainerPoint([p.lat,p.lon]), d=(q.x-cp.x)**2+(q.y-cp.y)**2; if(d<=bd){ bd=d; best=p; } }
+  if(best) L.popup({minWidth:240,maxWidth:340}).setLatLng([best.lat,best.lon]).setContent(rcPopup(best)).openOn(rcMap);
+}
+function rcFoco(p){
+  if(!rcMap) return;
+  document.getElementById('rcMapa').scrollIntoView({behavior:'smooth',block:'center'});
+  rcMap.setView([p.lat,p.lon],18);
+  L.popup({minWidth:240,maxWidth:340}).setLatLng([p.lat,p.lon]).setContent(rcPopup(p)).openOn(rcMap);
+}
+function rcPopup(p){
+  const [,l,c]=rcStInfo(p.s);
+  const linhaOS=(o,ab)=>'<div style="border-top:1px solid #e5e7eb;margin-top:4px;padding-top:4px">OS '+vEsc(o.n)+' · <b>'+vEsc(o.st||'—')+'</b>'+(ab?' <span style="color:#666">(carteira)</span>':'')
+    +'<br>'+(o.resp||o.eq?vEsc(o.resp||'')+(o.eq?' · '+vEsc(o.eq):''):'<span style="color:#666">sem equipe</span>')
+    +'<br>Aberta '+fmtData(o.ab)+(ab&&o.lim?' · limite '+fmtData(o.lim):'')+(o.ex?' · encerrada '+fmtData(o.ex):'')+' · '+rcN(o.vis)+' visita(s)'
+    +(o.oc?'<br><span style="color:#b3261e">Motivo: '+vEsc(o.oc)+'</span>':'')+'</div>';
+  const d=p.d||{a:[],e:[]};
+  return '<div style="font-size:12.5px;line-height:1.45"><b>Matrícula '+vEsc(p.m)+'</b> · '+vEsc(p.za)+'<br>'
+    +'<b style="color:'+c+'">'+vEsc(l)+'</b>'+(p.ex?' em '+fmtData(p.ex):'')+'<br>Ligação: '+vEsc(RC_SIT[p.sit]||p.sit||'—')+' · '+rcN(p.vis)+' visita(s) no total'
+    +(d.a||[]).map(o=>linhaOS(o,true)).join('')+(d.e||[]).map(o=>linhaOS(o,false)).join('')
+    +'<br><a href="https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+'" target="_blank" rel="noopener">🧭 Navegar</a></div>';
+}
+async function rcExport(){
+  const sel=rcVis.slice(); if(!sel.length){ toast('Nada para exportar.'); return; }
+  const btn=$('#rcCsv'); btn.disabled=true;
+  const cad=new Map();
+  try{
+    for(let i=0;i<sel.length;i+=20000){
+      btn.textContent='Gerando… '+rcN(Math.min(i,sel.length))+'/'+rcN(sel.length);
+      const {data,error}=await sb.rpc('app_recad_export',{p_matriculas:sel.slice(i,i+20000).map(p=>p.m)}); if(error) throw error;
+      (data||[]).forEach(x=>cad.set(x.mat,x));
+    }
+  }catch(e){ toast('Não consegui gerar o arquivo: '+((e&&e.message)||e)); rcRender(); return; }
+  const cab=['Matrícula','ZA','Situação da ligação','Status do recadastramento','Recadastrada','Executada em','OS atual','Status SIGOS','Responsável','Equipe','Abertura','Limite','Visitas (total)','Nº de OS','Motivo (não executada)','Endereço','Bairro','Setor','Rota','Roteiro de leitura','Latitude','Longitude'];
+  const c=v=>{ const s=v==null?'':String(v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const num=v=>v==null?'':String(v).replace('.',',');
+  const dt=v=>v?String(v).replace('T',' ').slice(0,16):'';
+  const lin=sel.map(p=>{ const k=cad.get(p.m)||{}, o=p.cur||{};
+    return [p.m,p.za,RC_SIT[p.sit]||p.sit||'',rcStInfo(p.s)[1],p.s==='EXEC'?'sim':'não',dt(p.ex),o.n||'',o.st||'',o.resp||'',o.eq||'',dt(o.ab),dt(o.lim),p.vis||0,p.nos||0,o.oc||'',
+      k.end||'',k.bai||'',k.setor||'',k.rota||'',k.rot||'',num(p.lat),num(p.lon)].map(c).join(';'); });
+  const csv=cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n';
+  try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
+    a.download='recadastramento_'+new Date().toISOString().slice(0,10)+(rcPoly?'_poligono':'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
+    toast(rcN(sel.length)+' matrículas exportadas.'); }catch(e){ toast('Não consegui gerar o arquivo'); }
+  rcRender();
 }
 
 function pdInit(){
