@@ -490,6 +490,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       .vt-pics img{width:100%;height:100%;object-fit:cover;border-radius:1.4vh;border:1px solid var(--vt-line);background:#0e1626;min-height:0}
       .vt-pics.n3 img:first-child{grid-row:span 2}
       .vt-info{display:flex;flex-direction:column;gap:1.6vh;min-height:0}
+      .vt-rdo{display:grid;grid-template-columns:repeat(var(--n,2),1fr);gap:1.6vw;flex:1;min-height:0}
+      .vt-rdo .vt-card{display:flex;flex-direction:column;gap:1vh}
+      .vt-rdo h2{margin:0 0 .6vh;font-size:3.2vh;display:flex;justify-content:space-between;align-items:center;gap:1vw}
+      .vt-rdo h2 small{font-size:1.8vh;font-weight:500;color:var(--vt-mut)}
+      .vt-rdo .ln{display:grid;grid-template-columns:1.4vh 1fr;gap:.8vw;align-items:start;font-size:2.15vh;line-height:1.3}
+      .vt-rdo .ln i{width:1.4vh;height:1.4vh;border-radius:50%;margin-top:.6vh}
+      .vt-rdo .ln em{color:var(--vt-mut);font-style:normal;font-size:1.8vh}
       .vt-tag{display:inline-block;padding:.6vh 1vw;border-radius:99px;font-size:2vh;font-weight:600;color:#0b1220;background:var(--k)}
       .vt-info .q{font-size:2.4vh;color:var(--vt-mut)}.vt-info .d{font-size:2.8vh;line-height:1.3}.vt-info .p{font-size:2.6vh;font-weight:600}
       .vt-info .vt-map{min-height:24vh}
@@ -1225,9 +1232,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>RDO diário</h1>
     <p class="sub">O que foi <b>executado</b> ou está <b>em andamento</b> em cada dia, juntando as OS do SIGOS e o que foi lançado no AcquaHub.
-      O texto sai pronto como rascunho; revise (editar, ocultar, acrescentar linha) e <b>feche o dia</b>. Se chegar relatório SIGOS depois e mudar o dia, ele aparece como <b>desatualizado</b>.</p>
+      Escolha um ou os dois consórcios. O texto sai pronto como rascunho; revise (editar, ocultar, acrescentar linha) e <b>feche o dia</b> de cada consórcio; <b>📋 Copiar RDO</b> copia o texto revisado para colar em outro lugar. Se chegar relatório SIGOS depois e mudar o dia, ele aparece como <b>desatualizado</b>.</p>
     <div class="rdotop">
-      <select id="rdoZa"><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
+      <div class="rdozas" id="rdoZas"></div>
       <div class="rdonav"><button type="button" id="rdoPrev">‹</button><b id="rdoMesTit"></b><button type="button" id="rdoNext">›</button></div>
     </div>
     <div class="rdocal" id="rdoCal"></div>
@@ -4789,8 +4796,7 @@ function pavProgRender(){ pavProgEsteira(); pavProgResumo();
   if(c){ c.innerHTML = arr.length ? ('<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(pavProgCard).join('')) : '<p class="sub">Nenhum pavimento nesse filtro.</p>';
     c.querySelectorAll('.pavreatdec').forEach(btn=>btn.onclick=()=>pavProgDecidir(btn.dataset.grupo,btn.dataset.id,btn.dataset.v==='1'));
     c.querySelectorAll('.pavrefeito').forEach(btn=>btn.onclick=()=>pavProgRefeito(btn.dataset.grupo,btn.dataset.id));
-    c.querySelectorAll('.pavoscriar').forEach(btn=>btn.onclick=()=>pavProgCriarOS(btn.dataset.grupo));
-    c.querySelectorAll('.pavexec').forEach(btn=>btn.onclick=()=>pavProgExecutar(btn.dataset.grupo,btn.dataset.id)); }
+    c.querySelectorAll('.pavoscriar').forEach(btn=>btn.onclick=()=>pavProgCriarOS(btn.dataset.grupo)); }
   if(pavpView==='mapa') pavProgMapa(); }
 function pavProgCard(g){
   const etapa=pavCardEtapa(g), v=pavEtapaVisual(g,etapa);
@@ -4798,8 +4804,7 @@ function pavProgCard(g){
   const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
   const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Mapa</a>`:'';
   const badge=`<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${v.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${v.txt}</span>`;
-  const hoje=pavDiaISO(Date.now()), dMin=g.created_at?pavDiaISO(g.created_at):'';
-  // por tipo: etapa + reaterro; na criação, campo da OS ("Criar OS" grava todos os campos preenchidos do ponto); com OS → data + "Marcar executado" (só esse tipo)
+  // por tipo: etapa + reaterro; na criação, campo da OS ("Criar OS" grava todos os campos preenchidos do ponto); com OS → execução vem SÓ do SIGOS (sigos_pav_auto)
   const itens=(g.itens||[]).map(it=>{ const et=pavEtapaItem(it);
     const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
     const os=it.os_recomposicao
@@ -4808,7 +4813,7 @@ function pavProgCard(g){
     const ex=!it.os_recomposicao ? ''
       : it.execucao_data
         ? `<div class="sub" style="margin-top:4px;font-size:12px"><b style="color:#6b7280">🏁 Executado em ${pavFmtDia(it.execucao_data)}</b>${it.execucao_por?(' · marcado por '+pavH(it.execucao_por)):''}</div>`
-        : `<div style="display:flex;gap:6px;margin-top:6px;align-items:center"><span class="sub" style="font-size:12px;white-space:nowrap">Executado em</span><input type="date" class="pavexdt" data-id="${it.id}" value="${hoje}" max="${hoje}" min="${dMin}" style="flex:1;min-width:0;font-size:13px;padding:8px"/><button class="btn pavexec" data-grupo="${g.grupo}" data-id="${it.id}" style="width:auto;padding:8px 12px;white-space:nowrap">Marcar executado</button></div>`;
+        : `<div class="sub" style="margin-top:4px;font-size:12px">⏳ Aguardando execução no SIGOS — marca sozinho quando um relatório trouxer esta OS como executada.</div>`;
     return `<div style="border-top:1px dashed var(--line);padding:8px 0"><div style="display:flex;gap:6px;align-items:center"><b style="font-size:13px">${PAV_TIPO_LBL(it.tipo)}</b>${it.dimensao?('<span style="font-size:13px">· '+pavH(it.dimensao)+'</span>'):''}<span class="pavetq">${PAV_ETAPA_LBL[et]}</span></div><div style="display:flex;gap:6px;margin-top:6px">${fotos||'<span class="sub" style="font-size:11px">sem foto</span>'}</div>${pavReatHtml(g,it,et)}${os}${ex}</div>`;
   }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${v.c};border-radius:12px;padding:12px 13px;margin-bottom:10px">
@@ -4857,15 +4862,6 @@ async function pavProgCriarOS(grupo){
     if(g) itens.forEach(x=>{ const it=(g.itens||[]).find(i=>i.id===x.id); if(it){ it.os_recomposicao=x.os; it.os_recomp_em=em; it.os_recomp_por=por; } });
     pavProgRender();
   }catch(e){ toast('Erro ao criar OS: '+(e.message||e)); } }
-async function pavProgExecutar(grupo,id){
-  const inp=document.querySelector('.pavexdt[data-id="'+id+'"]'), data=(inp&&inp.value)||'';
-  if(!data) return toast('Informe a data da execução');
-  const g=pavpUltimo.find(x=>x.grupo===grupo), it=g&&(g.itens||[]).find(i=>i.id===id);
-  if(!confirm('Marcar '+(it?PAV_TIPO_LBL(it.tipo):'o pavimento')+' como executado em '+pavFmtDia(data)+'?')) return;
-  try{ const {error}=await sb.rpc('app_pav_executar',{p_id:id,p_data:data}); if(error)throw error; toast('✓ Execução registrada');
-    if(it){ it.execucao_data=data; it.execucao_em=new Date().toISOString(); it.execucao_por=(ME&&(ME.nome||ME.email))||'—'; }
-    pavProgRender();
-  }catch(e){ toast('Erro ao registrar execução: '+(e.message||e)); } }
 function pavProgExport(){ const arr=pavProgFiltrado(); if(!arr.length) return toast('Nada para exportar.');
   const aoa=[['Data de solicitação','Etapa','Dias na etapa','Faixa de prazo','Ensaio de reaterro','Situação do reaterro','Ensaios feitos','Último laudo','OS recomposição','Executado em','Execução marcada por','Serviço de origem','OS origem','Consórcio','Solicitante','Latitude','Longitude','Tipo de pavimento','Dimensão','Foto 1','Foto 2']];
   arr.forEach(g=>{ const ds=g.created_at?new Date(g.created_at).toLocaleString('pt-BR'):'';
@@ -7236,7 +7232,7 @@ async function sgcProcessar(id,k){
 // RPC app_sigos_os_status(p_os text[]) — qualquer usuário ativo; devolve só serviço/status/datas.
 const SGX_CACHE=new Map();          // texto digitado → info (ou Promise)
 let sgxFila=new Set(), sgxTimer=null;
-const SGX_INPUTS='#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial';
+const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial';
 function sgxS(v){ v=(v==null?'':String(v)).trim(); return v?'<span class="sgx" data-sgx="'+vEsc(v)+'"></span>':''; }
 function sgxCss(){
   if(document.getElementById('sgxCss')) return;
@@ -7323,7 +7319,7 @@ function sgxBoot(){
 // depois do lançamento (e as Encerradas cobrem até ela) e a OS não aparece em nenhuma das duas → digitação/ZA errada.
 const SV_SIT=[['suspeita','⚠️ Suspeita de erro','bad'],['invalida','❌ Formato inválido','bad'],['encerrada_sem_execucao','⛔ Encerrada sem execução','bad'],
   ['aguardando','🔎 Aguardando relatório','nf'],['fora_janela','🗄️ Anterior aos relatórios','nf'],['pendente','⏳ Pendente','pe'],['executada','✅ Executada','ok']];
-let svDados=[], svCob={}, svF={sit:new Set(['suspeita','invalida','encerrada_sem_execucao']), mod:'', za:'', q:'', div:false};
+let svCor={}, svEdit=null, svDados=[], svCob={}, svF={sit:new Set(['suspeita','invalida','encerrada_sem_execucao']), mod:'', za:'', q:'', div:false};
 function svInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   sgxCss();
@@ -7334,7 +7330,9 @@ function svInit(){
 }
 async function svCarregar(){
   $('#svLista').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_sigos_vinculos'); if(error) throw error; svDados=(data&&data.itens)||[]; svCob=(data&&data.cobertura)||{}; }
+  try{ const [r,rc]=await Promise.all([sb.rpc('app_sigos_vinculos'), Promise.resolve(sb.rpc('app_sigos_os_correcoes')).catch(()=>({}))]);
+    if(r.error) throw r.error; const data=r.data; svDados=(data&&data.itens)||[]; svCob=(data&&data.cobertura)||{};
+    svCor={}; ((rc&&!rc.error&&rc.data)||[]).forEach(c=>{ const k=c.mod+'|'+c.campo+'|'+c.ref; if(!svCor[k]) svCor[k]=c; }); }
   catch(e){ $('#svLista').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; return; }
   const mods=[...new Set(svDados.map(d=>d.mod))].sort(), sel=$('#svMod'), cur=sel.value;
   sel.innerHTML='<option value="">Todos os módulos</option>'+mods.map(m=>'<option'+(m===cur?' selected':'')+'>'+vEsc(m)+'</option>').join('');
@@ -7367,8 +7365,38 @@ function svRender(){
       +(d.n?'<div class="m">SIGOS '+vEsc(d.n)+' · '+vEsc(d.srv||'')+' · '+vEsc(d.st||'')+(d.ex?' · executada em '+fmtData(String(d.ex).slice(0,10)):'')+(d.res?' · '+vEsc(d.res):'')+'</div>':'')
       +(d.div?'<div class="a">↔️ '+vEsc(d.div)+'</div>':'')
       +(d.v==='suspeita'?'<div class="a">Já chegou relatório novo da ZA depois do lançamento e esta OS não aparece — confira o número.</div>':'')
+      +svCorHtml(d)
       +'</div>').join('')+(vis.length>400?'<p class="sub">Mostrando 400 — use os filtros ou exporte o CSV.</p>':'')
     :'<p class="sub">Nenhuma OS nesse filtro.</p>';
+  svCorBind();
+}
+// correção do número da OS direto no campo de origem (app_sigos_os_corrigir, docs/migracao_rdo_ajustes.sql); guarda histórico
+const svKey=d=>d.mod+'|'+d.campo+'|'+d.ref;
+function svCorHtml(d){
+  const k=svKey(d), c=svCor[k];
+  const hist=c?'<div class="m">✏️ Corrigida de <span class="pjmono">'+vEsc(c.antes||'—')+'</span> para <span class="pjmono">'+vEsc(c.depois)+'</span> por '+vEsc(c.por||'—')+' em '+fmtData(String(c.em||'').slice(0,10))+(c.motivo?' — '+vEsc(c.motivo):'')+'</div>':'';
+  if(svEdit===k) return hist+'<div class="svcor" style="margin-top:6px;display:flex;flex-direction:column;gap:6px">'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap"><input class="svcorinp" data-svk="'+vEsc(k)+'" value="'+vEsc(d.os)+'" inputmode="numeric" placeholder="nº correto da OS (14 dígitos)" style="flex:1 1 200px;min-width:0;font-size:14px;padding:8px 10px"/></div>'
+    +'<input class="svcormot" placeholder="Motivo (opcional — ex.: dígito trocado, OS de outra ZA)" style="font-size:13px;padding:8px 10px"/>'
+    +'<div style="display:flex;gap:6px"><button type="button" class="btn" data-svsalvar="'+vEsc(k)+'" style="width:auto;margin:0;padding:7px 14px">Salvar correção</button>'
+    +'<button type="button" class="btn ghost" data-svcanc="1" style="width:auto;margin:0;padding:7px 14px">Cancelar</button></div>'
+    +'<div class="m">Grava o número novo no próprio registro ('+vEsc(d.mod)+' · '+vEsc(d.campo)+').'+(d.mod==='pavimento'&&d.campo==='OS da recomposição'?' Se a execução tinha vindo do SIGOS pela OS antiga, ela sai e volta sozinha quando a OS nova estiver executada.':'')+'</div></div>';
+  return hist+(d.v!=='executada'?'<div style="margin-top:4px"><button type="button" class="oachip" data-svcor="'+vEsc(k)+'" style="font-size:12px;padding:4px 10px">✏️ Corrigir OS</button></div>':'');
+}
+function svCorBind(){
+  const L=$('#svLista'); if(!L) return;
+  L.querySelectorAll('[data-svcor]').forEach(b=>b.onclick=()=>{ svEdit=b.dataset.svcor; svRender(); const i=L.querySelector('.svcorinp'); if(i){ i.focus(); i.select(); } });
+  L.querySelectorAll('[data-svcanc]').forEach(b=>b.onclick=()=>{ svEdit=null; svRender(); });
+  L.querySelectorAll('[data-svsalvar]').forEach(b=>b.onclick=async()=>{
+    const d=svDados.find(x=>svKey(x)===b.dataset.svsalvar); if(!d) return;
+    const nova=(L.querySelector('.svcorinp').value||'').replace(/\D/g,''), mot=(L.querySelector('.svcormot').value||'').trim();
+    if(nova.length!==14&&nova.length!==12&&nova.length!==10){ toast('O número SIGOS tem 14 dígitos (ex.: 00127516560801).'); return; }
+    if(!confirm('Trocar a OS '+d.os+' por '+nova+' em '+d.mod+' · '+d.campo+'?')) return;
+    b.disabled=true;
+    try{ const {error}=await sb.rpc('app_sigos_os_corrigir',{p_mod:d.mod,p_campo:d.campo,p_ref:d.ref,p_os_antes:d.os,p_os_nova:nova,p_motivo:mot||null}); if(error) throw error;
+      toast('OS corrigida.'); svEdit=null; try{ SGX_CACHE.delete(d.os); }catch(e){} svCarregar(); }
+    catch(e){ b.disabled=false; toast('Não corrigiu: '+(e.message||'erro')); }
+  });
 }
 function svCsv(){
   const vis=svDados.filter(svBase).filter(d=>!svF.sit.size||svF.sit.has(d.v)||(svF.div&&d.div));
@@ -7384,23 +7412,28 @@ function svCsv(){
 
 // ---------- RDO DIÁRIO — Auxiliar de Programação (tela rdo; docs/migracao_rdo_diario.sql, MODULOS §21.4) ----------
 // O que foi EXECUTADO ou está EM ANDAMENTO por dia × ZA: OS do SIGOS + lançamentos do AcquaHub (feed public.rdo_eventos).
-// Rascunho automático → revisão (editar/ocultar/linha manual) → Fechar o dia. Se o banco muda depois (carga SIGOS
-// atrasada, lançamento tardio) o dia fica "desatualizado" (hash das linhas automáticas ≠ do fechamento).
+// Rascunho automático → revisão (editar/ocultar/linha manual) → Fechar o dia (cada ZA fecha o seu). Se o banco muda depois
+// (carga SIGOS atrasada, lançamento tardio) o dia fica "desatualizado". Seleção de ZA múltipla: as duas lado a lado no mesmo dia.
+// "Copiar RDO" copia o texto já revisado (fechado = como foi fechado; ocultas não entram) num formato fixo p/ colar em outro lugar.
 const RDO_MIN='2026-09-01';
 const RDO_ST={vazio:['Sem registro','var(--line)'],rascunho:['Rascunho','#f59e0b'],fechado:['Fechado','var(--ok)'],desatualizado:['Desatualizado','var(--bad)']};
 const RDO_TIPOS=['Execução','Em andamento','Ocorrência','Pendência','Nota'];
+const RDO_ZAS=[['ZA1004','ZA1004 — Contagem'],['ZA0200','ZA0200 — Betim']];
 const RDO_DET={os:'OS',mat:'Matrícula',end:'Endereço',res:'Resultado',st:'Status',tipo:'Tipo',local:'Local',logger:'Logger',etapa:'Etapa',zona:'Zona',
   vrp:'VRP',sit:'Situação',sigos:'OS SIGOS',item:'Item',valor:'Valor',un:'Unid.',origem:'Origem',tipos:'Tipos',gc:'GC (%)',metodo:'Método'};
 const RDO_ETAPA={inst:'instalado',rem:'removido',fin:'dados concluídos'};
-let rdoS={za:'ZA1004',mes:null,dia:null,mesDados:null,diaDados:null,abertos:new Set(),edit:null,verAtual:false};
+let rdoS={zas:['ZA1004','ZA0200'],mes:null,dia:null,meses:{},dias:{},abertos:new Set(),edit:null,verAtual:new Set()};
 const rdoHoje=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
 const rdoMesNome=m=>{ const s=new Date(m+'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); };
 const rdoAddMes=(m,n)=>{ const d=new Date(m+'T12:00:00'); d.setMonth(d.getMonth()+n,1); return d.toISOString().slice(0,7)+'-01'; };
+const rdoZaNome=z=>(RDO_ZAS.find(x=>x[0]===z)||[z,z])[1];
 function rdoCss(){
   if(document.getElementById('rdoCss')) return;
   const st=document.createElement('style'); st.id='rdoCss';
   st.textContent=`#rdo .rdotop{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
-#rdo .rdotop select{flex:1 1 180px;min-width:0;font-size:14px;padding:9px 10px}
+#rdo .rdozas{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 220px}
+#rdo .rdozas button{font:inherit;font-size:13px;width:auto;margin:0;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#rdo .rdozas button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
 #rdo .rdonav{display:flex;align-items:center;gap:6px;flex:1 1 220px;justify-content:space-between}
 #rdo .rdonav b{font-size:15px;text-align:center;flex:1}
 #rdo .rdonav button{font:inherit;width:auto;margin:0;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
@@ -7416,6 +7449,9 @@ function rdoCss(){
 #rdo .rdoleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
 #rdo .rdohead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
 #rdo .rdohead h2{margin:0;font-size:17px}
+#rdo .rdohead .btn{width:auto;margin:0;padding:8px 14px;font-size:14px}
+#rdo .rdoza{margin-top:12px;padding-top:4px;border-top:2px solid var(--line)}
+#rdo .rdoza h3{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 4px;font-size:15px}
 #rdo .rdochip{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;color:#fff}
 #rdo .rdoaviso{font-size:12px;border-radius:10px;padding:8px 10px;margin:8px 0;background:var(--card);border:1px solid var(--line);border-left:4px solid #f59e0b}
 #rdo .rdoaviso.bad{border-left-color:var(--bad)}
@@ -7443,26 +7479,47 @@ function rdoInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   rdoCss();
   if(!rdoS.mes){ const h=rdoHoje(); rdoS.mes=(h<RDO_MIN?RDO_MIN:h).slice(0,7)+'-01'; }
-  const za=$('#rdoZa'); if(za&&!za.dataset.ready){ za.dataset.ready='1'; za.value=rdoS.za; za.onchange=()=>{ rdoS.za=za.value; rdoS.dia=null; rdoCarregarMes(); }; }
+  rdoRenderZas();
   const pv=$('#rdoPrev'), nx=$('#rdoNext');
   if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ rdoS.mes=rdoAddMes(rdoS.mes,-1); rdoS.dia=null; rdoCarregarMes(); }; }
   if(nx&&!nx.dataset.ready){ nx.dataset.ready='1'; nx.onclick=()=>{ rdoS.mes=rdoAddMes(rdoS.mes,1); rdoS.dia=null; rdoCarregarMes(); }; }
   rdoCarregarMes();
+}
+function rdoRenderZas(){
+  const box=$('#rdoZas'); if(!box) return;
+  box.innerHTML=RDO_ZAS.map(([z,l])=>'<button type="button" data-rdoza="'+z+'" class="'+(rdoS.zas.includes(z)?'on':'')+'">'+l+'</button>').join('');
+  box.querySelectorAll('[data-rdoza]').forEach(b=>b.onclick=()=>{ const z=b.dataset.rdoza;
+    if(rdoS.zas.includes(z)){ if(rdoS.zas.length===1){ toast('Deixe pelo menos um consórcio.'); return; } rdoS.zas=rdoS.zas.filter(x=>x!==z); }
+    else rdoS.zas=RDO_ZAS.map(x=>x[0]).filter(x=>x===z||rdoS.zas.includes(x));
+    rdoRenderZas(); rdoCarregarMes(true); });
+}
+// status do dia com várias ZAs: qualquer desatualizada → desatualizado; todas fechadas → fechado; tudo vazio → vazio; senão rascunho
+function rdoJuntar(lista){
+  const st=lista.map(d=>d.status), cheio=st.filter(s=>s!=='vazio');
+  return { dia:lista[0].dia, n:lista.reduce((a,d)=>a+(d.n||0),0),
+    status: !cheio.length?'vazio':(cheio.includes('desatualizado')?'desatualizado':(cheio.every(s=>s==='fechado')?'fechado':'rascunho')),
+    sigos: lista.some(d=>d.sigos==='aguardando')?'aguardando':(lista.every(d=>d.sigos==='sem_base')?'sem_base':'ok') };
 }
 async function rdoCarregarMes(manterDia){
   $('#rdoMesTit').textContent=rdoMesNome(rdoS.mes);
   $('#rdoPrev').disabled=rdoS.mes<=RDO_MIN.slice(0,7)+'-01';
   $('#rdoNext').disabled=rdoS.mes>=rdoHoje().slice(0,7)+'-01';
   if(!manterDia){ $('#rdoCal').innerHTML='<p class="sub" style="grid-column:1/-1">Carregando…</p>'; $('#rdoDia').innerHTML=''; }
-  try{ const {data,error}=await sb.rpc('app_rdo_mes',{p_mes:rdoS.mes,p_za:rdoS.za}); if(error) throw error; rdoS.mesDados=data; }
-  catch(e){ $('#rdoCal').innerHTML='<p class="sub" style="grid-column:1/-1">Não foi possível carregar (acesso ou rede).</p>'; return; }
-  const dias=(rdoS.mesDados&&rdoS.mesDados.dias)||[];
+  try{
+    const rs=await Promise.all(rdoS.zas.map(z=>sb.rpc('app_rdo_mes',{p_mes:rdoS.mes,p_za:z})));
+    rdoS.meses={}; rs.forEach((r,i)=>{ if(r.error) throw r.error; rdoS.meses[rdoS.zas[i]]=(r.data&&r.data.dias)||[]; });
+  }catch(e){ $('#rdoCal').innerHTML='<p class="sub" style="grid-column:1/-1">Não foi possível carregar (acesso ou rede).</p>'; return; }
+  const dias=rdoDiasMes();
   if(!rdoS.dia||!dias.some(d=>d.dia===rdoS.dia)){ const c=dias.filter(d=>d.n>0); rdoS.dia=(c.length?c[c.length-1]:dias[dias.length-1]||{}).dia||null; }
   rdoRenderCal();
   if(rdoS.dia) rdoCarregarDia(manterDia);
 }
+function rdoDiasMes(){
+  const por={}; rdoS.zas.forEach(z=>(rdoS.meses[z]||[]).forEach(d=>{ (por[d.dia]=por[d.dia]||[]).push(d); }));
+  return Object.keys(por).sort().map(k=>rdoJuntar(por[k]));
+}
 function rdoRenderCal(){
-  const dias=(rdoS.mesDados&&rdoS.mesDados.dias)||[], por={}; dias.forEach(d=>por[d.dia]=d);
+  const por={}; rdoDiasMes().forEach(d=>por[d.dia]=d);
   const ini=new Date(rdoS.mes+'T12:00:00'), lead=ini.getDay(), fim=new Date(ini.getFullYear(),ini.getMonth()+1,0).getDate();
   let h=['D','S','T','Q','Q','S','S'].map(w=>'<div class="wd">'+w+'</div>').join('')+'<div></div>'.repeat(lead);
   for(let i=1;i<=fim;i++){
@@ -7473,12 +7530,14 @@ function rdoRenderCal(){
       +'<b>'+i+'</b><span>'+(d.n?d.n+(d.sigos==='aguardando'?' ⏳':''):(d.sigos==='aguardando'?'⏳':''))+'</span></button>';
   }
   $('#rdoCal').innerHTML=h;
-  $('#rdoCal').querySelectorAll('[data-rdodia]').forEach(b=>b.onclick=()=>{ rdoS.dia=b.dataset.rdodia; rdoS.abertos.clear(); rdoS.edit=null; rdoS.verAtual=false; rdoRenderCal(); rdoCarregarDia(); });
+  $('#rdoCal').querySelectorAll('[data-rdodia]').forEach(b=>b.onclick=()=>{ rdoS.dia=b.dataset.rdodia; rdoS.abertos.clear(); rdoS.edit=null; rdoS.verAtual.clear(); rdoRenderCal(); rdoCarregarDia(); });
 }
 async function rdoCarregarDia(silencioso){
   if(!silencioso) $('#rdoDia').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_rdo_dia',{p_dia:rdoS.dia,p_za:rdoS.za}); if(error) throw error; rdoS.diaDados=data; }
-  catch(e){ $('#rdoDia').innerHTML='<p class="sub">Não foi possível carregar o dia.</p>'; return; }
+  try{
+    const rs=await Promise.all(rdoS.zas.map(z=>sb.rpc('app_rdo_dia',{p_dia:rdoS.dia,p_za:z})));
+    rdoS.dias={}; rs.forEach((r,i)=>{ if(r.error) throw r.error; rdoS.dias[rdoS.zas[i]]=r.data||{}; });
+  }catch(e){ $('#rdoDia').innerHTML='<p class="sub">Não foi possível carregar o dia.</p>'; return; }
   rdoRenderDia();
 }
 function rdoDetHtml(det){
@@ -7486,24 +7545,23 @@ function rdoDetHtml(det){
   return '<div class="det">'+det.map(o=>'<div>'+Object.entries(o||{}).filter(([k,v])=>v!=null&&v!=='')
       .map(([k,v])=>'<b>'+vEsc(RDO_DET[k]||k)+':</b> '+vEsc(k==='etapa'?(RDO_ETAPA[v]||v):v)).join(' · ')+'</div>').join('')+'</div>';
 }
-function rdoRenderDia(){
-  const D=rdoS.diaDados||{}, f=D.fechado, cob=D.cobertura||{};
-  const st=f?(f.desatualizado?'desatualizado':'fechado'):((D.linhas||[]).length?'rascunho':'vazio');
-  const usarSnap=!!f&&!rdoS.verAtual, linhas=usarSnap?(f.snapshot||[]):(D.linhas||[]), travado=!!f;
-  const dt=new Date(rdoS.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-  let h='<div class="rdohead"><h2>'+vEsc(dt.charAt(0).toUpperCase()+dt.slice(1))+' · '+vEsc(rdoS.za)+'</h2>'
-    +'<span class="rdochip" style="background:'+RDO_ST[st][1]+(st==='vazio'?';color:var(--ink)':'')+'">'+RDO_ST[st][0]+'</span></div>';
-  if(D.sigos==='sem_base') h+='<div class="rdoaviso">Sem relatório SIGOS para este dia'+(cob.encerradas_desde?' (a base desta ZA começa em '+fmtData(cob.encerradas_desde)+')':'')+' — o RDO mostra só o que foi lançado no AcquaHub.</div>';
+// linhas que valem para o texto: fechado → como foi fechado (a menos que peça a versão atual); ocultas ficam de fora
+const rdoLinhasZa=z=>{ const D=rdoS.dias[z]||{}, f=D.fechado; return (f&&!rdoS.verAtual.has(z))?(f.snapshot||[]):(D.linhas||[]); };
+const rdoStatusZa=z=>{ const D=rdoS.dias[z]||{}, f=D.fechado; return f?(f.desatualizado?'desatualizado':'fechado'):((D.linhas||[]).length?'rascunho':'vazio'); };
+function rdoSecao(z){
+  const D=rdoS.dias[z]||{}, f=D.fechado, cob=D.cobertura||{}, st=rdoStatusZa(z), travado=!!f, linhas=rdoLinhasZa(z);
+  let h='<div class="rdoza"><h3><span>'+vEsc(rdoZaNome(z))+'</span><span class="rdochip" style="background:'+RDO_ST[st][1]+(st==='vazio'?';color:var(--ink)':'')+'">'+RDO_ST[st][0]+'</span></h3>';
+  if(D.sigos==='sem_base') h+='<div class="rdoaviso">Sem relatório SIGOS para este dia'+(cob.encerradas_desde?' (a base desta ZA começa em '+fmtData(cob.encerradas_desde)+')':'')+' — aqui entra só o que foi lançado no AcquaHub.</div>';
   else if(D.sigos==='aguardando') h+='<div class="rdoaviso">⏳ As OS encerradas do SIGOS chegaram só até '+fmtData(cob.encerradas_ate)+'. Este dia ainda pode ganhar OS executadas quando entrar o próximo relatório.</div>';
   if(f){
     h+='<div class="rdoaviso'+(f.desatualizado?' bad':'')+'" style="border-left-color:'+(f.desatualizado?'var(--bad)':'var(--ok)')+'">🔒 Fechado por '+vEsc(f.por||'—')+' em '
       +new Date(f.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'.'
       +(f.desatualizado?' <b>O banco mudou depois do fechamento</b> (relatório SIGOS ou lançamento atrasado). Reabra, revise e feche de novo.':'')
-      +' <a href="#" data-rdover="1">'+(rdoS.verAtual?'Ver como foi fechado':'Ver versão atual')+'</a></div>';
+      +' <a href="#" data-rdover="'+z+'">'+(rdoS.verAtual.has(z)?'Ver como foi fechado':'Ver versão atual')+'</a></div>';
   }
   let n=0;
-  const rows=linhas.map(l=>{
-    const k=l.chave||('m:'+l.id), ed=rdoS.edit===k, aberto=rdoS.abertos.has(k), temDet=Array.isArray(l.det)&&l.det.length;
+  h+=linhas.map(l=>{
+    const k=z+'|'+(l.chave||('m:'+l.id)), ed=rdoS.edit===k, aberto=rdoS.abertos.has(k), temDet=Array.isArray(l.det)&&l.det.length;
     const num=l.oculto?'–':String(++n);
     let corpo;
     if(ed&&!travado){
@@ -7512,66 +7570,91 @@ function rdoRenderDia(){
         +(l.auto&&!l.manual?'<div class="sub" style="font-size:11px;margin:2px 0">Texto automático: '+vEsc(l.auto)+'</div>':'')
         +'<div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn" data-rdosalvar="'+vEsc(k)+'" style="width:auto;margin:0;padding:6px 12px">Salvar</button>'
         +'<button type="button" class="btn ghost" data-rdocanc="1" style="width:auto;margin:0;padding:6px 12px">Cancelar</button></div>';
-    } else {
-      corpo='<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'');
-    }
-    const ac=travado?(temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'')
-      :((temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'')
-       +'<button type="button" data-rdoed="'+vEsc(k)+'" title="Editar">✏️</button>'
+    } else corpo='<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'');
+    const bDet=temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'';
+    const ac=travado?bDet:(bDet+'<button type="button" data-rdoed="'+vEsc(k)+'" title="Editar">✏️</button>'
        +(l.manual?'<button type="button" data-rdodel="'+vEsc(k)+'" title="Excluir linha">🗑️</button>'
                  :'<button type="button" data-rdooc="'+vEsc(k)+'" title="'+(l.oculto?'Mostrar':'Ocultar')+'">'+(l.oculto?'👁️':'🚫')+'</button>'
                   +(l.editada||l.oculto?'<button type="button" data-rdorest="'+vEsc(k)+'" title="Voltar ao automático">↺</button>':'')));
     return '<div class="rdorow'+(l.oculto?' oc':'')+'"><div class="n">'+num+'</div><div class="b"><div class="tp">'+vEsc(l.tipo)+' · <span class="fo">'+vEsc(l.fonte||'')
       +(l.editada?' · revisado':'')+(l.oculto?' · oculto':'')+'</span></div>'+corpo+'</div><div class="ac">'+ac+'</div></div>';
-  }).join('');
-  h+=rows||'<p class="sub">Nada executado ou em andamento registrado neste dia.</p>';
+  }).join('')||'<p class="sub">Nada executado ou em andamento registrado neste dia.</p>';
   if(!travado){
-    h+='<div class="rdoadd"><select id="rdoNovoTp">'+RDO_TIPOS.map(t=>'<option'+(t==='Nota'?' selected':'')+'>'+t+'</option>').join('')+'</select>'
-      +'<input id="rdoNovoTx" placeholder="Acrescentar linha (ex.: serviço sem lançamento no app)"/><button type="button" class="btn ghost" id="rdoNovoBt">➕ Adicionar</button></div>';
+    h+='<div class="rdoadd"><select data-rdonovotp="'+z+'">'+RDO_TIPOS.map(t=>'<option'+(t==='Nota'?' selected':'')+'>'+t+'</option>').join('')+'</select>'
+      +'<input data-rdonovotx="'+z+'" placeholder="Acrescentar linha (ex.: serviço sem lançamento no app)"/><button type="button" class="btn ghost" data-rdonovo="'+z+'">➕ Adicionar</button></div>';
   }
-  h+='<div class="rdofim"><span class="sub" style="margin:0">'+n+' linha'+(n===1?'':'s')+' no RDO'+(usarSnap?' (como foi fechado)':'')+'</span>'
-    +(travado?'<button type="button" class="btn ghost" id="rdoReabrir">🔓 Reabrir o dia</button>':'<button type="button" class="btn" id="rdoFechar">🔒 Fechar o dia</button>')+'</div>';
-  const box=$('#rdoDia'); box.innerHTML=h;
-  const L=k=>linhas.find(l=>(l.chave||('m:'+l.id))===k);
-  const v=box.querySelector('[data-rdover]'); if(v) v.onclick=e=>{ e.preventDefault(); rdoS.verAtual=!rdoS.verAtual; rdoRenderDia(); };
+  h+='<div class="rdofim"><span class="sub" style="margin:0">'+n+' linha'+(n===1?'':'s')+' · '+vEsc(z)+(f&&!rdoS.verAtual.has(z)?' (como foi fechado)':'')+'</span>'
+    +(travado?'<button type="button" class="btn ghost" data-rdoreabrir="'+z+'">🔓 Reabrir '+z+'</button>':'<button type="button" class="btn" data-rdofechar="'+z+'">🔒 Fechar '+z+'</button>')+'</div></div>';
+  return h;
+}
+function rdoRenderDia(){
+  const dt=new Date(rdoS.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const box=$('#rdoDia');
+  box.innerHTML='<div class="rdohead"><h2>'+vEsc(dt.charAt(0).toUpperCase()+dt.slice(1))+'</h2><button type="button" class="btn" id="rdoCopiar">📋 Copiar RDO</button></div>'
+    +rdoS.zas.map(rdoSecao).join('');
+  const achar=k=>{ const i=k.indexOf('|'), z=k.slice(0,i), id=k.slice(i+1); return {z, l:rdoLinhasZa(z).find(l=>(l.chave||('m:'+l.id))===id)}; };
+  $('#rdoCopiar').onclick=rdoCopiar;
+  box.querySelectorAll('[data-rdover]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const z=a.dataset.rdover; rdoS.verAtual.has(z)?rdoS.verAtual.delete(z):rdoS.verAtual.add(z); rdoRenderDia(); });
   box.querySelectorAll('[data-rdoabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.rdoabre; rdoS.abertos.has(k)?rdoS.abertos.delete(k):rdoS.abertos.add(k); rdoRenderDia(); });
   box.querySelectorAll('[data-rdoed]').forEach(b=>b.onclick=()=>{ rdoS.edit=b.dataset.rdoed; rdoRenderDia(); const t=box.querySelector('[data-rdoetx]'); if(t) t.focus(); });
   box.querySelectorAll('[data-rdocanc]').forEach(b=>b.onclick=()=>{ rdoS.edit=null; rdoRenderDia(); });
-  box.querySelectorAll('[data-rdosalvar]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdosalvar); if(!l) return;
+  box.querySelectorAll('[data-rdosalvar]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdosalvar); if(!l) return;
     const tx=box.querySelector('[data-rdoetx]').value.trim(), tp=box.querySelector('[data-rdoetp]').value;
     if(!tx){ toast('Escreva a descrição.'); return; }
-    rdoSalvar(l,{tipo:tp,desc:(!l.manual&&tx===l.auto)?null:tx,oculto:l.oculto}); });
-  box.querySelectorAll('[data-rdooc]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdooc); if(l) rdoSalvar(l,{tipo:l.tipo,desc:l.editada?l.desc:null,oculto:!l.oculto}); });
-  box.querySelectorAll('[data-rdorest]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdorest); if(l) rdoExcluir(l); });
-  box.querySelectorAll('[data-rdodel]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdodel); if(l&&confirm('Excluir esta linha do RDO?')) rdoExcluir(l); });
-  const nb=$('#rdoNovoBt'); if(nb) nb.onclick=()=>{ const tx=$('#rdoNovoTx').value.trim(); if(!tx){ toast('Escreva a linha.'); return; } rdoSalvar(null,{tipo:$('#rdoNovoTp').value,desc:tx,oculto:false}); };
-  const fe=$('#rdoFechar'); if(fe) fe.onclick=rdoFechar;
-  const ra=$('#rdoReabrir'); if(ra) ra.onclick=rdoReabrir;
+    rdoSalvar(z,l,{tipo:tp,desc:(!l.manual&&tx===l.auto)?null:tx,oculto:l.oculto}); });
+  box.querySelectorAll('[data-rdooc]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdooc); if(l) rdoSalvar(z,l,{tipo:l.tipo,desc:l.editada?l.desc:null,oculto:!l.oculto}); });
+  box.querySelectorAll('[data-rdorest]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdorest); if(l) rdoExcluir(z,l); });
+  box.querySelectorAll('[data-rdodel]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdodel); if(l&&confirm('Excluir esta linha do RDO?')) rdoExcluir(z,l); });
+  box.querySelectorAll('[data-rdonovo]').forEach(b=>b.onclick=()=>{ const z=b.dataset.rdonovo, tx=box.querySelector('[data-rdonovotx="'+z+'"]').value.trim();
+    if(!tx){ toast('Escreva a linha.'); return; } rdoSalvar(z,null,{tipo:box.querySelector('[data-rdonovotp="'+z+'"]').value,desc:tx,oculto:false}); });
+  box.querySelectorAll('[data-rdofechar]').forEach(b=>b.onclick=()=>rdoFechar(b.dataset.rdofechar));
+  box.querySelectorAll('[data-rdoreabrir]').forEach(b=>b.onclick=()=>rdoReabrir(b.dataset.rdoreabrir));
 }
-async function rdoSalvar(l,o){
-  try{ const {error}=await sb.rpc('app_rdo_item_salvar',{p_dia:rdoS.dia,p_za:rdoS.za,p_chave:l&&l.chave||null,p_id:l&&l.manual?l.id:null,
+// texto do RDO já revisado, num formato fixo: cabeçalho do dia → por ZA → por tipo, numerado; ocultas não entram
+function rdoTexto(){
+  const dt=new Date(rdoS.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const out=['RDO — '+dt.charAt(0).toUpperCase()+dt.slice(1)];
+  rdoS.zas.forEach(z=>{
+    const D=rdoS.dias[z]||{}, f=D.fechado, ls=rdoLinhasZa(z).filter(l=>!l.oculto);
+    out.push('', rdoZaNome(z)+' — '+(f?('fechado por '+(f.por||'—')+(f.desatualizado?' (desatualizado)':'')):'rascunho'));
+    if(D.sigos==='aguardando') out.push('(SIGOS ainda não cobre este dia por completo)');
+    if(!ls.length){ out.push('Nada executado ou em andamento registrado.'); return; }
+    let n=0;
+    RDO_TIPOS.forEach(t=>{ const g=ls.filter(l=>l.tipo===t); if(!g.length) return;
+      out.push(t==='Nota'?'Observações':t); g.forEach(l=>out.push((++n)+'. '+String(l.desc||'').replace(/\s+/g,' ').trim())); });
+  });
+  return out.join('\n');
+}
+async function rdoCopiar(){
+  const tx=rdoTexto();
+  try{ await navigator.clipboard.writeText(tx); toast('RDO copiado.'); return; }catch(e){}
+  try{ const ta=document.createElement('textarea'); ta.value=tx; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
+    const ok=document.execCommand('copy'); ta.remove(); toast(ok?'RDO copiado.':'Não consegui copiar.'); }catch(e){ toast('Não consegui copiar.'); }
+}
+async function rdoSalvar(z,l,o){
+  try{ const {error}=await sb.rpc('app_rdo_item_salvar',{p_dia:rdoS.dia,p_za:z,p_chave:l&&l.chave||null,p_id:l&&l.manual?l.id:null,
          p_tipo:o.tipo,p_descricao:o.desc,p_oculto:!!o.oculto}); if(error) throw error; }
   catch(e){ toast('Não salvou: '+(e.message||'erro')); return; }
   rdoS.edit=null; rdoCarregarMes(true);
 }
-async function rdoExcluir(l){
-  try{ const {error}=await sb.rpc('app_rdo_item_excluir',{p_dia:rdoS.dia,p_za:rdoS.za,p_chave:l.manual?null:l.chave,p_id:l.manual?l.id:null}); if(error) throw error; }
+async function rdoExcluir(z,l){
+  try{ const {error}=await sb.rpc('app_rdo_item_excluir',{p_dia:rdoS.dia,p_za:z,p_chave:l.manual?null:l.chave,p_id:l.manual?l.id:null}); if(error) throw error; }
   catch(e){ toast('Não excluiu: '+(e.message||'erro')); return; }
   rdoCarregarMes(true);
 }
-async function rdoFechar(){
-  const D=rdoS.diaDados||{};
-  const msg=D.sigos==='aguardando'?'O SIGOS deste dia ainda não chegou por completo. Fechar mesmo assim? (o dia fica "desatualizado" se o relatório mudar algo)':'Fechar o RDO deste dia? Depois disso só reabrindo para editar.';
+async function rdoFechar(z){
+  const D=rdoS.dias[z]||{};
+  const msg=D.sigos==='aguardando'?'O SIGOS deste dia ainda não chegou por completo ('+z+'). Fechar mesmo assim? (o dia fica "desatualizado" se o relatório mudar algo)':'Fechar o RDO deste dia para '+z+'? Depois disso só reabrindo para editar.';
   if(!confirm(msg)) return;
-  try{ const {error}=await sb.rpc('app_rdo_fechar',{p_dia:rdoS.dia,p_za:rdoS.za}); if(error) throw error; }
+  try{ const {error}=await sb.rpc('app_rdo_fechar',{p_dia:rdoS.dia,p_za:z}); if(error) throw error; }
   catch(e){ toast('Não fechou: '+(e.message||'erro')); return; }
-  toast('Dia fechado.'); rdoS.verAtual=false; rdoCarregarMes(true);
+  toast('Dia fechado ('+z+').'); rdoS.verAtual.delete(z); rdoCarregarMes(true);
 }
-async function rdoReabrir(){
-  if(!confirm('Reabrir o dia para revisão? O fechamento atual é descartado.')) return;
-  try{ const {error}=await sb.rpc('app_rdo_reabrir',{p_dia:rdoS.dia,p_za:rdoS.za}); if(error) throw error; }
+async function rdoReabrir(z){
+  if(!confirm('Reabrir o dia para revisão ('+z+')? O fechamento atual é descartado.')) return;
+  try{ const {error}=await sb.rpc('app_rdo_reabrir',{p_dia:rdoS.dia,p_za:z}); if(error) throw error; }
   catch(e){ toast('Não reabriu: '+(e.message||'erro')); return; }
-  rdoS.verAtual=false; rdoCarregarMes(true);
+  rdoS.verAtual.delete(z); rdoCarregarMes(true);
 }
 
 // ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
@@ -14299,10 +14382,12 @@ async function vtInit(){
 async function vtCarregar(primeira){
   if(primeira){ vtSoltarMapas(); $('#vtDeck').innerHTML='<div class="vt-msg">Carregando atividades…</div>'; }
   let d;
-  try{ const r=await sb.rpc('app_vitrine_dados',{}); if(r.error) throw r.error; d=r.data; }
+  let rdo=null;
+  try{ const [r,rr]=await Promise.all([sb.rpc('app_vitrine_dados',{}), Promise.resolve(sb.rpc('app_vitrine_rdo',{})).catch(()=>({}))]);
+    if(r.error) throw r.error; d=r.data; if(rr&&!rr.error&&rr.data) rdo=rr.data; }
   catch(e){ if(primeira){ $('#vtDeck').innerHTML='<div class="vt-msg">Não foi possível carregar: '+vtEsc(e.message||e)+'</div>'; } else { vtShow(0); } return; }
   if(!vtAtivo) return;
-  vtMontar(d); vtShow(0);
+  vtMontar(d, rdo); vtShow(0);
 }
 function vtMapa(el, pts, zoom){
   if(typeof L==='undefined'){ el.innerHTML='<div class="vt-msg" style="position:static;height:100%">Mapa indisponível</div>'; return; }
@@ -14323,7 +14408,18 @@ function vtAjustaTl(el){ const tl=el.querySelector('.vt-tl'); if(!tl||tl.dataset
   const rows=[...tl.children], mais=document.createElement('p'); mais.className='vt-mais'; tl.prepend(mais);
   let n=0; while(n<rows.length-1&&tl.scrollHeight>tl.clientHeight+1){ rows[n++].style.display='none'; mais.textContent='+ '+n+' atividade'+(n>1?'s':'')+' mais cedo'; }
 }
-function vtMontar(d){
+// RDO do dia (docs/migracao_rdo_ajustes.sql → app_vitrine_rdo): linhas já revisadas, sem as ocultas, por ZA
+const VT_RDO_COR={'Execução':'#22c55e','Em andamento':'#38bdf8','Ocorrência':'#f59e0b','Pendência':'#f43f5e','Nota':'#94a3b8'};
+function vtRdoSlide(dia, porZa){
+  const zas=['ZA1004','ZA0200'].filter(z=>porZa[z]), q=new Date(dia+'T12:00:00'), lbl=VT_DIAS[q.getDay()]+' '+vtFmtD(dia), MAX=11;
+  const n=zas.reduce((a,z)=>a+porZa[z].linhas.length,0);
+  return `<div class="vt-top"><div><div class="vt-brand">RDO · ${lbl}</div><h1>O que foi executado e está em andamento</h1></div><div class="vt-sub">${n} linha${n>1?'s':''} · SIGOS + AcquaHub</div></div>
+   <div class="vt-rdo" style="--n:${zas.length}">${zas.map(z=>{ const r=porZa[z], ls=r.linhas;
+     return `<div class="vt-card"><h2>${VT_CONS[z]} <small>${r.fechado?'🔒 fechado':'rascunho'}</small></h2>`
+       +ls.slice(0,MAX).map(l=>`<div class="ln"><i style="background:${VT_RDO_COR[l.tipo]||'#94a3b8'}"></i><span>${vtEsc(l.desc)} <em>· ${vtEsc(l.tipo)}${l.fonte==='SIGOS'?' · SIGOS':''}</em></span></div>`).join('')
+       +(ls.length>MAX?`<p class="vt-mais" style="margin:0;color:var(--vt-mut);font-size:2vh">+ ${ls.length-MAX} linha${ls.length-MAX>1?'s':''}</p>`:'')+'</div>'; }).join('')}</div>`;
+}
+function vtMontar(d, rdo){
   const deck=$('#vtDeck'); vtSoltarMapas(); deck.innerHTML=''; vtSlides=[];
   const add=(html,dur,mapPts,zoom)=>{ const el=document.createElement('section'); el.className='vt-slide'; el.innerHTML=html; deck.appendChild(el);
     let m=null; const s={el,dur,onShow:()=>{ vtAjustaTl(el); if(!mapPts) return; const box=el.querySelector('.vt-map'); if(!box) return; if(!m) m=vtMapa(box,mapPts,zoom); setTimeout(()=>m&&m.invalidateSize(),50); }}; vtSlides.push(s); };
@@ -14371,10 +14467,13 @@ function vtMontar(d){
   const geo=EV.filter(e=>e.lat!=null);
   add(`<div class="vt-top"><div><div class="vt-brand">Onde estamos trabalhando</div><h1>Mapa das atividades desde ${desde}</h1></div><div class="vt-sub">${geo.length} pontos com GPS${EV.length>geo.length?` · ${EV.length-geo.length} sem GPS`:''}</div></div>
    <div class="vt-map"></div>${legend}`, 16000, geo);
-  // por dia + fotos
-  dias.forEach(x=>{ const its=EV.filter(e=>e.dia===x), lbl=its[0].diaLbl;
+  // por dia: mapa + linha do tempo, RDO do dia, fotos
+  const RD={}; ((rdo&&rdo.dias)||[]).forEach(r=>{ (RD[r.dia]=RD[r.dia]||{})[r.za]=r; });
+  [...new Set([...dias,...Object.keys(RD)])].sort().forEach(x=>{ const its=EV.filter(e=>e.dia===x), lbl=its.length?its[0].diaLbl:'';
+    if(!its.length){ if(RD[x]) add(vtRdoSlide(x,RD[x]), 16000); return; }
     add(`<div class="vt-top"><div><div class="vt-brand">${lbl}</div><h1>${its.length} atividade${its.length>1?'s':''} no dia</h1></div><div class="vt-sub">${[...new Set(its.map(e=>e.cons).filter(Boolean))].join(' · ')}</div></div>
      <div class="vt-grid2"><div class="vt-map"></div><div class="vt-card vt-tl">${its.map(e=>`<div><b>${e.hora}</b><i style="background:${VT_COR[e.g]}"></i><span>${vtEsc(e.tipo)} <em>· ${vtEsc(e.quem)}</em></span></div>`).join('')}</div></div>`, 14000, its.filter(e=>e.lat!=null));
+    if(RD[x]) add(vtRdoSlide(x,RD[x]), 16000);
     its.filter(e=>e.fotos.length).forEach(e=>{
       add(`<div class="vt-top"><div><div class="vt-brand">${lbl} · ${e.hora}</div><h1>${vtEsc(e.tipo)}</h1></div><div class="vt-sub">${vtEsc(e.cons)}</div></div>
        <div class="vt-photo"><div class="vt-pics n${e.fotos.length}">${e.fotos.map(f=>`<img src="${vtEsc(f)}" alt="">`).join('')}</div>
