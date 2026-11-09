@@ -315,7 +315,8 @@ pwa/
     ao digitar e painel com **suspeita de erro** (chegou relatório novo e a OS não aparece); a **recomposição de pavimento é marcada
     executada sozinha** quando o SIGOS a executa — ver `docs/MODULOS.md §21.2`.
     **RDO diário** (`rdo`, 2026-11-09, sw v339; v342 = seleção múltipla de ZA + 📋 Copiar RDO; correção de OS no Vínculo;
-    Vitrine com slide do RDO via `app_vitrine_rdo` — `docs/migracao_rdo_ajustes.sql`; v343 = SIGOS por família de serviço
+    Vitrine com slide do RDO via `app_vitrine_rdo` — `docs/migracao_rdo_ajustes.sql`; v344 = detalhe SIGOS por código de serviço + OS separadas por vírgula e título curto de projeto —
+    `docs/migracao_rdo_detalhe_enxuto.sql`; v343 = SIGOS por família de serviço
     `sigos_servico_grupo`, cópia formatada com detalhe e Vitrine com slides do SIGOS via `app_vitrine_sigos` —
     `docs/migracao_rdo_vitrine_sigos.sql`) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
     lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
