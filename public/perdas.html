@@ -2334,7 +2334,11 @@ let hdResumo=null, hdRows=[], hdTotal=0, hdDetCache={}, hdMap=null, hdPtLayer=nu
 let hdF={cat:'',motivo:'',cap:'',situacao:'ativa',interno:'',busca:'',adequacao:'',codigo:'',poligono:null,
  uni:'troca',      // 'troca' = só troca_efetiva (radar) · 'parque' = todo o parque de HDs
  idades:[],        // seleção múltipla de faixas (0..29 exata, 30 = 30+, -1 = sem idade)
- idMin:null,idMax:null}; // OU intervalo "de X até Y anos" — os dois modos são exclusivos
+ idMin:null,idMax:null, // OU intervalo "de X até Y anos" — os dois modos são exclusivos
+ sigos:[],         // situações SIGOS selecionadas (multi; HD_SG) — vazio = todas
+ sigCol:'',        // colaborador da OS atual (resp | 'Equipe <eq>' | '__sem')
+ trocados:false,   // mostrar os já trocados no SIGOS (por padrão saem da lista)
+ cor:'cat'};       // cor do mapa: 'cat' = prioridade · 'sit' = situação SIGOS
 let hdSort={k:'ips',dir:-1};
 let hdDrawnLayer=null, hdDrawCtl=null;
 const HD_CAT={P1:{l:'P1 · Substituição prioritária',s:'Priorizar',c:'#d6336c'},P2:{l:'P2 · Alta prioridade',s:'Programar próximo ciclo',c:'#e05d5d'},P3:{l:'P3 · Avaliação',s:'Avaliar',c:'#e6a23c'},P4:{l:'P4 · Monitoramento',s:'Acompanhar',c:'#4b9fe0'},P5:{l:'P5 · Sem prioridade',s:'Manter',c:'#8a8f98'}};
@@ -2342,11 +2346,23 @@ const HD_ADEQ={adequado:{l:'Adequado',c:'#3fb27f'},subdimensionado:{l:'Subdimens
 const HD_SIT={R:'Ativa',I:'Inativa/cortada',F:'Factível',P:'Potencial'};
 const HD_CAL={X:0.6,Y:0.75,Z:1,A:1.5,B:2.5,C:3.5,D:5,E:6,F:10,G:15,J:25,K:40,L:60,M:100};
 const HD_COD2CAL={'117 79 00':'Y','117 78 00':'A','117 48 00':'B','117 49 00':'C','117 58 00':'D','117 59 00':'E','117 68 00':'F','117 69 00':'G'};
+/* situação da OS de troca no SIGOS (hd_sigos_situacao no banco) */
+const HD_SG={sem:{l:'Sem OS de troca',s:'—',c:'#adb5bd'},NP:{l:'Não programada',s:'Não prog.',c:'#e6a23c'},RE:{l:'Recebida',s:'Recebida',c:'#7950f2'},PR:{l:'Programada',s:'Programada',c:'#4b9fe0'},
+ PE:{l:'Pendente',s:'Pendente',c:'#f08c00'},AV:{l:'Agendamento vencido',s:'Agend. vencido',c:'#e05d5d'},N:{l:'Não exec. c/ visita (em carteira)',s:'Não exec. c/ vis.',c:'#a0522d'},
+ BL:{l:'Bloqueada pela COPASA',s:'Bloq. COPASA',c:'#862e9c'},OUT:{l:'Outro status da carteira',s:'Outro status',c:'#5c7080'},nao_exec:{l:'Encerrada sem execução',s:'Encerr. s/ exec.',c:'#c92a2a'},
+ trocado:{l:'Trocado (executada)',s:'Trocado',c:'#2f9e44'}};
+const HD_SG_ORDER=['sem','NP','RE','PR','PE','AV','N','BL','OUT','nao_exec','trocado'];
+const HD_DIV={fora_cadastro:'Matrícula fora da priorização',sem_troca_recomendada:'Sem troca recomendada',calibre_diferente:'Calibre da OS ≠ recomendado'};
+function hdDt(v){ if(!v)return '—'; const t=String(v); return t.slice(8,10)+'/'+t.slice(5,7)+'/'+t.slice(0,4); }
+function hdColLab(c){ return c==='__sem'?'OS sem equipe':c; }
+function hdEsc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+let hdDivCache={};
 function hdNv(v){ return (v==null||isNaN(+v))?'—':(''+(+v)).replace('.',','); }
 function hdQ3(c){ return hdNv(HD_CAL[c]); }
 function hdCons(){ return za==='all'?null:za; }
 function hdFilterArgs(){ return {p_consorcio:hdCons(),p_situacao:hdF.situacao,p_interno:hdF.interno||null,p_categoria:hdF.cat||null,p_motivo:hdF.motivo||null,p_cap:hdF.cap||null,p_adequacao:hdF.adequacao||null,p_codigo:hdF.codigo||null,p_poligono:hdF.poligono||null,
- p_idades:hdF.idades.length?hdF.idades:null,p_idade_min:hdF.idMin,p_idade_max:hdF.idMax,p_incluir_sem_troca:hdF.uni==='parque'}; }
+ p_idades:hdF.idades.length?hdF.idades:null,p_idade_min:hdF.idMin,p_idade_max:hdF.idMax,p_incluir_sem_troca:hdF.uni==='parque',
+ p_sigos:hdF.sigos.length?hdF.sigos:null,p_sigos_col:hdF.sigCol||null,p_mostrar_trocados:!!hdF.trocados}; }
 function hdRankArgs(extra){ return Object.assign(hdFilterArgs(),{p_busca:hdF.busca||null},extra||{}); }
 function hdMapaArgs(){ const a=hdFilterArgs(); delete a.p_motivo; a.p_limit=8000; return a; }
 function hdIB(k){ return `<button class="mminfo" data-hdinfo="${k}" title="Sobre">ⓘ</button>`; }
@@ -2354,6 +2370,7 @@ const HD_INFO={
  serv:{t:'Serviço a abrir (por calibre recomendado)',h:`<p>Distribuição dos <b>códigos de serviço SIENGE</b> a abrir, agrupados pelo <b>calibre recomendado</b> (o que será instalado). Clique numa barra para <b>filtrar</b> a tela inteira por aquele serviço. Y→117 79 00 · A→117 78 00 · B→117 48 00 · C→117 49 00 · D→117 58 00 · E→117 59 00 · F→117 68 00 · G→117 69 00.</p>`},
  ips:{t:'Motivos & IPS',h:`<p>O <b>IPS</b> (0–100) pondera anomalia (15), idade (21), mudança (21), utilização (22), dimensionamento (21) e modelo (0) — pesos ajustáveis em <b>⚙️ Premissas</b> (cabeçalho). <b>Motivos</b> são os fatores que dispararam a priorização; clique num motivo para filtrar a tela. Categorias P1≥70 … P5&lt;25 (cortes também em Premissas).</p>`},
  adeq:{t:'Adequação de dimensionamento',h:`<p><b>Superdimensionado</b>: consumo baixo p/ a capacidade (medidor grande subregistra vazões baixas) → trocar por calibre <b>menor</b>. <b>Subdimensionado</b>: consumo alto p/ o calibre → trocar por <b>maior</b>. O critério é a <b>faixa de consumo mensal (m³/mês)</b> típica de cada calibre (não a vazão média em m³/h). ⚠️ indício calibrável.</p>`},
+ sigos:{t:'Situação no SIGOS',h:`<p>Cruza cada matrícula com as <b>OS de troca de hidrômetro</b> dos relatórios do SIGOS (carteira da última <b>Relação de Serviços</b> + <b>Encerradas</b> acumuladas). Vale a OS mais recente; uma OS executada sempre ganha.</p><ul style="margin:4px 0 0;padding-left:18px"><li><b>Trocado</b> — OS executada (Encerrada EXECUTADA, carteira EXECUTADA, ou encerrada com motivo <b>S89 — hidrômetro já substituído</b>).</li><li><b>Status da carteira</b> — Não programada, Recebida, Programada, Pendente, Agendamento vencido, Não exec. c/ visita, <b>Bloqueada pela COPASA</b> (status que só aparece em OS de troca de HD) e outros.</li><li><b>Encerrada sem execução</b> — só há OS encerradas sem troca (motivo no detalhe).</li><li><b>Sem OS de troca</b> — ainda não foi aberta.</li></ul><p><b>Já trocados saem da lista por padrão</b> enquanto o cadastro de HD não for recarregado (ele ainda mostra o hidrômetro velho). Marque <b>Mostrar já trocados</b> para vê-los. Clique nas barras para filtrar (várias ao mesmo tempo).</p><p><b>Divergências</b> lista as OS de troca em carteira que não batem com a priorização: matrícula fora da lista, sem troca recomendada, ou calibre da OS diferente do recomendado.</p>`},
  idade:{t:'Idade do medidor',h:`<p>Quantos hidrômetros há em cada idade (anos, pelo ano de fabricação do nº do HD). <b>Clique nas colunas</b> para selecionar uma ou várias idades, <b>ou</b> informe um intervalo <b>de / até</b> (ex.: só "até 5" = HDs de 0 a 5 anos) — a tela inteira (distribuições, mapa, lista e export) passa a mostrar só essas idades. As colunas sempre mostram todas as idades dos demais filtros, para você poder somar idades à seleção.</p><p>Para olhar o <b>parque inteiro</b> (inclusive HDs sem troca recomendada), troque no cabeçalho <b>"Só com troca recomendada"</b> por <b>"Todo o parque de HDs"</b>.</p>`}
 };
 function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.createElement('style'); st.id='hdcss'; st.textContent=`
@@ -2382,6 +2399,28 @@ function hdCss(){ if(document.getElementById('hdcss'))return; const st=document.
  #s-hdpri .hdhcol .a{font-size:10.5px;text-align:center;color:var(--muted);border-top:1px solid var(--line);padding-top:2px;white-space:nowrap}
  #s-hdpri .hdhcol.on .a{color:var(--ink);font-weight:700}
  #s-hdpri .hdhist.sel .hdhcol:not(.on) .b{opacity:.28}
+ #s-hdpri .hdsg{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.3fr);gap:18px}
+ @media(max-width:1000px){#s-hdpri .hdsg{grid-template-columns:1fr}}
+ #s-hdpri .hdsgtools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:10px;font-size:12px}
+ #s-hdpri .hdsgtools select{background:var(--surface-2);border:1px solid var(--line);color:inherit;border-radius:7px;padding:4px 7px;font-size:12px;font-family:inherit;max-width:260px}
+ #s-hdpri .hdsgtools label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+ #s-hdpri table.hdsgt{width:100%;border-collapse:collapse;font-size:12px}
+ #s-hdpri table.hdsgt th,#s-hdpri table.hdsgt td{padding:5px 7px;border-bottom:1px solid var(--line-2);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+ #s-hdpri table.hdsgt th{color:var(--muted);font-weight:600}
+ #s-hdpri table.hdsgt td:first-child,#s-hdpri table.hdsgt th:first-child{text-align:left}
+ #s-hdpri table.hdsgt tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+ #s-hdpri .hdsgbar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line-2);min-width:90px}
+ #s-hdpri .hdsgbar>span{display:block;height:100%}
+ #s-hdpri .hdmaplg{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--muted);margin-top:6px}
+ #s-hdpri .hdmaplg i,.hdsgdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+ .hdsgpill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;color:#fff;white-space:nowrap}
+ table.hdht{width:100%;border-collapse:collapse;font-size:11.5px}
+ table.hdht th,table.hdht td{padding:4px 6px;border-bottom:1px solid var(--line-2);text-align:left;white-space:nowrap}
+ table.hdht th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}
+ .hddivwrap .hdhtwrap{max-height:55vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+ .mmmodal-bx:has(.hddivwrap){max-width:1100px}
+ .hddivwrap .hdbtn{font:inherit;font-size:11.5px;font-weight:600;padding:5px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:var(--on-accent);cursor:pointer}
+ .hddivwrap .hdbtn.sec{background:var(--surface);color:var(--accent)}
  #s-hdpri table.hdt{width:100%;border-collapse:collapse;font-size:12px}
  #s-hdpri table.hdt th,#s-hdpri table.hdt td{padding:5px 7px;border-bottom:1px solid var(--line-2);text-align:left;white-space:nowrap}
  #s-hdpri table.hdt th{cursor:pointer;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel);z-index:1}
@@ -2661,10 +2700,11 @@ function hdRenderAll(){ const body=$('#hdBody');
      <div class="panel" style="margin:0"><div class="phead"><h3>Adequação de dimensionamento</h3>${hdIB('adeq')}</div><div class="pbody"><div class="hddistwrap" id="hdDistAdeq">${hdDistAdeq()}</div></div></div>
    </div>
    <div class="panel" style="margin:0 0 14px"><div class="phead"><h3>Idade do medidor</h3>${hdIB('idade')}<span class="note" id="hdIdSum" style="margin-left:auto;font-size:11.5px">${hdIdadeSum()}</span></div><div class="pbody" id="hdIdade">${hdIdadeHtml()}</div></div>
+   <div class="panel" style="margin:0 0 14px"><div class="phead"><h3>Situação no SIGOS</h3>${hdIB('sigos')}<span class="note" id="hdSgSum" style="margin-left:auto;font-size:11.5px">${hdSigosSum()}</span></div><div class="pbody" id="hdSigos">${hdSigosHtml()}</div></div>
    <div class="hdbottom">
      <div class="panel" style="margin:0"><div class="phead"><h3>Mapa logístico</h3><span class="chip real" style="margin-left:auto">real</span></div><div class="pbody">
-        <div class="hdmaptools"><button class="hdbtn sec" id="hdClearBtn" hidden>✕ Limpar seleção</button><span class="note" id="hdDrawHint" style="font-size:11px">Use as ferramentas de desenho no mapa (polígono ou retângulo, canto superior direito) para filtrar por área.</span></div>
-        <div id="hdMapDiv"></div><p class="note" id="hdMapNote" style="margin:8px 0 0"></p></div></div>
+        <div class="hdmaptools"><select class="hdbtn sec" id="hdCor" title="Cor dos pontos"><option value="cat"${hdF.cor==='cat'?' selected':''}>Cor: prioridade</option><option value="sit"${hdF.cor==='sit'?' selected':''}>Cor: situação SIGOS</option></select><button class="hdbtn sec" id="hdClearBtn" hidden>✕ Limpar seleção</button><span class="note" id="hdDrawHint" style="font-size:11px">Use as ferramentas de desenho no mapa (polígono ou retângulo, canto superior direito) para filtrar por área.</span></div>
+        <div id="hdMapDiv"></div><div class="hdmaplg" id="hdMapLg"></div><p class="note" id="hdMapNote" style="margin:8px 0 0"></p></div></div>
      <div class="panel" style="margin:0"><div class="phead"><h3>Lista operacional de troca</h3><button class="hdbtn" id="hdExport" style="margin-left:auto">⭳ Exportar .xlsx</button></div><div class="pbody" style="padding-top:8px"><div id="hdRankWrap">${hdRankTable()}</div></div></div>
    </div>`;
  hdSyncHeader(); hdWire(); hdInitMap();
@@ -2713,16 +2753,77 @@ function hdWireIdade(){
  ['hdIdMin','hdIdMax'].forEach(id=>{ const el=$('#'+id); if(el)el.onkeydown=e=>{ if(e.key==='Enter')ap(); }; });
  const bl=$('#hdIdLimpar'); if(bl)bl.onclick=()=>{ hdF.idades=[]; hdF.idMin=hdF.idMax=null; hdReload(); };
 }
+/* ---- situação no SIGOS: barras (multi), mostrar trocados, colaborador, P1–P5, divergências ---- */
+function hdSigosSum(){ const r=hdResumo||{}, ps=r.por_sigos||{}, tot=Object.values(ps).reduce((a,b)=>a+b,0), sem=ps.sem||0, oc=r.n_trocados_ocultos||0;
+ const comOs=tot-sem; return `<b>${fmt(comOs)}</b> de ${fmt(tot)} com OS de troca (${tot?br1(comOs/tot*100):'0,0'}%) · <b>${fmt(ps.trocado||0)}</b> trocado(s)${oc&&!hdF.trocados?` · ${fmt(oc)} fora da lista`:''}`; }
+function hdSigosHtml(){
+ const r=hdResumo||{}, ps=r.por_sigos||{}, oc=r.n_trocados_ocultos||0;
+ const ks=HD_SG_ORDER.filter(k=>ps[k]!=null), mx=Math.max(1,...ks.map(k=>ps[k]));
+ const bars=ks.map(k=>{ const g=HD_SG[k], on=hdF.sigos.includes(k);
+   const extra=k==='trocado'&&oc&&!hdF.trocados?` <span class="note" style="font-size:10.5px">(${fmt(oc)} fora da lista)</span>`:'';
+   return `<div class="hddist ${on?'on':''}" data-sgk="${k}"><span class="lab"><i class="hdsgdot" style="background:${g.c}"></i>${g.l}${extra}</span><div class="bar"><span style="width:${Math.round(ps[k]/mx*100)}%;background:${g.c}"></span></div><span class="vv">${fmt(ps[k])}</span></div>`; }).join('')||'<p class="note" style="margin:0">—</p>';
+ const pc=r.por_sigos_col||{}, cols=Object.entries(pc).sort((a,b)=>b[1]-a[1]);
+ if(hdF.sigCol&&pc[hdF.sigCol]==null) cols.unshift([hdF.sigCol,0]);
+ const colSel=`<select id="hdSgCol"><option value="">Todos os colaboradores</option>${cols.map(([c,n])=>`<option value="${hdEsc(c)}"${c===hdF.sigCol?' selected':''}>${hdEsc(hdColLab(c))} (${fmt(n)})</option>`).join('')}</select>`;
+ const dv=hdDivCache[hdCons()||'all'], nDiv=dv?Object.values(dv.por_tipo||{}).reduce((a,b)=>a+b,0):null;
+ const tools=`<div class="hdsgtools"><label><input type="checkbox" id="hdSgTroc"${hdF.trocados?' checked':''}> Mostrar já trocados</label>${colSel}
+   <button class="hdbtn sec" id="hdSgLimpar"${hdF.sigos.length||hdF.sigCol?'':' hidden'}>✕ Limpar SIGOS</button>
+   <button class="hdbtn sec" id="hdSgDiv" style="margin-left:auto">⚠️ Divergências${nDiv!=null?' ('+fmt(nDiv)+')':''}</button></div>`;
+ const sc=r.sigos_por_categoria||{}, cats=['P1','P2','P3','P4','P5'].filter(k=>sc[k]);
+ const T={total:0,trocado:0,carteira:0,nao_exec:0,sem:0}; cats.forEach(k=>Object.keys(T).forEach(f=>T[f]+=+sc[k][f]||0));
+ const row=(lab,o,cls)=>{ const t=o.total||0, p=x=>t?(x/t*100):0;
+   return `<tr class="${cls||''}"><td>${lab}</td><td>${fmt(t)}</td><td>${fmt(o.trocado)}</td><td>${fmt(o.carteira)}</td><td>${fmt(o.nao_exec)}</td><td>${fmt(o.sem)}</td><td><b>${br1(p(o.trocado))}%</b></td>
+    <td><div class="hdsgbar" title="trocado · em carteira · encerrada s/ exec. · sem OS"><span style="width:${p(o.trocado)}%;background:${HD_SG.trocado.c}"></span><span style="width:${p(o.carteira)}%;background:${HD_SG.PR.c}"></span><span style="width:${p(o.nao_exec)}%;background:${HD_SG.nao_exec.c}"></span></div></td></tr>`; };
+ const tab=`<table class="hdsgt"><thead><tr><th>Prioridade</th><th>Total</th><th>Trocado</th><th>Em carteira</th><th>Encerr. s/ exec.</th><th>Sem OS</th><th>% trocado</th><th></th></tr></thead><tbody>
+   ${cats.map(k=>row(`<span class="hdpill" style="background:${(HD_CAT[k]||{}).c}">${k}</span>`,sc[k])).join('')}${cats.length>1?row('Total',T,'tot'):''}</tbody></table>
+   <p class="note" style="margin:6px 0 0;font-size:11px">Conta os já trocados (inclusive os que saíram da lista) e ignora o filtro de situação/colaborador acima.</p>`;
+ return `${tools}<div class="hdsg"><div class="hddistwrap">${bars}</div><div>${tab}</div></div>`;
+}
+function hdWireSigos(){
+ document.querySelectorAll('#hdSigos .hddist[data-sgk]').forEach(el=>el.onclick=()=>{ const k=el.dataset.sgk;
+  hdF.sigos=hdF.sigos.includes(k)?hdF.sigos.filter(x=>x!==k):hdF.sigos.concat(k);
+  if(k==='trocado'&&hdF.sigos.includes('trocado')) hdF.trocados=true; hdReload(); });
+ const t=$('#hdSgTroc'); if(t)t.onchange=()=>{ hdF.trocados=t.checked; if(!t.checked)hdF.sigos=hdF.sigos.filter(x=>x!=='trocado'); hdReload(); };
+ const c=$('#hdSgCol'); if(c)c.onchange=()=>{ hdF.sigCol=c.value; hdReload(); };
+ const l=$('#hdSgLimpar'); if(l)l.onclick=()=>{ hdF.sigos=[]; hdF.sigCol=''; hdReload(); };
+ const d=$('#hdSgDiv'); if(d)d.onclick=hdDivergencias;
+ hdDivLoad();
+}
+function hdDivLoad(){ const k=hdCons()||'all'; if(hdDivCache[k])return;
+ sbg.rpc('app_nrw_hd_sigos_diverg',{p_consorcio:hdCons()}).then(r=>{ if(r.error||!r.data)return; hdDivCache[k]=r.data;
+  const b=$('#hdSgDiv'), n=Object.values(r.data.por_tipo||{}).reduce((a,x)=>a+x,0); if(b&&(hdCons()||'all')===k)b.textContent='⚠️ Divergências ('+fmt(n)+')'; }); }
+let hdDivTipo='';
+function hdDivergencias(){ const k=hdCons()||'all', d=hdDivCache[k];
+ if(!d){ mmModal('Divergências SIGOS × priorização','<p class="note" style="margin:0">Carregando…</p>');
+  sbg.rpc('app_nrw_hd_sigos_diverg',{p_consorcio:hdCons()}).then(r=>{ if(r.error){ mmModal('Divergências SIGOS × priorização','<p class="note" style="color:var(--crit)">Erro: '+hdEsc(r.error.message||'')+'</p>'); return; } hdDivCache[k]=r.data; hdDivergencias(); }); return; }
+ const pt=d.por_tipo||{}, rows=(d.rows||[]).filter(x=>!hdDivTipo||x.tipo===hdDivTipo);
+ const chips=Object.keys(HD_DIV).map(t=>`<button class="hdbtn ${hdDivTipo===t?'':'sec'}" data-dvt="${t}" style="font-size:11.5px">${HD_DIV[t]} · ${fmt(pt[t]||0)}</button>`).join(' ');
+ const tb=rows.slice(0,2000).map(x=>`<tr><td>${HD_DIV[x.tipo]||x.tipo}</td><td>${hdEsc(x.os)}</td><td>${hdEsc(x.za)}</td><td>${x.mat}</td><td>${hdEsc(x.st)}</td><td>${hdEsc(x.cod)}</td><td>${hdEsc(x.resp||(x.eq?'Equipe '+x.eq:'—'))}</td><td>${hdDt(x.ab)}</td><td>${hdDt(x.lim)}</td><td>${x.categoria?`<span class="hdpill" style="background:${(HD_CAT[x.categoria]||{}).c}">${x.categoria}</span>`:'—'}</td><td>${hdEsc(x.cap||'—')}${x.cal_rec&&x.cal_rec!==x.cap?' → <b>'+hdEsc(x.cal_rec)+'</b>':''}</td><td>${hdEsc(x.cod_rec)}</td></tr>`).join('')
+   ||'<tr><td colspan="12" class="note" style="padding:12px">Nenhuma divergência.</td></tr>';
+ mmModal('Divergências SIGOS × priorização',`<div class="hddivwrap"><p class="note" style="margin:0 0 8px">OS de troca de HD <b>em carteira</b> (sem as executadas) que não batem com a priorização${hdCons()?' — '+hdCons():''}. Clique num tipo para filtrar.</p>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${chips}<button class="hdbtn" id="hdDivXls" style="margin-left:auto;font-size:11.5px">⭳ Exportar .xlsx</button></div>
+  <div class="hdhtwrap"><table class="hdht"><thead><tr><th>Tipo</th><th>OS</th><th>ZA</th><th>Matrícula</th><th>Status</th><th>Cód. OS</th><th>Colaborador</th><th>Abertura</th><th>Limite</th><th>Prior.</th><th>Calibre (atual → rec.)</th><th>Cód. recomendado</th></tr></thead><tbody>${tb}</tbody></table></div>
+  ${rows.length>2000?`<p class="note" style="margin:6px 0 0">Mostrando 2.000 de ${fmt(rows.length)} — o export traz todas.</p>`:''}</div>`);
+ setTimeout(()=>{ document.querySelectorAll('#mmModal [data-dvt]').forEach(b=>b.onclick=()=>{ hdDivTipo=hdDivTipo===b.dataset.dvt?'':b.dataset.dvt; hdDivergencias(); });
+  const x=$('#hdDivXls'); if(x)x.onclick=()=>{ if(typeof XLSX==='undefined')return;
+   const head=['Tipo','OS','ZA','Matrícula','Status','Código OS','Serviço','Equipe','Responsável','Abertura','Limite','Endereço (SIGOS)','Prioridade','Calibre atual','Calibre recomendado','Código recomendado'];
+   const data=rows.map(r=>[HD_DIV[r.tipo]||r.tipo,r.os||'',r.za||'',r.mat,r.st||'',r.cod||'',r.srv||'',r.eq||'',r.resp||'',hdDt(r.ab),hdDt(r.lim),r.end||'',r.categoria||'',r.cap||'',r.cal_rec||'',r.cod_rec||'']);
+   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head,...data]),'Divergencias');
+   XLSX.writeFile(wb,`divergencias_HD_SIGOS_${hdCons()||'ambos'}_${new Date().toISOString().slice(0,10)}.xlsx`); }; },0);
+}
+function hdSigCell(x){ const g=HD_SG[x.sit]||HD_SG.sem; if(x.sit==='sem'||!x.sit) return '<span class="note">—</span>';
+ const who=x.sig_resp||(x.sig_eq?'Eq. '+x.sig_eq:''); const tip=[x.sig_st,x.sig_os?'OS '+x.sig_os:'',who,x.sig_oc].filter(Boolean).join(' · ');
+ return `<span class="hdsgpill" style="background:${g.c}" title="${hdEsc(tip)}">${g.s}</span>${x.sit==='trocado'&&x.sig_trocado_em?' <span class="note" style="font-size:10.5px">'+hdDt(x.sig_trocado_em)+'</span>':(who?' <span class="note" style="font-size:10.5px">'+hdEsc(who.length>18?who.slice(0,17)+'…':who)+'</span>':'')}`; }
 function hdCmp(a,b){ const k=hdSort.k,d=hdSort.dir; let va=a[k],vb=b[k]; if(va==null)va=(typeof vb==='string'?'':-Infinity); if(vb==null)vb=(typeof va==='string'?'':-Infinity); if(typeof va==='string'||typeof vb==='string')return d*String(va).localeCompare(String(vb)); return d*(va-vb); }
 function hdTrocaCell(x){ const rec=x.cal_recomendado; if(!rec||rec===x.cap) return (x.cap||'—'); const up=(HD_CAL[rec]||0)>(HD_CAL[x.cap]||0); return `<span class="hdtroca">${x.cap||'—'}<span class="ar">→</span><b style="color:${up?'#e05d5d':'#2f8b6c'}">${rec}</b></span>`; }
 function hdRankTable(){
- const cols=[['categoria','Prior.'],['matricula','Matrícula'],['cap','Troca'],['idade_medidor','Idade'],['media','m³/mês'],['adequacao','Adequação'],['ips','IPS'],['codigo_servico','Abrir OS']];
+ const cols=[['categoria','Prior.'],['matricula','Matrícula'],['sit','SIGOS'],['cap','Troca'],['idade_medidor','Idade'],['media','m³/mês'],['adequacao','Adequação'],['ips','IPS'],['codigo_servico','Abrir OS']];
  const rows=hdRows.slice().sort(hdCmp), rnum={idade_medidor:1,media:1,ips:1};
  const th=cols.map(c=>`<th class="${rnum[c[0]]?'r':''}" data-k="${c[0]}">${c[1]}${hdSort.k===c[0]?(hdSort.dir<0?' ▾':' ▴'):''}</th>`).join('');
  const body=rows.map(x=>{ const m=HD_CAT[x.categoria]||{c:'#888'}, ad=HD_ADEQ[x.adequacao]||{l:x.adequacao||'—',c:'inherit'};
    const rem=x.remanejamento_sugerido?' <span class="mmtag" style="--cc:#0e7c86" title="interno + ativa">rem</span>':'';
-   return `<tr data-mat="${x.matricula}"><td><span class="hdpill" style="background:${m.c}">${x.categoria}</span></td><td>${x.matricula}${rem}</td><td>${hdTrocaCell(x)}</td><td class="r">${x.idade_medidor!=null?x.idade_medidor:'—'}</td><td class="r">${x.media!=null?br1(x.media):'—'}</td><td><span style="color:${ad.c}">${ad.l}</span></td><td class="r"><b>${x.ips!=null?br1(x.ips):'—'}</b></td><td style="font-variant-numeric:tabular-nums">${x.codigo_servico||'<span class="note">fora</span>'}</td></tr>`;
- }).join('')||'<tr><td colspan="8" class="note" style="padding:14px">Nenhuma matrícula nesse filtro.</td></tr>';
+   return `<tr data-mat="${x.matricula}"><td><span class="hdpill" style="background:${m.c}">${x.categoria}</span></td><td>${x.matricula}${rem}</td><td>${hdSigCell(x)}</td><td>${hdTrocaCell(x)}</td><td class="r">${x.idade_medidor!=null?x.idade_medidor:'—'}</td><td class="r">${x.media!=null?br1(x.media):'—'}</td><td><span style="color:${ad.c}">${ad.l}</span></td><td class="r"><b>${x.ips!=null?br1(x.ips):'—'}</b></td><td style="font-variant-numeric:tabular-nums">${x.codigo_servico||'<span class="note">fora</span>'}</td></tr>`;
+ }).join('')||'<tr><td colspan="9" class="note" style="padding:14px">Nenhuma matrícula nesse filtro.</td></tr>';
  const selMsg=hdF.poligono?' · <b style="color:var(--accent)">área selecionada no mapa</b>':'';
  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span class="note">${fmt(hdTotal)} ${hdF.uni==='parque'?'HD(s) no parque':'candidato(s)'}${selMsg} · exibindo ${rows.length}</span></div><div class="hdtwrap"><table class="hdt"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -2773,10 +2874,21 @@ function hdDetailHtml(d){
    <div><span class="k">Situação ligação</span><span>${HD_SIT[d.situacao_lig]||d.situacao_lig||'—'}</span></div>
    <div><span class="k">Situação desde</span><span>${sitDesde(d.situacao_desde)}</span></div>
   </div>
+  ${hdDetSigos(d)}
   <div class="mmblock-h" style="margin-top:6px">Consumo micromedido (18 meses)</div>${chart}
   <p class="note" style="margin:9px 0 2px"><b>Por que priorizar:</b> ${d.justificativa||'—'}</p>
   <p class="note" style="margin:4px 0 0"><b>Fatores:</b> ${(d.motivos||[]).map(x=>'<span class="mmtag" style="--cc:#8a8f98">'+x+'</span>').join(' ')||'—'}</p>
   <div style="margin-top:10px;padding:9px 11px;border-radius:8px;background:rgba(var(--accent-rgb),.08);font-size:12.5px">${acao}${d.remanejamento_sugerido?'<br><b>Avaliar remanejamento</b> do padrão para fora (imóvel interno + ativo).':''}</div></div>`;
+}
+function hdDetSigos(d){ const s=d.sigos;
+ if(!s) return `<div class="mmblock-h" style="margin-top:6px">OS de troca no SIGOS ${hdIB('sigos')}</div><p class="note" style="margin:2px 0 8px">Nenhuma OS de troca de hidrômetro nos relatórios do SIGOS.</p>`;
+ const g=HD_SG[s.sit]||HD_SG.sem;
+ const aviso=s.sit==='trocado'?(s.oculto?`Trocado em <b>${hdDt(s.trocado_em)}</b>, depois da última carga do cadastro de HD (${hdDt(d.cadastro_hd_em)}) — fica fora da lista até a próxima carga.`:`Trocado em <b>${hdDt(s.trocado_em)}</b> (antes da carga do cadastro de HD de ${hdDt(d.cadastro_hd_em)}).`):'';
+ const hist=(s.hist||[]).map(h=>`<tr><td>${hdEsc(h.n)}</td><td>${hdEsc(h.cod)}</td><td>${hdEsc(h.st)}</td><td>${h.carteira?'Carteira':'Encerrada'}</td><td>${hdEsc(h.resp||(h.eq?'Equipe '+h.eq:'—'))}</td><td>${hdDt(h.ab)}</td><td>${hdDt(h.ex)}</td><td>${h.vis||0}</td><td>${hdEsc(h.oc)}</td></tr>`).join('');
+ return `<div class="mmblock-h" style="margin-top:6px">OS de troca no SIGOS ${hdIB('sigos')}</div>
+  <p style="margin:2px 0 6px;font-size:12.5px"><span class="hdsgpill" style="background:${g.c}">${g.l}</span> <span class="note">${s.n_os} OS · ${s.vis||0} visita(s)</span></p>
+  ${aviso?`<p class="note" style="margin:0 0 6px;font-size:11.5px">${aviso}</p>`:''}
+  <div style="overflow:auto;max-height:180px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px"><table class="hdht"><thead><tr><th>OS</th><th>Cód.</th><th>Status</th><th>Fonte</th><th>Colaborador</th><th>Abertura</th><th>Execução</th><th>Vis.</th><th>Motivo</th></tr></thead><tbody>${hist}</tbody></table></div>`;
 }
 function hdOpenDetail(mat){
  const render=(d)=>{ mmModal('Matrícula '+mat, hdDetailHtml(d)); setTimeout(()=>document.querySelectorAll('#mmModal [data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);}),0); };
@@ -2786,7 +2898,8 @@ function hdOpenDetail(mat){
 }
 function hdWire(){
  document.querySelectorAll('#s-hdpri [data-hdinfo]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=HD_INFO[b.dataset.hdinfo];if(i)mmModal(i.t,i.h);});
- hdWireRank(); hdWireCharts(); hdWireIdade();
+ hdWireRank(); hdWireCharts(); hdWireIdade(); hdWireSigos();
+ const co=$('#hdCor'); if(co)co.onchange=()=>{ hdF.cor=co.value; hdLoadMap(); };
  const ex=$('#hdExport'); if(ex)ex.onclick=hdExport;
  const cb=$('#hdClearBtn'); if(cb){ cb.onclick=hdDrawReset; cb.hidden=!hdF.poligono; }
  if(hdF.poligono){ const h=$('#hdDrawHint'); if(h)h.textContent='Área aplicada — a lista e o mapa mostram só as matrículas dentro dela.'; }
@@ -2801,7 +2914,7 @@ function hdReload(){
  .then(([r1,r2])=>{ if(r1.error||r2.error)return; hdResumo=r1.data||{}; const rk=r2.data||{}; hdRows=rk.rows||[]; hdTotal=rk.total||0;
   const u=(id,html)=>{ const e=$('#'+id); if(e)e.innerHTML=html; };
   u('hdDistServ',hdDistServ()); u('hdDistCat',hdDistCat()); u('hdDistMot',hdDistMot()); u('hdDistAdeq',hdDistAdeq()); u('hdRankWrap',hdRankTable());
-  u('hdIdade',hdIdadeHtml()); u('hdIdSum',hdIdadeSum());
+  u('hdIdade',hdIdadeHtml()); u('hdIdSum',hdIdadeSum()); u('hdSigos',hdSigosHtml()); u('hdSgSum',hdSigosSum());
   hdSyncHeader(); hdWire(); hdLoadMap();
  });
 }
@@ -2831,11 +2944,15 @@ function hdLoadMap(){ if(!hdMap||!hdPtLayer)return; const note=$('#hdMapNote'); 
  sbg.rpc('app_nrw_hd_mapa',hdMapaArgs()).then(r=>{
   if(r.error){ if(note)note.textContent='Erro ao carregar o mapa.'; return; }
   const pts=r.data||[]; hdPtLayer.clearLayers(); const bounds=[];
-  pts.forEach(p=>{ if(p.lat==null||p.lon==null)return; const m=HD_CAT[p.categoria]||{c:'#888'};
-   const mk=L.circleMarker([+p.lat,+p.lon],{radius:4,color:'#fff',weight:.8,fillColor:m.c,fillOpacity:.9});
-   mk.bindPopup(`<b>Matrícula ${p.matricula}</b><br>${p.categoria} · IPS ${p.ips!=null?br1(p.ips):'—'}${p.idade_medidor!=null?' · '+p.idade_medidor+' anos':''}<br>${p.cap||'—'}→<b>${p.cal_recomendado||'—'}</b> · OS ${p.codigo_servico||'(fora)'}<br><a href="#" onclick="hdOpenDetail(${p.matricula});return false;">ver detalhe</a>`);
+  const bySit=hdF.cor==='sit', seen={};
+  if(bySit) pts.sort((a,b)=>(b.sit==='sem')-(a.sit==='sem'));   // "sem OS" desenhado primeiro (por baixo)
+  pts.forEach(p=>{ if(p.lat==null||p.lon==null)return; const m=HD_CAT[p.categoria]||{c:'#888'}, g=HD_SG[p.sit]||HD_SG.sem;
+   const fc=bySit?g.c:m.c; if(bySit)seen[p.sit||'sem']=1;
+   const mk=L.circleMarker([+p.lat,+p.lon],{radius:bySit&&p.sit!=='sem'?5:4,color:'#fff',weight:.8,fillColor:fc,fillOpacity:.9});
+   mk.bindPopup(`<b>Matrícula ${p.matricula}</b><br>${p.categoria} · IPS ${p.ips!=null?br1(p.ips):'—'}${p.idade_medidor!=null?' · '+p.idade_medidor+' anos':''}<br>${p.cap||'—'}→<b>${p.cal_recomendado||'—'}</b> · OS ${p.codigo_servico||'(fora)'}<br>SIGOS: <b style="color:${g.c}">${g.l}</b>${p.sig_os?' · OS '+hdEsc(p.sig_os):''}<br><a href="#" onclick="hdOpenDetail(${p.matricula});return false;">ver detalhe</a>`);
    hdPtLayer.addLayer(mk); bounds.push([+p.lat,+p.lon]);
   });
+  const lg=$('#hdMapLg'); if(lg) lg.innerHTML=bySit?HD_SG_ORDER.filter(k=>seen[k]).map(k=>`<span><i style="background:${HD_SG[k].c}"></i>${HD_SG[k].l}</span>`).join(''):['P1','P2','P3','P4','P5'].map(k=>`<span><i style="background:${HD_CAT[k].c}"></i>${k}</span>`).join('');
   if(note)note.textContent=fmt(pts.length)+' ponto(s)'+(hdF.poligono?' na área selecionada':'')+' (máx 8.000, maior IPS). '+(hdF.poligono?'':'Desenhe um polígono ou retângulo no mapa para filtrar por área.');
   if(bounds.length && !hdF.poligono){ try{ hdMap.fitBounds(bounds,{padding:[20,20],maxZoom:15}); }catch(e){} }
  });
@@ -2857,8 +2974,10 @@ function hdExport(){ const btn=$('#hdExport'); if(typeof XLSX==='undefined'){ if
  const all=[]; const pageN=1000; let tot=0;
  function fetchPage(off){ return sbg.rpc('app_nrw_hd_ranking',hdRankArgs({p_limit:pageN,p_offset:off,p_incluir_endereco:true})).then(r=>{ if(r.error)throw r.error; const rk=r.data||{}, rows=rk.rows||[]; tot=rk.total||0; all.push(...rows); if(rows.length===pageN && all.length<tot && all.length<60000) return fetchPage(off+pageN); }); }
  fetchPage(0).then(()=>{
-  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Situação desde','Remanejamento','Justificativa'];
-  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.situacao_desde?sitDesde(x.situacao_desde):'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'']);
+  const head=['Matrícula','Bairro','Endereço','Nº Hidrômetro','Calibre atual','Vazão atual (m³/h)','Consumo médio (m³/mês)','Consumo médio (m³/h)','Calibre recomendado','Vazão rec. (m³/h)','Código serviço','Descrição serviço','Prioridade','IPS','Idade (anos)','Faixa','Tendência','Adequação','Volume período (m³)','Interno/Externo','Situação ligação','Situação desde','Remanejamento','Justificativa',
+   'Situação SIGOS','OS SIGOS','Status da OS','Código OS','Serviço OS','Equipe','Responsável','Abertura OS','Limite OS','Motivo encerramento','Visitas','Nº OS de troca','Trocado em'];
+  const data=all.map(x=>[x.matricula,x.bairro||'',x.endereco||'',x.num_hidr||'',x.cap||'',x.q3!=null?+x.q3:'',x.media!=null?+x.media:'',x.media_m3h!=null?+x.media_m3h:'',x.cal_recomendado||'',x.q3_recomendado!=null?+x.q3_recomendado:'',x.codigo_servico||'',x.desc_recomendado||'',x.categoria,x.ips!=null?+x.ips:'',x.idade_medidor,x.faixa_predominante||'',x.tendencia||'',(HD_ADEQ[x.adequacao]||{l:x.adequacao}).l,x.volume_periodo!=null?Math.round(x.volume_periodo):'',x.interno_externo||'',HD_SIT[x.situacao_lig]||x.situacao_lig||'',x.situacao_desde?sitDesde(x.situacao_desde):'',x.remanejamento_sugerido?'SIM':'',x.justificativa||'',
+   (HD_SG[x.sit]||HD_SG.sem).l,x.sig_os||'',x.sig_st||'',x.sig_cod||'',x.sig_srv||'',x.sig_eq||'',x.sig_resp||'',x.sig_ab?hdDt(x.sig_ab):'',x.sig_lim?hdDt(x.sig_lim):'',x.sig_oc||'',x.sig_vis!=null?x.sig_vis:'',x.sig_n!=null?x.sig_n:'',x.sig_trocado_em?hdDt(x.sig_trocado_em):'']);
   const ws=XLSX.utils.aoa_to_sheet([head,...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Priorizacao HD');
   XLSX.writeFile(wb,`priorizacao_troca_HD_${za==='all'?'ambos':za}_${new Date().toISOString().slice(0,10)}.xlsx`);
   if(btn){btn.disabled=false;btn.textContent='⭳ Exportar .xlsx';}

@@ -314,7 +314,7 @@ pwa/
     almoxarifado, loggers…) conferido contra o SIGOS pela base de 10 dígitos: selo de situação em qualquer `<span data-sgx>`, aviso
     ao digitar e painel com **suspeita de erro** (chegou relatório novo e a OS não aparece); a **recomposição de pavimento é marcada
     executada sozinha** quando o SIGOS a executa — ver `docs/MODULOS.md §21.2`.
-    **RDO diário** (`rdo`, 2026-11-09, sw v339; v340 = seleção múltipla de ZA + 📋 Copiar RDO; correção de OS no Vínculo;
+    **RDO diário** (`rdo`, 2026-11-09, sw v339; v342 = seleção múltipla de ZA + 📋 Copiar RDO; correção de OS no Vínculo;
     Vitrine com slide do RDO via `app_vitrine_rdo` — `docs/migracao_rdo_ajustes.sql`) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
     lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
     linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
@@ -337,7 +337,7 @@ pwa/
   registro; `os_recomposicao`=OS da recomposição, **por tipo**, lançada no `pavprog`.) `app_pav_os(p_grupo,p_os)` fica só
   p/ app em cache (≤ v281): "A, B" numérico com nº de partes = nº de tipos é distribuído na ordem do card (alfabética do tipo).
   **Etapa de execução** (2026-10-28): etapas por tipo **criação → execução → executada**; o ponto fica na mais atrasada.
-  Desde 2026-11-09 (sw v340) **não há mais "Marcar executado" na tela**: a execução vem só do SIGOS (`sigos_pav_auto`);
+  Desde 2026-11-09 (sw v342) **não há mais "Marcar executado" na tela**: a execução vem só do SIGOS (`sigos_pav_auto`);
   `app_pav_executar(p_id,p_data)` segue no banco sem uso.
   **Ensaio de reaterro (2026-11-02, sw v314):** antes da OS o programador responde por tipo "Necessita ensaio de compactação
   do reaterro?" (`app_pav_reaterro_decidir`); Sim → fila da **Qualidade** (tela `pavqual`, Home › 🛠️ Execução, gate
@@ -369,7 +369,9 @@ pwa/
 - **Cadastro técnico** (`cadastro`) — camadas do PostGIS no mapa (rede, ligações, unidades, **VRPs**,
   **válvulas de manobra** — nós REG/RGF/ALM/VBO via view `unidades_valvulas_manobra`, 2026-11-09,
   **limite das ZAs** — contorno tracejado via `app_limites_zas` + máscara escurecendo o fundo fora das ZAs, 2026-10-29)
-  com busca + marcador "Você" (GPS, `cadOnGps`, pane próprio sempre por cima). RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
+  com busca + marcador "Você" (GPS, `cadOnGps`, pane próprio sempre por cima). **Isolamento de trecho** (2026-11-09, sw v340):
+  botão "🚱 Isolar este trecho" no popup da rede → `app_isolamento_trecho` devolve as válvulas a fechar (grafo
+  `"2 - infra_agua".isolamento_aresta`/`_valvula`; **rodar `isolamento_recalcular()` após carga de rede/nós**) — `docs/MODULOS.md §2.5`. RPCs `app_cadastro_geojson` (bbox → GeoJSON) e `app_cadastro_buscar`. Cache em IndexedDB versionado
   por `CAD_VER` (recarregou o `limite_za`? suba `CAD_VER`).
 - **Biblioteca** (`biblioteca`) — documentos de referência (bucket Storage `biblioteca`).
 
@@ -494,6 +496,8 @@ com gate `admin|dev_acesso|aux_acesso`; lentes grandes-consumidores / **consumo 
 polígono + export .xlsx p/ SIGOS. **Fora de escopo:** priorização por DMC e estimativa de recuperação de volume.
 ⚠️ **`cd_situaca` (R/I/F/P) = situação da LIGAÇÃO** (Real/Inativo/Factível/Potencial), não da leitura — não confundir.
 **HD — recomendação e "troca efetiva" (2026-10-20d, só DB):** dimensionamento por `ref_dim = greatest(mediana, least(p90, média_4m))` (robusto a pico isolado); coluna `hd_priorizacao.media_4m`. **`cal_recomendado` só muda de calibre quando `adequacao` é sub/superdimensionado** (consumo > 1,5× máx da faixa, ou < mín) — migração de faixa que ainda cabe no calibre atual **mantém o calibre**. Flag `troca_efetiva` = `(cal_recomendado≠cap) OU (idade≥idade_alta)` esconde do radar as trocas de mesmo calibre em medidor novo (eram 64%). `app_nrw_hd_resumo/_mapa/_ranking` filtram `troca_efetiva` por padrão (`p_incluir_sem_troca` nos três = select **"Todo o parque de HDs"** no cabeçalho, 2026-10-29). **Filtro por idade (2026-10-29, sw v300):** painel histograma **Idade do medidor** (seleção múltipla por coluna **ou** intervalo de/até) → `p_idades int[]` (30 = 30+, -1 = sem idade) / `p_idade_min`/`p_idade_max` nas 3 RPCs; `_resumo` devolve `por_idade` + `idade_media`. `app_nrw_hd_rebuild` e `_rebuild_chunk` patcheados. **Situação da ligação (2026-10-22):** `situacao_lig` (filtro ativa/inativa + remanejamento) passou a vir de **`"0 - vitrine_gis".vw_gis_micromedicao_atual.situacao_ligacao`** (último mês da micromedição; `"3 - comercial".ligacoes` só fallback) — o cadastro divergia em 22% (28,6k matrículas). Mesmo ancoramento na view na Fiscalização (`app_nrw_fraude_ranking/_detalhe`, lá sem impacto: já usava o último mês via `mm_matricula_stats.situacao_atual`).
+
+**HD × SIGOS (2026-11-09, banco — migração `hd_sigos`, `docs/migracao_hd_sigos.sql`):** helper interno `hd_sigos_situacao()` (plpgsql — não inlinar; sem grant) dá por matrícula a situação da OS de troca de HD (códigos da `hd_calibre` sem espaço ou `SUBST.HIDROMETRO%`): `trocado` (EXECUTADA/`(E)`/motivo S89) › status da carteira NP/PR/RE/PE/AV/BL/N/OUT › `nao_exec` › `sem`; `oculto` = trocado depois de `hd_cadastro.importado_em`. `app_nrw_hd_resumo/_mapa/_ranking` ganharam `p_sigos text[]`, `p_sigos_col`, `p_mostrar_trocados` (default false → **trocados somem da lista por padrão**); `_resumo` + `por_sigos`/`n_trocados_ocultos`/`sigos_por_categoria`/`por_sigos_col`; `_detalhe` + `sigos.hist`; novo `app_nrw_hd_sigos_diverg` (fora_cadastro/sem_troca_recomendada/calibre_diferente). Detalhe em MODULOS §11 (Priorização de HD › Vínculo SIGOS). **Tela (sw v341):** painel *Situação no SIGOS* (barras multi-seleção, Mostrar já trocados, colaborador, P1–P5, ⚠️ Divergências c/ export), cor do mapa por situação, coluna SIGOS na lista, bloco de OS no detalhe e +13 colunas no export. **Acesso (2026-11-09, migração `hd_acesso_aux`):** RPCs de leitura do HD liberadas p/ **admin | dev_acesso | aux_acesso** (programador entra pelo Auxiliar); salvar premissas/rebuild seguem admin|dev.
 
 **Vitrine (TV)** (`vitrine`, home › 🚧 Em desenvolvimento — gate `dev_acesso` pela engrenagem da categoria, no card e na RPC; apresentação em loop de atividades de campo + indicadores, ao vivo via `app_vitrine_dados`; ver docs/MODULOS.md §17). **Avisos** (`avisos`, **admin-only**, home › 🚧 Em desenvolvimento (card só p/ admin, sem `dev_acesso`) — avisos genéricos: pop-up + lembretes push para um público montado por consórcio/função/cargo/pessoas/condição, modo de exibição (sempre/1x por dia/1x só/"Li e entendi") com registro de quem viu, botão p/ qualquer tela ou link externo; job único `aviso-lembretes` a cada 15 min; ver docs/MODULOS.md §19). **Telemetria (CCO)** (`telemetria`, **admin-only**, home › 🚧 Em desenvolvimento — schema `15 - telemetria`) — importa os
 CSVs exportados do sistema CCO da COPASA (vazão/volume macro, nível reservatório, bombas/pressão booster),
