@@ -3748,6 +3748,8 @@ cada colaborador.
   (clicar filtra o grupo) e visitas realizadas; barra de progresso com o **% recadastrado** e o % que já teve OS.
 - **Filtros:** ZA, colaborador, visitas (0/1/2/3+), busca por matrícula ou nº da OS (1 resultado → centraliza e abre o
   popup) e chips de status (vários). O polígono/retângulo (Leaflet.draw) muda o universo.
+- **Layout (sw v337):** no desktop a tela usa a largura toda da janela (sem a coluna de 1040 px das outras telas) e o mapa
+  ocupa quase a altura da janela.
 - **Mapa:** camada canvas própria (mesma técnica da Situação dos Imóveis); sem OS = ponto cinza pequeno, por baixo;
   recadastradas por cima. Clique abre o popup com todas as OS da matrícula e "🧭 Navegar".
 - **Por colaborador:** tabela (matrículas, programadas/recebidas, não programadas, pendentes, agend. vencido, não executadas,
