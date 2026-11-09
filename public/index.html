@@ -1035,6 +1035,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="pavprog"><div class="ic">🧱</div><div class="nm">Pavimentos a recompor</div></button>
     </div>
 
+    <div class="sec" style="margin-top:20px">📋 RDO</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="rdo"><div class="ic">📋</div><div class="nm">RDO diário</div></button>
+    </div>
+
     <div class="sec" style="margin-top:20px">📥 Relatórios SIGOS</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="sigos_abertas"><div class="ic">🗺️</div><div class="nm">OS não executadas</div></button>
@@ -1214,6 +1219,20 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="svChips" class="oachips"></div>
     <div class="oabar"><div id="svResumo" class="sub" style="margin:0"></div><button type="button" class="btn" id="svCsv" style="width:auto">⬇️ Exportar CSV</button></div>
     <div id="svLista"><p class="sub">Carregando…</p></div>
+  </main>
+
+  <main id="rdo" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>RDO diário</h1>
+    <p class="sub">O que foi <b>executado</b> ou está <b>em andamento</b> em cada dia, juntando as OS do SIGOS e o que foi lançado no AcquaHub.
+      O texto sai pronto como rascunho; revise (editar, ocultar, acrescentar linha) e <b>feche o dia</b>. Se chegar relatório SIGOS depois e mudar o dia, ele aparece como <b>desatualizado</b>.</p>
+    <div class="rdotop">
+      <select id="rdoZa"><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
+      <div class="rdonav"><button type="button" id="rdoPrev">‹</button><b id="rdoMesTit"></b><button type="button" id="rdoNext">›</button></div>
+    </div>
+    <div class="rdocal" id="rdoCal"></div>
+    <div class="rdoleg"><span><i style="background:var(--line)"></i>Sem registro</span><span><i style="background:#f59e0b"></i>Rascunho</span><span><i style="background:var(--ok)"></i>Fechado</span><span><i style="background:var(--bad)"></i>Desatualizado</span><span>⏳ SIGOS ainda não chegou</span></div>
+    <div id="rdoDia"></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2149,7 +2168,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
@@ -2182,6 +2201,7 @@ function irPara(id){
   if(id==='sigos_carga') sgcInit();
   if(id==='sigos_abertas') oaInit();
   if(id==='sigos_vinculo') svInit();
+  if(id==='rdo') rdoInit();
   if(id==='recad_prog') rcInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
@@ -7360,6 +7380,198 @@ function svCsv(){
   try{ const u=URL.createObjectURL(new Blob(['﻿'+cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n'],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
     a.download='vinculos_os_sigos_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
     toast(vis.length+' OS exportadas.'); }catch(e){ toast('Não consegui gerar o CSV'); }
+}
+
+// ---------- RDO DIÁRIO — Auxiliar de Programação (tela rdo; docs/migracao_rdo_diario.sql, MODULOS §21.4) ----------
+// O que foi EXECUTADO ou está EM ANDAMENTO por dia × ZA: OS do SIGOS + lançamentos do AcquaHub (feed public.rdo_eventos).
+// Rascunho automático → revisão (editar/ocultar/linha manual) → Fechar o dia. Se o banco muda depois (carga SIGOS
+// atrasada, lançamento tardio) o dia fica "desatualizado" (hash das linhas automáticas ≠ do fechamento).
+const RDO_MIN='2026-09-01';
+const RDO_ST={vazio:['Sem registro','var(--line)'],rascunho:['Rascunho','#f59e0b'],fechado:['Fechado','var(--ok)'],desatualizado:['Desatualizado','var(--bad)']};
+const RDO_TIPOS=['Execução','Em andamento','Ocorrência','Pendência','Nota'];
+const RDO_DET={os:'OS',mat:'Matrícula',end:'Endereço',res:'Resultado',st:'Status',tipo:'Tipo',local:'Local',logger:'Logger',etapa:'Etapa',zona:'Zona',
+  vrp:'VRP',sit:'Situação',sigos:'OS SIGOS',item:'Item',valor:'Valor',un:'Unid.',origem:'Origem',tipos:'Tipos',gc:'GC (%)',metodo:'Método'};
+const RDO_ETAPA={inst:'instalado',rem:'removido',fin:'dados concluídos'};
+let rdoS={za:'ZA1004',mes:null,dia:null,mesDados:null,diaDados:null,abertos:new Set(),edit:null,verAtual:false};
+const rdoHoje=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+const rdoMesNome=m=>{ const s=new Date(m+'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); };
+const rdoAddMes=(m,n)=>{ const d=new Date(m+'T12:00:00'); d.setMonth(d.getMonth()+n,1); return d.toISOString().slice(0,7)+'-01'; };
+function rdoCss(){
+  if(document.getElementById('rdoCss')) return;
+  const st=document.createElement('style'); st.id='rdoCss';
+  st.textContent=`#rdo .rdotop{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+#rdo .rdotop select{flex:1 1 180px;min-width:0;font-size:14px;padding:9px 10px}
+#rdo .rdonav{display:flex;align-items:center;gap:6px;flex:1 1 220px;justify-content:space-between}
+#rdo .rdonav b{font-size:15px;text-align:center;flex:1}
+#rdo .rdonav button{font:inherit;width:auto;margin:0;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#rdo .rdonav button:disabled{opacity:.35;cursor:default}
+#rdo .rdocal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:6px 0 4px}
+#rdo .rdocal .wd{font-size:11px;color:var(--mut);text-align:center}
+#rdo .rdocal button{font:inherit;min-width:0;margin:0;padding:6px 2px 4px;border-radius:9px;border:1px solid var(--line);border-bottom:4px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:center;line-height:1.15}
+#rdo .rdocal button b{display:block;font-size:14px}
+#rdo .rdocal button span{display:block;font-size:10px;color:var(--mut);min-height:12px}
+#rdo .rdocal button.sel{outline:2px solid var(--acc);outline-offset:-1px}
+#rdo .rdocal button:disabled{opacity:.3;cursor:default}
+#rdo .rdoleg{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--mut);margin:4px 0 10px}
+#rdo .rdoleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+#rdo .rdohead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+#rdo .rdohead h2{margin:0;font-size:17px}
+#rdo .rdochip{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;color:#fff}
+#rdo .rdoaviso{font-size:12px;border-radius:10px;padding:8px 10px;margin:8px 0;background:var(--card);border:1px solid var(--line);border-left:4px solid #f59e0b}
+#rdo .rdoaviso.bad{border-left-color:var(--bad)}
+#rdo .rdorow{display:flex;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
+#rdo .rdorow.oc{opacity:.5} #rdo .rdorow.oc .d{text-decoration:line-through}
+#rdo .rdorow .n{font-weight:700;min-width:22px;color:var(--mut)}
+#rdo .rdorow .b{flex:1;min-width:0}
+#rdo .rdorow .tp{font-size:11px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+#rdo .rdorow .tp .fo{font-weight:500;text-transform:none}
+#rdo .rdorow .d{margin-top:2px}
+#rdo .rdorow .det{margin-top:6px;font-size:12px;color:var(--mut);max-height:260px;overflow:auto;border-top:1px dashed var(--line);padding-top:4px}
+#rdo .rdorow .det div{padding:2px 0;border-bottom:1px dotted var(--line)}
+#rdo .rdorow .ac{display:flex;gap:4px;align-items:flex-start}
+#rdo .rdorow .ac button{font:inherit;font-size:13px;width:auto;margin:0;padding:3px 7px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+#rdo .rdorow textarea{width:100%;min-height:70px;font:inherit;font-size:13px;margin-top:4px}
+#rdo .rdorow select{font-size:13px;padding:5px 6px;margin-top:4px}
+#rdo .rdoadd{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+#rdo .rdoadd select{flex:0 1 150px;font-size:14px;padding:8px}
+#rdo .rdoadd input{flex:1 1 220px;min-width:0;font-size:14px;padding:8px 10px}
+#rdo .rdoadd button,#rdo .rdofim button{width:auto;margin:0;padding:9px 14px;font-size:14px}
+#rdo .rdofim{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin:12px 0}`;
+  document.head.appendChild(st);
+}
+function rdoInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  rdoCss();
+  if(!rdoS.mes){ const h=rdoHoje(); rdoS.mes=(h<RDO_MIN?RDO_MIN:h).slice(0,7)+'-01'; }
+  const za=$('#rdoZa'); if(za&&!za.dataset.ready){ za.dataset.ready='1'; za.value=rdoS.za; za.onchange=()=>{ rdoS.za=za.value; rdoS.dia=null; rdoCarregarMes(); }; }
+  const pv=$('#rdoPrev'), nx=$('#rdoNext');
+  if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ rdoS.mes=rdoAddMes(rdoS.mes,-1); rdoS.dia=null; rdoCarregarMes(); }; }
+  if(nx&&!nx.dataset.ready){ nx.dataset.ready='1'; nx.onclick=()=>{ rdoS.mes=rdoAddMes(rdoS.mes,1); rdoS.dia=null; rdoCarregarMes(); }; }
+  rdoCarregarMes();
+}
+async function rdoCarregarMes(manterDia){
+  $('#rdoMesTit').textContent=rdoMesNome(rdoS.mes);
+  $('#rdoPrev').disabled=rdoS.mes<=RDO_MIN.slice(0,7)+'-01';
+  $('#rdoNext').disabled=rdoS.mes>=rdoHoje().slice(0,7)+'-01';
+  if(!manterDia){ $('#rdoCal').innerHTML='<p class="sub" style="grid-column:1/-1">Carregando…</p>'; $('#rdoDia').innerHTML=''; }
+  try{ const {data,error}=await sb.rpc('app_rdo_mes',{p_mes:rdoS.mes,p_za:rdoS.za}); if(error) throw error; rdoS.mesDados=data; }
+  catch(e){ $('#rdoCal').innerHTML='<p class="sub" style="grid-column:1/-1">Não foi possível carregar (acesso ou rede).</p>'; return; }
+  const dias=(rdoS.mesDados&&rdoS.mesDados.dias)||[];
+  if(!rdoS.dia||!dias.some(d=>d.dia===rdoS.dia)){ const c=dias.filter(d=>d.n>0); rdoS.dia=(c.length?c[c.length-1]:dias[dias.length-1]||{}).dia||null; }
+  rdoRenderCal();
+  if(rdoS.dia) rdoCarregarDia(manterDia);
+}
+function rdoRenderCal(){
+  const dias=(rdoS.mesDados&&rdoS.mesDados.dias)||[], por={}; dias.forEach(d=>por[d.dia]=d);
+  const ini=new Date(rdoS.mes+'T12:00:00'), lead=ini.getDay(), fim=new Date(ini.getFullYear(),ini.getMonth()+1,0).getDate();
+  let h=['D','S','T','Q','Q','S','S'].map(w=>'<div class="wd">'+w+'</div>').join('')+'<div></div>'.repeat(lead);
+  for(let i=1;i<=fim;i++){
+    const ds=rdoS.mes.slice(0,8)+String(i).padStart(2,'0'), d=por[ds];
+    if(!d){ h+='<button type="button" disabled><b>'+i+'</b><span></span></button>'; continue; }
+    const cor=(RDO_ST[d.status]||RDO_ST.vazio)[1];
+    h+='<button type="button" data-rdodia="'+ds+'" class="'+(ds===rdoS.dia?'sel':'')+'" style="border-bottom-color:'+cor+'" title="'+(RDO_ST[d.status]||[''])[0]+'">'
+      +'<b>'+i+'</b><span>'+(d.n?d.n+(d.sigos==='aguardando'?' ⏳':''):(d.sigos==='aguardando'?'⏳':''))+'</span></button>';
+  }
+  $('#rdoCal').innerHTML=h;
+  $('#rdoCal').querySelectorAll('[data-rdodia]').forEach(b=>b.onclick=()=>{ rdoS.dia=b.dataset.rdodia; rdoS.abertos.clear(); rdoS.edit=null; rdoS.verAtual=false; rdoRenderCal(); rdoCarregarDia(); });
+}
+async function rdoCarregarDia(silencioso){
+  if(!silencioso) $('#rdoDia').innerHTML='<p class="sub">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_rdo_dia',{p_dia:rdoS.dia,p_za:rdoS.za}); if(error) throw error; rdoS.diaDados=data; }
+  catch(e){ $('#rdoDia').innerHTML='<p class="sub">Não foi possível carregar o dia.</p>'; return; }
+  rdoRenderDia();
+}
+function rdoDetHtml(det){
+  if(!Array.isArray(det)||!det.length) return '';
+  return '<div class="det">'+det.map(o=>'<div>'+Object.entries(o||{}).filter(([k,v])=>v!=null&&v!=='')
+      .map(([k,v])=>'<b>'+vEsc(RDO_DET[k]||k)+':</b> '+vEsc(k==='etapa'?(RDO_ETAPA[v]||v):v)).join(' · ')+'</div>').join('')+'</div>';
+}
+function rdoRenderDia(){
+  const D=rdoS.diaDados||{}, f=D.fechado, cob=D.cobertura||{};
+  const st=f?(f.desatualizado?'desatualizado':'fechado'):((D.linhas||[]).length?'rascunho':'vazio');
+  const usarSnap=!!f&&!rdoS.verAtual, linhas=usarSnap?(f.snapshot||[]):(D.linhas||[]), travado=!!f;
+  const dt=new Date(rdoS.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  let h='<div class="rdohead"><h2>'+vEsc(dt.charAt(0).toUpperCase()+dt.slice(1))+' · '+vEsc(rdoS.za)+'</h2>'
+    +'<span class="rdochip" style="background:'+RDO_ST[st][1]+(st==='vazio'?';color:var(--ink)':'')+'">'+RDO_ST[st][0]+'</span></div>';
+  if(D.sigos==='sem_base') h+='<div class="rdoaviso">Sem relatório SIGOS para este dia'+(cob.encerradas_desde?' (a base desta ZA começa em '+fmtData(cob.encerradas_desde)+')':'')+' — o RDO mostra só o que foi lançado no AcquaHub.</div>';
+  else if(D.sigos==='aguardando') h+='<div class="rdoaviso">⏳ As OS encerradas do SIGOS chegaram só até '+fmtData(cob.encerradas_ate)+'. Este dia ainda pode ganhar OS executadas quando entrar o próximo relatório.</div>';
+  if(f){
+    h+='<div class="rdoaviso'+(f.desatualizado?' bad':'')+'" style="border-left-color:'+(f.desatualizado?'var(--bad)':'var(--ok)')+'">🔒 Fechado por '+vEsc(f.por||'—')+' em '
+      +new Date(f.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'.'
+      +(f.desatualizado?' <b>O banco mudou depois do fechamento</b> (relatório SIGOS ou lançamento atrasado). Reabra, revise e feche de novo.':'')
+      +' <a href="#" data-rdover="1">'+(rdoS.verAtual?'Ver como foi fechado':'Ver versão atual')+'</a></div>';
+  }
+  let n=0;
+  const rows=linhas.map(l=>{
+    const k=l.chave||('m:'+l.id), ed=rdoS.edit===k, aberto=rdoS.abertos.has(k), temDet=Array.isArray(l.det)&&l.det.length;
+    const num=l.oculto?'–':String(++n);
+    let corpo;
+    if(ed&&!travado){
+      corpo='<select data-rdoetp>'+RDO_TIPOS.map(t=>'<option'+(t===l.tipo?' selected':'')+'>'+t+'</option>').join('')+'</select>'
+        +'<textarea data-rdoetx>'+vEsc(l.desc||'')+'</textarea>'
+        +(l.auto&&!l.manual?'<div class="sub" style="font-size:11px;margin:2px 0">Texto automático: '+vEsc(l.auto)+'</div>':'')
+        +'<div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn" data-rdosalvar="'+vEsc(k)+'" style="width:auto;margin:0;padding:6px 12px">Salvar</button>'
+        +'<button type="button" class="btn ghost" data-rdocanc="1" style="width:auto;margin:0;padding:6px 12px">Cancelar</button></div>';
+    } else {
+      corpo='<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'');
+    }
+    const ac=travado?(temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'')
+      :((temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'')
+       +'<button type="button" data-rdoed="'+vEsc(k)+'" title="Editar">✏️</button>'
+       +(l.manual?'<button type="button" data-rdodel="'+vEsc(k)+'" title="Excluir linha">🗑️</button>'
+                 :'<button type="button" data-rdooc="'+vEsc(k)+'" title="'+(l.oculto?'Mostrar':'Ocultar')+'">'+(l.oculto?'👁️':'🚫')+'</button>'
+                  +(l.editada||l.oculto?'<button type="button" data-rdorest="'+vEsc(k)+'" title="Voltar ao automático">↺</button>':'')));
+    return '<div class="rdorow'+(l.oculto?' oc':'')+'"><div class="n">'+num+'</div><div class="b"><div class="tp">'+vEsc(l.tipo)+' · <span class="fo">'+vEsc(l.fonte||'')
+      +(l.editada?' · revisado':'')+(l.oculto?' · oculto':'')+'</span></div>'+corpo+'</div><div class="ac">'+ac+'</div></div>';
+  }).join('');
+  h+=rows||'<p class="sub">Nada executado ou em andamento registrado neste dia.</p>';
+  if(!travado){
+    h+='<div class="rdoadd"><select id="rdoNovoTp">'+RDO_TIPOS.map(t=>'<option'+(t==='Nota'?' selected':'')+'>'+t+'</option>').join('')+'</select>'
+      +'<input id="rdoNovoTx" placeholder="Acrescentar linha (ex.: serviço sem lançamento no app)"/><button type="button" class="btn ghost" id="rdoNovoBt">➕ Adicionar</button></div>';
+  }
+  h+='<div class="rdofim"><span class="sub" style="margin:0">'+n+' linha'+(n===1?'':'s')+' no RDO'+(usarSnap?' (como foi fechado)':'')+'</span>'
+    +(travado?'<button type="button" class="btn ghost" id="rdoReabrir">🔓 Reabrir o dia</button>':'<button type="button" class="btn" id="rdoFechar">🔒 Fechar o dia</button>')+'</div>';
+  const box=$('#rdoDia'); box.innerHTML=h;
+  const L=k=>linhas.find(l=>(l.chave||('m:'+l.id))===k);
+  const v=box.querySelector('[data-rdover]'); if(v) v.onclick=e=>{ e.preventDefault(); rdoS.verAtual=!rdoS.verAtual; rdoRenderDia(); };
+  box.querySelectorAll('[data-rdoabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.rdoabre; rdoS.abertos.has(k)?rdoS.abertos.delete(k):rdoS.abertos.add(k); rdoRenderDia(); });
+  box.querySelectorAll('[data-rdoed]').forEach(b=>b.onclick=()=>{ rdoS.edit=b.dataset.rdoed; rdoRenderDia(); const t=box.querySelector('[data-rdoetx]'); if(t) t.focus(); });
+  box.querySelectorAll('[data-rdocanc]').forEach(b=>b.onclick=()=>{ rdoS.edit=null; rdoRenderDia(); });
+  box.querySelectorAll('[data-rdosalvar]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdosalvar); if(!l) return;
+    const tx=box.querySelector('[data-rdoetx]').value.trim(), tp=box.querySelector('[data-rdoetp]').value;
+    if(!tx){ toast('Escreva a descrição.'); return; }
+    rdoSalvar(l,{tipo:tp,desc:(!l.manual&&tx===l.auto)?null:tx,oculto:l.oculto}); });
+  box.querySelectorAll('[data-rdooc]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdooc); if(l) rdoSalvar(l,{tipo:l.tipo,desc:l.editada?l.desc:null,oculto:!l.oculto}); });
+  box.querySelectorAll('[data-rdorest]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdorest); if(l) rdoExcluir(l); });
+  box.querySelectorAll('[data-rdodel]').forEach(b=>b.onclick=()=>{ const l=L(b.dataset.rdodel); if(l&&confirm('Excluir esta linha do RDO?')) rdoExcluir(l); });
+  const nb=$('#rdoNovoBt'); if(nb) nb.onclick=()=>{ const tx=$('#rdoNovoTx').value.trim(); if(!tx){ toast('Escreva a linha.'); return; } rdoSalvar(null,{tipo:$('#rdoNovoTp').value,desc:tx,oculto:false}); };
+  const fe=$('#rdoFechar'); if(fe) fe.onclick=rdoFechar;
+  const ra=$('#rdoReabrir'); if(ra) ra.onclick=rdoReabrir;
+}
+async function rdoSalvar(l,o){
+  try{ const {error}=await sb.rpc('app_rdo_item_salvar',{p_dia:rdoS.dia,p_za:rdoS.za,p_chave:l&&l.chave||null,p_id:l&&l.manual?l.id:null,
+         p_tipo:o.tipo,p_descricao:o.desc,p_oculto:!!o.oculto}); if(error) throw error; }
+  catch(e){ toast('Não salvou: '+(e.message||'erro')); return; }
+  rdoS.edit=null; rdoCarregarMes(true);
+}
+async function rdoExcluir(l){
+  try{ const {error}=await sb.rpc('app_rdo_item_excluir',{p_dia:rdoS.dia,p_za:rdoS.za,p_chave:l.manual?null:l.chave,p_id:l.manual?l.id:null}); if(error) throw error; }
+  catch(e){ toast('Não excluiu: '+(e.message||'erro')); return; }
+  rdoCarregarMes(true);
+}
+async function rdoFechar(){
+  const D=rdoS.diaDados||{};
+  const msg=D.sigos==='aguardando'?'O SIGOS deste dia ainda não chegou por completo. Fechar mesmo assim? (o dia fica "desatualizado" se o relatório mudar algo)':'Fechar o RDO deste dia? Depois disso só reabrindo para editar.';
+  if(!confirm(msg)) return;
+  try{ const {error}=await sb.rpc('app_rdo_fechar',{p_dia:rdoS.dia,p_za:rdoS.za}); if(error) throw error; }
+  catch(e){ toast('Não fechou: '+(e.message||'erro')); return; }
+  toast('Dia fechado.'); rdoS.verAtual=false; rdoCarregarMes(true);
+}
+async function rdoReabrir(){
+  if(!confirm('Reabrir o dia para revisão? O fechamento atual é descartado.')) return;
+  try{ const {error}=await sb.rpc('app_rdo_reabrir',{p_dia:rdoS.dia,p_za:rdoS.za}); if(error) throw error; }
+  catch(e){ toast('Não reabriu: '+(e.message||'erro')); return; }
+  rdoS.verAtual=false; rdoCarregarMes(true);
 }
 
 // ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
