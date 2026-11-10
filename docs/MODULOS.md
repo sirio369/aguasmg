@@ -3326,7 +3326,7 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   família) · **Executado no mês** · **Por dia** (30 dias) · **Onde executamos** (2 mapas, cor = família, aro branco = com
   foto) · **Situação agora** (em aberto/vencidos, loggers em campo, frota, manutenções, pendências VRP, solicitações/ocorrências
   sem OS, km de rede pesquisados) · **Em aberto** · **Quem mais executou** · por dia: mapa + famílias + linha do tempo de
-  todos os serviços, RDO do dia e as fotos. Saíram o slide "No mês até agora" do app (coberto pelas famílias) e "Usuários
+  todos os serviços, RDO do dia e até 6 fotos espalhadas pelo dia — só dias desde "desde" (sem nada no período, os últimos 7 dias). Saíram o slide "No mês até agora" do app (coberto pelas famílias) e "Usuários
   ativos". `app_vitrine_dados`/`app_vitrine_sigos` seguem no banco só para app em cache (≤ v345) — podem ser dropadas depois.
 - *(histórico)* **SIGOS na Vitrine (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):** slides próprios do SIGOS
   (`app_vitrine_sigos`) ao lado dos do AcquaHub (`app_vitrine_dados`) — substituídos pela versão unificada acima.

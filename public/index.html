@@ -14614,7 +14614,7 @@ function vtMontar(d, rdo){
     const s={el,dur,onShow:()=>{ vtAjustaTl(el); if(!lista.length) return; const boxes=el.querySelectorAll('.vt-map');
       lista.forEach((mm,i)=>{ if(!ms[i]&&boxes[i]) ms[i]=vtMapa(boxes[i],mm.pts||[],mm.zoom); }); setTimeout(()=>ms.forEach(x=>x&&x.invalidateSize()),50); }}; vtSlides.push(s); };
   const IT=(d.itens||[]).map(e=>{ const q=new Date(e.dia+'T12:00:00');
-    return {...e,diaLbl:VT_DIAS[q.getDay()]+' '+vtFmtD(e.dia),cons:VT_CONS[e.za]||'',quem:e.quem||'',d:e.d||'',fotos:(e.fotos||[]).map(f=>SBASE+f)}; });
+    return {...e,s:e.s?e.s[0].toUpperCase()+e.s.slice(1):'',diaLbl:VT_DIAS[q.getDay()]+' '+vtFmtD(e.dia),cons:VT_CONS[e.za]||'',quem:e.quem||'',d:e.d||'',fotos:(e.fotos||[]).map(f=>SBASE+f)}; });
   const I=d.ind||{}, gerado=d.gerado||'', desde=String(d.desde||'').slice(0,10), mes=String(d.mes||'').slice(0,10);
   const cob=d.cobertura||{}, encAte=['ZA1004','ZA0200'].map(z=>cob[z]&&cob[z].encerradas_ate).filter(Boolean).sort()[0];
   $('#vtFonte').textContent='Atualizado '+gerado+(encAte?' · OS encerradas carregadas até '+vtFmtD(String(encAte).slice(0,10)):'')+' · recarrega a cada volta';
@@ -14645,9 +14645,9 @@ function vtMontar(d, rdo){
     ${vtKpi(num(I.pesq_km_rede),'Km de rede pesquisados no mês',vtCor('Pesquisa de vazamento'),`${num(I.pesq_km_andado)} km andados`)}</div>`, 16000);
   if((d.carteira||[]).length) add(vtCarteira(d), 16000);
   if((d.quem_mes||[]).length) add(vtQuem(d), 14000);
-  // por dia: mapa + famílias + linha do tempo, depois o RDO do dia e as fotos
+  // por dia (desde "desde"; sem nada no período, os últimos 7 dias): mapa + famílias + linha do tempo, RDO do dia e até 6 fotos
   const RD={}; ((rdo&&rdo.dias)||[]).forEach(r=>{ (RD[r.dia]=RD[r.dia]||{})[r.za]=r; });
-  [...new Set([...IT.map(e=>e.dia),...Object.keys(RD)])].sort().forEach(x=>{ const its=IT.filter(e=>e.dia===x);
+  [...new Set([...IT.map(e=>e.dia),...Object.keys(RD)])].filter(x=>x>=desdeMapa).sort().forEach(x=>{ const its=IT.filter(e=>e.dia===x);
     const q=new Date(x+'T12:00:00'), lbl=VT_DIAS[q.getDay()]+' '+vtFmtD(x);
     if(its.length){
       const cnt={}; its.forEach(e=>cnt[e.f]=(cnt[e.f]||0)+1); const fs=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
@@ -14659,7 +14659,8 @@ function vtMontar(d, rdo){
        14000, [{pts:its}]);
     }
     if(RD[x]) add(vtRdoSlide(x,RD[x]), 16000);
-    its.filter(e=>e.fotos.length).forEach(e=>{
+    const comFoto=its.filter(e=>e.fotos.length), passo=Math.max(1,comFoto.length/6);   // até 6, espalhadas pelo dia
+    comFoto.filter((e,i)=>comFoto.length<=6||Math.floor(i/passo)!==Math.floor((i-1)/passo)).slice(0,6).forEach(e=>{
       add(`<div class="vt-top"><div><div class="vt-brand">${lbl}${e.h?' · '+e.h:''}</div><h1>${vtEsc(e.s)}</h1></div><div class="vt-sub">${vtEsc(e.cons)}</div></div>
        <div class="vt-photo"><div class="vt-pics n${e.fotos.length}">${e.fotos.map(f=>`<img src="${vtEsc(f)}" alt="">`).join('')}</div>
         <div class="vt-info"><span><span class="vt-tag" style="--k:${vtCor(e.f)}">${vtEsc(e.f)}</span></span>
