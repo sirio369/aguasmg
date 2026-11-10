@@ -3942,6 +3942,9 @@ gerada). Linha sem nenhuma executada no dia sai com tipo **Pendência** (chave c
   REGISTRO EXT)", nome curto = `sigos_servico_curto`) e o detalhe de cada OS traz serviço e equipe.
   **2026-11-10:** família **"Mobilização social"** (732 79 00 TRABALHO MOB.SOCIAL…, gerência GNDS; ordem 78; nome "trabalho de
   mobilização social") — `docs/migracao_sigos_familia_mobilizacao.sql`, aplicada.
+  **2026-11-10:** VISTORIA DE IMOVEL (676 79 00 = fiscalização de fraudes, PDF v3.6) deixou de ser família própria e entra em
+  **"Fiscalização de irregularidade"** (mesmo arquivo, migração `sigos_vistoria_em_fiscalizacao`); o detalhe separa por código.
+  A cor `'Vistoria de imóvel'` em `VT_F_COR` (Vitrine) ficou sem uso.
 - Ordem (`rdo_familia_ordem`): cada família do SIGOS e logo depois a linha do AcquaHub da mesma família (ex.: VRP do SIGOS →
   VRP do app; loggers do SIGOS → loggers do app).
 - **📋 Copiar RDO** copia em dois formatos no mesmo clique — **HTML** (cola formatado no Word/e-mail/Teams: título, ZA,
