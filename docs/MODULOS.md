@@ -3696,12 +3696,14 @@ Serviços de cada ZA) no mapa e montar a programação.
   e aparecem na lista, no popup do mapa e no CSV. Em 10/11/2026: 49 recomposições → 38 Igor, 10 Werneck, 1 sem origem
   (só 2 casaram pelo Gestão de Pavimento; o resto pela matrícula). Sondagem (141 79 00, "Igor · Werneck") entra no filtro
   dos dois.
-- **Tela (de cima para baixo):** filtros → **resumo** (cartões de **tempo corrido**
-  0–7 / 8–30 / 31–90 / > 90; tabela **agrupamento × faixa**, vários clicáveis). **Sem cartão nem coluna por gestor** (decisão
-  do usuário 10/11: não expor comparação entre responsáveis — a visão de cada um é só pelo filtro **Gestor**). Sem textos
-  explicativos na tela; explicação só dentro do pop-up → mapa → lista. Tudo responde aos filtros; cada painel conta sem o próprio filtro.
+- **Tela (de cima para baixo):** filtros + chips → bloco **"Resumo e gráficos"** recolhível (`<details id="oaPainel">`,
+  estado lembrado em `localStorage` `oaPainel`; fechado não calcula os gráficos) → mapa → lista. No bloco: 3 cartões
+  (OS em aberto · **% fora do prazo** = vencidas ÷ total · **tempo médio de abertura** = hoje − abertura, em dias) e 4 gráficos
+  de barras (`oaGrafRender`): **status SIGOS, categoria, gestor, agrupamento** — cada barra com quantidade e % fora do prazo;
+  clique filtra (agrupamento soma vários); cada gráfico conta sem o próprio filtro. Os cartões de faixa (0–7/8–30/…) e a
+  tabela agrupamento × faixa saíram (v349). Sem textos explicativos na tela; explicação só dentro do pop-up.
 - **Filtros:** ZA, **gestor**, **agrupamento** (multi), **categoria**, **código / serviço** (multi com busca por código ou
-  descrição), status SIGOS, visitas (0/1/2/3+), busca (OS, matrícula, rua, bairro).
+  descrição), status SIGOS, visitas (0/1/2/3+). A busca por OS/matrícula/rua saiu (v349).
 - **Pop-up "ℹ️ Códigos e responsáveis"** (botão no topo e "ℹ️ Código" em cada OS, que abre já no código): abas por gestor
   (+ Compartilhados com a regra do pavimento, Igor · Werneck, Não usar, Fora do PDF), códigos por grupo do PDF com categoria,
   fluxo, agrupamento, **prazo** e OS em aberto/vencidas; subcódigos de piso recolhidos sob o código-mãe; busca em todas as
