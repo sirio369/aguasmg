@@ -33,3 +33,18 @@ begin
     execute n;
   end if;
 end $mig$;
+
+-- Parte 2 (2026-11-10, migração `sigos_vistoria_em_fiscalizacao`, APLICADA): VISTORIA DE IMOVEL (676 79 00 = fiscalização de
+-- fraudes) entra na família "Fiscalização de irregularidade" (antes: família própria "Vistoria de imóvel").
+do $mig$
+declare d text; n text;
+begin
+  d := pg_get_functiondef('public.sigos_servico_grupo(text)'::regprocedure);
+  n := replace(d, $x$when p_desc ~* '^VISTORIA DE IMOVEL' then 'Vistoria de imóvel'$x$,
+                  $x$when p_desc ~* '^VISTORIA DE IMOVEL' then 'Fiscalização de irregularidade'   -- 676 79 00 = fiscalização de fraudes (2026-11-10)$x$);
+  if n = d then
+    if d ~ 'VISTORIA DE IMOVEL'' then ''Fiscaliza' then return; end if;
+    raise exception 'âncora não encontrada em sigos_servico_grupo';
+  end if;
+  execute n;
+end $mig$;
