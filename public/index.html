@@ -1156,18 +1156,28 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="sigos_abertas" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
-    <h1>OS não executadas</h1>
-    <p class="sub" id="oaSub">Carregando a carteira…</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h1 style="margin:0">OS não executadas</h1>
+      <button type="button" class="btn ghost" id="oaCodBtn" style="width:auto;margin:0;padding:8px 13px;font-size:14px">ℹ️ Códigos e responsáveis</button>
+    </div>
+    <p class="sub" id="oaSub">Carregando…</p>
     <div id="oaGeo" class="oageo hidden"></div>
-    <div id="oaCards" class="oacards"></div>
     <div class="oafilt">
       <select id="oaZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
-      <select id="oaCls"><option value="">Todas as classificações</option></select>
+      <select id="oaGest"><option value="">Todos os gestores</option></select>
+      <div class="msdd" id="oaFamDd"><button type="button" class="msdd-btn" id="oaFamBtn">Agrupamento ▾</button><div class="msdd-panel hidden" id="oaFamPanel"></div></div>
+      <select id="oaCat"><option value="">Todas as categorias</option></select>
+      <div class="msdd" id="oaCodDd"><button type="button" class="msdd-btn" id="oaCodFBtn">Código / serviço ▾</button><div class="msdd-panel hidden" id="oaCodPanel"></div></div>
       <select id="oaSt"><option value="">Todos os status SIGOS</option></select>
       <select id="oaVis"><option value="">Visitas: todas</option><option value="0">Sem visita</option><option value="1">1 visita</option><option value="2">2 visitas</option><option value="3">3 ou mais</option></select>
       <input type="search" id="oaQ" placeholder="Buscar OS, matrícula, rua ou bairro"/>
     </div>
     <div id="oaChips" class="oachips"></div>
+    <div class="sec" style="margin-top:10px">Resumo</div>
+    <div id="oaCards" class="oacards"></div>
+    <div id="oaAtiv" style="margin-top:8px"></div>
+    <div class="sec" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Mapa
+      <select id="oaCorModo" style="font-size:13px;padding:6px 8px;width:auto"><option value="tempo">Cor: tempo corrido</option><option value="gest">Cor: gestor</option><option value="fam">Cor: agrupamento</option></select></div>
     <div id="oaMapa"></div>
     <div class="oabar">
       <div id="oaResumo" class="sub" style="margin:0"></div>
@@ -1177,10 +1187,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
         <button type="button" class="btn" id="oaCsv">⬇️ Exportar CSV</button>
       </div>
     </div>
-    <div class="sec" style="margin-top:14px">Por atividade</div>
-    <div id="oaAtiv" style="margin-top:8px"></div>
-    <div class="sec" style="margin-top:18px">Ordens de serviço <span style="font-weight:400;color:var(--mut)">(mais antigas primeiro)</span></div>
+    <div class="sec" style="margin-top:18px">Ordens de serviço</div>
     <div id="oaLista" style="margin-top:8px"></div>
+    <div id="oaCodOv" class="oacodov hidden"><div class="oacodbox" role="dialog" aria-label="Códigos e responsáveis">
+      <div class="oacodhd"><b>Códigos de serviço e responsáveis</b><button type="button" id="oaCodX" aria-label="Fechar">✕</button></div>
+      <div id="oaCodBody" class="oacodbd"><p class="sub">Carregando…</p></div></div></div>
   </main>
 
   <main id="recad_prog" class="hidden">
@@ -7767,12 +7778,27 @@ async function rdoReabrir(z){
 // (docs/migracao_sigos_abertas.sql, MODULOS §21.1). Uma RPC traz a carteira inteira (≈3,3 mil OS) e
 // filtros/polígono/CSV rodam no app. Ponto: cadastro (matrícula) > manual > OpenStreetMap (consultado pelo
 // navegador, em laço enquanto a tela está aberta). Sem ponto → "Sem localização".
-let oaDados=[], oaCart={}, oaMap=null, oaPtsLayer=null, oaDrawn=null, oaPoly=null, oaPin=null, oaGeoBusy=false, oaLimite=150;
-const oaF={za:'',cls:'',st:'',vis:'',q:'',ativ:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
+// Classificação pelo CÓDIGO (docs/migracao_sigos_codigos.sql, PDF "Gestão de OS" v3.6): gestor, agrupamento (= família da
+// Vitrine/RDO), categoria e fluxo. A "classificação" que vem do SIGOS não é usada (decisão do usuário, 10/11/2026).
+// Códigos compartilhados (pavimento, manobras) recebem o gestor pela origem: Gestão de Pavimento › OS de origem › matrícula.
+let oaDados=[], oaCart={}, oaMap=null, oaPtsLayer=null, oaDrawn=null, oaPoly=null, oaPin=null, oaGeoBusy=false, oaLimite=150, oaLegenda=null;
+const oaF={za:'',gest:'',cat:'',st:'',vis:'',q:'',fam:new Set(),cods:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
+let oaCorModo='tempo', oaCodigos=null;
 const OA_FAIXAS=[['f1','0–7 dias','#1a7f4b'],['f2','8–30 dias','#d49b00'],['f3','31–90 dias','#ea6a12'],['f4','> 90 dias','#b3261e']];
 const OA_PRAZOS=[['vencida','Vencidas'],['vence7','Vencem em 7 dias'],['prazo','No prazo'],['sem','Sem prazo']];
+const OA_GEST=['Werneck','Igor','Yasmin','Compartilhado','—','Sem cadastro'];
+const OA_GEST_COR={Werneck:'#2563eb',Igor:'#ea580c',Yasmin:'#9333ea',Compartilhado:'#64748b','Igor · Werneck':'#0d9488','—':'#94a3b8','Sem cadastro':'#94a3b8'};
+const OA_GEST_SUB={Werneck:'Equipamentos, loggers e vazamentos',Igor:'Redes e ramais',Yasmin:'Hidrômetro, cadastro, fraudes e social',
+  Compartilhado:'sem origem identificada','—':'códigos "não usar"','Sem cadastro':'código fora do PDF'};
+const OA_CAT={escopo_rma:'Escopo mínimo · com remuneração (RMA)',escopo_sem_rem:'Escopo mínimo · sem remuneração própria',suporte:'Suporte (não conta na produção)',nao_usar:'Não usar',sem_cadastro:'Fora do PDF'};
+const OA_CAT_CURTO={escopo_rma:'com RMA',escopo_sem_rem:'sem remuneração',suporte:'suporte',nao_usar:'não usar',sem_cadastro:'fora do PDF'};
+const OA_FAM_COR=f=>(typeof VT_F_COR!=='undefined'&&VT_F_COR[f])||({'Ligação de água':'#0ea5e9','Instalação de registro':'#a16207','Macromedidor':'#4f46e5','Mobilização social':'#db2777','DMC':'#0891b2'})[f]||'#94a3b8';
+const oaCodFmt=c=>c&&c.length===7?c.slice(0,3)+' '+c.slice(3,5)+' '+c.slice(5):(c||'sem código');
 const oaFaixa=o=>{ const d=o.idade??0; return d<=7?'f1':d<=30?'f2':d<=90?'f3':'f4'; };
-const oaCor=o=>(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[2]||'#888';
+const oaCorTempo=o=>(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[2]||'#888';
+const oaCor=o=>oaCorModo==='gest'?(OA_GEST_COR[o.gest]||'#94a3b8'):oaCorModo==='fam'?OA_FAM_COR(o.fam):oaCorTempo(o);
+// "Igor · Werneck" (sondagem) entra no filtro dos dois
+const oaGestDe=o=>o.gest==='Igor · Werneck'?['Igor','Werneck']:[o.gest||'Sem cadastro'];
 function oaPrazo(o){
   if(!o.lim) return 'sem';
   const t=new Date(o.lim).getTime(), now=Date.now();
@@ -7783,15 +7809,33 @@ const oaN=n=>Number(n||0).toLocaleString('pt-BR');
 function oaCss(){
   if(document.getElementById('oaCss')) return;
   const st=document.createElement('style'); st.id='oaCss';
-  st.textContent=`#sigos_abertas .oacards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0}
+  st.textContent=`#sigos_abertas .oacards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:8px 0}
+#sigos_abertas .oagcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0}
 @media(max-width:640px){#sigos_abertas .oacards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 #sigos_abertas .oacard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;font:inherit;color:inherit;cursor:pointer;min-width:0}
 #sigos_abertas .oacard b{display:block;font-size:22px;line-height:1.1}
 #sigos_abertas .oacard span{font-size:12px;color:var(--mut)}
 #sigos_abertas .oacard.on{outline:2px solid var(--acc);outline-offset:-2px}
 #sigos_abertas .oacard i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
-#sigos_abertas .oafilt{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
-#sigos_abertas .oafilt select,#sigos_abertas .oafilt input[type=search]{flex:1 1 150px;min-width:0;font-size:14px;padding:9px 10px}
+#sigos_abertas .oagcard{border-top:4px solid var(--k)}
+#sigos_abertas .oagcard .nm{font-weight:700;font-size:14px;display:block}
+#sigos_abertas .oagcard .mt{font-size:12px;color:var(--mut);display:block;margin-top:3px}
+#sigos_abertas .oagcard .vc{color:var(--bad)}
+#sigos_abertas .oafilt{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:8px 0;align-items:stretch}
+#sigos_abertas .oafilt select,#sigos_abertas .oafilt input[type=search]{width:100%;min-width:0;margin:0;font-size:14px;padding:9px 10px;box-sizing:border-box}
+#sigos_abertas .oafilt input[type=search]#oaQ{grid-column:span 2}
+@media(max-width:640px){#sigos_abertas .oafilt input[type=search]#oaQ{grid-column:auto}}
+/* dropdown multi-seleção próprio (o .msdd global só é injetado pela tela do pavimento) */
+#sigos_abertas .msdd{position:relative;min-width:0}
+#sigos_abertas .msdd-btn{width:100%;height:100%;box-sizing:border-box;margin:0;font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sigos_abertas .msdd-panel{position:absolute;z-index:600;top:calc(100% + 4px);left:0;min-width:320px;max-width:min(560px,92vw);max-height:360px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
+#sigos_abertas .msdd-panel.hidden{display:none}
+#sigos_abertas .msdd-opt{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:8px;cursor:pointer;font-size:13.5px;margin:0;font-weight:400}
+#sigos_abertas .msdd-opt:hover{background:rgba(127,127,127,.12)}
+#sigos_abertas .msdd-opt input{width:17px;height:17px;margin:0;flex:0 0 auto}
+#sigos_abertas .msdd-opt i{flex:0 0 auto}
+#sigos_abertas .msdd-opt small{color:var(--mut);margin-left:auto;padding-left:8px}
+#sigos_abertas .oams-q{width:100%;box-sizing:border-box;font-size:14px;padding:8px 9px;margin:0 0 4px}
 #sigos_abertas .oachips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 #sigos_abertas .oachip{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 #sigos_abertas .oachip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
@@ -7807,22 +7851,61 @@ function oaCss(){
 #sigos_abertas .oatab th:first-child,#sigos_abertas .oatab td:first-child{text-align:left;white-space:normal}
 #sigos_abertas .oatab tr.on td{background:var(--ok-bg)}
 #sigos_abertas .oatab tbody tr{cursor:pointer}
+#sigos_abertas .oatab td i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+#sigos_abertas .oatab .gs{color:var(--mut);font-size:12px}
 #sigos_abertas .oatabw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 8px}
 #sigos_abertas .oarow{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
 #sigos_abertas .oarow .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:600}
 #sigos_abertas .oarow .m{color:var(--mut);font-size:12px;margin-top:2px}
 #sigos_abertas .oarow .a{color:var(--bad);font-size:12px;margin-top:3px}
 #sigos_abertas .oarow .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-#sigos_abertas .oarow .acts button{font:inherit;font-size:12.5px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}`;
+#sigos_abertas .oarow .acts button{font:inherit;font-size:12.5px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+#sigos_abertas .oatag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;color:#fff;background:var(--k);margin-right:4px;vertical-align:1px}
+#sigos_abertas .oatag.lt{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.oacodov{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}
+.oacodov.hidden{display:none}
+.oacodbox{background:var(--bg);color:var(--ink);border-radius:14px;width:min(980px,100%);box-shadow:0 20px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;max-height:92vh}
+.oacodhd{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);font-size:16px}
+.oacodhd button{font:inherit;font-size:18px;background:none;border:none;color:var(--ink);cursor:pointer;padding:2px 6px}
+.oacodbd{padding:12px 16px 18px;overflow:auto;font-size:13px}
+.oacodbd .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+.oacodbd .tabs button{font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.oacodbd .tabs button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.oacodbd h3{font-size:14px;margin:14px 0 4px}
+.oacodbd .gsub{color:var(--mut);font-size:12.5px;margin:0 0 6px}
+.oacodbd table{width:100%;border-collapse:collapse;table-layout:fixed}
+.oacodbd th:nth-child(1),.oacodbd td:nth-child(1){width:86px}.oacodbd th:nth-child(3),.oacodbd td:nth-child(3){width:118px}
+.oacodbd th:nth-child(4),.oacodbd td:nth-child(4){width:44px}.oacodbd th:nth-child(5),.oacodbd td:nth-child(5){width:160px}
+.oacodbd th:nth-child(6),.oacodbd td:nth-child(6){width:112px}.oacodbd th:nth-child(7),.oacodbd td:nth-child(7){width:104px}
+.oacodbd td[colspan]{width:auto!important}
+@media(max-width:700px){.oacodbd th:nth-child(4),.oacodbd td:nth-child(4),.oacodbd th:nth-child(5),.oacodbd td:nth-child(5){display:none}}
+.oacodbd th,.oacodbd td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.oacodbd th{color:var(--mut);font-weight:600;font-size:12px;white-space:nowrap}
+.oacodbd td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.oacodbd td.c{white-space:nowrap;font-variant-numeric:tabular-nums}
+.oacodbd tr.lk{cursor:pointer} .oacodbd tr.lk:hover td{background:rgba(127,127,127,.08)}
+.oacodbd tr.sub td{font-size:12px;color:var(--mut)}
+.oacodbd .vc{color:var(--bad)}
+.oacodbd .nota{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:8px 0;line-height:1.45}
+.oacodbd .cat{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.oacodbd .cat.escopo_rma{border-color:#16a34a;color:#16a34a}.oacodbd .cat.escopo_sem_rem{border-color:#0891b2;color:#0891b2}
+.oacodbd .cat.nao_usar{border-color:var(--bad);color:var(--bad)}
+.oacodbd input[type=search]{width:100%;box-sizing:border-box;font-size:14px;padding:8px 10px}`;
   document.head.appendChild(st);
 }
 function oaInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   oaCss();
   const bind=(id,k)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(el.tagName==='INPUT'&&el.type==='search'?'input':'change',()=>{ oaF[k]=el.value.trim(); oaLimite=150; oaRender(); }); } };
-  bind('#oaZa','za'); bind('#oaCls','cls'); bind('#oaSt','st'); bind('#oaVis','vis'); bind('#oaQ','q');
+  bind('#oaZa','za'); bind('#oaGest','gest'); bind('#oaCat','cat'); bind('#oaSt','st'); bind('#oaVis','vis'); bind('#oaQ','q');
+  const cm=$('#oaCorModo'); if(cm&&!cm.dataset.ready){ cm.dataset.ready='1'; cm.onchange=()=>{ oaCorModo=cm.value; oaLegendaRender(); oaRender(); }; }
   const csv=$('#oaCsv'); if(csv&&!csv.dataset.ready){ csv.dataset.ready='1'; csv.onclick=oaCsv; }
   const lp=$('#oaLimpar'); if(lp&&!lp.dataset.ready){ lp.dataset.ready='1'; lp.onclick=oaLimparFiltros; }
+  const cb=$('#oaCodBtn'); if(cb&&!cb.dataset.ready){ cb.dataset.ready='1'; cb.onclick=()=>oaCodAbrir(); }
+  const cx=$('#oaCodX'); if(cx&&!cx.dataset.ready){ cx.dataset.ready='1'; cx.onclick=oaCodFechar;
+    $('#oaCodOv').addEventListener('click',e=>{ if(e.target.id==='oaCodOv') oaCodFechar(); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('#oaCodOv').classList.contains('hidden')) oaCodFechar(); }); }
+  oaMsBind('oaFam','fam','Agrupamento',false); oaMsBind('oaCod','cods','Código / serviço',true);
   oaMapaInit();
   oaCarregar().then(()=>oaGeoRodar());
 }
@@ -7835,21 +7918,58 @@ async function oaCarregar(){
   oaOpcoes(); oaRender();
 }
 function oaOpcoes(){
-  const cont=(k)=>{ const m=new Map(); oaDados.forEach(o=>{ const v=o[k]||''; if(v) m.set(v,(m.get(v)||0)+1); }); return [...m.entries()].sort((a,b)=>b[1]-a[1]); };
-  const fill=(id,arr,lbl)=>{ const el=$(id); if(!el) return; const cur=el.value;
-    el.innerHTML='<option value="">'+lbl+'</option>'+arr.map(([v,n])=>'<option value="'+vEsc(v)+'">'+vEsc(v)+' ('+oaN(n)+')</option>').join('');
+  const cont=(fn)=>{ const m=new Map(); oaDados.forEach(o=>{ [].concat(fn(o)).forEach(v=>{ if(v) m.set(v,(m.get(v)||0)+1); }); }); return m; };
+  const fill=(id,arr,lbl,rot)=>{ const el=$(id); if(!el) return; const cur=el.value;
+    el.innerHTML='<option value="">'+lbl+'</option>'+arr.map(([v,n])=>'<option value="'+vEsc(v)+'">'+vEsc(rot?rot(v):v)+' ('+oaN(n)+')</option>').join('');
     el.value=arr.some(a=>a[0]===cur)?cur:''; };
-  fill('#oaCls',cont('cls'),'Todas as classificações');
-  fill('#oaSt',cont('st'),'Todos os status SIGOS');
+  const g=cont(oaGestDe); fill('#oaGest',OA_GEST.filter(k=>g.has(k)).map(k=>[k,g.get(k)]),'Todos os gestores',k=>k==='—'?'Não usar (sem gestor)':k);
+  const c=cont(o=>o.cat); fill('#oaCat',Object.keys(OA_CAT).filter(k=>c.has(k)).map(k=>[k,c.get(k)]),'Todas as categorias',k=>OA_CAT[k]);
+  fill('#oaSt',[...cont(o=>o.st).entries()].sort((a,b)=>b[1]-a[1]),'Todos os status SIGOS');
   const sub=$('#oaSub'); if(sub){
     const dh=ts=>ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
-    sub.innerHTML='Carteira da última <b>Relação de Serviços</b> carregada — ZA1004: '+dh(oaCart.ZA1004)+' · ZA0200: '+dh(oaCart.ZA0200)+'. Desenhe um polígono no mapa para selecionar uma área.';
+    sub.innerHTML='Carteira — ZA1004: '+dh(oaCart.ZA1004)+' · ZA0200: '+dh(oaCart.ZA0200)+'';
   }
 }
-// filtros "de base" (tudo menos faixa/atividade, que são os painéis clicáveis — contam sobre a base)
-function oaBase(o){
+// dropdown multi-seleção (agrupamento / código); o de código tem busca
+function oaMsBind(pre,k,rot,busca){
+  const btn=$('#'+pre+(pre==='oaCod'?'FBtn':'Btn')), panel=$('#'+pre+'Panel'); if(!btn||btn.dataset.ready) return; btn.dataset.ready='1';
+  btn.onclick=e=>{ e.stopPropagation(); const ab=panel.classList.contains('hidden'); document.querySelectorAll('#sigos_abertas .msdd-panel').forEach(p=>p.classList.add('hidden'));
+    if(ab){ oaMsPainel(pre,k,busca); panel.style.left=''; panel.style.right=''; panel.classList.remove('hidden');
+      if(panel.getBoundingClientRect().right>window.innerWidth-8){ panel.style.left='auto'; panel.style.right='0'; }   // não cabe: alinha à direita
+      const q=panel.querySelector('.oams-q'); if(q) q.focus(); } };
+  panel.addEventListener('click',e=>e.stopPropagation());
+  document.addEventListener('click',()=>panel.classList.add('hidden'));
+  btn.dataset.rot=rot;
+}
+function oaMsOpcoes(k){
+  const base=oaDados.filter(o=>oaBase(o,k)).filter(oaNoPoly), m=new Map();
+  base.forEach(o=>{ const v=k==='fam'?o.fam:o.cod; if(!v) return; let r=m.get(v); if(!r){ r={v,n:0,lbl:k==='fam'?v:(oaCodFmt(o.cod)+' · '+(o.cdesc||o.srv||'')),cor:k==='fam'?OA_FAM_COR(v):(OA_GEST_COR[o.gest]||'#94a3b8')}; m.set(v,r); } r.n++; });
+  oaF[k].forEach(v=>{ if(!m.has(v)) m.set(v,{v,n:0,lbl:k==='fam'?v:oaCodFmt(v),cor:'#94a3b8'}); });
+  return [...m.values()].sort((a,b)=>b.n-a.n);
+}
+function oaMsPainel(pre,k,busca){
+  const panel=$('#'+pre+'Panel'), q0=(panel.querySelector('.oams-q')||{}).value||'';
+  const ops=oaMsOpcoes(k), qq=oaNorm(q0), vis=qq?ops.filter(o=>oaNorm(o.lbl+' '+o.v).includes(qq)):ops;
+  panel.innerHTML=(busca?'<input type="search" class="oams-q" placeholder="Código ou descrição (ex.: 117, hidrômetro)" value="'+vEsc(q0)+'">':'')
+    +vis.map(o=>'<label class="msdd-opt"><input type="checkbox" data-v="'+vEsc(o.v)+'" '+(oaF[k].has(o.v)?'checked':'')+'/> <i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+o.cor+'"></i> '+vEsc(o.lbl)+'<small>'+oaN(o.n)+'</small></label>').join('')
+    +(vis.length?'':'<p class="sub" style="margin:6px">Nada encontrado.</p>')
+    +'<div class="msdd-opt" data-clear style="justify-content:center;color:var(--acc);font-weight:600">Limpar seleção</div>';
+  panel.querySelectorAll('input[data-v]').forEach(c=>c.onchange=()=>{ c.checked?oaF[k].add(c.dataset.v):oaF[k].delete(c.dataset.v); oaLimite=150; oaRender(); });
+  panel.querySelector('[data-clear]').onclick=()=>{ oaF[k].clear(); oaLimite=150; oaRender(); oaMsPainel(pre,k,busca); };
+  const q=panel.querySelector('.oams-q'); if(q){ q.oninput=()=>{ const pos=q.selectionStart; oaMsPainel(pre,k,busca); const n=panel.querySelector('.oams-q'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }; }
+}
+function oaMsRotulo(){
+  const b1=$('#oaFamBtn'), b2=$('#oaCodFBtn');
+  if(b1) b1.textContent=oaF.fam.size?(oaF.fam.size===1?[...oaF.fam][0]:oaF.fam.size+' agrupamentos')+' ▾':'Agrupamento ▾';
+  if(b2) b2.textContent=oaF.cods.size?(oaF.cods.size===1?oaCodFmt([...oaF.cods][0]):oaF.cods.size+' códigos')+' ▾':'Código / serviço ▾';
+}
+// filtros "de base" (tudo menos faixa, que é painel clicável). `sem` = filtro ignorado (p/ contar as opções dele mesmo)
+function oaBase(o,sem){
   if(oaF.za&&o.za!==oaF.za) return false;
-  if(oaF.cls&&o.cls!==oaF.cls) return false;
+  if(oaF.gest&&sem!=='gest'&&!oaGestDe(o).includes(oaF.gest)) return false;
+  if(oaF.cat&&o.cat!==oaF.cat) return false;
+  if(oaF.fam.size&&sem!=='fam'&&!oaF.fam.has(o.fam)) return false;
+  if(oaF.cods.size&&sem!=='cods'&&!oaF.cods.has(o.cod)) return false;
   if(oaF.st&&o.st!==oaF.st) return false;
   if(oaF.vis){ const v=o.vis||0; if(oaF.vis==='3'?v<3:v!==+oaF.vis) return false; }
   if(oaF.prazo.size&&!oaF.prazo.has(oaPrazo(o))) return false;
@@ -7859,7 +7979,7 @@ function oaBase(o){
   if(oaF.q){ const q=oaF.q.toUpperCase(); if(!((o.n||'').includes(q)||String(o.mat||'').includes(q)||(o.end||'').toUpperCase().includes(q)||(o.bai||'').toUpperCase().includes(q))) return false; }
   return true;
 }
-const oaPassa=o=>oaBase(o)&&(!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)))&&(!oaF.ativ.size||oaF.ativ.has(o.srv));
+const oaPassa=o=>oaBase(o)&&(!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)));
 function oaNoPoly(o){
   if(!oaPoly) return true; if(o.lat==null) return false;
   const x=o.lon, y=o.lat; let dentro=false;
@@ -7868,12 +7988,12 @@ function oaNoPoly(o){
   return dentro;
 }
 function oaRender(){
-  const base=oaDados.filter(oaBase).filter(oaNoPoly);
-  const vis=base.filter(o=>(!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)))&&(!oaF.ativ.size||oaF.ativ.has(o.srv)));
-  // cards de envelhecimento (sobre a base + atividade)
-  const bA=base.filter(o=>!oaF.ativ.size||oaF.ativ.has(o.srv));
-  const nF=k=>bA.filter(o=>oaFaixa(o)===k).length;
-  $('#oaCards').innerHTML='<div class="oacard" style="cursor:default"><b>'+oaN(bA.length)+'</b><span>OS em aberto · '+oaN(bA.filter(o=>oaPrazo(o)==='vencida').length)+' vencidas</span></div>'
+  const base=oaDados.filter(o=>oaBase(o)).filter(oaNoPoly);
+  const vis=base.filter(o=>!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)));
+  const venc=a=>a.filter(o=>oaPrazo(o)==='vencida').length, med=a=>a.length?Math.round(a.reduce((s,o)=>s+(o.idade||0),0)/a.length):0;
+  // tempo corrido (sobre a base) — clique filtra
+  const nF=k=>base.filter(o=>oaFaixa(o)===k).length;
+  $('#oaCards').innerHTML='<div class="oacard" style="cursor:default"><b>'+oaN(base.length)+'</b><span>OS em aberto · <span style="color:var(--bad)">'+oaN(venc(base))+' vencidas</span></span></div>'
     +OA_FAIXAS.map(([k,l,c])=>'<button type="button" class="oacard'+(oaF.faixa.has(k)?' on':'')+'" data-f="'+k+'"><b>'+oaN(nF(k))+'</b><span><i style="background:'+c+'"></i>'+l+'</span></button>').join('');
   $('#oaCards').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ const k=b.dataset.f; oaF.faixa.has(k)?oaF.faixa.delete(k):oaF.faixa.add(k); oaLimite=150; oaRender(); });
   // chips: prazo + destaques
@@ -7884,16 +8004,18 @@ function oaRender(){
     +'<button type="button" class="oachip'+(oaF.semloc?' on':'')+'" data-x="semloc">📍 Sem localização ('+oaN(nSl)+')</button>';
   $('#oaChips').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ const k=b.dataset.p; oaF.prazo.has(k)?oaF.prazo.delete(k):oaF.prazo.add(k); oaLimite=150; oaRender(); });
   $('#oaChips').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ const k=b.dataset.x; oaF[k]=!oaF[k]; oaLimite=150; oaRender(); });
-  // tabela atividade × faixa (sobre a base + faixa) — clique filtra (várias)
-  const bF=base.filter(o=>!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)));
-  const porA=new Map(); bF.forEach(o=>{ const k=o.srv||'—'; let r=porA.get(k); if(!r){ r={t:0,f1:0,f2:0,f3:0,f4:0,v:0,id:0}; porA.set(k,r); } r.t++; r[oaFaixa(o)]++; if(oaPrazo(o)==='vencida') r.v++; r.id+=(o.idade||0); });
+  // agrupamento × tempo corrido (sobre a base sem o filtro de agrupamento) — clique filtra (vários)
+  const bF=oaDados.filter(o=>oaBase(o,'fam')).filter(oaNoPoly).filter(o=>!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)));
+  const porA=new Map(); bF.forEach(o=>{ const k=o.fam||'—'; let r=porA.get(k); if(!r){ r={t:0,f1:0,f2:0,f3:0,f4:0,v:0,id:0,g:new Map()}; porA.set(k,r); } r.t++; r[oaFaixa(o)]++; if(oaPrazo(o)==='vencida') r.v++; r.id+=(o.idade||0); r.g.set(o.gest,(r.g.get(o.gest)||0)+1); });
   const linhas=[...porA.entries()].sort((a,b)=>b[1].t-a[1].t);
-  $('#oaAtiv').innerHTML=linhas.length?'<div class="oatabw"><table class="oatab"><thead><tr><th>Atividade'+(oaF.ativ.size?' <a href="#" id="oaAtivLimpar" style="font-weight:400;color:var(--acc)">(limpar)</a>':' <span style="font-weight:400;color:var(--mut)">— clique para filtrar</span>')+'</th><th>Total</th>'
+  $('#oaAtiv').innerHTML=linhas.length?'<div class="oatabw"><table class="oatab"><thead><tr><th>Agrupamento'+(oaF.fam.size?' <a href="#" id="oaAtivLimpar" style="font-weight:400;color:var(--acc)">(limpar)</a>':'')+'</th><th>Total</th>'
     +OA_FAIXAS.map(f=>'<th title="'+f[1]+'"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+f[2]+'"></i> '+f[1].replace(' dias','')+'</th>').join('')+'<th>Vencidas</th><th>Média (dias)</th></tr></thead><tbody>'
-    +linhas.map(([k,r])=>'<tr data-a="'+vEsc(k)+'" class="'+(oaF.ativ.has(k)?'on':'')+'"><td>'+vEsc(k)+'</td><td><b>'+oaN(r.t)+'</b></td><td>'+oaN(r.f1)+'</td><td>'+oaN(r.f2)+'</td><td>'+oaN(r.f3)+'</td><td>'+oaN(r.f4)+'</td><td>'+oaN(r.v)+'</td><td>'+Math.round(r.id/r.t)+'</td></tr>').join('')
+    +linhas.map(([k,r])=>'<tr data-a="'+vEsc(k)+'" class="'+(oaF.fam.has(k)?'on':'')+'"><td><i style="background:'+OA_FAM_COR(k)+'"></i>'+vEsc(k)+'</td><td><b>'+oaN(r.t)+'</b></td><td>'+oaN(r.f1)+'</td><td>'+oaN(r.f2)+'</td><td>'+oaN(r.f3)+'</td><td>'+oaN(r.f4)+'</td><td>'+oaN(r.v)+'</td><td>'+Math.round(r.id/r.t)+'</td></tr>').join('')
     +'</tbody></table></div>':'';
-  $('#oaAtiv').querySelectorAll('tr[data-a]').forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.a; oaF.ativ.has(k)?oaF.ativ.delete(k):oaF.ativ.add(k); oaLimite=150; oaRender(); });
-  const al=$('#oaAtivLimpar'); if(al) al.onclick=(e)=>{ e.preventDefault(); oaF.ativ.clear(); oaRender(); };
+  $('#oaAtiv').querySelectorAll('tr[data-a]').forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.a; oaF.fam.has(k)?oaF.fam.delete(k):oaF.fam.add(k); oaLimite=150; oaRender(); });
+  const al=$('#oaAtivLimpar'); if(al) al.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); oaF.fam.clear(); oaRender(); };
+  oaMsRotulo();
+  ['oaFam','oaCod'].forEach(p=>{ const pn=$('#'+p+'Panel'); if(pn&&!pn.classList.contains('hidden')) oaMsPainel(p,p==='oaFam'?'fam':'cods',p==='oaCod'); });
   // barra
   const comPt=vis.filter(o=>o.lat!=null).length;
   $('#oaResumo').innerHTML='<b>'+oaN(vis.length)+'</b> OS'+(oaPoly?' <b>no polígono</b>':' no filtro')+' · '+oaN(comPt)+' no mapa'+(vis.length-comPt?' · '+oaN(vis.length-comPt)+' sem localização':'');
@@ -7902,33 +8024,95 @@ function oaRender(){
   oaLista(vis);
 }
 function oaLimparFiltros(){
-  Object.assign(oaF,{za:'',cls:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.ativ.clear(); oaF.faixa.clear(); oaF.prazo.clear();
-  ['#oaZa','#oaCls','#oaSt','#oaVis','#oaQ'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  Object.assign(oaF,{za:'',gest:'',cat:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.fam.clear(); oaF.cods.clear(); oaF.faixa.clear(); oaF.prazo.clear();
+  ['#oaZa','#oaGest','#oaCat','#oaSt','#oaVis','#oaQ'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
   oaLimite=150; oaRender();
 }
+const OA_VIA={pavimento:'pela Gestão de Pavimento',origem:'pela OS de origem do SIGOS',matricula:'por outra OS da mesma matrícula',sem_origem:'sem origem identificada'};
 function oaDescr(o){
   const pz=oaPrazo(o), lim=o.lim?fmtData(o.lim):'—';
   return { pz:pz==='vencida'?'vencida desde '+lim:pz==='vence7'?'vence em '+lim:pz==='prazo'?'prazo '+lim:'sem prazo',
     loc:o.gf==='cadastro'?'cadastro (matrícula)':o.gf==='manual'?'posicionado à mão':o.gf==='osm'?('endereço · OpenStreetMap'+(o.gp==='rua'?' (só a rua — aproximado)':'')):'sem localização',
+    gest:o.gcomp?('código compartilhado — gestor '+OA_VIA[o.gvia||'sem_origem']+(o.gref?' ('+vEsc(o.gref)+')':'')):'',
     al:[o.exec_sigos?'consta executada no SIGOS ('+vEsc(o.st)+(o.encr?', encerr. '+fmtData(o.encr):'')+')':'',
         o.enc_depois?'OS '+vEsc(o.enc_depois.os)+' encerrada na matrícula em '+fmtData(o.enc_depois.em)+' ('+vEsc(o.enc_depois.srv)+')':''].filter(Boolean) };
 }
+const oaTags=o=>'<span class="oatag" style="--k:'+(OA_GEST_COR[o.gest]||'#94a3b8')+'">'+vEsc(o.gest||'—')+'</span><span class="oatag" style="--k:'+OA_FAM_COR(o.fam)+'">'+vEsc(o.fam||'—')+'</span><span class="oatag lt">'+oaCodFmt(o.cod)+' · '+(OA_CAT_CURTO[o.cat]||'')+'</span>';
 function oaLista(vis){
   const box=$('#oaLista'); if(!box) return;
   if(!vis.length){ box.innerHTML='<p class="sub">Nenhuma OS com esses filtros.</p>'; return; }
   const arr=vis.slice(0,oaLimite);
   box.innerHTML=arr.map(o=>{ const d=oaDescr(o);
-    return '<div class="oarow" style="border-left-color:'+oaCor(o)+'" data-n="'+vEsc(o.n)+'"><div class="t"><span>'+vEsc(o.srv)+'</span><span style="color:'+oaCor(o)+'">há '+oaN(o.idade)+' dias</span></div>'
+    return '<div class="oarow" style="border-left-color:'+oaCorTempo(o)+'" data-n="'+vEsc(o.n)+'"><div class="t"><span>'+vEsc(o.srv)+'</span><span style="color:'+oaCorTempo(o)+'">há '+oaN(o.idade)+' dias</span></div>'
+      +'<div class="m" style="margin-top:4px">'+oaTags(o)+'</div>'
       +'<div class="m">OS '+vEsc(o.n)+' · '+vEsc(o.za)+' · '+vEsc(o.st||'—')+' · '+d.pz+' · '+oaN(o.vis)+' visita(s)'+(o.eq?' · equipe '+vEsc(o.eq):'')+'</div>'
       +'<div class="m">'+vEsc(o.end||'—')+(o.mat?' · matr. '+vEsc(o.mat):'')+((o.nmat||1)>1?' · <b>'+o.nmat+' OS nesta matrícula</b>':'')+'</div>'
+      +(d.gest?'<div class="m">👤 '+d.gest+'</div>':'')
       +(d.al.length?'<div class="a">⚠️ '+d.al.join(' · ')+'</div>':'')
       +'<div class="acts">'+(o.lat!=null?'<button type="button" data-ver>🗺️ Ver no mapa</button>':'')
-      +(o.gf!=='cadastro'?'<button type="button" data-pin>📍 '+(o.lat!=null?'Ajustar ponto':'Posicionar no mapa')+'</button>':'')+'</div></div>'; }).join('')
+      +(o.gf!=='cadastro'?'<button type="button" data-pin>📍 '+(o.lat!=null?'Ajustar ponto':'Posicionar no mapa')+'</button>':'')
+      +'<button type="button" data-cod>ℹ️ Código '+oaCodFmt(o.cod)+'</button></div></div>'; }).join('')
     +(vis.length>oaLimite?'<button type="button" class="btn ghost" id="oaMais">Mostrar mais ('+oaN(vis.length-oaLimite)+' restantes)</button>':'');
   box.querySelectorAll('.oarow').forEach(r=>{ const o=oaDados.find(x=>x.n===r.dataset.n); if(!o) return;
     const v=r.querySelector('[data-ver]'); if(v) v.onclick=()=>oaVer(o);
-    const p=r.querySelector('[data-pin]'); if(p) p.onclick=()=>oaPinIniciar(o); });
+    const p=r.querySelector('[data-pin]'); if(p) p.onclick=()=>oaPinIniciar(o);
+    const c=r.querySelector('[data-cod]'); if(c) c.onclick=()=>oaCodAbrir(o); });
   const m=$('#oaMais'); if(m) m.onclick=()=>{ oaLimite+=300; oaLista(vis); };
+}
+// ---- pop-up "Códigos e responsáveis" (app_sigos_codigos: todos os códigos do PDF + carteira aberta + prazo do SIGOS) ----
+let oaCodAba='Werneck', oaCodQ='', oaCodFoco=null;
+async function oaCodAbrir(o){
+  $('#oaCodOv').classList.remove('hidden'); document.body.style.overflow='hidden';
+  oaCodFoco=null;
+  if(o){ oaCodFoco=o.ccod||o.cod; const g=o.gcomp?'Compartilhado':(o.gest==='Igor · Werneck'?'Igor · Werneck':o.gest); oaCodAba=['Werneck','Igor','Yasmin','Compartilhado','Igor · Werneck','—'].includes(g)?g:'Fora'; oaCodQ=''; }
+  if(!oaCodigos){ $('#oaCodBody').innerHTML='<p class="sub">Carregando…</p>';
+    try{ const {data,error}=await sb.rpc('app_sigos_codigos'); if(error) throw error; oaCodigos=data||{codigos:[],fora:[]}; }
+    catch(e){ $('#oaCodBody').innerHTML='<p class="sub">Não foi possível carregar os códigos.</p>'; return; } }
+  oaCodRender();
+}
+function oaCodFechar(){ $('#oaCodOv').classList.add('hidden'); document.body.style.overflow=''; }
+function oaCodRender(){
+  const C=oaCodigos.codigos||[], F=oaCodigos.fora||[];
+  const abas=[['Werneck','Werneck'],['Igor','Igor'],['Yasmin','Yasmin'],['Compartilhado','Compartilhados'],['Igor · Werneck','Igor · Werneck'],['—','Não usar']].concat(F.length?[['Fora','Fora do PDF']]:[]);
+  const q=oaNorm(oaCodQ);
+  const pz=c=>c.prazo==null?'<span style="color:var(--mut)">—</span>':'<b>'+c.prazo+' dia'+(c.prazo===1?'':'s')+'</b>'+(c.prazo_min!==c.prazo_max?' <span style="color:var(--mut)">('+c.prazo_min+'–'+c.prazo_max+')</span>':'');
+  const ab=c=>c.abertas?oaN(c.abertas)+(c.vencidas?' <span class="vc">· '+oaN(c.vencidas)+' venc.</span>':''):'<span style="color:var(--mut)">0</span>';
+  const linha=(c,sub)=>'<tr class="'+(c.cod?'lk ':'')+(sub?'sub':'')+'"'+(c.cod?' data-cod="'+vEsc(c.cod)+'"':'')+(oaCodFoco&&c.cod===oaCodFoco?' style="outline:2px solid var(--acc)"':'')+'>'
+    +'<td class="c">'+oaCodFmt(c.cod)+'</td><td>'+vEsc(c.desc)+(c.obs?'<div style="color:var(--mut);font-size:11.5px">'+vEsc(c.obs)+'</div>':'')+'</td>'
+    +'<td>'+(c.cat?'<span class="cat '+c.cat+'">'+(OA_CAT_CURTO[c.cat]||'')+'</span>':'')+'</td><td>'+vEsc(c.fluxo||'—')+'</td><td>'+vEsc(c.fam||'')+'</td>'
+    +'<td class="n">'+pz(c)+'</td><td class="n">'+ab(c)+'</td></tr>';
+  const cab='<table><thead><tr><th>Código</th><th>Serviço</th><th>Categoria</th><th>Fluxo</th><th>Agrupamento</th><th style="text-align:right">Prazo (SIGOS)</th><th style="text-align:right">Em aberto</th></tr></thead><tbody>';
+  let corpo='';
+  if(q){   // busca: atravessa todas as abas
+    const hit=C.filter(c=>oaNorm((c.cod||'')+' '+oaCodFmt(c.cod)+' '+c.desc+' '+c.fam+' '+(c.gestor||'')).includes(q));
+    corpo=hit.length?cab+hit.map(c=>linha(c,!!c.mae).replace('<td>'+vEsc(c.fam||'')+'</td>','<td>'+vEsc(c.fam||'')+' · <b>'+vEsc(c.gestor||'—')+'</b></td>')).join('')+'</tbody></table>':'<p class="sub">Nenhum código encontrado.</p>';
+  } else if(oaCodAba==='Fora'){
+    corpo='<p class="gsub">Códigos que estão na carteira mas não constam do PDF v3.6 — ficam como "Sem cadastro" até entrarem na tabela.</p>'+cab
+      +F.map(f=>linha({cod:f.cod,desc:f.desc,cat:'sem_cadastro',abertas:f.abertas,vencidas:f.vencidas,prazo:f.prazo,prazo_min:f.prazo,prazo_max:f.prazo},false)).join('')+'</tbody></table>';
+  } else {
+    const cs=C.filter(c=>(c.gestor||'—')===oaCodAba), grupos=[...new Set(cs.map(c=>c.grupo))];
+    const tot=cs.reduce((a,c)=>a+(c.abertas||0),0);   // mãe e subcódigo contam separados (cada OS cai em um só)
+    corpo='<p class="gsub"><b>'+vEsc(oaCodAba==='—'?'Não usar':oaCodAba)+'</b>'+(OA_GEST_SUB[oaCodAba]&&!['Compartilhado','—'].includes(oaCodAba)?' — '+vEsc(OA_GEST_SUB[oaCodAba]):'')+' · '+cs.filter(c=>!c.mae).length+' códigos · '+oaN(tot)+' OS em aberto</p>';
+    if(oaCodAba==='Compartilhado') corpo+='<div class="nota">🧱 <b>Pavimento e manobras não têm um setor fixo.</b> O gestor de cada OS sai da <b>origem do serviço</b>, nesta ordem:<br>'
+      +'1. <b>Gestão de Pavimento</b> — a OS de recomposição lançada no pavprog → serviço de origem do registro de campo (ramal/rede = Igor; vazamento/VRP/DMC = Werneck; fiscalização = Yasmin);<br>'
+      +'2. <b>OS de origem</b> informada no próprio SIGOS;<br>3. <b>outra OS da mesma matrícula</b> de um serviço que abre vala (ramal, rede, reparo, VRP, registro, macromedidor, sondagem, interligação) — a mais recente até a abertura;<br>'
+      +'4. sem nada disso, a OS fica como <b>Compartilhado</b>. Na lista, cada OS mostra por qual caminho o gestor foi definido.</div>';
+    if(oaCodAba==='—') corpo+='<div class="nota">⛔ Códigos marcados como <b>não usar</b> no PDF.</div>';
+    grupos.forEach(g=>{ const doG=cs.filter(c=>c.grupo===g&&!c.mae);
+      corpo+='<h3>'+vEsc(g)+'</h3>'+cab+doG.map(c=>{ const filhos=c.cod?cs.filter(x=>x.mae===c.cod):[];   // DMC/controlador não têm código: sem filhos
+        return linha(c,false)+(filhos.length?'<tr class="sub"><td></td><td colspan="6"><details'+(filhos.some(x=>x.cod===oaCodFoco)?' open':'')+'><summary style="cursor:pointer">'+filhos.length+' subcódigos de piso (mesmo tratamento do código-mãe) · '+oaN(filhos.reduce((a,x)=>a+(x.abertas||0),0))+' em aberto</summary><table>'+filhos.map(x=>linha(x,true)).join('')+'</table></details></td></tr>':''); }).join('')+'</tbody></table>'; });
+  }
+  $('#oaCodBody').innerHTML='<input type="search" id="oaCodQ" placeholder="Buscar código ou serviço em todos os gestores (ex.: 505, ramal)" value="'+vEsc(oaCodQ)+'">'
+    +'<div class="tabs">'+abas.map(([k,l])=>'<button type="button" data-aba="'+vEsc(k)+'" class="'+(!q&&oaCodAba===k?'on':'')+'">'+vEsc(l)+'</button>').join('')+'</div>'
+    +'<p class="gsub">Prazo = dias entre a abertura e o limite da OS no SIGOS (mediana das OS carregadas; entre parênteses, o menor e o maior). Clique num código para filtrar a tela por ele. Fonte: PDF "Gestão de Ordens de Serviço" v3.6 (nov/2026).</p>'
+    +corpo;
+  const qi=$('#oaCodQ'); qi.oninput=()=>{ const pos=qi.selectionStart; oaCodQ=qi.value; oaCodRender(); const n=$('#oaCodQ'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} };
+  $('#oaCodBody').querySelectorAll('[data-aba]').forEach(b=>b.onclick=()=>{ oaCodAba=b.dataset.aba; oaCodQ=''; oaCodRender(); });
+  $('#oaCodBody').querySelectorAll('tr[data-cod]').forEach(tr=>tr.onclick=()=>{ const cod=tr.dataset.cod;
+    // filtra pelos códigos da carteira que caem nesse código (o próprio ou, p/ código-mãe, os subcódigos sem linha própria)
+    const alvo=new Set(oaDados.filter(o=>o.cod===cod||o.ccod===cod).map(o=>o.cod)); if(!alvo.size) alvo.add(cod);
+    oaF.cods=alvo; oaLimite=150; oaCodFechar(); oaRender(); document.getElementById('oaCards').scrollIntoView({behavior:'smooth',block:'start'}); });
+  const foco=$('#oaCodBody').querySelector('tr[style*="outline"]'); if(foco&&oaCodFoco){ foco.scrollIntoView({block:'center'}); oaCodFoco=null; }
 }
 function oaMapaInit(){
   const cont=document.getElementById('oaMapa'); if(!cont) return;
@@ -7950,16 +8134,25 @@ function oaMapaInit(){
   }
   const pl=$('#oaPolyLimpar'); if(pl) pl.onclick=()=>{ oaDrawn.clearLayers(); oaPoly=null; oaRender(); };
   const Lg=L.Control.extend({options:{position:'bottomright'},onAdd:function(){
-    const d=L.DomUtil.create('div'); d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.5 system-ui,sans-serif;color:#333';
-    d.innerHTML='<b>Tempo corrido</b><br>'+OA_FAIXAS.map(f=>'<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f[2]+';margin-right:5px"></i>'+f[1]).join('<br>')
-      +'<br><i style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px dashed #333;margin-right:5px"></i>ponto aproximado';
-    L.DomEvent.disableClickPropagation(d); return d; }});
-  oaMap.addControl(new Lg());
+    const d=L.DomUtil.create('div'); d.style.cssText='background:rgba(255,255,255,.94);border:1px solid #ccc;border-radius:8px;padding:6px 8px;font:12px/1.5 system-ui,sans-serif;color:#333;max-height:46vh;overflow:auto';
+    oaLegenda=d; L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; }});
+  oaMap.addControl(new Lg()); oaLegendaRender();
   oaMap.on('click',oaPinClique);
   setTimeout(()=>oaMap.invalidateSize(),60);
 }
+// legenda conforme a cor escolhida (tempo corrido / gestor / agrupamento); gestor e agrupamento listam só o que está no filtro
+function oaLegendaRender(vis){
+  if(!oaLegenda) return;
+  const bola=(c,l)=>'<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+c+';margin-right:5px"></i>'+vEsc(l);
+  let h;
+  if(oaCorModo==='gest'){ const s=new Set((vis||oaDados).map(o=>o.gest)); h='<b>Gestor</b><br>'+OA_GEST.concat(['Igor · Werneck']).filter(g=>s.has(g)).map(g=>bola(OA_GEST_COR[g]||'#94a3b8',g)).join('<br>'); }
+  else if(oaCorModo==='fam'){ const c=new Map(); (vis||oaDados).forEach(o=>c.set(o.fam,(c.get(o.fam)||0)+1)); h='<b>Agrupamento</b><br>'+[...c.entries()].sort((a,b)=>b[1]-a[1]).map(([f])=>bola(OA_FAM_COR(f),f)).join('<br>'); }
+  else h='<b>Tempo corrido</b><br>'+OA_FAIXAS.map(f=>bola(f[2],f[1])).join('<br>');
+  oaLegenda.innerHTML=h+'<br><i style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px dashed #333;margin-right:5px"></i>ponto aproximado';
+}
 let oaFitFeito=false;
 function oaMapaRender(vis){
+  oaLegendaRender(vis);
   if(!oaMap||!oaPtsLayer) return;
   oaPtsLayer.clearLayers();
   const pts=[];
@@ -7974,7 +8167,8 @@ function oaMapaRender(vis){
 function oaPopup(o){
   const d=oaDescr(o);
   return '<div style="font-size:12.5px;line-height:1.45"><b>'+vEsc(o.srv)+'</b><br>OS '+vEsc(o.n)+' · '+vEsc(o.za)+'<br>'
-    +'<b style="color:'+oaCor(o)+'">há '+oaN(o.idade)+' dias</b> · '+d.pz+'<br>'+vEsc(o.st||'—')+' · '+oaN(o.vis)+' visita(s)'+(o.eq?'<br>Equipe '+vEsc(o.eq):'')
+    +'👤 <b style="color:'+(OA_GEST_COR[o.gest]||'#555')+'">'+vEsc(o.gest||'—')+'</b> · '+vEsc(o.fam||'')+' · '+oaCodFmt(o.cod)+(d.gest?'<br><span style="color:#666">'+d.gest+'</span>':'')+'<br>'
+    +'<b style="color:'+oaCorTempo(o)+'">há '+oaN(o.idade)+' dias</b> · '+d.pz+'<br>'+vEsc(o.st||'—')+' · '+oaN(o.vis)+' visita(s)'+(o.eq?'<br>Equipe '+vEsc(o.eq):'')
     +'<br>'+vEsc(o.end||'')+(o.mat?'<br>Matrícula '+vEsc(o.mat):'')+((o.nmat||1)>1?' · <b>'+o.nmat+' OS</b>':'')
     +(d.al.length?'<br><span style="color:#b3261e">⚠️ '+d.al.join('<br>⚠️ ')+'</span>':'')
     +'<br><span style="color:#666">Local: '+d.loc+'</span>'
@@ -8075,11 +8269,11 @@ async function oaGeoRodar(){
 function oaCsv(){
   const vis=oaDados.filter(oaPassa).filter(oaNoPoly);
   if(!vis.length){ toast('Nada para exportar.'); return; }
-  const cab=['OS','ZA','Cod. serviço','Atividade','Classificação','Status SIGOS','Tipo atendimento','Equipe','Matrícula','Endereço','Bairro','Setor','Rota','Abertura','Limite','Dias corridos','Faixa','Prazo','Visitas','OS na matrícula','Consta executada (SIGOS)','OS encerrada depois (matrícula)','Latitude','Longitude','Fonte da localização'];
+  const cab=['OS','ZA','Cod. serviço','Atividade','Gestor','Agrupamento','Categoria','Fluxo','Gestor definido por','Status SIGOS','Tipo atendimento','Equipe','Matrícula','Endereço','Bairro','Setor','Rota','Abertura','Limite','Dias corridos','Faixa','Prazo','Visitas','OS na matrícula','Consta executada (SIGOS)','OS encerrada depois (matrícula)','Latitude','Longitude','Fonte da localização'];
   const c=v=>{ const s=v==null?'':String(v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const num=v=>v==null?'':String(v).replace('.',',');
   const dt=v=>v?String(v).replace('T',' ').slice(0,16):'';
-  const lin=vis.map(o=>[o.n,o.za,o.cod,o.srv,o.cls,o.st,o.ta,o.eq,o.mat,o.end,o.bai,o.setor,o.rota,dt(o.ab),dt(o.lim),o.idade,(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[1],(OA_PRAZOS.find(p=>p[0]===oaPrazo(o))||[])[1],o.vis,o.nmat,o.exec_sigos?'sim':'',o.enc_depois?(o.enc_depois.os+' em '+fmtData(o.enc_depois.em)):'',num(o.lat),num(o.lon),oaDescr(o).loc].map(c).join(';'));
+  const lin=vis.map(o=>[o.n,o.za,oaCodFmt(o.cod),o.srv,o.gest,o.fam,OA_CAT[o.cat]||'',o.fluxo,o.gcomp?(OA_VIA[o.gvia||'sem_origem']+(o.gref?' — '+o.gref:'')):'código',o.st,o.ta,o.eq,o.mat,o.end,o.bai,o.setor,o.rota,dt(o.ab),dt(o.lim),o.idade,(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[1],(OA_PRAZOS.find(p=>p[0]===oaPrazo(o))||[])[1],o.vis,o.nmat,o.exec_sigos?'sim':'',o.enc_depois?(o.enc_depois.os+' em '+fmtData(o.enc_depois.em)):'',num(o.lat),num(o.lon),oaDescr(o).loc].map(c).join(';'));
   const csv=cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n';
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
     a.download='os_nao_executadas_'+new Date().toISOString().slice(0,10)+(oaPoly?'_poligono':'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
