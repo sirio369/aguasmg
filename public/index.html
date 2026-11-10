@@ -8033,6 +8033,7 @@ function oaRender(){
   const comPt=vis.filter(o=>o.lat!=null).length;
   $('#oaResumo').innerHTML='<b>'+oaN(vis.length)+'</b> OS'+(oaPoly?' <b>no polígono</b>':' no filtro')+' · '+oaN(comPt)+' no mapa'+(vis.length-comPt?' · '+oaN(vis.length-comPt)+' sem localização':'');
   $('#oaPolyLimpar').classList.toggle('hidden',!oaPoly);
+  oaMapaFit();
   oaMapaRender(vis);
   oaLista(vis);
 }
@@ -8057,6 +8058,16 @@ function oaGrafRender(){
   el.querySelectorAll('[data-lk]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const k=a.dataset.lk;
     if(k==='fam') oaF.fam.clear(); else { oaF[k]=''; const s=$(sel[k]); if(s) s.value=''; }
     oaLimite=150; oaRender(); });
+}
+// mapa cabe inteiro na janela (desktop): altura = janela − posição do mapa (com o resumo fechado) − respiro; encolhe aos poucos com a janela
+function oaMapaFit(){
+  const m=$('#oaMapa'); if(!m) return;
+  if(!window.__oaFitRs){ window.__oaFitRs=1; window.addEventListener('resize',()=>{ clearTimeout(window.__oaFitT); window.__oaFitT=setTimeout(()=>{ if(!$('#sigos_abertas').classList.contains('hidden')) oaMapaFit(); },120); }); }
+  if(window.innerWidth<860){ m.style.height=''; return; }
+  const pn=$('#oaPainel'), aberto=pn&&!pn.classList.contains('hidden');
+  const topo=m.getBoundingClientRect().top+window.scrollY-(aberto?pn.getBoundingClientRect().height+8:0);
+  const h=Math.max(320,Math.round(window.innerHeight-topo-12));
+  if(m.style.height!==h+'px'){ m.style.height=h+'px'; if(oaMap) oaMap.invalidateSize(); }
 }
 function oaLimparFiltros(){
   Object.assign(oaF,{za:'',gest:'',cat:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.fam.clear(); oaF.cods.clear(); oaF.faixa.clear(); oaF.prazo.clear();
