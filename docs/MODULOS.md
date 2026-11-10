@@ -3926,11 +3926,13 @@ duas famílias o RDO não separa mais "Execução" (`sigos:exec:`) e "Pendência
 chave `sigos:exec:<família>`, tipo Execução — "Recadastramento — 29 OS executadas, 21 OS encerradas sem execução (21 com
 visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Implementado com a coluna `sk` em `rdo_eventos`
 (`'todas'` p/ essas famílias, senão a situação). As outras famílias seguem separadas.
-**Troca de hidrômetro** entrou na mesma regra em 2026-11-10 (`docs/migracao_rdo_troca_hd_bloco_unico.sql`, aplicada): "Troca de
+**Troca de hidrômetro** entrou na mesma regra em 2026-11-10 (`docs/migracao_rdo_bloco_unico_familias.sql`, aplicada): "Troca de
 hidrômetro — 27 OS executadas, 8 OS encerradas sem execução (7 com visita, 1 sem visita): 35 substituição de hidrômetro cap. Y".
 **Vistoria de imóvel** também (2026-11-10, mesmo arquivo, migração `rdo_vistoria_bloco_unico`): "Vistoria de imóvel — 10 OS
-executadas, 2 OS encerradas sem execução (2 com visita): 12 vistoria de imóvel". Lista atual das famílias em bloco único:
-Recadastramento, Fiscalização de irregularidade, Troca de hidrômetro, Vistoria de imóvel.
+executadas, 2 OS encerradas sem execução (2 com visita): 12 vistoria de imóvel".
+**Desde 2026-11-10 (migração `rdo_todas_familias_bloco_unico`, mesmo arquivo): TODAS as famílias do SIGOS saem em bloco único**
+(`sk` sempre `'todas'`; os ramos `sk='executada'`/`'encerrada_sem_execucao'` ficaram sem uso e a chave `sigos:nexec:` não é mais
+gerada). Linha sem nenhuma executada no dia sai com tipo **Pendência** (chave continua `sigos:exec:<família>`).
 
 **Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
 - O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";

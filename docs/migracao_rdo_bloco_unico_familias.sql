@@ -28,3 +28,23 @@ begin
     execute n;
   end if;
 end $mig$;
+
+-- Parte 3 (2026-11-10, migração `rdo_todas_familias_bloco_unico`, APLICADA): TODAS as famílias em bloco único.
+-- Linha só com encerradas sem execução sai como 'Pendência'. Não havia RDO fechado nem rdo_item em sigos:nexec:*.
+do $mig$
+declare d text; n text;
+begin
+  d := pg_get_functiondef('public.rdo_eventos(date,date)'::regprocedure);
+  if d ~ $x$case when true then 'todas'$x$ then return; end if;
+  n := replace(d,
+    $x$case when public.sigos_servico_grupo(s.desc_servico) in ('Recadastramento', 'Fiscalização de irregularidade', 'Troca de hidrômetro', 'Vistoria de imóvel')$x$,
+    $x$case when true   -- desde 2026-11-10 todas as famílias (antes: Recadastramento/Fiscalização/Troca de HD/Vistoria)$x$);
+  if n = d then raise exception 'âncora 1 não encontrada em rdo_eventos'; end if;
+  d := n;
+  n := replace(d,
+    $x$select x.d, x.z, 'sigos:exec:' || x.grp, 'Execução', 'SIGOS'$x$,
+    $x$select x.d, x.z, 'sigos:exec:' || x.grp,
+           case when count(*) filter (where x.sit = 'executada') = 0 then 'Pendência' else 'Execução' end, 'SIGOS'$x$);
+  if n = d then raise exception 'âncora 2 não encontrada em rdo_eventos'; end if;
+  execute n;
+end $mig$;
