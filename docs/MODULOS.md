@@ -3698,8 +3698,8 @@ Serviços de cada ZA) no mapa e montar a programação.
   dos dois.
 - **Tela (de cima para baixo):** filtros + chips → bloco **"Resumo e gráficos"** recolhível (`<details id="oaPainel">`,
   estado lembrado em `localStorage` `oaPainel`; fechado não calcula os gráficos) → mapa → lista. No bloco: 3 cartões
-  (OS em aberto · **% fora do prazo** = vencidas ÷ total · **tempo médio de abertura** = hoje − abertura, em dias) e 4 gráficos
-  de barras (`oaGrafRender`): **status SIGOS, categoria, gestor, agrupamento** — cada barra com quantidade e % fora do prazo;
+  (OS em aberto · **% fora do prazo** = vencidas ÷ total · **tempo médio de abertura** = hoje − abertura, em dias) e 2 gráficos
+  de barras (`oaGrafRender`): **status SIGOS e agrupamento** (categoria e gestor saíram na v353) — cada barra com quantidade e % fora do prazo;
   clique filtra (agrupamento soma vários); cada gráfico conta sem o próprio filtro. Os cartões de faixa (0–7/8–30/…) e a
   tabela agrupamento × faixa saíram (v349). Sem textos explicativos na tela; explicação só dentro do pop-up.
 - **Filtros:** ZA, **gestor**, **agrupamento** (multi), **código / serviço** (multi com busca por código ou
