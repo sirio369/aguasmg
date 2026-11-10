@@ -1024,10 +1024,11 @@ Acompanhamento.
   pesquisada depois das 21h cai no dia seguinte lá). Casamento traço/ocorrência ↔ usuário por **nome OU e-mail** (§4.3.5).
 - **Consórcio de cada coisa:** rede = `rede.consorcio` · ocorrência = `ocorrencia.consorcio` (pelo ponto desde 2026-10-27,
   §2.3) · **trecho = pela geometria** (`pp_trecho_consorcio(geom, gravado)`: ZA do `limite_za` que contém
-  `st_pointonsurface` do trecho; o gravado só se cair fora das ZAs). ⚠️ `pesquisa_trecho.consorcio` vem do
-  `localStorage` do aparelho (`app_pesquisa_trecho_registrar`) e está **errado ou vazio em 190 de 299 trechos** (ex.: Marcos,
-  Betim, gravado ZA1004 → todo dia dele aparecia nos dois consórcios). Não confie nessa coluna; o Acompanhamento ainda filtra
-  km andado por ela.
+  `st_pointonsurface` do trecho; o gravado só se cair fora das ZAs). O app manda `p_consorcio` do `localStorage` do aparelho
+  (`app_pesquisa_trecho_registrar`), que vinha errado/vazio (Marcos em Betim gravado ZA1004; Roberto vazio desde 29/10).
+  **Desde 2026-11-10** o gatilho `trg_tz_consorcio` (BEFORE INSERT/UPDATE de geom/consorcio, roda depois do snap) sobrescreve
+  `pesquisa_trecho.consorcio` com `pp_trecho_consorcio(geom, gravado)`, e os 246 trechos antigos divergentes foram acertados
+  (`docs/migracao_pesquisa_trecho_consorcio.sql`). A coluna agora é confiável (Acompanhamento, Vitrine, checklist NRW, mapa).
 - **Mapa estático:** `relMapaCanvas(pts,W,H,desenhar,{tolerante,justo})` — o compositor OSM em canvas da ficha do
   logger virou genérico (o `relComporMapa` do logger chama ele sem opções, comportamento igual). `justo` = zoom
   fracionário (tiles do nível seguinte encolhidos) p/ a área encher o quadro; `tolerante` = tile que falha fica
