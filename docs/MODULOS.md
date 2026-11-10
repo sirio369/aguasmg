@@ -3904,7 +3904,7 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
   `gerencia`, `matricula` texto, `endereco`, `data_geracao`, `data_execucao`, `empresa` = empresa contratada, `ocorrencia`) +
   `arquivo_origem` (nome do arquivo da carga), `pasta_origem` (AAAA-MM da execução), `carregado_em`. Sem responsável,
   integrantes, coordenadas, reclamação e resultado (LGPD / sem uso). Os nomes das colunas são o **contrato** com o BI.
-- **Chave do BI:** `select public.bi_chave_criar('producao', '17 - sigos', 'bi_');` (SQL Editor; mostra uma vez). No BI vai no
+- **Chave do BI:** `select public.bi_chave_criar('producao', '17 - sigos', 'bi_producao');` (SQL Editor; mostra uma vez). No BI vai no
   parâmetro `SbChave`; no serviço, credencial **Anônimo** + "Ignorar conexão de teste".
 - No BI só mudou o começo do `qRealizado` (API no lugar de `Folder.Files` + `fnLerSigos`; sem dedupe — o número é único no
   banco) e o `dInfo` (`arquivos_sigos` = arquivos de carga distintos). Regras de consórcio, de-para código→ação, preço, Redes e

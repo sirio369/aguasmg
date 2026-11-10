@@ -24,7 +24,7 @@
 -- Fora (LGPD / sem uso no BI): responsável, integrantes, coordenadas, reclamação, resultado.
 --
 -- Chave do BI (SQL Editor, como postgres — mostra a chave UMA vez; a anterior deixa de valer):
---   select public.bi_chave_criar('producao', '17 - sigos', 'bi_');
+--   select public.bi_chave_criar('producao', '17 - sigos', 'bi_producao');
 -- No Power BI: parâmetro SbChave = essa chave; no serviço, credencial Anônimo + "Ignorar conexão de teste".
 
 create or replace view "17 - sigos".bi_producao_os as
