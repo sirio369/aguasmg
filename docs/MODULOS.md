@@ -3913,5 +3913,12 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
   código, descrição, datas). Diferenças que existiam: **233 OS da gerência GNDS** (732 79 00, mobilização social, set/2026)
   só no CSV do BI — o banco recusa gerência sem ZA em `gerencia_za`; e **13 OS de Betim** de exportações posteriores (baixas
   retroativas) — reenviar o mês inteiro na Carga SIGOS resolve, porque Encerradas só soma OS novas.
+- **Redes e Pesquisa também do banco (2026-11-10, migração `bi_producao_redes_pesquisa`):** `qRedes` lê a view
+  **`bi_producao_redes`** (= `"13 - projetos_obra".intervencao_avanco` no formato do `resumo_avancos_projetos.csv`; atividade = nome da
+  etapa pela chave estável em `etapa_modelo`, como o app; dia no horário de Brasília) e `qPesquisa` lê **`bi_producao_pesquisa`**
+  (dia × ZA × colaborador: km de rede = `pp_execucao` com ZA pela rede; km andado = `pesquisa_trecho` com **ZA pela geometria no
+  `limite_za`** — o `consorcio` do trecho vem vazio/errado em parte dos registros; vazamentos = tipos `Vazamento…`; ocorrências = todas).
+  As pastas `Bases\Realizado Redes` e `Bases\Realizado Pesquisa` deixam de ser lidas. As views ficam no `"17 - sigos"` só porque a
+  chave do BI é presa a um schema. Conferido: os 29 pullbacks (4.192,25 m) e os 17 dias de pesquisa batem linha a linha com os CSV.
 - **Cuidados:** `anon` tem `statement_timeout` 3 s (hoje ~35 ms, ~1,8 MB p/ 3,5 mil OS); se a base crescer muito, paginar por
   período na view/RPC. Baixa retroativa num mês já carregado só entra se o arquivo daquele mês for reenviado.
