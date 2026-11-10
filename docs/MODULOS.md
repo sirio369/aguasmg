@@ -3915,6 +3915,12 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
 - Título da linha de projeto = **código da intervenção — tipo (HDD…) — descrição/local — avanço total X%** (ou "concluída
   (100%)"); as atividades lançadas no dia ficam só no detalhe. Dia já fechado mantém o snapshot antigo (reabrir e fechar atualiza).
 
+**Recadastramento e Fiscalização num bloco só (2026-11-10, `docs/migracao_rdo_agrupa_familias.sql`, só banco):** para essas
+duas famílias o RDO não separa mais "Execução" (`sigos:exec:`) e "Pendência" (`sigos:nexec:`): sai **uma linha por dia × ZA**,
+chave `sigos:exec:<família>`, tipo Execução — "Recadastramento — 29 OS executadas, 21 OS encerradas sem execução (21 com
+visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Implementado com a coluna `sk` em `rdo_eventos`
+(`'todas'` p/ essas famílias, senão a situação). As outras famílias seguem separadas.
+
 **Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
 - O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";
   RECOMPOSICAO PASSEIO/ASFALTO + REATERRO → "Recomposição de pavimento"; SUBST.HIDROMETRO (todas as capacidades) → "Troca de
