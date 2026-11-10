@@ -3677,10 +3677,41 @@ Serviços de cada ZA) no mapa e montar a programação.
 
 - **Uma RPC só**, `app_sigos_abertas()`, traz a carteira inteira (≈3,3 mil OS, ~2 MB, < 1 s). Filtros, polígono, tabela e
   CSV rodam no app.
-- **Painéis clicáveis (filtram):**
-  - cartões de **tempo corrido**: dias desde a abertura, faixas 0–7 / 8–30 / 31–90 / > 90;
-  - tabela **atividade × faixa**, com total, vencidas e média de dias; dá para marcar várias atividades.
-- **Filtros:** ZA, classificação, status SIGOS, visitas (0/1/2/3+), busca (OS, matrícula, rua, bairro).
+- **Classificação pelo código (2026-11-10, sw v348, `docs/migracao_sigos_codigos.sql`):** a "classificação" do SIGOS
+  (COMERCIAL/PERDAS/MANUTENCAO…) **não é mais usada** (decisão do usuário: não serve de nada; o campo `cls` segue na RPC só
+  p/ app em cache). Cada OS recebe, pelo código do serviço, **gestor** (Werneck / Igor / Yasmin), **agrupamento** (= família
+  da Vitrine/RDO), **categoria** (escopo mínimo c/ RMA · sem remuneração própria · suporte · não usar) e **fluxo** A/B —
+  tabela `"17 - sigos".codigo_servico` (RLS sem policy, só via RPC), transcrita do PDF *Gestão de Ordens de Serviço* v3.6
+  (116 linhas: escopo mínimo, suporte, "não usar", 20 subcódigos de piso 248/258 79 01…10, DMC e controlador sem código).
+  **117 80 00** (HD embaçado cap Y, fora do PDF) = Yasmin, escopo c/ RMA (decisão de 10/11). `public.sigos_cod_info(cod)`
+  busca o código exato e, sem achar, o código-mãe (xx xx **00**) — ex.: 505 79 05 cai em 505 79 00. Código novo que não
+  estiver na tabela vira **"Sem cadastro"** (aba "Fora do PDF" no pop-up) até ser inserido. Suporte aparece sempre; a
+  distinção é só no filtro de categoria.
+- **Códigos compartilhados (pavimento 504/505/507, manobras 541/542):** não têm setor fixo — o gestor de cada OS sai da
+  **origem**, nesta ordem: (1) **Gestão de Pavimento** — `pav_recomposicao.os_recomposicao` (base de 10 dígitos) = nº da OS →
+  `servico_origem` (ramal/rede = Igor; vazamento/vrp/dmc = Werneck; fiscalização = Yasmin, `sigos_gestor_pav_origem`);
+  (2) **OS de origem** do SIGOS (`cod_os_origem`, quase sempre vazia na carteira); (3) **outra OS da mesma matrícula**
+  (carteira + Encerradas) de serviço que abre vala — prefixos 143/201/180/189/258/163/182/144/512/513/159/141/126 — a mais
+  recente até a abertura (+1 dia); (4) senão fica **Compartilhado**. A via e a OS de referência vão no item (`gvia`/`gref`)
+  e aparecem na lista, no popup do mapa e no CSV. Em 10/11/2026: 49 recomposições → 38 Igor, 10 Werneck, 1 sem origem
+  (só 2 casaram pelo Gestão de Pavimento; o resto pela matrícula). Sondagem (141 79 00, "Igor · Werneck") entra no filtro
+  dos dois.
+- **Tela (de cima para baixo):** filtros + chips → bloco **"Resumo e gráficos"** recolhível (`<details id="oaPainel">`,
+  estado lembrado em `localStorage` `oaPainel`; fechado não calcula os gráficos) → mapa → lista. No bloco: 3 cartões
+  (OS em aberto · **% fora do prazo** = vencidas ÷ total · **tempo médio de abertura** = hoje − abertura, em dias) e 4 gráficos
+  de barras (`oaGrafRender`): **status SIGOS, categoria, gestor, agrupamento** — cada barra com quantidade e % fora do prazo;
+  clique filtra (agrupamento soma vários); cada gráfico conta sem o próprio filtro. Os cartões de faixa (0–7/8–30/…) e a
+  tabela agrupamento × faixa saíram (v349). Sem textos explicativos na tela; explicação só dentro do pop-up.
+- **Filtros:** ZA, **gestor**, **agrupamento** (multi), **código / serviço** (multi com busca por código ou
+  descrição), status SIGOS, visitas (0/1/2/3+). A busca por OS/matrícula/rua saiu (v349); o filtro de **categoria** saiu
+  (v350 — RMA ou não não importa agora; o gráfico de categoria ficou só informativo, sem clique).
+- **Prazo em 3 divisões (v350):** Dentro do prazo / Prestes a vencer (até 7 dias) / Vencido — chips com contagem, cor do
+  mapa ("Cor: prazo") e CSV. As faixas de tempo corrido 0–7/8–30/31–90/>90 não aparecem mais (todas as OS têm limite). Chip "2+ OS na matrícula" removido (v351). **OS "já executadas" fora da tela (v352):** as que o SIGOS dá como executadas (status EXECUTADA ou encerramento realizado preenchido) ou com outra OS da mesma matrícula encerrada depois da abertura (`oaAlerta`) são descartadas no carregamento; o chip "⚠️ Já executada?" saiu. A RPC continua devolvendo todas.
+- **Pop-up "ℹ️ Códigos e responsáveis"** (botão no topo e "ℹ️ Código" em cada OS, que abre já no código): abas por gestor
+  (+ Compartilhados com a regra do pavimento, Igor · Werneck, Não usar, Fora do PDF), códigos por grupo do PDF com categoria,
+  fluxo, agrupamento, **prazo** e OS em aberto/vencidas; subcódigos de piso recolhidos sob o código-mãe; busca em todas as
+  abas; clicar num código filtra a tela por ele. **Prazo** = dias entre abertura e limite no SIGOS (mediana das OS carregadas,
+  carteira + Encerradas; menor–maior entre parênteses) — RPC `app_sigos_codigos()` (mesmo gate `sigos_pode_ver`).
 - **Chips:**
   - **prazo:** vencida / vence em 7 dias / no prazo / sem prazo;
   - **⚠️ Já executada?:** status `EXECUTADA(E)` ou encerramento realizado preenchido, ou outra OS **encerrada** na mesma
@@ -3688,7 +3719,7 @@ Serviços de cada ZA) no mapa e montar a programação.
   - **🔁 2+ OS na matrícula:** uma ida resolve várias;
   - **📍 Sem localização.**
 - **Mapa:**
-  - a cor do ponto é a faixa de tempo corrido;
+  - a cor do ponto é a faixa de tempo corrido, o **gestor** ou o **agrupamento** (seletor acima do mapa; a legenda acompanha);
   - borda tracejada = ponto aproximado (só a rua); borda roxa = posicionado à mão;
   - polígono ou retângulo (Leaflet.draw) seleciona a área, e lista, tabela e CSV passam a valer só para ela.
 - **CSV:** `;`, BOM, decimal com vírgula (abre direto no Excel). Exporta o filtro atual ∩ polígono.

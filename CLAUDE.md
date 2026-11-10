@@ -307,7 +307,9 @@ pwa/
     Encerradas × ZA1004 / ZA0200) dos relatórios exportados do SIGOS; Relação substitui a carteira da ZA, Encerradas acumula
     OS novas; arquivo no campo errado é recusado. Bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` + schema
     `17 - sigos` — ver `docs/MODULOS.md §4.5` e `§21`.
-    **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333) — carteira aberta no mapa (polígono, CSV, tempo corrido,
+    **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333; **v348/v349**: gestor/agrupamento/categoria pelo código do PDF v3.6, gráficos recolhíveis em
+    `"17 - sigos".codigo_servico`, pavimento e manobras com gestor pela origem, resumo por gestor antes do mapa e pop-up de
+    códigos com prazo — `docs/migracao_sigos_codigos.sql`) — carteira aberta no mapa (polígono, CSV, tempo corrido,
     atividade × faixa, prazo, "já executada?", 2+ OS na matrícula, fila sem localização); ponto = cadastro > manual >
     OpenStreetMap (consultado pelo navegador, cache `geo_endereco`) — ver `docs/MODULOS.md §21.1`.
     **Vínculo das OS** (`sigos_vinculo`, 2026-11-09, sw v335) — todo campo de OS do app (pavimento, projetos, VRP, pesquisa, APR,
