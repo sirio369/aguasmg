@@ -3313,20 +3313,28 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   de remontar o deck (o Leaflet prende o mapa no `resize` do window; sem isso cada volta vaza ~1 mapa por slide). Não
   chamar `vtSoltarMapas` em `vtParar` (roda em todo `irPara`, possivelmente antes de `vtMapas` existir). A linha do
   tempo do slide do dia é ajustada ao mostrar (`vtAjustaTl`): se não cabe, esconde as mais antigas com "+N mais cedo".
-- **SIGOS na Vitrine (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):** a TV busca também `app_vitrine_sigos(desde)`
-  (gate e período da Vitrine): famílias de serviço (`sigos_servico_grupo`) × ZA no período e no mês (executadas / encerradas sem
-  execução), série de 30 dias, pontos das OS executadas (coordenada da foto, senão do imóvel; desde o mais cedo entre "desde" e
-  7 dias; até 5 mil, em canvas), carteira aberta por família (tira o que já está nas Encerradas; vencidas = `limite` passado;
-  idade média) e equipes do mês. Slides novos logo depois da capa: **Serviços executados** (período — só se houver),
-  **Quantitativos do mês**, **OS executadas por dia** (30 dias, Contagem × Betim), **Onde executamos** (2 mapas, cor =
-  família), **Carteira aberta** e **Equipes**. O slide de cada dia passou a juntar pinos do AcquaHub + pontos do SIGOS no
-  mesmo mapa, com o resumo do SIGOS por família ao lado; dias recentes só com SIGOS (o relatório chega com atraso) também
-  entram. Rodapé mostra até quando vão as Encerradas. Se a RPC falhar, a Vitrine segue sem os slides do SIGOS.
+- **Vitrine unificada (2026-11-10, sw v346, `docs/migracao_vitrine_unificada.sql`):** a TV deixou de separar "AcquaHub" de
+  "SIGOS" — tudo é **serviço executado**, por **família de serviço** (a mesma taxonomia do SIGOS/RDO: `sigos_servico_grupo`;
+  o app entra em Loggers de pressão, VRP, Pesquisa de vazamento, Fiscalização de irregularidade (ocorrência `Fraude - …`),
+  Recomposição de pavimento (ponto levantado), Obras (projetos) e Atendimento comercial). Fonte única
+  **`app_vitrine_feed(p_desde)`** (mesmo gate/período): `itens` (desde o mais cedo entre "desde" e 7 dias: za, família `f`,
+  serviço legível `s`, dia/hora, `quem` = equipe do SIGOS ou colaborador do app, local, lat/lon, fotos, OS), `agg` (dia × ZA ×
+  família, 30 dias/mês), `nex` (OS encerradas sem execução), `quem_mes`, `carteira` (em aberto, tira o que já está nas
+  Encerradas), `ind` e `cobertura`. **Deduplicação:** lançamento do app com a OS SIGOS do mesmo serviço já executada (logger:
+  OS de instalação/remoção; VRP: `os_sigos`) fica **um item só** — o do app (foto, pessoa, GPS) com a OS ao lado; a OS some
+  da lista do SIGOS. Deck: **O que executamos desde sexta** (KPIs total/Contagem/Betim/encerradas sem execução + barras por
+  família) · **Executado no mês** · **Por dia** (30 dias) · **Onde executamos** (2 mapas, cor = família, aro branco = com
+  foto) · **Situação agora** (em aberto/vencidos, loggers em campo, frota, manutenções, pendências VRP, solicitações/ocorrências
+  sem OS, km de rede pesquisados) · **Em aberto** · **Quem mais executou** · por dia: mapa + famílias + linha do tempo de
+  todos os serviços, RDO do dia e as fotos. Saíram o slide "No mês até agora" do app (coberto pelas famílias) e "Usuários
+  ativos". `app_vitrine_dados`/`app_vitrine_sigos` seguem no banco só para app em cache (≤ v345) — podem ser dropadas depois.
+- *(histórico)* **SIGOS na Vitrine (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):** slides próprios do SIGOS
+  (`app_vitrine_sigos`) ao lado dos do AcquaHub (`app_vitrine_dados`) — substituídos pela versão unificada acima.
 - **RDO na Vitrine (2026-11-09, sw v342, `docs/migracao_rdo_ajustes.sql`):** a TV busca também `app_vitrine_rdo(desde)` (mesmo
-  gate e mesmo período padrão do `app_vitrine_dados`) = `public.rdo_periodo` → linhas do RDO **já revisadas** (dia fechado =
+  gate e mesmo período padrão) = `public.rdo_periodo` → linhas do RDO **já revisadas** (dia fechado =
   snapshot; senão rascunho com a revisão aplicada; ocultas fora). Depois do slide "mapa + linha do tempo" de cada dia entra
-  o slide **"RDO · dia"** com Contagem e Betim lado a lado (`vtRdoSlide`, até 11 linhas por ZA + "+N"); dia só com RDO
-  (sem atividade com GPS) ganha só o slide do RDO. Se a RPC falhar, a Vitrine segue sem esses slides.
+  o slide **"RDO · dia"** com Contagem e Betim lado a lado (`vtRdoSlide`, até 11 linhas por ZA + "+N"; sem marcar a origem da
+  linha); dia só com RDO ganha só o slide do RDO. Se a RPC falhar, a Vitrine segue sem esses slides.
 
 ## 18. Segurança do Trabalho (APR · PT · PET) + QSMS — `// SEGURANÇA DO TRABALHO` · telas `seg` / `seg_form` / `qsms` (hub) / `qsms_ind` / `qsms_form` / `qsms_epi_painel` / `qsms_cesta` / `qsms_epi_col` / `qsms_acesso` (2026-10-28)
 
