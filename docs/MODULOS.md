@@ -3631,8 +3631,8 @@ oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem no
 - `os_encerrada` (PK `numero`) — histórico acumulado; `geom_imovel`/`geom_foto` (Point 31983, de lat/lon WGS84; 0,0 → null).
 - Views `vw_os_aberta` (+ `idade_dias`, `vencida`, `carteira_de`), `vw_os_encerrada` (+ `no_prazo`, `dist_foto_m`,
   `foto_sem_gps`, `foto_longe` > 200 m), `vw_os_ligacao` (abertas + encerradas ligadas a `"3 - comercial".ligacoes` pela matrícula).
-- BI: grupo `bi_sigos_leitura` (só as 3 views) concedido a `bi_leitura`. **Sem acesso GIS** (schema app-only; se for ao QGIS,
-  criar view curada na vitrine).
+- BI: grupo `bi_sigos_leitura` (as 3 views + `bi_producao_os`) concedido a `bi_leitura`. **Sem acesso GIS** (schema app-only; se for ao QGIS,
+  criar view curada na vitrine). O **Dashboard Producao** lê as Encerradas daqui pela API (§21.5).
 - RPCs (definer, `authenticated`): `app_sigos_registrar(tipo, za, path, nome, tamanho)`, `app_sigos_arquivo_info(id)`,
   `app_sigos_falha(id, erro)`, `sigos_processar(…)`, `app_sigos_slots()` (os 4 campos: última carga + quantas OS no banco),
   `app_sigos_cargas_listar(limite)`.
@@ -3891,3 +3891,34 @@ escolhidas, num formato fixo:
 **Tela:** ZA + mês (‹ ›, mínimo set/2026) → calendário colorido → painel do dia com linhas numeradas (ocultas ficam riscadas,
 sem número), ▾ abre o detalhe (OS do SIGOS, loggers, itens do projeto…), ✏️ editar, 🚫 ocultar, ↺ voltar ao automático,
 ➕ linha manual, 🔒 Fechar / 🔓 Reabrir. Dia fechado mostra o que foi fechado; "Ver versão atual" compara com o banco.
+
+### 21.5 BI "Dashboard Producao" lendo o SIGOS do banco · `docs/migracao_bi_producao.sql` (2026-11-10)
+
+**Antes:** a consulta `qRealizado` do BI (`2 - Dashboards Ativos\Dashboard Producao\Dashboard Producao.pbip`) lia os CSV
+de Encerradas soltos em `Bases\Realizado SIGOS\<AAAA-MM>\*.csv` (pasta do SharePoint pelo OneDrive de quem atualiza;
+`fnLerSigos` pegava as colunas por posição). **Agora:** lê `"17 - sigos".os_encerrada` — alimentada pela tela Carga SIGOS —
+pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
+`GET {SbUrl}rest/v1/rpc/bi_dados?p_view=bi_producao_os&apikey={SbAnon}&p_chave={SbChave}`.
+
+- View **`bi_producao_os`**: exatamente as colunas que o `fnLerSigos` extraía (`n_os`, `status`, `codigo_bruto`, `descricao`,
+  `gerencia`, `matricula` texto, `endereco`, `data_geracao`, `data_execucao`, `empresa` = empresa contratada, `ocorrencia`) +
+  `arquivo_origem` (nome do arquivo da carga), `pasta_origem` (AAAA-MM da execução), `carregado_em`. Sem responsável,
+  integrantes, coordenadas, reclamação e resultado (LGPD / sem uso). Os nomes das colunas são o **contrato** com o BI.
+- **Chave do BI:** `select public.bi_chave_criar('producao', '17 - sigos', 'bi_producao');` (SQL Editor; mostra uma vez). No BI vai no
+  parâmetro `SbChave`; no serviço, credencial **Anônimo** + "Ignorar conexão de teste".
+- No BI só mudou o começo do `qRealizado` (API no lugar de `Folder.Files` + `fnLerSigos`; sem dedupe — o número é único no
+  banco) e o `dInfo` (`arquivos_sigos` = arquivos de carga distintos). Regras de consórcio, de-para código→ação, preço, Redes e
+  Pesquisa não mudaram. A pasta `Bases\Realizado SIGOS` deixa de ser lida (as demais bases do `PastaBases` continuam).
+- **Conferência (10/11/2026):** das OS em comum, 3.503 batem campo a campo com o BI (status, matrícula, endereço, ocorrência,
+  código, descrição, datas). Diferenças que existiam: **233 OS da gerência GNDS** (732 79 00, mobilização social, set/2026)
+  só no CSV do BI — o banco recusa gerência sem ZA em `gerencia_za`; e **13 OS de Betim** de exportações posteriores (baixas
+  retroativas) — reenviar o mês inteiro na Carga SIGOS resolve, porque Encerradas só soma OS novas.
+- **Redes e Pesquisa também do banco (2026-11-10, migração `bi_producao_redes_pesquisa`):** `qRedes` lê a view
+  **`bi_producao_redes`** (= `"13 - projetos_obra".intervencao_avanco` no formato do `resumo_avancos_projetos.csv`; atividade = nome da
+  etapa pela chave estável em `etapa_modelo`, como o app; dia no horário de Brasília) e `qPesquisa` lê **`bi_producao_pesquisa`**
+  (dia × ZA × colaborador: km de rede = `pp_execucao` com ZA pela rede; km andado = `pesquisa_trecho` com **ZA pela geometria no
+  `limite_za`** — o `consorcio` do trecho vem vazio/errado em parte dos registros; vazamentos = tipos `Vazamento…`; ocorrências = todas).
+  As pastas `Bases\Realizado Redes` e `Bases\Realizado Pesquisa` deixam de ser lidas. As views ficam no `"17 - sigos"` só porque a
+  chave do BI é presa a um schema. Conferido: os 29 pullbacks (4.192,25 m) e os 17 dias de pesquisa batem linha a linha com os CSV.
+- **Cuidados:** `anon` tem `statement_timeout` 3 s (hoje ~35 ms, ~1,8 MB p/ 3,5 mil OS); se a base crescer muito, paginar por
+  período na view/RPC. Baixa retroativa num mês já carregado só entra se o arquivo daquele mês for reenviado.
