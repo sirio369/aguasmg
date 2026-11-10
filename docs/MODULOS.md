@@ -3933,6 +3933,8 @@ visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Im
   hidrômetro". Serviço novo que não casa com nenhuma regra fica com o próprio nome. Chave da linha = `sigos:exec:<família>`.
   Quando a família junta serviços diferentes, o texto traz a quebra ("4 OS executadas (2 ABERTURA REGISTRO EXT, 2 FECHAMENTO
   REGISTRO EXT)", nome curto = `sigos_servico_curto`) e o detalhe de cada OS traz serviço e equipe.
+  **2026-11-10:** família **"Mobilização social"** (732 79 00 TRABALHO MOB.SOCIAL…, gerência GNDS; ordem 78; nome "trabalho de
+  mobilização social") — `docs/migracao_sigos_familia_mobilizacao.sql`, aplicada.
 - Ordem (`rdo_familia_ordem`): cada família do SIGOS e logo depois a linha do AcquaHub da mesma família (ex.: VRP do SIGOS →
   VRP do app; loggers do SIGOS → loggers do app).
 - **📋 Copiar RDO** copia em dois formatos no mesmo clique — **HTML** (cola formatado no Word/e-mail/Teams: título, ZA,
