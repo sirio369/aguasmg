@@ -3882,7 +3882,7 @@ A `chave` é estável (é nela que a revisão se prende). A Vitrine vai passar a
 |---|---|---|
 | `sigos:exec:<serviço>` | SIGOS | `vw_os_situacao` executada, por `data_execucao` e serviço — "N OS executadas" (detalhe: OS, matrícula, endereço, resultado) |
 | `sigos:nexec:<serviço>` | SIGOS | encerrada sem execução, com/sem visita → **Pendência** |
-| `app:pesquisa` | AcquaHub | km de `pesquisa_trecho` (ZA pela `limite_za` quando vazia) + ocorrências (vazamento × `Fraude…`) |
+| `app:pesquisa` | AcquaHub | **km de rede pesquisada** = `pp_execucao` (ZA pela rede, dia de Brasília — desde 2026-11-10, `docs/migracao_rdo_pesquisa_km_rede.sql`; antes era o km andado de `pesquisa_trecho`; mesma conta do Acompanhamento/BI) + ocorrências (vazamento × `Fraude…`) |
 | `app:pressao` | AcquaHub | leituras de `mapeamento_pressao` |
 | `app:loggers` | AcquaHub | instalados / removidos / dados concluídos, cada etapa na sua data |
 | `app:vrp_visita`, `app:vrp_os` | AcquaHub | visita primária; OS de VRP concluída / com pendência / improdutiva (anota quantas também estão executadas no SIGOS) |
