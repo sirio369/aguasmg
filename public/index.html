@@ -1239,13 +1239,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>RDO diário</h1>
     <p class="sub">O que foi <b>executado</b> ou está <b>em andamento</b> em cada dia, juntando as OS do SIGOS e o que foi lançado no AcquaHub.
-      Escolha um ou os dois consórcios. Serviços parecidos do SIGOS vêm juntos por família (ex.: abertura e fechamento de registro). O texto sai pronto como rascunho; revise (editar, ocultar, acrescentar linha) e <b>feche o dia</b> de cada consórcio; <b>📋 Copiar RDO</b> copia o texto revisado, formatado e com o detalhe de cada linha. Se chegar relatório SIGOS depois e mudar o dia, ele aparece como <b>desatualizado</b>.</p>
+      Escolha um ou os dois consórcios. Serviços parecidos do SIGOS vêm juntos por família (ex.: abertura e fechamento de registro). <b>📋 Copiar RDO</b> copia o texto do dia, formatado e com o detalhe de cada linha.</p>
     <div class="rdotop">
       <div class="rdozas" id="rdoZas"></div>
       <div class="rdonav"><button type="button" id="rdoPrev">‹</button><b id="rdoMesTit"></b><button type="button" id="rdoNext">›</button></div>
     </div>
     <div class="rdocal" id="rdoCal"></div>
-    <div class="rdoleg"><span><i style="background:var(--line)"></i>Sem registro</span><span><i style="background:#f59e0b"></i>Rascunho</span><span><i style="background:var(--ok)"></i>Fechado</span><span><i style="background:var(--bad)"></i>Desatualizado</span><span>⏳ SIGOS ainda não chegou</span></div>
+    <div class="rdoleg"><span>⏳ SIGOS ainda não chegou</span></div>
     <div id="rdoDia"></div>
   </main>
 
@@ -7496,17 +7496,16 @@ function svCsv(){
 
 // ---------- RDO DIÁRIO — Auxiliar de Programação (tela rdo; docs/migracao_rdo_diario.sql, MODULOS §21.4) ----------
 // O que foi EXECUTADO ou está EM ANDAMENTO por dia × ZA: OS do SIGOS + lançamentos do AcquaHub (feed public.rdo_eventos).
-// Rascunho automático → revisão (editar/ocultar/linha manual) → Fechar o dia (cada ZA fecha o seu). Se o banco muda depois
-// (carga SIGOS atrasada, lançamento tardio) o dia fica "desatualizado". Seleção de ZA múltipla: as duas lado a lado no mesmo dia.
-// "Copiar RDO" copia o texto já revisado (fechado = como foi fechado; ocultas não entram) num formato fixo p/ colar em outro lugar.
+// SÓ CONSULTA (10/11/2026): sem rascunho/fechado/desatualizado, sem fechar/reabrir e sem edição — as linhas saem sempre
+// com o texto automático do feed. Seleção de ZA múltipla: as duas lado a lado no mesmo dia.
+// "Copiar RDO" copia o texto do dia num formato fixo p/ colar em outro lugar.
 const RDO_MIN='2026-09-01';
-const RDO_ST={vazio:['Sem registro','var(--line)'],rascunho:['Rascunho','#f59e0b'],fechado:['Fechado','var(--ok)'],desatualizado:['Desatualizado','var(--bad)']};
 const RDO_TIPOS=['Execução','Em andamento','Ocorrência','Pendência','Nota'];
 const RDO_ZAS=[['ZA1004','ZA1004 — Contagem'],['ZA0200','ZA0200 — Betim']];
 const RDO_DET={os:'OS',mat:'Matrícula',end:'Endereço',res:'Resultado',st:'Status',tipo:'Tipo',local:'Local',logger:'Logger',etapa:'Etapa',zona:'Zona',
   vrp:'VRP',sit:'Situação',sigos:'OS SIGOS',item:'Item',valor:'Valor',un:'Unid.',origem:'Origem',tipos:'Tipos',gc:'GC (%)',metodo:'Método',srv:'Serviço',eqp:'Equipe'};
 const RDO_ETAPA={inst:'instalado',rem:'removido',fin:'dados concluídos'};
-let rdoS={zas:['ZA1004','ZA0200'],mes:null,dia:null,meses:{},dias:{},abertos:new Set(),edit:null,verAtual:new Set()};
+let rdoS={zas:['ZA1004','ZA0200'],mes:null,dia:null,meses:{},dias:{},abertos:new Set()};
 const rdoHoje=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
 const rdoMesNome=m=>{ const s=new Date(m+'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); };
 const rdoAddMes=(m,n)=>{ const d=new Date(m+'T12:00:00'); d.setMonth(d.getMonth()+n,1); return d.toISOString().slice(0,7)+'-01'; };
@@ -7536,11 +7535,9 @@ function rdoCss(){
 #rdo .rdohead .btn{width:auto;margin:0;padding:8px 14px;font-size:14px}
 #rdo .rdoza{margin-top:12px;padding-top:4px;border-top:2px solid var(--line)}
 #rdo .rdoza h3{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 4px;font-size:15px}
-#rdo .rdochip{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;color:#fff}
 #rdo .rdoaviso{font-size:12px;border-radius:10px;padding:8px 10px;margin:8px 0;background:var(--card);border:1px solid var(--line);border-left:4px solid #f59e0b}
 #rdo .rdoaviso.bad{border-left-color:var(--bad)}
 #rdo .rdorow{display:flex;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
-#rdo .rdorow.oc{opacity:.5} #rdo .rdorow.oc .d{text-decoration:line-through}
 #rdo .rdorow .n{font-weight:700;min-width:22px;color:var(--mut)}
 #rdo .rdorow .b{flex:1;min-width:0}
 #rdo .rdorow .tp{font-size:11px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
@@ -7550,12 +7547,7 @@ function rdoCss(){
 #rdo .rdorow .det div{padding:2px 0;border-bottom:1px dotted var(--line)}
 #rdo .rdorow .ac{display:flex;gap:4px;align-items:flex-start}
 #rdo .rdorow .ac button{font:inherit;font-size:13px;width:auto;margin:0;padding:3px 7px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
-#rdo .rdorow textarea{width:100%;min-height:70px;font:inherit;font-size:13px;margin-top:4px}
-#rdo .rdorow select{font-size:13px;padding:5px 6px;margin-top:4px}
-#rdo .rdoadd{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-#rdo .rdoadd select{flex:0 1 150px;font-size:14px;padding:8px}
-#rdo .rdoadd input{flex:1 1 220px;min-width:0;font-size:14px;padding:8px 10px}
-#rdo .rdoadd button,#rdo .rdofim button{width:auto;margin:0;padding:9px 14px;font-size:14px}
+#rdo .rdofim button{width:auto;margin:0;padding:9px 14px;font-size:14px}
 #rdo .rdofim{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin:12px 0}`;
   document.head.appendChild(st);
 }
@@ -7577,11 +7569,9 @@ function rdoRenderZas(){
     else rdoS.zas=RDO_ZAS.map(x=>x[0]).filter(x=>x===z||rdoS.zas.includes(x));
     rdoRenderZas(); rdoCarregarMes(true); });
 }
-// status do dia com várias ZAs: qualquer desatualizada → desatualizado; todas fechadas → fechado; tudo vazio → vazio; senão rascunho
+// dia com várias ZAs: soma as linhas; ⏳ se alguma ZA ainda espera o SIGOS
 function rdoJuntar(lista){
-  const st=lista.map(d=>d.status), cheio=st.filter(s=>s!=='vazio');
   return { dia:lista[0].dia, n:lista.reduce((a,d)=>a+(d.n||0),0),
-    status: !cheio.length?'vazio':(cheio.includes('desatualizado')?'desatualizado':(cheio.every(s=>s==='fechado')?'fechado':'rascunho')),
     sigos: lista.some(d=>d.sigos==='aguardando')?'aguardando':(lista.every(d=>d.sigos==='sem_base')?'sem_base':'ok') };
 }
 async function rdoCarregarMes(manterDia){
@@ -7609,12 +7599,12 @@ function rdoRenderCal(){
   for(let i=1;i<=fim;i++){
     const ds=rdoS.mes.slice(0,8)+String(i).padStart(2,'0'), d=por[ds];
     if(!d){ h+='<button type="button" disabled><b>'+i+'</b><span></span></button>'; continue; }
-    const cor=(RDO_ST[d.status]||RDO_ST.vazio)[1];
-    h+='<button type="button" data-rdodia="'+ds+'" class="'+(ds===rdoS.dia?'sel':'')+'" style="border-bottom-color:'+cor+'" title="'+(RDO_ST[d.status]||[''])[0]+'">'
+    const cor=d.n?'var(--acc)':'var(--line)';
+    h+='<button type="button" data-rdodia="'+ds+'" class="'+(ds===rdoS.dia?'sel':'')+'" style="border-bottom-color:'+cor+'">'
       +'<b>'+i+'</b><span>'+(d.n?d.n+(d.sigos==='aguardando'?' ⏳':''):(d.sigos==='aguardando'?'⏳':''))+'</span></button>';
   }
   $('#rdoCal').innerHTML=h;
-  $('#rdoCal').querySelectorAll('[data-rdodia]').forEach(b=>b.onclick=()=>{ rdoS.dia=b.dataset.rdodia; rdoS.abertos.clear(); rdoS.edit=null; rdoS.verAtual.clear(); rdoRenderCal(); rdoCarregarDia(); });
+  $('#rdoCal').querySelectorAll('[data-rdodia]').forEach(b=>b.onclick=()=>{ rdoS.dia=b.dataset.rdodia; rdoS.abertos.clear(); rdoRenderCal(); rdoCarregarDia(); });
 }
 async function rdoCarregarDia(silencioso){
   if(!silencioso) $('#rdoDia').innerHTML='<p class="sub">Carregando…</p>';
@@ -7642,46 +7632,21 @@ function rdoDetHtml(det){
   if(!Array.isArray(det)||!det.length) return '';
   return '<div class="det">'+det.map(o=>'<div>'+vEsc(rdoDetLinha(o))+'</div>').join('')+'</div>';
 }
-// linhas que valem para o texto: fechado → como foi fechado (a menos que peça a versão atual); ocultas ficam de fora
-const rdoLinhasZa=z=>{ const D=rdoS.dias[z]||{}, f=D.fechado; return (f&&!rdoS.verAtual.has(z))?(f.snapshot||[]):(D.linhas||[]); };
-const rdoStatusZa=z=>{ const D=rdoS.dias[z]||{}, f=D.fechado; return f?(f.desatualizado?'desatualizado':'fechado'):((D.linhas||[]).length?'rascunho':'vazio'); };
+// linhas do dia (só consulta): texto automático do feed; revisões antigas (editar/ocultar) não valem mais
+const rdoLinhasZa=z=>((rdoS.dias[z]||{}).linhas||[]).map(l=>Object.assign({},l,{desc:l.manual?l.desc:(l.auto||l.desc)}));
 function rdoSecao(z){
-  const D=rdoS.dias[z]||{}, f=D.fechado, cob=D.cobertura||{}, st=rdoStatusZa(z), travado=!!f, linhas=rdoLinhasZa(z);
-  let h='<div class="rdoza"><h3><span>'+vEsc(rdoZaNome(z))+'</span><span class="rdochip" style="background:'+RDO_ST[st][1]+(st==='vazio'?';color:var(--ink)':'')+'">'+RDO_ST[st][0]+'</span></h3>';
+  const D=rdoS.dias[z]||{}, cob=D.cobertura||{}, linhas=rdoLinhasZa(z);
+  let h='<div class="rdoza"><h3><span>'+vEsc(rdoZaNome(z))+'</span></h3>';
   if(D.sigos==='sem_base') h+='<div class="rdoaviso">Sem relatório SIGOS para este dia'+(cob.encerradas_desde?' (a base desta ZA começa em '+fmtData(cob.encerradas_desde)+')':'')+' — aqui entra só o que foi lançado no AcquaHub.</div>';
   else if(D.sigos==='aguardando') h+='<div class="rdoaviso">⏳ As OS encerradas do SIGOS chegaram só até '+fmtData(cob.encerradas_ate)+'. Este dia ainda pode ganhar OS executadas quando entrar o próximo relatório.</div>';
-  if(f){
-    h+='<div class="rdoaviso'+(f.desatualizado?' bad':'')+'" style="border-left-color:'+(f.desatualizado?'var(--bad)':'var(--ok)')+'">🔒 Fechado por '+vEsc(f.por||'—')+' em '
-      +new Date(f.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'.'
-      +(f.desatualizado?' <b>O banco mudou depois do fechamento</b> (relatório SIGOS ou lançamento atrasado). Reabra, revise e feche de novo.':'')
-      +' <a href="#" data-rdover="'+z+'">'+(rdoS.verAtual.has(z)?'Ver como foi fechado':'Ver versão atual')+'</a></div>';
-  }
   let n=0;
   h+=linhas.map(l=>{
-    const k=z+'|'+(l.chave||('m:'+l.id)), ed=rdoS.edit===k, aberto=rdoS.abertos.has(k), temDet=Array.isArray(l.det)&&l.det.length;
-    const num=l.oculto?'–':String(++n);
-    let corpo;
-    if(ed&&!travado){
-      corpo='<select data-rdoetp>'+RDO_TIPOS.map(t=>'<option'+(t===l.tipo?' selected':'')+'>'+t+'</option>').join('')+'</select>'
-        +'<textarea data-rdoetx>'+vEsc(l.desc||'')+'</textarea>'
-        +(l.auto&&!l.manual?'<div class="sub" style="font-size:11px;margin:2px 0">Texto automático: '+vEsc(l.auto)+'</div>':'')
-        +'<div style="display:flex;gap:6px;margin-top:4px"><button type="button" class="btn" data-rdosalvar="'+vEsc(k)+'" style="width:auto;margin:0;padding:6px 12px">Salvar</button>'
-        +'<button type="button" class="btn ghost" data-rdocanc="1" style="width:auto;margin:0;padding:6px 12px">Cancelar</button></div>';
-    } else corpo='<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'');
+    const k=z+'|'+(l.chave||('m:'+l.id)), aberto=rdoS.abertos.has(k), temDet=Array.isArray(l.det)&&l.det.length;
     const bDet=temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'';
-    const ac=travado?bDet:(bDet+'<button type="button" data-rdoed="'+vEsc(k)+'" title="Editar">✏️</button>'
-       +(l.manual?'<button type="button" data-rdodel="'+vEsc(k)+'" title="Excluir linha">🗑️</button>'
-                 :'<button type="button" data-rdooc="'+vEsc(k)+'" title="'+(l.oculto?'Mostrar':'Ocultar')+'">'+(l.oculto?'👁️':'🚫')+'</button>'
-                  +(l.editada||l.oculto?'<button type="button" data-rdorest="'+vEsc(k)+'" title="Voltar ao automático">↺</button>':'')));
-    return '<div class="rdorow'+(l.oculto?' oc':'')+'"><div class="n">'+num+'</div><div class="b"><div class="tp">'+vEsc(l.tipo)+' · <span class="fo">'+vEsc(l.fonte||'')
-      +(l.editada?' · revisado':'')+(l.oculto?' · oculto':'')+'</span></div>'+corpo+'</div><div class="ac">'+ac+'</div></div>';
+    return '<div class="rdorow"><div class="n">'+(++n)+'</div><div class="b"><div class="tp">'+vEsc(l.tipo)+' · <span class="fo">'+vEsc(l.fonte||'')+'</span></div>'
+      +'<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'')+'</div><div class="ac">'+bDet+'</div></div>';
   }).join('')||'<p class="sub">Nada executado ou em andamento registrado neste dia.</p>';
-  if(!travado){
-    h+='<div class="rdoadd"><select data-rdonovotp="'+z+'">'+RDO_TIPOS.map(t=>'<option'+(t==='Nota'?' selected':'')+'>'+t+'</option>').join('')+'</select>'
-      +'<input data-rdonovotx="'+z+'" placeholder="Acrescentar linha (ex.: serviço sem lançamento no app)"/><button type="button" class="btn ghost" data-rdonovo="'+z+'">➕ Adicionar</button></div>';
-  }
-  h+='<div class="rdofim"><span class="sub" style="margin:0">'+n+' linha'+(n===1?'':'s')+' · '+vEsc(z)+(f&&!rdoS.verAtual.has(z)?' (como foi fechado)':'')+'</span>'
-    +(travado?'<button type="button" class="btn ghost" data-rdoreabrir="'+z+'">🔓 Reabrir '+z+'</button>':'<button type="button" class="btn" data-rdofechar="'+z+'">🔒 Fechar '+z+'</button>')+'</div></div>';
+  h+='<div class="rdofim"><span class="sub" style="margin:0">'+n+' linha'+(n===1?'':'s')+' · '+vEsc(z)+'</span></div></div>';
   return h;
 }
 function rdoRenderDia(){
@@ -7689,36 +7654,20 @@ function rdoRenderDia(){
   const box=$('#rdoDia');
   box.innerHTML='<div class="rdohead"><h2>'+vEsc(dt.charAt(0).toUpperCase()+dt.slice(1))+'</h2><button type="button" class="btn" id="rdoCopiar">📋 Copiar RDO</button></div>'
     +rdoS.zas.map(rdoSecao).join('');
-  const achar=k=>{ const i=k.indexOf('|'), z=k.slice(0,i), id=k.slice(i+1); return {z, l:rdoLinhasZa(z).find(l=>(l.chave||('m:'+l.id))===id)}; };
   $('#rdoCopiar').onclick=rdoCopiar;
-  box.querySelectorAll('[data-rdover]').forEach(a=>a.onclick=e=>{ e.preventDefault(); const z=a.dataset.rdover; rdoS.verAtual.has(z)?rdoS.verAtual.delete(z):rdoS.verAtual.add(z); rdoRenderDia(); });
   box.querySelectorAll('[data-rdoabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.rdoabre; rdoS.abertos.has(k)?rdoS.abertos.delete(k):rdoS.abertos.add(k); rdoRenderDia(); });
-  box.querySelectorAll('[data-rdoed]').forEach(b=>b.onclick=()=>{ rdoS.edit=b.dataset.rdoed; rdoRenderDia(); const t=box.querySelector('[data-rdoetx]'); if(t) t.focus(); });
-  box.querySelectorAll('[data-rdocanc]').forEach(b=>b.onclick=()=>{ rdoS.edit=null; rdoRenderDia(); });
-  box.querySelectorAll('[data-rdosalvar]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdosalvar); if(!l) return;
-    const tx=box.querySelector('[data-rdoetx]').value.trim(), tp=box.querySelector('[data-rdoetp]').value;
-    if(!tx){ toast('Escreva a descrição.'); return; }
-    rdoSalvar(z,l,{tipo:tp,desc:(!l.manual&&tx===l.auto)?null:tx,oculto:l.oculto}); });
-  box.querySelectorAll('[data-rdooc]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdooc); if(l) rdoSalvar(z,l,{tipo:l.tipo,desc:l.editada?l.desc:null,oculto:!l.oculto}); });
-  box.querySelectorAll('[data-rdorest]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdorest); if(l) rdoExcluir(z,l); });
-  box.querySelectorAll('[data-rdodel]').forEach(b=>b.onclick=()=>{ const {z,l}=achar(b.dataset.rdodel); if(l&&confirm('Excluir esta linha do RDO?')) rdoExcluir(z,l); });
-  box.querySelectorAll('[data-rdonovo]').forEach(b=>b.onclick=()=>{ const z=b.dataset.rdonovo, tx=box.querySelector('[data-rdonovotx="'+z+'"]').value.trim();
-    if(!tx){ toast('Escreva a linha.'); return; } rdoSalvar(z,null,{tipo:box.querySelector('[data-rdonovotp="'+z+'"]').value,desc:tx,oculto:false}); });
-  box.querySelectorAll('[data-rdofechar]').forEach(b=>b.onclick=()=>rdoFechar(b.dataset.rdofechar));
-  box.querySelectorAll('[data-rdoreabrir]').forEach(b=>b.onclick=()=>rdoReabrir(b.dataset.rdoreabrir));
 }
-// "Copiar RDO": texto já revisado (ocultas fora; fechado = como foi fechado) COM o detalhe de cada linha, em dois formatos
+// "Copiar RDO": texto do dia COM o detalhe de cada linha, em dois formatos
 // no mesmo clique — HTML (cola formatado no Word/e-mail/Teams) e texto simples (WhatsApp/bloco de notas).
-// Estrutura fixa: título do dia → ZA (situação) → seção por tipo → itens numerados → sub-itens do detalhe.
+// Estrutura fixa: título do dia → ZA → seção por tipo → itens numerados → sub-itens do detalhe.
 function rdoExport(){
   const dt=new Date(rdoS.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
   const tit='RDO — '+dt.charAt(0).toUpperCase()+dt.slice(1), E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const txt=[tit,'='.repeat(tit.length)], html=['<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt"><h2 style="margin:0 0 6px">'+E(tit)+'</h2>'];
   rdoS.zas.forEach(z=>{
-    const D=rdoS.dias[z]||{}, f=D.fechado, ls=rdoLinhasZa(z).filter(l=>!l.oculto);
-    const st=f?('fechado por '+(f.por||'—')+(f.desatualizado?' — desatualizado (o banco mudou depois do fechamento)':'')):'rascunho (não fechado)';
-    txt.push('', rdoZaNome(z).toUpperCase(), 'Situação: '+st);
-    html.push('<h3 style="margin:14px 0 2px;border-bottom:1px solid #999">'+E(rdoZaNome(z))+'</h3><p style="margin:0 0 6px;color:#555"><i>Situação: '+E(st)+'</i></p>');
+    const D=rdoS.dias[z]||{}, ls=rdoLinhasZa(z);
+    txt.push('', rdoZaNome(z).toUpperCase());
+    html.push('<h3 style="margin:14px 0 6px;border-bottom:1px solid #999">'+E(rdoZaNome(z))+'</h3>');
     if(D.sigos==='aguardando'){ txt.push('Obs.: os relatórios do SIGOS ainda não cobrem este dia por completo.'); html.push('<p style="margin:0 0 6px;color:#a15c00">Obs.: os relatórios do SIGOS ainda não cobrem este dia por completo.</p>'); }
     if(!ls.length){ txt.push('Nada executado ou em andamento registrado.'); html.push('<p>Nada executado ou em andamento registrado.</p>'); return; }
     let n=0;
@@ -7746,31 +7695,6 @@ async function rdoCopiar(){
     document.addEventListener('copy',fn); document.execCommand('copy'); document.removeEventListener('copy',fn);
     if(ok){ toast('RDO copiado (formatado).'); return; } }catch(e){}
   try{ await navigator.clipboard.writeText(txt); toast('RDO copiado (texto simples).'); }catch(e){ toast('Não consegui copiar.'); }
-}
-async function rdoSalvar(z,l,o){
-  try{ const {error}=await sb.rpc('app_rdo_item_salvar',{p_dia:rdoS.dia,p_za:z,p_chave:l&&l.chave||null,p_id:l&&l.manual?l.id:null,
-         p_tipo:o.tipo,p_descricao:o.desc,p_oculto:!!o.oculto}); if(error) throw error; }
-  catch(e){ toast('Não salvou: '+(e.message||'erro')); return; }
-  rdoS.edit=null; rdoCarregarMes(true);
-}
-async function rdoExcluir(z,l){
-  try{ const {error}=await sb.rpc('app_rdo_item_excluir',{p_dia:rdoS.dia,p_za:z,p_chave:l.manual?null:l.chave,p_id:l.manual?l.id:null}); if(error) throw error; }
-  catch(e){ toast('Não excluiu: '+(e.message||'erro')); return; }
-  rdoCarregarMes(true);
-}
-async function rdoFechar(z){
-  const D=rdoS.dias[z]||{};
-  const msg=D.sigos==='aguardando'?'O SIGOS deste dia ainda não chegou por completo ('+z+'). Fechar mesmo assim? (o dia fica "desatualizado" se o relatório mudar algo)':'Fechar o RDO deste dia para '+z+'? Depois disso só reabrindo para editar.';
-  if(!confirm(msg)) return;
-  try{ const {error}=await sb.rpc('app_rdo_fechar',{p_dia:rdoS.dia,p_za:z}); if(error) throw error; }
-  catch(e){ toast('Não fechou: '+(e.message||'erro')); return; }
-  toast('Dia fechado ('+z+').'); rdoS.verAtual.delete(z); rdoCarregarMes(true);
-}
-async function rdoReabrir(z){
-  if(!confirm('Reabrir o dia para revisão ('+z+')? O fechamento atual é descartado.')) return;
-  try{ const {error}=await sb.rpc('app_rdo_reabrir',{p_dia:rdoS.dia,p_za:z}); if(error) throw error; }
-  catch(e){ toast('Não reabriu: '+(e.message||'erro')); return; }
-  rdoS.verAtual.delete(z); rdoCarregarMes(true);
 }
 
 // ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
