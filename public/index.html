@@ -7991,7 +7991,6 @@ function oaBase(o,sem){
   if(oaF.st&&sem!=='st'&&o.st!==oaF.st) return false;
   if(oaF.vis){ const v=o.vis||0; if(oaF.vis==='3'?v<3:v!==+oaF.vis) return false; }
   if(oaF.prazo.size&&!oaF.prazo.has(oaPrazo(o))) return false;
-  if(oaF.reinc&&!((o.nmat||1)>1)) return false;
   if(oaF.exec&&!oaAlerta(o)) return false;
   if(oaF.semloc&&o.lat!=null) return false;
   return true;
@@ -8014,10 +8013,9 @@ function oaRender(){
     +'<div class="oacard" style="cursor:default"><b style="color:var(--bad)">'+String(pv).replace('.',',')+'%</b><span>fora do prazo · '+oaN(venc(base))+' OS</span></div>'
     +'<div class="oacard" style="cursor:default"><b>'+oaN(med(base))+' dias</b><span>tempo médio de abertura</span></div>';
   // chips: prazo + destaques
-  const nAl=base.filter(oaAlerta).length, nRe=base.filter(o=>(o.nmat||1)>1).length, nSl=base.filter(o=>o.lat==null).length;
+  const nAl=base.filter(oaAlerta).length, nSl=base.filter(o=>o.lat==null).length;
   $('#oaChips').innerHTML=OA_PRAZOS.map(([k,l,c])=>'<button type="button" class="oachip'+(oaF.prazo.has(k)?' on':'')+'" data-p="'+k+'"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+c+';margin-right:5px"></i>'+l+' ('+oaN(base.filter(o=>oaPrazo(o)===k).length)+')</button>').join('')
     +'<button type="button" class="oachip al'+(oaF.exec?' on':'')+'" data-x="exec">⚠️ Já executada? ('+oaN(nAl)+')</button>'
-    +'<button type="button" class="oachip'+(oaF.reinc?' on':'')+'" data-x="reinc">🔁 2+ OS na matrícula ('+oaN(nRe)+')</button>'
     +'<button type="button" class="oachip'+(oaF.semloc?' on':'')+'" data-x="semloc">📍 Sem localização ('+oaN(nSl)+')</button>';
   $('#oaChips').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ const k=b.dataset.p; oaF.prazo.has(k)?oaF.prazo.delete(k):oaF.prazo.add(k); oaLimite=150; oaRender(); });
   $('#oaChips').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ const k=b.dataset.x; oaF[k]=!oaF[k]; oaLimite=150; oaRender(); });
