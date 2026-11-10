@@ -3882,7 +3882,7 @@ A `chave` é estável (é nela que a revisão se prende). A Vitrine vai passar a
 |---|---|---|
 | `sigos:exec:<serviço>` | SIGOS | `vw_os_situacao` executada, por `data_execucao` e serviço — "N OS executadas" (detalhe: OS, matrícula, endereço, resultado) |
 | `sigos:nexec:<serviço>` | SIGOS | encerrada sem execução, com/sem visita → **Pendência** |
-| `app:pesquisa` | AcquaHub | km de `pesquisa_trecho` (ZA pela `limite_za` quando vazia) + ocorrências (vazamento × `Fraude…`) |
+| `app:pesquisa` | AcquaHub | **km de rede pesquisada** = `pp_execucao` (ZA pela rede, dia de Brasília — desde 2026-11-10, `docs/migracao_rdo_pesquisa_km_rede.sql`; antes era o km andado de `pesquisa_trecho`; mesma conta do Acompanhamento/BI) + ocorrências (vazamento × `Fraude…`) |
 | `app:pressao` | AcquaHub | leituras de `mapeamento_pressao` |
 | `app:loggers` | AcquaHub | instalados / removidos / dados concluídos, cada etapa na sua data |
 | `app:vrp_visita`, `app:vrp_os` | AcquaHub | visita primária; OS de VRP concluída / com pendência / improdutiva (anota quantas também estão executadas no SIGOS) |
@@ -3926,6 +3926,13 @@ duas famílias o RDO não separa mais "Execução" (`sigos:exec:`) e "Pendência
 chave `sigos:exec:<família>`, tipo Execução — "Recadastramento — 29 OS executadas, 21 OS encerradas sem execução (21 com
 visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Implementado com a coluna `sk` em `rdo_eventos`
 (`'todas'` p/ essas famílias, senão a situação). As outras famílias seguem separadas.
+**Troca de hidrômetro** entrou na mesma regra em 2026-11-10 (`docs/migracao_rdo_bloco_unico_familias.sql`, aplicada): "Troca de
+hidrômetro — 27 OS executadas, 8 OS encerradas sem execução (7 com visita, 1 sem visita): 35 substituição de hidrômetro cap. Y".
+**Vistoria de imóvel** também (2026-11-10, mesmo arquivo, migração `rdo_vistoria_bloco_unico`): "Vistoria de imóvel — 10 OS
+executadas, 2 OS encerradas sem execução (2 com visita): 12 vistoria de imóvel".
+**Desde 2026-11-10 (migração `rdo_todas_familias_bloco_unico`, mesmo arquivo): TODAS as famílias do SIGOS saem em bloco único**
+(`sk` sempre `'todas'`; os ramos `sk='executada'`/`'encerrada_sem_execucao'` ficaram sem uso e a chave `sigos:nexec:` não é mais
+gerada). Linha sem nenhuma executada no dia sai com tipo **Pendência** (chave continua `sigos:exec:<família>`).
 
 **Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
 - O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";
@@ -3935,6 +3942,9 @@ visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Im
   REGISTRO EXT)", nome curto = `sigos_servico_curto`) e o detalhe de cada OS traz serviço e equipe.
   **2026-11-10:** família **"Mobilização social"** (732 79 00 TRABALHO MOB.SOCIAL…, gerência GNDS; ordem 78; nome "trabalho de
   mobilização social") — `docs/migracao_sigos_familia_mobilizacao.sql`, aplicada.
+  **2026-11-10:** VISTORIA DE IMOVEL (676 79 00 = fiscalização de fraudes, PDF v3.6) deixou de ser família própria e entra em
+  **"Fiscalização de irregularidade"** (mesmo arquivo, migração `sigos_vistoria_em_fiscalizacao`); o detalhe separa por código.
+  A cor `'Vistoria de imóvel'` em `VT_F_COR` (Vitrine) ficou sem uso.
 - Ordem (`rdo_familia_ordem`): cada família do SIGOS e logo depois a linha do AcquaHub da mesma família (ex.: VRP do SIGOS →
   VRP do app; loggers do SIGOS → loggers do app).
 - **📋 Copiar RDO** copia em dois formatos no mesmo clique — **HTML** (cola formatado no Word/e-mail/Teams: título, ZA,
