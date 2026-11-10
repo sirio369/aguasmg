@@ -3915,6 +3915,12 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
 - Título da linha de projeto = **código da intervenção — tipo (HDD…) — descrição/local — avanço total X%** (ou "concluída
   (100%)"); as atividades lançadas no dia ficam só no detalhe. Dia já fechado mantém o snapshot antigo (reabrir e fechar atualiza).
 
+**Só consulta (2026-11-10, sw v359):** decisão do usuário — o RDO não usa mais rascunho/fechado/desatualizado nem
+"Fechar/Reabrir", e não tem mais edição (editar, ocultar, ↺, acrescentar linha). As linhas saem sempre com o texto automático
+do feed (`l.auto`), revisões antigas em `rdo_item` (1 linha oculta em 10/11) são ignoradas. Ficam: calendário (dia com
+registro = borda azul; ⏳ = SIGOS ainda não chegou), detalhe ▾ e "📋 Copiar RDO" (sem a linha "Situação"). As RPCs
+`app_rdo_item_salvar/excluir/fechar/reabrir` e as tabelas `rdo_item`/`rdo_dia` continuam no banco, sem uso pelo app.
+
 **Recadastramento e Fiscalização num bloco só (2026-11-10, `docs/migracao_rdo_agrupa_familias.sql`, só banco):** para essas
 duas famílias o RDO não separa mais "Execução" (`sigos:exec:`) e "Pendência" (`sigos:nexec:`): sai **uma linha por dia × ZA**,
 chave `sigos:exec:<família>`, tipo Execução — "Recadastramento — 29 OS executadas, 21 OS encerradas sem execução (21 com
