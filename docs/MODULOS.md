@@ -3702,8 +3702,11 @@ Serviços de cada ZA) no mapa e montar a programação.
   de barras (`oaGrafRender`): **status SIGOS, categoria, gestor, agrupamento** — cada barra com quantidade e % fora do prazo;
   clique filtra (agrupamento soma vários); cada gráfico conta sem o próprio filtro. Os cartões de faixa (0–7/8–30/…) e a
   tabela agrupamento × faixa saíram (v349). Sem textos explicativos na tela; explicação só dentro do pop-up.
-- **Filtros:** ZA, **gestor**, **agrupamento** (multi), **categoria**, **código / serviço** (multi com busca por código ou
-  descrição), status SIGOS, visitas (0/1/2/3+). A busca por OS/matrícula/rua saiu (v349).
+- **Filtros:** ZA, **gestor**, **agrupamento** (multi), **código / serviço** (multi com busca por código ou
+  descrição), status SIGOS, visitas (0/1/2/3+). A busca por OS/matrícula/rua saiu (v349); o filtro de **categoria** saiu
+  (v350 — RMA ou não não importa agora; o gráfico de categoria ficou só informativo, sem clique).
+- **Prazo em 3 divisões (v350):** Dentro do prazo / Prestes a vencer (até 7 dias) / Vencido — chips com contagem, cor do
+  mapa ("Cor: prazo") e CSV. As faixas de tempo corrido 0–7/8–30/31–90/>90 não aparecem mais (todas as OS têm limite).
 - **Pop-up "ℹ️ Códigos e responsáveis"** (botão no topo e "ℹ️ Código" em cada OS, que abre já no código): abas por gestor
   (+ Compartilhados com a regra do pavimento, Igor · Werneck, Não usar, Fora do PDF), códigos por grupo do PDF com categoria,
   fluxo, agrupamento, **prazo** e OS em aberto/vencidas; subcódigos de piso recolhidos sob o código-mãe; busca em todas as
