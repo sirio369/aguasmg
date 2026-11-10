@@ -3928,6 +3928,9 @@ visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Im
 (`'todas'` p/ essas famílias, senão a situação). As outras famílias seguem separadas.
 **Troca de hidrômetro** entrou na mesma regra em 2026-11-10 (`docs/migracao_rdo_troca_hd_bloco_unico.sql`, aplicada): "Troca de
 hidrômetro — 27 OS executadas, 8 OS encerradas sem execução (7 com visita, 1 sem visita): 35 substituição de hidrômetro cap. Y".
+**Vistoria de imóvel** também (2026-11-10, mesmo arquivo, migração `rdo_vistoria_bloco_unico`): "Vistoria de imóvel — 10 OS
+executadas, 2 OS encerradas sem execução (2 com visita): 12 vistoria de imóvel". Lista atual das famílias em bloco único:
+Recadastramento, Fiscalização de irregularidade, Troca de hidrômetro, Vistoria de imóvel.
 
 **Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
 - O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";
