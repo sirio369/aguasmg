@@ -1166,7 +1166,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <select id="oaZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
       <select id="oaGest"><option value="">Todos os gestores</option></select>
       <div class="msdd" id="oaFamDd"><button type="button" class="msdd-btn" id="oaFamBtn">Agrupamento ▾</button><div class="msdd-panel hidden" id="oaFamPanel"></div></div>
-      <select id="oaCat"><option value="">Todas as categorias</option></select>
       <div class="msdd" id="oaCodDd"><button type="button" class="msdd-btn" id="oaCodFBtn">Código / serviço ▾</button><div class="msdd-panel hidden" id="oaCodPanel"></div></div>
       <select id="oaSt"><option value="">Todos os status SIGOS</option></select>
       <select id="oaVis"><option value="">Visitas: todas</option><option value="0">Sem visita</option><option value="1">1 visita</option><option value="2">2 visitas</option><option value="3">3 ou mais</option></select>
@@ -1177,7 +1176,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <div id="oaGraf" class="oagrafs"></div>
     </details>
     <div class="sec" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Mapa
-      <select id="oaCorModo" style="font-size:13px;padding:6px 8px;width:auto"><option value="tempo">Cor: tempo corrido</option><option value="gest">Cor: gestor</option><option value="fam">Cor: agrupamento</option></select></div>
+      <select id="oaCorModo" style="font-size:13px;padding:6px 8px;width:auto"><option value="tempo">Cor: prazo</option><option value="gest">Cor: gestor</option><option value="fam">Cor: agrupamento</option></select></div>
     <div id="oaMapa"></div>
     <div class="oabar">
       <div id="oaResumo" class="sub" style="margin:0"></div>
@@ -7785,7 +7784,7 @@ let oaDados=[], oaCart={}, oaMap=null, oaPtsLayer=null, oaDrawn=null, oaPoly=nul
 const oaF={za:'',gest:'',cat:'',st:'',vis:'',q:'',fam:new Set(),cods:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
 let oaCorModo='tempo', oaCodigos=null;
 const OA_FAIXAS=[['f1','0–7 dias','#1a7f4b'],['f2','8–30 dias','#d49b00'],['f3','31–90 dias','#ea6a12'],['f4','> 90 dias','#b3261e']];
-const OA_PRAZOS=[['vencida','Vencidas'],['vence7','Vencem em 7 dias'],['prazo','No prazo'],['sem','Sem prazo']];
+const OA_PRAZOS=[['prazo','Dentro do prazo','#1a7f4b'],['vence7','Prestes a vencer (até 7 dias)','#d49b00'],['vencida','Vencido','#b3261e']];
 const OA_GEST=['Werneck','Igor','Yasmin','Compartilhado','—','Sem cadastro'];
 const OA_GEST_COR={Werneck:'#2563eb',Igor:'#ea580c',Yasmin:'#9333ea',Compartilhado:'#64748b','Igor · Werneck':'#0d9488','—':'#94a3b8','Sem cadastro':'#94a3b8'};
 const OA_GEST_SUB={Werneck:'Equipamentos, loggers e vazamentos',Igor:'Redes e ramais',Yasmin:'Hidrômetro, cadastro, fraudes e social',
@@ -7795,7 +7794,7 @@ const OA_CAT_CURTO={escopo_rma:'com RMA',escopo_sem_rem:'sem remuneração',supo
 const OA_FAM_COR=f=>(typeof VT_F_COR!=='undefined'&&VT_F_COR[f])||({'Ligação de água':'#0ea5e9','Instalação de registro':'#a16207','Macromedidor':'#4f46e5','Mobilização social':'#db2777','DMC':'#0891b2'})[f]||'#94a3b8';
 const oaCodFmt=c=>c&&c.length===7?c.slice(0,3)+' '+c.slice(3,5)+' '+c.slice(5):(c||'sem código');
 const oaFaixa=o=>{ const d=o.idade??0; return d<=7?'f1':d<=30?'f2':d<=90?'f3':'f4'; };
-const oaCorTempo=o=>(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[2]||'#888';
+const oaCorTempo=o=>(OA_PRAZOS.find(p=>p[0]===oaPrazo(o))||[])[2]||'#888';
 const oaCor=o=>oaCorModo==='gest'?(OA_GEST_COR[o.gest]||'#94a3b8'):oaCorModo==='fam'?OA_FAM_COR(o.fam):oaCorTempo(o);
 // "Igor · Werneck" (sondagem) entra no filtro dos dois
 const oaGestDe=o=>o.gest==='Igor · Werneck'?['Igor','Werneck']:[o.gest||'Sem cadastro'];
@@ -7845,7 +7844,7 @@ function oaCss(){
 #sigos_abertas .oafilt select,#sigos_abertas .oafilt input[type=search]{width:100%;min-width:0;margin:0;font-size:14px;padding:9px 10px;box-sizing:border-box}
 /* dropdown multi-seleção próprio (o .msdd global só é injetado pela tela do pavimento) */
 #sigos_abertas .msdd{position:relative;min-width:0}
-#sigos_abertas .msdd-btn{width:100%;height:100%;box-sizing:border-box;margin:0;font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sigos_abertas .msdd-btn{outline:2px solid var(--acc);outline-offset:-1px;width:100%;height:100%;box-sizing:border-box;margin:0;font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #sigos_abertas .msdd-panel{position:absolute;z-index:600;top:calc(100% + 4px);left:0;min-width:320px;max-width:min(560px,92vw);max-height:360px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
 #sigos_abertas .msdd-panel.hidden{display:none}
 #sigos_abertas .msdd-opt{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:8px;cursor:pointer;font-size:13.5px;margin:0;font-weight:400}
@@ -7915,7 +7914,7 @@ function oaInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   oaCss();
   const bind=(id,k)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(el.tagName==='INPUT'&&el.type==='search'?'input':'change',()=>{ oaF[k]=el.value.trim(); oaLimite=150; oaRender(); }); } };
-  bind('#oaZa','za'); bind('#oaGest','gest'); bind('#oaCat','cat'); bind('#oaSt','st'); bind('#oaVis','vis');
+  bind('#oaZa','za'); bind('#oaGest','gest'); bind('#oaSt','st'); bind('#oaVis','vis');
   const pn=$('#oaPainel'); if(pn&&!pn.dataset.ready){ pn.dataset.ready='1';
     try{ if(localStorage.getItem('oaPainel')==='0') pn.open=false; }catch(e){}
     pn.addEventListener('toggle',()=>{ try{ localStorage.setItem('oaPainel',pn.open?'1':'0'); }catch(e){} if(pn.open) oaRender(); }); }
@@ -7944,7 +7943,6 @@ function oaOpcoes(){
     el.innerHTML='<option value="">'+lbl+'</option>'+arr.map(([v,n])=>'<option value="'+vEsc(v)+'">'+vEsc(rot?rot(v):v)+' ('+oaN(n)+')</option>').join('');
     el.value=arr.some(a=>a[0]===cur)?cur:''; };
   const g=cont(oaGestDe); fill('#oaGest',OA_GEST.filter(k=>g.has(k)).map(k=>[k,g.get(k)]),'Todos os gestores',k=>k==='—'?'Não usar (sem gestor)':k);
-  const c=cont(o=>o.cat); fill('#oaCat',Object.keys(OA_CAT).filter(k=>c.has(k)).map(k=>[k,c.get(k)]),'Todas as categorias',k=>OA_CAT[k]);
   fill('#oaSt',[...cont(o=>o.st).entries()].sort((a,b)=>b[1]-a[1]),'Todos os status SIGOS');
   const sub=$('#oaSub'); if(sub){
     const dh=ts=>ts?new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
@@ -7988,7 +7986,6 @@ function oaMsRotulo(){
 function oaBase(o,sem){
   if(oaF.za&&o.za!==oaF.za) return false;
   if(oaF.gest&&sem!=='gest'&&!oaGestDe(o).includes(oaF.gest)) return false;
-  if(oaF.cat&&sem!=='cat'&&o.cat!==oaF.cat) return false;
   if(oaF.fam.size&&sem!=='fam'&&!oaF.fam.has(o.fam)) return false;
   if(oaF.cods.size&&sem!=='cods'&&!oaF.cods.has(o.cod)) return false;
   if(oaF.st&&sem!=='st'&&o.st!==oaF.st) return false;
@@ -8018,7 +8015,7 @@ function oaRender(){
     +'<div class="oacard" style="cursor:default"><b>'+oaN(med(base))+' dias</b><span>tempo médio de abertura</span></div>';
   // chips: prazo + destaques
   const nAl=base.filter(oaAlerta).length, nRe=base.filter(o=>(o.nmat||1)>1).length, nSl=base.filter(o=>o.lat==null).length;
-  $('#oaChips').innerHTML=OA_PRAZOS.map(([k,l])=>'<button type="button" class="oachip'+(oaF.prazo.has(k)?' on':'')+'" data-p="'+k+'">'+l+'</button>').join('')
+  $('#oaChips').innerHTML=OA_PRAZOS.map(([k,l,c])=>'<button type="button" class="oachip'+(oaF.prazo.has(k)?' on':'')+'" data-p="'+k+'"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+c+';margin-right:5px"></i>'+l+' ('+oaN(base.filter(o=>oaPrazo(o)===k).length)+')</button>').join('')
     +'<button type="button" class="oachip al'+(oaF.exec?' on':'')+'" data-x="exec">⚠️ Já executada? ('+oaN(nAl)+')</button>'
     +'<button type="button" class="oachip'+(oaF.reinc?' on':'')+'" data-x="reinc">🔁 2+ OS na matrícula ('+oaN(nRe)+')</button>'
     +'<button type="button" class="oachip'+(oaF.semloc?' on':'')+'" data-x="semloc">📍 Sem localização ('+oaN(nSl)+')</button>';
@@ -8040,18 +8037,18 @@ function oaGrafRender(){
   const el=$('#oaGraf'); if(!el) return;
   const fx=o=>!oaF.faixa.size||oaF.faixa.has(oaFaixa(o));
   const conta=(sem,chave)=>{ const m=new Map(); oaDados.filter(o=>oaBase(o,sem)&&fx(o)).filter(oaNoPoly).forEach(o=>{ [].concat(chave(o)).forEach(k=>{ k=k||'—'; let r=m.get(k); if(!r){ r={n:0,v:0}; m.set(k,r); } r.n++; if(oaPrazo(o)==='vencida') r.v++; }); }); return [...m.entries()].sort((a,b)=>b[1].n-a[1].n); };
-  const bloco=(tit,k,linhas,rot,cor,on)=>{ const mx=Math.max(1,...linhas.map(l=>l[1].n)), alg=linhas.some(([v])=>on(v));
+  const bloco=(tit,k,linhas,rot,cor,on,so)=>{ const mx=Math.max(1,...linhas.map(l=>l[1].n)), alg=linhas.some(([v])=>on(v));
     return '<div class="oagraf"><h3>'+tit+(alg?'<a href="#" data-lk="'+k+'">limpar</a>':'')+'</h3><div class="bx">'
-      +(linhas.length?linhas.map(([v,r])=>'<button type="button" class="oabr'+(on(v)?' on':'')+'" data-k="'+k+'" data-v="'+vEsc(v)+'" title="'+vEsc(rot(v))+' — '+oaN(r.n)+' OS, '+oaN(r.v)+' fora do prazo">'
+      +(linhas.length?linhas.map(([v,r])=>'<button type="button" class="oabr'+(on(v)?' on':'')+'"'+(so?' disabled style="cursor:default"':'')+' data-k="'+k+'" data-v="'+vEsc(v)+'" title="'+vEsc(rot(v))+' — '+oaN(r.n)+' OS, '+oaN(r.v)+' fora do prazo">'
         +'<span class="l">'+vEsc(rot(v))+'</span><span class="b"><i style="width:'+(r.n*100/mx).toFixed(1)+'%;background:'+cor(v)+'"></i></span>'
         +'<span class="n">'+oaN(r.n)+(r.v?'<small>'+Math.round(r.v*100/r.n)+'% fora</small>':'')+'</span></button>').join(''):'<p class="sub" style="margin:4px">Sem OS.</p>')
       +'</div></div>'; };
   el.innerHTML=bloco('Por status SIGOS','st',conta('st',o=>o.st),v=>v,()=>'#64748b',v=>oaF.st===v)
-    +bloco('Por categoria','cat',conta('cat',o=>o.cat),v=>({escopo_rma:'Escopo com RMA',escopo_sem_rem:'Escopo sem remuneração',suporte:'Suporte',nao_usar:'Não usar',sem_cadastro:'Fora do PDF'})[v]||v,v=>OA_CAT_COR[v]||'#94a3b8',v=>oaF.cat===v)
+    +bloco('Por categoria','cat',conta('cat',o=>o.cat),v=>({escopo_rma:'Escopo com RMA',escopo_sem_rem:'Escopo sem remuneração',suporte:'Suporte',nao_usar:'Não usar',sem_cadastro:'Fora do PDF'})[v]||v,v=>OA_CAT_COR[v]||'#94a3b8',()=>false,true)
     +bloco('Por gestor','gest',conta('gest',oaGestDe),v=>v==='—'?'Não usar':v,v=>OA_GEST_COR[v]||'#94a3b8',v=>oaF.gest===v)
     +bloco('Por agrupamento','fam',conta('fam',o=>o.fam),v=>v,v=>OA_FAM_COR(v),v=>oaF.fam.has(v));
-  const sel={st:'#oaSt',cat:'#oaCat',gest:'#oaGest'};
-  el.querySelectorAll('.oabr').forEach(b=>b.onclick=()=>{ const k=b.dataset.k, v=b.dataset.v;
+  const sel={st:'#oaSt',gest:'#oaGest'};
+  el.querySelectorAll('.oabr:not([disabled])').forEach(b=>b.onclick=()=>{ const k=b.dataset.k, v=b.dataset.v;
     if(k==='fam'){ oaF.fam.has(v)?oaF.fam.delete(v):oaF.fam.add(v); }
     else { oaF[k]=oaF[k]===v?'':v; const s=$(sel[k]); if(s) s.value=oaF[k]; }
     oaLimite=150; oaRender(); });
@@ -8061,7 +8058,7 @@ function oaGrafRender(){
 }
 function oaLimparFiltros(){
   Object.assign(oaF,{za:'',gest:'',cat:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.fam.clear(); oaF.cods.clear(); oaF.faixa.clear(); oaF.prazo.clear();
-  ['#oaZa','#oaGest','#oaCat','#oaSt','#oaVis'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  ['#oaZa','#oaGest','#oaSt','#oaVis'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
   oaLimite=150; oaRender();
 }
 const OA_VIA={pavimento:'pela Gestão de Pavimento',origem:'pela OS de origem do SIGOS',matricula:'por outra OS da mesma matrícula',sem_origem:'sem origem identificada'};
@@ -8176,14 +8173,14 @@ function oaMapaInit(){
   oaMap.on('click',oaPinClique);
   setTimeout(()=>oaMap.invalidateSize(),60);
 }
-// legenda conforme a cor escolhida (tempo corrido / gestor / agrupamento); gestor e agrupamento listam só o que está no filtro
+// legenda conforme a cor escolhida (prazo / gestor / agrupamento); gestor e agrupamento listam só o que está no filtro
 function oaLegendaRender(vis){
   if(!oaLegenda) return;
   const bola=(c,l)=>'<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+c+';margin-right:5px"></i>'+vEsc(l);
   let h;
   if(oaCorModo==='gest'){ const s=new Set((vis||oaDados).map(o=>o.gest)); h='<b>Gestor</b><br>'+OA_GEST.concat(['Igor · Werneck']).filter(g=>s.has(g)).map(g=>bola(OA_GEST_COR[g]||'#94a3b8',g)).join('<br>'); }
   else if(oaCorModo==='fam'){ const c=new Map(); (vis||oaDados).forEach(o=>c.set(o.fam,(c.get(o.fam)||0)+1)); h='<b>Agrupamento</b><br>'+[...c.entries()].sort((a,b)=>b[1]-a[1]).map(([f])=>bola(OA_FAM_COR(f),f)).join('<br>'); }
-  else h='<b>Tempo corrido</b><br>'+OA_FAIXAS.map(f=>bola(f[2],f[1])).join('<br>');
+  else h='<b>Prazo</b><br>'+OA_PRAZOS.map(p=>bola(p[2],p[1])).join('<br>');
   oaLegenda.innerHTML=h+'<br><i style="display:inline-block;width:10px;height:10px;border-radius:50%;border:2px dashed #333;margin-right:5px"></i>ponto aproximado';
 }
 let oaFitFeito=false;
@@ -8305,11 +8302,11 @@ async function oaGeoRodar(){
 function oaCsv(){
   const vis=oaDados.filter(oaPassa).filter(oaNoPoly);
   if(!vis.length){ toast('Nada para exportar.'); return; }
-  const cab=['OS','ZA','Cod. serviço','Atividade','Gestor','Agrupamento','Categoria','Fluxo','Gestor definido por','Status SIGOS','Tipo atendimento','Equipe','Matrícula','Endereço','Bairro','Setor','Rota','Abertura','Limite','Dias corridos','Faixa','Prazo','Visitas','OS na matrícula','Consta executada (SIGOS)','OS encerrada depois (matrícula)','Latitude','Longitude','Fonte da localização'];
+  const cab=['OS','ZA','Cod. serviço','Atividade','Gestor','Agrupamento','Categoria','Fluxo','Gestor definido por','Status SIGOS','Tipo atendimento','Equipe','Matrícula','Endereço','Bairro','Setor','Rota','Abertura','Limite','Dias corridos','Prazo','Visitas','OS na matrícula','Consta executada (SIGOS)','OS encerrada depois (matrícula)','Latitude','Longitude','Fonte da localização'];
   const c=v=>{ const s=v==null?'':String(v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const num=v=>v==null?'':String(v).replace('.',',');
   const dt=v=>v?String(v).replace('T',' ').slice(0,16):'';
-  const lin=vis.map(o=>[o.n,o.za,oaCodFmt(o.cod),o.srv,o.gest,o.fam,OA_CAT[o.cat]||'',o.fluxo,o.gcomp?(OA_VIA[o.gvia||'sem_origem']+(o.gref?' — '+o.gref:'')):'código',o.st,o.ta,o.eq,o.mat,o.end,o.bai,o.setor,o.rota,dt(o.ab),dt(o.lim),o.idade,(OA_FAIXAS.find(f=>f[0]===oaFaixa(o))||[])[1],(OA_PRAZOS.find(p=>p[0]===oaPrazo(o))||[])[1],o.vis,o.nmat,o.exec_sigos?'sim':'',o.enc_depois?(o.enc_depois.os+' em '+fmtData(o.enc_depois.em)):'',num(o.lat),num(o.lon),oaDescr(o).loc].map(c).join(';'));
+  const lin=vis.map(o=>[o.n,o.za,oaCodFmt(o.cod),o.srv,o.gest,o.fam,OA_CAT[o.cat]||'',o.fluxo,o.gcomp?(OA_VIA[o.gvia||'sem_origem']+(o.gref?' — '+o.gref:'')):'código',o.st,o.ta,o.eq,o.mat,o.end,o.bai,o.setor,o.rota,dt(o.ab),dt(o.lim),o.idade,(OA_PRAZOS.find(p=>p[0]===oaPrazo(o))||[])[1],o.vis,o.nmat,o.exec_sigos?'sim':'',o.enc_depois?(o.enc_depois.os+' em '+fmtData(o.enc_depois.em)):'',num(o.lat),num(o.lon),oaDescr(o).loc].map(c).join(';'));
   const csv=cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n';
   try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
     a.download='os_nao_executadas_'+new Date().toISOString().slice(0,10)+(oaPoly?'_poligono':'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
