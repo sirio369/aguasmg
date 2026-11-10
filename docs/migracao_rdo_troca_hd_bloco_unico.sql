@@ -14,3 +14,17 @@ begin
     execute n;
   end if;
 end $mig$;
+
+-- Parte 2 (2026-11-10, migração `rdo_vistoria_bloco_unico`, APLICADA): Vistoria de imóvel entra na mesma regra.
+do $mig$
+declare d text; n text;
+begin
+  d := pg_get_functiondef('public.rdo_eventos(date,date)'::regprocedure);
+  if d !~ $x$'Troca de hidrômetro', 'Vistoria de imóvel'\)$x$ then
+    n := replace(d, $x$in ('Recadastramento', 'Fiscalização de irregularidade', 'Troca de hidrômetro')$x$,
+                    $x$in ('Recadastramento', 'Fiscalização de irregularidade', 'Troca de hidrômetro', 'Vistoria de imóvel')$x$);
+    if n = d then raise exception 'âncora não encontrada em rdo_eventos'; end if;
+    n := replace(n, '-- Recadastramento / Fiscalização / Troca de HD: executadas', '-- Recadastramento / Fiscalização / Troca de HD / Vistoria: executadas');
+    execute n;
+  end if;
+end $mig$;
