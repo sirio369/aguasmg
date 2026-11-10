@@ -3328,6 +3328,14 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
   sem OS, km de rede pesquisados) · **Em aberto** · **Quem mais executou** · por dia: mapa + famílias + linha do tempo de
   todos os serviços, RDO do dia e até 6 fotos espalhadas pelo dia — só dias desde "desde" (sem nada no período, os últimos 7 dias). Saíram o slide "No mês até agora" do app (coberto pelas famílias) e "Usuários
   ativos". `app_vitrine_dados`/`app_vitrine_sigos` seguem no banco só para app em cache (≤ v345) — podem ser dropadas depois.
+- **Só acumulados + mapas corrigidos (2026-11-10, sw v347, só front):** pedido do usuário — nada por dia. Deck agora =
+  **desde sexta** · **no mês** · **Onde executamos** · **Situação agora** · **Em aberto** · **Quem mais executou** · **Fotos —
+  últimos serviços executados** (1 slide, mosaico 4×2 com a 1ª foto dos 8 serviços mais recentes que têm foto: família, serviço,
+  dia/hora, Contagem/Betim, quem). Saíram o gráfico de 30 dias, os slides por dia (mapa + linha do tempo), o RDO do dia e as
+  fotos uma a uma (tDias/tRdoSlide/tAjustaTl removidas; a TV não chama mais pp_vitrine_rdo, que fica no banco p/ cache
+  ≤ v346). **Mapas:** o Leaflet não se reajustava quando a caixa mudava de tamanho (tela cheia na TV/troca de resolução) — fundo
+  cobria só o tamanho antigo e os pontos ficavam num canto; agora ResizeObserver + tAjusta (invalidateSize + reenquadra)
+  a cada mudança e a cada exibição do slide.
 - *(histórico)* **SIGOS na Vitrine (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):** slides próprios do SIGOS
   (`app_vitrine_sigos`) ao lado dos do AcquaHub (`app_vitrine_dados`) — substituídos pela versão unificada acima.
 - **RDO na Vitrine (2026-11-09, sw v342, `docs/migracao_rdo_ajustes.sql`):** a TV busca também `app_vitrine_rdo(desde)` (mesmo
