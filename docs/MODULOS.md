@@ -3926,6 +3926,8 @@ duas famílias o RDO não separa mais "Execução" (`sigos:exec:`) e "Pendência
 chave `sigos:exec:<família>`, tipo Execução — "Recadastramento — 29 OS executadas, 21 OS encerradas sem execução (21 com
 visita): 50 revisão de cadastro" — com o detalhe código → OS unificado. Implementado com a coluna `sk` em `rdo_eventos`
 (`'todas'` p/ essas famílias, senão a situação). As outras famílias seguem separadas.
+**Troca de hidrômetro** entrou na mesma regra em 2026-11-10 (`docs/migracao_rdo_troca_hd_bloco_unico.sql`, aplicada): "Troca de
+hidrômetro — 27 OS executadas, 8 OS encerradas sem execução (7 com visita, 1 sem visita): 35 substituição de hidrômetro cap. Y".
 
 **Famílias de serviço e cópia com detalhe (2026-11-09, sw v343, `docs/migracao_rdo_vitrine_sigos.sql`):**
 - O SIGOS entra por **família** (`public.sigos_servico_grupo`): ex. ABERTURA + FECHAMENTO REGISTRO EXT → "Manobra de registro";
