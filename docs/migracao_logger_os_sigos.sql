@@ -138,3 +138,15 @@ revoke all on function public.app_logger_set_os_sigos(bigint,text) from public, 
 grant execute on function public.app_logger_instalar(bigint,numeric,text,text,text,double precision,double precision,numeric,text,text,text,timestamptz,text,text,text,text,text) to authenticated;
 grant execute on function public.app_logger_criar(uuid,text,text,text,text,text,numeric,text,text,text,double precision,double precision,numeric,text,timestamptz,text,text,text,text,boolean,text) to authenticated;
 grant execute on function public.app_logger_set_os_sigos(bigint,text) to authenticated;
+
+-- ============================================================================================
+-- FASE 2 — PENDENTE: OS SIGOS obrigatória também no servidor (decisão do usuário 11/11/2026).
+-- Aplicar SÓ depois que o PR do front (sw v366+) estiver em produção e a fila offline dos
+-- celulares tiver esvaziado (app em cache antigo manda instalação sem OS → ficaria presa na fila).
+-- Troca, em app_logger_instalar e app_logger_criar, a linha de validação do formato por:
+--
+--   if v_sig is null then raise exception 'Informe o número da OS SIGOS.'; end if;
+--   if public.sigos_os_base(v_sig) is null then raise exception 'Número da OS SIGOS fora do padrão (14 dígitos, ex.: 00127516560801).'; end if;
+--
+-- (create or replace com a MESMA assinatura acima — não muda parâmetros, não cria overload.)
+-- ============================================================================================

@@ -221,7 +221,7 @@ pwa/
   e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo do temporário: **pendente → instalado → dados pendentes
   (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após
   7 dias); **o fixo termina em "instalado"** (sem remoção; `app_logger_remover` recusa fixo — 2026-11-11, sw v366).
-  **OS SIGOS** (2026-11-11): campo opcional na instalação/criação (`p_os_sigos`), linha editável no detalhe
+  **OS SIGOS** (2026-11-11): campo **obrigatório** na instalação/criação (`p_os_sigos`; no banco ainda opcional até a fase 2), linha editável no detalhe
   (`app_logger_set_os_sigos`), selo na lista e chips "SIGOS:" de situação, incl. encerrado no app × não executado
   no SIGOS — `docs/migracao_logger_os_sigos.sql`, `docs/MODULOS.md §2.2`. Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
   View `vw_loggers` (tem `consorcio`, geom real × planejada; `situacao_atual` é **derivada** das datas —

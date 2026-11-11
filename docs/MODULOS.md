@@ -228,9 +228,10 @@
   da instalação, sem formulário de remoção); `app_logger_remover` **recusa** logger fixo; o PDF do fixo não tem
   as seções Remoção/Finalização (Pressão vira a seção 3).
 - **OS SIGOS (2026-11-11, sw v366, `docs/migracao_logger_os_sigos.sql`)** — 1 OS por logger (`os_sigos`), nos dois modos:
-  - Campo **OS SIGOS** (opcional) na instalação e na criação avulsa (`#di_os` → `p_os_sigos` em
-    `app_logger_instalar`/`app_logger_criar`, param novo com default null). Se preenchida, tem de estar no padrão
-    (`vmSigOk` no front, `sigos_os_base` no banco).
+  - Campo **OS SIGOS obrigatório** na instalação e na criação avulsa (`#di_os` → `p_os_sigos` em
+    `app_logger_instalar`/`app_logger_criar`, param novo com default null): o botão só libera com o nº no padrão
+    (`lgOsOk`/`vmSigOk` no front, `sigos_os_base` no banco). **Fase 2 pendente:** no banco o `p_os_sigos` ainda é
+    opcional (app antigo em cache / fila offline); depois do PR em produção, aplicar o bloco do fim da migração.
   - No detalhe (todas as etapas pós-instalação, exceto "dados pendentes", que já tem o campo `#fzOs` preenchido):
     linha "OS SIGOS: nº + selo + Editar/＋ Adicionar" (`lgSigRow`/`lgLigarSig`) → **`app_logger_set_os_sigos(p_id,
     p_os_sigos)`** (qualquer autenticado, online; não aceita apagar). `app_logger_finalizar` não apaga mais a OS
