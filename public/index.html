@@ -1264,12 +1264,13 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sigos_carga" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
     <h1>Carga SIGOS</h1>
-    <p class="sub">Envie cada relatório exportado do SIGOS no campo dele. <b>Relação de Serviços</b> substitui a carteira inteira da ZA;
-      <b>Encerradas</b> só acrescenta as OS novas (as já gravadas ficam). Arquivo no campo errado é recusado sem mexer no banco.</p>
+    <p class="sub">Envie os relatórios exportados do SIGOS no campo do tipo — pode soltar vários de uma vez (Contagem, Betim,
+      mobilização social…); a ZA de cada OS sai da própria linha do arquivo. <b>Relação de Serviços</b> substitui a carteira só das
+      unidades que vierem no arquivo; <b>Encerradas</b> só acrescenta as OS novas. Arquivo no campo errado é recusado sem mexer no banco.</p>
     <div id="sgcSlots" class="sggrid"><p class="sub">Carregando…</p></div>
     <div class="sec" style="margin-top:20px">Últimas cargas</div>
     <div id="sgcHist"><p class="sub">Carregando…</p></div>
-    <input type="file" id="sgcFile" accept=".csv,text/csv,application/vnd.ms-excel" class="hidden"/>
+    <input type="file" id="sgcFile" accept=".csv,text/csv,application/vnd.ms-excel" multiple class="hidden"/>
   </main>
 
   <main id="ent_ocorrencia" class="hidden">
@@ -7374,14 +7375,16 @@ function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(
 let pdBlocos=[], pdStatus='pendente', pdPrazo='';
 const PD_COR={rede:'#1D9E75',trecho:'#d81b60',vaz:'#1565c0',fraude:'#c2410c'};
 // ---------- CARGA SIGOS (Auxiliar de Programação) ----------
-// 4 campos (Relação/Encerradas × ZA1004/ZA0200). Upload → bucket privado sigos-relatorios/<tipo>/<ZA>/<dia>/… →
-// app_sigos_registrar → Edge Function sigos-ingest (lê o CSV UTF-16 e chama sigos_processar). Regra toda no banco
-// (docs/migracao_sigos_carga.sql, MODULOS §21): Relação substitui a carteira da ZA; Encerradas acumula.
-const SGC_SLOTS=[['relacao','ZA1004'],['relacao','ZA0200'],['encerradas','ZA1004'],['encerradas','ZA0200']];
+// 2 campos (Relação de Serviços / Encerradas), vários arquivos por vez (2026-11-11). A ZA sai de CADA LINHA do arquivo
+// (Relação: Unidade; Encerradas: Escritório Local se estiver no de-para — GNDSEQCT/GNDSEQBE da mobilização social —,
+// senão Gerência). Upload → bucket privado sigos-relatorios/<tipo>/geral/<dia>/… → app_sigos_registrar (p_slot_za null)
+// → Edge Function sigos-ingest → sigos_processar. Regra toda no banco (docs/migracao_sigos_carga.sql +
+// docs/migracao_sigos_carga_2campos.sql, MODULOS §21): Relação substitui a carteira SÓ das unidades do arquivo; Encerradas acumula.
+const SGC_SLOTS=['relacao','encerradas'];
 const SGC_TIPO={relacao:'Relação de Serviços',encerradas:'Encerradas'};
-const SGC_TIPO_SUB={relacao:'OS não executadas · substitui a carteira inteira da ZA',encerradas:'OS executadas · só acrescenta OS novas'};
+const SGC_TIPO_SUB={relacao:'OS não executadas · substitui a carteira só das unidades que vierem no arquivo',encerradas:'OS executadas · só acrescenta OS novas'};
 const SGC_ZA={ZA1004:'Contagem',ZA0200:'Betim'};
-let sgcSlotsDados=[], sgcHistDados=[], sgcOcupado={}, sgcAlvo=null;
+let sgcPainel=null, sgcHistDados=[], sgcFila={relacao:[],encerradas:[]}, sgcRodando={}, sgcAlvo=null;
 function sgcCss(){
   if(document.getElementById('sgcCss')) return;
   const st=document.createElement('style'); st.id='sgcCss';
@@ -7394,26 +7397,32 @@ function sgcCss(){
 #sigos_carga .sgsub{font-size:12px;color:var(--mut)}
 #sigos_carga .sgst{font-size:13px;border-radius:8px;padding:8px 10px;background:var(--bg);line-height:1.4;overflow-wrap:anywhere}
 #sigos_carga .sgst.ok{background:var(--ok-bg)} #sigos_carga .sgst.erro{background:var(--bad-bg)} #sigos_carga .sgst.wait{background:var(--warn-bg)}
+#sigos_carga .sgst .m{color:var(--mut);font-size:12px}
 #sigos_carga .sgbanco{font-size:12px;color:var(--mut)}
+#sigos_carga .sgtab{width:100%;border-collapse:collapse;font-size:12.5px}
+#sigos_carga .sgtab td,#sigos_carga .sgtab th{padding:4px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+#sigos_carga .sgtab th{color:var(--mut);font-weight:600;border-top:0}
+#sigos_carga .sgtab td.n,#sigos_carga .sgtab th.n{text-align:right;font-variant-numeric:tabular-nums}
 #sigos_carga .sgbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
 #sigos_carga .sgbtns .btn{margin:0;width:auto;flex:1;min-width:130px;padding:10px 12px;font-size:14px}
 #sigos_carga .sgrow{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;overflow-wrap:anywhere}
 #sigos_carga .sgrow .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:600}
-#sigos_carga .sgrow .m{color:var(--mut);font-size:12px;margin-top:2px}`;
+#sigos_carga .sgrow .m{color:var(--mut);font-size:12px;margin-top:2px}
+#sigos_carga .sgrow .btn{margin:6px 0 0;width:auto;padding:6px 12px;font-size:13px}`;
   document.head.appendChild(st);
 }
 function sgcInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   sgcCss();
   const f=$('#sgcFile');
-  if(f && !f.dataset.ready){ f.dataset.ready='1'; f.onchange=()=>{ const file=f.files&&f.files[0]; f.value=''; if(file&&sgcAlvo) sgcEnviar(sgcAlvo[0],sgcAlvo[1],file); }; }
+  if(f && !f.dataset.ready){ f.dataset.ready='1'; f.onchange=()=>{ const fs=[...(f.files||[])]; f.value=''; if(fs.length&&sgcAlvo) sgcEnfileirar(sgcAlvo,fs); }; }
   sgcCarregar();
 }
 async function sgcCarregar(){
   try{
-    const [a,b]=await Promise.all([sb.rpc('app_sigos_slots'), sb.rpc('app_sigos_cargas_listar',{p_limite:40})]);
+    const [a,b]=await Promise.all([sb.rpc('app_sigos_painel'), sb.rpc('app_sigos_cargas_listar',{p_limite:40})]);
     if(a.error) throw a.error; if(b.error) throw b.error;
-    sgcSlotsDados=a.data||[]; sgcHistDados=b.data||[];
+    sgcPainel=a.data||{}; sgcHistDados=b.data||[];
   }catch(e){
     $('#sgcSlots').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; $('#sgcHist').innerHTML=''; return;
   }
@@ -7421,7 +7430,8 @@ async function sgcCarregar(){
 }
 const sgcDH=ts=>{ if(!ts) return '—'; try{ return new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(ts); } };
 const sgcN=n=>(n==null?'—':Number(n).toLocaleString('pt-BR'));
-// Resumo de uma carga (usado no campo e no histórico)
+const sgcZaTxt=za=>za?String(za).split(', ').map(z=>z+(SGC_ZA[z]?' · '+SGC_ZA[z]:'')).join(' + '):'—';
+// Resumo de uma carga (usado na fila do campo e no histórico)
 function sgcResumo(f,tipo){
   if(!f) return '';
   if(f.status==='erro') return '⚠️ '+vEsc(f.erro||'Erro no processamento.');
@@ -7431,77 +7441,96 @@ function sgcResumo(f,tipo){
                            : base+sgcN(f.inseridas)+' novas · '+sgcN(f.ja_existentes)+' já existentes';
   return '✅ '+r+(f.aviso?'<br>ℹ️ '+vEsc(f.aviso):'');
 }
+// Situação no banco por tipo: carteira por unidade (Relação) / OS encerradas por gerência × ZA (Encerradas)
+function sgcBanco(tipo){
+  const P=sgcPainel||{};
+  if(tipo==='relacao'){
+    const L=P.relacao||[]; if(!L.length) return '<div class="sgbanco">Carteira vazia no banco.</div>';
+    return '<table class="sgtab"><tr><th>Unidade</th><th>ZA</th><th class="n">Abertas</th><th>Carteira de</th></tr>'
+      +L.map(u=>'<tr><td>'+vEsc(u.unidade||'—')+'</td><td>'+vEsc(sgcZaTxt(u.za))+'</td><td class="n">'+sgcN(u.abertas)+'</td><td>'+sgcDH(u.carteira_de)+'</td></tr>').join('')+'</table>';
+  }
+  const L=P.encerradas||[]; if(!L.length) return '<div class="sgbanco">Nenhuma OS encerrada no banco.</div>';
+  return '<table class="sgtab"><tr><th>Gerência</th><th>ZA</th><th class="n">OS</th><th>Execução</th></tr>'
+    +L.map(e=>'<tr><td>'+vEsc(e.unidade||'—')+'</td><td>'+vEsc(sgcZaTxt(e.za))+'</td><td class="n">'+sgcN(e.n)+'</td><td>'+(e.exec_min?fmtData(e.exec_min)+' a '+fmtData(e.exec_max):'—')+'</td></tr>').join('')+'</table>';
+}
 function sgcRender(){
   const box=$('#sgcSlots'); if(!box) return;
-  const porK=new Map(sgcSlotsDados.map(s=>[s.tipo+'|'+s.za,s]));
-  box.innerHTML=SGC_SLOTS.map(([tipo,za])=>{
-    const k=tipo+'|'+za, s=porK.get(k)||{}, u=s.ultima, busy=sgcOcupado[k];
-    let st, cls;
-    if(busy){ st='⏳ '+vEsc(busy); cls='wait'; }
-    else if(!u){ st='Nenhum arquivo enviado ainda.'; cls=''; }
-    else{
-      st=sgcResumo(u,tipo)+'<div class="sgbanco" style="margin-top:4px">'+vEsc(u.nome||'')+' · '+sgcDH(u.enviado_em)+(u.por?' · '+vEsc(u.por):'')+'</div>';
-      cls=u.status==='ok'?'ok':(u.status==='erro'?'erro':'wait');
-    }
-    const banco=tipo==='relacao'
-      ? 'Carteira no banco: <b>'+sgcN(s.no_banco)+'</b> OS abertas'+(s.ultima_ok_em?' (de '+sgcDH(s.ultima_ok_em)+')':'')
-      : 'No banco: <b>'+sgcN(s.no_banco)+'</b> OS encerradas'+(s.exec_min?' · execução de '+fmtData(s.exec_min)+' a '+fmtData(s.exec_max):'');
-    const re=(!busy && u && u.status!=='ok') ? '<button class="btn ghost" data-re="'+vEsc(u.id)+'">↻ Reprocessar</button>' : '';
-    return '<div class="sgslot" data-k="'+k+'">'
-      +'<div class="sgh"><b>'+SGC_TIPO[tipo]+'</b><span class="sgza">'+za+' · '+SGC_ZA[za]+'</span></div>'
+  box.innerHTML=SGC_SLOTS.map(tipo=>{
+    const fila=sgcFila[tipo], busy=!!sgcRodando[tipo];
+    const st=fila.length ? fila.map(it=>{
+        const cls=it.r?(it.r.status==='ok'?'ok':'erro'):'wait';
+        const txt=it.r?sgcResumo(it.r,tipo):'⏳ '+vEsc(it.msg||'Na fila…');
+        const za=it.r&&it.r.za?'<div class="m">'+vEsc(sgcZaTxt(it.r.za))+(it.r.unidades?' · '+vEsc(it.r.unidades):'')+'</div>':'';
+        return '<div class="sgst '+cls+'"><b>'+vEsc(it.nome)+'</b><br>'+txt+za+'</div>';
+      }).join('')
+      : '<div class="sgst">Solte aqui os arquivos exportados do SIGOS (pode ser mais de um: Contagem, Betim, mobilização social…).</div>';
+    return '<div class="sgslot" data-k="'+tipo+'">'
+      +'<div class="sgh"><b>'+SGC_TIPO[tipo]+'</b><span class="sgza">ZA pela linha do arquivo</span></div>'
       +'<div class="sgsub">'+SGC_TIPO_SUB[tipo]+'</div>'
-      +'<div class="sgst '+cls+'">'+st+'</div>'
-      +'<div class="sgbanco">'+banco+'</div>'
-      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo</button>'+re+'</div></div>';
+      +st
+      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivos</button>'
+      +(fila.length&&!busy?'<button class="btn ghost" data-limpa>Limpar lista</button>':'')+'</div>'
+      +'<div class="sgbanco" style="margin-top:4px"><b>No banco agora</b></div>'+sgcBanco(tipo)+'</div>';
   }).join('');
   box.querySelectorAll('.sgslot').forEach(el=>{
-    const [tipo,za]=el.dataset.k.split('|');
-    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ sgcAlvo=[tipo,za]; $('#sgcFile').click(); };
-    const re=el.querySelector('[data-re]'); if(re) re.onclick=()=>sgcProcessar(re.dataset.re, el.dataset.k);
+    const tipo=el.dataset.k;
+    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ sgcAlvo=tipo; $('#sgcFile').click(); };
+    const lp=el.querySelector('[data-limpa]'); if(lp) lp.onclick=()=>{ sgcFila[tipo]=[]; sgcRender(); };
     el.ondragover=ev=>{ ev.preventDefault(); el.classList.add('drag'); };
     el.ondragleave=()=>el.classList.remove('drag');
-    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); const file=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(file && !sgcOcupado[el.dataset.k]) sgcEnviar(tipo,za,file); };
+    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); const fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])]; if(fs.length && !sgcRodando[tipo]) sgcEnfileirar(tipo,fs); };
   });
   const h=$('#sgcHist');
-  h.innerHTML=sgcHistDados.length ? sgcHistDados.map(f=>'<div class="sgrow"><div class="t"><span>'+SGC_TIPO[f.tipo]+' · '+f.za+' · '+SGC_ZA[f.za]+'</span><span>'+sgcDH(f.enviado_em)+'</span></div>'
-      +'<div>'+sgcResumo(f,f.tipo)+'</div><div class="m">'+vEsc(f.nome||'')+(f.por?' · '+vEsc(f.por):'')+'</div></div>').join('')
+  h.innerHTML=sgcHistDados.length ? sgcHistDados.map(f=>'<div class="sgrow"><div class="t"><span>'+SGC_TIPO[f.tipo]+' · '+vEsc(sgcZaTxt(f.za))+(f.unidades?' · '+vEsc(f.unidades):'')+'</span><span>'+sgcDH(f.enviado_em)+'</span></div>'
+      +'<div>'+sgcResumo(f,f.tipo)+'</div><div class="m">'+vEsc(f.nome||'')+(f.por?' · '+vEsc(f.por):'')+'</div>'
+      +(f.status!=='ok'?'<button class="btn ghost" data-re="'+vEsc(f.id)+'" data-tipo="'+f.tipo+'">↻ Reprocessar</button>':'')+'</div>').join('')
     : '<p class="sub">Nenhuma carga ainda.</p>';
+  h.querySelectorAll('[data-re]').forEach(b=>b.onclick=async()=>{
+    if(sgcRodando[b.dataset.tipo]){ toast('Aguarde a carga em andamento.'); return; }
+    b.disabled=true; b.textContent='Processando…';
+    const r=await sgcProcessar(b.dataset.re); if(r) toast(r.ok?'Reprocessado.':(r.erro||'Arquivo recusado.')); sgcCarregar();
+  });
 }
-async function sgcEnviar(tipo,za,file){
-  const k=tipo+'|'+za;
+// Vários arquivos no mesmo campo: um de cada vez (a Relação apaga/regrava a carteira das unidades do arquivo).
+async function sgcEnfileirar(tipo,files){
   if(!navigator.onLine){ toast('Sem internet — a carga precisa estar online.'); return; }
-  if(!/\.csv$/i.test(file.name||'')){ toast('Envie o arquivo .csv exportado do SIGOS.'); return; }
-  if(file.size>20*1024*1024){ toast('Arquivo maior que 20 MB.'); return; }
-  sgcOcupado[k]='Enviando '+(file.name||'arquivo')+'…'; sgcRender();
+  const ok=files.filter(f=>/\.csv$/i.test(f.name||'') && f.size<=20*1024*1024);
+  if(ok.length<files.length) toast('Só vale .csv exportado do SIGOS, até 20 MB — '+(files.length-ok.length)+' ignorado(s).');
+  if(!ok.length) return;
+  sgcFila[tipo]=sgcFila[tipo].concat(ok.map(f=>({file:f,nome:f.name||'arquivo.csv',msg:'Na fila…',r:null})));
+  if(sgcRodando[tipo]){ sgcRender(); return; }
+  sgcRodando[tipo]=true; sgcRender();
+  for(let i=0;i<sgcFila[tipo].length;i++){ const it=sgcFila[tipo][i]; if(it.r||!it.file) continue; await sgcEnviar(it,tipo); it.file=null; sgcRender(); }
+  sgcRodando[tipo]=false;
+  const res=sgcFila[tipo].filter(it=>it.r), nok=res.filter(it=>it.r.status==='ok').length;
+  toast(nok+' de '+res.length+' arquivo(s) carregado(s)'+(nok<res.length?' — veja os recusados na lista.':'.'));
+  sgcCarregar();
+}
+async function sgcEnviar(it,tipo){
+  const file=it.file;
   try{
+    it.msg='Enviando…'; sgcRender();
     const d=new Date(), p2=n=>String(n).padStart(2,'0');
     const dia=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
     const nome=String(file.name||'arquivo.csv').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.\-]+/g,'_').slice(-120);
-    const path=tipo+'/'+za+'/'+dia+'/'+crypto.randomUUID()+'_'+nome;
+    const path=tipo+'/geral/'+dia+'/'+crypto.randomUUID()+'_'+nome;
     const up=await sb.storage.from('sigos-relatorios').upload(path,file,{contentType:file.type||'text/csv',upsert:false});
     if(up.error) throw up.error;
-    const {data:id,error}=await sb.rpc('app_sigos_registrar',{p_slot_tipo:tipo,p_slot_za:za,p_path:path,p_nome:file.name||nome,p_tamanho:file.size});
+    const {data:id,error}=await sb.rpc('app_sigos_registrar',{p_slot_tipo:tipo,p_slot_za:null,p_path:path,p_nome:file.name||nome,p_tamanho:file.size});
     if(error) throw error;
-    await sgcProcessar(id,k);
+    it.msg='Processando…'; sgcRender();
+    const r=await sgcProcessar(id);
+    it.r=r ? {...r,status:r.ok?'ok':'erro'} : {status:'erro',erro:'Não processou — use Reprocessar no histórico abaixo.'};
   }catch(e){
-    delete sgcOcupado[k]; toast('Falha no envio: '+((e&&e.message)||e)); sgcCarregar();
+    it.r={status:'erro',erro:'Falha no envio: '+((e&&e.message)||e)};
   }
 }
-async function sgcProcessar(id,k){
-  const tipo=k.split('|')[0];
-  sgcOcupado[k]='Processando…'; sgcRender();
-  let r=null;
+async function sgcProcessar(id){
   try{
     const {data,error}=await sb.functions.invoke('sigos-ingest',{body:{arquivo_id:id}});
     if(error){ let m=error.message; try{ const j=await error.context.json(); m=j.erro||j.message||m; }catch(_){} throw new Error(m); }
-    r=data;
-  }catch(e){ toast('Não processou: '+((e&&e.message)||e)+' — use Reprocessar.'); }
-  delete sgcOcupado[k];
-  if(r){
-    if(r.ok) toast(tipo==='relacao' ? 'Carteira '+r.za+' atualizada: '+sgcN(r.inseridas)+' OS abertas.' : sgcN(r.inseridas)+' OS novas · '+sgcN(r.ja_existentes)+' já existentes.');
-    else toast(r.erro||'Arquivo recusado.');
-  }
-  sgcCarregar();
+    return data;
+  }catch(e){ toast('Não processou: '+((e&&e.message)||e)+' — use Reprocessar.'); return null; }
 }
 
 // ---------- VÍNCULO OS SIGOS (selo de situação em todo campo de OS do app) ----------
