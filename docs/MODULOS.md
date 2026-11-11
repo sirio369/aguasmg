@@ -1119,17 +1119,18 @@ Acompanhamento.
   - **Export** (`pavProgExport`, sem botão): Etapa · Dias na etapa · Faixa de prazo · Ensaio de reaterro (Sim/Não) · Situação do reaterro · Ensaios feitos · Último laudo + colunas de antes.
 
 
-### 4.5 Carga SIGOS — `// ---------- CARGA SIGOS` · tela `sigos_carga` (2026-11-06, sw v332)
+### 4.5 Carga SIGOS — `// ---------- CARGA SIGOS` · tela `sigos_carga` (2026-11-06, sw v332; 2 campos na v368)
 
 Card **📥 Carga SIGOS** na seção **📥 Relatórios SIGOS** do hub (gate da tela = o do Auxiliar, `aux_acesso`/admin; o banco
 usa `sigos_pode_carregar`, hoje qualquer logado). Backend, regras e tabelas em **§21**.
-- Grade 2×2 de campos (`SGC_SLOTS`: Relação/Encerradas × ZA1004/ZA0200; 1 coluna no celular). Cada campo mostra a última carga
-  (`app_sigos_slots`: status, resumo, arquivo, quando/quem) e o que está no banco (carteira aberta ou encerradas + período de
-  execução), com **📤 Enviar arquivo** (seletor ou arrastar e soltar no campo) e **↻ Reprocessar** quando a última carga não
-  ficou `ok`.
-- `sgcEnviar(tipo, za, file)`: só online e `.csv` ≤ 20 MB → upload em `sigos-relatorios/<tipo>/<za>/<AAAA-MM-DD>/<uuid>_<nome>`
-  → `app_sigos_registrar` → `sgcProcessar(id)` = `sb.functions.invoke('sigos-ingest', {arquivo_id})` → toast com o resumo
-  (ou o motivo da recusa) e recarrega. Lista **Últimas cargas** = `app_sigos_cargas_listar(40)`.
+- **2 campos** desde 11/11/2026, sw v368 (`SGC_SLOTS`: Relação / Encerradas; 1 coluna no celular) — antes eram 4 (tipo × ZA).
+  Cada campo aceita **vários arquivos** (seletor `multiple` ou arrastar e soltar) e mostra a fila desta sessão (cada arquivo com
+  status, resumo, ZA(s) e unidades detectadas) e o **"No banco agora"** de `app_sigos_painel`: Relação = carteira por **unidade** ×
+  ZA × OS abertas × "carteira de"; Encerradas = OS por gerência × ZA + período de execução.
+- `sgcEnfileirar(tipo, files)` → `sgcEnviar(item, tipo)` **um arquivo de cada vez**: só online e `.csv` ≤ 20 MB → upload em
+  `sigos-relatorios/<tipo>/geral/<AAAA-MM-DD>/<uuid>_<nome>` → `app_sigos_registrar` (`p_slot_za: null`) → `sgcProcessar(id)` =
+  `sb.functions.invoke('sigos-ingest', {arquivo_id})`; no fim, toast "N de M carregados" e recarrega. Lista **Últimas cargas** =
+  `app_sigos_cargas_listar(40)` (tipo · ZA(s) · unidades), com **↻ Reprocessar** em cada carga que não ficou `ok`.
 - Prefixo `sgc*`/`SGC_*` (o `sg*` já é da Segurança do Trabalho).
 
 ---
@@ -3719,45 +3720,57 @@ outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo par
 
 **Aplicado em 06/11/2026** (migrações `sigos_carga` + `sigos_searchpath`; Edge Function `sigos-ingest` v1 publicada,
 verify_jwt=true). Ponto único de entrada dos relatórios de OS exportados à mão do **SIGOS** da COPASA, para servir de base a outras telas,
-BI e cruzamentos (ligações, pavimento, pesquisa, fraude). São **4 campos de envio** (tipo × ZA):
+BI e cruzamentos (ligações, pavimento, pesquisa, fraude). Desde **11/11/2026 (sw v368, `docs/migracao_sigos_carga_2campos.sql`)**
+são **2 campos de envio** (um por tipo), cada um aceitando **vários arquivos de uma vez** — a ZA sai de **cada linha** do arquivo.
+São 6 relatórios hoje (Contagem, Betim e mobilização social × 2 tipos):
 
-| | ZA1004 — Contagem (GRCN) | ZA0200 — Betim (GRMS/ELBE) |
+| Campo | Arquivo | ZA de cada linha |
 |---|---|---|
-| **Relação de Serviços** (OS não executadas, sem limite de dias; 21 colunas, "Abertura OS") | `relacao/ZA1004` | `relacao/ZA0200` |
-| **Encerradas** (executadas, janela de 30 dias; 40 colunas, "Data de Execução") | `encerradas/ZA1004` | `encerradas/ZA0200` |
+| **Relação de Serviços** (OS não executadas, sem limite de dias; 21 colunas, "Abertura OS") | `relacao/geral/…` | coluna **Unidade** (GRCN, ELBE, GNDSEQCT, GNDSEQBE) |
+| **Encerradas** (executadas, janela de 30 dias; 40 colunas, "Data de Execução") | `encerradas/geral/…` | **Escritório Local** se estiver no de-para, senão **Gerência** |
+
+*Mobilização social* (código 732 79 00) vem da **GNDS** (Gerência de Desenvolvimento Social), que atende as duas ZAs: quem separa é o
+escritório — **GNDSEQCT = ZA1004/Contagem**, **GNDSEQBE = ZA0200/Betim**. Até 11/11 eram 4 campos fixos (tipo × ZA) e a Relação
+apagava a carteira da ZA inteira — uma Relação da GNDS no campo da ZA1004 teria apagado a carteira da GRCN.
 
 **Regras (decididas pelo usuário):**
-- **Relação = substituição**: o arquivo novo apaga a carteira inteira **daquela ZA** (`os_aberta where consorcio = ZA`) e grava o
-  novo. Contagem nunca apaga Betim. Uma Relação mais antiga que a última carregada no campo é recusada (não regride a carteira).
+- **Relação = substituição por unidade**: o arquivo novo apaga só a carteira **das unidades que vêm nele** (`os_aberta where
+  unidade = any(unidades do arquivo)`) e grava o novo — a GNDS nunca apaga a GRCN e vice-versa. Uma Relação mais antiga que a última
+  carregada para alguma dessas unidades é recusada (não regride a carteira). **Unidade que zerar a carteira não aparece no arquivo**
+  e a carteira antiga fica — a tela mostra "carteira de" por unidade para isso ficar visível.
 - **Encerradas = acumulativa**: `insert … on conflict (numero) do nothing` — só entra OS nova; nada é apagado. Como o SIGOS
   limita a 30 dias, os envios se sobrepõem e o resumo mostra inseridas × já existentes.
-- **Conferência do campo**: o tipo vem do cabeçalho e a ZA da Gerência/Unidade das linhas (de-para editável
-  `"17 - sigos".gerencia_za`: GRCN→ZA1004, GRMS/ELBE→ZA0200). Não bateu com o campo → recusado com mensagem, banco intacto.
+- **Conferência**: o tipo vem do cabeçalho (arquivo no campo do outro tipo → recusado) e a ZA de cada linha pelo de-para editável
+  `"17 - sigos".gerencia_za` (a chave pode ser gerência, unidade ou escritório: GRCN→ZA1004, GRMS/ELBE→ZA0200,
+  GNDSEQCT→ZA1004, GNDSEQBE→ZA0200). Linha sem ZA → arquivo inteiro recusado ("sem ZA cadastrada: GNDS / GNDSEQXX"), banco
+  intacto; resolve-se incluindo a chave no de-para e reprocessando. App ≤ v367 (4 campos, `slot_za` preenchido) segue
+  funcionando: nesse caso ainda confere "arquivo da ZA do campo".
 - Mesmo arquivo de novo (sha256) não é recusado — só gera **aviso** "idêntico ao já enviado em …" (reprocessar é inofensivo).
 
-**Fluxo:** app sobe o `.csv` em `sigos-relatorios/<tipo>/<ZA>/<AAAA-MM-DD>/<uuid>_<nome>` → `app_sigos_registrar` (linha
-`pendente` em `arquivo`) → `functions.invoke('sigos-ingest', {arquivo_id})`. A função roda **com o JWT do usuário** (sem
+**Fluxo:** app sobe cada `.csv` (um de cada vez, na ordem) em `sigos-relatorios/<tipo>/geral/<AAAA-MM-DD>/<uuid>_<nome>` →
+`app_sigos_registrar` com `p_slot_za = null` (linha `pendente` em `arquivo`) → `functions.invoke('sigos-ingest', {arquivo_id})`. A função roda **com o JWT do usuário** (sem
 service role): baixa do bucket, decodifica (o SIGOS exporta **UTF-16 LE sem BOM**; cai para UTF-8/Windows-1252), lê o CSV
 (`;`, aspas RFC 4180 — as coordenadas vêm como `"=""-19.93"""`) e chama `sigos_processar(arquivo, cabeçalho, linhas, sha256,
 tamanho)`. **Toda a regra está no SQL**; a função é só leitor. Falha de leitura → `app_sigos_falha` grava o erro e o campo
-oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem novo upload). Não há rotina agendada: envio só pelo app.
+oferece "Reprocessar" no histórico (chama a função de novo com o mesmo `arquivo_id`, sem novo upload). Não há rotina agendada: envio só pelo app.
 
 **Banco (`"17 - sigos"`, app-only, RLS sem policy):**
-- `arquivo` — log de cargas (nunca apaga): campo (`slot_tipo`/`slot_za`), path, nome, sha256, tipo/ZA detectados, período
+- `arquivo` — log de cargas (nunca apaga): campo (`slot_tipo`; `slot_za` só nas cargas do app antigo, null desde v368), path, nome, sha256, tipo/ZA(s) detectados (`za_detectada` pode ser "ZA0200, ZA1004"), unidades (`gerencias`), período
   (das Encerradas, lido do nome `EncerradasAAAAMMDDaAAAAMMDD…`), linhas/inseridas/já existentes/removidas, status
   `pendente|ok|erro`, erro, aviso, quem/quando.
-- `os_aberta` (PK `numero`) — carteira atual = última Relação de cada ZA. `equipe` e `responsavel` saem de "Equipe e Responsável".
+- `os_aberta` (PK `numero`) — carteira atual = última Relação de cada **unidade** (`unidade`; `consorcio` vem da linha). `equipe` e `responsavel` saem de "Equipe e Responsável".
 - `os_encerrada` (PK `numero`) — histórico acumulado; `geom_imovel`/`geom_foto` (Point 31983, de lat/lon WGS84; 0,0 → null).
 - Views `vw_os_aberta` (+ `idade_dias`, `vencida`, `carteira_de`), `vw_os_encerrada` (+ `no_prazo`, `dist_foto_m`,
   `foto_sem_gps`, `foto_longe` > 200 m), `vw_os_ligacao` (abertas + encerradas ligadas a `"3 - comercial".ligacoes` pela matrícula).
 - BI: grupo `bi_sigos_leitura` (as 3 views + `bi_producao_os`) concedido a `bi_leitura`. **Sem acesso GIS** (schema app-only; se for ao QGIS,
   criar view curada na vitrine). O **Dashboard Producao** lê as Encerradas daqui pela API (§21.5).
-- RPCs (definer, `authenticated`): `app_sigos_registrar(tipo, za, path, nome, tamanho)`, `app_sigos_arquivo_info(id)`,
-  `app_sigos_falha(id, erro)`, `sigos_processar(…)`, `app_sigos_slots()` (os 4 campos: última carga + quantas OS no banco),
-  `app_sigos_cargas_listar(limite)`.
+- RPCs (definer, `authenticated`): `app_sigos_registrar(tipo, za|null, path, nome, tamanho)`, `app_sigos_arquivo_info(id)`,
+  `app_sigos_falha(id, erro)`, `sigos_processar(…)`, **`app_sigos_painel()`** (tela v368: carteira por unidade + "carteira de",
+  encerradas por gerência × ZA, de-para), `app_sigos_cargas_listar(limite)` (`za` = ZA detectada, + `unidades`).
+  `app_sigos_slots()` (4 campos) ficou só para o app ≤ v367 — pode sair depois que ninguém mais estiver nele.
 - **Acesso:** helper único `public.sigos_pode_carregar(uid)` usado nas RPCs e nas policies do bucket. **Por ora = qualquer
   usuário logado e ativo** (o usuário vai definir a regra); para restringir, trocar só essa função.
-- Bucket **`sigos-relatorios`** privado (20 MB): insert/select para `sigos_pode_carregar`, só nas 4 pastas; sem update/delete
+- Bucket **`sigos-relatorios`** privado (20 MB): insert/select para `sigos_pode_carregar`, só nas pastas `<tipo>/ZA1004|ZA0200|geral`; sem update/delete
   (o arquivo bruto fica como prova de cada carga).
 
 **Cuidados:**
@@ -3767,7 +3780,7 @@ oferece "Reprocessar" (chama a função de novo com o mesmo `arquivo_id`, sem no
   o campo vem vazio sem erro — conferir o resumo da primeira carga depois de qualquer mudança no SIGOS.
 - `sigos_processar` nunca levanta erro de validação: grava `status='erro'` + mensagem e devolve `{ok:false}`; erro inesperado
   na gravação desfaz só os dados (subbloco) e também vira `erro` no log.
-- Carga concorrente no mesmo campo é serializada por `pg_advisory_xact_lock`.
+- Carga concorrente do mesmo tipo é serializada por `pg_advisory_xact_lock` (`sigos:<tipo>`); a tela também manda os arquivos um a um.
 - **pg_safeupdate**: nas chamadas do app (PostgREST) todo `UPDATE`/`DELETE` precisa de `WHERE` — senão dá
   "UPDATE requires a WHERE clause". Testes pela Management API/MCP **não** pegam isso (a extensão não carrega lá).
   Corrigido em 06/11/2026 (migração `sigos_processar_safeupdate`: `where true` no update da tabela temporária).
