@@ -1059,7 +1059,7 @@ Acompanhamento.
   (`p_consorcio` null = o dia inteiro, sem OS única). Cabeçalho (consórcio, data + dia da semana,
   colaborador, período em pesquisa = 1º início → último fim dos trechos, **OS SIGOS do dia** ou "Pendente" — `os_dia`) →
   **1 · Produção do dia** (3 cards: km pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa]) →
-  **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa). **Desde 11/11/2026 (sw v366) a folha
+  **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa). **Desde 11/11/2026 (sw v364) a folha
   traz só o trajeto percorrido/pesquisado:** não mostra vazamentos nem fraudes (nem contagem, vaz/km, pinos no mapa ou
   detalhe com foto) — decisão do usuário. A RPC continua devolvendo `vazamentos`/`fraudes`/`kpis.vaz_km`, mas a folha os
   ignora. O **card da lista de blocos** também mostra só km pesquisado · km andado · km/h (sem contagem de ocorrências).

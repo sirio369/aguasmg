@@ -299,7 +299,7 @@ pwa/
     blocos dia × colaborador × consórcio no estilo da Gestão de Pavimento — abas Pendente de OS/OS criada/Todos, chips de
     prazo, filtros de consórcio, colaborador e dia; o backoffice lança a **OS SIGOS do dia** no bloco (`"12 - retaguarda".pesquisa_dia_os`)
     e cada bloco abre a folha p/ imprimir/PDF — só o trajeto percorrido/pesquisado (km pesquisado, km andado,
-    velocidade e mapa da rede + trajeto; **sem vazamentos/fraudes** desde 11/11/2026, sw v366); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9) ·
+    velocidade e mapa da rede + trajeto; **sem vazamentos/fraudes** desde 11/11/2026, sw v364); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9) ·
     Acompanhamento da pesquisa (`pp_acomp`, §4.3.8).
   - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma
     preventivo (`vrpman_prev`) — **migradas do hub `vrpman`** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg` admin).
