@@ -7281,10 +7281,10 @@ function paToggleRep(){ paShowRep=!paShowRep; paPintarToggles(); paCarregarMapa(
 // chips de prazo (dias desde o dia trabalhado, PAV_SLA), filtros de consórcio, colaborador e dia. Cada consórcio é um
 // contrato → bloco, OS e folha são por consórcio (trecho pela geometria, ver SQL). O backoffice lança a OS SIGOS do dia no
 // bloco (app_pp_diario_os) → o bloco vira "OS criada" (rastreio do que virou OS por dia de trabalho). Cada bloco abre a
-// folha do dia (overlay #relatorio + REL_CSS → imprimir/PDF): produção (km pesquisado = rede, km andado, velocidade,
-// vazamentos, fraudes, vaz/km — mesmas definições do Acompanhamento), mapa estático (rede + trajetos + ocorrências
-// numeradas) e o detalhe de cada vazamento e de cada fraude (foto + descrição do pesquisador). Fraude fica fora do
-// vaz/km; numeração única: vazamentos 1..n, depois fraudes n+1.. (pdOcorrencias).
+// folha do dia (overlay #relatorio + REL_CSS → imprimir/PDF): SÓ o trajeto percorrido/pesquisado — produção (km
+// pesquisado = rede, km andado, velocidade — mesmas definições do Acompanhamento) e mapa estático (rede + trajetos).
+// Desde 11/11/2026 a folha NÃO mostra vazamentos/fraudes apontados (nem contagem, vaz/km, pinos ou detalhe); a RPC
+// ainda devolve esses campos, mas a folha e o card da lista os ignoram.
 // RPCs app_pp_diario_lista / app_pp_diario_os / app_pp_relatorio_diario.
 let pdBlocos=[], pdStatus='pendente', pdPrazo='';
 const PD_COR={rede:'#1D9E75',trecho:'#d81b60',vaz:'#1565c0',fraude:'#c2410c'};
@@ -8720,8 +8720,8 @@ function pdCard(b){
   const cons=b.consorcio==='ZA1004'?'Contagem':(b.consorcio==='ZA0200'?'Betim':(b.consorcio||'Sem consórcio'));
   const vel=b.duracao_s>0?(Number(b.km_andado)/(b.duracao_s/3600)):0;
   const badge='<span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:'+cor+';padding:2px 10px;border-radius:999px;white-space:nowrap">'+(pend?(bk.lbl+' · '+pavDiasTxt(d)):'✓ OS criada')+'</span>';
-  const met=[relNum(b.km_rede,2)+' km pesquisados',relNum(b.km_andado,2)+' km andados',relNum(vel,1)+' km/h',
-    b.vazamentos+' vazamento'+(b.vazamentos===1?'':'s'),b.fraudes+' fraude'+(b.fraudes===1?'':'s')].join(' · ');
+  // só trajeto (sem contagem de vazamentos/fraudes — 11/11/2026)
+  const met=[relNum(b.km_rede,2)+' km pesquisados',relNum(b.km_andado,2)+' km andados',relNum(vel,1)+' km/h'].join(' · ');
   const campo=(v,bt)=>'<div style="display:flex;gap:6px;margin-top:8px"><input class="pdosinp" data-k="'+k+'" value="'+vEsc(v||'')+'" placeholder="nº da OS SIGOS do dia" autocomplete="off" style="flex:1;min-width:0"/><button class="btn pdoscriar" data-k="'+k+'" style="width:auto;margin:0;padding:8px 14px;white-space:nowrap">'+bt+'</button></div>';
   const os=pend ? campo('','Criar OS')
     : '<div class="sub" style="margin-top:8px;font-size:12px"><b style="color:#0e7c86">✓ OS '+vEsc(b.os_sigos)+'</b>'+sgxS(b.os_sigos)+(b.os_por?(' · lançada por '+vEsc(b.os_por)):'')+(b.os_em?(' em '+new Date(b.os_em).toLocaleDateString('pt-BR')):'')
@@ -8759,57 +8759,36 @@ async function pdGerar(bl, btn){
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   const pb=document.getElementById('relPrint'); pb.onclick=()=>window.print();
   await pdDesenharMapa(d);
-  await pdEsperarFotos(8000);   // libera a impressão só com mapa e fotos carregados (ou após 8 s)
+  await pdEsperarFotos(8000);   // libera a impressão só com o mapa carregado (ou após 8 s)
   pb.disabled=false;
 }
 function pdDataBR(s){ const p=String(s||'').split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:'—'; }
 function pdHora(s){ return s?String(s).slice(11,16):'—'; }   // timestamps do schema 8 já vêm no horário de Brasília
 function pdDuracao(seg){ seg=Number(seg||0); const h=Math.floor(seg/3600), m=Math.round(seg%3600/60); return h?(h+' h '+String(m).padStart(2,'0')+' min'):(m+' min'); }
 function pdDocHtml(d){
-  const k=d.kpis||{}, oc=pdOcorrencias(d), vaz=oc.filter(o=>!o.fraude), fra=oc.filter(o=>o.fraude), cons=(d.consorcios||[]).map(c=>REL_CONS[c]||c).join(' · ');
+  // folha só com o trajeto percorrido/pesquisado — sem vazamentos/fraudes apontados (pedido 11/11/2026)
+  const k=d.kpis||{}, cons=(d.consorcios||[]).map(c=>REL_CONS[c]||c).join(' · ');
   const p=String(d.data||'').split('-'), sem=p.length===3?new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString('pt-BR',{weekday:'long'}):'';
   const card=(t,v,u,s)=>'<div class="relCard"><div class="relCardT">'+t+'</div><div class="relCardV">'+v+(u?' <span>'+u+'</span>':'')+'</div>'+(s?'<div class="relCardS">'+s+'</div>':'')+'</div>';
   let h='<div class="relTop"><div><h1>Relatório Diário · Pesquisa de Vazamentos</h1><div class="sub">'+(cons||'Pesquisa de vazamentos')+'</div></div><div class="relBadge">'+pdDataBR(d.data)+'</div></div><div class="relBody">';
   h+='<div class="relGrid">'+relField('Colaborador',vEsc((d.colaborador||{}).nome))+relField('Data',pdDataBR(d.data)+(sem?(' · '+sem):''))
     +relField('Período em pesquisa',k.inicio?(pdHora(k.inicio)+' às '+pdHora(k.fim)):'—')+relField('OS SIGOS do dia',(d.os_dia&&d.os_dia.os_sigos)?vEsc(d.os_dia.os_sigos):'<span style="color:#b45309">Pendente</span>')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
-  h+='<div class="relSec"><span class="relNum">1</span> Produção do dia</div><div class="relCards c6">'
+  h+='<div class="relSec"><span class="relNum">1</span> Produção do dia</div><div class="relCards" style="grid-template-columns:repeat(3,1fr)">'
     +card('Km pesquisado',relNum(k.km_rede_pesquisado,2),'km','rede pesquisada')
     +card('Km andado',relNum(k.km_andado,2),'km',(k.n_trechos||0)+' trecho(s)')
-    +card('Velocidade',relNum(k.velocidade_kmh,1),'km/h',k.duracao_s?('em '+pdDuracao(k.duracao_s)):'')
-    +card('Vazamentos',String(k.vazamentos||0),'','apontados')
-    +card('Fraudes',String(k.fraudes||0),'','apontadas')
-    +card('Vaz/km',relNum(k.vaz_km,2),'','por km pesquisado')+'</div>';
+    +card('Velocidade',relNum(k.velocidade_kmh,1),'km/h',k.duracao_s?('em '+pdDuracao(k.duracao_s)):'')+'</div>';
   h+='<div class="relSec"><span class="relNum">2</span> Mapa da pesquisa</div><div id="pdMapa" class="relMapWrap"><div class="relMapPh">Preparando mapa…</div></div>';
   h+='<div class="relLeg"><span><i style="display:inline-block;width:18px;height:4px;background:'+PD_COR.rede+';vertical-align:middle;margin-right:4px"></i>Rede pesquisada</span>'
-    +'<span><i style="display:inline-block;width:18px;border-top:3px dashed '+PD_COR.trecho+';vertical-align:middle;margin-right:4px"></i>Trajeto andado</span>'
-    +'<span><span class="relDot" style="background:'+PD_COR.vaz+'"></span>Vazamento</span>'
-    +'<span><span class="relDot" style="background:'+PD_COR.fraude+'"></span>Fraude (nº = detalhe abaixo)</span></div>';
-  h+='<div class="relSec"><span class="relNum">3</span> Vazamentos apontados ('+vaz.length+')</div>';
-  h+=vaz.length?vaz.map(pdOcHtml).join(''):'<div class="relPend">Nenhum vazamento apontado neste dia.</div>';
-  h+='<div class="relSec"><span class="relNum">4</span> Fraudes apontadas ('+fra.length+')</div>';
-  h+=fra.length?fra.map(pdOcHtml).join(''):'<div class="relPend">Nenhuma fraude apontada neste dia.</div>';
+    +'<span><i style="display:inline-block;width:18px;border-top:3px dashed '+PD_COR.trecho+';vertical-align:middle;margin-right:4px"></i>Trajeto andado</span></div>';
   h+='</div><div class="relFoot"><span>AcquaHub · relatório diário da pesquisa</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
   return h;
-}
-// vazamentos e fraudes numa lista só (mesma numeração do mapa e do detalhe)
-function pdOcorrencias(d){ const oc=(d.vazamentos||[]).map(v=>Object.assign({},v,{fraude:false})).concat((d.fraudes||[]).map(f=>Object.assign({},f,{fraude:true})));
-  oc.forEach((o,i)=>{ o.n=i+1; }); return oc; }
-function pdOcHtml(v){
-  const foto=v.foto?'<img src="'+fotoURL(v.foto)+'" onerror="this.style.display=\'none\'"/>':'<div class="relMapPh">Sem foto</div>';
-  const coord=(v.lat!=null&&v.lon!=null)?(Number(v.lat).toFixed(6)+', '+Number(v.lon).toFixed(6)):'—';
-  return '<div class="relVaz"><div>'+foto+'</div><div>'
-    +'<div class="relVazT"><span class="relNum" style="background:'+(v.fraude?PD_COR.fraude:PD_COR.vaz)+'">'+v.n+'</span>'+vEsc(v.fraude?String(v.tipo||'Fraude').replace(/^Fraude - /,''):(v.tipo||'Vazamento'))+'</div>'
-    +'<div class="relGrid">'+relField('Local',vEsc(v.local))+relField('Hora do apontamento',pdHora(v.data_hora))+relField('OS COPASA',vEsc(v.os))
-    +relField('Coordenada',coord)+relWide('Descrição do pesquisador',vEsc(v.observacao))+'</div></div></div>';
 }
 function pdLinhas(g){ if(!g) return []; if(g.type==='LineString') return [g.coordinates]; if(g.type==='MultiLineString') return g.coordinates; return []; }
 async function pdDesenharMapa(d){
   const box=document.getElementById('pdMapa'); if(!box) return;
   const rede=((d.rede||{}).features||[]).flatMap(f=>pdLinhas(f.geometry));
   const tr=((d.trechos||{}).features||[]).flatMap(f=>pdLinhas(f.geometry));
-  const oc=pdOcorrencias(d);
-  const pts=rede.flat().concat(tr.flat()).map(c=>({lat:c[1],lon:c[0]}))
-    .concat(oc.filter(v=>v.lat!=null&&v.lon!=null).map(v=>({lat:+v.lat,lon:+v.lon})));
+  const pts=rede.flat().concat(tr.flat()).map(c=>({lat:c[1],lon:c[0]}));   // só rede + trajeto (sem ocorrências)
   if(!pts.length){ box.innerHTML='<div class="relMapPh">Sem pesquisa georreferenciada neste dia.</div>'; return; }
   const linha=(ctx,xy,ls,cor,larg,traco)=>{ ctx.strokeStyle=cor; ctx.lineWidth=larg; ctx.lineCap='round'; ctx.setLineDash(traco||[]);
     ls.forEach(l=>{ ctx.beginPath(); l.forEach((c,j)=>{ const [x,y]=xy(c[1],c[0]); if(j) ctx.lineTo(x,y); else ctx.moveTo(x,y); }); ctx.stroke(); });
@@ -8818,10 +8797,6 @@ async function pdDesenharMapa(d){
     const url=await relMapaCanvas(pts,760,440,(ctx,xy)=>{
       linha(ctx,xy,rede,PD_COR.rede,5);
       linha(ctx,xy,tr,PD_COR.trecho,2.5,[6,5]);
-      oc.forEach(v=>{ if(v.lat==null||v.lon==null) return; const [x,y]=xy(+v.lat,+v.lon);
-        ctx.beginPath(); ctx.arc(x,y,10,0,Math.PI*2); ctx.fillStyle=v.fraude?PD_COR.fraude:PD_COR.vaz; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.stroke();
-        ctx.fillStyle='#fff'; ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(v.n),x,y+1);
-        ctx.textAlign='left'; ctx.textBaseline='alphabetic'; });
     },{tolerante:true,justo:true});
     box.innerHTML='<img class="relMap" src="'+url+'"/>';
   }catch(e){ box.innerHTML='<div class="relMapPh">Não foi possível montar o mapa ('+vEsc(e.message||e)+').</div>'; }
