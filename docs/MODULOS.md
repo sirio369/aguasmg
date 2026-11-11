@@ -607,6 +607,38 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   `pgOcAbrir(id,temOs)` (chamado pelo popup do Acompanhamento, §4.3.8) abre em modo pesquisa, na aba certa
   (pendente/OS criada), limpa os filtros, rola até o card (`data-occ`) e o destaca (`.occ.foco`); o "‹ voltar"
   segue `pgBackTo` (volta ao Acompanhamento nesse caso). `app_ocorrencia_fila` passou a devolver `usuario_nome`.
+- **Ocorrências: ciclo da OS × SIGOS (2026-11-11, sw v364, só front).** No modo pesquisa as abas Pendentes/OS
+  criada/Todas (`#pgFiltros`, `pgFiltro`) **somem**. No lugar delas entra `#pgOcCiclo`, com as abas do ciclo
+  (`OC_ETAPAS`, estado `pgOcEtapa`, padrão `criar`):
+  - **📝 Pendente de criação** = sem OS;
+  - **⏳ OS em aberto** = OS lançada que ainda não aparece no SIGOS, ou com nº fora do padrão, ou na carteira;
+  - **🏁 OS encerrada** = executada ou encerrada sem execução;
+  - **Todas**.
+
+  Cada aba mostra sua contagem, e a contagem respeita tipo/local/consórcio. Dentro das abas de OS aparecem os chips
+  **"Situação no SIGOS"** (`pgOcSig`):
+  - 🔎 Não aparece no SIGOS;
+  - ❌ Nº fora do padrão;
+  - um chip por **status da carteira** (`st:<status>`: Não programada, Programada, Fora atendimento, Agendamento
+    vencido…);
+  - ✅ Executada;
+  - ⛔ Encerrada sem execução.
+
+  A situação vem do mesmo selo do Vínculo SIGOS (§21.2, `sgxGet` → `app_sigos_os_status`), num lote único.
+  `pgCarregarOc` passou a buscar sempre `p_filtro='todas'` e grava a situação em `o._sg`. Tudo é filtrado no
+  navegador (`ocSit`/`ocEtapa`/`ocSigKey`, dentro de `pgOcFiltrado`).
+
+  O card (`pgOcCicloHtml`) mostra:
+  - o trilho **Registro › OS criada › No SIGOS › Encerrada**, com o passo atual em âmbar;
+  - sem OS: há quantos dias a ocorrência espera a OS;
+  - com OS: o selo, o nº e quando/por quem foi lançada, o serviço do SIGOS e a data de abertura;
+  - OS encerrada: data, status e resultado, e o **ciclo em dias** (registro → encerramento);
+  - OS em aberto: há quantos dias está aberta.
+
+  O mapa pinta por etapa: vermelho = sem OS, âmbar = em aberto, verde = executada, cinza = encerrada sem
+  execução. `pgOcAbrir(id,temOs)` abre em "Pendente de criação" quando a ocorrência não tem OS e em "Todas" quando
+  tem; `pgOcAbrirFiltro` abre em "Todas". O banco não mudou. ⚠️ A classificação segue o `vw_os_situacao`, então
+  OS **CANCELADA(CA)** ainda na carteira conta como "em aberto".
 
 ### 4.3 Programação de pesquisa de vazamento — `// MÓDULO PROGRAMAÇÃO DE PESQUISA` (~L2438) · tela `programacao_pesquisa` (dentro de Auxiliar de Programação)
 
