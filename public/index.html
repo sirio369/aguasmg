@@ -70,6 +70,17 @@ input:focus,select,textarea:focus{outline:2px solid var(--acc);outline-offset:-1
 .occ-dt{font-size:11px;color:var(--mut);white-space:nowrap}
 .occ-links{display:flex;gap:12px;font-size:12px}
 .occ-ok{background:var(--ok-bg);border-radius:8px;padding:2px 8px;font-size:12px}
+/* ciclo da OS × SIGOS (2026-11-11): Registro › OS criada › No SIGOS › Encerrada + bloco com a situação */
+.occ-ciclo{display:flex;flex-wrap:wrap;align-items:center;gap:2px 3px;font-size:10.5px;justify-content:flex-end}
+.occ-st{padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.occ-st.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:600}
+.occ-st.cur{border-color:#f59e0b;color:#92400e;background:var(--warn-bg);font-weight:600}
+.occ-sa{color:var(--mut)}
+.occ-cl{font-size:11.5px;color:#92400e}
+.occ-sig{width:100%;box-sizing:border-box;border-radius:8px;padding:4px 8px;font-size:11.5px;line-height:1.4;background:var(--warn-bg);overflow-wrap:anywhere}
+.occ-sig.encerrada{background:var(--ok-bg)}
+.occ-sig.encerrada_sem_execucao{background:var(--bg);border:1px solid var(--line)}
+.occ-sig .sgx{margin:0 0 2px;white-space:normal}
 .occ-os{display:flex;gap:6px;width:100%}
 .occ-os input{flex:1;min-width:0;padding:7px 10px;font-size:14px}
 .occ-os .btn{margin:0;width:auto;padding:7px 12px;font-size:14px}
@@ -1339,6 +1350,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
         <select id="pgOcFLocal" style="flex:1 1 150px;min-width:0"><option value="">Todos os locais</option></select>
         <select id="pgOcFCons" style="flex:1 1 150px;min-width:0"><option value="">Todos os consórcios</option><option value="ZA0200">ZA0200 · Betim</option><option value="ZA1004">ZA1004 · Contagem</option></select>
       </div>
+      <div id="pgOcCiclo" style="margin-top:10px"></div>
       <div id="pgOcTabs" style="display:flex;gap:6px;margin:8px 0"></div>
       <div id="pgOcLista" style="margin-top:8px"></div>
       <div id="pgOcMapa" class="hidden" style="margin-top:8px;height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
@@ -5177,8 +5189,10 @@ function pgInit(){
 }
 function pgRenderFiltros(){
   const c=document.getElementById('pgFiltros'); if(!c) return;
+  if(pgModo==='pesquisa'){ c.innerHTML=''; c.style.display='none'; return; }   // ocorrências: abas do ciclo da OS ficam em #pgOcCiclo
+  c.style.display='flex';
   c.innerHTML=PG_FILTROS.map(f=>`<button class="btn ghost" data-pgf="${f[0]}" style="margin:0;flex:1;padding:8px 6px;font-size:13px${pgFiltro===f[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${f[1]}</button>`).join('');
-  c.querySelectorAll('[data-pgf]').forEach(b=>b.addEventListener('click',()=>{ pgFiltro=b.dataset.pgf; pgRenderFiltros(); pgCarregar(); pgCarregarOc(); }));
+  c.querySelectorAll('[data-pgf]').forEach(b=>b.addEventListener('click',()=>{ pgFiltro=b.dataset.pgf; pgRenderFiltros(); pgCarregar(); }));
 }
 async function pgCarregar(){
   const c=document.getElementById('pgLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
@@ -5237,6 +5251,36 @@ function pgOcFillEnderecos(root){
     revGeo(+sp.dataset.lat,+sp.dataset.lon).then(txt=>{ sp.textContent = txt?('🏠 '+txt):'endereço indisponível'; });
   });
 }
+// --- ciclo da OS da ocorrência × SIGOS (2026-11-11, mesmo selo da Gestão de VRPs: app_sigos_os_status via sgxGet) ---
+// Etapa: 'criar' (sem OS) → 'aberta' (OS lançada: ainda não aparece / nº fora do padrão / na carteira do SIGOS com o
+// status dela) → 'encerrada' (executada ou encerrada sem execução). Situação = sit do vw_os_situacao (+ status da carteira).
+const OC_ETAPAS=[['criar','📝 Pendente de criação'],['aberta','⏳ OS em aberto'],['encerrada','🏁 OS encerrada'],['','Todas']];
+const OC_SIG_ROT={nao_encontrada:'🔎 Não aparece no SIGOS',invalida:'❌ Nº fora do padrão',executada:'✅ Executada',encerrada_sem_execucao:'⛔ Encerrada sem execução'};
+function ocSit(s){ if(!s.os_numero) return 'sem'; const i=s._sg; return (i&&i.sit)||'nao_encontrada'; }
+function ocEtapa(s){ const t=ocSit(s); return t==='sem'?'criar':((t==='executada'||t==='encerrada_sem_execucao')?'encerrada':'aberta'); }
+function ocStRot(st){ st=String(st||'pendente').replace(/\s*\([A-Z]+\)\s*$/,'').toLowerCase(); return st.charAt(0).toUpperCase()+st.slice(1); }
+// chave do chip de situação: na carteira vira 'st:<status>' (Não programada, Programada, Fora atendimento…)
+function ocSigKey(s){ const t=ocSit(s); return t==='pendente'?('st:'+((s._sg&&s._sg.st)||'PENDENTE')):t; }
+function ocSigRot(k){ return k.startsWith('st:')?('⏳ '+ocStRot(k.slice(3))):(OC_SIG_ROT[k]||k); }
+function ocDias(a,b){ if(!a) return null; const d=Math.floor(((b?new Date(b):new Date())-new Date(a))/864e5); return d<0?0:d; }
+function pgOcCicloHtml(s){
+  const et=ocEtapa(s), t=ocSit(s), i=s._sg||null;
+  const passos=[['Registro',true],['OS criada',!!s.os_numero],['No SIGOS',t==='pendente'||et==='encerrada'],['Encerrada',et==='encerrada']];
+  const cur=passos.filter(p=>p[1]).length;   // próximo passo = o que está pendente agora
+  const step=passos.map((p,k)=>`<span class="occ-st ${p[1]?'ok':(k===cur?'cur':'')}">${p[0]}</span>`).join('<span class="occ-sa">›</span>');
+  if(!s.os_numero) return `<div class="occ-ciclo">${step}</div><div class="occ-cl">aguardando OS há ${ocDias(s.data_hora)} dia(s)</div>`;
+  const lin=[];
+  lin.push(`OS <b>${vEsc(s.os_numero)}</b>${s.os_criada_em?(' · lançada '+ocDataCurta(s.os_criada_em)):''}${s.os_por?(' · '+vEsc(s.os_por)):''}`);
+  if(i&&i.srv) lin.push(vEsc(i.srv));
+  if(i&&i.ab) lin.push('Aberta no SIGOS em '+sgxDt(i.ab));
+  if(et==='encerrada'){
+    const d=ocDias(s.data_hora,i&&i.ex);
+    lin.push((t==='executada'?'Executada':'Encerrada')+(i&&i.ex?(' em '+sgxDt(i.ex)):'')+(i&&i.st&&t!=='executada'?(' · '+vEsc(i.st)):'')+(d!=null?(' · ciclo de '+d+' dia(s)'):''));
+    if(i&&i.res) lin.push('Resultado: '+vEsc(i.res));
+  } else lin.push(`em aberto há ${ocDias(s.data_hora)} dia(s) desde o registro`);
+  const selo=i?sgxInfoHtml(i,false):(t==='nao_encontrada'?sgxInfoHtml({sit:'nao_encontrada'},false):'');
+  return `<div class="occ-ciclo">${step}</div><div class="occ-sig ${et} ${t}">${selo}${lin.map(x=>`<div>${x}</div>`).join('')}</div>`;
+}
 // --- card compartilhado entre lista e popup do mapa ---
 // Compacto (2026-10-27): à esquerda tipo+tags, endereço, quem/coordenada e obs; à direita (sob a data) links, OS e o
 // campo de OS. No celular e no popup a coluna da direita desce (CSS .occ).
@@ -5246,7 +5290,7 @@ function pgOcCard(s,popup){
   const tags=[s.local,s.consorcio].filter(Boolean).map(t=>`<span class="occ-tag">${vEsc(t)}</span>`).join('');
   const quem=`👤 ${vEsc(s.usuario_nome||s.usuario||'—')}`+((s.lat!=null&&s.lon!=null)?` · 📌 <span style="font-family:monospace;user-select:all">${(+s.lat).toFixed(6)}, ${(+s.lon).toFixed(6)}</span>`:'');
   const end=(s.lat!=null&&s.lon!=null)?`<div class="occ-l"><span class="pgOcEnd" data-lat="${s.lat}" data-lon="${s.lon}">buscando endereço…</span></div>`:'';
-  const done=s.os_numero?`<div class="occ-ok">✓ OS <b>${vEsc(s.os_numero)}</b>${sgxS(s.os_numero)}${s.os_por?(' · '+vEsc(s.os_por)):''}</div>`:'';
+  const done=pgOcCicloHtml(s);
   return `<div class="occ${popup?' pop':''}" data-occ="${s.id}">
         <div class="occ-main">
           <div class="occ-h"><b>${ocIcone(s.tipo)} ${vEsc(s.tipo||'Ocorrência')}</b>${tags}</div>
@@ -5265,9 +5309,11 @@ function pgOcCard(s,popup){
 let pgOcData=[], pgOcMode='lista', pgOcMap=null, pgOcMarkers=null;
 // filtros: tipo (tipo exato | '@vaz' | '@fraude') · local (combinado tipo × local = esforço da equipe, ex. não visível
 // na rede) · consórcio; + card a destacar
-let pgOcFTipo='', pgOcFLocal='', pgOcFCons='', pgOcFoco=null;
-function pgOcFiltrado(sem){   // sem = 'tipo' | 'local' → ignora esse filtro (p/ as contagens do próprio dropdown)
+let pgOcFTipo='', pgOcFLocal='', pgOcFCons='', pgOcFoco=null, pgOcEtapa='criar', pgOcSig='';
+function pgOcFiltrado(sem){   // sem = 'tipo' | 'local' | 'etapa' | 'sig' → ignora esse filtro (p/ as contagens do próprio controle)
   return (pgOcData||[]).filter(o=>(!pgOcFCons||o.consorcio===pgOcFCons)
+    && (sem==='etapa'||!pgOcEtapa||ocEtapa(o)===pgOcEtapa)
+    && (sem==='etapa'||sem==='sig'||!pgOcSig||ocSigKey(o)===pgOcSig)
     && (sem==='local'||!pgOcFLocal||o.local===pgOcFLocal)
     && (sem==='tipo'||!pgOcFTipo||(pgOcFTipo==='@vaz'?!ocEhFraude(o.tipo):(pgOcFTipo==='@fraude'?ocEhFraude(o.tipo):o.tipo===pgOcFTipo))));
 }
@@ -5294,11 +5340,31 @@ function pgOcRenderFTipo(){
     +'<optgroup label="Vazamento">'+opt('@vaz','Todos os vazamentos',nV)+vaz.map(t=>opt(t,t,n(t))).join('')+'</optgroup>'
     +'<optgroup label="Fraude">'+opt('@fraude','Todas as fraudes',arr.length-nV)+fra.map(t=>opt(t,t,n(t))).join('')+'</optgroup>';
 }
+// abas do ciclo (contagem respeita tipo/local/consórcio) + chips da situação no SIGOS dentro da aba
+function pgOcRenderCiclo(){
+  const c=document.getElementById('pgOcCiclo'); if(!c) return;
+  const base=pgOcFiltrado('etapa'), n=e=>e?base.filter(o=>ocEtapa(o)===e).length:base.length;
+  const tabs=OC_ETAPAS.map(e=>`<button class="btn ghost" data-oce="${e[0]}" style="margin:0;flex:1 1 130px;padding:8px 6px;font-size:13px${pgOcEtapa===e[0]?';background:var(--acc);color:var(--acc-ink);border-color:var(--acc)':''}">${e[1]} (${n(e[0])})</button>`).join('');
+  let chips='';
+  if(pgOcEtapa!=='criar'){
+    const arr=pgOcFiltrado('sig').filter(o=>ocEtapa(o)!=='criar'), cnt={};
+    arr.forEach(o=>{ const k=ocSigKey(o); cnt[k]=(cnt[k]||0)+1; });
+    const ord=k=>k==='nao_encontrada'?0:k==='invalida'?1:k.startsWith('st:')?2:k==='executada'?3:4;
+    const ks=Object.keys(cnt).sort((a,b)=>ord(a)-ord(b)||a.localeCompare(b));
+    if(pgOcSig&&!cnt[pgOcSig]) ks.push(pgOcSig);
+    chips=`<div style="font-size:11.5px;color:var(--mut);margin:8px 0 4px">Situação no SIGOS</div><div class="vmfchips" style="margin-bottom:0">`
+      +`<button class="vmfchip ${!pgOcSig?'on':''}" data-ocs="">Todas (${arr.length})</button>`
+      +ks.map(k=>`<button class="vmfchip ${pgOcSig===k?'on':''}" data-ocs="${vEsc(k)}">${vEsc(ocSigRot(k))} (${cnt[k]||0})</button>`).join('')+`</div>`;
+  }
+  c.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:6px">${tabs}</div>${chips}`;
+  c.querySelectorAll('[data-oce]').forEach(b=>b.addEventListener('click',()=>{ pgOcEtapa=b.dataset.oce; pgOcSig=''; pgOcRender(); }));
+  c.querySelectorAll('[data-ocs]').forEach(b=>b.addEventListener('click',()=>{ pgOcSig=b.dataset.ocs; pgOcRender(); }));
+}
 function pgOcRender(){
   const c=document.getElementById('pgOcLista'); if(!c) return;
-  pgOcRenderFTipo(); pgOcRenderFLocal();
+  pgOcRenderFTipo(); pgOcRenderFLocal(); pgOcRenderCiclo();
   const arr=pgOcFiltrado();
-  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+((pgOcFTipo||pgOcFLocal||pgOcFCons)?' no filtro':(pgFiltro==='pendente'?' pendente':(pgFiltro==='criada'?' com OS':'')))+'.</p>'; }
+  if(!arr.length){ c.innerHTML='<p class="sub">Nenhuma ocorrência'+((pgOcFTipo||pgOcFLocal||pgOcFCons||pgOcSig)?' no filtro':(pgOcEtapa==='criar'?' pendente de criação de OS':(pgOcEtapa==='aberta'?' com OS em aberto':(pgOcEtapa==='encerrada'?' com OS encerrada':''))))+'.</p>'; }
   else {
     c.innerHTML=arr.map(s=>pgOcCard(s,false)).join('');
     c.querySelectorAll('[data-ocsave]').forEach(b=>b.addEventListener('click',()=>pgSalvarOcOs(b.dataset.ocsave)));
@@ -5310,14 +5376,14 @@ function pgOcRender(){
 }
 // atalho do popup do Acompanhamento da pesquisa → card da ocorrência (aba certa, sem filtros, rola e destaca)
 function pgOcAbrir(id,temOs){
-  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro=temOs?'criada':'pendente';
+  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgOcEtapa=temOs?'':'criar'; pgOcSig='';
   pgOcFTipo=''; pgOcFLocal=''; pgOcFCons=''; pgOcMode='lista'; pgOcFoco=id;
   irPara('programacao_servicos');
 }
 // atalho da matriz tipo × local do Acompanhamento → abertura já filtrada (aba "Todas", p/ bater com a contagem da célula;
 // período/colaborador do Acompanhamento não existem aqui)
 function pgOcAbrirFiltro(tipo,local,cons){
-  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgFiltro='todas';
+  pgModo='pesquisa'; pgBackTo='pp_acomp'; pgOcEtapa=''; pgOcSig='';
   pgOcFTipo=tipo||''; pgOcFLocal=local||''; pgOcFCons=cons||''; pgOcMode='lista'; pgOcFoco=null;
   irPara('programacao_servicos');
 }
@@ -5340,7 +5406,7 @@ function pgOcCarregarMapa(){
   pgOcMarkers.clearLayers();
   const arr=pgOcFiltrado().filter(s=>s.lat!=null&&s.lon!=null), pts=[];
   arr.forEach(s=>{
-    const cor=s.os_numero?'#1D9E75':'#dc2626';
+    const t=ocSit(s), cor=t==='sem'?'#dc2626':t==='executada'?'#1D9E75':t==='encerrada_sem_execucao'?'#6b7280':'#f59e0b';
     const m=L.circleMarker([s.lat,s.lon],{radius:8,color:'#fff',weight:2,fillColor:cor,fillOpacity:1});
     m.bindPopup(()=>pgOcCard(s,true),{maxWidth:320,minWidth:270});
     pgOcMarkers.addLayer(m); pts.push([s.lat,s.lon]);
@@ -5350,8 +5416,11 @@ function pgOcCarregarMapa(){
 }
 async function pgCarregarOc(){
   const c=document.getElementById('pgOcLista'); if(!c) return; c.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:pgFiltro}); if(error)throw error; pgOcData=data||[];
-    pgOcRender();
+  try{ const {data,error}=await sb.rpc('app_ocorrencia_fila',{p_filtro:'todas'}); if(error)throw error;   // ciclo é filtrado no navegador
+    const arr=data||[];
+    const inf=await Promise.all(arr.map(o=>o.os_numero?sgxGet(o.os_numero).catch(()=>null):null));   // situação no SIGOS (lote único, cache)
+    arr.forEach((o,k)=>{ o._sg=inf[k]||null; });
+    pgOcData=arr; pgOcRender();
   }catch(e){ c.innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 async function pgSalvarOcOs(id){

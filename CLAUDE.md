@@ -292,7 +292,7 @@ pwa/
     por matrícula / `?s=mm` foi removida do Auxiliar em 2026-10-20; a tela segue existindo no cockpit NRW.)*
   - **🎧 Pesquisa de Vazamentos** (nesta ordem no hub, 2026-10-30): Programação de pesquisa (`programacao_pesquisa`) ·
     **Abertura de serviços** (`programacao_servicos` em `pgModo='pesquisa'` — só a seção de
-    **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`) · **Relatório diário** (`pp_diario`, 2026-10-30: lista de
+    **ocorrências** de vazamento `app_ocorrencia_fila`/`_os`; desde 2026-11-11, sw v365, com abas do **ciclo da OS** — pendente de criação / em aberto / encerrada — e chips de situação no SIGOS, igual à Gestão de VRPs, §4.2) · **Relatório diário** (`pp_diario`, 2026-10-30: lista de
     blocos dia × colaborador × consórcio no estilo da Gestão de Pavimento — abas Pendente de OS/OS criada/Todos, chips de
     prazo, filtros de consórcio, colaborador e dia; o backoffice lança a **OS SIGOS do dia** no bloco (`"12 - retaguarda".pesquisa_dia_os`)
     e cada bloco abre a folha p/ imprimir/PDF — só o trajeto percorrido/pesquisado (km pesquisado, km andado,
