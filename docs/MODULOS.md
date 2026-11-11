@@ -3743,7 +3743,11 @@ apagava a carteira da ZA inteira — uma Relação da GNDS no campo da ZA1004 te
 - **Conferência**: o tipo vem do cabeçalho (arquivo no campo do outro tipo → recusado) e a ZA de cada linha pelo de-para editável
   `"17 - sigos".gerencia_za` (a chave pode ser gerência, unidade ou escritório: GRCN→ZA1004, GRMS/ELBE→ZA0200,
   GNDSEQCT→ZA1004, GNDSEQBE→ZA0200). Linha sem ZA → arquivo inteiro recusado ("sem ZA cadastrada: GNDS / GNDSEQXX"), banco
-  intacto; resolve-se incluindo a chave no de-para e reprocessando. App ≤ v367 (4 campos, `slot_za` preenchido) segue
+  intacto; resolve-se incluindo a chave no de-para e reprocessando. **Exceção (2026-11-11, `docs/migracao_sigos_ignorar_escritorios.sql`):**
+  a exportação da GNDS vem com **todos os escritórios dela** (GNDSEQBH, GNDSEQRN, GNDSEQSZ…); linha sem ZA cuja unidade/escritório/
+  gerência casa com um padrão de `"17 - sigos".unidade_ignorar` (hoje `GNDS%`) é **descartada** — não entra nem substitui carteira —,
+  contada em `arquivo.ignoradas` e citada no aviso ("N OS de fora das ZAs ignoradas (…)"). Arquivo só com linhas ignoradas → recusado
+  ("Nenhuma OS das ZAs no arquivo"). Qualquer outra unidade sem ZA continua recusando o arquivo inteiro. App ≤ v367 (4 campos, `slot_za` preenchido) segue
   funcionando: nesse caso ainda confere "arquivo da ZA do campo".
 - Mesmo arquivo de novo (sha256) não é recusado — só gera **aviso** "idêntico ao já enviado em …" (reprocessar é inofensivo).
 
@@ -3756,7 +3760,7 @@ oferece "Reprocessar" no histórico (chama a função de novo com o mesmo `arqui
 
 **Banco (`"17 - sigos"`, app-only, RLS sem policy):**
 - `arquivo` — log de cargas (nunca apaga): campo (`slot_tipo`; `slot_za` só nas cargas do app antigo, null desde v368), path, nome, sha256, tipo/ZA(s) detectados (`za_detectada` pode ser "ZA0200, ZA1004"), unidades (`gerencias`), período
-  (das Encerradas, lido do nome `EncerradasAAAAMMDDaAAAAMMDD…`), linhas/inseridas/já existentes/removidas, status
+  (das Encerradas, lido do nome `EncerradasAAAAMMDDaAAAAMMDD…`), linhas/ignoradas/inseridas/já existentes/removidas, status
   `pendente|ok|erro`, erro, aviso, quem/quando.
 - `os_aberta` (PK `numero`) — carteira atual = última Relação de cada **unidade** (`unidade`; `consorcio` vem da linha). `equipe` e `responsavel` saem de "Equipe e Responsável".
 - `os_encerrada` (PK `numero`) — histórico acumulado; `geom_imovel`/`geom_foto` (Point 31983, de lat/lon WGS84; 0,0 → null).
