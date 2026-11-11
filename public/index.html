@@ -7664,8 +7664,9 @@ function rdoSecao(z){
   h+=linhas.map(l=>{
     const k=z+'|'+(l.chave||('m:'+l.id)), aberto=rdoS.abertos.has(k), temDet=Array.isArray(l.det)&&l.det.length;
     const bDet=temDet?'<button type="button" data-rdoabre="'+vEsc(k)+'" title="Detalhe">'+(aberto?'▴':'▾')+'</button>':'';
+    const bCop='<button type="button" data-rdocop="'+vEsc(k)+'" title="Copiar este bloco">📋</button>';
     return '<div class="rdorow"><div class="n">'+(++n)+'</div><div class="b"><div class="tp">'+vEsc(l.tipo)+' · <span class="fo">'+vEsc(l.fonte||'')+'</span></div>'
-      +'<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'')+'</div><div class="ac">'+bDet+'</div></div>';
+      +'<div class="d">'+vEsc(l.desc||'')+'</div>'+(aberto?rdoDetHtml(l.det):'')+'</div><div class="ac">'+bCop+bDet+'</div></div>';
   }).join('')||'<p class="sub">Nada executado ou em andamento registrado neste dia.</p>';
   h+='<div class="rdofim"><span class="sub" style="margin:0">'+n+' linha'+(n===1?'':'s')+' · '+vEsc(z)+'</span></div></div>';
   return h;
@@ -7677,6 +7678,17 @@ function rdoRenderDia(){
     +rdoS.zas.map(rdoSecao).join('');
   $('#rdoCopiar').onclick=rdoCopiar;
   box.querySelectorAll('[data-rdoabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.rdoabre; rdoS.abertos.has(k)?rdoS.abertos.delete(k):rdoS.abertos.add(k); rdoRenderDia(); });
+  box.querySelectorAll('[data-rdocop]').forEach(b=>b.onclick=()=>rdoCopiarBloco(b.dataset.rdocop));
+}
+// 📋 de cada bloco: copia só aquele bloco (texto + detalhe), no mesmo formato do "Copiar RDO"
+function rdoCopiarBloco(k){
+  const i=k.indexOf('|'), z=k.slice(0,i), l=rdoLinhasZa(z).find(x=>(x.chave||('m:'+x.id))===k.slice(i+1)); if(!l) return;
+  const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const d=String(l.desc||'').replace(/\s+/g,' ').trim(), det=(Array.isArray(l.det)?l.det:[]).map(rdoDetLinha).filter(Boolean);
+  const txt=[d].concat(det.map(x=>'     - '+x)).join('\n');
+  const html='<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt"><b>'+E(d)+'</b>'
+    +(det.length?'<ul style="margin:2px 0 0;padding-left:18px;color:#333;font-size:10pt">'+det.map(x=>'<li>'+E(x)+'</li>').join('')+'</ul>':'')+'</div>';
+  rdoClip(txt,html,'Bloco copiado');
 }
 // "Copiar RDO": texto do dia COM o detalhe de cada linha, em dois formatos
 // no mesmo clique — HTML (cola formatado no Word/e-mail/Teams) e texto simples (WhatsApp/bloco de notas).
@@ -7706,16 +7718,16 @@ function rdoExport(){
   return {txt:txt.join('\n'), html:html.join('')};
 }
 function rdoTexto(){ return rdoExport().txt; }
-async function rdoCopiar(){
-  const {txt,html}=rdoExport();
+async function rdoCopiar(){ const {txt,html}=rdoExport(); return rdoClip(txt,html,'RDO copiado'); }
+async function rdoClip(txt,html,msg){
   try{ if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){
       await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([txt],{type:'text/plain'})})]);
-      toast('RDO copiado (formatado).'); return; } }catch(e){}
+      toast(msg+' (formatado).'); return; } }catch(e){}
   // plano B: evento copy com os dois formatos
   try{ let ok=false; const fn=e=>{ e.clipboardData.setData('text/html',html); e.clipboardData.setData('text/plain',txt); e.preventDefault(); ok=true; };
     document.addEventListener('copy',fn); document.execCommand('copy'); document.removeEventListener('copy',fn);
-    if(ok){ toast('RDO copiado (formatado).'); return; } }catch(e){}
-  try{ await navigator.clipboard.writeText(txt); toast('RDO copiado (texto simples).'); }catch(e){ toast('Não consegui copiar.'); }
+    if(ok){ toast(msg+' (formatado).'); return; } }catch(e){}
+  try{ await navigator.clipboard.writeText(txt); toast(msg+' (texto simples).'); }catch(e){ toast('Não consegui copiar.'); }
 }
 
 // ---------- OS NÃO EXECUTADAS (carteira aberta do SIGOS) — Auxiliar de Programação ----------
@@ -14680,7 +14692,7 @@ async function vtCarregar(primeira){
   vtMontar(d); vtShow(0);
 }
 // família de serviço → cor: uma legenda só para tudo o que foi executado (venha do SIGOS ou do app)
-const VT_F_COR={'Recadastramento':'#a78bfa','Troca de hidrômetro':'#38bdf8','Fiscalização de irregularidade':'#f43f5e','Vistoria de imóvel':'#f59e0b',
+const VT_F_COR={'Recadastramento':'#a78bfa','Troca de hidrômetro':'#38bdf8','Fiscalização de irregularidade':'#f43f5e','Confirmação de fraude':'#be123c','Vistoria de imóvel':'#f59e0b',
   'Ramal predial':'#22c55e','Recomposição de pavimento':'#eab308','Telemetria':'#06b6d4','VRP':'#3b82f6','Loggers de pressão':'#10b981',
   'Pesquisa de vazamento':'#fb7185','Manobra de registro':'#c084fc','Padrão de ligação':'#94a3b8','Rede de água':'#14b8a6',
   'Obras (projetos)':'#f97316','Atendimento comercial':'#e879f9'};
