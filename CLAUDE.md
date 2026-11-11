@@ -540,7 +540,7 @@ configuração (No escopo?, Liberar) e no detalhe (anexar com folha A0–A4, lin
 e só a Engenharia mexe no cadeado; `situacao_atual` saiu do schema 7. **Ensaio de reaterro no projeto (sw v320,
 `docs/migracao_proj_reaterro.sql`):** a Recomposição de pavimento de cada bloco (Vala N, Câmara, Caixa, Obra civil, Peça; raiz na VCA)
 só libera com o ensaio de compactação aprovado pela Qualidade — Obras pede no `projeto_det` (`app_proj_reaterro_solicitar`), a
-Qualidade ensaia na mesma `pavqual` (`app_qual_reaterro_fila`/`app_proj_reaterro_ensaio`), trava em `app_proj_avanco_registrar` e (sw v322) também ao gravar a árvore em `app_proj_estado_set`; ensaios no Resumo;
+Qualidade ensaia na mesma `pavqual` (`app_qual_reaterro_fila`/`app_proj_reaterro_ensaio`; sw v363: cada pedido mostra a **origem** — fotos do lançamento do reaterro / do registro de campo — e abre a intervenção ou o ponto na Gestão de Pavimento), trava em `app_proj_avanco_registrar` e (sw v322) também ao gravar a árvore em `app_proj_estado_set`; ensaios no Resumo;
 tabela `"13 - projetos_obra".proj_reaterro` (29 blocos legado). **Folha (sw v321):** o anexo confere o tamanho real do PDF
 contra a folha A0–A4 escolhida e o PDF consolidado imprime cada prancha no fim, na própria folha (`@page` nomeado) — detalhe em `docs/MODULOS.md §8`. Suporte tem 2 telas: **Configuração** (`projeto_cfg`) e **Resumo por período** (`projeto_resumo` —
 KPIs+timeline por dia/intervenção/atividade+CSV, sobre o feed `pjAllAvancos`). ⚠️ **Protótipo:** avanços não são

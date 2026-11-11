@@ -1373,9 +1373,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="pavprog" class="hidden">
-    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <div class="bar"><button class="bk" id="pavpBack">‹ Auxiliar de Programação</button></div>
     <h1>Gestão de Pavimento</h1>
     <p class="sub">Pavimentos registrados em campo — responda se cada tipo precisa de ensaio de reaterro, lance a OS da recomposição e, depois, marque a execução.</p>
+    <div id="pavpFocoBar" class="banner hidden" style="margin:6px 0 4px"></div>
     <div id="pavpEsteira" class="pavchips" style="margin:6px 0 10px"></div>
     <div class="seg" id="pavpViewSeg" style="margin:0 0 10px">
       <button type="button" data-v="lista" class="sel">📋 Lista</button>
@@ -2680,7 +2681,7 @@ function pjHasAdv(node){ if(node.k==='%')return (node.p||0)>0; if(node.k==='m')r
 const pjPodeSup=()=>!!(ME&&(ME.is_admin || ME.proj_sup));
 const pjPodeSetSup=()=>!!(ME&&ME.is_admin);   // só admin define quem acessa o Suporte (mini-cadeado)
 // back buttons das telas do módulo (uma vez, no load — as telas já existem no DOM)
-['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjDetBack:projeto_campo','pjRelBack:projeto_det','pjAcessoBack:projeto_sup','pjRsBack:projetos'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
+['pjCampoBack:projetos','pjSupBack:projetos','pjCfgBack:projeto_sup','pjRelBack:projeto_det','pjAcessoBack:projeto_sup','pjRsBack:projetos'].forEach(s=>{ const[id,dest]=s.split(':'); const b=$('#'+id); if(b) b.onclick=()=>irPara(dest); });
 function pjRepAdd(node){ const last=node.f[node.f.length-1]; const c=pjZero(JSON.parse(JSON.stringify(last))); const m=last.n.match(/^(.*?)(\d+)\s*$/); c.n=m?(m[1]+(node.f.length+1)):(last.n+' '+(node.f.length+1)); node.f.push(c); node.rep=node.f.length; }
 function pjRepDel(node){ if(node.f.length>(node.min||1)){ node.f.pop(); node.rep=node.f.length; } }
 
@@ -3486,7 +3487,8 @@ function pjNodeHtml(node){
   }
   return h+`</div>`;
 }
-async function pjOpen(id){ pjCur=id; irPara('projeto_det'); const el=$('#pjDet'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); pjPipeCur=null; await Promise.all([pjAvancosLoad(iv),pjDocsLoad(iv),pjPipeLoad(iv),pjReatLoad(iv)]); if(pjCur===id) pjRenderDet(); }
+let pjDetVolta='projeto_campo';   // tela do "‹ Voltar" do projeto_det (pavqual quando aberto pelo Ensaio de reaterro)
+async function pjOpen(id,volta){ pjCur=id; pjDetVolta=volta||'projeto_campo'; { const b=$('#pjDetBack'); if(b){ b.textContent=volta==='pavqual'?'‹ Ensaio de reaterro':'‹ Intervenções'; b.onclick=()=>irPara(pjDetVolta); } } irPara('projeto_det'); const el=$('#pjDet'); if(el) el.innerHTML='<p class="sub">Carregando…</p>'; window.scrollTo(0,0); const iv=PJ_IVS.find(i=>i.id===id); pjPipeCur=null; await Promise.all([pjAvancosLoad(iv),pjDocsLoad(iv),pjPipeLoad(iv),pjReatLoad(iv)]); if(pjCur===id) pjRenderDet(); }
 function pjSnapOpen(d){ const s=new Set(); d.querySelectorAll('.pjdetpanel:not([hidden])').forEach(pnl=>{ const n=pjReg[pnl.id.slice(0,-1)]; if(n)s.add(n); }); return s; }
 function pjReopen(d,keep){ if(keep&&keep.size){ Object.keys(pjReg).forEach(rid=>{ if(keep.has(pjReg[rid])){ const pnl=document.getElementById(rid+'D'); if(pnl&&pnl.hidden){ pnl.hidden=false; const row=d.querySelector('[data-det="'+rid+'"]'); const tw=row&&row.querySelector('.tw'); if(tw)tw.textContent='▾'; const b=row&&row.querySelector('[data-detbtn]'); if(b){b.textContent='Fechar';b.classList.add('open');} } } }); } }
 // wiring compartilhado da árvore (campo + config). rerender = função de re-render da tela (recebe o snapshot de painéis abertos).
@@ -4706,6 +4708,7 @@ async function pavMinhasRender(){ const c=document.getElementById('pavMinhas'); 
     }).join(''):'<p class="sub">Você ainda não registrou pavimentos.</p>';
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar seus registros.</p>'; } }
 // --- Auxiliar de Programação: Gestão de Pavimento (esteira por etapa + filtros + controle de prazo) ---
+let pavpFoco=null, pavpVolta=null, pavpFocoNovo=false; // foco num ponto aberto a partir do Ensaio de reaterro (pavqual) e tela de volta
 let pavpUltimo=[], pavpOrig=new Set(), pavpPrazo='', pavpStatus='analise', pavpView='lista', pavpMap=null, pavpMarkers=null, pavpOddWired=false;
 const PAV_SLA=[3,5]; // dias: 0–3 no prazo · 4–5 atenção · >5 atrasado (padrão das etapas do programador; o Relatório diário da pesquisa usa também)
 function pavDias(iso){ if(!iso)return null; return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
@@ -4757,7 +4760,9 @@ function pavReatHtml(g,it,et){ const h=it.reaterro_hist||[], semEnsaio=!h.some(e
   return ''; } // registro antigo (OS lançada antes da etapa de reaterro)
 function pavProgInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  if(!pavpFocoNovo){ pavpFoco=null; pavpVolta=null; } pavpFocoNovo=false;   // foco só vale na entrada vinda do Ensaio de reaterro
   pavCss(); pavpRenderOrigDd();
+  const bk=document.getElementById('pavpBack'); if(bk){ bk.textContent=pavpVolta==='pavqual'?'‹ Ensaio de reaterro':'‹ Auxiliar de Programação'; bk.onclick=()=>{ const v=pavpVolta||'auxiliar_programacao'; pavpFoco=null; pavpVolta=null; irPara(v); }; }
   document.querySelectorAll('#pavpViewSeg button').forEach(b=>b.onclick=()=>pavProgSetView(b.dataset.v));
   const ob=document.getElementById('pavpOrigBtn'); if(ob) ob.onclick=e=>{ e.stopPropagation(); const p=document.getElementById('pavpOrigPanel'); if(p)p.classList.toggle('hidden'); };
   if(!pavpOddWired){ document.addEventListener('click',e=>{ const dd=document.getElementById('pavpOrigDd'), p=document.getElementById('pavpOrigPanel'); if(dd&&p&&!dd.contains(e.target)) p.classList.add('hidden'); }); pavpOddWired=true; }
@@ -4774,6 +4779,7 @@ async function pavProgCarregar(){ const c=document.getElementById('pavpLista'); 
     pavpUltimo=data||[]; pavProgRender();
   }catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; } }
 function pavProgFiltrado(soOrigem){ let arr=pavpUltimo.slice();
+  if(pavpFoco) return arr.filter(g=>g.grupo===pavpFoco);   // aberto pelo Ensaio de reaterro: só o ponto de origem, em qualquer etapa
   if(pavpOrig.size) arr=arr.filter(g=>pavpOrig.has(g.servico_origem));
   if(soOrigem===true) return arr;
   const sla=PAV_SLA_ETAPA[pavpStatus];
@@ -4799,6 +4805,8 @@ function pavProgResumo(){ const r=document.getElementById('pavpResumo'); if(!r)r
   r.innerHTML=pavPrazoChips(cnt,sla,pavpPrazo,'Dias nesta etapa: no prazo até '+sla[0]+' · atenção até '+sla[1]+' · atrasado depois');
   r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ const k=ch.dataset.prazo; pavpPrazo=(pavpPrazo===k?'':k); pavProgRender(); }); }
 function pavProgRender(){ pavProgEsteira(); pavProgResumo();
+  const fb=document.getElementById('pavpFocoBar'); if(fb){ fb.classList.toggle('hidden',!pavpFoco);
+    if(pavpFoco){ fb.innerHTML='🧪 Mostrando só o ponto que originou o pedido de ensaio · <a href="#" id="pavpFocoX">ver todos</a>'; const x=document.getElementById('pavpFocoX'); if(x) x.onclick=e=>{ e.preventDefault(); pavpFoco=null; pavProgRender(); }; } }
   const arr=pavProgFiltrado(), c=document.getElementById('pavpLista');
   if(c){ c.innerHTML = arr.length ? ('<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(pavProgCard).join('')) : '<p class="sub">Nenhum pavimento nesse filtro.</p>';
     c.querySelectorAll('.pavreatdec').forEach(btn=>btn.onclick=()=>pavProgDecidir(btn.dataset.grupo,btn.dataset.id,btn.dataset.v==='1'));
@@ -4880,8 +4888,8 @@ function pavProgExport(){ const arr=pavProgFiltrado(); if(!arr.length) return to
 // Fila = tipos que o programador mandou p/ ensaio (app_pav_qual_listar). Prazo = PAV_SLA_ETAPA.ensaio, contado do pedido (ou do "refeito").
 let pqlUltimo=[], pqlView='lista', pqlPrazo='', pqlMap=null, pqlMarkers=null, pqe=null; // pqe = ensaio em preenchimento {g,it,id,res,laudo,f1,f2}
 // pedido de ensaio de um bloco de obra dos Projetos (Reaterro → Recomposição) no formato de "ponto" da fila do pavimento
-const pqlProjGrupo=p=>({grupo:'pj:'+p.id,proj:p,servico_origem:'projeto',consorcio:p.consorcio,lat:p.lat,lon:p.lon,usuario:p.pedido_nome,
-  itens:[{id:p.id,lbl:p.rotulo||'Vala da rede',reaterro_resp_por:p.pedido_nome,reaterro_resp_em:p.pedido_em,reaterro_status_em:p.status_em,reaterro_hist:(p.hist||[]).filter(e=>e.ev!=='pedido')}]});
+const pqlProjGrupo=p=>({grupo:'pj:'+p.id,proj:p,ivId:(p.kind==='ponto'?'pt':'ln')+p.gid,servico_origem:'projeto',consorcio:p.consorcio,lat:p.lat,lon:p.lon,usuario:p.pedido_nome,
+  itens:[{id:p.id,lbl:p.rotulo||'Vala da rede',reaterro_resp_por:p.pedido_nome,reaterro_resp_em:p.pedido_em,reaterro_status_em:p.status_em,reaterro_hist:(p.hist||[]).filter(e=>e.ev!=='pedido'),origem:p.origem||[]}]});
 const pqlTit=g=>g.proj?('📐 '+pavH(g.proj.lbl||'Projeto')):(PAV_ORIGEM[g.servico_origem]||g.servico_origem);
 const pqlItLbl=it=>it.lbl?pavH(it.lbl):PAV_TIPO_LBL(it.tipo);
 function pqlDias(g){ let m=null; (g.itens||[]).forEach(it=>{ const d=pavDias(it.reaterro_status_em); if(d!=null&&(m==null||d>m))m=d; }); return m; }
@@ -4905,19 +4913,33 @@ function pavQualRender(){ const r=$('#pqlResumo'), sla=PAV_SLA_ETAPA.ensaio;
     r.querySelectorAll('[data-prazo]').forEach(ch=>ch.onclick=()=>{ pqlPrazo=(pqlPrazo===ch.dataset.prazo?'':ch.dataset.prazo); pavQualRender(); }); }
   const arr=pavQualFiltrado(), c=$('#pqlLista');
   if(c){ c.innerHTML=arr.length?('<p class="sub" style="margin:0 0 8px">'+arr.length+' ponto(s)</p>'+arr.map(pavQualCard).join('')):'<p class="sub">Nenhum ensaio pendente.</p>';
-    c.querySelectorAll('.pqlabrir').forEach(b=>b.onclick=()=>pavQualAbrir(b.dataset.grupo,b.dataset.id)); }
+    c.querySelectorAll('.pqlabrir').forEach(b=>b.onclick=()=>pavQualAbrir(b.dataset.grupo,b.dataset.id));
+    c.querySelectorAll('.pqlorig').forEach(b=>b.onclick=()=>pavQualOrigem(b.dataset)); }
   if(pqlView==='mapa') pavQualMapa(); }
 function pavQualCard(g){ const d=pqlDias(g), b=pavBucket(d,PAV_SLA_ETAPA.ensaio);
   const cUf=g.consorcio==='ZA1004'?'Contagem':(g.consorcio==='ZA0200'?'Betim':(g.consorcio||'—'));
   const mapa=(g.lat&&g.lon)?`<a href="https://www.google.com/maps?q=${g.lat},${g.lon}" target="_blank" rel="noopener" style="font-size:12px">📍 Como chegar</a>`:'';
   const itens=(g.itens||[]).map(it=>{ const u=pavUltEnsaio(it), rf=(it.reaterro_hist||[]).filter(e=>e.ev==='refeito').pop();
-    const fotos=[it.foto1,it.foto2].filter(Boolean).map(p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`).join('');
+    const fotoA=p=>`<a href="${PAV_FOTO_URL(p)}" target="_blank" rel="noopener"><img src="${PAV_FOTO_URL(p)}" loading="lazy" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"/></a>`;
+    // origem do pedido: projeto = lançamentos de Reaterro do bloco (fotos do avanço); pavimento = as 2 fotos do registro de campo
+    const og=g.proj?(it.origem||[]):null, fl=og?og.flatMap(a=>a.fotos||[]):[it.foto1,it.foto2].filter(Boolean);
+    const fotos=fl.slice(0,6).map(fotoA).join('');
+    const orTxt=og?(og.length?og.map(a=>`Reaterro ${pavH(a.valor)}${a.unidade==='%'?'%':(' '+pavH(a.unidade||''))} lançado em ${pavFmtEm(a.em)} por ${pavH(a.por||'—')}${a.obs?(' · “'+pavH(a.obs)+'”'):''}`).join('<br>'):'Sem lançamento de reaterro neste bloco')
+      :`Registro de campo de ${pavH(g.usuario||'—')}${g.created_at?(' em '+pavFmtEm(g.created_at)):''}`;
+    const podeOrig=!g.proj&&ME&&(ME.aux_acesso||ME.is_admin);
+    const btOrig=g.proj?`<button class="btn ghost pqlorig" data-iv="${pavH(g.ivId)}" style="margin:6px 0 0;width:auto;padding:6px 12px;font-size:12.5px">📐 Abrir a intervenção</button>`
+      :(podeOrig?`<button class="btn ghost pqlorig" data-pav="${pavH(g.grupo)}" style="margin:6px 0 0;width:auto;padding:6px 12px;font-size:12.5px">🧱 Abrir na Gestão de Pavimento</button>`:'');
+    const orig=`<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:6px"><div class="sub" style="font-size:12px"><b>Origem do pedido</b> · ${orTxt}</div>${fotos?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${fotos}</div>`:''}${btOrig}</div>`;
     const ant=u?`<div class="sub" style="font-size:12px;margin-top:4px">🔁 ${u.tentativa+1}º ensaio — o anterior foi reprovado em ${pavFmtEm(u.em)}${u.obs?(' (“'+pavH(u.obs)+'”)'):''}${rf?(' · reaterro refeito em '+pavFmtDia(rf.data)):''}</div>`:'';
-    return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${pqlItLbl(it)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div class="sub" style="font-size:12px;margin-top:2px">Pedido por ${pavH(it.reaterro_resp_por||'—')} em ${pavFmtEm(it.reaterro_resp_em)} · na fila ${pavDiasTxt(pavDias(it.reaterro_status_em))}</div>${ant}<div style="display:flex;gap:6px;margin-top:6px">${fotos}</div><button class="btn pqlabrir" data-grupo="${g.grupo}" data-id="${it.id}" style="margin-top:8px">🧪 Registrar ensaio</button></div>`; }).join('');
+    return `<div style="border-top:1px dashed var(--line);padding:8px 0"><b style="font-size:13px">${pqlItLbl(it)}</b>${it.dimensao?(' · '+pavH(it.dimensao)):''}<div class="sub" style="font-size:12px;margin-top:2px">Pedido por ${pavH(it.reaterro_resp_por||'—')} em ${pavFmtEm(it.reaterro_resp_em)} · na fila ${pavDiasTxt(pavDias(it.reaterro_status_em))}</div>${ant}${orig}<button class="btn pqlabrir" data-grupo="${g.grupo}" data-id="${it.id}" style="margin-top:8px">🧪 Registrar ensaio</button></div>`; }).join('');
   return `<div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${b.c};border-radius:12px;padding:12px 13px;margin-bottom:10px">
     <div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center"><b>${pqlTit(g)}</b><span style="margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:${b.c};padding:2px 10px;border-radius:999px;white-space:nowrap">${b.lbl} · ${pavDiasTxt(d)}</span></div>
     <div class="sub" style="margin-top:3px">${g.proj?(pavH(g.proj.projeto||'')+' · '):''}${g.os_sigos?('OS origem '+pavH(g.os_sigos)+sgxS(g.os_sigos)+' · '):''}${cUf} · ${g.proj?'pedido':'registrado'} por ${pavH(g.usuario||'—')} ${mapa}</div>
     ${itens}</div>`; }
+// abre a informação que originou o pedido: a intervenção (projeto_det) ou o ponto na Gestão de Pavimento (só aux/admin)
+async function pavQualOrigem(ds){
+  if(ds.iv){ if(!pjLoaded) await pjLoad(); if(!PJ_IVS.find(i=>i.id===ds.iv)){ toast('Intervenção não encontrada'); return; } pjOpen(ds.iv,'pavqual'); return; }
+  if(ds.pav){ pavpFoco=ds.pav; pavpVolta='pavqual'; pavpFocoNovo=true; pavpStatus='todos'; pavpPrazo=''; pavpOrig.clear(); const cs=$('#pavpCons'); if(cs) cs.value=''; irPara('pavprog'); } }
 function pavQualSetView(v){ pqlView=v;
   document.querySelectorAll('#pqlViewSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.v===v));
   const l=$('#pqlLista'), m=$('#pqlMapa'); if(l)l.classList.toggle('hidden',v!=='lista'); if(m)m.classList.toggle('hidden',v!=='mapa');
