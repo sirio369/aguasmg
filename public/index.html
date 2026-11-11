@@ -679,6 +679,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="lgFiltros" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgCons" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgSub" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
+    <div id="lgSig" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;font-size:12px;"></div>
     <div id="lgLista"></div>
     <div id="lgMapa" style="display:none;height:62vh;min-height:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);"></div>
   </main>
@@ -3846,12 +3847,13 @@ async function carregarLoggers(){
     if(!lgAll.length){$('#lgLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>';$('#lgFiltros').innerHTML='';return;}
   }
   loggersData=lgAll.filter(p=>(!!p.logger_temporario)===(lgModo==='temp'));
-  renderFiltros(); renderConsFiltros(); atualizarVista();
+  renderFiltros(); renderConsFiltros(); renderSigFiltros(); atualizarVista();
+  lgCarregarSig();   // situação no SIGOS (assíncrono, 1 RPC em lote)
 }
 function renderFiltros(){
-  const ordem=['todos','pendente','instalado','removido','concluido'];
+  const ordem=lgModo==='fixo'?['todos','pendente','instalado']:['todos','pendente','instalado','removido','concluido'];   // fixo não tem remoção
   $('#lgFiltros').innerHTML=ordem.map(s=>`<button class="lgf" data-f="${s}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s===lgFiltro?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${LG_SIT[s].lbl} ${contar(s)}</button>`).join('');
-  $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;lgSub='todos';renderFiltros();renderConsFiltros();renderSubFiltros();atualizarVista();}));
+  $('#lgFiltros').querySelectorAll('.lgf').forEach(b=>b.addEventListener('click',()=>{lgFiltro=b.dataset.f;lgSub='todos';renderFiltros();renderConsFiltros();renderSubFiltros();renderSigFiltros();atualizarVista();}));
   renderSubFiltros();
 }
 function renderSubFiltros(){
@@ -3860,22 +3862,22 @@ function renderSubFiltros(){
   const opts=[['todos','Todos'],['com','✅ Com dados de pressão'],['sem','⚠️ Sem dados']];
   el.innerHTML=opts.map(o=>{ const n=o[0]==='todos'?contar('concluido'):contarSub(o[0]); const bad=o[0]==='sem'&&n>0;
     return `<button class="lgsf" data-sf="${o[0]}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o[0]===lgSub?('background:'+(bad?'var(--bad)':'var(--acc)')+';color:#fff;'):('background:var(--card);border:1px solid '+(bad?'var(--bad)':'var(--line)')+';'+(bad?'color:var(--bad);':''))}">${o[1]} ${n}</button>`;}).join('');
-  el.querySelectorAll('.lgsf').forEach(b=>b.addEventListener('click',()=>{lgSub=b.dataset.sf;renderSubFiltros();atualizarVista();}));
+  el.querySelectorAll('.lgsf').forEach(b=>b.addEventListener('click',()=>{lgSub=b.dataset.sf;renderSubFiltros();renderSigFiltros();atualizarVista();}));
 }
 function renderConsFiltros(){
   const c=$('#lgCons'); if(!c) return;
   c.innerHTML=LG_CONS.map(o=>`<button class="lgc" data-c="${o.v}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${o.v===lgCons?'background:var(--acc);color:var(--acc-ink);':'background:var(--card);border:1px solid var(--line);'}">${o.l} ${contarCons(o.v)}</button>`).join('');
-  c.querySelectorAll('.lgc').forEach(b=>b.addEventListener('click',()=>{lgCons=b.dataset.c;renderFiltros();renderConsFiltros();atualizarVista();}));
+  c.querySelectorAll('.lgc').forEach(b=>b.addEventListener('click',()=>{lgCons=b.dataset.c;renderFiltros();renderConsFiltros();renderSigFiltros();atualizarVista();}));
 }
 function lgMatchSub(p){ return !(lgFiltro==='concluido'&&lgSub!=='todos') || (lgSub==='com'?!!p.tem_pressao:!p.tem_pressao); }
 function renderLoggers(){
-  let arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p));
+  let arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p)&&lgMatchSig(p));
   if(gps) arr=arr.slice().sort((a,b)=>((distKm(a.lat,a.lon)??9e9)-(distKm(b.lat,b.lon)??9e9)));
   if(!arr.length){$('#lgLista').innerHTML='<p style="color:var(--mut);font-size:14px">Nenhum ponto nesse filtro.</p>';return;}
   $('#lgLista').innerHTML=arr.map(p=>{
     const s=LG_SIT[p.situacao]||{lbl:p.situacao,bg:'--line',fg:'--mut'};
     const semDados=p.situacao==='concluido'&&!p.tem_pressao;
-    const sub=[p.avulso?'⚡ avulso':'',p.zona,distTxt(distKm(p.lat,p.lon)),p.dias_instalado!=null?('há '+p.dias_instalado+' d'):'',semDados?'⚠️ sem dados de pressão':'',p._pendente?'⏳ na fila':''].filter(Boolean).join(' · ');
+    const sub=[p.avulso?'⚡ avulso':'',p.zona,p.os_sigos?('OS '+vEsc(p.os_sigos)+sgxS(p.os_sigos)):'',distTxt(distKm(p.lat,p.lon)),p.dias_instalado!=null?('há '+p.dias_instalado+' d'):'',semDados?'⚠️ sem dados de pressão':'',p._pendente?'⏳ na fila':''].filter(Boolean).join(' · ');
     return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${p.label||('#'+p.id)}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span><button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button></div>`;
   }).join('');
   $('#lgLista').querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>abrirDetalhe(+el.dataset.open)));
@@ -3905,7 +3907,7 @@ function renderMapa(){
   setTimeout(()=>lgMap.invalidateSize(),0);
   lgMarkers.clearLayers();
   const cor={pendente:'#e0a300',instalado:'#0e639c',remocao_autorizada:'#b3261e',removido:'#8a5a00',concluido:'#1a7f4b'};
-  const arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p)&&p.lat&&p.lon);
+  const arr=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p)&&lgMatchSig(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{
     const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:cor[p.situacao]||'#888',fillOpacity:1});
@@ -3926,10 +3928,13 @@ function abrirDetalhe(id){
   detPonto=loggersData.find(p=>p.id===id); detFotos={}; if(!detPonto) return;
   const p=detPonto; let h;
   if(p.situacao==='pendente') h=formInstalar(p);
+  else if(!p.logger_temporario) h=resumoFixo(p);   // fixo: pipeline termina em "instalado"
   else if(p.situacao==='instalado'||p.situacao==='remocao_autorizada') h=formRemover(p);
   else if(p.situacao==='removido') h=formFinalizar(p);
   else h=resumo(p);
-  $('#lgDet').innerHTML=h; ligarDetalhe(p);
+  $('#lgDet').innerHTML=h;
+  if(p.situacao!=='pendente'&&p.situacao!=='removido'){ const t=$('#lgDet').querySelector('h1'); if(t){ t.insertAdjacentHTML('afterend',lgSigRow(p)); lgLigarSig(p); } }
+  ligarDetalhe(p);
   if(p.situacao==='concluido') lgCarregarPressao(p,'lgResumoPressao',null,true);
   const rb=document.createElement('button'); rb.className='btn ghost'; rb.style.marginTop='10px';
   rb.textContent='📄 Emitir relatório (PDF)'; rb.addEventListener('click',()=>emitirRelatorio(p));
@@ -4046,6 +4051,7 @@ function formCriar(){
   <label>Consórcio</label><select id="cr_cons"><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
   ${cInput('Zona (opcional)','cr_zona','')}
   ${cInput('Número do logger *','di_logger','')}${cInput('Número do HD','di_hd','')}${cNum('Leitura do HD na instalação *','di_leitura')}
+  ${lgOsInput()}
   ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}${cFoto('Foto extra (opcional)','f_extra')}
   ${cArea('Observação (opcional)','di_obs')}
   <button id="lgSalvar" class="btn" disabled>Criar logger</button>`;
@@ -4062,9 +4068,66 @@ function formInstalar(p){
   <div class="banner ok" style="margin-bottom:10px">${[p.zona,p.pressao_modelo?('pressão modelo '+p.pressao_modelo+' mca'):''].filter(Boolean).join(' · ')||'ponto planejado'}</div>
   ${nav_btn(p)}<div id="lgGps" class="banner warn">Obtendo GPS…</div>
   ${cInput('Número do logger *','di_logger','')}${cInput('Número do HD','di_hd','')}${cNum('Leitura do HD na instalação *','di_leitura')}
+  ${lgOsInput(p.os_sigos)}
   ${cFoto('Foto do HD *','f_hd')}${cFoto('Foto da leitura do HD *','f_leitura')}${cFoto('Foto da numeração do HD *','f_numeracao')}${cFoto('Foto do cavalete pós-instalação *','f_cav')}${cFoto('Foto da fachada *','f_fach')}${cFoto('Foto extra (opcional)','f_extra')}
   ${cArea('Observação (opcional)','di_obs')}
   <button id="lgSalvar" class="btn" disabled>Confirmar instalação</button>`;
+}
+// ---------- Loggers · OS SIGOS (campo na instalação + linha editável no detalhe + chips "Situação no SIGOS") ----------
+function lgOsInput(v){ return `<label>OS SIGOS</label><input id="di_os" inputmode="numeric" autocomplete="off" placeholder="ex.: 00127516560801" value="${vEsc(v||'')}"/>`; }
+function lgOsOk(id){ const v=((document.getElementById(id)||{}).value||'').trim(); return !v||vmSigOk(v); }   // vazio = ok (opcional); preenchido = padrão SIGOS
+// linha "OS SIGOS: nº [selo] [Editar]" logo abaixo do título do detalhe (etapas pós-instalação)
+function lgSigRow(p){
+  return `<div id="lgSigRow" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;font-size:13px">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="color:var(--mut)">OS SIGOS</span><b>${p.os_sigos?vEsc(p.os_sigos):'—'}</b>${sgxS(p.os_sigos)}<button id="lgSigBtn" class="vmtbtn" style="margin-left:auto">${p.os_sigos?'Editar':'＋ Adicionar'}</button></div>
+    <div id="lgSigEd" class="hidden" style="margin-top:8px"><input id="lgSigIn" inputmode="numeric" autocomplete="off" placeholder="ex.: 00127516560801" value="${vEsc(p.os_sigos||'')}"/>
+      <button id="lgSigSalvar" class="btn" style="margin-top:8px">Salvar OS SIGOS</button></div></div>`;
+}
+function lgLigarSig(p){
+  const b=document.getElementById('lgSigBtn'); if(!b) return;
+  b.onclick=()=>{ document.getElementById('lgSigEd').classList.toggle('hidden'); const i=document.getElementById('lgSigIn'); if(i) i.focus(); };
+  document.getElementById('lgSigSalvar').onclick=async()=>{
+    const v=document.getElementById('lgSigIn').value.trim();
+    if(!v) return toast('Informe o número da OS SIGOS');
+    if(!vmSigOk(v)) return toast('Número fora do padrão SIGOS (14 dígitos, ex.: 00127516560801)');
+    if(!navigator.onLine) return toast('Sem conexão — conecte para salvar a OS SIGOS');
+    const btn=document.getElementById('lgSigSalvar'); btn.disabled=true;
+    try{ const {error}=await sb.rpc('app_logger_set_os_sigos',{p_id:p.id,p_os_sigos:v}); if(error) throw error;
+      lgAll.forEach(x=>{ if(x.id===p.id) x.os_sigos=v; }); try{ localStorage.setItem('loggers_cache',JSON.stringify(lgAll)); }catch(e){}
+      toast('✓ OS SIGOS salva'); abrirDetalhe(p.id); renderSigFiltros(); atualizarVista();
+    }catch(e){ toast('⚠ '+(e.message||e)); btn.disabled=false; }
+  };
+}
+// situação no SIGOS de cada logger (cache do sgxGet) → chips com contagem + filtro
+let lgSig='', lgSigInfo={};
+function lgEncerradoApp(p){ return lgModo==='fixo' ? p.situacao==='instalado' : (p.situacao==='removido'||p.situacao==='concluido'); }
+function lgSigSit(p){ return vmSigSit(p,lgSigInfo[p.os_sigos]); }
+function lgSigDiverg(p){ return lgEncerradoApp(p) && lgSigSit(p)!=='executada'; }
+function lgMatchSig(p){ return !lgSig || (lgSig==='diverg'?lgSigDiverg(p):lgSigSit(p)===lgSig); }
+async function lgCarregarSig(){
+  const nums=[...new Set(loggersData.map(p=>p.os_sigos).filter(Boolean))];
+  const inf=await Promise.all(nums.map(n=>sgxGet(n).catch(()=>null)));
+  lgSigInfo={}; nums.forEach((n,k)=>{ if(inf[k]) lgSigInfo[n]=inf[k]; });
+  renderSigFiltros(); atualizarVista();
+}
+function renderSigFiltros(){
+  const el=$('#lgSig'); if(!el) return;
+  if(!navigator.onLine){ el.innerHTML=''; return; }
+  const base=loggersData.filter(p=>(lgFiltro==='todos'||p.situacao===lgFiltro)&&lgMatchC(p)&&lgMatchSub(p));
+  const cnt={'':base.length}; base.forEach(p=>{ const t=lgSigSit(p); cnt[t]=(cnt[t]||0)+1; if(lgSigDiverg(p)) cnt.diverg=(cnt.diverg||0)+1; });
+  const ops=VM_SIG.map(s=>s[0]==='diverg'?['diverg',lgModo==='fixo'?'⚠️ Instalado no app, não executado no SIGOS':'⚠️ Encerrado no app, não executado no SIGOS']:s);
+  el.innerHTML='<span style="color:var(--mut);align-self:center;white-space:nowrap">SIGOS:</span>'+ops.filter(s=>!s[0]||cnt[s[0]]||lgSig===s[0]).map(s=>{ const al=s[0]==='diverg'||s[0]==='sem';
+    return `<button class="lgsg" data-sg="${s[0]}" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;${s[0]===lgSig?('background:'+(al?'var(--bad)':'var(--acc)')+';color:#fff;'):('background:var(--card);border:1px solid '+(al?'var(--bad)':'var(--line)')+';'+(al?'color:var(--bad);':''))}">${s[1]} ${cnt[s[0]]||0}</button>`; }).join('');
+  el.querySelectorAll('.lgsg').forEach(b=>b.addEventListener('click',()=>{lgSig=b.dataset.sg;renderSigFiltros();atualizarVista();}));
+}
+// logger FIXO: o ciclo termina em "instalado" (não há remoção nem extração de dados)
+function resumoFixo(p){
+  const fi=[['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada],['Foto extra',p.foto_extra]].filter(f=>f[1]).map(f=>`<div style="text-align:center"><img src="${fotoURL(f[1])}" style="width:100%;border-radius:8px"/><div style="font-size:11px;color:var(--mut)">${f[0]}</div></div>`).join('');
+  return `<h1>${vEsc(p.label||('#'+p.id))} · instalado</h1>
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;line-height:1.9">Logger fixo — o ciclo termina na instalação (sem remoção).<br>Logger ${vEsc(p.numero_logger||'—')} · HD ${vEsc(p.numero_hd||'—')}<br>Leitura inicial ${p.leitura_hd_instalacao??'—'} · instalado há ${p.dias_instalado??'?'} dias<br>Instalado por ${vEsc(p.usuario_instalacao||'—')}${p.zona?('<br>Zona '+vEsc(p.zona)):''}</div>
+  <div style="font-size:12px;color:var(--mut);margin:10px 0 4px">Fotos da instalação:</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">${fi||'<span style="color:var(--mut);font-size:12px">sem fotos</span>'}</div>
+  ${nav_btn(p)}`;
 }
 function formRemover(p){
   const fi=[['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada],['Foto extra',p.foto_extra]].filter(f=>f[1]).map(f=>`<div style="text-align:center"><img src="${fotoURL(f[1])}" style="width:100%;border-radius:8px"/><div style="font-size:11px;color:var(--mut)">${f[0]}</div></div>`).join('');
@@ -4086,7 +4149,7 @@ function formFinalizar(p){
   <label class="pickb" style="display:inline-flex;cursor:pointer">📎 Anexar arquivo do logger (.json)<input id="fzFile" type="file" accept=".json,application/json" style="display:none"></label>
   <div id="fzMsg" class="sub" style="margin-top:6px"></div>
   <div id="fzResumo" style="margin-top:8px"></div>
-  <label style="margin-top:10px">OS SIGOS (opcional)</label><input id="fzOs" autocomplete="off"/>
+  <label style="margin-top:10px">OS SIGOS</label><input id="fzOs" inputmode="numeric" autocomplete="off" placeholder="ex.: 00127516560801" value="${vEsc(p.os_sigos||'')}"/>
   <button id="lgFinalizar" class="btn" disabled>Concluir</button>`;
 }
 function resumo(p){
@@ -4160,7 +4223,8 @@ function relDocHtml(p){
   const cons=REL_CONS[p.consorcio]||p.consorcio||'—';
   const st=REL_ST[p.situacao]||p.situacao||'—';
   const clr=REL_STCLR[p.situacao]||'#555';
-  const temInst=!!p.data_instalacao, temRem=!!p.data_remocao, temFin=!!(p.link_dados_sharepoint||p.os_sigos||p.data_finalizacao);
+  const temInst=!!p.data_instalacao, temRem=!!p.data_remocao, temFin=!!(p.link_dados_sharepoint||p.data_finalizacao);
+  const fixo=!p.logger_temporario;   // fixo: ciclo termina na instalação → sem as seções de remoção/finalização
   const gpsReal=(p.geom_real&&p.lat!=null&&p.lon!=null)?(Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)):'—';
   const sug=(p.lat_sugerida!=null&&p.lon_sugerida!=null)?(Number(p.lat_sugerida).toFixed(6)+', '+Number(p.lon_sugerida).toFixed(6)):'—';
   let dist='—';
@@ -4170,7 +4234,7 @@ function relDocHtml(p){
   let h='<div class="relTop"><div><h1>Relatório de Ponto · Logger de Vazão</h1><div class="sub">'+cons+'</div></div><div class="relBadge" style="color:'+clr+'">'+st+'</div></div>';
   h+='<div class="relBody">';
   h+='<div class="relGrid">'+relField('Identificação',p.label)+relField('Zona',p.zona)+relField('Origem',p.origem)+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
-  h+='<div class="relGrid" style="margin-top:10px">'+relField('OS COPASA instalação',p.os_copasa_instalacao)+relField('OS COPASA remoção',p.os_copasa_remocao)+relField('OS COPASA social',p.os_copasa_social)+'</div>';
+  h+='<div class="relGrid" style="margin-top:10px">'+relField('OS SIGOS',p.os_sigos)+relField('OS COPASA instalação',p.os_copasa_instalacao)+(fixo?'':relField('OS COPASA remoção',p.os_copasa_remocao))+relField('OS COPASA social',p.os_copasa_social)+'</div>';
   // 1 · Localização (sugerido × instalado + mapa)
   h+='<div class="relSec"><span class="relNum">1</span> Localização</div>';
   h+='<div class="relGrid">'+relField('Coordenada sugerida',sug)+relField('Coordenada instalada',gpsReal)+relField('Distância sugerido → instalado',dist)+'</div>';
@@ -4182,6 +4246,7 @@ function relDocHtml(p){
     h+='<div class="relGrid">'+relField('Nº do logger',p.numero_logger)+relField('Nº do HD',p.numero_hd)+relField('Leitura inicial do HD',p.leitura_hd_instalacao)+relField('Data da instalação',relFmtData(p.data_instalacao))+relField('Responsável',p.usuario_instalacao)+relField('Precisão GPS',p.gps_precisao_inst!=null?(p.gps_precisao_inst+' m'):'—')+relField('Dias instalado',p.dias_instalado!=null?(p.dias_instalado+' d'):'—')+(p.observacao_instalacao?relWide('Observação',p.observacao_instalacao):'')+'</div>';
     h+=relFotos([['Foto do HD',p.foto_hd_instalacao],['Leitura do HD',p.foto_leitura_hd_instalacao],['Numeração do HD',p.foto_numeracao_hd_instalacao],['Cavalete',p.foto_cavalete_instalacao],['Fachada',p.foto_fachada],['Foto extra',p.foto_extra]]);
   } else h+='<div class="relPend">Aguardando instalação — dados a preencher.</div>';
+  if(!fixo){
   // 3 · Remoção
   h+='<div class="relSec"><span class="relNum">3</span> Remoção</div>';
   if(temRem){
@@ -4191,10 +4256,11 @@ function relDocHtml(p){
   // 4 · Finalização
   h+='<div class="relSec"><span class="relNum">4</span> Finalização</div>';
   if(temFin){
-    h+='<div class="relGrid">'+relField('OS SIGOS',p.os_sigos)+relField('Data de finalização',relFmtData(p.data_finalizacao))+relField('Responsável',p.usuario_finalizacao)+(p.link_dados_sharepoint?relWide('Link dos dados (SharePoint)',p.link_dados_sharepoint):'')+'</div>';
-  } else h+='<div class="relPend">Aguardando finalização (dados / SharePoint).</div>';
-  // 5 · Pressão (dados importados do logger)
-  h+='<div class="relSec"><span class="relNum">5</span> Pressão (histórico do logger)</div>';
+    h+='<div class="relGrid">'+relField('Data de finalização',relFmtData(p.data_finalizacao))+relField('Responsável',p.usuario_finalizacao)+(p.link_dados_sharepoint?relWide('Link dos dados (SharePoint)',p.link_dados_sharepoint):'')+'</div>';
+  } else h+='<div class="relPend">Aguardando finalização (dados do logger).</div>';
+  }
+  // 5 · Pressão (dados importados do logger) — no fixo vira a seção 3
+  h+='<div class="relSec"><span class="relNum">'+(fixo?3:5)+'</span> Pressão (histórico do logger)</div>';
   h+='<div id="relPressao"><div class="relMapPh">Carregando dados de pressão…</div></div>';
   h+='</div>';
   h+='<div class="relFoot"><span>AcquaHub · relatório gerado do banco de dados</span><span>'+relFmtData(new Date().toISOString())+'</span></div>';
@@ -4448,11 +4514,11 @@ function lgValidar(){
     const lb=(document.getElementById('cr_label')||{}).value;
     const lg=(document.getElementById('di_logger')||{}).value;
     const lt=parseFloat(((document.getElementById('di_leitura')||{}).value||'').replace(',','.'));
-    ok=okGps&&!!lb&&!!lg&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_leitura&&!!detFotos.f_numeracao&&!!detFotos.f_cav&&!!detFotos.f_fach;
+    ok=okGps&&!!lb&&!!lg&&!isNaN(lt)&&lgOsOk('di_os')&&!!detFotos.f_hd&&!!detFotos.f_leitura&&!!detFotos.f_numeracao&&!!detFotos.f_cav&&!!detFotos.f_fach;
   }else if(p.situacao==='pendente'){
     const lg=(document.getElementById('di_logger')||{}).value;
     const lt=parseFloat(((document.getElementById('di_leitura')||{}).value||'').replace(',','.'));
-    ok=okGps&&!!lg&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_leitura&&!!detFotos.f_numeracao&&!!detFotos.f_cav&&!!detFotos.f_fach;
+    ok=okGps&&!!lg&&!isNaN(lt)&&lgOsOk('di_os')&&!!detFotos.f_hd&&!!detFotos.f_leitura&&!!detFotos.f_numeracao&&!!detFotos.f_cav&&!!detFotos.f_fach;
   }else{
     const lt=parseFloat(((document.getElementById('dr_leitura')||{}).value||'').replace(',','.'));
     ok=okGps&&!isNaN(lt)&&!!detFotos.f_hd&&!!detFotos.f_cav;
@@ -4473,6 +4539,7 @@ function ligarDetalhe(p){
     lgValidar();
   }));
   const dl=document.getElementById('di_logger'); if(dl) dl.addEventListener('input',lgValidar);
+  const dos=document.getElementById('di_os'); if(dos) dos.addEventListener('input',lgValidar);   // OS SIGOS: opcional, mas se preenchida tem de estar no padrão
   const cl=document.getElementById('cr_label'); if(cl) cl.addEventListener('input',lgValidar);
   const cc=document.getElementById('cr_cons'); if(cc) cc.addEventListener('change',lgValidar);
   const sv=document.getElementById('lgSalvar'); if(sv) sv.addEventListener('click',submeterLogger);
@@ -4505,6 +4572,7 @@ async function submeterLogger(){
         p_zona:(document.getElementById('cr_zona').value||null),
         p_numero_logger:(document.getElementById('di_logger').value||null),
         p_numero_hd:(document.getElementById('di_hd').value||null),
+        p_os_sigos:(document.getElementById('di_os').value.trim()||null),
         p_leitura:lt,p_observacao:(document.getElementById('di_obs').value||null),
         p_lat:gps.lat,p_lon:gps.lon,p_precisao:Math.round(gps.acc*10)/10,p_gps_ts:gps.ts,p_dispositivo:navigator.userAgent.slice(0,60)}};
     const okN=await enviarOuEnfileirar(item,'✓ Logger criado');
@@ -4517,7 +4585,7 @@ async function submeterLogger(){
     const lt=parseFloat(document.getElementById('di_leitura').value.replace(',','.'));
     item={id:uid,tipo:'logger',rpc:'app_logger_instalar',pasta:'logger',
       fotos:{p_foto_hd:detFotos.f_hd,p_foto_leitura_hd:detFotos.f_leitura,p_foto_numeracao_hd:detFotos.f_numeracao,p_foto_cavalete:detFotos.f_cav,p_foto_fachada:detFotos.f_fach,p_foto_extra:detFotos.f_extra},
-      fields:{...comum,p_leitura:lt,p_numero_logger:(document.getElementById('di_logger').value||null),p_numero_hd:(document.getElementById('di_hd').value||null),p_observacao:(document.getElementById('di_obs').value||null)}};
+      fields:{...comum,p_leitura:lt,p_numero_logger:(document.getElementById('di_logger').value||null),p_numero_hd:(document.getElementById('di_hd').value||null),p_os_sigos:(document.getElementById('di_os').value.trim()||null),p_observacao:(document.getElementById('di_obs').value||null)}};
     novaSit='instalado'; msg='✓ Instalação registrada';
   }else{
     const lt=parseFloat(document.getElementById('dr_leitura').value.replace(',','.'));
@@ -4532,6 +4600,7 @@ async function submeterLogger(){
 }
 async function finalizarLogger(){
   const p=detPonto, os=((document.getElementById('fzOs')||{}).value||'').trim()||null;
+  if(os&&!vmSigOk(os)) return toast('OS SIGOS fora do padrão (14 dígitos, ex.: 00127516560801)');
   const btn=document.getElementById('lgFinalizar'); if(btn) btn.disabled=true;
   try{
     const {error}=await sb.rpc('app_logger_finalizar',{p_id:p.id,p_os_sigos:os});
@@ -4540,8 +4609,8 @@ async function finalizarLogger(){
 }
 if($('#lgBack')) $('#lgBack').addEventListener('click',()=>irPara('loggers'));
 if($('#lgNovo')) $('#lgNovo').addEventListener('click',abrirCriar);
-if($('#lgModoTemp')) $('#lgModoTemp').addEventListener('click',()=>{lgModo='temp';lgFiltro='todos';lgCons='todos';lgSub='todos';irPara('loggers');});
-if($('#lgModoFixo')) $('#lgModoFixo').addEventListener('click',()=>{lgModo='fixo';lgFiltro='todos';lgCons='todos';lgSub='todos';irPara('loggers');});
+if($('#lgModoTemp')) $('#lgModoTemp').addEventListener('click',()=>{lgModo='temp';lgFiltro='todos';lgCons='todos';lgSub='todos';lgSig='';irPara('loggers');});
+if($('#lgModoFixo')) $('#lgModoFixo').addEventListener('click',()=>{lgModo='fixo';lgFiltro='todos';lgCons='todos';lgSub='todos';lgSig='';irPara('loggers');});
 if($('#lgVoltarHub')) $('#lgVoltarHub').addEventListener('click',()=>irPara('loggers_hub'));
 if($('#vwLista')) $('#vwLista').addEventListener('click',()=>setView('lista'));
 if($('#vwMapa')) $('#vwMapa').addEventListener('click',()=>setView('mapa'));
@@ -7428,7 +7497,7 @@ async function sgcProcessar(id,k){
 // RPC app_sigos_os_status(p_os text[]) — qualquer usuário ativo; devolve só serviço/status/datas.
 const SGX_CACHE=new Map();          // texto digitado → info (ou Promise)
 let sgxFila=new Set(), sgxTimer=null;
-const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,#vmPgSig,#vmGcSig,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial';
+const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,#vmPgSig,#vmGcSig,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial,#di_os,#fzOs,#lgSigIn';
 function sgxS(v){ v=(v==null?'':String(v)).trim(); return v?'<span class="sgx" data-sgx="'+vEsc(v)+'"></span>':''; }
 function sgxCss(){
   if(document.getElementById('sgxCss')) return;

@@ -218,9 +218,12 @@ pwa/
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
 - **Loggers** (card "Loggers" → hub `loggers_hub` com **Temporários**/**Fixos** → `loggers`/`logger_det`) —
   os dois modos usam a **mesma tela**; `lgModo` filtra pela flag `logger_temporario` (true=temp, false=fixo)
-  e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo: **pendente → instalado → dados pendentes
+  e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo do temporário: **pendente → instalado → dados pendentes
   (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após
-  7 dias). Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
+  7 dias); **o fixo termina em "instalado"** (sem remoção; `app_logger_remover` recusa fixo — 2026-11-11, sw v366).
+  **OS SIGOS** (2026-11-11): campo opcional na instalação/criação (`p_os_sigos`), linha editável no detalhe
+  (`app_logger_set_os_sigos`), selo na lista e chips "SIGOS:" de situação, incl. encerrado no app × não executado
+  no SIGOS — `docs/migracao_logger_os_sigos.sql`, `docs/MODULOS.md §2.2`. Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
   View `vw_loggers` (tem `consorcio`, geom real × planejada; `situacao_atual` é **derivada** das datas —
   não há coluna `situacao` na tabela base `instalacao_logger_calibracao`). Filtro por situação **e por
   consórcio** (ZA1004/ZA0200). No **lápis** (aprovador/admin) dá pra editar/anexar todas as fotos e 3
@@ -296,7 +299,7 @@ pwa/
     blocos dia × colaborador × consórcio no estilo da Gestão de Pavimento — abas Pendente de OS/OS criada/Todos, chips de
     prazo, filtros de consórcio, colaborador e dia; o backoffice lança a **OS SIGOS do dia** no bloco (`"12 - retaguarda".pesquisa_dia_os`)
     e cada bloco abre a folha p/ imprimir/PDF — só o trajeto percorrido/pesquisado (km pesquisado, km andado,
-    velocidade e mapa da rede + trajeto; **sem vazamentos/fraudes** desde 11/11/2026, sw v364); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9) ·
+    velocidade e mapa da rede + trajeto; **sem vazamentos/fraudes** desde 11/11/2026, sw v366); `app_pp_diario_lista`/`app_pp_diario_os`/`app_pp_relatorio_diario`, §4.3.9) ·
     Acompanhamento da pesquisa (`pp_acomp`, §4.3.8).
   - **🔧 Gestão de VRPs:** Gestão de serviços (`vrpman_serv`) · Ficha cadastral (`vrpman_fichas`) · Cronograma
     preventivo (`vrpman_prev`) — **migradas do hub `vrpman`** (gate `ME.vrp_gestao`; ⚙️ acesso `vrpman_cfg` admin).
