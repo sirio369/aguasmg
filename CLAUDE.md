@@ -597,7 +597,10 @@ Dados de exemplo em `PJ_IVS` (sem backend ainda; futuro: RPCs `app_proj_*`). Det
 
 **Exibido como "Almoxarifado"** (só o rótulo — screen id `suprimentos`, funções `sup_*` e o schema
 seguem com o nome antigo). Home em duas seções: **📦 Áreas** — **Insumos**, **Equipamentos**,
-**EPI / Uniforme**, **Ferramentas** — e, separada, **📋 Conferência** — **Baixas/Conferência**.
+**EPI / Uniforme**, **Ferramentas** — e, separadas, **📋 Conferência** — **Baixas/Conferência** — e
+**🔎 Controle** — **Itens em posse por colaborador** (2026-11-11: tudo que está com a pessoa — insumos,
+ferramentas, equipamentos, EPI/uniforme — p/ cobrar a devolução no desligamento; só leitura, área `controle`
+na engrenagem, que **não** conta em `sup_e_almox`; RPCs `app_sup_controle_*`, `docs/MODULOS.md §5.5.1`).
 Papéis liberam ações via `ME`. `SUP_ACTS` mapeia act→função; `supBlocks*` monta os menus.
 **Acesso às categorias Almoxarifado (de cada área) e Conferência não é mais por `is_almoxarife`** —
 2026-09-16 virou **5 engrenagens ⚙️ admin-only** (uma por área: baixas/insumo/equip/epi/ferramenta),

@@ -9145,7 +9145,7 @@ const SUP_ACTS={
 };
 // Acesso dinâmico por engrenagem às categorias Almoxarifado/Conferência (ME.sup_areas vem do app_me).
 // admin sempre tem acesso. Substitui o antigo "só almoxarife" (2026-09-16).
-const SUP_AREA_LABEL={baixas:'Baixas / Conferência', insumo:'Insumos — Almoxarifado', equip:'Equipamentos — Almoxarifado', epi:'EPI / Uniforme — Almoxarifado', ferramenta:'Ferramentas — Almoxarifado'};
+const SUP_AREA_LABEL={baixas:'Baixas / Conferência', controle:'Controle — Itens em posse', insumo:'Insumos — Almoxarifado', equip:'Equipamentos — Almoxarifado', epi:'EPI / Uniforme — Almoxarifado', ferramenta:'Ferramentas — Almoxarifado'};
 function supAreaAcesso(key){ return !!(ME && (ME.is_admin || (ME.sup_areas && ME.sup_areas[key]))); }
 function supCatArea(cat){ return cat==='insumos'?'insumo':(cat==='equip'?'equip':(cat==='epi'?'epi':(cat==='ferramenta'?'ferramenta':null))); }
 function supBlocks(){
@@ -9206,6 +9206,8 @@ function supHome(){
   const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
   const verBaixas=supAreaAcesso('baixas'), admin=!!(ME&&ME.is_admin);
   const confGear=admin?'<button id="supConfGear" title="Definir quem vê Baixas / Conferência" style="all:unset;cursor:pointer;font-size:17px;margin-left:auto;padding:0 4px">⚙️</button>':'';
+  const verControle=supAreaAcesso('controle');
+  const ctlGear=admin?'<button id="supCtlGear" title="Definir quem vê Controle" style="all:unset;cursor:pointer;font-size:17px;margin-left:auto;padding:0 4px">⚙️</button>':'';
   $('#supView').innerHTML='<h1 style="margin-bottom:2px">Almoxarifado</h1><p class="sub">Escolha uma área</p>'+
     '<div class="sec" style="margin-top:14px">📦 Áreas</div>'+
     '<div class="grid" style="margin-top:10px">'+
@@ -9218,11 +9220,18 @@ function supHome(){
       '<div class="grid" style="margin-top:10px">'+
         (verBaixas?'<button class="mod" data-supbaixas="1"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div></button>'
                   :'<button class="mod soon" data-suplock="Baixas / Conferência"><div class="ic">📋</div><div class="nm">Baixas / Conferência</div><span class="tag">via engrenagem</span></button>')+
+      '</div>'):'')+
+    ((verControle||admin)?('<div class="sec" style="margin-top:20px;display:flex;align-items:center">🔎 Controle'+ctlGear+'</div>'+
+      '<div class="grid" style="margin-top:10px">'+
+        (verControle?'<button class="mod" data-supcontrole="1"><div class="ic">👤</div><div class="nm">Itens em posse por colaborador</div></button>'
+                    :'<button class="mod soon" data-suplock="Itens em posse"><div class="ic">👤</div><div class="nm">Itens em posse por colaborador</div><span class="tag">via engrenagem</span></button>')+
       '</div>'):'');
   $('#supView').querySelectorAll('[data-suparea]').forEach(el=>el.addEventListener('click',()=>supArea(el.dataset.suparea)));
   $('#supView').querySelectorAll('[data-supbaixas]').forEach(el=>el.addEventListener('click',()=>supVBaixas()));
+  $('#supView').querySelectorAll('[data-supcontrole]').forEach(el=>el.addEventListener('click',()=>supVControle()));
   $('#supView').querySelectorAll('[data-suplock]').forEach(el=>el.addEventListener('click',()=>toast('Liberado pela engrenagem (admin)')));
   if($('#supConfGear')) $('#supConfGear').addEventListener('click',()=>supAreaGate('baixas',supHome));
+  if($('#supCtlGear')) $('#supCtlGear').addEventListener('click',()=>supAreaGate('controle',supHome));
 }
 function supArea(cat){
   supAreaId=cat; supCurrent='area';
@@ -9730,6 +9739,88 @@ async function supVBaixas(){
     exportarXlsx(nome,'Baixas',aoa);
   });
   load();
+}
+
+// --- Controle › Itens em posse por colaborador (2026-11-11) ---
+// Tudo que está com a pessoa (insumos, ferramentas, equipamentos, EPI/uniforme) p/ cobrar a devolução
+// no desligamento. Só leitura. Gate: área 'controle' (engrenagem admin) — RPCs app_sup_controle_*.
+let ctlColabs=[];
+const ctlEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ctlTotal=c=>(+c.insumos||0)+(+c.ferramentas||0)+(+c.equipamentos||0)+(+c.epis||0);
+async function supVControle(){
+  supCurrent='area'; const bk=$('#supBack'); if(bk) bk.textContent='‹ Almoxarifado';
+  const tt=$('#supTitle'); if(tt) tt.textContent='Itens em posse por colaborador';
+  const cfg=$('#supCfg'); if(cfg) cfg.classList.add('hidden');
+  $('#supView').innerHTML=`
+    <p class="sub" style="margin-top:2px">Escolha um colaborador para ver tudo o que está com ele — insumos, ferramentas, equipamentos e EPI/uniforme — e cobrar a devolução.</p>
+    <input id="ctlBusca" placeholder="Buscar por nome, e-mail ou cargo…" autocomplete="off" style="margin-top:8px"/>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <select id="ctlFiltro" style="flex:1;min-width:0"><option value="posse">Só quem tem itens em posse</option><option value="inativos">Desligados com itens em posse</option><option value="todos">Todos os colaboradores</option></select>
+    </div>
+    <div id="ctlOut" style="margin-top:10px"><p class="sub">Carregando…</p></div>`;
+  $('#ctlBusca').addEventListener('input',ctlRenderLista);
+  $('#ctlFiltro').addEventListener('change',ctlRenderLista);
+  try{ const {data,error}=await sb.rpc('app_sup_controle_colaboradores'); if(error)throw error; ctlColabs=data||[]; }
+  catch(e){ $('#ctlOut').innerHTML='<div class="banner bad">Erro: '+ctlEsc(e.message||e)+'</div>'; return; }
+  ctlRenderLista();
+}
+function ctlRenderLista(){
+  const out=$('#ctlOut'); if(!out) return;
+  const termo=(($('#ctlBusca')||{}).value||'').trim().toLowerCase(), f=($('#ctlFiltro')||{}).value||'posse';
+  const arr=ctlColabs.filter(c=>{
+    if(f==='posse' && !ctlTotal(c)) return false;
+    if(f==='inativos' && (c.ativo || !ctlTotal(c))) return false;
+    return !termo || [c.nome,c.email,c.cargo].some(v=>(v||'').toLowerCase().includes(termo));
+  });
+  if(!arr.length){ out.innerHTML='<p class="sub">Ninguém encontrado.</p>'; return; }
+  const pill=(n,ic,lbl)=>n?'<span style="font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap;background:var(--card);border:1px solid var(--line)">'+ic+' '+n+' '+lbl+'</span>':'';
+  out.innerHTML='<div class="sub" style="margin-bottom:6px">'+arr.length+' colaborador(es)</div>'+arr.map(c=>{
+    const tot=ctlTotal(c);
+    const inat=c.ativo?'':'<span style="font-size:10px;padding:1px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn)">Desligado'+(c.demissao?' · '+eqDia(c.demissao):'')+'</span>';
+    return '<button data-ctl="'+c.id+'" style="all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px">'+
+      '<div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0"><div style="font-size:14px">'+ctlEsc(c.nome)+' '+inat+'</div><div class="sub" style="font-size:12px">'+ctlEsc(c.cargo||'—')+'</div></div><b style="font-size:15px">'+tot+'</b></div>'+
+      (tot?'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+pill(c.insumos,'📦','insumo(s)')+pill(c.ferramentas,'🔧','ferramenta(s)')+pill(c.equipamentos,'🧰','equipamento(s)')+pill(c.epis,'🦺','EPI/uniforme')+'</div>':'<div class="sub" style="font-size:12px;margin-top:4px">Nada em posse</div>')+
+      '</button>';
+  }).join('');
+  out.querySelectorAll('[data-ctl]').forEach(b=>b.addEventListener('click',()=>ctlDetalhe(b.dataset.ctl)));
+}
+async function ctlDetalhe(uuid){
+  const v=$('#supView');
+  v.innerHTML='<button class="btn ghost" id="ctlVoltar" style="margin:0 0 12px">‹ Colaboradores</button><div id="ctlDet"><p class="sub">Carregando…</p></div>';
+  $('#ctlVoltar').addEventListener('click',()=>supVControle());
+  let d;
+  try{ const {data,error}=await sb.rpc('app_sup_controle_posse',{p_uuid:uuid}); if(error)throw error; d=data||{}; }
+  catch(e){ $('#ctlDet').innerHTML='<div class="banner bad">Erro: '+ctlEsc(e.message||e)+'</div>'; return; }
+  const c=d.colaborador||{}, ins=d.insumos||[], fer=d.ferramentas||[], eq=d.equipamentos||[], epi=d.epis||[];
+  const tot=ins.length+fer.length+eq.length+epi.length;
+  const tag=(txt,warn)=>'<span style="font-size:10px;padding:1px 7px;border-radius:999px;white-space:nowrap;background:var('+(warn?'--warn-bg':'--ok-bg')+');color:var('+(warn?'--warn':'--ok')+')">'+txt+'</span>';
+  const linha=(titulo,sub,dir,extra)=>'<div style="display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-size:14px">'+titulo+'</div><div class="sub" style="font-size:12px">'+sub+'</div></div><div style="text-align:right;white-space:nowrap">'+dir+(extra?'<div style="margin-top:3px">'+extra+'</div>':'')+'</div></div>';
+  const bloco=(ic,t,arr,fn)=>'<div class="sec" style="margin-top:16px">'+ic+' '+t+' ('+arr.length+')</div>'+
+    (arr.length?'<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:2px 13px;margin-top:8px">'+arr.map(fn).join('')+'</div>':'<p class="sub" style="margin-top:6px">Nada em posse.</p>');
+  const status=c.ativo===false?tag('Desligado'+(c.demissao?' em '+eqDia(c.demissao):''),true):tag('Ativo');
+  $('#ctlDet').innerHTML=
+    '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px">'+
+      '<div style="display:flex;gap:8px;align-items:center"><div style="flex:1;min-width:0;font-size:16px"><b>'+ctlEsc(c.nome)+'</b></div>'+status+'</div>'+
+      '<div class="sub" style="font-size:12px;margin-top:3px">'+ctlEsc(c.cargo||'—')+(c.matricula?' · matr. '+ctlEsc(c.matricula):'')+(c.email?' · '+ctlEsc(c.email):'')+'</div>'+
+      '<div style="margin-top:8px;font-size:14px">'+(tot?'<b>'+tot+'</b> item(ns) a devolver':'✅ Nada em posse — nada a cobrar')+'</div>'+
+      (tot?'<button id="ctlXlsx" class="btn ghost" style="margin:10px 0 0;width:auto;padding:0 14px">⬇ Exportar lista (XLSX)</button>':'')+
+    '</div>'+
+    bloco('🧰','Equipamentos',eq,r=>linha(ctlEsc(r.nome),ctlEsc(r.tipo||'')+(r.num_serie?' · nº série '+ctlEsc(r.num_serie):'')+' · entregue '+eqDia(r.aceito_em||r.emitido_em),'1 un',
+      r.termo_status==='pendente'?tag('Termo não aceito',true):(r.devolucao_solicitada?tag('Devolução solicitada'):''))) +
+    bloco('🔧','Ferramentas',fer,r=>linha(ctlEsc(r.material),(r.sku?'cód. '+ctlEsc(r.sku)+' · ':'')+'última retirada '+eqDia(r.ultima_entrada),'<b>'+supNum(r.saldo)+'</b> '+ctlEsc(r.unidade||''),
+      +r.devolucao_pendente?tag('Devolução solicitada: '+supNum(r.devolucao_pendente)):'')) +
+    bloco('🦺','EPI / Uniforme',epi,r=>linha(ctlEsc(r.epi)+(r.tamanho?' <b>['+ctlEsc(r.tamanho)+']</b>':''),(r.ca?'CA '+ctlEsc(r.ca)+' · ':'')+'entregue '+eqDia(r.entregue_em),'<b>'+supNum(r.quantidade)+'</b> un',
+      r.devolucao_pendente?tag('Devolução/troca solicitada'):'')) +
+    bloco('📦','Insumos',ins,r=>linha(ctlEsc(r.material),(r.sku?'cód. '+ctlEsc(r.sku)+' · ':'')+'última retirada '+eqDia(r.ultima_entrada),'<b>'+supNum(r.saldo)+'</b> '+ctlEsc(r.unidade||''),''));
+  if($('#ctlXlsx')) $('#ctlXlsx').addEventListener('click',()=>{
+    const aoa=[['Categoria','Item','Código / nº série','Tamanho','Quantidade','Unidade','Entregue em','Situação']];
+    eq.forEach(r=>aoa.push(['Equipamento',r.nome||'',r.num_serie||'','',1,'un',eqDia(r.aceito_em||r.emitido_em),r.termo_status==='pendente'?'Termo não aceito':(r.devolucao_solicitada?'Devolução solicitada':'Em posse')]));
+    fer.forEach(r=>aoa.push(['Ferramenta',r.material||'',r.sku||'','',+r.saldo||0,r.unidade||'',eqDia(r.ultima_entrada),+r.devolucao_pendente?'Devolução solicitada':'Em posse']));
+    epi.forEach(r=>aoa.push(['EPI / Uniforme',r.epi||'',r.ca?('CA '+r.ca):'',r.tamanho||'',+r.quantidade||0,'un',eqDia(r.entregue_em),r.devolucao_pendente?'Devolução/troca solicitada':'Em posse']));
+    ins.forEach(r=>aoa.push(['Insumo',r.material||'',r.sku||'','',+r.saldo||0,r.unidade||'',eqDia(r.ultima_entrada),'Em posse']));
+    const slug=String(c.nome||'colaborador').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_');
+    exportarXlsx('itens_em_posse_'+slug+'.xlsx','Itens em posse',aoa);
+  });
 }
 
 // ===== FERRAMENTAS =====
