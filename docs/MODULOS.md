@@ -998,7 +998,7 @@ Acompanhamento.
   `PAV_SLA`/`pavBucket` da pavimentação — 🟢 0–3 no prazo · 🟡 4–5 atenção · 🔴 >5 atrasado; o relógio conta só sem OS;
   clicar num chip filtra e força a aba Pendente. Ordem: pendentes do mais antigo p/ o mais novo; demais, mais novos primeiro.
 - **Card do bloco:** "📅 dia da semana, data" + badge (faixa de prazo · há N dias, ou ✓ OS criada) + borda colorida ·
-  colaborador · consórcio · métricas do dia · **campo "nº da OS SIGOS do dia" + Criar OS** (pendente) ou "✓ OS … · lançada
+  colaborador · consórcio · métricas do trajeto (km pesquisado · km andado · km/h) · **campo "nº da OS SIGOS do dia" + Criar OS** (pendente) ou "✓ OS … · lançada
   por … em …" + **✏️ alterar** (reabre o campo; apagar o número e salvar devolve o dia a pendente, com confirmação) ·
   **📄 Relatório do dia ›**.
 - **OS (`app_pp_diario_os(p_colaborador, p_data, p_consorcio, p_os)`):** grava/troca em
@@ -1009,12 +1009,11 @@ Acompanhamento.
 - **Folha (`app_pp_relatorio_diario(p_colaborador, p_data, p_consorcio)`):** só o que é do consórcio do bloco
   (`p_consorcio` null = o dia inteiro, sem OS única). Cabeçalho (consórcio, data + dia da semana,
   colaborador, período em pesquisa = 1º início → último fim dos trechos, **OS SIGOS do dia** ou "Pendente" — `os_dia`) →
-  **1 · Produção do dia** (6 cards: km pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa],
-  vazamentos, fraudes, vaz/km) → **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa,
-  vazamentos em azul e fraudes em laranja, **numerados**) → **3 · Vazamentos apontados** e **4 · Fraudes apontadas** (um
-  bloco por ocorrência, na ordem do horário, com o mesmo nº do mapa: foto, tipo, local, hora, OS COPASA, coordenada e a
-  **descrição do pesquisador** = `ocorrencia.observacao`). Numeração única (`pdOcorrencias`): vazamentos 1..n, depois
-  fraudes n+1…
+  **1 · Produção do dia** (3 cards: km pesquisado, km andado [+ nº de trechos], velocidade [+ tempo em pesquisa]) →
+  **2 · Mapa da pesquisa** (rede pesquisada em verde, trajeto andado tracejado rosa). **Desde 11/11/2026 (sw v364) a folha
+  traz só o trajeto percorrido/pesquisado:** não mostra vazamentos nem fraudes (nem contagem, vaz/km, pinos no mapa ou
+  detalhe com foto) — decisão do usuário. A RPC continua devolvendo `vazamentos`/`fraudes`/`kpis.vaz_km`, mas a folha os
+  ignora. O **card da lista de blocos** também mostra só km pesquisado · km andado · km/h (sem contagem de ocorrências).
 - **Mesmas definições do Acompanhamento (§4.3.8):** km pesquisado = `pp_execucao` (rede) · km andado =
   `pesquisa_trecho` · vaz/km = vazamentos ÷ km de rede · velocidade = km andado ÷ soma de `duracao_s`. **Fraude
   aparece à parte e não entra no vaz/km** (vazamento = tipo que não começa com "Fraude", §2.3); a RPC devolve as listas
