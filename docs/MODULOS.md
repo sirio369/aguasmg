@@ -3316,7 +3316,10 @@ Painel para a TV da sala: **apresentação em loop** com as atividades de campo 
 - **Vitrine unificada (2026-11-10, sw v346, `docs/migracao_vitrine_unificada.sql`):** a TV deixou de separar "AcquaHub" de
   "SIGOS" — tudo é **serviço executado**, por **família de serviço** (a mesma taxonomia do SIGOS/RDO: `sigos_servico_grupo`;
   o app entra em Loggers de pressão, VRP, Pesquisa de vazamento, Fiscalização de irregularidade (ocorrência `Fraude - …`),
-  Recomposição de pavimento (ponto levantado), Obras (projetos) e Atendimento comercial). Fonte única
+  Recomposição de pavimento (ponto levantado), Obras (projetos) e Atendimento comercial). **Desde 2026-11-11** (migração
+  `rdo_fiscalizacao_regra_bi`, ver §21.4) a família do SIGOS vem de `sigos_familia` (regra do BI: Fiscalização = 676 79 00 +
+  152 05 00 gerada até 31/10/2026, contando também "NÃO EXEC. C/ VISITA"; "Confirmação de fraude" à parte, cor `#be123c`) e a
+  ocorrência `Fraude - …` do app passou para **Pesquisa de vazamento** (Fiscalização = só SIGOS, igual ao BI e ao RDO). Fonte única
   **`app_vitrine_feed(p_desde)`** (mesmo gate/período): `itens` (desde o mais cedo entre "desde" e 7 dias: za, família `f`,
   serviço legível `s`, dia/hora, `quem` = equipe do SIGOS ou colaborador do app, local, lat/lon, fotos, OS), `agg` (dia × ZA ×
   família, 30 dias/mês), `nex` (OS encerradas sem execução), `quem_mes`, `carteira` (em aberto, tira o que já está nas
@@ -3920,6 +3923,23 @@ Fusos: `timestamptz` com `at time zone 'America/Sao_Paulo'`; `timestamp` do sche
 do feed (`l.auto`), revisões antigas em `rdo_item` (1 linha oculta em 10/11) são ignoradas. Ficam: calendário (dia com
 registro = borda azul; ⏳ = SIGOS ainda não chegou), detalhe ▾ e "📋 Copiar RDO" (sem a linha "Situação"). As RPCs
 `app_rdo_item_salvar/excluir/fechar/reabrir` e as tabelas `rdo_item`/`rdo_dia` continuam no banco, sem uso pelo app.
+**📋 por bloco (2026-11-11, sw v360):** cada linha do dia tem um 📋 ao lado do ▾ que copia só aquele bloco (texto + detalhe,
+HTML + texto simples, mesmo formato do "Copiar RDO") — `rdoCopiarBloco(k)`; a cópia em si é `rdoClip(txt, html, msg)`.
+
+**Fiscalização × Confirmação de fraude = regra do BI Produção (2026-11-11, migração `rdo_fiscalizacao_regra_bi`,
+`docs/migracao_rdo_fiscalizacao_regra_bi.sql`, aplicada):** o RDO e a Vitrine contam a fiscalização igual ao BI Dashboard
+Producao (`qRealizado` + `dCodigo` + aba Regras do `Parametros_Modelo.xlsx`):
+- família pela função `public.sigos_familia(cod, desc, abertura)`: **676 79 00** = Fiscalização de irregularidade sempre;
+  **152 05 00** = Fiscalização só se a OS foi **gerada até 31/10/2026** (`sigos_fisc_corte()` = `Regras[fiscalizacao_152_gerada_ate]`);
+  os demais `CONF. DE INFRACAO…` (152 05 00 gerada depois, 152 06 00…) = família nova **"Confirmação de fraude"** (Suporte, ordem 62),
+  mostrada à parte — primeiro acontece a fiscalização, depois pode ser aberta a OS de confirmação; outros códigos de VISTORIA
+  DE IMOVEL = "Vistoria de imóvel"; o resto segue `sigos_servico_grupo(desc)`;
+- `public.sigos_conta(família, situação, status)`: conta a OS executada e, **só na fiscalização**, também "NÃO EXEC. C/ VISITA"
+  (`Regras[fiscalizacao_status_extra]`); sem visita não conta;
+- linha do RDO: "Fiscalização de irregularidade — 24 fiscalizações (21 executadas, 3 não executadas com visita)[; N OS sem visita
+  (não contam)]: …" (`qtd` = só as que contam); Confirmação de fraude segue o bloco único ("9 OS executadas, 1 OS encerrada sem execução…").
+- Conferido em 11/11 (01/10–09/11): Fiscalização ZA0200 384 / ZA1004 281 e Confirmação executada 65 / 13 — iguais ao BI.
+- ⚠️ Se a data de corte mudar no BI, mudar também `sigos_fisc_corte()`.
 
 **Recadastramento e Fiscalização num bloco só (2026-11-10, `docs/migracao_rdo_agrupa_familias.sql`, só banco):** para essas
 duas famílias o RDO não separa mais "Execução" (`sigos:exec:`) e "Pendência" (`sigos:nexec:`): sai **uma linha por dia × ZA**,
