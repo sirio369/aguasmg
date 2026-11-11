@@ -2634,8 +2634,8 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   **1 Projeto** (Engenharia insere, liga/desliga etapas, anexa Projeto Executivo/Mapeamento/[HDD] Plano de furo **com
   folha A0–A4** e **Libera**) → **2 Aprovação** (Qualidade aprova/reprova cada documento; reprovação exige comentário,
   volta o documento para quem anexou e avisa essa pessoa) → **3 Pré-obra** (Obras: vistoria cautelar = **link do
-  SharePoint** aprovado pela Qualidade, Liberação prefeitura [ex-Autorização de Intervenção de Via], GASMIG, Transcon,
-  Licença ambiental, OS SIGOS) → **4 Execução** (a árvore de avanço de sempre) → **5 Encerramento** (relatórios de Obras
+  SharePoint** aprovado pela Qualidade, Liberação TransCon/Transbetim [ex-Liberação prefeitura / Autorização de Intervenção
+  de Via], GASMIG, Licença ambiental, OS SIGOS — desde 2026-11-11 **só a OS SIGOS trava a Execução** e os demais têm "Não se aplica") → **4 Execução** (a árvore de avanço de sempre) → **5 Encerramento** (relatórios de Obras
   e As built, **todos aprovados pela Qualidade**, + Relatório de Qualidade da Pavimentação anexado pela Qualidade; abre
   com a execução em 100%). Tipos do pipeline (`vw_iv.tipo`): linha `HDD`→`hdd`, outras linhas→`vca`, ponto
   `VRP`→`vrp`, `Valvula`/`Registro`→`registro`, `Macromedidor`→`macro`.
@@ -2682,6 +2682,22 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     status 14 configuração / 18 em andamento / 29 não iniciadas, ciclo completo num ponto novo (recusas de ator, folha,
     justificativa, escopo travado, reprovação+aviso, reenvio, aprovação, fases 3/4/5 com avisos, OS só dígitos),
     importação de ponto e de linha, prazos.
+- **🚧 Pré-obra: TransCon/Transbetim, "Não se aplica" e só a OS SIGOS trava (2026-11-11, sw v367,
+  `docs/migracao_proj_preobra_nao_aplica.sql`).**
+  - **Liberação prefeitura = Liberação Transcon** → ficou uma etapa só, a `alvara` (que já tinha histórico); a `lib_transcon`
+    saiu do `etapa_modelo` (nenhuma intervenção tinha dado nela). O **nome segue a região** da intervenção pela função
+    `"13 - projetos_obra".proj_etapa_nome(chave,nome,consorcio,cidade)`: ZA1004/Contagem = **Liberação TransCon**, ZA0200/Betim =
+    **Liberação Transbetim** (sem consórcio nem cidade: "Liberação TransCon / Transbetim", que é o nome gravado no modelo).
+    Usada em `proj_calc` e `app_proj_eventos` (Resumo).
+  - **"Não se aplica"** (Obras, botão 🚫 em cada item doc/link da pré-obra — vistoria, liberações, licença — **menos a OS SIGOS**):
+    `app_proj_etapa_nao_aplica(kind,gid,chave,p_nao_aplica)`; status novo **`nao_aplica`** (conta como feito, sai da fila e do
+    "com quem está") e eventos `nao_aplica`/`aplica`. Na vistoria a **aprovação da Qualidade some junto** (fica inativa).
+    Só em item pendente/em correção; **↩ Desfazer** volta a pendente.
+  - **Só a OS SIGOS trava a Execução:** em `proj_calc`, `f3` passou a olhar só o item `natureza='os'` da fase 3. Os demais
+    documentos da pré-obra continuam abertos com Obras (fila + prazo contado de `fase3_em`) mesmo com a obra em andamento.
+    Status `preobra` agora = falta a OS SIGOS.
+  - Testado com rollback (11/11/2026, linha 47 / ZA0200): nome "Liberação Transbetim", vistoria "não se aplica" com a aprovação
+    inativa, OS SIGOS recusa "não se aplica", lançar a OS abriu a Execução com GASMIG ainda pendente/acionável, desfazer ok.
 - **🔁 Pipeline — FRONT (2026-11-02, sw v317).** Depende de `docs/migracao_proj_pipeline.sql` aplicado (sem ele
   `app_proj_pipeline_resumo` falha e toda intervenção aparece como "Em configuração").
   - **Hub em 3 atores:** 🏗️ **Obras** (Intervenções · Resumo · Indicadores) · 📐 **Engenharia** (ex-"Suporte":

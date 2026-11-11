@@ -535,7 +535,9 @@ popup), **Cronograma preventivo** (`vrpman_prev`: farol + resumo). OS SIGOS edit
 VCA/HDD). **Pipeline Engenharia → Qualidade → Obras (2026-11-02; banco `docs/migracao_proj_pipeline.sql`, front sw
 v317):** 5 fases (Projeto → Aprovação → Pré-obra → Execução → Encerramento) com etapas por tipo em `etapa_modelo`
 (5 tipos: Rede HDD/VCA, Instalação de VRP/macromedidor/registro), aprovação da Qualidade com comentário e aviso, prazos
-por etapa, legado sem portões. **Hub em 3 atores** (🏗️ Obras · 📐 Engenharia [ex-Suporte] · ✅ Qualidade → tela
+por etapa, legado sem portões. **Pré-obra (2026-11-11, sw v367, `docs/migracao_proj_preobra_nao_aplica.sql`):** só a
+**OS SIGOS** trava a Execução; os demais itens têm **"Não se aplica"** (Obras, status `nao_aplica`); prefeitura e Transcon
+viraram uma etapa só (`alvara`) com nome pela região — **Liberação TransCon** (ZA1004) / **Liberação Transbetim** (ZA0200). **Hub em 3 atores** (🏗️ Obras · 📐 Engenharia [ex-Suporte] · ✅ Qualidade → tela
 `projeto_qual`); lista/mapa com status do pipeline, "com quem está" e chips de prazo; **Etapas** em acordeão na
 configuração (No escopo?, Liberar) e no detalhe (anexar com folha A0–A4, link da vistoria, OS, aprovar/reprovar); a
 árvore ficou só com a execução (chave estável `c` por etapa de topo). **Lançar avanço e salvar a árvore exigem ator**
