@@ -3169,7 +3169,7 @@ function pjRsTopoHtml(ev){
     return `<div class="pjrskpi"><b>${c.iv}</b><span>${PJ_ATOR[a][0]} com ${PJ_ATOR[a][1]}${c.n?' · '+c.n+' pend.':''}${(c.aten||c.atraso)?'<br>🟡 '+c.aten+' · 🔴 '+c.atraso:''}</span></div>`; }).join('');
   const k=x=>ev.filter(x).length;
   const kp=`<div class="pjrskpis"><div class="pjrskpi"><b>${k(e=>e.evento==='liberado')}</b><span>liberadas</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='enviado'&&e.natureza==='doc')}</b><span>documentos enviados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='aprovado')}</b><span>aprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='reprovado')}</b><span>reprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='enviado'&&e.natureza==='os')}</b><span>OS lançadas</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_pedido')}</b><span>ensaios de reaterro pedidos</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_aprovado')}</b><span>ensaios aprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_reprovado')}</b><span>ensaios reprovados</span></div></div>`;
-  const EVN={liberado:'🔓 liberada',reaberto:'🔒 reaberta',enviado:'📤 enviado',aprovado:'✔ aprovado',reprovado:'✖ reprovado',escopo:'escopo',removido:'removido',fase:'fase aberta',
+  const EVN={liberado:'🔓 liberada',reaberto:'🔒 reaberta',enviado:'📤 enviado',aprovado:'✔ aprovado',reprovado:'✖ reprovado',escopo:'escopo',removido:'removido',fase:'fase aberta',nao_aplica:'🚫 não se aplica',aplica:'↩ voltou a se aplicar',
     ensaio_pedido:'🧪 ensaio pedido',reaterro_refeito:'🔁 reaterro refeito',ensaio_aprovado:'🧪 ✔ ensaio aprovado',ensaio_reprovado:'🧪 ✖ ensaio reprovado'};
   const byDay={}; ev.forEach(e=>{ (byDay[e.d+'/'+e.ano]=byDay[e.d+'/'+e.ano]||[]).push(e); });
   const lista=Object.keys(byDay).map(dd=>`<div class="pjrsday"><div class="h"><b>${dd}</b><span>${byDay[dd].length} evento(s)</span></div>`+byDay[dd].map(e=>`<div class="pjet-b" style="padding:3px 0">${pjFmtDH(e.em).slice(6)} · <b>${e.iv||e.projeto||'#'+e.gid}</b> · ${e.evento==='fase'?(PJ_FASE_N[e.valor]||'fase '+e.valor):(e.nome||'')} · ${EVN[e.evento]||e.evento}${e.por?' · '+e.por:''}${e.comentario?' · <i>'+e.comentario+'</i>':''}</div>`).join('')+'</div>').join('');
@@ -3213,7 +3213,10 @@ async function pjFolhaConfere(file,folha){ if(!folha||!PJ_FOLHA_MM[folha]) retur
     return 'A folha escolhida é '+folha+', mas '+(n>1?(ruins.length+' de '+n+' página(s) não batem — a página '+r.pg+' tem '):'o PDF tem ')+tam+'.\n\nNo PDF consolidado a prancha sai ajustada à folha '+folha+'. Anexar mesmo assim?'; }
   catch(_){ return null; } }
 // rótulo/classe da situação de uma etapa
-function pjEtapaSit(it){ if(!it.ativo) return ['fora do escopo',''];
+function pjEtapaSit(it){
+  if(it.natureza==='aprovacao'&&!it.ativo){ const dl=((pjPipeCur&&pjPipeCur.itens)||[]).find(x=>x.chave===it.aprova); if(dl&&dl.status==='nao_aplica') return ['não se aplica','']; }
+  if(!it.ativo) return ['fora do escopo',''];
+  if(it.status==='nao_aplica') return ['não se aplica','ok'];
   const ap=it.natureza!=='aprovacao'?((pjPipeCur&&pjPipeCur.itens)||[]).find(x=>x.natureza==='aprovacao'&&x.aprova===it.chave&&x.ativo):null;
   if(it.natureza==='aprovacao') return ({pendente:['aguarda o documento',''],aguardando:['aguardando aprovação','wait'],aprovado:['aprovado','ok'],reprovado:['reprovado','bad']})[it.status]||[it.status,''];
   if(it.status==='correcao') return ['em correção','bad'];
@@ -3221,14 +3224,14 @@ function pjEtapaSit(it){ if(!it.ativo) return ['fora do escopo',''];
   return ['pendente',''];
 }
 function pjFmtDH(iso){ try{ const d=new Date(iso); return pjDDMM(iso)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; } }
-const PJ_EVT={enviado:'enviado',aprovado:'aprovado',reprovado:'reprovado',escopo:'escopo',legado:'migrado (legado)',removido:'removido'};
+const PJ_EVT={enviado:'enviado',aprovado:'aprovado',reprovado:'reprovado',escopo:'escopo',legado:'migrado (legado)',removido:'removido',nao_aplica:'não se aplica',aplica:'voltou a se aplicar'};
 // bloco "Etapas": fases 1–5 em acordeão; ctx 'cfg' (Engenharia: "No escopo?") | 'det' (todos: ações conforme o ator)
 function pjEtapasHtml(iv,ctx){ const P=pjPipeCur||{}, itens=P.itens||[], ev=P.eventos||[], cfg=ctx==='cfg', lib=!!P.liberado;
   const faseAtual=P.fase||1;
   const html=[1,2,3,4,5].map(f=>{
     if(f===4){ const ab=pjAberta(iv,4), pct=Math.round(pjIvPct(iv));
       return `<details class="pjfase ${faseAtual===4?'atual':''} ${ab?'':'fechada'}" ${faseAtual===4?'open':''}><summary>4 · Execução <span class="cnt">${ab?pct+'% · '+(pct>=100?'concluída':'aberta'):'fechada'}</span></summary>
-        <div class="pjet"><div class="pjet-b">${ab?'Avanço lançado na árvore <b>Execução</b> abaixo (responsáveis de obras).':'Abre quando a pré-obra estiver completa.'}</div></div></details>`; }
+        <div class="pjet"><div class="pjet-b">${ab?'Avanço lançado na árvore <b>Execução</b> abaixo (responsáveis de obras).':'Abre quando a OS SIGOS for lançada na pré-obra.'}</div></div></details>`; }
     const its=itens.filter(x=>x.fase===f); if(!its.length) return '';
     const atv=its.filter(x=>x.ativo), feitos=atv.filter(x=>f===1&&!lib?x.status==='enviado':x.feito).length;
     const aberta=f===1?true:pjAberta(iv,f);
@@ -3254,13 +3257,19 @@ function pjEtapaRow(iv,it,ctx,ev){ const cfg=ctx==='cfg', P=pjPipeCur||{}, lib=!
   // ações
   const acts=[]; const pode=pjPodeAtor(it.ator);
   const apAprov=it.natureza!=='aprovacao'&&((P.itens||[]).some(x=>x.natureza==='aprovacao'&&x.aprova===it.chave&&x.status==='aprovado'));
-  if(doc) acts.push(`<button class="btn ghost pjmini" data-eopen="${doc.path}">👁 Abrir</button>`);
-  if(it.ativo&&pode&&it.aberta&&!apAprov&&it.natureza==='doc'){
+  const na=it.status==='nao_aplica';
+  if(doc&&!na) acts.push(`<button class="btn ghost pjmini" data-eopen="${doc.path}">👁 Abrir</button>`);
+  // "Não se aplica" (Obras): itens da pré-obra, menos a OS SIGOS — conta como feito; dá para desfazer
+  if(it.ativo&&pode&&it.aberta&&it.fase===3&&(it.natureza==='doc'||it.natureza==='link')){
+    if(na) acts.push(`<button class="btn ghost pjmini" data-enaplica="${it.chave}" data-v="0">↩ Desfazer "não se aplica"</button>`);
+    else if(it.status==='pendente'||it.status==='correcao') acts.push(`<button class="btn ghost pjmini" data-enaplica="${it.chave}" data-v="1">🚫 Não se aplica</button>`);
+  }
+  if(!na&&it.ativo&&pode&&it.aberta&&!apAprov&&it.natureza==='doc'){
     if(it.pede_folha) acts.push(`<select data-efolha="${it.chave}"><option value="">Folha…</option>${PJ_FOLHAS.map(f=>`<option${doc&&doc.folha===f?' selected':''}>${f}</option>`).join('')}</select>`);
     acts.push(`<button class="btn ghost pjmini" data-eanexar="${it.chave}">📎 ${doc?'Substituir':'Anexar PDF'}</button><input type="file" accept="application/pdf" hidden data-efile="${it.chave}">`);
     if(doc&&cfg&&!lib&&pjPodeEng()) acts.push(`<button class="btn ghost pjmini bad" data-eremover="${it.chave}">🗑 Remover</button>`);
   }
-  if(it.ativo&&pode&&it.aberta&&!apAprov&&it.natureza==='link') acts.push(`<input type="url" data-elink="${it.chave}" placeholder="https://… (pasta no SharePoint)" value="${it.valor?String(it.valor).replace(/"/g,'&quot;'):''}"><button class="btn ghost pjmini" data-esalvar="${it.chave}">Salvar link</button>`);
+  if(!na&&it.ativo&&pode&&it.aberta&&!apAprov&&it.natureza==='link') acts.push(`<input type="url" data-elink="${it.chave}" placeholder="https://… (pasta no SharePoint)" value="${it.valor?String(it.valor).replace(/"/g,'&quot;'):''}"><button class="btn ghost pjmini" data-esalvar="${it.chave}">Salvar link</button>`);
   if(it.ativo&&pode&&it.aberta&&it.natureza==='os') acts.push(`<input type="text" inputmode="numeric" data-eos="${it.chave}" placeholder="nº da OS" value="${it.valor||''}"><button class="btn ghost pjmini" data-esalvar="${it.chave}">Salvar OS</button>`);
   if(it.natureza==='aprovacao'&&it.status==='aguardando'&&pjPodeQual()&&(it.acionavel||it.pend_legado)){
     const dl=(P.itens||[]).find(x=>x.chave===it.aprova);
@@ -3289,7 +3298,13 @@ function pjWireEtapas(d,iv){
   d.querySelectorAll('[data-esalvar]').forEach(b=>b.onclick=()=>{ const ch=b.dataset.esalvar, inp=d.querySelector('[data-elink="'+ch+'"],[data-eos="'+ch+'"]'); pjEtapaValor(iv,ch,inp?inp.value.trim():''); });
   d.querySelectorAll('[data-eaval]').forEach(b=>b.onclick=()=>{ const it=pjPipeItem(b.dataset.eaval); pjAvaliarModal(iv.kind,iv.gid,b.dataset.eaval,(it&&it.nome)||'',b.dataset.ok==='1',()=>pjPipeRefresh(iv)); });
   d.querySelectorAll('[data-eescopo]').forEach(s=>s.onclick=()=>pjEtapaEscopo(iv,s.dataset.eescopo,!s.classList.contains('on')));
+  d.querySelectorAll('[data-enaplica]').forEach(b=>b.onclick=()=>pjEtapaNaoAplica(iv,b.dataset.enaplica,b.dataset.v==='1'));
 }
+// "Não se aplica" de um item da pré-obra (Obras) — conta como feito e não trava a obra; desfazer volta a pendente
+async function pjEtapaNaoAplica(iv,chave,na){ const it=pjPipeItem(chave)||{};
+  if(na&&!confirm('Marcar "'+(it.nome||chave)+'" como não se aplica a esta intervenção?')) return;
+  try{ const {error}=await sb.rpc('app_proj_etapa_nao_aplica',{p_kind:iv.kind,p_gid:iv.gid,p_chave:chave,p_nao_aplica:na}); if(error) throw error;
+    toast(na?'Marcado como não se aplica':'Voltou a se aplicar'); await pjPipeRefresh(iv); }catch(e){ toast('Erro: '+(e.message||e)); } }
 async function pjEtapaAnexar(iv,chave,file,folha){ if(!iv||!file) return;
   if(file.type&&file.type!=='application/pdf'){ toast('Envie um arquivo PDF'); return; }
   if(folha){ const q=await pjFolhaConfere(file,folha); if(q&&!confirm(q)){ toast('Anexo cancelado — confira a folha'); return; } }
@@ -3561,7 +3576,7 @@ function pjRenderDet(keep){
   const banner=ab4
     ? (pjExecOk?`<div class="pjbanner ok">🏗️ <b>Execução liberada</b> — registre os avanços do dia.</div>`
                :`<div class="pjbanner ok">🏗️ <b>Execução liberada</b> — só os responsáveis de obras (Supervisor de Produção, Coordenador de Serviços, Gestor de Obras) lançam avanço.</div>`)
-    : `<div class="pjbanner warn">⏳ <b>Execução fechada</b> — abre quando a pré-obra estiver completa (vistoria aprovada, liberações, licença e OS SIGOS).</div>`;
+    : `<div class="pjbanner warn">⏳ <b>Execução fechada</b> — abre quando a OS SIGOS for lançada na pré-obra (os demais documentos não travam).</div>`;
   $('#pjDet').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
    <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
    ${pjSpecs(iv)}
