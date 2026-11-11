@@ -1092,7 +1092,7 @@ usa `sigos_pode_carregar`, hoje qualquer logado). Backend, regras e tabelas em *
 Home própria (`supHome`) com duas seções: **📦 Áreas** (**Insumos**, **Equipamentos**,
 **EPI/Uniforme**, **Ferramentas** — os cards sempre visíveis) e, separada, **📋 Conferência**
 (**Baixas/Conferência** — visualmente apartada das 4 áreas porque não é "mais uma área", é a etapa de
-conferência que consolida as outras). `SUP_ACTS` mapeia act→função; `supBlocks*` montam os menus por
+conferência que consolida as outras) e **🔎 Controle** (**Itens em posse por colaborador**, §5.5.1). `SUP_ACTS` mapeia act→função; `supBlocks*` montam os menus por
 papel (`ME`). Navegação interna por `supArea`/`supHome`/`supGoAct`; back inteligente em `#supBack`.
 Helpers de papel no banco: `sup_funcao(uuid)`, `sup_e_almox(uuid)`, `sup_pode_aprovar(uuid)`.
 
@@ -1295,6 +1295,24 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   oficial (`cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs`, cacheado em `_xlsxLib`); colunas
   Consórcio/Tipo/Código/Descrição/Tamanho/Unidade/Quantidade/Nº entregas/Status. Reutilizável por
   outras telas.
+
+### 5.5.1 Controle › Itens em posse por colaborador (2026-11-11) — `// --- Controle › Itens em posse`
+- 3ª seção da home do Almoxarifado, **🔎 Controle**, abaixo da Conferência. Card **"Itens em posse por
+  colaborador"** (`supVControle`/`ctlRenderLista`/`ctlDetalhe`, `supCurrent='area'` → back volta p/ `supHome`).
+  Objetivo: no **desligamento**, ver tudo que está com a pessoa e cobrar a devolução. **Só leitura.**
+- Gate: área nova **`controle`** na mesma engrenagem (`sup_acesso_area`, ⚙️ admin no cabeçalho da seção,
+  `ME.sup_areas.controle`). ⚠️ **`controle` NÃO entra em `sup_e_almox`** (a função passou a ignorar essa área),
+  senão quem só pode consultar ganharia as ações de almoxarife (§5 "contrapartida").
+- Lista: todos os perfis (inclui **inativos/desligados**, com data de `perfil.demissao`) + contagem por categoria;
+  filtro "Só quem tem itens em posse" (padrão) / "Desligados com itens em posse" / "Todos" + busca.
+- Detalhe (4 blocos): **Equipamentos** (`sup_termo` pendente/ativo — chip "Termo não aceito"/"Devolução
+  solicitada"), **Ferramentas** e **Insumos** (`sup_saldo>0`, separados por `sup_material.ferramenta`; última
+  retirada = último movimento positivo; ferramenta mostra devolução pendente de `sup_ferramenta_devolucao`),
+  **EPI/Uniforme** (`sup_epi_entrega_item` sem `substituido_em`/`devolvido_em`; chip se há `sup_epi_baixa_pedido`
+  solicitada/aguardando). Botão **⬇ Exportar lista (XLSX)** (`exportarXlsx`).
+- RPCs (definer, gate `sup_tem_area(uid,'controle')` = admin ou área concedida): `app_sup_controle_colaboradores()`,
+  `app_sup_controle_posse(p_uuid)`. Migração `docs/migracao_sup_controle_posse.sql` (também atualiza
+  `app_sup_area_listar/_set`, `app_me` e `sup_e_almox`).
 
 ### 5.6 Configurações (admin) — `// tela: Configurações` (~L3824)
 - **Duas entradas, uma tela** (`supAbrirConfig(from)`, `from` = `'home'` | `'epi'`; roda dentro do
