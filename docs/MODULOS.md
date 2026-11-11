@@ -607,7 +607,7 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   `pgOcAbrir(id,temOs)` (chamado pelo popup do Acompanhamento, §4.3.8) abre em modo pesquisa, na aba certa
   (pendente/OS criada), limpa os filtros, rola até o card (`data-occ`) e o destaca (`.occ.foco`); o "‹ voltar"
   segue `pgBackTo` (volta ao Acompanhamento nesse caso). `app_ocorrencia_fila` passou a devolver `usuario_nome`.
-- **Ocorrências: ciclo da OS × SIGOS (2026-11-11, sw v364, só front).** No modo pesquisa as abas Pendentes/OS
+- **Ocorrências: ciclo da OS × SIGOS (2026-11-11, sw v365, só front).** No modo pesquisa as abas Pendentes/OS
   criada/Todas (`#pgFiltros`, `pgFiltro`) **somem**. No lugar delas entra `#pgOcCiclo`, com as abas do ciclo
   (`OC_ETAPAS`, estado `pgOcEtapa`, padrão `criar`):
   - **📝 Pendente de criação** = sem OS;
