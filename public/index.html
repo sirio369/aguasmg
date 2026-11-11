@@ -6157,7 +6157,13 @@ function vmReportHtml(d){
 // ---------- MANUTENÇÃO DE VRPs · GESTÃO (backoffice) ----------
 const VM_FAROL={em_dia:['Em dia','var(--ok)'],a_vencer:['A vencer','var(--warn)'],vencida:['Vencida','var(--bad)'],sem_historico:['Sem histórico','var(--mut)']};
 const VM_PST={aberta:['Aberta','var(--bad)'],em_andamento:['Corretiva em andamento','var(--warn)'],resolvida:['Resolvida','var(--ok)'],cancelada:['Cancelada','var(--mut)']};
-let vmG={tab:'gestao',view:'lista',pview:'lista',cons:'',dmc:'',status:'',origem:'',colab:''};
+let vmG={tab:'gestao',view:'lista',pview:'lista',cons:'',dmc:'',status:'',origem:'',colab:'',sig:''};
+// Situação no SIGOS das OS de VRP (filtro da Gestão de serviços) — usa o selo do Vínculo SIGOS (sgxGet)
+const VM_SIG=[['','Todas'],['sem','Sem OS SIGOS'],['pendente','⏳ Pendente no SIGOS'],['executada','✅ Executada no SIGOS'],['encerrada_sem_execucao','⛔ Encerrada sem execução'],['nao_encontrada','🔎 Não aparece no SIGOS'],['invalida','❌ Nº fora do padrão'],['diverg','⚠️ Concluída no app, não executada no SIGOS']];
+function vmSigSit(o,i){ if(!o.os_sigos) return 'sem'; return (i&&i.sit)||'nao_encontrada'; }
+function vmSigDiverg(o,i){ return (o.status==='concluida'||o.status==='concluida_pendencia') && vmSigSit(o,i)!=='executada'; }
+// OS SIGOS no padrão (mesma regra do banco sigos_os_base: 12 dígitos sem os zeros à esquerda, ou a base de 10)
+function vmSigOk(v){ const d=String(v||'').replace(/\D/g,'').replace(/^0+/,''); return d.length===12||d.length===10; }
 let vmGDmcs=[], vmGColab=[], vmGFarolCache=[], vmCfgUsers=[], vmGMap=null, vmGLayer=null, vmPMap=null, vmPLayer=null, vmBodySel='#vmServBody';
 function vmDsec(n,t,warn){const c=warn?'var(--warn)':'var(--acc)';return '<div class="vmdsec" style="color:'+c+'"><span style="background:'+c+';color:#fff;width:17px;height:17px;border-radius:5px;display:inline-grid;place-items:center;font-size:11px;font-family:ui-monospace,monospace">'+n+'</span>'+t+'</div>';}
 function vmFmtFullDate(s){ try{ return new Date(String(s).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR'); }catch(e){ return s; } }
@@ -6261,14 +6267,20 @@ async function vmGLoadOs(){
       sb.rpc('app_vrp_os_kpis',{p_consorcio:vmG.cons||null,p_de:null,p_ate:null})]);
     if(a.error)throw a.error; os=a.data||[]; kpi=(b.data)||{};
   }catch(e){ $(vmBodySel).innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
+  // situação no SIGOS de cada OS (lote único, com cache) → contagem + filtro
+  const sinfo=await Promise.all(os.map(o=>o.os_sigos?sgxGet(o.os_sigos).catch(()=>null):null));
+  const scnt={'':os.length}; os.forEach((o,k)=>{ const t=vmSigSit(o,sinfo[k]); scnt[t]=(scnt[t]||0)+1; if(vmSigDiverg(o,sinfo[k])) scnt.diverg=(scnt.diverg||0)+1; });
+  if(vmG.sig) os=os.filter((o,k)=>vmG.sig==='diverg'?vmSigDiverg(o,sinfo[k]):vmSigSit(o,sinfo[k])===vmG.sig);
+  const schips=`<div style="font-size:11.5px;color:var(--mut);margin:-4px 0 4px">Situação no SIGOS</div><div class="vmfchips">${VM_SIG.filter(s=>!s[0]||scnt[s[0]]||vmG.sig===s[0]).map(s=>`<button class="vmfchip ${vmG.sig===s[0]?'on':''}" data-sig="${s[0]}">${s[1]} (${scnt[s[0]]||0})</button>`).join('')}</div>`;
   const cnt={'':(kpi.total||0),programada:((kpi.programada||0)+(kpi.em_execucao||0)),concluida:(kpi.concluida||0),concluida_pendencia:(kpi.concluida_pendencia||0),improdutiva:(kpi.improdutiva||0)};
   const STs=[['','Todas'],['programada','Programadas'],['concluida','Concluídas'],['concluida_pendencia','C/ pendência'],['improdutiva','Improdutivas']];
   const fchips=`<div class="vmfchips">${STs.map(s=>`<button class="vmfchip ${vmG.status===s[0]?'on':''}" data-st="${s[0]}">${s[1]} (${cnt[s[0]]||0})</button>`).join('')}</div>`;
   const view=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:13px">${os.length} OS</b><span style="flex:1"></span><button class="vmtbtn" id="vmProgNew">＋ Programar</button><div class="vmseg" id="vmViewSeg" style="margin-left:6px"><button data-v="lista" class="${vmG.view==='lista'?'on':''}">☰ Lista</button><button data-v="mapa" class="${vmG.view==='mapa'?'on':''}">🗺️ Mapa</button></div></div>`;
   let body = vmG.view==='mapa' ? '<div class="vmmap" id="vmGMap"></div><div class="vmleg" id="vmGLeg"></div>' : (os.length? os.map(vmGOsCard).join('') : '<p class="sub">Nenhuma OS no filtro.</p>');
-  $(vmBodySel).innerHTML=fchips+view+body;
+  $(vmBodySel).innerHTML=fchips+schips+view+body;
   const el=$(vmBodySel);
   el.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{vmG.status=b.dataset.st;vmGLoadOs();});
+  el.querySelectorAll('[data-sig]').forEach(b=>b.onclick=()=>{vmG.sig=b.dataset.sig;vmGLoadOs();});
   el.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{vmG.view=b.dataset.v;vmGLoadOs();});
   el.querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmOsView(b.dataset.os));
   el.querySelectorAll('[data-desprog]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();vmDesprogramar(b.dataset.desprog);});
@@ -6439,6 +6451,7 @@ async function vmProgramar(vrpId, vrpNum){
     vrpField=`<div><label>VRP (digite para filtrar)</label><input class="vmin" id="vmPgVrp" list="vmPgVrpList" autocomplete="off" placeholder="${elig.length?'busque pelo nome/código…':'nenhuma VRP disponível (todas com serviço em aberto)'}" style="width:100%"><datalist id="vmPgVrpList">${opts}</datalist></div>`; }
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🗓️ Programar OS</div>
     <div class="vmmb">${vrpField}
+      <div><label>OS SIGOS <span style="color:var(--bad)">*</span></label><input class="vmin" id="vmPgSig" inputmode="numeric" autocomplete="off" placeholder="nº da OS no SIGOS (ex.: 00127516560801)" style="width:100%"></div>
       <div><label>Usuário de campo (recebe a OS)</label><select class="vmsel" id="vmPgColab" style="width:100%">${vmColabOpts()}</select></div>
       <div><label>Data programada</label><input class="vmin" type="date" id="vmPgData"></div>
       <div><label>Tipo de serviço</label><div class="vmseg" id="vmPgOrig"><button data-o="preventiva" class="on">Preventiva</button><button data-o="corretiva">Corretiva</button><button data-o="substituicao">Substituição</button></div></div></div>
@@ -6450,17 +6463,21 @@ async function vmProgramar(vrpId, vrpNum){
     let vid=vrpId;
     if(!vid){ const inp=m.querySelector('#vmPgVrp'); const txt=((inp&&inp.value)||'').trim(); const found=elig.find(f=>(f.num_vrp||('VRP '+f.vrp_id))===txt); vid=found?found.vrp_id:0; }
     if(!vid) return toast('Escolha uma VRP da lista');
+    const sig=((m.querySelector('#vmPgSig')||{}).value||'').trim();
+    if(!sig) return toast('Informe o número da OS SIGOS');
+    if(!vmSigOk(sig)) return toast('OS SIGOS fora do padrão (14 dígitos, ex.: 00127516560801)');
     const uid=(m.querySelector('#vmPgColab')||{}).value||null; const data=(m.querySelector('#vmPgData')||{}).value||null;
-    try{ const r=await sb.rpc('app_vrp_os_programar',{p_vrp_id:vid,p_atribuido_uuid:uid,p_data:data,p_origem:orig}); if(r.error)throw r.error;
+    try{ const r=await sb.rpc('app_vrp_os_programar',{p_vrp_id:vid,p_atribuido_uuid:uid,p_data:data,p_origem:orig,p_os_sigos:sig}); if(r.error)throw r.error;
       vmModalClose(); toast('✓ OS '+((r.data&&r.data.os_numero)||'')+' programada'); if(vmG.tab==='prev')vmGLoadPrev(); else vmGLoadOs();
     }catch(e){ toast('⚠ '+(e.message||e)); } };
 }
 async function vmSigos(osId, cur){
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🔗 OS SIGOS</div>
-    <div class="vmmb"><div><label>Número da OS no SIGOS (COPASA)</label><input class="vmin" id="vmSgIn" value="${vEsc(cur||'')}" placeholder="ex.: 2026-XXXXXXX"></div></div>
+    <div class="vmmb"><div><label>Número da OS no SIGOS (COPASA)</label><input class="vmin" id="vmSgIn" value="${vEsc(cur||'')}" inputmode="numeric" placeholder="ex.: 00127516560801"></div></div>
     <div class="vmmf"><button class="vmbtn sec" id="vmSgCancel">Cancelar</button><button class="vmbtn" id="vmSgOk">Salvar</button></div></div>`);
   m.querySelector('#vmSgCancel').onclick=vmModalClose;
   m.querySelector('#vmSgOk').onclick=async()=>{ const v=(m.querySelector('#vmSgIn').value||'').trim();
+    if(!v) return toast('Informe o número da OS SIGOS'); if(!vmSigOk(v)) return toast('OS SIGOS fora do padrão (14 dígitos, ex.: 00127516560801)');
     try{ const r=await sb.rpc('app_vrp_os_set_sigos',{p_os_id:osId,p_os_sigos:v}); if(r.error)throw r.error; vmModalClose(); toast('✓ OS SIGOS atualizada'); vmOsView(osId); }
     catch(e){ toast('⚠ '+(e.message||e)); } };
 }
@@ -6468,6 +6485,7 @@ async function vmGerarCorr(pendId, after){
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🔧 Gerar OS para a pendência</div>
     <div class="vmmb"><p class="sub" style="margin:0">Escolha o <b>tipo de OS</b> para sanar a pendência. A OS cobre as <b>pendências abertas desta VRP</b>; ao concluí-la, elas são marcadas como resolvidas.</p>
       <div><label>Tipo de OS</label><div class="vmseg" id="vmGcOrig"><button data-o="corretiva" class="on">Corretiva</button><button data-o="preventiva">Preventiva</button><button data-o="substituicao">Substituição</button></div></div>
+      <div><label>OS SIGOS <span style="color:var(--bad)">*</span></label><input class="vmin" id="vmGcSig" inputmode="numeric" autocomplete="off" placeholder="nº da OS no SIGOS (ex.: 00127516560801)" style="width:100%"></div>
       <div><label>Usuário de campo (recebe a OS)</label><select class="vmsel" id="vmGcColab" style="width:100%">${vmColabOpts()}</select></div>
       <div><label>Data programada</label><input class="vmin" type="date" id="vmGcData"></div></div>
     <div class="vmmf"><button class="vmbtn sec" id="vmGcCancel">Cancelar</button><button class="vmbtn" id="vmGcOk">Gerar e notificar</button></div></div>`);
@@ -6475,7 +6493,10 @@ async function vmGerarCorr(pendId, after){
   m.querySelectorAll('#vmGcOrig button').forEach(b=>b.onclick=()=>{orig=b.dataset.o;m.querySelectorAll('#vmGcOrig button').forEach(x=>x.classList.toggle('on',x===b));});
   m.querySelector('#vmGcCancel').onclick=vmModalClose;
   m.querySelector('#vmGcOk').onclick=async()=>{ const uid=(m.querySelector('#vmGcColab')||{}).value||null; const data=(m.querySelector('#vmGcData')||{}).value||null;
-    try{ const r=await sb.rpc('app_vrp_pendencia_gerar_os',{p_pendencia_id:pendId,p_atribuido_uuid:uid,p_data:data,p_origem:orig}); if(r.error)throw r.error;
+    const sig=((m.querySelector('#vmGcSig')||{}).value||'').trim();
+    if(!sig) return toast('Informe o número da OS SIGOS');
+    if(!vmSigOk(sig)) return toast('OS SIGOS fora do padrão (14 dígitos, ex.: 00127516560801)');
+    try{ const r=await sb.rpc('app_vrp_pendencia_gerar_os',{p_pendencia_id:pendId,p_atribuido_uuid:uid,p_data:data,p_origem:orig,p_os_sigos:sig}); if(r.error)throw r.error;
       vmModalClose(); const n=(r.data&&r.data.pendencias_cobertas)||1; toast('✓ OS '+((r.data&&r.data.os_numero)||'')+' gerada'+(n>1?(' ('+n+' pendências)'):'')); (after||vmGLoadPend)();
     }catch(e){ toast('⚠ '+(e.message||e)); } };
 }
@@ -7316,7 +7337,7 @@ async function sgcProcessar(id,k){
 // RPC app_sigos_os_status(p_os text[]) — qualquer usuário ativo; devolve só serviço/status/datas.
 const SGX_CACHE=new Map();          // texto digitado → info (ou Promise)
 let sgxFila=new Set(), sgxTimer=null;
-const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial';
+const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,#vmPgSig,#vmGcSig,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial';
 function sgxS(v){ v=(v==null?'':String(v)).trim(); return v?'<span class="sgx" data-sgx="'+vEsc(v)+'"></span>':''; }
 function sgxCss(){
   if(document.getElementById('sgxCss')) return;

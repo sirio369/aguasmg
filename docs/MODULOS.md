@@ -3239,6 +3239,21 @@ foi **removido** — o módulo antigo já está dentro de Campo como **Visita pr
 - **Tooltip de etapa** nos cards de OS (`title`, `VM_STAGE` + selo ⓘ): explica o status e em que etapa do
   processo a OS vive.
 
+**OS SIGOS obrigatória + filtro de situação no SIGOS (2026-11-11, sw v361, `docs/migracao_vrp_os_sigos_obrig.sql`):**
+para não haver serviço executado no AcquaHub sem OS no SIGOS.
+- **Programar** (`vmProgramar`) e **Gerar OS da pendência** (`vmGerarCorr`) têm o campo **OS SIGOS \*** (obrigatório,
+  `#vmPgSig`/`#vmGcSig`, com o aviso do Vínculo SIGOS ao digitar). O front recusa vazio e número fora do padrão
+  (`vmSigOk` = mesma regra de `sigos_os_base`: 12 dígitos sem os zeros à esquerda, ou a base de 10).
+  `app_vrp_os_programar` e `app_vrp_pendencia_gerar_os` ganharam `p_os_sigos` (grava em `vrp_os.os_sigos`, recusa
+  formato inválido). **Editar** a OS SIGOS (`vmSigos`→`app_vrp_os_set_sigos`) não aceita mais apagar o número.
+- **Fase 2 pendente:** no banco o `p_os_sigos` ainda é opcional (default null) para o app antigo em cache não quebrar;
+  depois deste front em produção, aplicar o bloco "Fase 2" do arquivo de migração (torna obrigatório no servidor).
+- **Gestão de serviços — OS:** segunda linha de chips **Situação no SIGOS** (`vmG.sig`, `VM_SIG`), sobre a lista já
+  filtrada por status/consórcio/DMC/colaborador: Sem OS SIGOS · Pendente · Executada · Encerrada sem execução · Não aparece
+  no SIGOS · Nº fora do padrão · **⚠️ Concluída no app, não executada no SIGOS** (`vmSigDiverg`). A situação vem do
+  mesmo selo do Vínculo SIGOS (`sgxGet` → `app_sigos_os_status`, em lote); filtro só no navegador, sem RPC nova. Chips
+  com contagem zero ficam escondidos. Vale para lista e mapa.
+
 ## 16. Telemetria (CCO COPASA) — `// MÓDULO TELEMETRIA (CCO COPASA)` · tela `telemetria` (admin-only)
 
 Importa os **CSVs horários/sub-horários exportados do sistema CCO da COPASA** (telemetria de macro,
