@@ -8672,7 +8672,9 @@ function pdInit(){
 function pdSetStatus(st){ pdStatus=st; document.querySelectorAll('#pdStatusSeg button').forEach(x=>x.classList.toggle('sel',x.dataset.st===st)); pdRender(); }
 async function pdCarregar(){
   const c=$('#pdLista'); c.innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_pp_diario_lista'); if(error) throw error; pdBlocos=data||[]; }
+  try{ const {data,error}=await sb.rpc('app_pp_diario_lista'); if(error) throw error;
+    // só dia com trajeto (trecho andado ou rede pesquisada); dia só com ocorrência solta não é dia de pesquisa (11/11/2026)
+    pdBlocos=(data||[]).filter(b=>Number(b.n_trechos)>0||Number(b.km_rede)>0); }
   catch(e){ c.innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; return; }
   const s=$('#pdColab'), ant=s.value, nomes=new Map();
   pdBlocos.forEach(b=>nomes.set(b.colaborador_uuid,b.nome));
