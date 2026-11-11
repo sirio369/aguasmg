@@ -221,8 +221,26 @@
   **sem dados de pressão** (135 loggers + 62k linhas de `logger_pressao` via FK CASCADE); backup em
   `"8 - coleta_campo"._bkp_loggers_del_20261017`/`_bkp_logger_pressao_del_20261017`. Restaram **97**
   concluídos com pressão, todos `logger_temporario=true`.
-- **Ciclo (situação DERIVADA, não há coluna):** `pendente → instalado → removido ("dados pendentes")
+- **Ciclo (situação DERIVADA, não há coluna):** temporário = `pendente → instalado → removido ("dados pendentes")
   → concluido`. **Não existe mais** promoção automática após 7 dias.
+  **Fixo (2026-11-11, sw v366): o ciclo termina em `instalado`** — não há remoção nem extração de dados.
+  Filtros do fixo = Todos/Pendente/Instalado; o detalhe de um fixo instalado é `resumoFixo(p)` (dados + fotos
+  da instalação, sem formulário de remoção); `app_logger_remover` **recusa** logger fixo; o PDF do fixo não tem
+  as seções Remoção/Finalização (Pressão vira a seção 3).
+- **OS SIGOS (2026-11-11, sw v366, `docs/migracao_logger_os_sigos.sql`)** — 1 OS por logger (`os_sigos`), nos dois modos:
+  - Campo **OS SIGOS obrigatório** na instalação e na criação avulsa (`#di_os` → `p_os_sigos` em
+    `app_logger_instalar`/`app_logger_criar`, param novo com default null): o botão só libera com o nº no padrão
+    (`lgOsOk`/`vmSigOk` no front, `sigos_os_base` no banco). **Fase 2 pendente:** no banco o `p_os_sigos` ainda é
+    opcional (app antigo em cache / fila offline); depois do PR em produção, aplicar o bloco do fim da migração.
+  - No detalhe (todas as etapas pós-instalação, exceto "dados pendentes", que já tem o campo `#fzOs` preenchido):
+    linha "OS SIGOS: nº + selo + Editar/＋ Adicionar" (`lgSigRow`/`lgLigarSig`) → **`app_logger_set_os_sigos(p_id,
+    p_os_sigos)`** (qualquer autenticado, online; não aceita apagar). `app_logger_finalizar` não apaga mais a OS
+    quando o campo vem vazio.
+  - Lista: `OS nº` + selo `sgxS` em cada linha e chips **"SIGOS:"** (`#lgSig`, `renderSigFiltros`/`lgMatchSig`, mesmos
+    rótulos de `VM_SIG` da Gestão de VRPs): sem OS / pendente / executada / encerrada sem execução / não aparece /
+    fora do padrão / **⚠️ encerrado no app (temp: removido ou concluído · fixo: instalado) e não executado no SIGOS**.
+    Situação vem do `sgxGet` (1 RPC em lote); chips somem offline. O PDF mostra a OS SIGOS no cabeçalho.
+  - Inputs `#di_os`, `#fzOs`, `#lgSigIn` estão em `SGX_INPUTS` (aviso da situação ao digitar).
 - **Tabela base:** `"8 - coleta_campo".instalacao_logger_calibracao`. **View:** `vw_loggers`
   calcula `situacao_atual` a partir das datas (`data_instalacao`, `data_remocao`, `data_finalizacao`)
   e `dias_instalado`. **Não crie coluna `situacao`** — mexa no CASE da view.
@@ -236,7 +254,7 @@
   `foto_leitura_hd_instalacao`, `foto_numeracao_hd_instalacao`, `foto_cavalete_instalacao`,
   `foto_fachada`, `foto_extra`, `foto_hd_remocao`, `foto_cavalete_remocao`.
 - **OS COPASA:** `os_copasa_instalacao/remocao/social` (texto) — editáveis só pelo **lápis**
-  (`formEditarLogger`/`salvarEdicaoLogger`), via `p_campos`. `os_sigos` é da finalização.
+  (`formEditarLogger`/`salvarEdicaoLogger`), via `p_campos`. `os_sigos` tem campo próprio (ver OS SIGOS acima).
 - **Lápis** (`editarLogger`, gate `pode_aprovar && !p.novo`): edita campos digitados **e** todas as
   fotos (miniatura atual + substituir/adicionar), inclusive as que faltavam em loggers antigos.
   Salva pela fila (`app_logger_editar` com `p_campos` + `p_foto_*` = paths; `coalesce` mantém o que

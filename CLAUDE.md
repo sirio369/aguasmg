@@ -218,9 +218,12 @@ pwa/
 - **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
 - **Loggers** (card "Loggers" → hub `loggers_hub` com **Temporários**/**Fixos** → `loggers`/`logger_det`) —
   os dois modos usam a **mesma tela**; `lgModo` filtra pela flag `logger_temporario` (true=temp, false=fixo)
-  e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo: **pendente → instalado → dados pendentes
+  e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo do temporário: **pendente → instalado → dados pendentes
   (removido) → concluído** (a remoção sai direto de "instalado"; não há mais promoção automática após
-  7 dias). Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
+  7 dias); **o fixo termina em "instalado"** (sem remoção; `app_logger_remover` recusa fixo — 2026-11-11, sw v366).
+  **OS SIGOS** (2026-11-11): campo **obrigatório** na instalação/criação (`p_os_sigos`; no banco ainda opcional até a fase 2), linha editável no detalhe
+  (`app_logger_set_os_sigos`), selo na lista e chips "SIGOS:" de situação, incl. encerrado no app × não executado
+  no SIGOS — `docs/migracao_logger_os_sigos.sql`, `docs/MODULOS.md §2.2`. Fotos: HD, leitura, numeração, cavalete, fachada + **foto extra** (opcional); relatório PDF.
   View `vw_loggers` (tem `consorcio`, geom real × planejada; `situacao_atual` é **derivada** das datas —
   não há coluna `situacao` na tabela base `instalacao_logger_calibracao`). Filtro por situação **e por
   consórcio** (ZA1004/ZA0200). No **lápis** (aprovador/admin) dá pra editar/anexar todas as fotos e 3
