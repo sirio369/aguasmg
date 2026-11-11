@@ -990,7 +990,8 @@ Acompanhamento.
 - **Lista (`app_pp_diario_lista()`):** um bloco por (colaborador, dia, consórcio) com **qualquer** atividade — trecho,
   rede pesquisada (`pp_execucao`) ou ocorrência (vazamento ou fraude) —, com `consorcio`, km pesquisado, km andado,
   duração/nº de trechos, vazamentos, fraudes e a OS do dia (`os_sigos`, `os_em`, `os_por` = nome). Tudo de uma vez;
-  filtros no front. Inclui os dias antigos com ocorrência solta (ex.: 14/09, 21/09, 07/10), que nascem pendentes.
+  filtros no front. **O front descarta o bloco sem trajeto** (`n_trechos`=0 e `km_rede`=0 — só ocorrência solta, ex.:
+  14/09, 21/09, 07/10; 11/11/2026): a lista mostra só dia de pesquisa de fato. A RPC ainda devolve esses blocos.
 - **Cabeçalho (igual ao `pavprog`):** abas `.seg` **Pendente de OS [default] / OS criada / Todos** (`#pdStatusSeg`) ·
   filtros de **consórcio** (`#pdCons`: Todos / Betim / Contagem), **colaborador** (montado dos próprios blocos) e **dia**
   (date + ✕ = todos os dias) — tudo no front; os chips contam dentro dos filtros · **chips de prazo**
