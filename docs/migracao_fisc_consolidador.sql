@@ -614,7 +614,7 @@ create or replace function public.app_fisc_proj_detalhe(p_kind text, p_gid bigin
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare v_arv jsonb; v_aj jsonb; v_adj jsonb := '[]'::jsonb; f jsonb; v_tipo text; v_lin jsonb := '[]'::jsonb; v_fim timestamptz;
 begin
-  if not public.sigos_pode_ver(auth.uid()) then raise exception 'sem permissão'; end if;
+  if not (public.sigos_pode_ver(auth.uid()) or public.fisc_pode_ver_validado(auth.uid())) then raise exception 'sem permissão'; end if;
   v_fim := ((p_dia + 1)::timestamp at time zone 'America/Sao_Paulo');
   select e.arv, v.tipo into v_arv, v_tipo
     from "13 - projetos_obra".intervencao_estado e join "13 - projetos_obra".vw_iv v on v.kind = e.kind and v.gid = e.gid
@@ -657,12 +657,15 @@ grant execute on function public.app_fisc_proj_detalhe(text, bigint, date) to au
 
 -- =====================================================================================================================
 -- Módulo Fiscalização COPASA: lê SÓ o que foi validado (snapshot de fisc_dia). O Consolidador (app_fisc_*) é o interno.
--- Por enquanto quem vê = sigos_pode_ver (interno); o acesso da COPASA entra aqui depois (uma chave no perfil).
+-- Quem vê = admin, chave perfil.fisc_acesso ou função 'fiscal' (engrenagem do bloco — docs/migracao_fiscal_acesso.sql).
 -- =====================================================================================================================
 create or replace function public.fisc_pode_ver_validado(p_uid uuid)
-returns boolean language sql stable security definer set search_path = public as $$
-  select public.sigos_pode_ver(p_uid);
-$$;
+returns boolean language plpgsql stable security definer set search_path = public as $$
+begin
+  -- admin OU chave fisc_acesso OU função fiscal (engrenagem do bloco Fiscalização — docs/migracao_fiscal_acesso.sql)
+  return p_uid is not null and exists (select 1 from public.perfil
+    where id = p_uid and coalesce(ativo, true) and (funcao in ('admin', 'fiscal') or coalesce(fisc_acesso, false)));
+end $$;
 revoke all on function public.fisc_pode_ver_validado(uuid) from public, anon;
 
 create or replace function public.app_fiscv_mes(p_mes date, p_za text)

@@ -286,8 +286,8 @@ pwa/
   `auxAcInit`/`auxAcRender`, RPCs `app_aux_acesso_listar`/`app_aux_acesso_set` — espelham `dev_acesso`). A
   **engrenagem exclusiva de VRP saiu**: a Gestão de VRPs agora é liberada pelo mesmo acesso geral
   (`app_me.vrp_gestao` e `vrp_pode_gestao()` passaram a incluir `aux_acesso`). Seed de continuidade: os
-  **aprovadores** existentes receberam `aux_acesso=true`. `apInit()` monta o hub (barra as não-autorizadas) em
-  **3 categorias**:
+  **aprovadores** existentes receberam `aux_acesso=true`. `apInit()` monta o hub (barra as não-autorizadas); a **1ª categoria é 📋 Gestão Geral** (2026-11-12, sw v372:
+  Consolidador + **OS Pendentes** = ex-"OS não executadas"); depois:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
     (`ent_oc_gestao`) · ~~Roteiro de leitura~~ (removido em 2026-11-09, sw v338; RPCs `app_roteiro_*` e views seguem no banco) · **Priorização de troca de HD** e
@@ -311,7 +311,7 @@ pwa/
     de Contagem/Betim); Relação substitui a carteira só das unidades do arquivo, Encerradas acumula
     OS novas; arquivo no campo errado é recusado. Bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` + schema
     `17 - sigos` — ver `docs/MODULOS.md §4.5` e `§21`.
-    **OS não executadas** (`sigos_abertas`, 2026-11-06, sw v333; **v348/v349**: gestor/agrupamento/categoria pelo código do PDF v3.6, gráficos recolhíveis em
+    **OS Pendentes** (ex-"OS não executadas"; desde v372 na categoria 📋 Gestão Geral) (`sigos_abertas`, 2026-11-06, sw v333; **v348/v349**: gestor/agrupamento/categoria pelo código do PDF v3.6, gráficos recolhíveis em
     `"17 - sigos".codigo_servico`, pavimento e manobras com gestor pela origem, resumo por gestor antes do mapa e pop-up de
     códigos com prazo — `docs/migracao_sigos_codigos.sql`) — carteira aberta no mapa (polígono, CSV, tempo corrido,
     atividade × faixa, prazo, "já executada?", 2+ OS na matrícula, fila sem localização); ponto = cadastro > manual >
@@ -328,9 +328,10 @@ pwa/
     `docs/migracao_rdo_vitrine_sigos.sql`) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
     lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
     linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
-  - **📋 Consolidador** (`fisc`, **substitui o card do RDO**, 2026-11-12, sw v369, `docs/migracao_fisc_consolidador.sql`) e
+  - **📋 Gestão Geral › Consolidador** (`fisc`, **substitui o card do RDO**, 2026-11-12, sw v369, `docs/migracao_fisc_consolidador.sql`) e
     **Execução Física** (`fiscv` = mesma tela, só os dias validados, só leitura; fica no 4º bloco da tela inicial **🏛️ Fiscalização**,
-    com atalhos p/ Cadastro técnico e Biblioteca, sw v370) —
+    com atalhos p/ Cadastro técnico e Biblioteca, sw v370; ⚙️ do bloco define Sem acesso / Acessa / **Fiscal** — função nova que vê
+    só esse bloco, sw v371, `docs/migracao_fiscal_acesso.sql`) —
     tabela dia × ZA × atividade com acumulado, cada execução com fotos/mapa (feed `fisc_execucoes`: 1 execução = 1 registro na
     data do campo, OS SIGOS como atributo; vazamento localizado sem correção nunca aparece) + obras em andamento com % por dia;
     só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel; detalhe da

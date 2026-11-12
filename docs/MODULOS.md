@@ -3789,9 +3789,9 @@ oferece "Reprocessar" no histórico (chama a função de novo com o mesmo `arqui
   "UPDATE requires a WHERE clause". Testes pela Management API/MCP **não** pegam isso (a extensão não carrega lá).
   Corrigido em 06/11/2026 (migração `sigos_processar_safeupdate`: `where true` no update da tabela temporária).
 
-### 21.1 Tela "OS não executadas" (`sigos_abertas`) · `docs/migracao_sigos_abertas.sql` (2026-11-06, sw v333; geocodificação pelo navegador na v334)
+### 21.1 Tela "OS Pendentes" (ex-"OS não executadas", `sigos_abertas`) · `docs/migracao_sigos_abertas.sql` (2026-11-06, sw v333; geocodificação pelo navegador na v334)
 
-Auxiliar de Programação › 📥 Relatórios SIGOS › **🗺️ OS não executadas**. Mesmo acesso do Auxiliar: `aux_acesso` ou admin,
+Auxiliar de Programação › **📋 Gestão Geral** (1ª categoria do hub, 2026-11-12, sw v372) › **🗺️ OS Pendentes** (antes "OS não executadas", em 📥 Relatórios SIGOS). Mesmo acesso do Auxiliar: `aux_acesso` ou admin,
 com o gate do banco em `public.sigos_pode_ver`. Serve para o time de programação olhar a carteira aberta (a última Relação de
 Serviços de cada ZA) no mapa e montar a programação.
 
@@ -4136,7 +4136,7 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
 **Para quê:** a fiscalização da COPASA ver o que foi executado — tabela por **dia × ZA**, **uma linha por atividade**
 (qtd do dia + **acumulado desde 01/09/2026**), cada execução com detalhe, fotos e mapa, e **obras em andamento com linha
 permanente** (% no dia, Δ, acumulado da obra). **O Consolidador é o novo RDO** (decisão do usuário 12/11/2026): o card
-📋 RDO saiu do Auxiliar e no lugar entrou **📋 Consolidador** (a tela `rdo` antiga, que já era só consulta, ficou no código sem
+📋 RDO saiu do Auxiliar e no lugar entrou **📋 Consolidador** (desde sw v372 na categoria **📋 Gestão Geral**, a primeira do hub, junto com 🗺️ OS Pendentes) (a tela `rdo` antiga, que já era só consulta, ficou no código sem
 card). No Consolidador cada linha é **validada** (não existe "ocultar" — só validar) e depois o **dia**; o dia validado vai
 para **Execução Física** (`fiscv`), que lê **só** o snapshot validado (só leitura). Desde a v370 ela fica no **4º bloco da
 tela inicial, 🏛️ Fiscalização** (`#homeFisc`, depois de Em desenvolvimento; visível p/ admin|aux_acesso, mesma regra de
@@ -4167,6 +4167,17 @@ o dia da conclusão. O **% na data** é reconstruído **de trás p/ frente**: á
 os incrementos de `intervencao_avanco.valor` lançados depois da data (`fisc_arv_ajusta` por caminho "A › B › C") →
 `proj_arv_pct`. Assim o último dia bate com `exec_pct` (conferido nas 25 obras) e o legado sem log fica certo. Só
 recalcula em dia com lançamento (repete nos demais). (Sem gráfico de evolução — retirado a pedido do usuário.)
+**Acesso Fiscal + ⚙️ do bloco Fiscalização** (`docs/migracao_fiscal_acesso.sql`, sw v371): engrenagem no bloco 🏛️ Fiscalização
+da tela inicial (só admin, tela `fisc_acesso`, RPCs `app_fisc_acesso_listar`/`app_fisc_acesso_set(uuid, nivel)`) com 3
+níveis por pessoa: **Sem acesso** · **Acessa** (chave `perfil.fisc_acesso`, soma à função) · **Fiscal** (nova função
+`perfil.funcao = 'fiscal'`: vê **só** o bloco — Execução Física, Cadastro técnico, Biblioteca; Execução/Suporte/Em
+desenvolvimento e o 🔄 Sincronizar **somem** (`body.fiscal-only`, guardado em `localStorage ah_fiscal` p/ não piscar antes do
+`app_me`); `irPara` só deixa abrir `FISCAL_TELAS` e força o modo Execução Física). Tirar alguém de Fiscal volta a função p/
+Campo. Admin sempre acessa. `fisc_pode_ver_validado` = admin OU `fisc_acesso` OU fiscal (antes era `sigos_pode_ver`: **aux
+deixou de ver o bloco automaticamente** — precisa ser marcado na ⚙️). `app_me` + `fisc_acesso`/`is_fiscal`;
+`sup_admin_set_funcao` e Configurações de usuários aceitam "Fiscal"; `app_fisc_proj_detalhe` aceita quem vê a Execução
+Física. ⚠️ O bloqueio dos outros módulos é de **tela**: RPCs que só exigem login continuam abertas p/ o Fiscal.
+
 **Agregador por AL** (só tela/Excel, sem banco): frentes de HDD da mesma AL (`fscAl`: `AL-13`/`AL_15` no código ou
 "AL 14" no local; ex.: CON-08-AL-13-F01…F10) ficam sob **uma linha da AL**, resumida por padrão (▾ abre as frentes), com o
 **% ponderado pela extensão de cada frente** (`fscExt`: comprimento da linha da intervenção pelo GeoJSON, haversine —
