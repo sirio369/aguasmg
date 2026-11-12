@@ -100,11 +100,15 @@ begin
            coalesce(public.fisc_vrp(o.num_vrp), o.cd_no_agua) loc, p.nome eq, to_char(o.executado_em at time zone 'America/Sao_Paulo', 'HH24:MI') hr,
            1::numeric q, 'OS'::text un, o.os_numero osa, o.os_sigos oss,
            coalesce(t.txt, case when o.os_sigos is null then 'sem OS SIGOS informada' else 'aguardando execução no SIGOS' end) sst,
-           public.fisc_fotos_json(o.fotos) ft, public.fisc_pt(o.gps_lat, o.gps_lon) g,
+           public.fisc_fotos_json(o.fotos) ft, coalesce(vc.g, public.fisc_pt(o.gps_lat, o.gps_lon)) g,
            jsonb_strip_nulls(jsonb_build_object('Estabilizada', case when o.estabilizada then 'sim' when o.estabilizada = false then 'não' end, 'Obs.', nullif(o.obs, ''))) ex
       from "8 - coleta_campo".vrp_os o
       left join public.perfil p on p.id = o.executado_por
       left join sg_txt t on t.base = public.sigos_os_base(o.os_sigos)
+      -- ponto do mapa = posição da VRP no cadastro técnico; o GPS do app (de quem concluiu a OS) só se a VRP não estiver no
+      -- cadastro — 19 de 57 OS tinham o GPS a mais de 500 m da VRP (concluídas longe do campo), decisão do usuário 12/11/2026
+      left join lateral (select st_asgeojson(st_transform(c.geom, 4326), 6)::jsonb g from "2 - infra_agua".vrps c
+                          where c.num_vrp = o.num_vrp and c.geom is not null order by (c.consorcio = o.consorcio) desc, c.id limit 1) vc on true
      where o.status in ('concluida', 'concluida_pendencia', 'improdutiva') and o.executado_em is not null
   ),
   e_vrp_vis as (
@@ -113,8 +117,10 @@ begin
            coalesce(public.fisc_vrp(v.num_vrp), 'VRP —') || ' — ' || coalesce(v.situacao, 'visitada') || case when v.localizada = false then ' (não localizada)' else '' end,
            coalesce(public.fisc_vrp(v.num_vrp), v.cd_no_agua), p.nome, to_char(v.visitado_em at time zone 'America/Sao_Paulo', 'HH24:MI'),
            1::numeric, 'visita', null::text, null::text, null::text,
-           public.fisc_fotos_json(v.fotos), public.fisc_pt(v.gps_lat, v.gps_lon), '{}'::jsonb
+           public.fisc_fotos_json(v.fotos), coalesce(vc.g, public.fisc_pt(v.gps_lat, v.gps_lon)), '{}'::jsonb
       from "8 - coleta_campo".vrp_visita v left join public.perfil p on p.id = v.visitado_por
+      left join lateral (select st_asgeojson(st_transform(c.geom, 4326), 6)::jsonb g from "2 - infra_agua".vrps c
+                          where c.num_vrp = v.num_vrp and c.geom is not null order by (c.consorcio = v.consorcio) desc, c.id limit 1) vc on true
      where v.visitado_em is not null
   ),
   -- ---------------- Loggers (instalação / remoção) ----------------

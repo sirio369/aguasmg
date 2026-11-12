@@ -4149,6 +4149,8 @@ Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_v
   atributo da execução do app (`os_sigos` + `sigos_sit` "executada no SIGOS em dd/mm" / "aguardando execução no SIGOS");
   OS SIGOS sem lançamento no app entra pela data do SIGOS. Nada muda de dia depois (no RDO a VRP mudava de dia).
 - **VRP:** `vrp_os` concluída/com pendência/improdutiva (`os_sigos`) + `vrp_visita`; OS SIGOS de VRP sem `vrp_os` entra pelo SIGOS.
+  **Ponto do mapa da VRP = posição no cadastro** (`"2 - infra_agua".vrps.geom` pelo `num_vrp`); o GPS do app só se a VRP não
+  estiver no cadastro — o GPS de quem conclui a OS saiu longe do campo em 19 de 57 OS (> 500 m; decisão do usuário 12/11/2026).
 - **Loggers:** só o registro do app (instalação/remoção, `os_copasa_instalacao/_remocao` como atributo). **OS SIGOS de
   logger sem vínculo NÃO vira linha** (sem esse cuidado contava 2×; não dá p/ casar por GPS — as coordenadas do SIGOS
   não batem). Com a OS obrigatória no app (§2.2) o vínculo passa a existir.
