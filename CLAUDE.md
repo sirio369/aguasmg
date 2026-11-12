@@ -329,7 +329,8 @@ pwa/
     lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
     linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
   - **📋 Consolidador** (`fisc`, **substitui o card do RDO**, 2026-11-12, sw v369, `docs/migracao_fisc_consolidador.sql`) e
-    **🏛️ Fiscalização COPASA › Execução validada** (`fiscv` = mesma tela, só os dias validados, só leitura) —
+    **Execução Física** (`fiscv` = mesma tela, só os dias validados, só leitura; fica no 4º bloco da tela inicial **🏛️ Fiscalização**,
+    com atalhos p/ Cadastro técnico e Biblioteca, sw v370) —
     tabela dia × ZA × atividade com acumulado, cada execução com fotos/mapa (feed `fisc_execucoes`: 1 execução = 1 registro na
     data do campo, OS SIGOS como atributo; vazamento localizado sem correção nunca aparece) + obras em andamento com % por dia;
     só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel; detalhe da
