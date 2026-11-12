@@ -1051,9 +1051,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="pavprog"><div class="ic">🧱</div><div class="nm">Pavimentos a recompor</div></button>
     </div>
 
-    <div class="sec" style="margin-top:20px">📋 RDO</div>
+    <div class="sec" style="margin-top:20px">📋 Consolidador</div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-go="rdo"><div class="ic">📋</div><div class="nm">RDO diário</div></button>
+      <button class="mod" data-go="fisc"><div class="ic">📋</div><div class="nm">Consolidador</div></button>
+    </div>
+
+    <div class="sec" style="margin-top:20px">🏛️ Fiscalização COPASA</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="fiscv"><div class="ic">🏛️</div><div class="nm">Execução validada</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">📥 Relatórios SIGOS</div>
@@ -1259,6 +1264,22 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="rdocal" id="rdoCal"></div>
     <div class="rdoleg"><span>⏳ SIGOS ainda não chegou</span></div>
     <div id="rdoDia"></div>
+  </main>
+
+  <main id="fisc" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1 id="fscTit">Consolidador</h1>
+    <p class="sub" id="fscSub">O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (fotos e mapa).
+      Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço.
+      Antes de ir para a fiscalização da COPASA, cada linha é <b>validada</b> e depois o dia.</p>
+    <div class="fsctop">
+      <div class="fsczas" id="fscZas"></div>
+      <div class="fscnav"><button type="button" id="fscPrev">‹</button><b id="fscMesTit"></b><button type="button" id="fscNext">›</button></div>
+      <button type="button" class="btn fscxl" id="fscXlsx">⬇️ Excel do mês</button>
+    </div>
+    <div class="fsccal" id="fscCal"></div>
+    <div class="fscleg" id="fscLeg"><span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span></div>
+    <div id="fscDia"></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2197,8 +2218,9 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
+  if(id==='fiscv'){ fscModo('fisc'); id='fisc'; } else if(id==='fisc') fscModo('cons');
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
   if(id==='home') homeGate();
@@ -2231,6 +2253,7 @@ function irPara(id){
   if(id==='sigos_abertas') oaInit();
   if(id==='sigos_vinculo') svInit();
   if(id==='rdo') rdoInit();
+  if(id==='fisc') fscInit();
   if(id==='recad_prog') rcInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
@@ -9841,6 +9864,423 @@ async function supVPainel(rpcNome){
     }catch(e){ $('#supPOut').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
   };
   $('#supPLoad').addEventListener('click',load);
+}
+
+// ---------- FISCALIZAÇÃO COPASA — CONSOLIDADOR DE EXECUÇÃO (2026-11-12) ----------
+// Tabela por dia × ZA: uma linha por atividade (qtd do dia + acumulado desde 01/09/2026), cada execução com detalhe,
+// fotos e mapa; obras em andamento com linha permanente (% no dia, Δ, curva). Validação (só admin): valida cada linha,
+// depois o dia → snapshot em "12 - retaguarda".fisc_dia (o que a COPASA verá). Dado novo depois → linha volta a
+// pendente e o dia fica "mudou depois de validado". Feed `fisc_execucoes`: 1 execução = 1 registro na data do campo,
+// OS SIGOS como atributo; vazamento localizado sem correção executada nunca aparece. RPCs `app_fisc_*`.
+const FSC_MIN='2026-09-01';
+const FSC_ST={vazio:['—','var(--line)'],pendente:['pendente','#f59e0b'],pronto:['pronto','#2563eb'],validado:['validado','#16a34a'],desatualizado:['mudou','#dc2626']};
+let fscS={modo:'cons',zas:['ZA1004','ZA0200'],mes:null,dia:null,meses:{},dias:{},abertos:new Set(),mapas:{},detObra:{},arvAb:{},podeValidar:false};
+// 'cons' = Consolidador (interno: valida linha e dia) · 'fisc' = Fiscalização COPASA (só os dias validados, snapshot, só leitura)
+const FSC_RPC={cons:{mes:'app_fisc_mes',dia:'app_fisc_dia',per:'app_fisc_periodo'},fisc:{mes:'app_fiscv_mes',dia:'app_fiscv_dia',per:'app_fiscv_periodo'}};
+const fscCons=()=>fscS.modo==='cons';
+function fscModo(m){
+  if(fscS.modo!==m){ fscS.modo=m; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={}; }
+  const t=$('#fscTit'), sub=$('#fscSub'), lg=$('#fscLeg');
+  if(t) t.textContent=m==='cons'?'Consolidador':'Fiscalização COPASA — execução validada';
+  if(sub) sub.innerHTML=m==='cons'
+    ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
+    :'Somente os dias <b>validados</b> no Consolidador, exatamente como foram validados. Uma linha por atividade, com o acumulado desde 01/09/2026, as OS do dia e o detalhe de cada execução (fotos e mapa).';
+  if(lg) lg.innerHTML=m==='cons'
+    ?'<span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span>'
+    :'<span><i style="background:#16a34a"></i>dia validado</span><span>dias apagados ainda não foram validados</span>';
+}
+function fscCss(){
+  if(document.getElementById('fscCss')) return;
+  const st=document.createElement('style'); st.id='fscCss';
+  st.textContent=`#fisc .fsctop{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+#fisc .fsczas{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 220px}
+#fisc .fsczas button{font:inherit;font-size:13px;width:auto;margin:0;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#fisc .fsczas button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+#fisc .fscnav{display:flex;align-items:center;gap:6px;flex:1 1 220px;justify-content:space-between}
+#fisc .fscnav b{font-size:15px;text-align:center;flex:1}
+#fisc .fscnav button,#fisc .fscxl{font:inherit;width:auto;margin:0;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#fisc .fscnav button:disabled{opacity:.35;cursor:default}
+#fisc .fsccal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:6px 0 4px}
+#fisc .fsccal .wd{font-size:11px;color:var(--mut);text-align:center}
+#fisc .fsccal button{font:inherit;min-width:0;margin:0;padding:6px 2px 4px;border-radius:9px;border:1px solid var(--line);border-bottom:4px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:center;line-height:1.15}
+#fisc .fsccal button b{display:block;font-size:14px}
+#fisc .fsccal button span{display:block;font-size:10px;color:var(--mut);min-height:12px}
+#fisc .fsccal button.sel{outline:2px solid var(--acc);outline-offset:-1px}
+#fisc .fsccal button:disabled{opacity:.3;cursor:default}
+#fisc .fscleg{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--mut);margin:4px 0 10px}
+#fisc .fscleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+#fisc .fschead h2{margin:14px 0 0;font-size:17px}
+#fisc .fscza{margin-top:12px;padding-top:4px;border-top:2px solid var(--line)}
+#fisc .fscza h3{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 6px;font-size:15px}
+#fisc .fscbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 8px}
+#fisc .fscbar .btn,#fisc .fscbar button{width:auto;margin:0;padding:7px 12px;font-size:13px}
+#fisc .fscpill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;color:#fff;white-space:nowrap}
+#fisc .fscaviso{font-size:12px;border-radius:10px;padding:8px 10px;margin:8px 0;background:var(--card);border:1px solid var(--line);border-left:4px solid #f59e0b}
+#fisc .fscaviso.ok{border-left-color:#16a34a}#fisc .fscaviso.bad{border-left-color:#dc2626}
+#fisc .fsctab{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#fisc .fsctab th{font-size:11px;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+#fisc .fsctab td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:break-word;word-break:normal}
+#fisc .fsctab td.n,#fisc .fsctab th.n{text-align:right;white-space:nowrap}
+#fisc .fsctab tr.val td:first-child{box-shadow:inset 4px 0 0 #16a34a}
+#fisc .fsctab tr.mud td:first-child{box-shadow:inset 4px 0 0 #dc2626}
+#fisc .fsctab tr.fscalrow td{background:rgba(14,116,144,.06)}
+#fisc .fsctab tr.fscfilha>td:first-child{padding-left:22px}
+#fisc .fsctab .ac{white-space:nowrap;text-align:right}
+#fisc .fsctab .ac button{font:inherit;font-size:13px;width:auto;margin:0 0 0 3px;padding:3px 7px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+#fisc .fsctab td.det{background:var(--bg,transparent);padding:6px 8px 10px}
+#fisc .fscex{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:var(--card);font-size:12.5px}
+#fisc .fscex .t{font-weight:700}
+#fisc .fscex .m{color:var(--mut);margin-top:2px}
+#fisc .fscex .kv{color:var(--mut);margin-top:2px}
+#fisc .fscex .ft{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#fisc .fscex .ft img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--line)}
+#fisc .fscex .ft a.doc{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:8px}
+#fisc .fscos{border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;padding:8px 10px;margin:4px 0 8px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
+#fisc .fscos .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:3px}
+#fisc .fscos .v{user-select:all;font-variant-numeric:tabular-nums}
+#fisc .fscmapa{height:300px;border-radius:10px;border:1px solid var(--line);margin:6px 0}
+#fisc .fscpb{height:8px;background:var(--line);border-radius:6px;overflow:hidden;min-width:60px}
+#fisc .fscpb i{display:block;height:100%;background:var(--acc)}
+#fisc .fscinp{display:flex;gap:6px;margin:6px 0}
+#fisc .fscinp input{flex:1;min-width:0;font-size:13px;margin:0}
+#fisc .fscinp button{width:auto;margin:0;padding:6px 10px;font-size:13px}
+#fisc .fscsec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin:12px 0 4px}
+#fisc .fscan{padding:5px 0;border-bottom:1px dotted var(--line);font-size:13px;overflow-wrap:anywhere}
+#fisc .fscarv2{border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:13px}
+#fisc .fscfo,#fisc .fscgr>summary{display:flex;align-items:center;gap:8px;padding:6px 8px;border-top:1px solid var(--line);overflow-wrap:anywhere}
+#fisc .fscarv2>:first-child,#fisc .fscarv2>:first-child>summary{border-top:0}
+#fisc .fscfo>div:first-child{flex:1}
+#fisc .fscgr>summary{cursor:pointer;list-style:none;background:rgba(14,116,144,.05)}
+#fisc .fscgr>summary::-webkit-details-marker{display:none}
+#fisc .fscgr>summary>b{flex:1}
+#fisc .fscseta{display:inline-block;width:14px;color:var(--acc);transition:transform .15s}
+#fisc .fscgr[open]>summary>.fscseta{transform:rotate(90deg)}
+#fisc .fscfi{padding-left:16px}
+#fisc .fscpc{flex:none;width:110px;text-align:right}
+#fisc .fscarvbt{display:flex;gap:4px}
+#fisc .fscarvbt button{font-size:11px;text-transform:none;letter-spacing:0;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:3px 8px;cursor:pointer}
+@media (max-width:640px){#fisc .fsctab .hm{display:none}#fisc .fsctab td,#fisc .fsctab th{padding:6px 5px}#fisc .fsctab .ac{white-space:normal;width:64px}#fisc .fsctab .ac button{margin:2px;padding:3px 5px}#fisc .fsctab td b{word-break:break-word}}`;
+  document.head.appendChild(st);
+}
+function fscInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  fscCss();
+  if(!fscS.mes){ const h=rdoHoje(); fscS.mes=(h<FSC_MIN?FSC_MIN:h).slice(0,7)+'-01'; }
+  fscRenderZas();
+  const pv=$('#fscPrev'), nx=$('#fscNext'), xl=$('#fscXlsx');
+  if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,-1); fscS.dia=null; fscCarregarMes(); }; }
+  if(nx&&!nx.dataset.ready){ nx.dataset.ready='1'; nx.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,1); fscS.dia=null; fscCarregarMes(); }; }
+  if(xl&&!xl.dataset.ready){ xl.dataset.ready='1'; xl.onclick=fscExcel; }
+  const dbox=$('#fscDia');
+  if(dbox&&!dbox.dataset.arv){ dbox.dataset.arv='1';
+    dbox.addEventListener('toggle',e=>{ const g=e.target; if(g&&g.dataset&&g.dataset.fscgr) fscS.arvAb[g.dataset.fscgr]=g.open; },true);
+    dbox.addEventListener('click',e=>{ const b=e.target.closest('[data-fscarvtodos]'); if(!b) return; e.stopPropagation();
+      const box=b.closest('[data-fscdet]'), ab=!!b.dataset.ab; if(!box) return;
+      box.querySelectorAll('details.fscgr').forEach(g=>{ g.open=ab; fscS.arvAb[g.dataset.fscgr]=ab; }); },true); }
+  fscCarregarMes();
+}
+function fscRenderZas(){
+  const box=$('#fscZas'); if(!box) return;
+  box.innerHTML=RDO_ZAS.map(([z,l])=>'<button type="button" data-fscza="'+z+'" class="'+(fscS.zas.includes(z)?'on':'')+'">'+l+'</button>').join('');
+  box.querySelectorAll('[data-fscza]').forEach(b=>b.onclick=()=>{ const z=b.dataset.fscza;
+    if(fscS.zas.includes(z)){ if(fscS.zas.length===1){ toast('Deixe pelo menos um consórcio.'); return; } fscS.zas=fscS.zas.filter(x=>x!==z); }
+    else fscS.zas=RDO_ZAS.map(x=>x[0]).filter(x=>x===z||fscS.zas.includes(x));
+    fscRenderZas(); fscCarregarMes(true); });
+}
+async function fscCarregarMes(manterDia){
+  $('#fscMesTit').textContent=rdoMesNome(fscS.mes);
+  $('#fscPrev').disabled=fscS.mes<=FSC_MIN.slice(0,7)+'-01';
+  $('#fscNext').disabled=fscS.mes>=rdoHoje().slice(0,7)+'-01';
+  if(!manterDia){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Carregando…</p>'; $('#fscDia').innerHTML=''; }
+  try{
+    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].mes,{p_mes:fscS.mes,p_za:z})));
+    fscS.meses={}; rs.forEach((r,i)=>{ if(r.error) throw r.error; fscS.meses[fscS.zas[i]]=(r.data&&r.data.dias)||[]; fscS.podeValidar=!!(r.data&&r.data.pode_validar); });
+  }catch(e){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Não foi possível carregar (acesso ou rede).</p>'; return; }
+  const dias=fscDiasMes();
+  if(!fscS.dia||!dias.some(d=>d.dia===fscS.dia)){ const c=dias.filter(d=>d.n>0); fscS.dia=(c.length?c[c.length-1]:dias[dias.length-1]||{}).dia||null; }
+  fscRenderCal();
+  if(fscS.dia) fscCarregarDia(manterDia); else $('#fscDia').innerHTML='';
+}
+// dia com várias ZAs: pior status manda (mudou › pendente › pronto › validado › vazio)
+function fscDiasMes(){
+  const por={}, ordem=['desatualizado','pendente','pronto','validado','vazio'];
+  fscS.zas.forEach(z=>(fscS.meses[z]||[]).forEach(d=>{ (por[d.dia]=por[d.dia]||[]).push(d); }));
+  return Object.keys(por).sort().map(k=>{ const l=por[k];
+    const st=ordem.find(o=>l.some(d=>d.status===o&&(o!=='vazio'||l.every(x=>x.status==='vazio'))))||'vazio';
+    return {dia:k, n:l.reduce((a,d)=>a+(d.n||0),0), pend:l.reduce((a,d)=>a+(d.pend||0),0), status:st, sigos:l.some(d=>d.sigos==='aguardando')?'aguardando':'ok'}; });
+}
+function fscRenderCal(){
+  const por={}; fscDiasMes().forEach(d=>por[d.dia]=d);
+  const ini=new Date(fscS.mes+'T12:00:00'), lead=ini.getDay(), fim=new Date(ini.getFullYear(),ini.getMonth()+1,0).getDate();
+  let h=['D','S','T','Q','Q','S','S'].map(w=>'<div class="wd">'+w+'</div>').join('')+'<div></div>'.repeat(lead);
+  for(let i=1;i<=fim;i++){
+    const ds=fscS.mes.slice(0,8)+String(i).padStart(2,'0'), d=por[ds];
+    if(!d||(!fscCons()&&d.status!=='validado')){ h+='<button type="button" disabled><b>'+i+'</b><span></span></button>'; continue; }
+    const cor=(FSC_ST[d.status]||FSC_ST.vazio)[1];
+    const tx=d.status==='vazio'?'':(d.status==='pendente'?d.pend+'/'+d.n:(d.status==='validado'?'✔':(d.status==='desatualizado'?'!':d.n)));
+    h+='<button type="button" data-fscdia="'+ds+'" class="'+(ds===fscS.dia?'sel':'')+'" style="border-bottom-color:'+cor+'" title="'+vEsc((FSC_ST[d.status]||[''])[0])+'">'
+      +'<b>'+i+'</b><span>'+tx+(d.sigos==='aguardando'?' ⏳':'')+'</span></button>';
+  }
+  $('#fscCal').innerHTML=h;
+  $('#fscCal').querySelectorAll('[data-fscdia]').forEach(b=>b.onclick=()=>{ fscS.dia=b.dataset.fscdia; fscS.abertos.clear(); fscRenderCal(); fscCarregarDia(); });
+}
+async function fscCarregarDia(silencioso){
+  if(!silencioso) $('#fscDia').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].dia,{p_dia:fscS.dia,p_za:z})));
+    fscS.dias={}; rs.forEach((r,i)=>{ if(r.error) throw r.error; fscS.dias[fscS.zas[i]]=r.data||{}; });
+  }catch(e){ $('#fscDia').innerHTML='<p class="sub">Não foi possível carregar o dia.</p>'; return; }
+  fscRenderDia();
+}
+const fscNum=(v,dec)=>{ const n=Number(v||0); return n.toLocaleString('pt-BR',{maximumFractionDigits:dec==null?(Number.isInteger(n)?0:2):dec}); };
+const fscMed=(ms,k)=>(ms||[]).map(m=>fscNum(m[k])+' '+m.un).join(' + ');
+function fscStatusLinha(l){
+  const v=l.val;
+  if(!v) return {cls:'',pill:'<span class="fscpill" style="background:#f59e0b">pendente</span>'};
+  if(!v.ok) return {cls:'mud',pill:'<span class="fscpill" style="background:#dc2626" title="Validada por '+vEsc(v.por||'')+', mas os dados mudaram depois">mudou</span>'};
+  return {cls:'val',pill:'<span class="fscpill" style="background:#16a34a" title="'+vEsc((v.por||'')+' · '+(v.em?new Date(v.em).toLocaleString('pt-BR'):''))+'">validada</span>'};
+}
+function fscFotos(arr){
+  arr=(arr||[]).filter(Boolean); if(!arr.length) return '';
+  return '<div class="ft">'+arr.map(p=>{ const u=SBASE+p;
+    return /\.pdf$/i.test(p)?'<a class="doc" href="'+vEsc(u)+'" target="_blank" rel="noopener">📄 PDF</a>'
+      :'<a href="'+vEsc(u)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+vEsc(u)+'" alt="foto"></a>'; }).join('')+'</div>';
+}
+// consolidado das OS do dia da linha: OS SIGOS (ou a do AcquaHub quando não há SIGOS), sem repetir, separadas por vírgula
+function fscOsDia(execs){
+  const os=[], vistos=new Set(), sem=[];
+  // a mesma OS pode vir com zeros à esquerda/sufixo (SIGOS) ou só a base digitada no app → não repete (base de 10 dígitos)
+  (execs||[]).forEach(e=>{ const n=e.os_sigos||e.os_app; if(n){ const t=String(n).trim(), b=t.replace(/\D/g,'').replace(/^0+/,'').slice(0,10)||t; if(!vistos.has(b)){ vistos.add(b); os.push(t); } } else sem.push(e); });
+  os.sort();
+  return '<div class="fscos"><div class="l">OS do dia ('+os.length+')</div>'
+    +(os.length?'<div class="v">'+vEsc(os.join(', '))+'</div>':'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>')
+    +(sem.length?'<div class="sub" style="margin:4px 0 0">+ '+sem.length+' registro'+(sem.length===1?'':'s')+' sem OS</div>':'')+'</div>';
+}
+function fscExecHtml(z,e){
+  const os=[e.os_app?'OS '+e.os_app:null, e.os_sigos?'OS SIGOS '+e.os_sigos+(e.sigos&&e.origem!=='SIGOS'?' — '+e.sigos:''):(e.sigos&&e.origem!=='SIGOS'?e.sigos:null)].filter(Boolean).join(' · ');
+  const kv=Object.entries(e.extra||{}).map(([k,v])=>k+': '+v).join(' · ');
+  const meta=[e.local, e.equipe?'equipe '+e.equipe:null, e.hora].filter(Boolean).join(' · ');
+  return '<div class="fscex">'
+    +'<div class="t">'+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
+    +'<div>'+vEsc(e.desc||'')+'</div>'+(meta?'<div class="m">'+vEsc(meta)+'</div>':'')+(os?'<div class="m">'+vEsc(os)+'</div>':'')
+    +(kv?'<div class="kv">'+vEsc(kv)+'</div>':'')+fscFotos(e.fotos)+'</div>';
+}
+function fscTabAtividades(z,D,pode,travado){
+  const ls=D.linhas||[];
+  if(!ls.length) return '<p class="sub">Nenhuma execução registrada neste dia.</p>';
+  const cs=fscCons(), nc=cs?5:4;
+  let h='<table class="fsctab"><thead><tr><th>Atividade</th><th class="n">No dia</th><th class="n hm">Acumulado</th>'+(cs?'<th>Situação</th>':'')+'<th></th></tr></thead><tbody>';
+  ls.forEach(l=>{
+    const k=z+'|'+l.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(l);
+    const bVal=pode&&!travado?(l.val&&l.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
+      :'';
+    h+='<tr class="'+st.cls+'"><td><b>'+vEsc(l.atividade)+'</b><div class="sub" style="margin:2px 0 0">'+l.n+' registro'+(l.n===1?'':'s')+'</div></td>'
+      +'<td class="n">'+vEsc(fscMed(l.medidas,'dia'))+'</td><td class="n hm">'+vEsc(fscMed(l.medidas,'acum'))+'</td>'+(cs?'<td>'+st.pill+'</td>':'')
+      +'<td class="ac">'+bVal+'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button><button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
+    h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
+    if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+fscOsDia(l.execs)+(l.execs||[]).map(e=>fscExecHtml(z,e)).join('')+'</td></tr>';
+  });
+  return h+'</tbody></table>';
+}
+const fscId=k=>k.replace(/[^a-zA-Z0-9]/g,'_');
+function fscTabObras(z,D,pode,travado){
+  const ps=D.projetos||[];
+  if(!ps.length) return '';
+  const cs=fscCons(), nc=cs?5:4;
+  let h='<h4 style="margin:14px 0 6px">🏗️ Obras em andamento</h4><table class="fsctab"><thead><tr><th>Obra</th><th class="n">% no dia</th><th class="hm">Avanço</th>'+(cs?'<th>Situação</th>':'')+'<th></th></tr></thead><tbody>';
+  // agregador: frentes de HDD da mesma AL (ex.: CON-08-AL-13-F01…F10) ficam sob uma linha da AL, resumida por padrão
+  const grupos=[], porAl={};
+  ps.forEach(p=>{ const al=fscAl(p); if(al){ if(!porAl[al]){ porAl[al]=[]; grupos.push({al,ps:porAl[al]}); } porAl[al].push(p); } else grupos.push({ps:[p]}); });
+  const nAl=g=>g.al?parseInt(g.al.slice(3),10):1e9; grupos.sort((a,b)=>nAl(a)-nAl(b));
+  grupos.forEach(g=>g.ps.sort((a,b)=>String(a.codigo||'').localeCompare(String(b.codigo||''),'pt-BR',{numeric:true})));
+  grupos.forEach(g=>{
+    if(!g.al){ g.ps.forEach(p=>{ h+=linhaObra(p,false); }); return; }
+    const gk=z+'|al:'+g.al, gab=fscS.abertos.has(gk), n=g.ps.length;
+    // % da AL ponderado pela extensão de cada frente (comprimento da linha da intervenção); se faltar a linha de alguma, média simples
+    const exts=g.ps.map(fscExt), temExt=exts.every(x=>x>0), ext=temExt?exts.reduce((a,x)=>a+x,0):0, w=i=>temExt?exts[i]/ext:1/n;
+    const med=g.ps.reduce((a,p,i)=>a+(p.pct||0)*w(i),0), ant=g.ps.reduce((a,p,i)=>a+(p.pct_ant||0)*w(i),0), dl=med-ant;
+    const comAv=g.ps.filter(p=>(p.avancos||[]).length).length, nVal=g.ps.filter(p=>p.val&&p.val.ok).length, nMud=g.ps.filter(p=>p.val&&!p.val.ok).length;
+    const pill=nVal===n?'<span class="fscpill" style="background:#16a34a">validadas</span>':'<span class="fscpill" style="background:'+(nMud?'#dc2626':'#f59e0b')+'">'+nVal+'/'+n+' validadas</span>';
+    const bGr=pode&&!travado&&nVal<n?'<button type="button" data-fscgrval="'+vEsc(z+'|'+g.al)+'" title="Validar todas as frentes desta AL">✔ todas</button>':'';
+    h+='<tr class="fscalrow'+(nVal===n?' val':(nMud?' mud':''))+'"><td><b>'+(gab?'▾ ':'▸ ')+vEsc(g.al)+'</b><div class="sub" style="margin:2px 0 0">'+n+' frente'+(n===1?'':'s')+' · '+vEsc(g.ps[0].tipo||'')+(temExt?' · '+fscNum(Math.round(ext))+' m':'')+(comAv?' · '+comAv+' com avanço no dia':'')+'</div></td>'
+      +'<td class="n"><b>'+fscNum(med,1)+'%</b><div class="sub" style="margin:2px 0 0">'+(comAv?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia')+' · '+(temExt?'ponderado pela extensão':'média simples')+'</div></td>'
+      +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,med))+'%"></i></div></td>'+(cs?'<td>'+pill+'</td>':'')
+      +'<td class="ac">'+bGr+'<button type="button" data-fscabre="'+vEsc(gk)+'" title="Frentes">'+(gab?'▴':'▾')+'</button></td></tr>';
+    if(gab) g.ps.forEach(p=>{ h+=linhaObra(p,true); });
+  });
+  return h+'</tbody></table>';
+  function linhaObra(p,filha){
+    let h='';
+    const k=z+'|'+p.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(p), dl=(p.pct||0)-(p.pct_ant||0);
+    const bVal=pode&&!travado?(p.val&&p.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
+      :'';
+    const sit=p.concluida?'concluída (100%)':((p.avancos||[]).length?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia');
+    h+='<tr class="'+st.cls+(filha?' fscfilha':'')+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,fscExt(p)?fscNum(Math.round(fscExt(p)))+' m':null,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div></td>'
+      +'<td class="n"><b>'+fscNum(p.pct,1)+'%</b><div class="sub" style="margin:2px 0 0">'+vEsc(sit)+'</div></td>'
+      +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,p.pct||0))+'%"></i></div></td>'+(cs?'<td>'+st.pill+'</td>':'')
+      +'<td class="ac">'+bVal+(p.geo?'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button>':'')+'<button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
+    h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
+    if(ab){
+      const dk=p.kind+':'+p.gid+':'+fscS.dia, dt=fscS.detObra[dk];
+      h+='<tr><td colspan="'+nc+'" class="det"><div class="fscsec" style="margin-top:2px">🗓️ Avanços lançados neste dia</div>'
+        +((p.avancos||[]).length?(p.avancos||[]).map(fscAvHtml).join('')
+          :'<p class="sub">Nenhum avanço lançado neste dia.</p>')
+        +'<div data-fscdet="'+vEsc(dk)+'">'+(dt?fscObraDetHtml(dt,dk):'<p class="sub">Carregando o acumulado…</p>')+'</div></td></tr>';
+      if(!dt) fscCarregarDetObra(p.kind,p.gid,fscS.dia);
+    }
+    return h;
+  }
+}
+// AL da obra pelo código (CON-08-AL-13-F01, CON_06_AL_15_FL01) ou pelo local ("AL 14", "AL_15"); sem AL = obra sozinha
+// extensão (m) da intervenção linear pela linha do mapa (GeoJSON em WGS84, haversine); 0 = sem linha
+function fscExt(p){
+  const g=p&&p.geo; if(!g) return 0;
+  const seg=c=>{ let t=0; for(let i=1;i<(c||[]).length;i++){ const [x1,y1]=c[i-1],[x2,y2]=c[i], r=Math.PI/180, a=Math.sin((y2-y1)*r/2)**2+Math.cos(y1*r)*Math.cos(y2*r)*Math.sin((x2-x1)*r/2)**2; t+=12742000*Math.asin(Math.sqrt(a)); } return t; };
+  return g.type==='LineString'?seg(g.coordinates):(g.type==='MultiLineString'?(g.coordinates||[]).reduce((a,c)=>a+seg(c),0):0);
+}
+function fscAl(p){ const m=String((p.codigo||'')+' '+(p.local||'')).match(/(?:^|[^A-Z])AL[\s_-]*0*(\d+)/i); return m?'AL '+m[1]:null; }
+const fscAvHtml=a=>'<div class="fscex"><div class="t">'+vEsc(a.item||'')+' · +'+fscNum(a.valor)+(a.un==='%'?'%':' '+(a.un||''))+'</div>'
+  +'<div class="m">'+vEsc([a.dia?fmtData(a.dia):null,a.hora,a.por,a.equipe?'equipe '+a.equipe:null].filter(Boolean).join(' · '))+'</div>'+(a.obs?'<div>'+vEsc(a.obs)+'</div>':'')+fscFotos(a.fotos)+'</div>';
+const FSC_FASE={1:'1 · Projeto',2:'2 · Aprovação',3:'3 · Pré-obra',4:'4 · Execução',5:'5 · Encerramento'};
+// árvore da obra recolhível: cada grupo (ex.: Valas de perfuração › Vala 1) abre/resume no próprio botão; 1º nível aberto, subníveis resumidos
+function fscArvHtml(arv,dk){
+  let i=0;
+  const pb=v=>'<div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,v||0))+'%"></i></div>';
+  const linha=n=>{
+    if(n.k==='reg'||n.k==='sel') return '<div class="fscfo"><span class="sub" style="margin:0">'+vEsc(n.nome)+': </span>'+vEsc(n.v)+'</div>';
+    const val=n.k==='m'?fscNum(n.exec)+' / '+fscNum(n.meta)+' '+vEsc(n.un):'';
+    return '<div class="fscfo"><div>'+vEsc(n.nome)+(val?'<div class="sub" style="margin:0">'+val+'</div>':'')+'</div><div class="fscpc"><b>'+fscNum(n.pct,1)+'%</b>'+pb(n.pct)+'</div></div>';
+  };
+  const nivel=(min,cam)=>{
+    let h='';
+    while(i<arv.length&&arv[i].nivel>=min){
+      const n=arv[i++];
+      if(n.k!=='g'){ h+=linha(n); continue; }
+      const ck=dk+'|'+cam+'›'+n.nome, ab=ck in fscS.arvAb?fscS.arvAb[ck]:n.nivel===0;
+      const filhos=nivel(n.nivel+1,cam+'›'+n.nome);
+      h+='<details class="fscgr" data-fscgr="'+vEsc(ck)+'"'+(ab?' open':'')+'><summary><span class="fscseta">▸</span><b>'+vEsc(n.nome)+'</b><div class="fscpc"><b>'+fscNum(n.pct,1)+'%</b>'+pb(n.pct)+'</div></summary><div class="fscfi">'+(filhos||'<p class="sub">Sem itens.</p>')+'</div></details>';
+    }
+    return h;
+  };
+  return '<div class="fscarv2">'+nivel(0,'')+'</div>';
+}
+// detalhe acumulado da obra NA DATA: árvore como estava no fim do dia, só os anexos já feitos, todos os avanços até o dia
+function fscObraDetHtml(d,dk){
+  if(d.erro) return '<p class="sub">Não foi possível carregar o acumulado.</p>';
+  const arv=d.arvore||[], temGr=arv.some(n=>n.k==='g'&&n.nivel>0);
+  let h='<div class="fscsec" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>📊 Acumulado até o dia'+(d.pct!=null?' — '+fscNum(d.pct,1)+'%':'')+'</span>'
+    +(temGr?'<span class="fscarvbt"><button type="button" data-fscarvtodos="'+vEsc(dk)+'" data-ab="1">abrir tudo</button><button type="button" data-fscarvtodos="'+vEsc(dk)+'" data-ab="">resumir tudo</button></span>':'')+'</div>';
+  h+=arv.length?fscArvHtml(arv,dk):'<p class="sub">Árvore de avanço ainda não configurada.</p>';
+  const an=d.anexos||[];
+  if(an.length){
+    h+='<div class="fscsec">📎 Anexos ('+an.length+')</div>';
+    let fase=null;
+    an.forEach(e=>{ if(e.fase!==fase){ fase=e.fase; h+='<div class="sub" style="margin:8px 0 2px;font-weight:700">'+vEsc(FSC_FASE[fase]||(fase?'Fase '+fase:'Outros'))+'</div>'; }
+      const lk=e.path?'<a href="'+vEsc(SBASE+e.path)+'" target="_blank" rel="noopener">📄 '+vEsc(e.arquivo||'documento')+'</a>'+(e.folha?' <span class="sub" style="margin:0">('+vEsc(e.folha)+')</span>':'')
+        :(e.link?'<a href="'+vEsc(e.link)+'" target="_blank" rel="noopener">🔗 abrir link</a>':'');
+      h+='<div class="fscan"><div><b>'+vEsc(e.nome||'Documento')+'</b>'+(lk?'<div>'+lk+'</div>':'')
+        +(e.em?'<div class="sub" style="margin:0">'+vEsc([new Date(e.em).toLocaleDateString('pt-BR'),e.por].filter(Boolean).join(' · '))+'</div>':'')+'</div></div>'; });
+  }
+  const av=d.avancos||[], fotos=av.flatMap(a=>a.fotos||[]);
+  h+='<details><summary class="fscsec" style="cursor:pointer">🧾 Todos os avanços até o dia ('+av.length+(fotos.length?' · '+fotos.length+' foto'+(fotos.length===1?'':'s'):'')+')</summary>'
+    +(av.length?av.map(fscAvHtml).join(''):'<p class="sub">Nenhum avanço lançado até este dia.</p>')+'</details>';
+  return h;
+}
+async function fscCarregarDetObra(kind,gid,dia){
+  const key=kind+':'+gid+':'+dia; if(key in fscS.detObra) return; fscS.detObra[key]=null;
+  const {data,error}=await sb.rpc('app_fisc_proj_detalhe',{p_kind:kind,p_gid:gid,p_dia:dia});
+  fscS.detObra[key]=error?{erro:1}:(data||{});
+  const el=document.querySelector('[data-fscdet="'+key+'"]'); if(el) el.innerHTML=fscObraDetHtml(fscS.detObra[key],key);
+}
+function fscSecao(z){
+  if(!fscCons()) return fscSecaoFisc(z);
+  const D=fscS.dias[z]||{}, pode=!!D.pode_validar, V=D.validado, travado=!!V;
+  const todas=(D.linhas||[]).concat(D.projetos||[]), pend=todas.filter(l=>!(l.val&&l.val.ok)).length;
+  let h='<div class="fscza"><h3><span>'+vEsc(rdoZaNome(z))+'</span><span class="sub" style="margin:0">'+todas.length+' linha'+(todas.length===1?'':'s')+(pend?' · '+pend+' a validar':'')+'</span></h3>';
+  if(D.sigos==='aguardando') h+='<div class="fscaviso">⏳ O SIGOS chegou só até '+fmtData((D.cobertura||{}).encerradas_ate)+'. Este dia ainda pode ganhar OS executadas — a validação do dia fica liberada depois da próxima carga.</div>';
+  else if(D.sigos==='sem_base') h+='<div class="fscaviso">Sem relatório SIGOS para este dia — aqui entra só o que foi lançado no AcquaHub.</div>';
+  if(V) h+='<div class="fscaviso '+(V.desatualizado?'bad':'ok')+'">'+(V.desatualizado?'⚠️ Dia validado por '+vEsc(V.por||'')+' em '+new Date(V.em).toLocaleString('pt-BR')+', mas <b>os dados mudaram depois</b>. A fiscalização vê a versão validada; reabra para revisar.'
+      :'✔ Dia validado por '+vEsc(V.por||'')+' em '+new Date(V.em).toLocaleString('pt-BR')+'. É esta versão que a fiscalização vê.')+'</div>';
+  if(pode){
+    h+='<div class="fscbar">';
+    if(travado) h+='<button type="button" class="btn" data-fscreab="'+z+'">↺ Reabrir o dia</button>';
+    else{ if(pend) h+='<button type="button" class="btn" data-fsctodas="'+z+'">✔ Validar todas as linhas</button>';
+      h+='<button type="button" class="btn" data-fscdiaval="'+z+'"'+(pend||D.sigos==='aguardando'||!todas.length?' disabled':'')+'>🏛️ Validar o dia</button>'; }
+    h+='</div>';
+  }
+  h+=fscTabAtividades(z,D,pode,travado)+fscTabObras(z,D,pode,travado);
+  return h+'</div>';
+}
+function fscSecaoFisc(z){
+  const D=fscS.dias[z]||{}, V=D.validado, n=(D.linhas||[]).length+(D.projetos||[]).length;
+  let h='<div class="fscza"><h3><span>'+vEsc(rdoZaNome(z))+'</span>'+(V?'<span class="sub" style="margin:0">validado em '+new Date(V.em).toLocaleString('pt-BR')+'</span>':'')+'</h3>';
+  if(D.nao_validado) return h+'<p class="sub">Este dia ainda não foi validado para este consórcio.</p></div>';
+  if(!n) return h+'<p class="sub">Nenhuma execução neste dia.</p></div>';
+  return h+fscTabAtividades(z,D,false,true)+fscTabObras(z,D,false,true)+'</div>';
+}
+function fscRenderDia(){
+  Object.values(fscS._leaf||{}).forEach(m=>{ try{ m.remove(); }catch(_){} }); fscS._leaf={};
+  const dt=new Date(fscS.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  const box=$('#fscDia');
+  box.innerHTML='<div class="fschead"><h2>'+vEsc(dt.charAt(0).toUpperCase()+dt.slice(1))+'</h2></div>'+fscS.zas.map(fscSecao).join('');
+  const linha=k=>{ const i=k.indexOf('|'), z=k.slice(0,i), c=k.slice(i+1), D=fscS.dias[z]||{};
+    return {z,c,l:(D.linhas||[]).concat(D.projetos||[]).find(x=>x.chave===c)}; };
+  box.querySelectorAll('[data-fscabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.fscabre; fscS.abertos.has(k)?fscS.abertos.delete(k):fscS.abertos.add(k); fscRenderDia(); });
+  box.querySelectorAll('[data-fscmapa]').forEach(b=>b.onclick=()=>{ const k=b.dataset.fscmapa; if(fscS.mapas[k]) delete fscS.mapas[k]; else fscS.mapas[k]=1; fscRenderDia(); });
+  box.querySelectorAll('[data-fscval]').forEach(b=>b.onclick=()=>{ const {z,c}=linha(b.dataset.fscval); fscValidar(z,c,b.dataset.st||null,null); });
+  box.querySelectorAll('[data-fscgrval]').forEach(b=>b.onclick=async()=>{ b.disabled=true;
+    const k=b.dataset.fscgrval, i=k.indexOf('|'), z=k.slice(0,i), al=k.slice(i+1), D=fscS.dias[z]||{};
+    const fs=(D.projetos||[]).filter(p=>fscAl(p)===al&&!(p.val&&p.val.ok));
+    for(const p of fs){ const {error}=await sb.rpc('app_fisc_linha_validar',{p_dia:fscS.dia,p_za:z,p_chave:p.chave,p_status:'validada',p_obs:null}); if(error){ toast(error.message); break; } }
+    toast(fs.length+' frente(s) validada(s).'); fscRecarregar(); });
+  box.querySelectorAll('[data-fsctodas]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {data,error}=await sb.rpc('app_fisc_linhas_validar_todas',{p_dia:fscS.dia,p_za:b.dataset.fsctodas}); if(error){ toast(error.message); b.disabled=false; return; } toast((data&&data.n||0)+' linha(s) validada(s).'); fscRecarregar(); });
+  box.querySelectorAll('[data-fscdiaval]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {error}=await sb.rpc('app_fisc_dia_validar',{p_dia:fscS.dia,p_za:b.dataset.fscdiaval}); if(error){ toast(error.message); b.disabled=false; return; } toast('Dia validado.'); fscRecarregar(); });
+  box.querySelectorAll('[data-fscreab]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {error}=await sb.rpc('app_fisc_dia_reabrir',{p_dia:fscS.dia,p_za:b.dataset.fscreab}); if(error){ toast(error.message); b.disabled=false; return; } toast('Dia reaberto.'); fscRecarregar(); });
+  Object.keys(fscS.mapas).forEach(k=>{ const {l}=linha(k); if(l) fscMapa(k,l); });
+}
+async function fscValidar(z,chave,status,obs){
+  const {error}=await sb.rpc('app_fisc_linha_validar',{p_dia:fscS.dia,p_za:z,p_chave:chave,p_status:status,p_obs:obs});
+  if(error){ toast(error.message); return; } fscRecarregar();
+}
+async function fscRecarregar(){ await fscCarregarMes(true); }
+function fscMapa(k,l){
+  const el=document.getElementById('fscmap_'+fscId(k)); if(!el||typeof L==='undefined') return;
+  const m=L.map(el); mapAddCamadaBase(m); fscS._leaf[k]=m;
+  const grp=L.featureGroup().addTo(m);
+  const add=(geo,pop)=>{ if(!geo) return; try{ L.geoJSON(geo,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:7,weight:2,color:'#fff',fillColor:'#2563eb',fillOpacity:.9}),style:{color:'#2563eb',weight:4}}).bindPopup(pop).addTo(grp); }catch(_){} };
+  if(l.execs) l.execs.forEach(e=>add(e.geo,'<b>'+vEsc(e.servico||'')+'</b><br>'+vEsc(e.desc||'')+(e.local?'<br>'+vEsc(e.local):'')
+    +((e.fotos||[]).length&&!/\.pdf$/i.test(e.fotos[0])?'<br><img src="'+vEsc(SBASE+e.fotos[0])+'" style="width:160px;margin-top:4px;border-radius:6px">':'')));
+  else add(l.geo,'<b>'+vEsc(l.codigo||'')+'</b><br>'+fscNum(l.pct,1)+'%');
+  const b=grp.getBounds();
+  if(b.isValid()) m.fitBounds(b,{padding:[20,20],maxZoom:17}); else { m.setView([-19.94,-44.1],11); el.insertAdjacentHTML('beforeend',''); }
+  if(window.ResizeObserver){ const ro=new ResizeObserver(()=>m.invalidateSize()); ro.observe(el); }
+  setTimeout(()=>m.invalidateSize(),60);
+}
+// Excel do mês (aba Resumo = dia × ZA × atividade; aba Execuções = uma linha por execução; aba Obras = % por dia).
+// Dia validado sai do que foi validado (snapshot); os demais saem como estão agora, com a coluna "Situação".
+async function fscExcel(){
+  const b=$('#fscXlsx'); b.disabled=true; const tx=b.textContent; b.textContent='Gerando…';
+  try{
+    const ini=fscS.mes, fim=new Date(new Date(ini+'T12:00:00').getFullYear(),new Date(ini+'T12:00:00').getMonth()+1,0).toLocaleDateString('sv-SE');
+    const ate=fim>rdoHoje()?rdoHoje():fim, de=ini<FSC_MIN?FSC_MIN:ini;
+    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].per,{p_de:de,p_ate:ate,p_za:z})));
+    const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Latitude','Longitude','Fotos','Situação da linha']],
+      obr=[['Dia','ZA','AL','Obra','Extensão (m)','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
+    rs.forEach((r,i)=>{ if(r.error) throw r.error; const z=fscS.zas[i];
+      (r.data||[]).forEach(d=>{ const sit=x=>d.validado?'validado':(x.status||'pendente');
+        (d.linhas||[]).forEach(l=>{ (l.medidas||[]).forEach(m=>res.push([fmtData(d.dia),z,l.atividade,Number(m.dia),m.un,Number(m.acum),sit(l)]));
+          (l.execs||[]).forEach(e=>{ const c=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null;
+            exs.push([fmtData(d.dia),z,l.atividade,e.servico||'',e.origem||'',e.desc||'',e.local||'',e.equipe||'',e.hora||'',e.os_app||'',e.os_sigos||'',e.sigos||'',c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
+        (d.projetos||[]).forEach(p=>obr.push([fmtData(d.dia),z,fscAl(p)||'',p.codigo||'',fscExt(p)?Math.round(fscExt(p)):'',p.tipo||'',p.local||'',p.inicio?fmtData(p.inicio):'',Number(p.pct||0),Number(p.pct_ant||0),p.concluida?'sim':'não',
+          (p.avancos||[]).map(a=>a.item+': +'+a.valor+(a.un==='%'?'%':' '+(a.un||''))).join('; '),sit(p)]));
+      }); });
+    const XLSX=await getXLSX(), wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),'Resumo');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(exs),'Execuções');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(obr),'Obras');
+    XLSX.writeFile(wb,(fscCons()?'consolidador_':'fiscalizacao_validado_')+fscS.zas.join('_')+'_'+de+'_a_'+ate+'.xlsx');
+  }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
+  b.disabled=false; b.textContent=tx;
 }
 
 // --- Export XLSX (SheetJS carregado sob demanda do CDN oficial) ---
