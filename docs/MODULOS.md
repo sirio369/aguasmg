@@ -4135,7 +4135,7 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
 
 **Para quê:** a fiscalização da COPASA ver o que foi executado — tabela por **dia × ZA**, **uma linha por atividade**
 (qtd do dia + **acumulado desde 01/09/2026**), cada execução com detalhe, fotos e mapa, e **obras em andamento com linha
-permanente** (% no dia, Δ, curva). Antes de chegar à COPASA, cada linha é **validada** e depois o **dia** (por enquanto
+permanente** (% no dia, Δ, acumulado da obra). Antes de chegar à COPASA, cada linha é **validada** e depois o **dia** (por enquanto
 só interno; o acesso externo vai ler só o snapshot validado). Tela no Auxiliar › 🏛️ Fiscalização COPASA.
 
 **Regras do feed `public.fisc_execucoes(de, ate)` (decisões do usuário, 12/11/2026) — 1 linha por execução:**
@@ -4160,12 +4160,14 @@ só interno; o acesso externo vai ler só o snapshot validado). Tela no Auxiliar
 o dia da conclusão. O **% na data** é reconstruído **de trás p/ frente**: árvore atual (`intervencao_estado.arv`) menos
 os incrementos de `intervencao_avanco.valor` lançados depois da data (`fisc_arv_ajusta` por caminho "A › B › C") →
 `proj_arv_pct`. Assim o último dia bate com `exec_pct` (conferido nas 25 obras) e o legado sem log fica certo. Só
-recalcula em dia com lançamento (repete nos demais). `app_fisc_proj_curva(kind, gid)` = curva desde o início.
+recalcula em dia com lançamento (repete nos demais). (Sem gráfico de evolução — retirado a pedido do usuário.)
 **Detalhe acumulado da obra** (▾ da obra): `app_fisc_proj_detalhe(kind, gid, dia)` devolve a **árvore como estava no fim
-do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), as **etapas e
-anexos até o dia** (`etapa_modelo` × `intervencao_etapa` × `intervencao_documento`, só status/doc com data ≤ fim do dia;
-documento substituído depois aparece só a versão atual, então some nos dias anteriores à troca) e **todos os avanços até o
-dia** com fotos. Carregado sob demanda (não entra no snapshot do dia).
+do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), **só os
+anexos já feitos até o dia** (`anexos`: `intervencao_documento` com data ≤ fim do dia + links informados nas etapas, com
+nome/fase da `etapa_modelo`; o que falta NÃO aparece — pedido do usuário; documento substituído depois aparece só a versão
+atual, então some nos dias anteriores à troca) e **todos os avanços até o dia** com fotos. Na tela a árvore é
+**recolhível**: cada grupo (Valas de perfuração › Vala 1, Ramais › Ramal N…) abre/resume no próprio botão; 1º nível
+aberto, subníveis resumidos, + "abrir tudo"/"resumir tudo"; o estado fica guardado enquanto a tela está aberta. Carregado sob demanda (não entra no snapshot do dia).
 
 **Validação (só admin, `fisc_pode_validar`):** tabelas `"12 - retaguarda".fisc_linha_val(dia, za, chave, status
 validada|oculta, hash, obs)`, `fisc_exec_oculta(exec_id, motivo)` (tira registro de teste/errado sem esconder a linha) e
@@ -4176,15 +4178,15 @@ validadas/ocultas e o SIGOS cobrindo o dia; o snapshot guarda só as linhas vali
 validado trava a edição até **Reabrir**.
 
 **RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+ ocultas,
-cobertura SIGOS, `validado.desatualizado`), `app_fisc_proj_curva`, `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
+cobertura SIGOS, `validado.desatualizado`), `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
 validado sai do snapshot) · escrita: `app_fisc_linha_validar(dia, za, chave, status|null, obs)`,
 `app_fisc_linhas_validar_todas`, `app_fisc_exec_ocultar(exec_id, motivo, ocultar)`, `app_fisc_dia_validar`, `app_fisc_dia_reabrir`.
 Internas (sem grant): `fisc_execucoes`, `fisc_linhas`, `fisc_projetos`, `fisc_dia_dados`, `fisc_proj_pct`, `fisc_arv_ajusta`, `fisc_arv_linhas`. Também `app_fisc_proj_detalhe(kind, gid, dia)`.
 
 **Tela (`fsc*` no index.html):** ZAs (seleção múltipla), calendário com cor por status, tabela por ZA (Atividade · No dia ·
 Acumulado · Situação · ✔/🙈/🗺️/▾), detalhe com cada execução (OS, situação SIGOS, local, equipe, hora, fotos que abrem
-em nova aba, 🙈 ocultar com motivo), mapa Leaflet por linha, bloco **Obras em andamento** (% no dia, barra, curva SVG,
-avanços com fotos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
+em nova aba, 🙈 ocultar com motivo), mapa Leaflet por linha, bloco **Obras em andamento** (% no dia, barra, avanços do
+dia, acumulado recolhível, anexos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
 corte da Fiscalização mudar no BI, mudar `sigos_fisc_corte()` (vale aqui também). Nova fonte de execução = novo CTE em

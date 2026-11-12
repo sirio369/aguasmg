@@ -505,26 +505,6 @@ begin
                      'desatualizado', f.hash is distinct from public.fisc_dia_hash(d)) end);
 end $$;
 
--- curva de % de uma obra (desde o início) p/ o detalhe
-create or replace function public.app_fisc_proj_curva(p_kind text, p_gid bigint)
-returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare v_ini date; v_fim date; r jsonb;
-begin
-  if not public.sigos_pode_ver(auth.uid()) then raise exception 'sem permissão'; end if;
-  select least(coalesce((e.fase4_em at time zone 'America/Sao_Paulo')::date, '9999-12-31'),
-               coalesce((select min((a.ts at time zone 'America/Sao_Paulo')::date) from "13 - projetos_obra".intervencao_avanco a where a.kind = e.kind and a.gid = e.gid), '9999-12-31')),
-         coalesce((e.concluida_em at time zone 'America/Sao_Paulo')::date, (now() at time zone 'America/Sao_Paulo')::date)
-    into v_ini, v_fim
-    from "13 - projetos_obra".intervencao_estado e where e.kind = p_kind and e.gid = p_gid;
-  if v_ini is null or v_ini = '9999-12-31' then return '[]'::jsonb; end if;
-  with kd as (select v_ini - 1 d union select distinct (a.ts at time zone 'America/Sao_Paulo')::date from "13 - projetos_obra".intervencao_avanco a
-                where a.kind = p_kind and a.gid = p_gid),
-       kp as (select kd.d, public.fisc_proj_pct(p_kind, p_gid, kd.d) p from kd)
-  select jsonb_agg(jsonb_build_object('dia', g::date, 'pct', (select kp.p from kp where kp.d <= g::date order by kp.d desc limit 1)) order by g)
-    into r from generate_series(v_ini, v_fim, interval '1 day') g;
-  return coalesce(r, '[]'::jsonb);
-end $$;
-
 -- validar / ocultar uma linha (atividade ou obra) — grava o hash do momento
 create or replace function public.app_fisc_linha_validar(p_dia date, p_za text, p_chave text, p_status text, p_obs text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -641,16 +621,17 @@ begin
   return r;
 end $$;
 
-revoke all on function public.app_fisc_mes(date, text), public.app_fisc_dia(date, text), public.app_fisc_proj_curva(text, bigint),
+revoke all on function public.app_fisc_mes(date, text), public.app_fisc_dia(date, text),
   public.app_fisc_linha_validar(date, text, text, text, text), public.app_fisc_linhas_validar_todas(date, text),
   public.app_fisc_exec_ocultar(text, text, boolean), public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
   public.app_fisc_periodo(date, date, text) from public, anon;
-grant execute on function public.app_fisc_mes(date, text), public.app_fisc_dia(date, text), public.app_fisc_proj_curva(text, bigint),
+grant execute on function public.app_fisc_mes(date, text), public.app_fisc_dia(date, text),
   public.app_fisc_linha_validar(date, text, text, text, text), public.app_fisc_linhas_validar_todas(date, text),
   public.app_fisc_exec_ocultar(text, text, boolean), public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
   public.app_fisc_periodo(date, date, text) to authenticated;
 
--- detalhe acumulado de uma obra NA DATA: árvore como estava no fim do dia, etapas/anexos já feitos até o dia,
+-- detalhe acumulado de uma obra NA DATA: árvore como estava no fim do dia, SÓ os anexos já feitos até o dia
+-- (documentos + links informados; o que falta não aparece),
 -- todos os avanços até o dia (com fotos)
 create or replace function public.app_fisc_proj_detalhe(p_kind text, p_gid bigint, p_dia date)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -673,17 +654,21 @@ begin
   return jsonb_build_object(
     'pct', case when jsonb_typeof(v_arv) = 'array' then "13 - projetos_obra".proj_arv_pct(v_adj) end,
     'arvore', v_lin,
-    'etapas', coalesce((
-      select jsonb_agg(jsonb_build_object('fase', m.fase, 'nome', m.nome, 'natureza', m.natureza,
-               'status', case when e.status_em is null or e.status_em < v_fim then e.status end,
-               'em', case when e.status_em < v_fim then e.status_em end, 'por', case when e.status_em < v_fim then e.por_nome end,
-               'valor', case when e.status_em < v_fim then nullif(e.valor, '') end,
-               'doc', case when d.path is not null and d.atualizado_em < v_fim then jsonb_build_object('nome', d.nome, 'path', d.path, 'folha', d.folha, 'em', d.atualizado_em) end)
-             order by m.ordem)
-        from "13 - projetos_obra".etapa_modelo m
-        left join "13 - projetos_obra".intervencao_etapa e on e.kind = p_kind and e.gid = p_gid and e.chave = m.chave
-        left join "13 - projetos_obra".intervencao_documento d on d.kind = p_kind and d.gid = p_gid and d.tipo = m.chave
-       where m.tipo = v_tipo and m.natureza <> 'avanco' and coalesce(e.ativo, m.padrao_ativo, true)), '[]'::jsonb),
+    'anexos', coalesce((
+      select jsonb_agg(x.j order by x.fase nulls last, x.ordem nulls last, x.em) from (
+        select m.fase, m.ordem, d.atualizado_em em,
+               jsonb_build_object('fase', m.fase, 'nome', coalesce(m.nome, d.tipo), 'arquivo', d.nome, 'path', d.path, 'folha', d.folha,
+                                  'em', d.atualizado_em, 'por', case when e2.status_em < v_fim then e2.por_nome end) j
+          from "13 - projetos_obra".intervencao_documento d
+          left join "13 - projetos_obra".etapa_modelo m on m.tipo = v_tipo and m.chave = d.tipo
+          left join "13 - projetos_obra".intervencao_etapa e2 on e2.kind = d.kind and e2.gid = d.gid and e2.chave = d.tipo
+         where d.kind = p_kind and d.gid = p_gid and d.path is not null and d.atualizado_em < v_fim
+        union all
+        select m.fase, m.ordem, e.status_em,
+               jsonb_build_object('fase', m.fase, 'nome', m.nome, 'link', e.valor, 'em', e.status_em, 'por', e.por_nome)
+          from "13 - projetos_obra".intervencao_etapa e
+          join "13 - projetos_obra".etapa_modelo m on m.tipo = v_tipo and m.chave = e.chave
+         where e.kind = p_kind and e.gid = p_gid and e.status_em < v_fim and e.valor ~* '^https?://') x), '[]'::jsonb),
     'avancos', coalesce((
       select jsonb_agg(jsonb_build_object('dia', (a.ts at time zone 'America/Sao_Paulo')::date, 'hora', to_char(a.ts at time zone 'America/Sao_Paulo', 'HH24:MI'),
                'item', a.caminho, 'valor', a.valor, 'un', a.unidade, 'obs', nullif(a.obs, ''), 'por', a.autor_nome, 'equipe', a.equipe,
