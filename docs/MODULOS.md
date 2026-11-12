@@ -2641,7 +2641,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   com a execução em 100%). Tipos do pipeline (`vw_iv.tipo`): linha `HDD`→`hdd`, outras linhas→`vca`, ponto
   `VRP`→`vrp`, `Valvula`/`Registro`→`registro`, `Macromedidor`→`macro`.
   - **Atores:** Engenharia = admin/`proj_sup_acesso` (`proj_eng_pode`) · Qualidade = `pav_qualidade_pode` (a mesma do
-    ensaio de reaterro) · **Obras = admin ou cargo Supervisor de Produção / Coordenador de Serviços / Gestor de Obras**
+    ensaio de reaterro) · **Obras = admin ou cargo Supervisor de Produção / Coordenador de Serviços / Gestor de Obras / Assistente de Engenharia** (este último desde 12/11/2026, sw v373, migração `proj_obras_cargos_assistente_eng`)
     (`proj_obras_pode`, `app_me.proj_obras`). Quem não é ator só consulta.
   - **Tabelas novas (schema 13, RLS deny-all):** `etapa_modelo` (etapas por tipo: fase, ator, natureza
     doc|aprovacao|link|os|avanco|ensaio, `aprova`, `pede_folha`, `padrao_ativo`, **`prazo_aten`/`prazo_atraso`** em
