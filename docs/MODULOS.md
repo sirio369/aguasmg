@@ -4138,7 +4138,10 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
 permanente** (% no dia, Δ, acumulado da obra). **O Consolidador é o novo RDO** (decisão do usuário 12/11/2026): o card
 📋 RDO saiu do Auxiliar e no lugar entrou **📋 Consolidador** (a tela `rdo` antiga, que já era só consulta, ficou no código sem
 card). No Consolidador cada linha é **validada** (não existe "ocultar" — só validar) e depois o **dia**; o dia validado vai
-para o módulo **🏛️ Fiscalização COPASA › Execução validada** (`fiscv`), que lê **só** o snapshot validado (só leitura).
+para **Execução Física** (`fiscv`), que lê **só** o snapshot validado (só leitura). Desde a v370 ela fica no **4º bloco da
+tela inicial, 🏛️ Fiscalização** (`#homeFisc`, depois de Em desenvolvimento; visível p/ admin|aux_acesso, mesma regra de
+`fisc_pode_ver_validado`), junto com atalhos p/ **Cadastro técnico** e **Biblioteca** (cópias dos cards do Suporte); saiu do
+Auxiliar. No modo fiscalização o ‹ volta para o Início.
 Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_validado()`.
 
 **Regras do feed `public.fisc_execucoes(de, ate)` (decisões do usuário, 12/11/2026) — 1 linha por execução:**
