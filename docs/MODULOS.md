@@ -4166,9 +4166,10 @@ os incrementos de `intervencao_avanco.valor` lançados depois da data (`fisc_arv
 recalcula em dia com lançamento (repete nos demais). (Sem gráfico de evolução — retirado a pedido do usuário.)
 **Agregador por AL** (só tela/Excel, sem banco): frentes de HDD da mesma AL (`fscAl`: `AL-13`/`AL_15` no código ou
 "AL 14" no local; ex.: CON-08-AL-13-F01…F10) ficam sob **uma linha da AL**, resumida por padrão (▾ abre as frentes), com o
-**% médio simples das frentes** e o Δ do dia, quantas frentes têm avanço e quantas estão validadas, e **✔ todas** (valida as
+**% ponderado pela extensão de cada frente** (`fscExt`: comprimento da linha da intervenção pelo GeoJSON, haversine —
+decisão do usuário 12/11/2026; se alguma frente não tiver linha, cai para média simples e a linha avisa), a extensão total e o Δ do dia, quantas frentes têm avanço e quantas estão validadas, e **✔ todas** (valida as
 frentes pendentes da AL, uma a uma — a validação continua por frente). AL com uma frente só fica como linha normal. Excel
-(aba Obras) ganha a coluna **AL**.
+(aba Obras) ganha as colunas **AL** e **Extensão (m)**.
 **Detalhe acumulado da obra** (▾ da obra): `app_fisc_proj_detalhe(kind, gid, dia)` devolve a **árvore como estava no fim
 do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), **só os
 anexos já feitos até o dia** (`anexos`: `intervencao_documento` com data ≤ fim do dia + links informados nas etapas, com
