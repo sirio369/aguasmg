@@ -330,7 +330,8 @@ pwa/
     linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
   - **📋 Consolidador** (`fisc`, **substitui o card do RDO**, 2026-11-12, sw v369, `docs/migracao_fisc_consolidador.sql`) e
     **Execução Física** (`fiscv` = mesma tela, só os dias validados, só leitura; fica no 4º bloco da tela inicial **🏛️ Fiscalização**,
-    com atalhos p/ Cadastro técnico e Biblioteca, sw v370) —
+    com atalhos p/ Cadastro técnico e Biblioteca, sw v370; ⚙️ do bloco define Sem acesso / Acessa / **Fiscal** — função nova que vê
+    só esse bloco, sw v371, `docs/migracao_fiscal_acesso.sql`) —
     tabela dia × ZA × atividade com acumulado, cada execução com fotos/mapa (feed `fisc_execucoes`: 1 execução = 1 registro na
     data do campo, OS SIGOS como atributo; vazamento localizado sem correção nunca aparece) + obras em andamento com % por dia;
     só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel; detalhe da

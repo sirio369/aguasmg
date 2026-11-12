@@ -4167,6 +4167,17 @@ o dia da conclusão. O **% na data** é reconstruído **de trás p/ frente**: á
 os incrementos de `intervencao_avanco.valor` lançados depois da data (`fisc_arv_ajusta` por caminho "A › B › C") →
 `proj_arv_pct`. Assim o último dia bate com `exec_pct` (conferido nas 25 obras) e o legado sem log fica certo. Só
 recalcula em dia com lançamento (repete nos demais). (Sem gráfico de evolução — retirado a pedido do usuário.)
+**Acesso Fiscal + ⚙️ do bloco Fiscalização** (`docs/migracao_fiscal_acesso.sql`, sw v371): engrenagem no bloco 🏛️ Fiscalização
+da tela inicial (só admin, tela `fisc_acesso`, RPCs `app_fisc_acesso_listar`/`app_fisc_acesso_set(uuid, nivel)`) com 3
+níveis por pessoa: **Sem acesso** · **Acessa** (chave `perfil.fisc_acesso`, soma à função) · **Fiscal** (nova função
+`perfil.funcao = 'fiscal'`: vê **só** o bloco — Execução Física, Cadastro técnico, Biblioteca; Execução/Suporte/Em
+desenvolvimento e o 🔄 Sincronizar **somem** (`body.fiscal-only`, guardado em `localStorage ah_fiscal` p/ não piscar antes do
+`app_me`); `irPara` só deixa abrir `FISCAL_TELAS` e força o modo Execução Física). Tirar alguém de Fiscal volta a função p/
+Campo. Admin sempre acessa. `fisc_pode_ver_validado` = admin OU `fisc_acesso` OU fiscal (antes era `sigos_pode_ver`: **aux
+deixou de ver o bloco automaticamente** — precisa ser marcado na ⚙️). `app_me` + `fisc_acesso`/`is_fiscal`;
+`sup_admin_set_funcao` e Configurações de usuários aceitam "Fiscal"; `app_fisc_proj_detalhe` aceita quem vê a Execução
+Física. ⚠️ O bloqueio dos outros módulos é de **tela**: RPCs que só exigem login continuam abertas p/ o Fiscal.
+
 **Agregador por AL** (só tela/Excel, sem banco): frentes de HDD da mesma AL (`fscAl`: `AL-13`/`AL_15` no código ou
 "AL 14" no local; ex.: CON-08-AL-13-F01…F10) ficam sob **uma linha da AL**, resumida por padrão (▾ abre as frentes), com o
 **% ponderado pela extensão de cada frente** (`fscExt`: comprimento da linha da intervenção pelo GeoJSON, haversine —
