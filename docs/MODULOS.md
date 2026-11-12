@@ -4130,3 +4130,57 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
   chave do BI é presa a um schema. Conferido: os 29 pullbacks (4.192,25 m) e os 17 dias de pesquisa batem linha a linha com os CSV.
 - **Cuidados:** `anon` tem `statement_timeout` 3 s (hoje ~35 ms, ~1,8 MB p/ 3,5 mil OS); se a base crescer muito, paginar por
   período na view/RPC. Baixa retroativa num mês já carregado só entra se o arquivo daquele mês for reenviado.
+
+### 21.6 Consolidador de execução p/ a Fiscalização COPASA (`fisc`) · `docs/migracao_fisc_consolidador.sql` (2026-11-12, sw v369)
+
+**Para quê:** a fiscalização da COPASA ver o que foi executado — tabela por **dia × ZA**, **uma linha por atividade**
+(qtd do dia + **acumulado desde 01/09/2026**), cada execução com detalhe, fotos e mapa, e **obras em andamento com linha
+permanente** (% no dia, Δ, curva). Antes de chegar à COPASA, cada linha é **validada** e depois o **dia** (por enquanto
+só interno; o acesso externo vai ler só o snapshot validado). Tela no Auxiliar › 🏛️ Fiscalização COPASA.
+
+**Regras do feed `public.fisc_execucoes(de, ate)` (decisões do usuário, 12/11/2026) — 1 linha por execução:**
+- **1 execução = 1 registro, na data do campo.** A OS SIGOS casada pela base de 10 dígitos (`sigos_os_base`) vira
+  atributo da execução do app (`os_sigos` + `sigos_sit` "executada no SIGOS em dd/mm" / "aguardando execução no SIGOS");
+  OS SIGOS sem lançamento no app entra pela data do SIGOS. Nada muda de dia depois (no RDO a VRP mudava de dia).
+- **VRP:** `vrp_os` concluída/com pendência/improdutiva (`os_sigos`) + `vrp_visita`; OS SIGOS de VRP sem `vrp_os` entra pelo SIGOS.
+- **Loggers:** só o registro do app (instalação/remoção, `os_copasa_instalacao/_remocao` como atributo). **OS SIGOS de
+  logger sem vínculo NÃO vira linha** (sem esse cuidado contava 2×; não dá p/ casar por GPS — as coordenadas do SIGOS
+  não batem). Com a OS obrigatória no app (§2.2) o vínculo passa a existir.
+- **Vazamento:** "Pesquisa de vazamento" = km de rede pesquisada (`pp_execucao`, 1 registro por pesquisador × dia, ZA pela
+  rede) + detecção SIGOS 2487900; "Correção de vazamento" = OS SIGOS `COR.VAZ` (2587901/04/05) **só executadas**
+  (`fisc_familia` separa da família SIGOS "Pesquisa de vazamento"). **Vazamento localizado (ocorrência do app) sem
+  correção executada nunca aparece** — a ocorrência só empresta foto/local à correção da mesma OS.
+- **Pavimento:** recomposição executada no app (1 por OS de recomposição) + ensaios de reaterro; recomposição SIGOS sem app pelo SIGOS.
+- **Demais famílias SIGOS:** regra do BI (`sigos_conta`: executada; Fiscalização também NÃO EXEC. C/ VISITA).
+- **Fora:** pontos de pavimento levantados (pendência), atendimento comercial (solicitações/ocorrências), encerradas sem
+  execução que não contam, "dados concluídos" do logger (é escritório).
+- `exec_id` estável (`app:vrp_os:<id>`, `app:logger:inst:<id>`, `app:pesquisa:<colab>:<dia>`, `app:pav:<os|id>`, `sigos:<numero>`…).
+
+**Obras:** `fisc_projetos(de, ate, za)` — intervenção com `status` run/done a partir de `least(fase4_em, 1º avanço)` até
+o dia da conclusão. O **% na data** é reconstruído **de trás p/ frente**: árvore atual (`intervencao_estado.arv`) menos
+os incrementos de `intervencao_avanco.valor` lançados depois da data (`fisc_arv_ajusta` por caminho "A › B › C") →
+`proj_arv_pct`. Assim o último dia bate com `exec_pct` (conferido nas 25 obras) e o legado sem log fica certo. Só
+recalcula em dia com lançamento (repete nos demais). `app_fisc_proj_curva(kind, gid)` = curva desde o início.
+
+**Validação (só admin, `fisc_pode_validar`):** tabelas `"12 - retaguarda".fisc_linha_val(dia, za, chave, status
+validada|oculta, hash, obs)`, `fisc_exec_oculta(exec_id, motivo)` (tira registro de teste/errado sem esconder a linha) e
+`fisc_dia(dia, za, hash, snapshot)`. Chave da linha = `atv:<atividade>` ou `proj:<kind>:<gid>`; hash = md5 dos
+`exec_id`/descrição/qtd/situação SIGOS (obra: % + avanços do dia). Status do dia: vazio / pendente / pronto / validado /
+**desatualizado** (hash mudou depois de validar → linha volta a pendente). Validar o dia exige todas as linhas
+validadas/ocultas e o SIGOS cobrindo o dia; o snapshot guarda só as linhas validadas (ocultas saem). Linha/dia
+validado trava a edição até **Reabrir**.
+
+**RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+ ocultas,
+cobertura SIGOS, `validado.desatualizado`), `app_fisc_proj_curva`, `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
+validado sai do snapshot) · escrita: `app_fisc_linha_validar(dia, za, chave, status|null, obs)`,
+`app_fisc_linhas_validar_todas`, `app_fisc_exec_ocultar(exec_id, motivo, ocultar)`, `app_fisc_dia_validar`, `app_fisc_dia_reabrir`.
+Internas (sem grant): `fisc_execucoes`, `fisc_linhas`, `fisc_projetos`, `fisc_dia_dados`, `fisc_proj_pct`.
+
+**Tela (`fsc*` no index.html):** ZAs (seleção múltipla), calendário com cor por status, tabela por ZA (Atividade · No dia ·
+Acumulado · Situação · ✔/🙈/🗺️/▾), detalhe com cada execução (OS, situação SIGOS, local, equipe, hora, fotos que abrem
+em nova aba, 🙈 ocultar com motivo), mapa Leaflet por linha, bloco **Obras em andamento** (% no dia, barra, curva SVG,
+avanços com fotos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
+
+**Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
+corte da Fiscalização mudar no BI, mudar `sigos_fisc_corte()` (vale aqui também). Nova fonte de execução = novo CTE em
+`fisc_execucoes` com `exec_id` estável e, se tiver OS SIGOS, entrar em `app_os` p/ não duplicar.
