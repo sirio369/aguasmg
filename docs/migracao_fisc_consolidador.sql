@@ -300,6 +300,29 @@ begin
 end $$;
 revoke all on function public.fisc_proj_pct(text, bigint, date) from public, anon, authenticated;
 
+-- árvore achatada p/ o detalhe: uma linha por nó (nível, nome, tipo, valor acumulado, %); 'reg'/'sel' = informação
+create or replace function public.fisc_arv_linhas(n jsonb, nivel integer)
+returns jsonb language plpgsql immutable set search_path = public as $$
+declare k text; out jsonb := '[]'::jsonb; f jsonb;
+begin
+  if n is null or jsonb_typeof(n) <> 'object' or n->>'ativo' = 'false' then return out; end if;
+  k := n->>'k';
+  if k = '%' then
+    out := jsonb_build_array(jsonb_build_object('nivel', nivel, 'nome', n->>'n', 'k', k, 'pct', "13 - projetos_obra".proj_no_pct(n)));
+  elsif k = 'm' then
+    out := jsonb_build_array(jsonb_build_object('nivel', nivel, 'nome', n->>'n', 'k', k, 'exec', greatest(coalesce((n->>'exec')::numeric, 0), 0),
+             'meta', (n->>'meta')::numeric, 'un', coalesce(n->>'un', 'm'), 'pct', "13 - projetos_obra".proj_no_pct(n)));
+  elsif k in ('reg', 'sel') then
+    if coalesce(n->>'v', '') not in ('', '—') then out := jsonb_build_array(jsonb_build_object('nivel', nivel, 'nome', n->>'n', 'k', k, 'v', n->>'v')); end if;
+  elsif k = 'g' then
+    out := jsonb_build_array(jsonb_build_object('nivel', nivel, 'nome', n->>'n', 'k', k, 'pct', "13 - projetos_obra".proj_no_pct(n)));
+    for f in select value from jsonb_array_elements(coalesce(n->'f', '[]'::jsonb)) loop
+      out := out || public.fisc_arv_linhas(f, nivel + 1);
+    end loop;
+  end if;
+  return out;
+end $$;
+
 -- intervenções em andamento em cada dia do período (linha permanente até o dia da conclusão)
 create or replace function public.fisc_projetos(p_de date, p_ate date, p_za text)
 returns table(dia date, za text, chave text, kind text, gid bigint, codigo text, tipo text, local text, inicio date,
@@ -626,3 +649,46 @@ grant execute on function public.app_fisc_mes(date, text), public.app_fisc_dia(d
   public.app_fisc_linha_validar(date, text, text, text, text), public.app_fisc_linhas_validar_todas(date, text),
   public.app_fisc_exec_ocultar(text, text, boolean), public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
   public.app_fisc_periodo(date, date, text) to authenticated;
+
+-- detalhe acumulado de uma obra NA DATA: árvore como estava no fim do dia, etapas/anexos já feitos até o dia,
+-- todos os avanços até o dia (com fotos)
+create or replace function public.app_fisc_proj_detalhe(p_kind text, p_gid bigint, p_dia date)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_arv jsonb; v_aj jsonb; v_adj jsonb := '[]'::jsonb; f jsonb; v_tipo text; v_lin jsonb := '[]'::jsonb; v_fim timestamptz;
+begin
+  if not public.sigos_pode_ver(auth.uid()) then raise exception 'sem permissão'; end if;
+  v_fim := ((p_dia + 1)::timestamp at time zone 'America/Sao_Paulo');
+  select e.arv, v.tipo into v_arv, v_tipo
+    from "13 - projetos_obra".intervencao_estado e join "13 - projetos_obra".vw_iv v on v.kind = e.kind and v.gid = e.gid
+   where e.kind = p_kind and e.gid = p_gid;
+  if jsonb_typeof(v_arv) = 'array' then
+    select coalesce(jsonb_object_agg(caminho, s), '{}'::jsonb) into v_aj
+      from (select a.caminho, sum(a.valor) s from "13 - projetos_obra".intervencao_avanco a
+             where a.kind = p_kind and a.gid = p_gid and a.ts >= v_fim group by 1) t;
+    for f in select value from jsonb_array_elements(v_arv) loop
+      f := public.fisc_arv_ajusta(f, null, v_aj); v_adj := v_adj || jsonb_build_array(f);
+      v_lin := v_lin || public.fisc_arv_linhas(f, 0);
+    end loop;
+  end if;
+  return jsonb_build_object(
+    'pct', case when jsonb_typeof(v_arv) = 'array' then "13 - projetos_obra".proj_arv_pct(v_adj) end,
+    'arvore', v_lin,
+    'etapas', coalesce((
+      select jsonb_agg(jsonb_build_object('fase', m.fase, 'nome', m.nome, 'natureza', m.natureza,
+               'status', case when e.status_em is null or e.status_em < v_fim then e.status end,
+               'em', case when e.status_em < v_fim then e.status_em end, 'por', case when e.status_em < v_fim then e.por_nome end,
+               'valor', case when e.status_em < v_fim then nullif(e.valor, '') end,
+               'doc', case when d.path is not null and d.atualizado_em < v_fim then jsonb_build_object('nome', d.nome, 'path', d.path, 'folha', d.folha, 'em', d.atualizado_em) end)
+             order by m.ordem)
+        from "13 - projetos_obra".etapa_modelo m
+        left join "13 - projetos_obra".intervencao_etapa e on e.kind = p_kind and e.gid = p_gid and e.chave = m.chave
+        left join "13 - projetos_obra".intervencao_documento d on d.kind = p_kind and d.gid = p_gid and d.tipo = m.chave
+       where m.tipo = v_tipo and m.natureza <> 'avanco' and coalesce(e.ativo, m.padrao_ativo, true)), '[]'::jsonb),
+    'avancos', coalesce((
+      select jsonb_agg(jsonb_build_object('dia', (a.ts at time zone 'America/Sao_Paulo')::date, 'hora', to_char(a.ts at time zone 'America/Sao_Paulo', 'HH24:MI'),
+               'item', a.caminho, 'valor', a.valor, 'un', a.unidade, 'obs', nullif(a.obs, ''), 'por', a.autor_nome, 'equipe', a.equipe,
+               'fotos', coalesce(to_jsonb(a.fotos), '[]'::jsonb)) order by a.ts desc)
+        from "13 - projetos_obra".intervencao_avanco a where a.kind = p_kind and a.gid = p_gid and a.ts < v_fim), '[]'::jsonb));
+end $$;
+revoke all on function public.app_fisc_proj_detalhe(text, bigint, date) from public, anon;
+grant execute on function public.app_fisc_proj_detalhe(text, bigint, date) to authenticated;
