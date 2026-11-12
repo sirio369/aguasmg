@@ -9923,6 +9923,8 @@ function fscCss(){
 #fisc .fsctab td.n,#fisc .fsctab th.n{text-align:right;white-space:nowrap}
 #fisc .fsctab tr.val td:first-child{box-shadow:inset 4px 0 0 #16a34a}
 #fisc .fsctab tr.mud td:first-child{box-shadow:inset 4px 0 0 #dc2626}
+#fisc .fsctab tr.fscalrow td{background:rgba(14,116,144,.06)}
+#fisc .fsctab tr.fscfilha>td:first-child{padding-left:22px}
 #fisc .fsctab .ac{white-space:nowrap;text-align:right}
 #fisc .fsctab .ac button{font:inherit;font-size:13px;width:auto;margin:0 0 0 3px;padding:3px 7px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
 #fisc .fsctab td.det{background:var(--bg,transparent);padding:6px 8px 10px}
@@ -10086,12 +10088,32 @@ function fscTabObras(z,D,pode,travado){
   if(!ps.length) return '';
   const cs=fscCons(), nc=cs?5:4;
   let h='<h4 style="margin:14px 0 6px">🏗️ Obras em andamento</h4><table class="fsctab"><thead><tr><th>Obra</th><th class="n">% no dia</th><th class="hm">Avanço</th>'+(cs?'<th>Situação</th>':'')+'<th></th></tr></thead><tbody>';
-  ps.forEach(p=>{
+  // agregador: frentes de HDD da mesma AL (ex.: CON-08-AL-13-F01…F10) ficam sob uma linha da AL, resumida por padrão
+  const grupos=[], porAl={};
+  ps.forEach(p=>{ const al=fscAl(p); if(al){ if(!porAl[al]){ porAl[al]=[]; grupos.push({al,ps:porAl[al]}); } porAl[al].push(p); } else grupos.push({ps:[p]}); });
+  const nAl=g=>g.al?parseInt(g.al.slice(3),10):1e9; grupos.sort((a,b)=>nAl(a)-nAl(b));
+  grupos.forEach(g=>g.ps.sort((a,b)=>String(a.codigo||'').localeCompare(String(b.codigo||''),'pt-BR',{numeric:true})));
+  grupos.forEach(g=>{
+    if(!g.al||g.ps.length<2){ g.ps.forEach(p=>{ h+=linhaObra(p,false); }); return; }
+    const gk=z+'|al:'+g.al, gab=fscS.abertos.has(gk), n=g.ps.length;
+    const med=g.ps.reduce((a,p)=>a+(p.pct||0),0)/n, ant=g.ps.reduce((a,p)=>a+(p.pct_ant||0),0)/n, dl=med-ant;
+    const comAv=g.ps.filter(p=>(p.avancos||[]).length).length, nVal=g.ps.filter(p=>p.val&&p.val.ok).length, nMud=g.ps.filter(p=>p.val&&!p.val.ok).length;
+    const pill=nVal===n?'<span class="fscpill" style="background:#16a34a">validadas</span>':'<span class="fscpill" style="background:'+(nMud?'#dc2626':'#f59e0b')+'">'+nVal+'/'+n+' validadas</span>';
+    const bGr=pode&&!travado&&nVal<n?'<button type="button" data-fscgrval="'+vEsc(z+'|'+g.al)+'" title="Validar todas as frentes desta AL">✔ todas</button>':'';
+    h+='<tr class="fscalrow'+(nVal===n?' val':(nMud?' mud':''))+'"><td><b>'+(gab?'▾ ':'▸ ')+vEsc(g.al)+'</b><div class="sub" style="margin:2px 0 0">'+n+' frentes · '+vEsc(g.ps[0].tipo||'')+(comAv?' · '+comAv+' com avanço no dia':'')+'</div></td>'
+      +'<td class="n"><b>'+fscNum(med,1)+'%</b><div class="sub" style="margin:2px 0 0">'+(comAv?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia')+' · média</div></td>'
+      +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,med))+'%"></i></div></td>'+(cs?'<td>'+pill+'</td>':'')
+      +'<td class="ac">'+bGr+'<button type="button" data-fscabre="'+vEsc(gk)+'" title="Frentes">'+(gab?'▴':'▾')+'</button></td></tr>';
+    if(gab) g.ps.forEach(p=>{ h+=linhaObra(p,true); });
+  });
+  return h+'</tbody></table>';
+  function linhaObra(p,filha){
+    let h='';
     const k=z+'|'+p.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(p), dl=(p.pct||0)-(p.pct_ant||0);
     const bVal=pode&&!travado?(p.val&&p.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
       :'';
     const sit=p.concluida?'concluída (100%)':((p.avancos||[]).length?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia');
-    h+='<tr class="'+st.cls+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div></td>'
+    h+='<tr class="'+st.cls+(filha?' fscfilha':'')+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div></td>'
       +'<td class="n"><b>'+fscNum(p.pct,1)+'%</b><div class="sub" style="margin:2px 0 0">'+vEsc(sit)+'</div></td>'
       +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,p.pct||0))+'%"></i></div></td>'+(cs?'<td>'+st.pill+'</td>':'')
       +'<td class="ac">'+bVal+(p.geo?'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button>':'')+'<button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
@@ -10104,9 +10126,11 @@ function fscTabObras(z,D,pode,travado){
         +'<div data-fscdet="'+vEsc(dk)+'">'+(dt?fscObraDetHtml(dt,dk):'<p class="sub">Carregando o acumulado…</p>')+'</div></td></tr>';
       if(!dt) fscCarregarDetObra(p.kind,p.gid,fscS.dia);
     }
-  });
-  return h+'</tbody></table>';
+    return h;
+  }
 }
+// AL da obra pelo código (CON-08-AL-13-F01, CON_06_AL_15_FL01) ou pelo local ("AL 14", "AL_15"); sem AL = obra sozinha
+function fscAl(p){ const m=String((p.codigo||'')+' '+(p.local||'')).match(/(?:^|[^A-Z])AL[\s_-]*0*(\d+)/i); return m?'AL '+m[1]:null; }
 const fscAvHtml=a=>'<div class="fscex"><div class="t">'+vEsc(a.item||'')+' · +'+fscNum(a.valor)+(a.un==='%'?'%':' '+(a.un||''))+'</div>'
   +'<div class="m">'+vEsc([a.dia?fmtData(a.dia):null,a.hora,a.por,a.equipe?'equipe '+a.equipe:null].filter(Boolean).join(' · '))+'</div>'+(a.obs?'<div>'+vEsc(a.obs)+'</div>':'')+fscFotos(a.fotos)+'</div>';
 const FSC_FASE={1:'1 · Projeto',2:'2 · Aprovação',3:'3 · Pré-obra',4:'4 · Execução',5:'5 · Encerramento'};
@@ -10196,6 +10220,11 @@ function fscRenderDia(){
   box.querySelectorAll('[data-fscabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.fscabre; fscS.abertos.has(k)?fscS.abertos.delete(k):fscS.abertos.add(k); fscRenderDia(); });
   box.querySelectorAll('[data-fscmapa]').forEach(b=>b.onclick=()=>{ const k=b.dataset.fscmapa; if(fscS.mapas[k]) delete fscS.mapas[k]; else fscS.mapas[k]=1; fscRenderDia(); });
   box.querySelectorAll('[data-fscval]').forEach(b=>b.onclick=()=>{ const {z,c}=linha(b.dataset.fscval); fscValidar(z,c,b.dataset.st||null,null); });
+  box.querySelectorAll('[data-fscgrval]').forEach(b=>b.onclick=async()=>{ b.disabled=true;
+    const k=b.dataset.fscgrval, i=k.indexOf('|'), z=k.slice(0,i), al=k.slice(i+1), D=fscS.dias[z]||{};
+    const fs=(D.projetos||[]).filter(p=>fscAl(p)===al&&!(p.val&&p.val.ok));
+    for(const p of fs){ const {error}=await sb.rpc('app_fisc_linha_validar',{p_dia:fscS.dia,p_za:z,p_chave:p.chave,p_status:'validada',p_obs:null}); if(error){ toast(error.message); break; } }
+    toast(fs.length+' frente(s) validada(s).'); fscRecarregar(); });
   box.querySelectorAll('[data-fsctodas]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {data,error}=await sb.rpc('app_fisc_linhas_validar_todas',{p_dia:fscS.dia,p_za:b.dataset.fsctodas}); if(error){ toast(error.message); b.disabled=false; return; } toast((data&&data.n||0)+' linha(s) validada(s).'); fscRecarregar(); });
   box.querySelectorAll('[data-fscdiaval]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {error}=await sb.rpc('app_fisc_dia_validar',{p_dia:fscS.dia,p_za:b.dataset.fscdiaval}); if(error){ toast(error.message); b.disabled=false; return; } toast('Dia validado.'); fscRecarregar(); });
   box.querySelectorAll('[data-fscreab]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {error}=await sb.rpc('app_fisc_dia_reabrir',{p_dia:fscS.dia,p_za:b.dataset.fscreab}); if(error){ toast(error.message); b.disabled=false; return; } toast('Dia reaberto.'); fscRecarregar(); });
@@ -10228,13 +10257,13 @@ async function fscExcel(){
     const ate=fim>rdoHoje()?rdoHoje():fim, de=ini<FSC_MIN?FSC_MIN:ini;
     const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].per,{p_de:de,p_ate:ate,p_za:z})));
     const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Latitude','Longitude','Fotos','Situação da linha']],
-      obr=[['Dia','ZA','Obra','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
+      obr=[['Dia','ZA','AL','Obra','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
     rs.forEach((r,i)=>{ if(r.error) throw r.error; const z=fscS.zas[i];
       (r.data||[]).forEach(d=>{ const sit=x=>d.validado?'validado':(x.status||'pendente');
         (d.linhas||[]).forEach(l=>{ (l.medidas||[]).forEach(m=>res.push([fmtData(d.dia),z,l.atividade,Number(m.dia),m.un,Number(m.acum),sit(l)]));
           (l.execs||[]).forEach(e=>{ const c=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null;
             exs.push([fmtData(d.dia),z,l.atividade,e.servico||'',e.origem||'',e.desc||'',e.local||'',e.equipe||'',e.hora||'',e.os_app||'',e.os_sigos||'',e.sigos||'',c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
-        (d.projetos||[]).forEach(p=>obr.push([fmtData(d.dia),z,p.codigo||'',p.tipo||'',p.local||'',p.inicio?fmtData(p.inicio):'',Number(p.pct||0),Number(p.pct_ant||0),p.concluida?'sim':'não',
+        (d.projetos||[]).forEach(p=>obr.push([fmtData(d.dia),z,fscAl(p)||'',p.codigo||'',p.tipo||'',p.local||'',p.inicio?fmtData(p.inicio):'',Number(p.pct||0),Number(p.pct_ant||0),p.concluida?'sim':'não',
           (p.avancos||[]).map(a=>a.item+': +'+a.valor+(a.un==='%'?'%':' '+(a.un||''))).join('; '),sit(p)]));
       }); });
     const XLSX=await getXLSX(), wb=XLSX.utils.book_new();
