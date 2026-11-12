@@ -328,10 +328,12 @@ pwa/
     `docs/migracao_rdo_vitrine_sigos.sql`) — por dia × ZA, só o executado/em andamento: OS do SIGOS por serviço +
     lançamentos do AcquaHub (feed único `public.rdo_eventos`, que a Vitrine vai reaproveitar); rascunho → revisão (editar/ocultar/
     linha manual) → fechar o dia; fica **desatualizado** se o banco muda depois — ver `docs/MODULOS.md §21.4`.
-  - **🏛️ Fiscalização COPASA:** **Consolidador de execução** (`fisc`, 2026-11-12, sw v369, `docs/migracao_fisc_consolidador.sql`) —
+  - **📋 Consolidador** (`fisc`, **substitui o card do RDO**, 2026-11-12, sw v369, `docs/migracao_fisc_consolidador.sql`) e
+    **🏛️ Fiscalização COPASA › Execução validada** (`fiscv` = mesma tela, só os dias validados, só leitura) —
     tabela dia × ZA × atividade com acumulado, cada execução com fotos/mapa (feed `fisc_execucoes`: 1 execução = 1 registro na
     data do campo, OS SIGOS como atributo; vazamento localizado sem correção nunca aparece) + obras em andamento com % por dia;
-    validação por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel — ver `docs/MODULOS.md §21.6`.
+    só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel; detalhe da
+    atividade abre com as OS do dia separadas por vírgula — ver `docs/MODULOS.md §21.6`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**

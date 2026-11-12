@@ -4131,12 +4131,15 @@ pela API HTTPS, no mesmo esquema do BI QSMS (`docs/migracao_bi_api.sql`):
 - **Cuidados:** `anon` tem `statement_timeout` 3 s (hoje ~35 ms, ~1,8 MB p/ 3,5 mil OS); se a base crescer muito, paginar por
   período na view/RPC. Baixa retroativa num mês já carregado só entra se o arquivo daquele mês for reenviado.
 
-### 21.6 Consolidador de execução p/ a Fiscalização COPASA (`fisc`) · `docs/migracao_fisc_consolidador.sql` (2026-11-12, sw v369)
+### 21.6 Consolidador (`fisc`, substitui o RDO) + Fiscalização COPASA (`fiscv`) · `docs/migracao_fisc_consolidador.sql` (2026-11-12, sw v369)
 
 **Para quê:** a fiscalização da COPASA ver o que foi executado — tabela por **dia × ZA**, **uma linha por atividade**
 (qtd do dia + **acumulado desde 01/09/2026**), cada execução com detalhe, fotos e mapa, e **obras em andamento com linha
-permanente** (% no dia, Δ, acumulado da obra). Antes de chegar à COPASA, cada linha é **validada** e depois o **dia** (por enquanto
-só interno; o acesso externo vai ler só o snapshot validado). Tela no Auxiliar › 🏛️ Fiscalização COPASA.
+permanente** (% no dia, Δ, acumulado da obra). **O Consolidador é o novo RDO** (decisão do usuário 12/11/2026): o card
+📋 RDO saiu do Auxiliar e no lugar entrou **📋 Consolidador** (a tela `rdo` antiga, que já era só consulta, ficou no código sem
+card). No Consolidador cada linha é **validada** (não existe "ocultar" — só validar) e depois o **dia**; o dia validado vai
+para o módulo **🏛️ Fiscalização COPASA › Execução validada** (`fiscv`), que lê **só** o snapshot validado (só leitura).
+Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_validado()`.
 
 **Regras do feed `public.fisc_execucoes(de, ate)` (decisões do usuário, 12/11/2026) — 1 linha por execução:**
 - **1 execução = 1 registro, na data do campo.** A OS SIGOS casada pela base de 10 dígitos (`sigos_os_base`) vira
@@ -4170,22 +4173,27 @@ atual, então some nos dias anteriores à troca) e **todos os avanços até o di
 aberto, subníveis resumidos, + "abrir tudo"/"resumir tudo"; o estado fica guardado enquanto a tela está aberta. Carregado sob demanda (não entra no snapshot do dia).
 
 **Validação (só admin, `fisc_pode_validar`):** tabelas `"12 - retaguarda".fisc_linha_val(dia, za, chave, status
-validada|oculta, hash, obs)`, `fisc_exec_oculta(exec_id, motivo)` (tira registro de teste/errado sem esconder a linha) e
-`fisc_dia(dia, za, hash, snapshot)`. Chave da linha = `atv:<atividade>` ou `proj:<kind>:<gid>`; hash = md5 dos
+validada, hash, obs)` e `fisc_dia(dia, za, hash, snapshot)`. **Sem ocultar** (linha ou execução) — pedido do usuário: tudo o
+que foi executado vai para a fiscalização depois de validado. Chave da linha = `atv:<atividade>` ou `proj:<kind>:<gid>`; hash = md5 dos
 `exec_id`/descrição/qtd/situação SIGOS (obra: % + avanços do dia). Status do dia: vazio / pendente / pronto / validado /
 **desatualizado** (hash mudou depois de validar → linha volta a pendente). Validar o dia exige todas as linhas
-validadas/ocultas e o SIGOS cobrindo o dia; o snapshot guarda só as linhas validadas (ocultas saem). Linha/dia
+validadas e o SIGOS cobrindo o dia; o snapshot é o que a Fiscalização vê (sem `val`/`hash`). Linha/dia
 validado trava a edição até **Reabrir**.
 
-**RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+ ocultas,
+**RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+
 cobertura SIGOS, `validado.desatualizado`), `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
 validado sai do snapshot) · escrita: `app_fisc_linha_validar(dia, za, chave, status|null, obs)`,
-`app_fisc_linhas_validar_todas`, `app_fisc_exec_ocultar(exec_id, motivo, ocultar)`, `app_fisc_dia_validar`, `app_fisc_dia_reabrir`.
+`app_fisc_linhas_validar_todas`, `app_fisc_dia_validar`, `app_fisc_dia_reabrir` · **Fiscalização (só o validado,
+`fisc_pode_ver_validado` = hoje `sigos_pode_ver`):** `app_fiscv_mes(mes, za)` (dias validados), `app_fiscv_dia(dia, za)`
+(snapshot ou `nao_validado`), `app_fiscv_periodo(de, ate, za)` (Excel, só dias validados).
 Internas (sem grant): `fisc_execucoes`, `fisc_linhas`, `fisc_projetos`, `fisc_dia_dados`, `fisc_proj_pct`, `fisc_arv_ajusta`, `fisc_arv_linhas`. Também `app_fisc_proj_detalhe(kind, gid, dia)`.
 
-**Tela (`fsc*` no index.html):** ZAs (seleção múltipla), calendário com cor por status, tabela por ZA (Atividade · No dia ·
-Acumulado · Situação · ✔/🙈/🗺️/▾), detalhe com cada execução (OS, situação SIGOS, local, equipe, hora, fotos que abrem
-em nova aba, 🙈 ocultar com motivo), mapa Leaflet por linha, bloco **Obras em andamento** (% no dia, barra, avanços do
+**Tela (`fsc*` no index.html, uma tela `fisc` com dois modos — `fscS.modo` `cons`/`fisc`, `irPara('fiscv')` abre no modo
+fiscalização; `FSC_RPC` escolhe as RPCs):** ZAs (seleção múltipla), calendário com cor por status (no modo fiscalização só os
+dias validados ficam clicáveis), tabela por ZA (Atividade · No dia · Acumulado · Situação · ✔/🗺️/▾; sem Situação nem ✔ na
+fiscalização), detalhe da atividade com **"OS do dia" primeiro** (`fscOsDia`: OS SIGOS, ou a do AcquaHub sem SIGOS, sem
+repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros sem OS) e depois cada execução (OS, situação
+SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha, bloco **Obras em andamento** (% no dia, barra, avanços do
 dia, acumulado recolhível, anexos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o

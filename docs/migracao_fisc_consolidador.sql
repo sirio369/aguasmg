@@ -244,18 +244,15 @@ revoke all on function public.fisc_execucoes(date, date) from public, anon, auth
 -- =====================================================================================================================
 create table if not exists "12 - retaguarda".fisc_linha_val (
   dia date not null, za text not null, chave text not null,
-  status text not null check (status in ('validada', 'oculta')),
+  status text not null check (status = 'validada'),
   hash text, obs text, por uuid, por_nome text, em timestamptz not null default now(),
   primary key (dia, za, chave));
-create table if not exists "12 - retaguarda".fisc_exec_oculta (
-  exec_id text primary key, motivo text, por uuid, por_nome text, em timestamptz not null default now());
 create table if not exists "12 - retaguarda".fisc_dia (
   dia date not null, za text not null, validado_por uuid, validado_nome text, validado_em timestamptz not null default now(),
   hash text, snapshot jsonb, primary key (dia, za));
 alter table "12 - retaguarda".fisc_linha_val enable row level security;
-alter table "12 - retaguarda".fisc_exec_oculta enable row level security;
 alter table "12 - retaguarda".fisc_dia enable row level security;
-revoke all on "12 - retaguarda".fisc_linha_val, "12 - retaguarda".fisc_exec_oculta, "12 - retaguarda".fisc_dia from anon, authenticated;
+revoke all on "12 - retaguarda".fisc_linha_val, "12 - retaguarda".fisc_dia from anon, authenticated;
 
 create or replace function public.fisc_pode_validar(p_uid uuid)
 returns boolean language sql stable security definer set search_path = public as $$
@@ -398,7 +395,7 @@ begin
   return query
   with e as (
     select x.* from public.fisc_execucoes(date '2026-09-01', p_ate) x
-     where x.za = p_za and not exists (select 1 from "12 - retaguarda".fisc_exec_oculta o where o.exec_id = x.exec_id)
+     where x.za = p_za
   ),
   m as (select e.dia, e.atividade, e.unidade, sum(e.qtd) q, count(*) c from e group by 1, 2, 3),
   ma as (select m.*, sum(m.q) over (partition by m.atividade, m.unidade order by m.dia) acum from m),
@@ -423,7 +420,7 @@ revoke all on function public.fisc_linhas(date, date, text) from public, anon, a
 -- dia × ZA completo (o que a tela mostra e o que vira snapshot)
 create or replace function public.fisc_dia_dados(p_dia date, p_za text)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare v_l jsonb; v_p jsonb; v_oc jsonb;
+declare v_l jsonb; v_p jsonb;
 begin
   select coalesce(jsonb_agg(jsonb_build_object('chave', l.chave, 'atividade', l.atividade, 'ordem', l.ordem, 'medidas', l.medidas,
            'execs', l.execs, 'n', l.n, 'hash', l.hash,
@@ -484,19 +481,13 @@ end $$;
 
 create or replace function public.app_fisc_dia(p_dia date, p_za text)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare d jsonb; f record; c record; v_oc jsonb;
+declare d jsonb; f record; c record;
 begin
   if not public.sigos_pode_ver(auth.uid()) then raise exception 'sem permissão'; end if;
   d := public.fisc_dia_dados(p_dia, p_za);
   select * into f from "12 - retaguarda".fisc_dia where dia = p_dia and za = p_za;
   select * into c from "17 - sigos".vw_carga_cobertura where za = p_za;
-  -- execuções ocultas do dia (p/ o admin poder reexibir)
-  select coalesce(jsonb_agg(jsonb_build_object('id', o.exec_id, 'motivo', o.motivo, 'por', o.por_nome, 'em', o.em, 'atividade', x.atividade, 'desc', x.descricao)), '[]'::jsonb)
-    into v_oc
-    from "12 - retaguarda".fisc_exec_oculta o
-    join public.fisc_execucoes(p_dia, p_dia) x on x.exec_id = o.exec_id and x.za = p_za;
   return d || jsonb_build_object(
-    'ocultas', v_oc,
     'pode_validar', public.fisc_pode_validar(auth.uid()),
     'sigos', case when c.encerradas_desde is null or p_dia < c.encerradas_desde then 'sem_base'
                   when c.encerradas_ate is null or p_dia > c.encerradas_ate then 'aguardando' else 'ok' end,
@@ -505,7 +496,8 @@ begin
                      'desatualizado', f.hash is distinct from public.fisc_dia_hash(d)) end);
 end $$;
 
--- validar / ocultar uma linha (atividade ou obra) — grava o hash do momento
+-- validar / desfazer a validação de uma linha (atividade ou obra) — grava o hash do momento. Não existe "ocultar":
+-- tudo o que foi executado vai para a fiscalização depois de validado (decisão do usuário 12/11/2026).
 create or replace function public.app_fisc_linha_validar(p_dia date, p_za text, p_chave text, p_status text, p_obs text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare d jsonb; v_hash text; v_nome text;
@@ -516,8 +508,7 @@ begin
     delete from "12 - retaguarda".fisc_linha_val where dia = p_dia and za = p_za and chave = p_chave;
     return jsonb_build_object('ok', true);
   end if;
-  if p_status not in ('validada', 'oculta') then raise exception 'status inválido'; end if;
-  if p_status = 'oculta' and coalesce(btrim(p_obs), '') = '' then raise exception 'informe o motivo para ocultar a linha'; end if;
+  if p_status <> 'validada' then raise exception 'status inválido'; end if;
   d := public.fisc_dia_dados(p_dia, p_za);
   select x->>'hash' into v_hash from jsonb_array_elements(coalesce(d->'linhas', '[]') || coalesce(d->'projetos', '[]')) x where x->>'chave' = p_chave;
   if v_hash is null then raise exception 'linha não encontrada neste dia'; end if;
@@ -542,27 +533,13 @@ begin
   insert into "12 - retaguarda".fisc_linha_val(dia, za, chave, status, hash, por, por_nome, em)
   select p_dia, p_za, x.chave, 'validada', x.hash, auth.uid(), v_nome, now() from x
    where x.val is null or jsonb_typeof(x.val) = 'null' or (x.val->>'ok')::boolean is not true
-  on conflict (dia, za, chave) do update set status = case when "12 - retaguarda".fisc_linha_val.status = 'oculta' then 'oculta' else 'validada' end,
+  on conflict (dia, za, chave) do update set status = 'validada',
     hash = excluded.hash, por = excluded.por, por_nome = excluded.por_nome, em = excluded.em;
   get diagnostics n = row_count;
   return jsonb_build_object('ok', true, 'n', n);
 end $$;
 
--- ocultar / reexibir uma execução (registro de teste ou errado)
-create or replace function public.app_fisc_exec_ocultar(p_exec_id text, p_motivo text, p_ocultar boolean default true)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare v_nome text;
-begin
-  if not public.fisc_pode_validar(auth.uid()) then raise exception 'sem permissão'; end if;
-  if not p_ocultar then delete from "12 - retaguarda".fisc_exec_oculta where exec_id = p_exec_id; return jsonb_build_object('ok', true); end if;
-  if coalesce(btrim(p_motivo), '') = '' then raise exception 'informe o motivo'; end if;
-  select nome into v_nome from public.perfil where id = auth.uid();
-  insert into "12 - retaguarda".fisc_exec_oculta(exec_id, motivo, por, por_nome) values (p_exec_id, btrim(p_motivo), auth.uid(), v_nome)
-  on conflict (exec_id) do update set motivo = excluded.motivo, por = excluded.por, por_nome = excluded.por_nome, em = now();
-  return jsonb_build_object('ok', true);
-end $$;
-
--- validar o dia: todas as linhas validadas/ocultas com hash em dia; SIGOS precisa cobrir o dia
+-- validar o dia: todas as linhas validadas com hash em dia; SIGOS precisa cobrir o dia
 create or replace function public.app_fisc_dia_validar(p_dia date, p_za text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare d jsonb; c record; v_pend int; v_nome text; v_snap jsonb;
@@ -575,7 +552,7 @@ begin
    where x->'val' is null or jsonb_typeof(x->'val') = 'null' or (x->'val'->>'ok')::boolean is not true;
   if v_pend > 0 then raise exception '% linha(s) ainda sem validar', v_pend; end if;
   select nome into v_nome from public.perfil where id = auth.uid();
-  -- snapshot = só o que a fiscalização verá: linhas validadas (ocultas saem) e sem a marcação interna
+  -- snapshot = o que a fiscalização verá (módulo Fiscalização COPASA, app_fiscv_*), sem a marcação interna
   v_snap := jsonb_build_object('dia', p_dia, 'za', p_za,
     'linhas', coalesce((select jsonb_agg(x - 'val' - 'hash') from jsonb_array_elements(d->'linhas') x where x->'val'->>'status' = 'validada'), '[]'::jsonb),
     'projetos', coalesce((select jsonb_agg(x - 'val' - 'hash') from jsonb_array_elements(d->'projetos') x where x->'val'->>'status' = 'validada'), '[]'::jsonb));
@@ -623,11 +600,11 @@ end $$;
 
 revoke all on function public.app_fisc_mes(date, text), public.app_fisc_dia(date, text),
   public.app_fisc_linha_validar(date, text, text, text, text), public.app_fisc_linhas_validar_todas(date, text),
-  public.app_fisc_exec_ocultar(text, text, boolean), public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
+  public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
   public.app_fisc_periodo(date, date, text) from public, anon;
 grant execute on function public.app_fisc_mes(date, text), public.app_fisc_dia(date, text),
   public.app_fisc_linha_validar(date, text, text, text, text), public.app_fisc_linhas_validar_todas(date, text),
-  public.app_fisc_exec_ocultar(text, text, boolean), public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
+  public.app_fisc_dia_validar(date, text), public.app_fisc_dia_reabrir(date, text),
   public.app_fisc_periodo(date, date, text) to authenticated;
 
 -- detalhe acumulado de uma obra NA DATA: árvore como estava no fim do dia, SÓ os anexos já feitos até o dia
@@ -677,3 +654,53 @@ begin
 end $$;
 revoke all on function public.app_fisc_proj_detalhe(text, bigint, date) from public, anon;
 grant execute on function public.app_fisc_proj_detalhe(text, bigint, date) to authenticated;
+
+-- =====================================================================================================================
+-- Módulo Fiscalização COPASA: lê SÓ o que foi validado (snapshot de fisc_dia). O Consolidador (app_fisc_*) é o interno.
+-- Por enquanto quem vê = sigos_pode_ver (interno); o acesso da COPASA entra aqui depois (uma chave no perfil).
+-- =====================================================================================================================
+create or replace function public.fisc_pode_ver_validado(p_uid uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.sigos_pode_ver(p_uid);
+$$;
+revoke all on function public.fisc_pode_ver_validado(uuid) from public, anon;
+
+create or replace function public.app_fiscv_mes(p_mes date, p_za text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare v_de date := greatest(date_trunc('month', p_mes)::date, date '2026-09-01'); v_ate date; r jsonb;
+begin
+  if not public.fisc_pode_ver_validado(auth.uid()) then raise exception 'sem permissão'; end if;
+  v_ate := least((date_trunc('month', p_mes) + interval '1 month - 1 day')::date, (now() at time zone 'America/Sao_Paulo')::date);
+  if v_ate < v_de then return jsonb_build_object('za', p_za, 'dias', '[]'::jsonb); end if;
+  select coalesce(jsonb_agg(jsonb_build_object('dia', g.d,
+           'n', coalesce(jsonb_array_length(f.snapshot->'linhas'), 0) + coalesce(jsonb_array_length(f.snapshot->'projetos'), 0),
+           'status', case when f.dia is null then 'vazio' else 'validado' end, 'validado_em', f.validado_em) order by g.d), '[]'::jsonb)
+    into r
+    from (select generate_series(v_de, v_ate, interval '1 day')::date d) g
+    left join "12 - retaguarda".fisc_dia f on f.dia = g.d and f.za = p_za;
+  return jsonb_build_object('za', p_za, 'de', v_de, 'ate', v_ate, 'dias', r);
+end $$;
+
+create or replace function public.app_fiscv_dia(p_dia date, p_za text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare f record;
+begin
+  if not public.fisc_pode_ver_validado(auth.uid()) then raise exception 'sem permissão'; end if;
+  select * into f from "12 - retaguarda".fisc_dia where dia = p_dia and za = p_za;
+  if f.dia is null then return jsonb_build_object('dia', p_dia, 'za', p_za, 'linhas', '[]'::jsonb, 'projetos', '[]'::jsonb, 'nao_validado', true); end if;
+  return f.snapshot || jsonb_build_object('validado', jsonb_build_object('por', f.validado_nome, 'em', f.validado_em));
+end $$;
+
+create or replace function public.app_fiscv_periodo(p_de date, p_ate date, p_za text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare r jsonb;
+begin
+  if not public.fisc_pode_ver_validado(auth.uid()) then raise exception 'sem permissão'; end if;
+  if p_ate - p_de > 92 then raise exception 'período máximo de 3 meses'; end if;
+  select coalesce(jsonb_agg(f.snapshot || jsonb_build_object('validado', true, 'validado_por', f.validado_nome, 'validado_em', f.validado_em) order by f.dia), '[]'::jsonb)
+    into r from "12 - retaguarda".fisc_dia f where f.za = p_za and f.dia between p_de and p_ate;
+  return r;
+end $$;
+
+revoke all on function public.app_fiscv_mes(date, text), public.app_fiscv_dia(date, text), public.app_fiscv_periodo(date, date, text) from public, anon;
+grant execute on function public.app_fiscv_mes(date, text), public.app_fiscv_dia(date, text), public.app_fiscv_periodo(date, date, text) to authenticated;

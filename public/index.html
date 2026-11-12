@@ -1051,14 +1051,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="pavprog"><div class="ic">🧱</div><div class="nm">Pavimentos a recompor</div></button>
     </div>
 
-    <div class="sec" style="margin-top:20px">📋 RDO</div>
+    <div class="sec" style="margin-top:20px">📋 Consolidador</div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-go="rdo"><div class="ic">📋</div><div class="nm">RDO diário</div></button>
+      <button class="mod" data-go="fisc"><div class="ic">📋</div><div class="nm">Consolidador</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">🏛️ Fiscalização COPASA</div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-go="fisc"><div class="ic">🏛️</div><div class="nm">Consolidador de execução</div></button>
+      <button class="mod" data-go="fiscv"><div class="ic">🏛️</div><div class="nm">Execução validada</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">📥 Relatórios SIGOS</div>
@@ -1268,8 +1268,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="fisc" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
-    <h1>Consolidador de execução</h1>
-    <p class="sub">O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (fotos e mapa).
+    <h1 id="fscTit">Consolidador</h1>
+    <p class="sub" id="fscSub">O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (fotos e mapa).
       Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço.
       Antes de ir para a fiscalização da COPASA, cada linha é <b>validada</b> e depois o dia.</p>
     <div class="fsctop">
@@ -1278,7 +1278,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button type="button" class="btn fscxl" id="fscXlsx">⬇️ Excel do mês</button>
     </div>
     <div class="fsccal" id="fscCal"></div>
-    <div class="fscleg"><span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span></div>
+    <div class="fscleg" id="fscLeg"><span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span></div>
     <div id="fscDia"></div>
   </main>
 
@@ -2220,6 +2220,7 @@ if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvo
 // ---------- navegação ----------
 const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 function irPara(id){
+  if(id==='fiscv'){ fscModo('fisc'); id='fisc'; } else if(id==='fisc') fscModo('cons');
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
   if(id==='home') homeGate();
@@ -9873,7 +9874,21 @@ async function supVPainel(rpcNome){
 // OS SIGOS como atributo; vazamento localizado sem correção executada nunca aparece. RPCs `app_fisc_*`.
 const FSC_MIN='2026-09-01';
 const FSC_ST={vazio:['—','var(--line)'],pendente:['pendente','#f59e0b'],pronto:['pronto','#2563eb'],validado:['validado','#16a34a'],desatualizado:['mudou','#dc2626']};
-let fscS={zas:['ZA1004','ZA0200'],mes:null,dia:null,meses:{},dias:{},abertos:new Set(),mapas:{},detObra:{},arvAb:{},podeValidar:false};
+let fscS={modo:'cons',zas:['ZA1004','ZA0200'],mes:null,dia:null,meses:{},dias:{},abertos:new Set(),mapas:{},detObra:{},arvAb:{},podeValidar:false};
+// 'cons' = Consolidador (interno: valida linha e dia) · 'fisc' = Fiscalização COPASA (só os dias validados, snapshot, só leitura)
+const FSC_RPC={cons:{mes:'app_fisc_mes',dia:'app_fisc_dia',per:'app_fisc_periodo'},fisc:{mes:'app_fiscv_mes',dia:'app_fiscv_dia',per:'app_fiscv_periodo'}};
+const fscCons=()=>fscS.modo==='cons';
+function fscModo(m){
+  if(fscS.modo!==m){ fscS.modo=m; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={}; }
+  const t=$('#fscTit'), sub=$('#fscSub'), lg=$('#fscLeg');
+  if(t) t.textContent=m==='cons'?'Consolidador':'Fiscalização COPASA — execução validada';
+  if(sub) sub.innerHTML=m==='cons'
+    ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
+    :'Somente os dias <b>validados</b> no Consolidador, exatamente como foram validados. Uma linha por atividade, com o acumulado desde 01/09/2026, as OS do dia e o detalhe de cada execução (fotos e mapa).';
+  if(lg) lg.innerHTML=m==='cons'
+    ?'<span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span>'
+    :'<span><i style="background:#16a34a"></i>dia validado</span><span>dias apagados ainda não foram validados</span>';
+}
 function fscCss(){
   if(document.getElementById('fscCss')) return;
   const st=document.createElement('style'); st.id='fscCss';
@@ -9907,7 +9922,6 @@ function fscCss(){
 #fisc .fsctab td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:break-word;word-break:normal}
 #fisc .fsctab td.n,#fisc .fsctab th.n{text-align:right;white-space:nowrap}
 #fisc .fsctab tr.val td:first-child{box-shadow:inset 4px 0 0 #16a34a}
-#fisc .fsctab tr.oc td{opacity:.55}
 #fisc .fsctab tr.mud td:first-child{box-shadow:inset 4px 0 0 #dc2626}
 #fisc .fsctab .ac{white-space:nowrap;text-align:right}
 #fisc .fsctab .ac button{font:inherit;font-size:13px;width:auto;margin:0 0 0 3px;padding:3px 7px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
@@ -9919,8 +9933,9 @@ function fscCss(){
 #fisc .fscex .ft{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 #fisc .fscex .ft img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--line)}
 #fisc .fscex .ft a.doc{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:8px}
-#fisc .fscex .eac{float:right}
-#fisc .fscex .eac button{font:inherit;font-size:12px;width:auto;margin:0;padding:2px 7px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+#fisc .fscos{border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;padding:8px 10px;margin:4px 0 8px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
+#fisc .fscos .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:3px}
+#fisc .fscos .v{user-select:all;font-variant-numeric:tabular-nums}
 #fisc .fscmapa{height:300px;border-radius:10px;border:1px solid var(--line);margin:6px 0}
 #fisc .fscpb{height:8px;background:var(--line);border-radius:6px;overflow:hidden;min-width:60px}
 #fisc .fscpb i{display:block;height:100%;background:var(--acc)}
@@ -9976,7 +9991,7 @@ async function fscCarregarMes(manterDia){
   $('#fscNext').disabled=fscS.mes>=rdoHoje().slice(0,7)+'-01';
   if(!manterDia){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Carregando…</p>'; $('#fscDia').innerHTML=''; }
   try{
-    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc('app_fisc_mes',{p_mes:fscS.mes,p_za:z})));
+    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].mes,{p_mes:fscS.mes,p_za:z})));
     fscS.meses={}; rs.forEach((r,i)=>{ if(r.error) throw r.error; fscS.meses[fscS.zas[i]]=(r.data&&r.data.dias)||[]; fscS.podeValidar=!!(r.data&&r.data.pode_validar); });
   }catch(e){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Não foi possível carregar (acesso ou rede).</p>'; return; }
   const dias=fscDiasMes();
@@ -9998,7 +10013,7 @@ function fscRenderCal(){
   let h=['D','S','T','Q','Q','S','S'].map(w=>'<div class="wd">'+w+'</div>').join('')+'<div></div>'.repeat(lead);
   for(let i=1;i<=fim;i++){
     const ds=fscS.mes.slice(0,8)+String(i).padStart(2,'0'), d=por[ds];
-    if(!d){ h+='<button type="button" disabled><b>'+i+'</b><span></span></button>'; continue; }
+    if(!d||(!fscCons()&&d.status!=='validado')){ h+='<button type="button" disabled><b>'+i+'</b><span></span></button>'; continue; }
     const cor=(FSC_ST[d.status]||FSC_ST.vazio)[1];
     const tx=d.status==='vazio'?'':(d.status==='pendente'?d.pend+'/'+d.n:(d.status==='validado'?'✔':(d.status==='desatualizado'?'!':d.n)));
     h+='<button type="button" data-fscdia="'+ds+'" class="'+(ds===fscS.dia?'sel':'')+'" style="border-bottom-color:'+cor+'" title="'+vEsc((FSC_ST[d.status]||[''])[0])+'">'
@@ -10010,7 +10025,7 @@ function fscRenderCal(){
 async function fscCarregarDia(silencioso){
   if(!silencioso) $('#fscDia').innerHTML='<p class="sub">Carregando…</p>';
   try{
-    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc('app_fisc_dia',{p_dia:fscS.dia,p_za:z})));
+    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].dia,{p_dia:fscS.dia,p_za:z})));
     fscS.dias={}; rs.forEach((r,i)=>{ if(r.error) throw r.error; fscS.dias[fscS.zas[i]]=r.data||{}; });
   }catch(e){ $('#fscDia').innerHTML='<p class="sub">Não foi possível carregar o dia.</p>'; return; }
   fscRenderDia();
@@ -10021,7 +10036,6 @@ function fscStatusLinha(l){
   const v=l.val;
   if(!v) return {cls:'',pill:'<span class="fscpill" style="background:#f59e0b">pendente</span>'};
   if(!v.ok) return {cls:'mud',pill:'<span class="fscpill" style="background:#dc2626" title="Validada por '+vEsc(v.por||'')+', mas os dados mudaram depois">mudou</span>'};
-  if(v.status==='oculta') return {cls:'oc',pill:'<span class="fscpill" style="background:#64748b" title="'+vEsc(v.obs||'')+'">oculta</span>'};
   return {cls:'val',pill:'<span class="fscpill" style="background:#16a34a" title="'+vEsc((v.por||'')+' · '+(v.em?new Date(v.em).toLocaleString('pt-BR'):''))+'">validada</span>'};
 }
 function fscFotos(arr){
@@ -10030,29 +10044,39 @@ function fscFotos(arr){
     return /\.pdf$/i.test(p)?'<a class="doc" href="'+vEsc(u)+'" target="_blank" rel="noopener">📄 PDF</a>'
       :'<a href="'+vEsc(u)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+vEsc(u)+'" alt="foto"></a>'; }).join('')+'</div>';
 }
-function fscExecHtml(z,e,pode){
+// consolidado das OS do dia da linha: OS SIGOS (ou a do AcquaHub quando não há SIGOS), sem repetir, separadas por vírgula
+function fscOsDia(execs){
+  const os=[], vistos=new Set(), sem=[];
+  // a mesma OS pode vir com zeros à esquerda/sufixo (SIGOS) ou só a base digitada no app → não repete (base de 10 dígitos)
+  (execs||[]).forEach(e=>{ const n=e.os_sigos||e.os_app; if(n){ const t=String(n).trim(), b=t.replace(/\D/g,'').replace(/^0+/,'').slice(0,10)||t; if(!vistos.has(b)){ vistos.add(b); os.push(t); } } else sem.push(e); });
+  os.sort();
+  return '<div class="fscos"><div class="l">OS do dia ('+os.length+')</div>'
+    +(os.length?'<div class="v">'+vEsc(os.join(', '))+'</div>':'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>')
+    +(sem.length?'<div class="sub" style="margin:4px 0 0">+ '+sem.length+' registro'+(sem.length===1?'':'s')+' sem OS</div>':'')+'</div>';
+}
+function fscExecHtml(z,e){
   const os=[e.os_app?'OS '+e.os_app:null, e.os_sigos?'OS SIGOS '+e.os_sigos+(e.sigos&&e.origem!=='SIGOS'?' — '+e.sigos:''):(e.sigos&&e.origem!=='SIGOS'?e.sigos:null)].filter(Boolean).join(' · ');
   const kv=Object.entries(e.extra||{}).map(([k,v])=>k+': '+v).join(' · ');
   const meta=[e.local, e.equipe?'equipe '+e.equipe:null, e.hora].filter(Boolean).join(' · ');
-  return '<div class="fscex">'+(pode?'<span class="eac"><button type="button" data-fscoc="'+vEsc(z+'|'+e.id)+'" title="Tirar esta execução do consolidado">🙈 ocultar</button></span>':'')
+  return '<div class="fscex">'
     +'<div class="t">'+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
     +'<div>'+vEsc(e.desc||'')+'</div>'+(meta?'<div class="m">'+vEsc(meta)+'</div>':'')+(os?'<div class="m">'+vEsc(os)+'</div>':'')
-    +(kv?'<div class="kv">'+vEsc(kv)+'</div>':'')+fscFotos(e.fotos)+'<div class="fscinp hidden" data-fscocbox="'+vEsc(z+'|'+e.id)+'"><input placeholder="Motivo (ex.: registro de teste)"><button type="button" class="btn">Ocultar</button></div></div>';
+    +(kv?'<div class="kv">'+vEsc(kv)+'</div>':'')+fscFotos(e.fotos)+'</div>';
 }
 function fscTabAtividades(z,D,pode,travado){
   const ls=D.linhas||[];
   if(!ls.length) return '<p class="sub">Nenhuma execução registrada neste dia.</p>';
-  let h='<table class="fsctab"><thead><tr><th>Atividade</th><th class="n">No dia</th><th class="n hm">Acumulado</th><th>Situação</th><th></th></tr></thead><tbody>';
+  const cs=fscCons(), nc=cs?5:4;
+  let h='<table class="fsctab"><thead><tr><th>Atividade</th><th class="n">No dia</th><th class="n hm">Acumulado</th>'+(cs?'<th>Situação</th>':'')+'<th></th></tr></thead><tbody>';
   ls.forEach(l=>{
     const k=z+'|'+l.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(l);
     const bVal=pode&&!travado?(l.val&&l.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
-      +(!(l.val&&l.val.ok&&l.val.status==='oculta')?'<button type="button" data-fscocl="'+vEsc(k)+'" title="Ocultar a linha inteira">🙈</button>':''):'';
+      :'';
     h+='<tr class="'+st.cls+'"><td><b>'+vEsc(l.atividade)+'</b><div class="sub" style="margin:2px 0 0">'+l.n+' registro'+(l.n===1?'':'s')+'</div></td>'
-      +'<td class="n">'+vEsc(fscMed(l.medidas,'dia'))+'</td><td class="n hm">'+vEsc(fscMed(l.medidas,'acum'))+'</td><td>'+st.pill+'</td>'
+      +'<td class="n">'+vEsc(fscMed(l.medidas,'dia'))+'</td><td class="n hm">'+vEsc(fscMed(l.medidas,'acum'))+'</td>'+(cs?'<td>'+st.pill+'</td>':'')
       +'<td class="ac">'+bVal+'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button><button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
-    if(pode&&!travado) h+='<tr class="hidden" data-fscoclbox="'+vEsc(k)+'"><td colspan="5"><div class="fscinp"><input placeholder="Motivo para não mostrar esta linha à fiscalização"><button type="button" class="btn">Ocultar linha</button></div></td></tr>';
-    h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="5" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
-    if(ab) h+='<tr><td colspan="5" class="det">'+(l.execs||[]).map(e=>fscExecHtml(z,e,pode&&!travado)).join('')+'</td></tr>';
+    h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
+    if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+fscOsDia(l.execs)+(l.execs||[]).map(e=>fscExecHtml(z,e)).join('')+'</td></tr>';
   });
   return h+'</tbody></table>';
 }
@@ -10060,21 +10084,21 @@ const fscId=k=>k.replace(/[^a-zA-Z0-9]/g,'_');
 function fscTabObras(z,D,pode,travado){
   const ps=D.projetos||[];
   if(!ps.length) return '';
-  let h='<h4 style="margin:14px 0 6px">🏗️ Obras em andamento</h4><table class="fsctab"><thead><tr><th>Obra</th><th class="n">% no dia</th><th class="hm">Avanço</th><th>Situação</th><th></th></tr></thead><tbody>';
+  const cs=fscCons(), nc=cs?5:4;
+  let h='<h4 style="margin:14px 0 6px">🏗️ Obras em andamento</h4><table class="fsctab"><thead><tr><th>Obra</th><th class="n">% no dia</th><th class="hm">Avanço</th>'+(cs?'<th>Situação</th>':'')+'<th></th></tr></thead><tbody>';
   ps.forEach(p=>{
     const k=z+'|'+p.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(p), dl=(p.pct||0)-(p.pct_ant||0);
     const bVal=pode&&!travado?(p.val&&p.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
-      +(!(p.val&&p.val.ok&&p.val.status==='oculta')?'<button type="button" data-fscocl="'+vEsc(k)+'" title="Ocultar a linha">🙈</button>':''):'';
+      :'';
     const sit=p.concluida?'concluída (100%)':((p.avancos||[]).length?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia');
     h+='<tr class="'+st.cls+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div></td>'
       +'<td class="n"><b>'+fscNum(p.pct,1)+'%</b><div class="sub" style="margin:2px 0 0">'+vEsc(sit)+'</div></td>'
-      +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,p.pct||0))+'%"></i></div></td><td>'+st.pill+'</td>'
+      +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,p.pct||0))+'%"></i></div></td>'+(cs?'<td>'+st.pill+'</td>':'')
       +'<td class="ac">'+bVal+(p.geo?'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button>':'')+'<button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
-    if(pode&&!travado) h+='<tr class="hidden" data-fscoclbox="'+vEsc(k)+'"><td colspan="5"><div class="fscinp"><input placeholder="Motivo para não mostrar esta obra à fiscalização"><button type="button" class="btn">Ocultar linha</button></div></td></tr>';
-    h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="5" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
+    h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
     if(ab){
       const dk=p.kind+':'+p.gid+':'+fscS.dia, dt=fscS.detObra[dk];
-      h+='<tr><td colspan="5" class="det"><div class="fscsec" style="margin-top:2px">🗓️ Avanços lançados neste dia</div>'
+      h+='<tr><td colspan="'+nc+'" class="det"><div class="fscsec" style="margin-top:2px">🗓️ Avanços lançados neste dia</div>'
         +((p.avancos||[]).length?(p.avancos||[]).map(fscAvHtml).join('')
           :'<p class="sub">Nenhum avanço lançado neste dia.</p>')
         +'<div data-fscdet="'+vEsc(dk)+'">'+(dt?fscObraDetHtml(dt,dk):'<p class="sub">Carregando o acumulado…</p>')+'</div></td></tr>';
@@ -10137,6 +10161,7 @@ async function fscCarregarDetObra(kind,gid,dia){
   const el=document.querySelector('[data-fscdet="'+key+'"]'); if(el) el.innerHTML=fscObraDetHtml(fscS.detObra[key],key);
 }
 function fscSecao(z){
+  if(!fscCons()) return fscSecaoFisc(z);
   const D=fscS.dias[z]||{}, pode=!!D.pode_validar, V=D.validado, travado=!!V;
   const todas=(D.linhas||[]).concat(D.projetos||[]), pend=todas.filter(l=>!(l.val&&l.val.ok)).length;
   let h='<div class="fscza"><h3><span>'+vEsc(rdoZaNome(z))+'</span><span class="sub" style="margin:0">'+todas.length+' linha'+(todas.length===1?'':'s')+(pend?' · '+pend+' a validar':'')+'</span></h3>';
@@ -10152,11 +10177,14 @@ function fscSecao(z){
     h+='</div>';
   }
   h+=fscTabAtividades(z,D,pode,travado)+fscTabObras(z,D,pode,travado);
-  const oc=D.ocultas||[];
-  if(oc.length) h+='<details style="margin-top:8px"><summary class="sub">'+oc.length+' execução(ões) ocultada(s) neste dia</summary>'
-    +oc.map(o=>'<div class="fscex"><b>'+vEsc(o.atividade||'')+'</b> — '+vEsc(o.desc||'')+'<div class="m">Motivo: '+vEsc(o.motivo||'')+' · '+vEsc(o.por||'')+'</div>'
-      +(pode&&!travado?'<button type="button" class="btn" style="width:auto;margin:6px 0 0;padding:4px 10px;font-size:12px" data-fscreex="'+vEsc(o.id)+'">Mostrar de novo</button>':'')+'</div>').join('')+'</details>';
   return h+'</div>';
+}
+function fscSecaoFisc(z){
+  const D=fscS.dias[z]||{}, V=D.validado, n=(D.linhas||[]).length+(D.projetos||[]).length;
+  let h='<div class="fscza"><h3><span>'+vEsc(rdoZaNome(z))+'</span>'+(V?'<span class="sub" style="margin:0">validado em '+new Date(V.em).toLocaleString('pt-BR')+'</span>':'')+'</h3>';
+  if(D.nao_validado) return h+'<p class="sub">Este dia ainda não foi validado para este consórcio.</p></div>';
+  if(!n) return h+'<p class="sub">Nenhuma execução neste dia.</p></div>';
+  return h+fscTabAtividades(z,D,false,true)+fscTabObras(z,D,false,true)+'</div>';
 }
 function fscRenderDia(){
   Object.values(fscS._leaf||{}).forEach(m=>{ try{ m.remove(); }catch(_){} }); fscS._leaf={};
@@ -10168,14 +10196,6 @@ function fscRenderDia(){
   box.querySelectorAll('[data-fscabre]').forEach(b=>b.onclick=()=>{ const k=b.dataset.fscabre; fscS.abertos.has(k)?fscS.abertos.delete(k):fscS.abertos.add(k); fscRenderDia(); });
   box.querySelectorAll('[data-fscmapa]').forEach(b=>b.onclick=()=>{ const k=b.dataset.fscmapa; if(fscS.mapas[k]) delete fscS.mapas[k]; else fscS.mapas[k]=1; fscRenderDia(); });
   box.querySelectorAll('[data-fscval]').forEach(b=>b.onclick=()=>{ const {z,c}=linha(b.dataset.fscval); fscValidar(z,c,b.dataset.st||null,null); });
-  box.querySelectorAll('[data-fscocl]').forEach(b=>b.onclick=()=>{ const r=box.querySelector('[data-fscoclbox="'+CSS.escape(b.dataset.fscocl)+'"]'); if(r){ r.classList.toggle('hidden'); const i=r.querySelector('input'); if(i) i.focus(); } });
-  box.querySelectorAll('[data-fscoclbox]').forEach(r=>{ const bt=r.querySelector('button'), inp=r.querySelector('input');
-    bt.onclick=()=>{ const mot=inp.value.trim(); if(!mot){ toast('Informe o motivo.'); return; } const {z,c}=linha(r.dataset.fscoclbox); fscValidar(z,c,'oculta',mot); }; });
-  box.querySelectorAll('[data-fscoc]').forEach(b=>b.onclick=()=>{ const r=box.querySelector('[data-fscocbox="'+CSS.escape(b.dataset.fscoc)+'"]'); if(r){ r.classList.toggle('hidden'); const i=r.querySelector('input'); if(i) i.focus(); } });
-  box.querySelectorAll('[data-fscocbox]').forEach(r=>{ const bt=r.querySelector('button'), inp=r.querySelector('input');
-    bt.onclick=async()=>{ const mot=inp.value.trim(); if(!mot){ toast('Informe o motivo.'); return; } const k=r.dataset.fscocbox, id=k.slice(k.indexOf('|')+1);
-      const {error}=await sb.rpc('app_fisc_exec_ocultar',{p_exec_id:id,p_motivo:mot,p_ocultar:true}); if(error){ toast(error.message); return; } toast('Execução ocultada.'); fscRecarregar(); }; });
-  box.querySelectorAll('[data-fscreex]').forEach(b=>b.onclick=async()=>{ const {error}=await sb.rpc('app_fisc_exec_ocultar',{p_exec_id:b.dataset.fscreex,p_motivo:null,p_ocultar:false}); if(error){ toast(error.message); return; } fscRecarregar(); });
   box.querySelectorAll('[data-fsctodas]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {data,error}=await sb.rpc('app_fisc_linhas_validar_todas',{p_dia:fscS.dia,p_za:b.dataset.fsctodas}); if(error){ toast(error.message); b.disabled=false; return; } toast((data&&data.n||0)+' linha(s) validada(s).'); fscRecarregar(); });
   box.querySelectorAll('[data-fscdiaval]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {error}=await sb.rpc('app_fisc_dia_validar',{p_dia:fscS.dia,p_za:b.dataset.fscdiaval}); if(error){ toast(error.message); b.disabled=false; return; } toast('Dia validado.'); fscRecarregar(); });
   box.querySelectorAll('[data-fscreab]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {error}=await sb.rpc('app_fisc_dia_reabrir',{p_dia:fscS.dia,p_za:b.dataset.fscreab}); if(error){ toast(error.message); b.disabled=false; return; } toast('Dia reaberto.'); fscRecarregar(); });
@@ -10206,7 +10226,7 @@ async function fscExcel(){
   try{
     const ini=fscS.mes, fim=new Date(new Date(ini+'T12:00:00').getFullYear(),new Date(ini+'T12:00:00').getMonth()+1,0).toLocaleDateString('sv-SE');
     const ate=fim>rdoHoje()?rdoHoje():fim, de=ini<FSC_MIN?FSC_MIN:ini;
-    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc('app_fisc_periodo',{p_de:de,p_ate:ate,p_za:z})));
+    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].per,{p_de:de,p_ate:ate,p_za:z})));
     const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Latitude','Longitude','Fotos','Situação da linha']],
       obr=[['Dia','ZA','Obra','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
     rs.forEach((r,i)=>{ if(r.error) throw r.error; const z=fscS.zas[i];
@@ -10221,7 +10241,7 @@ async function fscExcel(){
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),'Resumo');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(exs),'Execuções');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(obr),'Obras');
-    XLSX.writeFile(wb,'consolidado_execucao_'+fscS.zas.join('_')+'_'+de+'_a_'+ate+'.xlsx');
+    XLSX.writeFile(wb,(fscCons()?'consolidador_':'fiscalizacao_validado_')+fscS.zas.join('_')+'_'+de+'_a_'+ate+'.xlsx');
   }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
   b.disabled=false; b.textContent=tx;
 }
