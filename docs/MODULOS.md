@@ -4158,7 +4158,7 @@ Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_v
   rede) + detecção SIGOS 2487900; "Correção de vazamento" = OS SIGOS `COR.VAZ` (2587901/04/05) **só executadas**
   (`fisc_familia` separa da família SIGOS "Pesquisa de vazamento"). **Vazamento localizado (ocorrência do app) sem
   correção executada nunca aparece** — a ocorrência só empresta foto/local à correção da mesma OS.
-- **Pavimento:** recomposição executada no app (1 por OS de recomposição) + ensaios de reaterro; recomposição SIGOS sem app pelo SIGOS.
+ - **Pavimento:** **só as OS SIGOS** de recomposição (pela data do SIGOS). Registros do AcquaHub (recomposição executada no app e ensaios de reaterro) não entram desde 12/11/2026 (decisão do usuário; antes a OS casada era atributo do registro do app).
 - **Demais famílias SIGOS:** regra do BI (`sigos_conta`: executada; Fiscalização também NÃO EXEC. C/ VISITA).
 - **Fora:** pontos de pavimento levantados (pendência), atendimento comercial (solicitações/ocorrências), encerradas sem
   execução que não contam, "dados concluídos" do logger (é escritório).
