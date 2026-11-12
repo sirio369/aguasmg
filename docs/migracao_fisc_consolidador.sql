@@ -13,6 +13,8 @@
 --  * Vazamento: "Pesquisa de vazamento" = rede pesquisada (km, pp_execucao) + detecção SIGOS 2487900;
 --    "Correção de vazamento" = OS SIGOS COR.VAZ (2587901/04/05) EXECUTADAS. Vazamento localizado (ocorrência do app)
 --    sem correção executada NUNCA aparece — a ocorrência só empresta foto/local à correção da mesma OS.
+--  * Recomposição de pavimento: SÓ as OS SIGOS (família Recomposição, pela data do SIGOS). Os registros do AcquaHub
+--    (pav_recomposicao executada e ensaios de reaterro) não entram (decisão do usuário, 12/11/2026).
 --  * Fora: pontos de pavimento levantados (pendência), atendimento comercial (solicitações/ocorrências), encerradas
 --    sem execução que não contam (sigos_conta / regra do BI).
 -- Leitura: sigos_pode_ver (admin ou aux_acesso). Validação: só admin.
@@ -82,7 +84,6 @@ begin
      where o.status in ('concluida', 'concluida_pendencia', 'improdutiva') and o.executado_em is not null
     union select public.sigos_os_base(l.os_copasa_instalacao) from "8 - coleta_campo".instalacao_logger_calibracao l where l.data_instalacao is not null
     union select public.sigos_os_base(l.os_copasa_remocao) from "8 - coleta_campo".instalacao_logger_calibracao l where l.data_remocao is not null
-    union select public.sigos_os_base(r.os_recomposicao) from "8 - coleta_campo".pav_recomposicao r where r.execucao_data is not null
   ),
   sg_txt as (   -- situação da OS SIGOS p/ mostrar ao lado da execução do app
     select distinct on (base) base, numero,
@@ -182,35 +183,7 @@ begin
            round(q.m / 1000.0, 3), 'km', null::text, null::text, null::text, '{}'::text[], q.g, '{}'::jsonb
       from e_pq q left join public.perfil p on p.id = q.u
   ),
-  -- ---------------- Pavimento: recomposição executada (1 por OS de recomposição) + ensaios ----------------
-  pav as (
-    select coalesce(public.sigos_os_base(r.os_recomposicao), r.id::text) k, min(r.execucao_data) d, min(r.consorcio) z,
-           min(r.os_recomposicao) os, string_agg(distinct r.tipo_pavimento, ', ') tipos, string_agg(distinct r.servico_origem, ', ') orig,
-           string_agg(distinct r.dimensao, ', ') dim, min(r.execucao_por) quem,
-           array_remove(array_agg(r.foto1) || array_agg(r.foto2), null) ft,
-           st_asgeojson(st_transform(st_centroid(st_collect(r.geom)), 4326), 6)::jsonb g
-      from "8 - coleta_campo".pav_recomposicao r where r.execucao_data is not null group by 1
-  ),
-  e_pav as (
-    select v.d, v.z, 'Recomposição de pavimento', 'app:pav:' || v.k, 'AcquaHub',
-           'Recomposição de pavimento',
-           'Recomposição — ' || coalesce(v.tipos, '—') || coalesce(' (' || v.dim || ')', ''),
-           v.orig, v.quem, null::text, 1::numeric, 'OS', null::text, v.os,
-           coalesce(t.txt, case when v.os is null then 'sem OS SIGOS informada' else 'aguardando execução no SIGOS' end),
-           v.ft, v.g, '{}'::jsonb
-      from pav v left join sg_txt t on t.base = public.sigos_os_base(v.os)
-    union all
-    select (e.created_at at time zone 'America/Sao_Paulo')::date, coalesce(r.consorcio, iv.consorcio), 'Recomposição de pavimento', 'app:ensaio:' || e.id, 'AcquaHub',
-           'Ensaio de compactação do reaterro',
-           'Ensaio ' || coalesce(e.resultado, '—') || coalesce(' — ' || e.metodo, '') || coalesce(' — GC ' || replace(e.gc_medido::text, '.', ',') || '%', ''),
-           null::text, e.usuario_nome, to_char(e.created_at at time zone 'America/Sao_Paulo', 'HH24:MI'),
-           1::numeric, 'ensaio', null::text, null::text, null::text,
-           array_remove(array[e.foto1, e.foto2, e.laudo], null), public.fisc_pt(e.lat::float8, e.lon::float8), '{}'::jsonb
-      from "8 - coleta_campo".pav_reaterro_ensaio e
-      left join "8 - coleta_campo".pav_recomposicao r on r.id = e.pav_id
-      left join "13 - projetos_obra".proj_reaterro pr on pr.id = e.proj_reaterro_id
-      left join "13 - projetos_obra".vw_iv iv on iv.kind = pr.kind and iv.gid = pr.gid
-  ),
+  -- ---------------- Pavimento: só as OS SIGOS (entram em e_sig); nada do AcquaHub ----------------
   -- ---------------- SIGOS sem lançamento no app (entra pela data do SIGOS) ----------------
   oc as (   -- foto/local do vazamento localizado no app, só p/ a correção da MESMA OS
     select public.sigos_os_base(o.os_numero) b, min(o.foto) foto, min(o.local_ref) loc, min(o.lat) lat, min(o.lon) lon
@@ -237,7 +210,7 @@ begin
   ),
   todas as (
     select * from e_vrp_os union all select * from e_vrp_vis union all select * from e_log union all select * from e_pres
-    union all select * from e_pesq union all select * from e_pav union all select * from e_sig
+    union all select * from e_pesq union all select * from e_sig
   )
   select t.d, t.z, t.atv, public.fisc_ordem(t.atv), t.eid, t.ori, t.srv, t.dsc, t.loc, t.eq, t.hr, t.q, t.un, t.osa, t.oss, t.sst, t.ft, t.g, t.ex
     from todas t(d, z, atv, eid, ori, srv, dsc, loc, eq, hr, q, un, osa, oss, sst, ft, g, ex)
