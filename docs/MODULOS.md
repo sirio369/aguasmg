@@ -4376,9 +4376,12 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
 
-## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v393)
+## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v394; migrações aplicadas em 13/11/2026)
 
-Card **👥 RH** na home › 🧰 Suporte, **no lugar do card Meus colaboradores** (`#homeRh`, `homeGate()` → `ME.pode_aprovar || ME.rh_acesso`).
+Card **👥 RH** na home › **🚧 Em desenvolvimento** (`#homeRh`, padrão da Vitrine: "RH 🔒" para quem não tem `ME.dev_acesso`; decisão do
+usuário em 13/11/2026 — o módulo fica em desenvolvimento por enquanto). Todas as telas `rh*` checam `rhDev()` (= `ME.dev_acesso`) além do
+gate próprio. O card **📇 Meus colaboradores** continua em 🧰 Suporte para aprovador/admin (`#homeMeusColab`). Quando sair de
+desenvolvimento, o plano é o RH substituir o card Meus colaboradores em Suporte (`ME.pode_aprovar || ME.rh_acesso`).
 O hub (`rhInit`) mostra: **📇 Meus colaboradores** (só aprovador/admin — a tela `meus_colab` de sempre, §12, agora com "‹ RH"),
 **📥 Carga RH** (`rh_carga`, só `ME.rh_acesso`), **✅ Validação gestor** (`rh_val`, §22.2) e **📊 Análise do ponto** (`rh_analise`, §22.3) — essas duas para aprovador (só a equipe)
 ou RH (todos).
