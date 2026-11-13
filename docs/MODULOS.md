@@ -4254,6 +4254,11 @@ frentes pendentes da AL, uma a uma — a validação continua por frente). AL co
 (reconstrução igual à do %; só **Puxamento/pullback** no HDD e **Assentamento de tubulação** na VCA, a regra do Resumo de
 Projetos `pjRsEhMetroRede`), devolvido como `ext` em cada obra por `fisc_dia_dados` (fora do hash: dias validados não
 mudam; snapshot antigo sem `ext` só não mostra a linha); Z = avanços do dia nesses itens. AL = soma das frentes. Não entra no Excel.
+**Agrupamento por tipo (2026-11-13, sw v382):** acima das ALs há uma linha por **tipo de intervenção** (`p.tipo`: HDD, VCA…;
+sem tipo = "Outros", por último) que junta todos os resultados daquele tipo num bloco só: nº de ALs/frentes/obras fora de AL,
+extensão total, extensão feita somada (+ no dia), % ponderado pela extensão de todas as obras do tipo, n/N validadas e "✔ todas"
+(valida todas as obras pendentes do tipo; `data-fscgrval` = `za|tipo:X` ou `za|al:AL n`). Hierarquia tipo › AL › frente, tudo
+resumido por padrão; obra sem AL fica direto sob o tipo.
 **Detalhe acumulado da obra** (▾ da obra): `app_fisc_proj_detalhe(kind, gid, dia)` devolve a **árvore como estava no fim
 do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), **só os
 anexos já feitos até o dia** (`anexos`: `intervencao_documento` com data ≤ fim do dia + links informados nas etapas, com
