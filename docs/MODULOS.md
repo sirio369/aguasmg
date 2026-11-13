@@ -4338,7 +4338,7 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   dígitos) o código do serviço (encerrada › aberta) → `"17 - sigos".codigo_servico` (mesma tabela das OS Pendentes);
   "Compartilhado" (pavimento, manobra) → gestor da OS de origem do SIGOS ou do `extra._origem` da recomposição. Sem OS SIGOS
   (loggers, visita de VRP do app, obras) → mapa **família → gestor/agrupamento** (moda) devolvido pela mesma RPC; atividade →
-  família em `FRL_FAM_ATV` (Logger % → Loggers de pressão; Obra → Rede de água). Sem correspondência = "Não definido".
+  família em `FRL_FAM_ATV` (Logger % e **Mapeamento de pressão** → Loggers de pressão = Werneck, decisão do usuário 13/11, sw v387; Obra → Rede de água). Sem correspondência = "Não definido".
 - **Abas:** **Resumo** (capa com período/base/filtros/gerado por, 4 indicadores, quadro atividade × unidade com quantidade,
   execuções, dias, média por dia, 1ª/última data — subtotal por grupo — e obras: % no início/fim, p.p., rede instalada) ·
   **Avanço diário/semanal/mensal** (todos os dias do período, por atividade+unidade: no período + acumulado desde a data
