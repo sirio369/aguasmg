@@ -4394,7 +4394,18 @@ ou RH (todos).
 
 ### 22.1 Carga RH — tela `rh_carga` · `// ---------- CARGA RH`
 Base **única** de horas a partir do **"Relatório de Ponto do Funcionário" do DIMEP Kairos (PDF)**, um por consórcio.
-- **Leitura no navegador:** `rhParsePdf` (pdf.js 3.11.174 via `pjLoadPdfJs`, o mesmo de Projetos) lê cada página (1 funcionário por
+- **Excel do Kairos (formato preferido desde 13/11/2026)** — `rhParseXls`: o "relatorio_ponto_funcionario…xls" é uma **página HTML
+  salva como .xls** (sem biblioteca: lido como texto, um bloco por funcionário a partir de "Nome:"). Confere a ordem dos 12 cabeçalhos
+  da tabela (layout mudou → recusa) e o CNPJ único no arquivo; devolve **o mesmo JSON do PDF** (nenhuma RPC muda).
+  - **O Excel não traz a data de emissão.** Vale a **data/hora do arquivo** (`File.lastModified` = quando foi baixado do Kairos),
+    gravada no nome do objeto no bucket (`<dia>/<uuid>_e<AAAAMMDDhhmm>_<nome>.xls`) para o ↻ Reprocessar (`rhDoCarimbo`). Por isso o
+    arquivo deve ser enviado como baixou (copiar/editar muda a data). Dias **depois** dessa data ficam de fora (o Excel traz o mês
+    inteiro, com o futuro em branco).
+  - O Kairos exporta **20 funcionários por arquivo** (paginação da tela). Vários arquivos do mesmo consórcio se somam na base única
+    sem duplicar: cada funcionário × dia é independente.
+  - Conferido em 13/11/2026 contra o PDF do mesmo dia: dias sobrepostos idênticos (mesmo hash → "iguais"). A única diferença foi o
+    13/11, completado no Excel, que é posterior. Bucket aceita `application/vnd.ms-excel` (`docs/migracao_rh_ponto_xls.sql`).
+- **Leitura no navegador (PDF):** `rhParsePdf` (pdf.js 3.11.174 via `pjLoadPdfJs`, o mesmo de Projetos) lê cada página (1 funcionário por
   página; continuação na página seguinte é juntada pelo CPF): cabeçalho (empresa, CNPJ, emissão `dd/mm/aaaa - hh:mm` do topo, nome,
   matrícula, PIS, CPF, admissão, base de horas), linhas de dia (horário previsto, marcações, H.Trab, H.E., Ad.N., Ad.N.HE.N., C.Ponte,
   descontos `hh:mm Atraso|Falta|DSR`, banco de horas débito/crédito, justificativa) e rodapé (dias trabalhados, atrasos, faltas, DSR,
@@ -4402,7 +4413,7 @@ Base **única** de horas a partir do **"Relatório de Ponto do Funcionário" do 
   tabela é conferido (`RH_HDR`) — se o Kairos mudar o layout, o PDF é **recusado** ("o layout do relatório mudou"), nunca gravado com
   coluna trocada. Conferido com os relatórios de 08–13/11/2026: AI 51 funcionários / 304 dias / HE 222:56; EH 43 / 254 / 290:22
   (bate com a análise manual).
-- **Fluxo** (um PDF de cada vez): sha256 → `app_rh_ponto_checar(sha)` (mesmo PDF já carregado com sucesso → "♻️ Já carregado em …",
+- **Fluxo** (um arquivo de cada vez; `rhLerArquivo` escolhe Excel ou PDF pela extensão): sha256 → `app_rh_ponto_checar(sha)` (mesmo PDF já carregado com sucesso → "♻️ Já carregado em …",
   nada sobe) → lê o PDF → upload no bucket **privado `rh-ponto`** (`<AAAA-MM-DD>/<uuid>_<nome>.pdf`, só PDF ≤ 20 MB, sem update/delete
   = prova da carga) → `app_rh_registrar(path, nome, tamanho, sha)` → `app_rh_ponto_processar(arquivo, dados)`. Falha depois do registro
   → `app_rh_falha`; **↻ Reprocessar** em Últimas cargas baixa o PDF do bucket, lê de novo e reenvia com o mesmo `arquivo_id`.

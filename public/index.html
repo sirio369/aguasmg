@@ -1764,7 +1764,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="rh_carga" class="hidden">
     <div class="bar"><button class="bk" data-go="rh">‹ RH</button></div>
     <h1>Carga RH</h1>
-    <p class="sub">Envie o <b>Relatório de Ponto do Funcionário</b> do Kairos em <b>PDF</b> — pode soltar vários de uma vez (Águas
+    <p class="sub">Envie o <b>Relatório de Ponto do Funcionário</b> do Kairos em <b>Excel (.xls)</b> ou <b>PDF</b> — pode soltar vários de uma vez (Águas
       Integradas, Eficiência Hídrica…); o consórcio sai do CNPJ do relatório. A base de horas é <b>única</b>: cada funcionário × dia
       existe uma vez só. Períodos que se sobrepõem ficam com o relatório <b>emitido por último</b>; um relatório mais antigo não
       sobrescreve o que já está no banco, e o mesmo PDF de novo não é carregado.</p>
@@ -1773,7 +1773,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="rhcBanco"><p class="sub">Carregando…</p></div>
     <div class="sec" style="margin-top:20px">Últimas cargas</div>
     <div id="rhcHist"><p class="sub">Carregando…</p></div>
-    <input type="file" id="rhcFile" accept=".pdf,application/pdf" multiple class="hidden"/>
+    <input type="file" id="rhcFile" accept=".pdf,.xls,application/pdf,application/vnd.ms-excel" multiple class="hidden"/>
   </main>
 
   <main id="rh_acesso" class="hidden">
@@ -16192,7 +16192,7 @@ function rhInit(){
   const cfg=$('#rhCfg'); if(cfg&&!cfg.dataset.ready){ cfg.dataset.ready='1'; cfg.onclick=()=>irPara('rh_acesso'); }
 }
 
-// ---------- CARGA RH (ponto do Kairos, PDF) ----------
+// ---------- CARGA RH (ponto do Kairos, Excel .xls ou PDF) ----------
 // Tela `rh_carga`. O PDF é lido NO NAVEGADOR (pdf.js 3.11.174, o mesmo carregador de Projetos — pjLoadPdfJs) por rhParsePdf;
 // o banco recebe o resultado já estruturado e aplica toda a regra (docs/migracao_rh_ponto_carga.sql, MODULOS §22):
 // sha256 → app_rh_ponto_checar (mesmo PDF já carregado? para) → upload no bucket privado rh-ponto/<dia>/<uuid>_<nome>
@@ -16259,6 +16259,62 @@ async function rhLerPdf(buf){
   const doc=await pdfjs.getDocument({data:new Uint8Array(buf.slice(0))}).promise;   // cópia: o pdf.js transfere o buffer ao worker
   try{ return await rhParsePdf(pdfjs,doc); } finally { try{ doc.destroy(); }catch(_){} }
 }
+// Excel do Kairos ("relatorio_ponto_funcionario…xls") = página HTML salva como .xls (uma tabela por funcionário). Lido como texto,
+// sem biblioteca. NÃO traz data de emissão: usa-se a data/hora do arquivo (quando foi baixado do Kairos), passada em `emitido`
+// (ISO com fuso) e gravada no nome do arquivo no bucket (…_e<AAAAMMDDhhmm>_…) para o Reprocessar. Dias depois da emissão
+// (o Excel traz o mês inteiro, futuro em branco) ficam fora. Mesmo formato de saída do rhParsePdf.
+const RH_XLS_HDR=['Data Marca','Hor.rio','Marca..es','H\\.Trab','H\\.E\\.','Ad\\. N\\.','Ad\\. N\\. HE\\. N\\.','C\\.Ponte','Descontos','D.bito','Cr.dito','Justificativa'];
+function rhTxt(h){ return String(h||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(+n)).replace(/\s+/g,' ').trim(); }
+function rhParseXls(txt, emitido){
+  const s=String(txt||'').replace(/^\uFEFF/,'');
+  if(!/Relat.rio de Ponto do Funcion.rio/.test(s)||!/tbl_ponto/.test(s)) throw new Error('não é o Excel "Relatório de Ponto do Funcionário" do Kairos.');
+  if(!emitido) throw new Error('sem a data do arquivo.');
+  const lab=(seg,re)=>{ const m=new RegExp(re+'\\s*<span[^>]*>([\\s\\S]*?)</span>').exec(seg); return m?(rhTxt(m[1])||null):null; };
+  const tdv=(seg,re)=>{ const m=new RegExp(re+'\\s*</td>\\s*<td[^>]*>([\\s\\S]*?)</td>').exec(seg); return m?(rhTxt(m[1])||null):null; };
+  const empresa=lab(s,'Empresa:'), cnpj=lab(s,'CNPJ / CPF:');
+  const cnpjs=new Set([...s.matchAll(/CNPJ \/ CPF:\s*<span[^>]*>([^<]*)<\/span>/g)].map(m=>m[1].replace(/\D/g,'')));
+  if(cnpjs.size>1) throw new Error('o arquivo mistura empresas (CNPJs diferentes) — exporte um por consórcio.');
+  const dEmit=emitido.slice(0,10);
+  const ini=[...s.matchAll(/Nome:\s*<span/g)].map(m=>m.index);
+  if(!ini.length) throw new Error('nenhum funcionário no arquivo.');
+  const funcs=[];
+  ini.forEach((a,i)=>{
+    const seg=s.slice(a,i+1<ini.length?ini[i+1]:s.length);
+    const th=[...(/<thead[\s\S]*?<\/thead>/.exec(seg)||[''])[0].matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map(m=>rhTxt(m[1])).filter(t=>!/^(Rendimento|Banco de horas)$/.test(t));
+    const ordem=['Data Marca','Hor.rio','Marca..es','Descontos','Justificativa','H\\.Trab','H\\.E\\.','Ad\\. N\\.','Ad\\. N\\. HE\\. N\\.','C\\.Ponte','D.bito','Cr.dito'];
+    if(th.length!==ordem.length||ordem.some((r,k)=>!new RegExp('^'+r).test(th[k]))) throw new Error('funcionário '+(i+1)+': o layout do Excel mudou (colunas: '+th.join(' | ')+') — avise o suporte.');
+    const cpf=lab(seg,'CPF:');
+    const f={pagina:i+1,nome:lab(seg,'Nome:'),matricula:lab(seg,'Matr.cula:'),pis:lab(seg,'PIS:'),cpf:cpf?cpf.replace(/\D/g,'').padStart(11,'0'):null,
+      admissao:rhIso(lab(seg,'Data de admiss.o:')),cargo:lab(seg,'Cargo:'),base_horas:lab(seg,'Base de horas:'),estrutura:lab(seg,'Estrutura organizacional:'),dias:[],resumo:{}};
+    if(!f.cpf||!f.nome) throw new Error('funcionário '+(i+1)+': não achei nome/CPF.');
+    for(const m of seg.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)){
+      const c=[...m[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(x=>rhTxt(x[1]));
+      if(c.length!==12||!/^\d\d\/\d\d\/\d{4}/.test(c[0])) continue;
+      const data=rhIso(c[0]); if(!data||data>dEmit) continue;
+      const descs=[]; (c[8].match(/\d+:\d\d\s+[^\d]+/g)||[]).forEach(t=>{ const q=/(\d+:\d\d)\s+(.+)/.exec(t.trim()); descs.push({min:rhMin(q[1]),tipo:q[2].trim()}); });
+      f.dias.push({data,dia_semana:(c[0].split(' ')[1]||null),horario:c[1]||null,marcacoes:(c[2].match(/\d\d:\d\d/g)||[]),marc_txt:c[2]||null,
+        htrab:rhMin(c[3]),he:rhMin(c[4]),adn:rhMin(c[5]),adnhe:rhMin(c[6]),cponte:rhMin(c[7]),descontos:descs,
+        bh_deb:rhMin(c[9]),bh_cred:rhMin(c[10]),justificativa:(c[11]||'').replace(/\s*\|\s*$/,'')||null});
+    }
+    f.resumo={dias_trabalhados:+(lab(seg,'Dias trabalhados:')||0),atrasos:rhMin(lab(seg,'Atrasos:')),faltas:rhMin(lab(seg,'Faltas:')),dsr:rhMin(lab(seg,'DSR:')),
+      saldo_anterior:tdv(seg,'Saldo Anterior:'),saldo_periodo:tdv(seg,'Saldo Per.odo:'),saldo_atual:tdv(seg,'Saldo Atual:'),
+      fechamento_bh:lab(seg,'Adiantamento/Fechamento BH:'),in_itinere:lab(seg,'In Itinere:'),
+      he_percentual:[...seg.matchAll(/>\s*(\d+:\d\d) - ([^<\d][^<]*?)\s*</g)].map(q=>({min:rhMin(q[1]),tipo:q[2]}))};
+    const ant=funcs.find(x=>x.cpf===f.cpf);
+    if(ant){ ant.dias.push(...f.dias); ant.resumo=f.resumo; } else funcs.push(f);
+  });
+  const ds=funcs.flatMap(f=>f.dias.map(d=>d.data)).filter(Boolean).sort();
+  return {empresa,cnpj,emitido_em:emitido,periodo_ini:ds[0]||null,periodo_fim:ds[ds.length-1]||null,paginas:ini.length,funcionarios:funcs,fonte:'xls'};
+}
+// Date → ISO com o fuso do aparelho (o banco recebe timestamptz) e o carimbo AAAAMMDDhhmm do nome no bucket
+function rhIsoLocal(d){ const p=n=>String(n).padStart(2,'0'), o=-d.getTimezoneOffset();
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':00'+(o>=0?'+':'-')+p(Math.floor(Math.abs(o)/60))+':'+p(Math.abs(o)%60); }
+const rhCarimbo=iso=>iso.slice(0,16).replace(/\D/g,'');
+function rhDoCarimbo(path){ const m=/_e(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)_/.exec(String(path||'')); return m?m[1]+'-'+m[2]+'-'+m[3]+'T'+m[4]+':'+m[5]+':00-03:00':null; }
+async function rhLerArquivo(buf, nome, emitido){
+  if(/\.pdf$/i.test(nome||'')) return rhLerPdf(buf);
+  return rhParseXls(new TextDecoder('utf-8').decode(buf), emitido);
+}
 async function rhSha256(buf){ const h=await crypto.subtle.digest('SHA-256',buf); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
 let rhcFila=[], rhcRodando=false, rhcPainel=[], rhcHistDados=[];
@@ -16319,9 +16375,9 @@ function rhcRender(){
   const st=rhcFila.length ? rhcFila.map(it=>{
       const cls=it.r?(it.r.status==='erro'?'erro':'ok'):'wait';
       return '<div class="rhst '+cls+'"><b>'+vEsc(it.nome)+'</b><br>'+(it.r?rhcResumo(it.r):'⏳ '+vEsc(it.msg||'Na fila…'))+'</div>'; }).join('')
-    : '<div class="rhst">Solte aqui os PDFs do Kairos (Relatório de Ponto do Funcionário) ou toque em Enviar.</div>';
-  box.innerHTML='<div class="rhslot"><b>Relatórios de ponto (PDF)</b>'+st
-    +'<div class="rhbtns"><button class="btn" data-up'+(rhcRodando?' disabled':'')+'>📤 Enviar PDFs</button>'
+    : '<div class="rhst">Solte aqui o Excel (.xls) ou o PDF do Kairos (Relatório de Ponto do Funcionário) ou toque em Enviar. No Excel, a emissão é a data/hora do arquivo — envie o arquivo do jeito que baixou do Kairos.</div>';
+  box.innerHTML='<div class="rhslot"><b>Relatórios de ponto (Excel ou PDF)</b>'+st
+    +'<div class="rhbtns"><button class="btn" data-up'+(rhcRodando?' disabled':'')+'>📤 Enviar arquivos</button>'
     +(rhcFila.length&&!rhcRodando?'<button class="btn ghost" data-limpa>Limpar lista</button>':'')+'</div></div>';
   const sl=box.querySelector('.rhslot');
   box.querySelector('[data-up]').onclick=()=>$('#rhcFile').click();
@@ -16354,8 +16410,8 @@ function rhcRender(){
 // Vários PDFs: um de cada vez (a regra "emitido por último" depende da ordem de gravação, então nada em paralelo)
 async function rhcEnfileirar(files){
   if(!navigator.onLine){ toast('Sem internet — a carga precisa estar online.'); return; }
-  const ok=files.filter(f=>/\.pdf$/i.test(f.name||'') && f.size<=20*1024*1024);
-  if(ok.length<files.length) toast('Só vale PDF do Kairos, até 20 MB — '+(files.length-ok.length)+' ignorado(s).');
+  const ok=files.filter(f=>/\.(pdf|xls)$/i.test(f.name||'') && f.size<=20*1024*1024);
+  if(ok.length<files.length) toast('Só vale o Excel (.xls) ou PDF do Kairos, até 20 MB — '+(files.length-ok.length)+' ignorado(s).');
   if(!ok.length) return;
   rhcFila=rhcFila.concat(ok.map(f=>({file:f,nome:f.name||'relatorio.pdf',msg:'Na fila…',r:null})));
   if(rhcRodando){ rhcRender(); return; }
@@ -16369,19 +16425,23 @@ async function rhcEnfileirar(files){
 async function rhcEnviar(it){
   const file=it.file; let id=null;
   try{
-    it.msg='Lendo o PDF…'; rhcRender();
+    const ehPdf=/\.pdf$/i.test(file.name||'');
+    // Excel não traz a emissão: vale a data/hora do arquivo (quando foi baixado do Kairos)
+    const emit=ehPdf?null:(file.lastModified?rhIsoLocal(new Date(file.lastModified)):null);
+    if(!ehPdf&&!emit){ it.r={status:'erro',erro:'Não consegui ler a data do arquivo — baixe de novo do Kairos.'}; return; }
+    it.msg=ehPdf?'Lendo o PDF…':'Lendo o Excel…'; rhcRender();
     const buf=await file.arrayBuffer();
     const sha=await rhSha256(buf);
     const ck=await sb.rpc('app_rh_ponto_checar',{p_sha256:sha}); if(ck.error) throw ck.error;
     if(ck.data){ it.r={...ck.data,status:'dup'}; return; }
     let dados;
-    try{ dados=await rhLerPdf(buf); }catch(e){ it.r={status:'erro',erro:'PDF recusado: '+((e&&e.message)||e)}; return; }
+    try{ dados=await rhLerArquivo(buf,file.name,emit); }catch(e){ it.r={status:'erro',erro:(ehPdf?'PDF':'Excel')+' recusado: '+((e&&e.message)||e)}; return; }
     it.msg='Enviando ('+dados.funcionarios.length+' funcionários)…'; rhcRender();
     const d=new Date(), p2=n=>String(n).padStart(2,'0');
     const dia=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
     const nome=String(file.name||'relatorio.pdf').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w.\-]+/g,'_').slice(-120);
-    const path=dia+'/'+crypto.randomUUID()+'_'+nome;
-    const up=await sb.storage.from('rh-ponto').upload(path,file,{contentType:'application/pdf',upsert:false});
+    const path=dia+'/'+crypto.randomUUID()+(emit?'_e'+rhCarimbo(emit):'')+'_'+nome;
+    const up=await sb.storage.from('rh-ponto').upload(path,file,{contentType:ehPdf?'application/pdf':'application/vnd.ms-excel',upsert:false});
     if(up.error) throw up.error;
     const rg=await sb.rpc('app_rh_registrar',{p_path:path,p_nome:file.name||nome,p_tamanho:file.size,p_sha256:sha}); if(rg.error) throw rg.error;
     id=rg.data;
@@ -16402,7 +16462,7 @@ async function rhcReprocessar(f){
   try{
     if(!f.path) throw new Error('caminho do arquivo não encontrado');
     const dl=await sb.storage.from('rh-ponto').download(f.path); if(dl.error) throw dl.error;
-    const dados=await rhLerPdf(await dl.data.arrayBuffer());
+    const dados=await rhLerArquivo(await dl.data.arrayBuffer(),f.path,rhDoCarimbo(f.path));
     const pr=await sb.rpc('app_rh_ponto_processar',{p_arquivo:f.id,p_dados:dados}); if(pr.error) throw pr.error;
     return pr.data;
   }catch(e){ const m=(e&&e.message)||String(e); try{ await sb.rpc('app_rh_falha',{p_id:f.id,p_erro:m}); }catch(_){} return {ok:false,erro:m}; }
