@@ -4347,6 +4347,11 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   agrupamento, atividade, serviço, origem, qtd/un, OS SIGOS/status/resultado, OS AcquaHub, matrícula, descrição, local, equipe,
   serviço de origem da recomposição, lat/lon, link da 1ª foto, situação — coluna vazia na aba inteira sai, as 10 primeiras ficam) ·
   **Obras** (avanço por dia).
+- **Visual (13/11, sw v392, pedido "mais profissional e segregado"):** faixa de título azul-marinho, ficha do relatório,
+  cartões de indicadores, Resumo segregado em blocos (padrão agora = **Agrupamento**), Avanço com cabeçalho em 3 níveis
+  (agrupamento › atividade › no dia/acumulado) e separadores por bloco, fim de semana sombreado, total em faixa; bases
+  ordenadas por agrupamento → atividade → data com linha separando blocos; casas decimais por coluna (sem "44,");
+  impressão A4 com cabeçalho/rodapé e paginação, títulos repetidos.
 - **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
   **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
   no lugar de "VRP" — vale no Consolidador, relatório e validação. A migração passou as validações `atv:VRP` em dia para as
