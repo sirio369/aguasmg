@@ -4355,9 +4355,9 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
 - **Enxuto (13/11, sw v393, pedido do usuário):** sem cartões de indicadores, sem coluna Execuções no quadro, sem
   "Como ler", sem coluna "Situação do dia" no avanço; bases sem Gestor, Serviço de origem (recomposição), Fotos e Situação
   (Obras também sem Situação).
-- **13/11, sw v397:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
+- **13/11, sw v395:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
   **% atual da obra** e rede instalada no período (saíram % no início, avanço p.p. e dias c/ avanço).
-- **Versão Fiscalização (13/11, sw v397, `docs/migracao_fiscv_relatorio.sql`):** botão 📊 Relatório consolidado no bloco
+- **Versão Fiscalização (13/11, sw v395, `docs/migracao_fiscv_relatorio.sql`):** botão 📊 Relatório consolidado no bloco
   🏛️ Fiscalização (tela `fiscv_rel` → `fisc_rel` em modo `fisc`, `frlModo`). Só filtro de data e consórcio; só dias
   validados (`app_fiscv_periodo` = snapshot, o mesmo da Execução Física); resumo por agrupamento e avanço diário fixos;
   sem filtros no navegador; Excel "Relatório de Execução Física". `app_fisc_rel_classes` passou a aceitar quem vê o validado
