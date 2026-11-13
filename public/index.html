@@ -896,6 +896,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   .vmmb{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
   .vmmb label{font-size:12px;font-weight:600;color:var(--mut);display:block;margin-bottom:4px}
   .vmmf{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px}
+  .vmmcard.vmedit{max-width:540px;max-height:92vh;display:flex;flex-direction:column}
+  .vmmcard.vmedit .vmmb{overflow:auto;flex:1;gap:8px}
+  .vmmcard.vmedit .vmq{margin-bottom:4px}
+  .vmpencil{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:4px 9px;font-size:15px;cursor:pointer;vertical-align:middle;margin-left:6px}
   .vmacrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
   .vmsw{width:38px;height:22px;border-radius:999px;background:var(--line);position:relative;flex:0 0 auto;cursor:pointer;transition:background .15s}
   .vmsw.on{background:var(--ok)} .vmsw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s} .vmsw.on::after{left:18px}
@@ -6648,7 +6652,8 @@ async function vmOsView(osId){
   let d; try{ const r=await sb.rpc('app_vrp_os_ver',{p_os_id:osId}); if(r.error)throw r.error; d=r.data; }catch(e){ $('#vmOs').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; return; }
   const r=(d.respostas||{}), cond=(r.condicao||{}), serv=(r.servicos||[]);
   const kv=(l,v)=>`<div class="vmdkv"><span>${l}</span><b>${vEsc(String(v==null||v===''?'—':v))}</b></div>`;
-  let h=`<h1 style="margin-bottom:2px">${vEsc(d.num_vrp||'VRP')} — ${d.os_numero}</h1>
+  const podeEditar=!!(ME&&(ME.vrp_gestao||ME.is_admin)) && d.status!=='programada';
+  let h=`<h1 style="margin-bottom:2px">${vEsc(d.num_vrp||'VRP')} — ${d.os_numero}${podeEditar?'<button class="vmpencil" id="vmEditBtn" title="Corrigir o que foi lançado">✏️</button>':''}</h1>
    <div class="sub" style="margin-top:0">${vmConsLbl(d.consorcio)}${d.dmc?(' · DMC '+d.dmc):''} · ${d.origem} · ${d.executor?vEsc(d.executor):'—'}</div>
    <span class="vmst ${d.status}">${VM_STLBL[d.status]||d.status}</span>
    <div class="vmsigrow"><span class="k">OS SIGOS</span><b>${d.os_sigos||'—'}</b>${sgxS(d.os_sigos)}<button class="vmtbtn" id="vmSigBtn" style="margin-left:auto">${d.os_sigos?'Editar':'＋ Adicionar'}</button></div>
@@ -6661,6 +6666,8 @@ async function vmOsView(osId){
   serv.forEach(s=>{ const dd=r['servd_'+vmSlug(s)]; if(dd) h+=kv(s,dd); });
   if(r.serv_outro&&serv.indexOf('Outro')>=0) h+=kv('Outro (o quê)',r.serv_outro);
   h+=vmDsec('5','Finalização')+kv('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+kv('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+kv('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+kv('Estabilizada',vmBool(d.estabilizada))+kv('Vazamento após',vmBool(d.vazamento_pos))+kv('Liberada',vmBool(d.liberada));
+  if(r.fim_jus_motivo) h+=kv('Jusante fora do setpoint — por quê',r.fim_jus_motivo);
+  if(d.obs) h+=kv('Observação',d.obs);
   if(d.origem==='substituicao'){ const a=r.vrp_anterior||{}, nv=r.vrp_nova||{}; const ar=v=>v==null||v===''?'—':String(v); const fk=(l,va,vb)=>kv(l, ar(va)+' → '+ar(vb));
     h+=vmDsec('🔁','Substituição (anterior → nova)',true)+(nv.motivo?kv('Motivo',nv.motivo):'')
      +fk('Diâmetro', a.diametro?('DN '+a.diametro):null, nv.diametro?('DN '+nv.diametro):null)
@@ -6677,13 +6684,80 @@ async function vmOsView(osId){
    if(pend.some(p=>p.tipo==='substituicao'&&p.status==='aberta')) h+=`<p class="sub" style="margin:8px 0 0;color:var(--bad)"><b>⚠ Esta VRP precisa de SUBSTITUIÇÃO</b> — programe uma OS do tipo <b>Substituição</b> (não corretiva).</p>`;
    if(pendAbertas.length){ h+=`<button class="vmbtn" id="vmProgPendBtn" style="margin-top:10px">🗓️ Gerar OS para as pendências</button><p class="sub" style="margin:6px 0 0">Gera uma única OS (você escolhe o tipo: corretiva/preventiva/substituição) cobrindo todas as pendências abertas desta VRP.</p>`; }
   }
+  const ed=(d.edicoes||[]);
+  if(ed.length){ h+=vmDsec('✏️','Correções da gestão')+ed.map(e=>`<div class="vmdkv"><span>${vEsc(e.motivo||'')}</span><b style="font-weight:500;font-size:12px">${vEsc(e.por||'—')} · ${new Date(e.em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</b></div>`).join(''); }
   h+=`<button class="vmbtn" id="vmRepBtn" style="margin-top:16px">📄 Gerar relatório (PDF)</button>`;
   $('#vmOs').innerHTML=h;
+  { const eb=$('#vmEditBtn'); if(eb) eb.onclick=()=>vmOsEditar(d); }
   { const pb=$('#vmProgPendBtn'); if(pb&&pendAbertas.length) pb.onclick=()=>vmGerarCorr(pendAbertas[0].id, ()=>vmOsView(d.id)); }
   $('#vmOs').querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmOsView(b.dataset.os));
   $('#vmSigBtn').onclick=()=>vmSigos(d.id,d.os_sigos);
   $('#vmFichaBtn2').onclick=()=>vmFichaOpen(d.vrp_id);
   $('#vmRepBtn').onclick=()=>vmReport(d.id);
+}
+// ✏️ Correção pela gestão: edita as respostas lançadas em campo (chegada, pressões, condição, serviço, finalização).
+// Não mexe em status, pendências, fotos nem GPS. Motivo obrigatório; histórico em vrp_os_edicao (app_vrp_os_editar).
+function vmOsEditar(d){
+  const r=d.respostas||{}; const sn=b=>b==null?undefined:(b?'Sim':'Não'); const nn=v=>v==null?'':String(v);
+  const E={ans:Object.assign({},r,{val_mont:nn(d.press_mont_enc),val_jus:nn(d.press_jus_enc),fim_mont:nn(d.press_mont_fin),fim_jus:nn(d.press_jus_fin),fim_pc:nn(d.press_pc_fin),
+             estab:sn(d.estabilizada),vaz_pos:sn(d.vazamento_pos),liberada:sn(d.liberada),obs:d.obs||''}),
+           cond:Object.assign({},r.condicao||{}), serv:new Set(r.servicos||[]), motivo:''};
+  delete E.ans.condicao; delete E.ans.servicos;
+  const opt=(k,opts)=>`<div class="vmopts">${opts.map(o=>`<button class="vmopt ${E.ans[k]===o?'on':''}" data-eo="${k}" data-val="${vEsc(o)}">${o}</button>`).join('')}</div>`;
+  const inp=(k,lbl,num)=>`<div class="vmq"><label>${lbl}</label><input class="vmin" data-ei="${k}" ${num?'inputmode="decimal"':''} value="${vEsc(nn(E.ans[k]))}"></div>`;
+  const area=(k,lbl)=>`<div class="vmq"><label>${lbl}</label><textarea class="vmin" data-ei="${k}">${vEsc(nn(E.ans[k]))}</textarea></div>`;
+  const q=(lbl,html)=>`<div class="vmq"><label>${lbl}</label>${html}</div>`;
+  function body(){
+    let h=`<p class="sub" style="margin:0">Corrija o que foi lançado errado. <b>Status, pendências e fotos não mudam por aqui.</b></p>`;
+    h+=vmDsec('1','Chegada')+q('VRP localizada?',opt('localizada',['Sim','Não']))+q('Caixa acessível?',opt('acessivel',['Sim','Não']))+q('Água / alagamento',opt('agua',['Não','Parcial','Alagada']));
+    h+=vmDsec('2','Pressões')+q('Montante — conectou o manômetro?',opt('conn_mont',['Sim','Não']))+inp('val_mont','Montante encontrada (mca)',1)
+      +q('Jusante — conectou o manômetro?',opt('conn_jus',['Sim','Não']))+inp('val_jus','Jusante encontrada (mca)',1);
+    h+=vmDsec('3','Condição')+VM_COND.map(([k,l])=>{ const cur=E.cond[k];
+      let x=`<div class="vmq"><label>${l}</label><div class="vmopts">`+['OK','Intervir','Não verificado'].map(o=>{const ex=o==='OK'?'ok':(o==='Intervir'?'int':'nv');return `<button class="vmopt ${ex} ${cur===o?'on':''}" data-ec="${k}" data-val="${o}">${o}</button>`;}).join('')+`</div>`;
+      if(cur==='Intervir') x+=`<textarea class="vmin" style="margin-top:4px" data-ecd="${k}" placeholder="O que intervir">${vEsc(nn(E.cond['d_'+k]))}</textarea>`;
+      return x+`</div>`; }).join('');
+    h+=vmDsec('4','Serviço')+`<div class="vmchips">${VM_SERV.map(s=>{const on=E.serv.has(s);return `<button class="vmchip ${on?'on':''}" data-es="${vEsc(s)}"><span class="bx">${on?'✓':''}</span>${s}</button>`;}).join('')}</div>`;
+    if(E.serv.has('Troca de peça')) h+=inp('peca','Peça trocada');
+    if(E.serv.has('Outro')) h+=inp('serv_outro','Descreva "Outro"');
+    [...E.serv].forEach(s=>{ h+=area('servd_'+vmSlug(s),'O que foi feito — '+vEsc(s)); });
+    h+=vmDsec('5','Finalização')+`<div class="vmref"><div class="p"><span>Mont. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-ei="fim_mont" value="${vEsc(nn(E.ans.fim_mont))}"></div>`
+      +`<div class="p"><span>Jus. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-ei="fim_jus" value="${vEsc(nn(E.ans.fim_jus))}"></div>`
+      +`<div class="p"><span>Ponto crítico</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-ei="fim_pc" value="${vEsc(nn(E.ans.fim_pc))}"></div></div>`;
+    h+=area('fim_jus_motivo','Jusante fora do setpoint — por quê (se for o caso)');
+    h+=q('VRP estabilizada?',opt('estab',['Sim','Não']))+q('Vazamento após o serviço?',opt('vaz_pos',['Não','Sim']))+q('VRP liberada?',opt('liberada',['Sim','Não']));
+    h+=area('obs','Observação');
+    h+=`<div class="vmq" style="margin-top:8px"><label>Motivo da correção <span class="vmreq">*</span></label><textarea class="vmin" id="vmEdMot" placeholder="O que estava errado e por quê">${vEsc(E.motivo)}</textarea></div>`;
+    return h;
+  }
+  const m=vmModal(`<div class="vmmcard vmedit"><div class="vmmh">✏️ Corrigir OS ${vEsc(d.os_numero||'')}</div><div class="vmmb" id="vmEdBody"></div>
+    <div class="vmmf"><button class="vmbtn sec" id="vmEdCancel">Cancelar</button><button class="vmbtn" id="vmEdOk">Salvar correção</button></div></div>`);
+  const bd=m.querySelector('#vmEdBody');
+  function render(){ const st=bd.scrollTop; bd.innerHTML=body(); bd.scrollTop=st;
+    bd.querySelectorAll('[data-eo]').forEach(b=>b.onclick=()=>{const k=b.dataset.eo;E.ans[k]=E.ans[k]===b.dataset.val?undefined:b.dataset.val;render();});
+    bd.querySelectorAll('[data-ec]').forEach(b=>b.onclick=()=>{const k=b.dataset.ec;E.cond[k]=E.cond[k]===b.dataset.val?undefined:b.dataset.val;render();});
+    bd.querySelectorAll('[data-es]').forEach(b=>b.onclick=()=>{const s=b.dataset.es;E.serv.has(s)?E.serv.delete(s):E.serv.add(s);render();});
+    bd.querySelectorAll('[data-ei]').forEach(i=>i.oninput=()=>{E.ans[i.dataset.ei]=i.value;});
+    bd.querySelectorAll('[data-ecd]').forEach(i=>i.oninput=()=>{E.cond['d_'+i.dataset.ecd]=i.value;});
+    bd.querySelector('#vmEdMot').oninput=e=>{E.motivo=e.target.value;};
+  }
+  render();
+  m.onclick=null; // formulário longo: não fechar ao tocar fora (evita perder o que foi digitado)
+  m.querySelector('#vmEdCancel').onclick=vmModalClose;
+  m.querySelector('#vmEdOk').onclick=async()=>{
+    if(!String(E.motivo||'').trim()) return toast('Informe o motivo da correção');
+    const numOk=v=>!String(v||'').trim()||!isNaN(parseFloat(String(v).replace(',','.')));
+    for(const k of ['val_mont','val_jus','fim_mont','fim_jus','fim_pc']) if(!numOk(E.ans[k])) return toast('Pressão inválida: '+E.ans[k]);
+    const b=v=>v==null?null:(v==='Sim');
+    const campos={press_mont_enc:E.ans.val_mont||null,press_jus_enc:E.ans.val_jus||null,press_mont_fin:E.ans.fim_mont||null,press_jus_fin:E.ans.fim_jus||null,press_pc_fin:E.ans.fim_pc||null,
+      estabilizada:b(E.ans.estab),vazamento_pos:b(E.ans.vaz_pos),liberada:b(E.ans.liberada),obs:E.ans.obs||null};
+    const resp=Object.assign({},E.ans,{condicao:E.cond,servicos:[...E.serv]}); delete resp.obs;
+    for(const k in resp) if(resp[k]===undefined) resp[k]=null;  // desmarcado → null (undefined some do JSON e o banco manteria o valor antigo)
+    for(const k in resp.condicao) if(resp.condicao[k]===undefined) resp.condicao[k]=null;
+    const btn=m.querySelector('#vmEdOk'); btn.classList.add('dis'); btn.textContent='Salvando…';
+    try{ const x=await sb.rpc('app_vrp_os_editar',{p_os_id:d.id,p_respostas:resp,p_campos:campos,p_motivo:E.motivo.trim()}); if(x.error)throw x.error;
+      vmModalClose(); toast('✓ OS corrigida'); vmOsView(d.id); }
+    catch(e){ toast('⚠ '+(e.message||e)); btn.classList.remove('dis'); btn.textContent='Salvar correção'; }
+  };
 }
 if($('#vmOsBack')) $('#vmOsBack').addEventListener('click',()=>irPara('vrpman_serv'));
 
