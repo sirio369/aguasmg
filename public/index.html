@@ -2029,16 +2029,44 @@ $('#pressao_v').addEventListener('input',e=>{
   if(parts.length>2) val=parts[0]+','+parts.slice(1).join('');
   e.target.value=val; validar();
 });
+// HEIC/HEIF (câmera Samsung/iPhone em "alta eficiência"): o Chrome do Android não decodifica, e o bucket
+// fotos-campo só aceita jpeg/png/webp/pdf → converte no aparelho com heic2any (carregado só quando precisa).
+const ehHeic=f=>!!f&&(/image\/hei[cf]/i.test(f.type||'')||/\.hei[cf]$/i.test(f.name||''));
+let _heic2anyP=null;
+function heicLib(){
+  if(window.heic2any) return Promise.resolve(window.heic2any);
+  return _heic2anyP||(_heic2anyP=new Promise((res,rej)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+    s.onload=()=>window.heic2any?res(window.heic2any):rej(new Error('heic2any'));
+    s.onerror=()=>{ _heic2anyP=null; s.remove(); rej(new Error('heic2any')); };
+    document.head.appendChild(s); }));
+}
+async function heicParaJpeg(file){
+  const lib=await heicLib(); const out=await lib({blob:file,toType:'image/jpeg',quality:0.85});
+  return Array.isArray(out)?out[0]:out;
+}
 async function comprimir(file){
+  const heic=ehHeic(file)||(file&&!file.type);
+  let src=file, bmp;
+  try{ bmp=await createImageBitmap(file,{imageOrientation:'from-image'}); }
+  catch(e){
+    if(!heic) return file;
+    try{ toast('Convertendo foto HEIC…'); src=await heicParaJpeg(file); bmp=await createImageBitmap(src,{imageOrientation:'from-image'}); }
+    catch(e2){
+      if(src!==file) return src;   // converteu, só não deu p/ reduzir: sobe o JPEG
+      toast(navigator.onLine?'⚠ Foto em HEIC não pôde ser convertida — tire a foto em JPG':'⚠ Foto em HEIC: conecte à internet para converter, ou tire a foto em JPG');
+      return file;
+    }
+  }
   try{
-    const bmp=await createImageBitmap(file,{imageOrientation:'from-image'});
     const max=1600; let w=bmp.width,h=bmp.height;
     if(Math.max(w,h)>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
     const cv=document.createElement('canvas');cv.width=w;cv.height=h;
     cv.getContext('2d').drawImage(bmp,0,0,w,h);
     const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.7));
-    return (blob&&blob.size<file.size)?blob:file;
-  }catch(e){ return file; }
+    // HEIC nunca volta cru (o bucket recusa), mesmo que o JPEG fique maior
+    return (blob&&(src!==file||ehHeic(file)||blob.size<file.size))?blob:src;
+  }catch(e){ return src; }
 }
 document.querySelectorAll('#pressao .fFoto').forEach(fi=>fi.addEventListener('change',async e=>{
   const f=e.target.files[0]||null; const img=$('#fotoPrev');
@@ -3692,7 +3720,7 @@ function pjWireTree(d,rerender){
       const files=[...wrap.querySelectorAll('.pjph2 input[type=file]')].map(i=>i.files&&i.files[0]).filter(Boolean);
       if(!files.length){ toast('Anexe pelo menos uma foto do avanço'); b.disabled=false; return; }
       const fotos=[];
-      for(const f of files){ const path='projetos/avanco/'+iv.kind+'/'+iv.gid+'/'+crypto.randomUUID()+'.jpg'; const up=await sb.storage.from('fotos-campo').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true}); if(!up.error) fotos.push(path); }
+      for(const f0 of files){ const f=await comprimir(f0); const path='projetos/avanco/'+iv.kind+'/'+iv.gid+'/'+crypto.randomUUID()+'.jpg'; const up=await sb.storage.from('fotos-campo').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true}); if(!up.error) fotos.push(path); }
       const obs=((wrap.querySelector('.pjobs')||{}).value||'').trim();
       const pth=pjNodePath(iv.arv,n)||[n.n], caminho=pth.join(' › '), atividade=pth[0], sub=pth[pth.length-1];
       const {data:row,error}=await sb.rpc('app_proj_avanco_registrar',{p_kind:iv.kind,p_gid:iv.gid,p_iv_cod:iv.cod,p_iv_local:iv.local,p_consorcio:iv.cons,p_tipo:iv.tipo,p_caminho:caminho,p_atividade:atividade,p_sub:sub,p_valor:val,p_unidade:(n.k==='m'?'m':'%'),p_obs:obs||null,p_fotos:fotos,p_equipe:iv.resp||null,...(execEm?{p_executado_em:execEm}:{})});

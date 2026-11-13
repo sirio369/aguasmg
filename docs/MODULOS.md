@@ -126,7 +126,12 @@
     (Segurança do Trabalho §18, primeiro uso). Canvas de assinatura → JPEG com fundo branco antes (`segSigJpeg`).
 - `sincronizar()`: erros com `code` SQLSTATE (5 chars) = rejeição de negócio → descarta o item;
   erro de rede → mantém e tenta depois.
-- `comprimir(file)` (~L598): reduz p/ ~1600px/JPEG 0.7 antes do upload.
+- `comprimir(file)` (~L598): reduz p/ ~1600px/JPEG 0.7 antes do upload. **HEIC/HEIF (2026-11-13, sw v385):** a foto
+  "alta eficiência" da câmera (Samsung/iPhone) não abre no Chrome do Android e o bucket `fotos-campo` só aceita
+  jpeg/png/webp/pdf ("mime type image/heic is not supported") → `comprimir` converte no aparelho com **heic2any**
+  (cdnjs 0.0.4, carregado só quando aparece um HEIC, `heicLib`/`heicParaJpeg`) e **nunca devolve HEIC cru**, mesmo
+  que o JPEG fique maior. Offline sem a lib em cache → toast pedindo conexão ou foto em JPG. Toda foto nova que vai
+  ao Storage deve passar por `comprimir` (o avanço de Projetos subia o arquivo cru; corrigido no mesmo PR).
 
 ### GPS — `// GPS` (~L579)
 - `iniciarGPS()` faz `watchPosition` e atualiza `gps={lat,lon,acc,alt,ts}`; chama os `*OnGps()` de
