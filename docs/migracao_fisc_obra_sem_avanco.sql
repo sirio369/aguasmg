@@ -9,6 +9,7 @@
 --   · no Excel/período, situação "sem avanço" (app_fisc_periodo).
 -- Hash do dia (fisc_dia_hash) e das obras não mudam → dias já validados continuam validados; avanço lançado depois com data
 -- desse dia muda o hash da obra (ela passa a ter avanço → volta a exigir validação) e o dia validado aparece como "mudou".
+-- APLICADO em produção em 2026-11-13 (migração `fisc_obra_sem_avanco`, via MCP), antes do merge do PR #352 (retrocompatível).
 -- Patch textual sobre as definições vigentes (falha se algum trecho não casar).
 
 create or replace function public.fisc_sem_avanco(x jsonb) returns boolean
