@@ -4320,3 +4320,34 @@ dia, acumulado recolhível, anexos) e **⬇️ Excel do mês** (abas Resumo / Ex
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
 corte da Fiscalização mudar no BI, mudar `sigos_fisc_corte()` (vale aqui também). Nova fonte de execução = novo CTE em
 `fisc_execucoes` com `exec_id` estável e, se tiver OS SIGOS, entrar em `app_os` p/ não duplicar.
+
+#### 21.6.1 Relatório consolidado (`fisc_rel`, Excel formatado) · `docs/migracao_fisc_relatorio.sql` (2026-11-13, sw v386)
+
+Card **📊 Relatório consolidado** no Auxiliar › **📋 Gestão Geral** (ao lado de Consolidador e OS Pendentes; gate
+`aux_acesso|admin`, igual ao Consolidador). Gera um **.xlsx com cara de relatório** (ExcelJS 4.4.0 do cdnjs, carregado só ao
+baixar — `excelJsLib()`; o SheetJS do app não formata célula).
+
+- **Parâmetros (recarregam o dado):** período De/Até (atalhos Desde o início / Mês atual / Mês anterior / Últimos 7 dias; mínimo
+  01/09/2026), consórcio(s) e **dados considerados**: *Só o validado* = só os dias validados (o snapshot de `fisc_dia`, o que vai
+  para a COPASA) · *Todas as informações* = dias validados como foram validados + dias pendentes como estão agora.
+  Carrega `app_fisc_periodo` em pedaços de **1 mês por ZA** (a RPC limita 3 meses; ~2 s por mês × ZA, 3 em paralelo).
+- **Filtros (no navegador, sem recarregar):** Atividade, **Gestor**, **Agrupamento**, Origem (SIGOS/AcquaHub/Obra) — chips com
+  contagem que respeita os outros filtros; **Agrupar o resumo por** Atividade/Gestor/Agrupamento/Consórcio; **Avanço por**
+  Diário/Semanal/Mensal.
+- **Gestor e agrupamento** = `app_fisc_rel_classes(p_os text[])` (só leitura, gate `sigos_pode_ver`): por OS SIGOS (base de 10
+  dígitos) o código do serviço (encerrada › aberta) → `"17 - sigos".codigo_servico` (mesma tabela das OS Pendentes);
+  "Compartilhado" (pavimento, manobra) → gestor da OS de origem do SIGOS ou do `extra._origem` da recomposição. Sem OS SIGOS
+  (loggers, visita de VRP do app, obras) → mapa **família → gestor/agrupamento** (moda) devolvido pela mesma RPC; atividade →
+  família em `FRL_FAM_ATV` (Logger % → Loggers de pressão; Obra → Rede de água). Sem correspondência = "Não definido".
+- **Abas:** **Resumo** (capa com período/base/filtros/gerado por, 4 indicadores, quadro atividade × unidade com quantidade,
+  execuções, dias, média por dia, 1ª/última data — subtotal por grupo — e obras: % no início/fim, p.p., rede instalada) ·
+  **Avanço diário/semanal/mensal** (todos os dias do período, por atividade+unidade: no período + acumulado desde a data
+  inicial; no diário, coluna com a situação do dia por ZA) · **Base de dados** (1 linha por execução, autofiltro: data, gestor,
+  agrupamento, atividade, serviço, origem, qtd/un, OS SIGOS/status/resultado, OS AcquaHub, matrícula, descrição, local, equipe,
+  serviço de origem da recomposição, lat/lon, link da 1ª foto, situação) · **Obras** (avanço por dia).
+- **Regras:** 1 execução = 1 registro na data do campo (feed `fisc_execucoes`); traçado de pesquisa "Aguardando SIGOS" fica
+  na base em cinza e **não conta**; obra **sem avanço no dia não entra**; quantidade da obra = metros de rede instalada
+  (`fscEhMetroRede`: pullback no HDD / assentamento na VCA). O saldo "em campo" dos loggers temporários não entra (só
+  instalações/remoções do período).
+- **Cuidados:** o acumulado do relatório começa na data inicial escolhida (não é o "desde 01/09" do Consolidador, a menos que
+  o período comece lá). Relatório de períodos longos = muitos pedaços; se a RPC ficar lenta, trocar por uma RPC só do relatório.

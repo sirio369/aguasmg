@@ -1063,6 +1063,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="fisc"><div class="ic">📋</div><div class="nm">Consolidador</div></button>
       <button class="mod" data-go="sigos_abertas"><div class="ic">🗺️</div><div class="nm">OS Pendentes</div></button>
+      <button class="mod" data-go="fisc_rel"><div class="ic">📊</div><div class="nm">Relatório consolidado</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">🧾 Serviços comerciais</div>
@@ -1310,6 +1311,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="fsccal" id="fscCal"></div>
     <div class="fscleg" id="fscLeg"><span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span></div>
     <div id="fscDia"></div>
+  </main>
+
+  <main id="fisc_rel" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Relatório consolidado</h1>
+    <p class="sub">Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.</p>
+    <div class="frlbox" id="frlParams"></div>
+    <div id="frlOut"></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2276,7 +2285,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','fisc_rel','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 const FISCAL_TELAS=['home','fisc','fiscv','cadastro','biblioteca','notificacoes'];
 function irPara(id){
   if(ME&&ME.is_fiscal){ if(!FISCAL_TELAS.includes(id)) id='home'; if(id==='fisc') id='fiscv'; }
@@ -2314,6 +2323,7 @@ function irPara(id){
   if(id==='sigos_vinculo') svInit();
   if(id==='rdo') rdoInit();
   if(id==='fisc') fscInit();
+  if(id==='fisc_rel') frlInit();
   if(id==='recad_prog') rcInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
@@ -10638,6 +10648,354 @@ async function fscExcel(){
     XLSX.writeFile(wb,(fscCons()?'consolidador_':'fiscalizacao_validado_')+fscS.zas.join('_')+'_'+de+'_a_'+ate+'.xlsx');
   }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
   b.disabled=false; b.textContent=tx;
+}
+
+// ---------- RELATÓRIO DO CONSOLIDADOR (Excel formatado) (2026-11-13) ----------
+// Tela `fisc_rel` (Auxiliar › 📋 Gestão Geral). Lê o mesmo dado do Consolidador (app_fisc_periodo, em pedaços de 1 mês
+// por ZA — a RPC aceita no máx. 3 meses) e monta um .xlsx com cara de relatório (ExcelJS, cdnjs, carregado sob demanda):
+// Resumo (capa + quadro por agrupamento + obras) · Avanço diário/semanal/mensal (no período + acumulado por atividade) ·
+// Base de dados (1 linha por execução) · Obras (avanço por dia). Base "validado" = só dias validados (o snapshot que vai
+// para a COPASA); "tudo" = validado + pendente como está agora. Gestor e agrupamento vêm do código SIGOS da OS
+// (app_fisc_rel_classes → "17 - sigos".codigo_servico); sem OS = pela família da atividade. Filtros e agrupamento são
+// aplicados no navegador sobre o dado carregado (recarrega só ao mudar período, consórcio ou base).
+const FRL_PER={dia:'Diário',semana:'Semanal',mes:'Mensal'};
+const FRL_AGR={atividade:'Atividade',gestor:'Gestor',grupo:'Agrupamento',za:'Consórcio'};
+const FRL_ZA_NOME={ZA1004:'ZA1004 — Contagem (Águas Integradas)',ZA0200:'ZA0200 — Betim (Eficiência Hídrica)'};
+// atividade sem OS SIGOS → família da tabela de códigos (para gestor/agrupamento)
+const FRL_FAM_ATV=a=>/^Logger /.test(a)?'Loggers de pressão':(/^Obra/.test(a)?'Rede de água':(a==='Correção de vazamento'?'Pesquisa de vazamento':a));
+let frlS={de:FSC_MIN,ate:null,zas:['ZA1004','ZA0200'],base:'tudo',agr:'atividade',per:'dia',chave:null,dias:null,cls:null,recs:[],obras:[],
+  f:{atv:new Set(),gest:new Set(),grp:new Set(),orig:new Set()}};
+function frlCss(){
+  if(document.getElementById('frlCss')) return;
+  const st=document.createElement('style'); st.id='frlCss';
+  st.textContent=`#fisc_rel .frlbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+#fisc_rel .frlbox h3{margin:0 0 8px;font-size:14px}
+#fisc_rel .frlrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#fisc_rel .frlrow label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:2px;margin:0}
+#fisc_rel .frlrow input[type=date]{margin:0;width:auto;font-size:13px;padding:6px 8px}
+#fisc_rel .frlchips{display:flex;flex-wrap:wrap;gap:5px}
+#fisc_rel .frlchip{font:inherit;font-size:12.5px;width:auto;margin:0;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#fisc_rel .frlchip.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+#fisc_rel .frlchip small{opacity:.75;margin-left:3px}
+#fisc_rel .frlf{margin-top:8px}
+#fisc_rel .frlf>b{display:flex;gap:8px;align-items:baseline;font-size:12px;color:var(--mut);margin-bottom:4px;font-weight:600}
+#fisc_rel .frlf>b a{font-weight:400;color:var(--acc);cursor:pointer}
+#fisc_rel .frlcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0}
+@media(max-width:640px){#fisc_rel .frlcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#fisc_rel .frlcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+#fisc_rel .frlcard b{display:block;font-size:20px;line-height:1.1}
+#fisc_rel .frlcard span{font-size:12px;color:var(--mut)}
+#fisc_rel .frltab{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#fisc_rel .frltab th{font-size:11px;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+#fisc_rel .frltab td{padding:6px 8px;border-bottom:1px solid var(--line)}
+#fisc_rel .frltab .n{text-align:right;white-space:nowrap}
+#fisc_rel .frltab tr.g td{background:rgba(14,116,144,.08);font-weight:700}
+#fisc_rel .frlbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+#fisc_rel .frlbar .btn{width:auto;margin:0;padding:9px 14px}
+@media(max-width:640px){#fisc_rel .frltab .hm{display:none}}`;
+  document.head.appendChild(st);
+}
+function frlInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  frlCss();
+  if(!frlS.ate) frlS.ate=rdoHoje();
+  frlRenderParams();
+  if(frlS.recs.length||frlS.obras.length) frlRender(); else $('#frlOut').innerHTML='';
+}
+function frlRenderParams(){
+  const h=new Date(rdoHoje()+'T12:00:00'), iso=d=>d.toLocaleDateString('sv-SE');
+  const m0=iso(new Date(h.getFullYear(),h.getMonth(),1)), ma0=iso(new Date(h.getFullYear(),h.getMonth()-1,1)), ma1=iso(new Date(h.getFullYear(),h.getMonth(),0));
+  const atalhos=[['Desde o início',FSC_MIN,rdoHoje()],['Mês atual',m0<FSC_MIN?FSC_MIN:m0,rdoHoje()],['Mês anterior',ma0<FSC_MIN?FSC_MIN:ma0,ma1],['Últimos 7 dias',iso(new Date(h.getTime()-6*864e5)),rdoHoje()]]
+    .filter(a=>a[2]>=FSC_MIN);
+  const chip=(on,attr,txt)=>'<button type="button" class="frlchip'+(on?' on':'')+'" '+attr+'>'+txt+'</button>';
+  $('#frlParams').innerHTML='<div class="frlrow">'
+    +'<label>De<input type="date" id="frlDe" min="'+FSC_MIN+'" max="'+rdoHoje()+'" value="'+frlS.de+'"></label>'
+    +'<label>Até<input type="date" id="frlAte" min="'+FSC_MIN+'" max="'+rdoHoje()+'" value="'+frlS.ate+'"></label>'
+    +'<div class="frlchips" style="align-self:flex-end">'+atalhos.map((a,i)=>chip(frlS.de===a[1]&&frlS.ate===a[2],'data-frlat="'+i+'"',a[0])).join('')+'</div></div>'
+    +'<div class="frlf"><b>Consórcio</b><div class="frlchips">'+RDO_ZAS.map(([z,l])=>chip(frlS.zas.includes(z),'data-frlza="'+z+'"',vEsc(l))).join('')+'</div></div>'
+    +'<div class="frlf"><b>Dados considerados</b><div class="frlchips">'
+      +chip(frlS.base==='validado','data-frlbase="validado"','Só o validado no Consolidador')
+      +chip(frlS.base==='tudo','data-frlbase="tudo"','Todas as informações (validado + pendente)')+'</div></div>'
+    +'<div class="frlbar"><button type="button" class="btn" id="frlCarregar">'+(frlS.chave?'↻ Recarregar dados':'Carregar dados')+'</button><span class="sub" id="frlSt" style="margin:0"></span></div>';
+  const P=$('#frlParams');
+  $('#frlDe').onchange=e=>{ frlS.de=e.target.value||FSC_MIN; frlRenderParams(); };
+  $('#frlAte').onchange=e=>{ frlS.ate=e.target.value||rdoHoje(); frlRenderParams(); };
+  P.querySelectorAll('[data-frlat]').forEach(b=>b.onclick=()=>{ const a=atalhos[+b.dataset.frlat]; frlS.de=a[1]; frlS.ate=a[2]; frlRenderParams(); });
+  P.querySelectorAll('[data-frlza]').forEach(b=>b.onclick=()=>{ const z=b.dataset.frlza;
+    if(frlS.zas.includes(z)){ if(frlS.zas.length===1){ toast('Deixe pelo menos um consórcio.'); return; } frlS.zas=frlS.zas.filter(x=>x!==z); }
+    else frlS.zas=RDO_ZAS.map(x=>x[0]).filter(x=>x===z||frlS.zas.includes(x));
+    frlRenderParams(); });
+  P.querySelectorAll('[data-frlbase]').forEach(b=>b.onclick=()=>{ frlS.base=b.dataset.frlbase; frlRenderParams(); });
+  $('#frlCarregar').onclick=frlCarregar;
+  const mud=frlS.chave&&frlS.chave!==frlChave();
+  $('#frlSt').textContent=mud?'Período, consórcio ou base mudou — recarregue os dados.':'';
+}
+const frlChave=()=>[frlS.de,frlS.ate,frlS.zas.join(','),frlS.base].join('|');
+// pedaços de até 1 mês (a RPC limita a 3 meses e cada mês por ZA leva ~2 s)
+function frlPedacos(de,ate){
+  const r=[]; let a=de;
+  while(a<=ate){ const d=new Date(a+'T12:00:00'), f=new Date(d.getFullYear(),d.getMonth()+1,0).toLocaleDateString('sv-SE');
+    r.push([a,f<ate?f:ate]); a=new Date(d.getFullYear(),d.getMonth()+1,1).toLocaleDateString('sv-SE'); }
+  return r;
+}
+const frlOsLista=s=>String(s||'').split(/[,;/\s]+/).map(x=>x.trim()).filter(Boolean);
+const frlBase=s=>{ const d=String(s||'').replace(/\D/g,'').replace(/^0+/,''); return d.length===12?d.slice(0,10):(d.length===10?d:null); };
+async function frlCarregar(){
+  if(frlS.de>frlS.ate){ toast('A data inicial é depois da final.'); return; }
+  const b=$('#frlCarregar'), st=$('#frlSt'); b.disabled=true;
+  const peds=frlPedacos(frlS.de<FSC_MIN?FSC_MIN:frlS.de,frlS.ate), tot=peds.length*frlS.zas.length; let feitos=0;
+  st.textContent='Carregando 0 de '+tot+'…';
+  try{
+    const jobs=[]; frlS.zas.forEach(z=>peds.forEach(([a,f])=>jobs.push({z,a,f})));
+    const out=[]; let i=0;
+    const run=async()=>{ while(i<jobs.length){ const j=jobs[i++];
+      const {data,error}=await sb.rpc('app_fisc_periodo',{p_de:j.a,p_ate:j.f,p_za:j.z}); if(error) throw error;
+      (data||[]).forEach(d=>out.push(Object.assign({za:j.z},d))); feitos++; st.textContent='Carregando '+feitos+' de '+tot+'…'; } };
+    await Promise.all([run(),run(),run()]);
+    const dias=out.filter(d=>frlS.base==='tudo'||d.validado);
+    const os=new Set();
+    dias.forEach(d=>(d.linhas||[]).forEach(l=>(l.execs||[]).forEach(e=>{ frlOsLista(e.os_sigos).forEach(x=>os.add(x)); const o=e.extra&&e.extra._origem; if(o&&o.os) os.add(o.os); })));
+    st.textContent='Classificando por gestor e agrupamento…';
+    const {data:cls,error:ec}=await sb.rpc('app_fisc_rel_classes',{p_os:[...os]}); if(ec) throw ec;
+    frlS.dias=out; frlS.cls=cls||{os:{},familias:{}}; frlS.chave=frlChave();
+    frlMontar(); st.textContent='';
+    Object.values(frlS.f).forEach(s=>s.clear());
+    frlRenderParams(); frlRender();
+  }catch(e){ st.textContent='Não foi possível carregar: '+(e.message||e); }
+  b.disabled=false;
+}
+// gestor/agrupamento: código SIGOS da OS › (pavimento/manobra "Compartilhado") OS de origem › família da atividade
+function frlClasse(atividade,osStr,origem){
+  const C=frlS.cls||{os:{},familias:{}}, fam=f=>(C.familias||{})[f];
+  let g=null, gr=null;
+  for(const o of frlOsLista(osStr)){ const m=(C.os||{})[frlBase(o)]; if(m){ g=m.gestor; gr=m.grupo; break; } }
+  if(g==='Compartilhado'&&origem){ const m=origem.os&&(C.os||{})[frlBase(origem.os)];
+    const g2=(m&&m.gestor)||((fam(origem.familia)||{}).gestor); if(g2&&g2!=='Compartilhado'&&g2!=='—') g=g2; }
+  if(!g||!gr){ const f=fam(FRL_FAM_ATV(atividade))||{}; g=g||f.gestor; gr=gr||f.grupo; }
+  return {gestor:g&&g!=='—'?g:'Não definido', grupo:gr||'Não definido'};
+}
+function frlMontar(){
+  const recs=[], obras=[];
+  (frlS.dias||[]).forEach(d=>{
+    if(frlS.base==='validado'&&!d.validado) return;
+    const sitDia=d.validado?'Dia validado':null;
+    (d.linhas||[]).forEach(l=>(l.execs||[]).forEach(e=>{
+      const o=(e.extra&&e.extra._origem)||null, temO=o&&o.os&&o.fonte!=='nenhuma', c=frlClasse(l.atividade,e.os_sigos,temO?o:null);
+      const pt=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null, ag=!!(e.extra&&e.extra._aguarda);
+      recs.push({dia:d.dia,za:d.za,atividade:l.atividade,ordem:l.ordem==null?999:Number(l.ordem),servico:e.servico||'',origem:e.origem||'',
+        desc:e.desc||'',local:e.local||'',equipe:e.equipe||'',hora:e.hora||'',qtd:ag?0:Number(e.qtd||0),un:e.un||'',os_app:e.os_app||'',os_sigos:e.os_sigos||'',
+        stSigos:fscStSigos(e)||'',resultado:(e.extra&&e.extra.Resultado)||'',matricula:(e.extra&&e.extra['Matrícula'])||'',
+        origRecomp:temO?('OS '+o.os+' — '+[o.servico||o.familia,o.cod&&o.desc?o.cod+' '+o.desc:''].filter(Boolean).join(' · ')):(o?'não identificada':''),
+        lat:pt?pt[1]:null,lon:pt?pt[0]:null,fotos:(e.fotos||[]).filter(Boolean),aguarda:ag,
+        sit:ag?'Aguardando SIGOS (não conta)':(sitDia||(l.status==='validada'?'Linha validada':'Pendente')),
+        gestor:c.gestor,grupo:c.grupo});
+    }));
+    (d.projetos||[]).forEach(p=>{
+      if(fscSemAvanco(p)) return;   // obra sem avanço no dia não entra (igual ao Consolidador: não precisa de validação)
+      const tipo=String(p.tipo||'').trim()||'Outros', c=frlClasse('Obra',null,null);
+      const m=(p.avancos||[]).filter(fscEhMetroRede).reduce((s,x)=>s+Number(x.valor||0),0);
+      obras.push({dia:d.dia,za:d.za,atividade:'Obra — '+tipo,ordem:1000,tipo,al:fscAl(p)||'',codigo:p.codigo||'',local:p.local||'',inicio:p.inicio||'',
+        pct:Number(p.pct||0),pct_ant:Number(p.pct_ant||0),concluida:!!p.concluida,qtd:m,un:'m de rede',
+        avancos:(p.avancos||[]).map(a=>a.item+': +'+fscNum(a.valor)+(a.un==='%'?'%':' '+(a.un||''))).join('; '),
+        sit:sitDia||(p.status==='validada'?'Linha validada':'Pendente'),gestor:c.gestor,grupo:c.grupo});
+    });
+  });
+  const zi=z=>frlS.zas.indexOf(z), ord=(a,b)=>a.dia.localeCompare(b.dia)||zi(a.za)-zi(b.za)||a.ordem-b.ordem||a.atividade.localeCompare(b.atividade,'pt-BR');
+  frlS.recs=recs.sort(ord); frlS.obras=obras.sort(ord);
+}
+function frlPassa(r,ign){
+  const F=frlS.f, ok=(k,v)=>k===ign||!F[k].size||F[k].has(v);
+  return ok('atv',r.atividade)&&ok('gest',r.gestor)&&ok('grp',r.grupo)&&ok('orig',r.origem||'Obra');
+}
+const frlFiltrados=()=>({recs:frlS.recs.filter(r=>frlPassa(r)),obras:frlS.obras.filter(r=>frlPassa(r))});
+// modelo único p/ tela e Excel: quadro por agrupamento (atividade × unidade) + avanço por período
+function frlModelo(){
+  const {recs,obras}=frlFiltrados(), todos=recs.filter(r=>!r.aguarda).concat(obras);
+  const key=r=>r.atividade+'\u0001'+r.un;
+  const atvs={};
+  todos.forEach(r=>{ const k=key(r), a=atvs[k]=atvs[k]||{atividade:r.atividade,un:r.un,ordem:r.ordem,qtd:0,n:0,dias:new Set(),ini:r.dia,fim:r.dia};
+    a.qtd+=r.qtd; a.n++; a.dias.add(r.dia); if(r.dia<a.ini) a.ini=r.dia; if(r.dia>a.fim) a.fim=r.dia; });
+  const cols=Object.values(atvs).sort((a,b)=>a.ordem-b.ordem||a.atividade.localeCompare(b.atividade,'pt-BR')||a.un.localeCompare(b.un));
+  // quadro agrupado
+  const gk=r=>frlS.agr==='atividade'?'':(frlS.agr==='za'?(FRL_ZA_NOME[r.za]||r.za):r[frlS.agr]);
+  const grupos={};
+  todos.forEach(r=>{ const g=gk(r), G=grupos[g]=grupos[g]||{nome:g,linhas:{},n:0}; G.n++;
+    const k=key(r), L=G.linhas[k]=G.linhas[k]||{atividade:r.atividade,un:r.un,ordem:r.ordem,qtd:0,n:0,dias:new Set(),ini:r.dia,fim:r.dia};
+    L.qtd+=r.qtd; L.n++; L.dias.add(r.dia); if(r.dia<L.ini) L.ini=r.dia; if(r.dia>L.fim) L.fim=r.dia; });
+  const quadro=Object.values(grupos).sort((a,b)=>(a.nome==='Não definido')-(b.nome==='Não definido')||a.nome.localeCompare(b.nome,'pt-BR'))
+    .map(G=>({nome:G.nome,n:G.n,linhas:Object.values(G.linhas).sort((a,b)=>a.ordem-b.ordem||a.atividade.localeCompare(b.atividade,'pt-BR'))}));
+  // períodos (todos os dias do intervalo, mesmo sem execução, p/ o acumulado ficar contínuo)
+  const pk=d=>{ if(frlS.per==='mes') return d.slice(0,7)+'-01'; if(frlS.per==='semana'){ const x=new Date(d+'T12:00:00'); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x.toLocaleDateString('sv-SE'); } return d; };
+  const per=[]; const vistos=new Set();
+  for(let d=new Date(frlS.de+'T12:00:00'), f=new Date(frlS.ate+'T12:00:00'); d<=f; d.setDate(d.getDate()+1)){ const k=pk(d.toLocaleDateString('sv-SE')); if(!vistos.has(k)){ vistos.add(k); per.push(k); } }
+  const mat={}; todos.forEach(r=>{ const p=pk(r.dia), k=key(r); (mat[p]=mat[p]||{})[k]=(mat[p][k]||0)+r.qtd; });
+  // situação de cada dia por ZA (p/ a coluna do avanço diário)
+  const sitDia={}; (frlS.dias||[]).forEach(d=>{ (sitDia[d.dia]=sitDia[d.dia]||{})[d.za]=d.validado?'validado':'pendente'; });
+  const diasExec=new Set(todos.map(r=>r.dia));
+  return {recs,obras,todos,cols,quadro,per,pk,mat,sitDia,diasExec,key};
+}
+function frlRender(){
+  const out=$('#frlOut');
+  if(!frlS.recs.length&&!frlS.obras.length){ out.innerHTML='<p class="sub">Nenhuma execução '+(frlS.base==='validado'?'validada ':'')+'no período.</p>'; return; }
+  // opções dos filtros com contagem (cada filtro conta respeitando os outros)
+  const all=frlS.recs.concat(frlS.obras);
+  const opts=(k,fn)=>{ const c={}; all.filter(r=>frlPassa(r,k)).forEach(r=>{ const v=fn(r); c[v]=(c[v]||0)+1; });
+    frlS.f[k].forEach(v=>{ if(!(v in c)) c[v]=0; });
+    return Object.keys(c).sort((a,b)=>k==='atv'?((all.find(r=>r.atividade===a)||{}).ordem-(all.find(r=>r.atividade===b)||{}).ordem||a.localeCompare(b,'pt-BR')):((a==='Não definido')-(b==='Não definido')||a.localeCompare(b,'pt-BR'))).map(v=>[v,c[v]]); };
+  const bloco=(k,tit,fn)=>{ const o=opts(k,fn);
+    return '<div class="frlf"><b>'+tit+(frlS.f[k].size?' <a data-frllimpa="'+k+'">limpar</a>':'')+'</b><div class="frlchips">'
+      +o.map(([v,n])=>'<button type="button" class="frlchip'+(frlS.f[k].has(v)?' on':'')+'" data-frlf="'+k+'" data-v="'+vEsc(v)+'">'+vEsc(v)+'<small>'+n+'</small></button>').join('')+'</div></div>'; };
+  const M=frlModelo();
+  const nDiasVal=new Set((frlS.dias||[]).filter(d=>d.validado).map(d=>d.dia+d.za)).size, nDias=new Set((frlS.dias||[]).map(d=>d.dia+d.za)).size;
+  let h='<div class="frlbox"><h3>Filtros</h3>'
+    +bloco('atv','Atividade',r=>r.atividade)+bloco('gest','Gestor',r=>r.gestor)+bloco('grp','Agrupamento',r=>r.grupo)+bloco('orig','Origem',r=>r.origem||'Obra')
+    +'<div class="frlf"><b>Agrupar o resumo por</b><div class="frlchips">'+Object.entries(FRL_AGR).map(([k,l])=>'<button type="button" class="frlchip'+(frlS.agr===k?' on':'')+'" data-frlagr="'+k+'">'+l+'</button>').join('')+'</div></div>'
+    +'<div class="frlf"><b>Avanço por</b><div class="frlchips">'+Object.entries(FRL_PER).map(([k,l])=>'<button type="button" class="frlchip'+(frlS.per===k?' on':'')+'" data-frlper="'+k+'">'+l+'</button>').join('')+'</div></div></div>';
+  h+='<div class="frlcards"><div class="frlcard"><b>'+fscNum(M.recs.filter(r=>!r.aguarda).length)+'</b><span>execuções</span></div>'
+    +'<div class="frlcard"><b>'+fscNum(M.diasExec.size)+'</b><span>dias com execução</span></div>'
+    +'<div class="frlcard"><b>'+fscNum(M.cols.length)+'</b><span>atividades</span></div>'
+    +'<div class="frlcard"><b>'+(frlS.base==='validado'?fscNum(nDiasVal):(nDias?fscNum(100*nDiasVal/nDias,0)+'%':'—'))+'</b><span>'+(frlS.base==='validado'?'dias validados (ZA × dia)':'dos dias já validados')+'</span></div></div>';
+  h+='<div class="frlbar"><button type="button" class="btn" id="frlXlsx">⬇️ Baixar relatório Excel</button></div>';
+  const ga=frlS.agr!=='atividade';
+  h+='<table class="frltab"><thead><tr><th>Atividade</th><th class="n">Quantidade</th><th class="n">Execuções</th><th class="n hm">Dias</th><th class="n hm">Período</th></tr></thead><tbody>';
+  M.quadro.forEach(G=>{ if(ga) h+='<tr class="g"><td colspan="5">'+vEsc(G.nome)+' <span class="sub" style="font-weight:400">· '+fscNum(G.n)+' execuções</span></td></tr>';
+    G.linhas.forEach(L=>{ h+='<tr><td'+(ga?' style="padding-left:20px"':'')+'>'+vEsc(L.atividade)+'</td><td class="n">'+fscNum(L.qtd)+' '+vEsc(L.un)+'</td><td class="n">'+fscNum(L.n)+'</td><td class="n hm">'+L.dias.size+'</td><td class="n hm">'+fmtData(L.ini).slice(0,5)+' a '+fmtData(L.fim).slice(0,5)+'</td></tr>'; }); });
+  h+='</tbody></table>';
+  out.innerHTML=h;
+  out.querySelectorAll('[data-frlf]').forEach(b=>b.onclick=()=>{ const s=frlS.f[b.dataset.frlf], v=b.dataset.v; s.has(v)?s.delete(v):s.add(v); frlRender(); });
+  out.querySelectorAll('[data-frllimpa]').forEach(a=>a.onclick=()=>{ frlS.f[a.dataset.frllimpa].clear(); frlRender(); });
+  out.querySelectorAll('[data-frlagr]').forEach(b=>b.onclick=()=>{ frlS.agr=b.dataset.frlagr; frlRender(); });
+  out.querySelectorAll('[data-frlper]').forEach(b=>b.onclick=()=>{ frlS.per=b.dataset.frlper; frlRender(); });
+  $('#frlXlsx').onclick=frlExcel;
+}
+let _excelJsP=null;
+function excelJsLib(){
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  return _excelJsP||(_excelJsP=new Promise((res,rej)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload=()=>window.ExcelJS?res(window.ExcelJS):rej(new Error('ExcelJS'));
+    s.onerror=()=>{ _excelJsP=null; s.remove(); rej(new Error('não foi possível carregar a biblioteca do Excel')); };
+    document.head.appendChild(s); }));
+}
+async function frlExcel(){
+  const b=$('#frlXlsx'); b.disabled=true; const tx=b.textContent; b.textContent='Gerando…';
+  try{ const ExcelJS=await excelJsLib(); const buf=await frlMontarXlsx(ExcelJS,frlModelo());
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='relatorio_consolidado_'+frlS.zas.join('_')+'_'+frlS.de+'_a_'+frlS.ate+(frlS.base==='validado'?'_validado':'')+'.xlsx';
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }catch(e){ toast('Erro ao gerar o Excel: '+(e.message||e)); }
+  b.disabled=false; b.textContent=tx;
+}
+async function frlMontarXlsx(ExcelJS,M){
+  const AZ='FF0E7490', AZC='FFE0F2F7', CINZA='FF64748B', LINHA='FFCBD5E1', NUM='#,##0.##';
+  const wb=new ExcelJS.Workbook(); wb.creator='AcquaHub'; wb.created=new Date();
+  const borda={top:{style:'thin',color:{argb:LINHA}},bottom:{style:'thin',color:{argb:LINHA}},left:{style:'thin',color:{argb:LINHA}},right:{style:'thin',color:{argb:LINHA}}};
+  const cab=(row)=>row.eachCell(c=>{ c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZ}}; c.alignment={vertical:'middle',horizontal:'center',wrapText:true}; c.border=borda; });
+  const dt=s=>{ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
+  const F=frlS.f, filtros=[['Atividade','atv'],['Gestor','gest'],['Agrupamento','grp'],['Origem','orig']].filter(([,k])=>F[k].size).map(([l,k])=>l+': '+[...F[k]].join(', '));
+  const titulo=(ws,t,ncol)=>{
+    ws.mergeCells(1,1,1,ncol); const c=ws.getCell(1,1); c.value=t; c.font={bold:true,size:16,color:{argb:AZ}}; ws.getRow(1).height=26;
+    ws.mergeCells(2,1,2,ncol); const s=ws.getCell(2,1);
+    s.value=frlS.zas.map(z=>FRL_ZA_NOME[z]||z).join(' · ')+'  |  '+fmtData(frlS.de)+' a '+fmtData(frlS.ate)+'  |  '+(frlS.base==='validado'?'somente dias validados':'validado + pendente');
+    s.font={size:10,color:{argb:CINZA}};
+  };
+  // ---------- Resumo ----------
+  const R=wb.addWorksheet('Resumo',{views:[{showGridLines:false}],pageSetup:{orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  R.columns=[{width:44},{width:16},{width:14},{width:13},{width:13},{width:15},{width:13},{width:13}];
+  titulo(R,'Relatório de Execução — Consolidador',8);
+  let r=4;
+  const info=[['Consórcio(s)',frlS.zas.map(z=>FRL_ZA_NOME[z]||z).join(' · ')],['Período',fmtData(frlS.de)+' a '+fmtData(frlS.ate)],
+    ['Dados considerados',frlS.base==='validado'?'Somente dias validados no Consolidador (o que vai para a fiscalização COPASA)':'Todas as informações — dias validados (como foram validados) + dias pendentes (como estão agora)'],
+    ['Filtros',filtros.length?filtros.join(' | '):'nenhum (tudo)'],['Resumo agrupado por',FRL_AGR[frlS.agr]],
+    ['Gerado em',new Date().toLocaleString('pt-BR')+((ME&&(ME.nome||ME.email))?' por '+(ME.nome||ME.email):'')]];
+  info.forEach(([k,v])=>{ R.getCell(r,1).value=k; R.getCell(r,1).font={bold:true,color:{argb:CINZA}}; R.mergeCells(r,2,r,8); R.getCell(r,2).value=v; R.getCell(r,2).alignment={wrapText:true,vertical:'top'}; r++; });
+  r++;
+  const nVal=new Set((frlS.dias||[]).filter(d=>d.validado).map(d=>d.dia+d.za)).size, nTot=new Set((frlS.dias||[]).map(d=>d.dia+d.za)).size;
+  const kpis=[['Execuções',M.recs.filter(x=>!x.aguarda).length],['Dias com execução',M.diasExec.size],['Atividades',M.cols.length],[frlS.base==='validado'?'Dias validados (ZA×dia)':'Dias validados',frlS.base==='validado'?nVal:(nVal+' de '+nTot)]];
+  kpis.forEach(([k,v],i)=>{ const c0=1+i*2; if(i) R.mergeCells(r,c0,r,c0+1); if(i) R.mergeCells(r+1,c0,r+1,c0+1);
+    const cv=R.getCell(r,c0), ck=R.getCell(r+1,c0); cv.value=v; cv.font={bold:true,size:18,color:{argb:AZ}}; cv.alignment={horizontal:'center'};
+    ck.value=k; ck.font={size:10,color:{argb:CINZA}}; ck.alignment={horizontal:'center'};
+    [r,r+1].forEach(rr=>{ for(let cc=c0;cc<=(i?c0+1:c0);cc++){ const x=R.getCell(rr,cc); x.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZC}}; } }); });
+  r+=3;
+  R.getCell(r,1).value='Resumo das atividades consolidadas'+(frlS.agr==='atividade'?'':' — por '+FRL_AGR[frlS.agr].toLowerCase()); R.getCell(r,1).font={bold:true,size:12}; r++;
+  const hq=R.getRow(r); hq.values=['Atividade','Quantidade','Unidade','Execuções','Dias com execução','Média por dia c/ execução','Primeira','Última']; cab(hq); hq.height=30; r++;
+  const ga=frlS.agr!=='atividade';
+  M.quadro.forEach(G=>{
+    if(ga){ R.mergeCells(r,1,r,8); const c=R.getCell(r,1); c.value=G.nome+'  ·  '+G.n.toLocaleString('pt-BR')+' execuções'; c.font={bold:true,color:{argb:AZ}};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZC}}; c.border=borda; r++; }
+    G.linhas.forEach(L=>{ const row=R.getRow(r);
+      row.values=[(ga?'   ':'')+L.atividade,L.qtd,L.un,L.n,L.dias.size,L.dias.size?L.qtd/L.dias.size:0,dt(L.ini),dt(L.fim)];
+      row.getCell(2).numFmt=NUM; row.getCell(6).numFmt=NUM; row.getCell(4).numFmt='#,##0'; row.getCell(7).numFmt='dd/mm/yyyy'; row.getCell(8).numFmt='dd/mm/yyyy';
+      row.eachCell({includeEmpty:true},c=>{ c.border=borda; }); row.getCell(3).alignment={horizontal:'center'}; r++; });
+  });
+  if(!M.quadro.length){ R.getCell(r,1).value='Nenhuma execução com os filtros escolhidos.'; r++; }
+  // obras: situação no início e no fim do período
+  if(M.obras.length){
+    r+=2; R.getCell(r,1).value='Obras em andamento no período'; R.getCell(r,1).font={bold:true,size:12}; r++;
+    const ho=R.getRow(r); ho.values=['Obra','Tipo','AL','% no início','% no fim','Avanço (p.p.)','Rede instalada (m)','Dias c/ avanço']; cab(ho); ho.height=30; r++;
+    const po={}; M.obras.forEach(o=>{ const k=o.za+'|'+o.codigo, P=po[k]=po[k]||{codigo:o.codigo,za:o.za,tipo:o.tipo,al:o.al,ini:o.pct_ant,fim:o.pct,m:0,d:new Set()}; P.fim=o.pct; P.m+=o.qtd; P.d.add(o.dia); });
+    Object.values(po).sort((a,b)=>a.tipo.localeCompare(b.tipo)||String(a.codigo).localeCompare(String(b.codigo),'pt-BR',{numeric:true})).forEach(P=>{ const row=R.getRow(r);
+      row.values=[P.codigo+(frlS.zas.length>1?' ('+P.za+')':''),P.tipo,P.al,P.ini/100,P.fim/100,P.fim-P.ini,P.m,P.d.size];
+      row.getCell(4).numFmt='0.0%'; row.getCell(5).numFmt='0.0%'; row.getCell(6).numFmt='0.0'; row.getCell(7).numFmt=NUM;
+      row.eachCell({includeEmpty:true},c=>{ c.border=borda; }); r++; });
+  }
+  r+=2;
+  [['Como ler',true],['• Cada execução aparece uma vez só, na data do campo; a OS do SIGOS vai como atributo.'],
+   ['• Gestor e agrupamento vêm do código de serviço da OS SIGOS (tabela de códigos × gestor); sem OS SIGOS, pela família da atividade. Recomposição de pavimento e manobra (compartilhados) seguem a OS de origem.'],
+   ['• Obras: quantidade = metros de rede instalada (pullback no HDD / assentamento na VCA); dias sem avanço não entram.'],
+   ['• Traçados de pesquisa ainda sem OS executada no SIGOS aparecem na base como "Aguardando SIGOS" e não contam.']].forEach(([t,bold])=>{
+    R.mergeCells(r,1,r,8); const c=R.getCell(r,1); c.value=t; c.font=bold?{bold:true}:{size:10,color:{argb:CINZA}}; c.alignment={wrapText:true}; if(!bold) R.getRow(r).height=26; r++; });
+  // ---------- Avanço (diário/semanal/mensal) ----------
+  const nomeAv='Avanço '+FRL_PER[frlS.per].toLowerCase();
+  const A=wb.addWorksheet(nomeAv,{views:[{state:'frozen',xSplit:1,ySplit:5,showGridLines:false}]});
+  const nc=1+M.cols.length*2+(frlS.per==='dia'?1:0);
+  titulo(A,'Avanço '+FRL_PER[frlS.per].toLowerCase()+' e acumulado por atividade',Math.max(nc,6));
+  const lab=k=>frlS.per==='mes'?new Date(k+'T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).replace('.',''):(frlS.per==='semana'?'Sem. '+fmtData(k).slice(0,5):dt(k));
+  const h4=A.getRow(4), h5=A.getRow(5);
+  A.getCell(4,1).value=frlS.per==='dia'?'Data':(frlS.per==='semana'?'Semana (início)':'Mês'); A.mergeCells(4,1,5,1);
+  M.cols.forEach((c,i)=>{ const c0=2+i*2; A.mergeCells(4,c0,4,c0+1); A.getCell(4,c0).value=c.atividade+' ('+c.un+')';
+    A.getCell(5,c0).value=frlS.per==='dia'?'No dia':'No período'; A.getCell(5,c0+1).value='Acumulado'; A.getColumn(c0).width=12; A.getColumn(c0+1).width=12; });
+  if(frlS.per==='dia'){ A.getCell(4,nc).value='Situação do dia'; A.mergeCells(4,nc,5,nc); A.getColumn(nc).width=30; }
+  cab(h4); cab(h5); h4.height=48; A.getColumn(1).width=14;
+  const acum={}; let ra=6;
+  M.per.forEach((p,ix)=>{ const row=A.getRow(ra), q=M.mat[p]||{};
+    row.getCell(1).value=lab(p); if(frlS.per==='dia') row.getCell(1).numFmt='dd/mm/yyyy (ddd)';
+    M.cols.forEach((c,i)=>{ const k=M.key(c), v=q[k]||0; acum[k]=(acum[k]||0)+v; const c0=2+i*2;
+      const cv=row.getCell(c0), ca=row.getCell(c0+1); cv.value=v||null; ca.value=acum[k]; cv.numFmt=NUM; ca.numFmt=NUM; ca.font={color:{argb:CINZA}}; });
+    if(frlS.per==='dia'){ const s=M.sitDia[p]||{}; row.getCell(nc).value=frlS.zas.map(z=>(frlS.zas.length>1?z+': ':'')+(s[z]||'sem execução')).join(' · '); row.getCell(nc).font={size:9,color:{argb:CINZA}}; }
+    row.eachCell({includeEmpty:true},c=>{ c.border=borda; if(ix%2) c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}}; });
+    if(frlS.per==='dia'&&[0,6].includes(new Date(p+'T12:00:00').getDay())) row.getCell(1).font={color:{argb:CINZA},italic:true};
+    ra++; });
+  const tr=A.getRow(ra); tr.getCell(1).value='Total';
+  M.cols.forEach((c,i)=>{ const c0=2+i*2; tr.getCell(c0).value=acum[M.key(c)]||0; tr.getCell(c0).numFmt=NUM; });
+  tr.eachCell({includeEmpty:true},c=>{ c.font={bold:true}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZC}}; c.border=borda; });
+  // ---------- Base de dados ----------
+  const B=wb.addWorksheet('Base de dados',{views:[{state:'frozen',ySplit:1}]});
+  const bc=[['Data',11],['Dia da semana',11],['Consórcio',10],['Gestor',13],['Agrupamento',22],['Atividade',26],['Serviço',30],['Origem',10],['Quantidade',11],['Unidade',9],
+    ['OS SIGOS',17],['Status SIGOS',18],['Resultado SIGOS',26],['OS AcquaHub',18],['Matrícula',12],['Descrição',40],['Local',34],['Equipe',18],['Hora',7],
+    ['Serviço de origem (recomposição)',40],['Latitude',11],['Longitude',11],['Fotos',9],['Situação',20]];
+  B.columns=bc.map(([h,w])=>({header:h,width:w}));
+  const WD=['dom','seg','ter','qua','qui','sex','sáb'];
+  M.recs.forEach(x=>{ const row=B.addRow([dt(x.dia),WD[new Date(x.dia+'T12:00:00').getDay()],x.za,x.gestor,x.grupo,x.atividade,x.servico,x.origem,x.qtd,x.un,
+      x.os_sigos,x.stSigos,x.resultado,x.os_app,x.matricula||'',x.desc,x.local,x.equipe,x.hora,x.origRecomp,x.lat,x.lon,null,x.sit]);
+    if(x.fotos.length) row.getCell(23).value={text:x.fotos.length+' foto'+(x.fotos.length>1?'s':''),hyperlink:SBASE+x.fotos[0]};
+    if(x.aguarda) row.font={color:{argb:CINZA},italic:true}; });
+  M.obras.forEach(o=>B.addRow([dt(o.dia),WD[new Date(o.dia+'T12:00:00').getDay()],o.za,o.gestor,o.grupo,o.atividade,o.codigo+(o.al?' · '+o.al:''),'Obra',o.qtd,o.un,
+    '','','','','',o.avancos,o.local,'','','',null,null,null,o.sit]));
+  cab(B.getRow(1)); B.getRow(1).height=30;
+  B.getColumn(1).numFmt='dd/mm/yyyy'; B.getColumn(9).numFmt=NUM; B.getColumn(21).numFmt='0.000000'; B.getColumn(22).numFmt='0.000000';
+  B.autoFilter={from:{row:1,column:1},to:{row:1,column:bc.length}};
+  // ---------- Obras ----------
+  if(M.obras.length){
+    const O=wb.addWorksheet('Obras',{views:[{state:'frozen',ySplit:1}]});
+    const oc=[['Data',11],['Consórcio',10],['Tipo',8],['AL',8],['Obra',26],['Local',30],['Início',11],['% dia anterior',11],['% no fim do dia',11],['Avanço (p.p.)',10],['Rede instalada no dia (m)',13],['Concluída',9],['Avanços do dia',60],['Situação',16]];
+    O.columns=oc.map(([h,w])=>({header:h,width:w}));
+    M.obras.forEach(o=>{ const row=O.addRow([dt(o.dia),o.za,o.tipo,o.al,o.codigo,o.local,dt(o.inicio),o.pct_ant/100,o.pct/100,o.pct-o.pct_ant,o.qtd,o.concluida?'sim':'não',o.avancos,o.sit]);
+      row.getCell(8).numFmt='0.0%'; row.getCell(9).numFmt='0.0%'; row.getCell(10).numFmt='0.0'; row.getCell(11).numFmt=NUM; row.getCell(13).alignment={wrapText:true,vertical:'top'}; });
+    cab(O.getRow(1)); O.getRow(1).height=30; O.getColumn(1).numFmt='dd/mm/yyyy'; O.getColumn(7).numFmt='dd/mm/yyyy';
+    O.autoFilter={from:{row:1,column:1},to:{row:1,column:oc.length}};
+  }
+  return wb.xlsx.writeBuffer();
 }
 
 // --- Export XLSX (SheetJS carregado sob demanda do CDN oficial) ---
