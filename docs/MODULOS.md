@@ -4359,3 +4359,7 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   31/10 — `sigos_familia`) e **Confirmação de fraude** (152 05 00 depois) no bloco único **"Fiscalização de irregularidades e
   fraudes"**; Mapeamento de pressão e visita primária de VRP → Setorização · DMC e VRP; OS de VRP → Manutenção de VRP existente.
   Ramal predial: hoje só há substituição (143 79 00) no período — sem instalação para separar.
+- **2026-11-13 (sw v390) — blocos do relatório:** **Setorização · DMC** = Mapeamento de pressão + Logger temporário (instalação/
+  remoção) + Logger fixo (instalação; hoje só Betim, desde 20/10); **VRP** = duas atividades no relatório (`frlAtv`/`FRL_VRP`):
+  **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
+  unidades rotuladas.
