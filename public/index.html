@@ -10714,10 +10714,13 @@ const FRL_ZA_NOME={ZA1004:'ZA1004 — Contagem (Águas Integradas)',ZA0200:'ZA02
 const FRL_GRUPO_FISC='Fiscalização de irregularidades e fraudes';
 function frlGrupo(atv,un,gr){
   if(atv==='Fiscalização de irregularidade'||atv==='Confirmação de fraude') return FRL_GRUPO_FISC;
-  if(atv==='Mapeamento de pressão') return 'Setorização · DMC e VRP';
-  if(atv==='VRP') return un==='visita'?'Setorização · DMC e VRP':'Manutenção de VRP existente';
+  if(atv==='Mapeamento de pressão'||/^Logger /.test(atv)) return 'Setorização · DMC';
+  if(atv==='VRP'||atv===FRL_VRP.visita||atv===FRL_VRP.OS) return 'VRP';
   return gr;
 }
+// no relatório a linha VRP do Consolidador vira duas atividades (pedido do usuário 13/11): visita primária (app) × manutenção (OS)
+const FRL_VRP={visita:'Vistoria primária de VRP',OS:'Manutenção de VRP'};
+const frlAtv=(atv,un)=>atv==='VRP'&&FRL_VRP[un]?FRL_VRP[un]:atv;
 const FRL_FAM_ATV=a=>/^Logger |^Mapeamento de pressão/.test(a)?'Loggers de pressão':(/^Obra/.test(a)?'Rede de água':(a==='Correção de vazamento'?'Pesquisa de vazamento':a));
 let frlS={de:FSC_MIN,ate:null,zas:['ZA1004','ZA0200'],base:'tudo',agr:'atividade',per:'dia',chave:null,dias:null,cls:null,recs:[],obras:[],
   f:{atv:new Set(),gest:new Set(),grp:new Set(),orig:new Set()}};
@@ -10838,8 +10841,9 @@ function frlMontar(){
     (d.linhas||[]).forEach(l=>(l.execs||[]).forEach(e=>{
       const o=(e.extra&&e.extra._origem)||null, temO=o&&o.os&&o.fonte!=='nenhuma', c=frlClasse(l.atividade,e.os_sigos,temO?o:null);
       const pt=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null, ag=!!(e.extra&&e.extra._aguarda);
-      recs.push({dia:d.dia,za:d.za,atividade:l.atividade,ordem:l.ordem==null?999:Number(l.ordem),servico:e.servico||'',origem:e.origem||'',
-        desc:e.desc||'',local:e.local||'',equipe:e.equipe||'',hora:e.hora||'',qtd:ag?0:Number(e.qtd||0),un:fscUn(l.atividade,e.un||''),os_app:e.os_app||'',os_sigos:e.os_sigos||'',
+      const atv=frlAtv(l.atividade,e.un);
+      recs.push({dia:d.dia,za:d.za,atividade:atv,ordem:(l.ordem==null?999:Number(l.ordem))+(atv===FRL_VRP.OS?0.5:0),servico:e.servico||'',origem:e.origem||'',
+        desc:e.desc||'',local:e.local||'',equipe:e.equipe||'',hora:e.hora||'',qtd:ag?0:Number(e.qtd||0),un:atv!==l.atividade?(e.un||''):fscUn(l.atividade,e.un||''),os_app:e.os_app||'',os_sigos:e.os_sigos||'',
         stSigos:fscStSigos(e)||'',resultado:(e.extra&&e.extra.Resultado)||'',matricula:(e.extra&&e.extra['Matrícula'])||'',
         origRecomp:temO?('OS '+o.os+' — '+[o.servico||o.familia,o.cod&&o.desc?o.cod+' '+o.desc:''].filter(Boolean).join(' · ')):(o?'não identificada':''),
         lat:pt?pt[1]:null,lon:pt?pt[0]:null,fotos:(e.fotos||[]).filter(Boolean),aguarda:ag,
@@ -10998,7 +11002,7 @@ async function frlMontarXlsx(ExcelJS,M){
   r+=2;
   [['Como ler',true],['• Cada execução aparece uma vez só, na data do campo; a OS do SIGOS vai como atributo.'],
    ['• Gestor e agrupamento vêm do código de serviço da OS SIGOS (tabela de códigos × gestor); sem OS SIGOS, pela família da atividade. Recomposição de pavimento e manobra (compartilhados) seguem a OS de origem.'],
-   ['• Fiscalização segue a regra do BI Produção: vistoria 676 79 00 sempre e confirmação de infração 152 05 00 gerada até 31/10/2026 = Fiscalização de irregularidade; 152 05 00 depois = Confirmação de fraude — as duas no bloco "Fiscalização de irregularidades e fraudes". Pesquisa de vazamento: OS de detecção (SIGOS) × km de rede pesquisada (traçado do app); VRP: visita primária × OS de manutenção.'],
+   ['• Fiscalização segue a regra do BI Produção: vistoria 676 79 00 sempre e confirmação de infração 152 05 00 gerada até 31/10/2026 = Fiscalização de irregularidade; 152 05 00 depois = Confirmação de fraude — as duas no bloco "Fiscalização de irregularidades e fraudes". Pesquisa de vazamento: OS de detecção (SIGOS) × km de rede pesquisada (traçado do app). VRP em duas atividades: Vistoria primária (app) e Manutenção (OS). Setorização · DMC = mapeamento de pressão + loggers temporários e fixos.'],
    ['• Obras: quantidade = metros de rede instalada (pullback no HDD / assentamento na VCA); dias sem avanço não entram.'],
    ['• Traçados de pesquisa ainda sem OS executada no SIGOS aparecem na base como "Aguardando SIGOS" e não contam.']].forEach(([t,bold])=>{
     R.mergeCells(r,1,r,8); const c=R.getCell(r,1); c.value=t; c.font=bold?{bold:true}:{size:10,color:{argb:CINZA}}; c.alignment={wrapText:true}; if(!bold) R.getRow(r).height=26; r++; });
