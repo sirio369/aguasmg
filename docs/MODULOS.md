@@ -3154,8 +3154,8 @@ A antiga **Gestão de Pessoas** (schema `"14 - pessoas"`: candidatos, aprovaçã
 checklist de setup, desligamento, premissas de benefícios, RH/`pessoas_admin`) **foi removida do app**. A
 admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaHub.xlsx` → `public.perfil`).
 
-- **Quem vê:** card **📇 Meus colaboradores** na home › 🧰 Suporte (`#homeMeusColab`, `homeGate()` → só
-  `ME.pode_aprovar`). **Aprovador** vê os colaboradores **ativos** que o têm como Aprovador 1 ou 2; **admin** vê
+- **Quem vê:** desde 2026-11-13 (sw v391) o card **📇 Meus colaboradores** fica **dentro do hub 👥 RH** (§22), que tomou o
+  lugar dele na home › 🧰 Suporte; no hub ele só aparece para `ME.pode_aprovar`. **Aprovador** vê os colaboradores **ativos** que o têm como Aprovador 1 ou 2; **admin** vê
   todos os ativos. O próprio usuário não aparece na lista dele.
 - **Tela:** busca (nome/e-mail/cargo), chips de consórcio (com contagem), select de área; total + quantitativos
   **por área, consórcio, projeto, cargo, modalidade e direto/indireto** (barras simples, `mcBloco`), e a lista —
@@ -4363,3 +4363,57 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   remoção) + Logger fixo (instalação; hoje só Betim, desde 20/10); **VRP** = duas atividades no relatório (`frlAtv`/`FRL_VRP`):
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
+
+## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` (2026-11-13, sw v391)
+
+Card **👥 RH** na home › 🧰 Suporte, **no lugar do card Meus colaboradores** (`#homeRh`, `homeGate()` → `ME.pode_aprovar || ME.rh_acesso`).
+O hub (`rhInit`) mostra: **📇 Meus colaboradores** (só aprovador/admin — a tela `meus_colab` de sempre, §12, agora com "‹ RH"),
+**📥 Carga RH** (`rh_carga`, só `ME.rh_acesso`), **✅ Validação gestor** e **📊 Análise do ponto** (ainda "em breve", `data-rhsoon`).
+⚙️ do hub (admin) → tela **`rh_acesso`** (quem faz a carga; `perfil.rh_acesso`, RPCs `app_rh_acesso_listar`/`_set`, admin-only).
+
+### 22.1 Carga RH — tela `rh_carga` · `// ---------- CARGA RH`
+Base **única** de horas a partir do **"Relatório de Ponto do Funcionário" do DIMEP Kairos (PDF)**, um por consórcio.
+- **Leitura no navegador:** `rhParsePdf` (pdf.js 3.11.174 via `pjLoadPdfJs`, o mesmo de Projetos) lê cada página (1 funcionário por
+  página; continuação na página seguinte é juntada pelo CPF): cabeçalho (empresa, CNPJ, emissão `dd/mm/aaaa - hh:mm` do topo, nome,
+  matrícula, PIS, CPF, admissão, base de horas), linhas de dia (horário previsto, marcações, H.Trab, H.E., Ad.N., Ad.N.HE.N., C.Ponte,
+  descontos `hh:mm Atraso|Falta|DSR`, banco de horas débito/crédito, justificativa) e rodapé (dias trabalhados, atrasos, faltas, DSR,
+  saldos, HE por percentual). As colunas são **faixas fixas de x** (`RH_COLS`, página deitada, em pt); antes de ler, o cabeçalho da
+  tabela é conferido (`RH_HDR`) — se o Kairos mudar o layout, o PDF é **recusado** ("o layout do relatório mudou"), nunca gravado com
+  coluna trocada. Conferido com os relatórios de 08–13/11/2026: AI 51 funcionários / 304 dias / HE 222:56; EH 43 / 254 / 290:22
+  (bate com a análise manual).
+- **Fluxo** (um PDF de cada vez): sha256 → `app_rh_ponto_checar(sha)` (mesmo PDF já carregado com sucesso → "♻️ Já carregado em …",
+  nada sobe) → lê o PDF → upload no bucket **privado `rh-ponto`** (`<AAAA-MM-DD>/<uuid>_<nome>.pdf`, só PDF ≤ 20 MB, sem update/delete
+  = prova da carga) → `app_rh_registrar(path, nome, tamanho, sha)` → `app_rh_ponto_processar(arquivo, dados)`. Falha depois do registro
+  → `app_rh_falha`; **↻ Reprocessar** em Últimas cargas baixa o PDF do bucket, lê de novo e reenvia com o mesmo `arquivo_id`.
+- **Regras (no SQL, `app_rh_ponto_processar`):**
+  - Empresa pelo **CNPJ** → consórcio pelo de-para `"18 - rh".empresa` (AI 66.149.888/0001-37 = ZA1004; EH 66.475.418/0001-63 =
+    ZA0200). CNPJ fora do de-para → arquivo recusado, banco intacto.
+  - **Funcionário = CNPJ + CPF** (`funcionario`, único). `perfil_id` casado pelo CPF com `public.perfil` (só dígitos, 11 com zero à
+    esquerda) → o **gestor** de cada um, na validação, será o Aprovador 1/2 desse perfil. Quem não casa aparece em "sem usuário no
+    AcquaHub" no painel (em 13/11/2026: 6 dos 94).
+  - **Base única = `ponto_dia` (PK funcionário × data).** Relatórios com períodos sobrepostos: o dia fica com o **emitido por último**
+    (`emitido_em`). Relatório mais antigo que o gravado para aquele dia → o dia não muda (conta em `dias_antigos`). Mesmo conteúdo →
+    `dias_iguais` (só atualiza emissão/arquivo/parcial). Conteúdo diferente → a versão anterior vai para **`ponto_dia_hist`** e `versao`
+    sobe (`dias_alterados`) — é o rastro que a RH vai usar para conferir as correções feitas no Kairos depois da validação do gestor.
+  - `hash` do dia = md5 do conteúdo (horário, marcações, rendimentos, descontos, BH, justificativa) — não da carga.
+  - **`parcial`** = dia ≥ data da emissão (relatório tirado no meio do expediente: batidas incompletas). A próxima carga completa o dia.
+  - Mesmo sha256 que chegue ao banco mesmo assim → processa (tudo "igual") e grava **aviso** "idêntico ao já carregado em …".
+  - Nunca levanta erro de validação: grava `status='erro'` + mensagem; erro inesperado na gravação desfaz só os dados (subbloco).
+    Cargas serializadas por `pg_advisory_xact_lock('rh:ponto')`.
+- **Tela:** campo único (seletor `multiple` ou arrastar), fila da sessão com o resumo de cada PDF (empresa · ZA · funcionários · período;
+  novos / alterados / iguais / ignorados), **No banco agora** (`app_rh_painel`: por empresa — funcionários, dias, parciais, período,
+  última emissão e a lista recolhível de quem não casou com usuário) e **Últimas cargas** (`app_rh_cargas_listar(40)`). Prefixo `rhc*`/`RH_*`.
+
+**Banco (`"18 - rh"`, app-only, RLS sem policy, acesso só por RPC definer):** `empresa` (de-para CNPJ → ZA), `arquivo` (log de cargas,
+nunca apaga: path, sha256, CNPJ, ZA, emissão, período, contagens, status/erro/aviso), `funcionario`, `ponto_dia` (marcações `text[]`,
+minutos em `*_min`, `descontos` jsonb + `atraso_min`/`falta_min`/`dsr_min` somados, `parcial`, `versao`, `hash`), `ponto_dia_hist`,
+`ponto_resumo` (rodapé por carga × funcionário: HE por percentual, saldos). Helper `public.rh_pode_carregar(uid)` = admin ou
+`perfil.rh_acesso` (ativo) — usado nas RPCs e nas policies do bucket. `app_me` devolve `rh_acesso`.
+
+**Cuidados:**
+- **LGPD:** CPF e PIS ficam só no schema 18 (app-only); a tela não mostra CPF. Sem acesso GIS/BI por enquanto — se for ao BI, criar
+  view curada sem CPF/PIS.
+- O almoço da Águas Integradas vem **sempre 12:00/13:00** (pré-assinalado no Kairos) e o da Eficiência Hídrica quase sempre não vem
+  (2 batidas, sem desconto do intervalo) — é dado do relógio, não erro de leitura; a tela de inconsistências vai tratar isso.
+- Coluna nova no relatório / mudança de posição → `RH_HDR` recusa o PDF; ajustar `RH_COLS`/`RH_HDR` com um PDF novo de referência.
+- O período do PDF é o que o RH exportou: em 13/11/2026 o zip "01 a 13/11" trazia só 08–13/11.

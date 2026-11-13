@@ -157,6 +157,7 @@ pwa/
 | `15 - telemetria` | **telemetria do CCO COPASA** (vazão/volume macro, nível reservatório, bombas/pressão booster): `tele_unidade` (dimensão + cruzamento c/ cadastro), `tele_leitura` (formato longo), `tele_carga` + views `vw_cobertura`/`vw_cadastro_sem_tele` — *app-only* |
 | `16 - qsms` | **Segurança do Trabalho / QSMS** (2026-10-28): APR, PT (altura) e PET (espaço confinado) digitais — `qsms_atividade`, `qsms_formulario`, `qsms_participante` (assinaturas), `qsms_medicao` (gases), `qsms_evento` (verificações); **Indicadores SST** (2026-11-05): `sst_*` (inspeção, DDS, ocorrência + ação, ASO, treinamento, CIPA) + views `bi_sst_*` lidas pelo BI QSMS via o login genérico dos BIs `bi_leitura` (grupo `bi_qsms_leitura`; BI novo = grupo `bi_<area>_leitura` + `grant … to bi_leitura`); o BI publicado lê em Import pela API HTTPS (`rpc/bi_dados` + chave por BI em `public.bi_api_chave`, `docs/migracao_bi_api.sql`) porque o serviço não aceita o certificado do Postgres; nada pode ser apagado (trigger) — *app-only* |
 | `17 - sigos` | **Carga SIGOS** (2026-11-06): relatórios de OS do SIGOS enviados pelo Auxiliar de Programação — `arquivo` (log de cargas), `os_aberta` (carteira: Relação substitui por unidade do arquivo, 2026-11-11), `os_encerrada` (Encerradas acumula), views `vw_os_*` (BI via `bi_sigos_leitura`) + `bi_producao_os`/`_redes`/`_pesquisa` (o BI Dashboard Producao lê Encerradas, avanço de obra e pesquisa pela API `rpc/bi_dados`, chave `producao`, 2026-11-10 — `docs/migracao_bi_producao.sql`), `geo_endereco` (cache de localização da tela OS não executadas); bucket privado `sigos-relatorios` + Edge Function `sigos-ingest` — *app-only*, ver `docs/MODULOS.md §21` |
+| `18 - rh` | **RH / ponto** (2026-11-13): base única de horas do Kairos — `empresa` (CNPJ → ZA), `arquivo` (log de cargas), `funcionario` (CNPJ+CPF, `perfil_id` pelo CPF), `ponto_dia` (1 linha por funcionário × dia; dia sobreposto fica com o relatório emitido por último), `ponto_dia_hist` (versões anteriores), `ponto_resumo`; bucket privado `rh-ponto`; PII (CPF/PIS) — *app-only*, ver `docs/MODULOS.md §22` |
 | `public` | RPCs + `perfil`, `push_subscription`, `push_config` |
 
 > `6 - analises` foi **aposentado** na reorg de 2026-09 (`logger_pressao` → `8`; `dmc` → `7`; NRW → `11`).
@@ -482,7 +483,12 @@ Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão
 Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
 direto do hub deve ser `irPara('frota')`, nunca `='home'`. **Fluxos de 2026-10-16 (e-mail Amanda):** multas/ocorrências/avarias (`frota_registro`, cadastro só da equipe de frotas, aviso só ao colaborador + gestor), manutenção preventiva agendada direto pela Frotas e aviso de ocorrência de checklist pra equipe de frotas — avisos pra "equipe de frotas" usam `frota_responsaveis()` (inclui a engrenagem `frota_admin`), ver docs/MODULOS.md §6.6.
 
-**Meus colaboradores** (`meus_colab`, home › Suporte, só aprovador/admin) — substitui a antiga Gestão de
+**RH** (`rh`, home › Suporte, no lugar do card Meus colaboradores, 2026-11-13, sw v391) — hub com **Meus colaboradores** (abaixo),
+**Carga RH** (`rh_carga`: "Relatório de Ponto do Funcionário" do Kairos em PDF lido no navegador por pdf.js → base única
+funcionário × dia no schema `18 - rh`; gate `ME.rh_acesso` = admin ou ⚙️ do hub `rh_acesso`), **Validação gestor** e **Análise do
+ponto** (em breve). Ver docs/MODULOS.md §22.
+
+**Meus colaboradores** (`meus_colab`, dentro do hub RH, só aprovador/admin) — substitui a antiga Gestão de
 Pessoas (removida em 2026-10). Aprovador vê os colaboradores **ativos** que o têm como Aprovador 1/2 (admin vê todos):
 quantitativos por área/consórcio/projeto/cargo/modalidade + ficha com e-mail etc. RPC `app_meus_colaboradores`;
 aviso "novo colaborador" por trigger em `public.perfil` quando o aprovador é vinculado. Ver docs/MODULOS.md §12.
