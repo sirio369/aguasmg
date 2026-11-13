@@ -10959,7 +10959,6 @@ async function frlMontarXlsx(ExcelJS,M){
   const fonte=o=>Object.assign({name:'Calibri',size:10},o||{});
   const wb=new ExcelJS.Workbook(); wb.creator='AcquaHub'; wb.created=new Date(); wb.title='Relatório de Execução — Consolidador';
   const dt=s=>{ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
-  const F=frlS.f, filtros=[['Atividade','atv'],['Gestor','gest'],['Agrupamento','grp'],['Origem','orig']].filter(([,k])=>F[k].size).map(([l,k])=>l+': '+[...F[k]].join(', '));
   const consorcios=frlS.zas.map(z=>FRL_ZA_NOME[z]||z).join('  ·  ');
   const subt=consorcios+'   |   '+fmtData(frlS.de)+' a '+fmtData(frlS.ate)+'   |   '+(frlS.base==='validado'?'somente dias validados':'validado + pendente');
   const folha=(nome,orient,extra)=>wb.addWorksheet(nome,Object.assign({
@@ -10984,9 +10983,8 @@ async function frlMontarXlsx(ExcelJS,M){
   const NC=8; R.columns=[{width:44},{width:14},{width:24},{width:13},{width:14},{width:13},{width:13},{width:12}];
   banner(R,'Relatório de Execução — Consolidador',NC);
   let r=5;
+  // ficha só com consórcio, período e geração (pedido do usuário 13/11: sem dados considerados/filtros/segregação)
   const info=[['Consórcio(s)',consorcios],['Período',fmtData(frlS.de)+' a '+fmtData(frlS.ate)],
-    ['Dados considerados',frlS.base==='validado'?'Somente dias validados no Consolidador (o que vai para a fiscalização COPASA)':'Todas as informações — dias validados (como foram validados) + dias pendentes (como estão agora)'],
-    ['Filtros',filtros.length?filtros.join('  |  '):'nenhum (tudo)'],['Resumo segregado por',FRL_AGR[frlS.agr]],
     ['Gerado em',new Date().toLocaleString('pt-BR')+((ME&&(ME.nome||ME.email))?' por '+(ME.nome||ME.email):'')]];
   info.forEach(([k,v])=>{ const a=R.getCell(r,1); a.value=k; a.font=fonte({bold:true,color:{argb:NAVY}}); a.fill=fill(BLOCO); a.alignment={vertical:'middle',indent:1};
     R.mergeCells(r,2,r,NC); const b=R.getCell(r,2); b.value=v; b.font=fonte(); b.alignment={wrapText:true,vertical:'middle',indent:1};
@@ -11010,14 +11008,14 @@ async function frlMontarXlsx(ExcelJS,M){
   });
   if(!M.quadro.length){ R.getCell(r,1).value='Nenhuma execução com os filtros escolhidos.'; R.getCell(r,1).font=fonte({italic:true,color:{argb:CINZA}}); r++; }
   if(M.obras.length){
-    r++; secao(R,r,'Obras em andamento no período',NC); r++;
-    const ho=R.getRow(r); ho.values=['Obra','Tipo','AL','% no início','% no fim','Avanço (p.p.)','Rede instalada (m)','Dias c/ avanço']; cab(ho,1,NC); ho.height=32; r++;
+    r++; secao(R,r,'Obras em andamento no período',5); r++;
+    const ho=R.getRow(r); ho.values=['Obra','Tipo','AL','% atual da obra','Rede instalada no período (m)']; cab(ho,1,5); ho.height=32; r++;
     const po={}; M.obras.forEach(o=>{ const k=o.za+'|'+o.codigo, P=po[k]=po[k]||{codigo:o.codigo,za:o.za,tipo:o.tipo,al:o.al,ini:o.pct_ant,fim:o.pct,m:0,d:new Set()}; P.fim=o.pct; P.m+=o.qtd; P.d.add(o.dia); });
     Object.values(po).sort((a,b)=>a.tipo.localeCompare(b.tipo)||String(a.codigo).localeCompare(String(b.codigo),'pt-BR',{numeric:true})).forEach((P,ix)=>{ const row=R.getRow(r);
-      row.values=[P.codigo+(frlS.zas.length>1?' ('+P.za+')':''),P.tipo,P.al,P.ini/100,P.fim/100,P.fim-P.ini,P.m,P.d.size];
-      corpo(row,1,NC,ix%2===1); row.getCell(1).alignment={vertical:'middle',indent:1};
-      row.getCell(4).numFmt='0.0%'; row.getCell(5).numFmt='0.0%'; row.getCell(6).numFmt='+0.0;-0.0;0.0'; row.getCell(7).numFmt=nf(P.m); row.getCell(8).numFmt='#,##0';
-      [2,3,4,5,6,8].forEach(i=>row.getCell(i).alignment={horizontal:'center',vertical:'middle'}); r++; });
+      row.values=[P.codigo+(frlS.zas.length>1?' ('+P.za+')':''),P.tipo,P.al,P.fim/100,P.m];
+      corpo(row,1,5,ix%2===1); row.getCell(1).alignment={vertical:'middle',indent:1};
+      row.getCell(4).numFmt='0.0%'; row.getCell(4).font=fonte({bold:true}); row.getCell(5).numFmt=nf(P.m);
+      [2,3,4].forEach(i=>row.getCell(i).alignment={horizontal:'center',vertical:'middle'}); r++; });
   }
 
   // ================= Avanço (segregado por agrupamento) =================
