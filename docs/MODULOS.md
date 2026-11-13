@@ -4275,9 +4275,9 @@ SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha
 (`EXECUTADA · 645`, `NÃO EXEC. C/ VISITA · 126`; `fscResumoLinha`) e, no detalhe, as execuções ficam **agrupadas por status
 SIGOS** dentro da atividade (`fscExecsAgrupadas`: EXECUTADA primeiro; lançamentos do app num grupo "Lançado no AcquaHub"),
 cada uma com o selo do status (verde executada, laranja não executada); na recomposição de pavimento, bloco **"Serviço de
-origem"** (`fscOrigemHtml`: OS + serviço + como foi identificada; tracejado = provável) e resumo "origem: Ramal predial N ·
-Correção de vazamento N · sem origem N" na linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de
-origem / Origem identificada por. Chaves de `extra` começando com `_` não são listadas no "chave: valor". bloco **Obras em andamento** (% no dia, barra, avanços do
+origem"** (`fscOrigemHtml`: OS + serviço + situação; **não mostra como a origem foi achada** — pedido do usuário 13/11/2026, sw v379;
+o `fonte` segue no banco só p/ auditoria) e resumo "origem: Ramal predial N · Correção de vazamento N · sem origem N" na
+linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de origem (sem a fonte). Chaves de `extra` começando com `_` não são listadas no "chave: valor". bloco **Obras em andamento** (% no dia, barra, avanços do
 dia, acumulado recolhível, anexos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o

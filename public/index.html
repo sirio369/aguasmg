@@ -10152,7 +10152,7 @@ function fscCss(){
 #fisc .fscos .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:3px}
 #fisc .fscos .v{user-select:all;font-variant-numeric:tabular-nums}
 #fisc .fscorig{border:1px solid var(--line);border-left:4px solid #b45309;border-radius:8px;padding:6px 8px;margin:6px 0 2px;background:rgba(180,83,9,.06);overflow-wrap:anywhere}
-#fisc .fscorig.prov{border-left-style:dashed}#fisc .fscorig.sem{border-left-color:var(--line);background:transparent}
+#fisc .fscorig.sem{border-left-color:var(--line);background:transparent}
 #fisc .fscorig .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:2px}
 #fisc .fscorig .m{color:var(--mut);margin-top:2px}
 #fisc .fscstg{margin:10px 0 4px}#fisc .fscstg>.h{display:flex;align-items:center;gap:6px;margin-bottom:2px}
@@ -10280,13 +10280,12 @@ function fscOsDia(execs){
 function fscStSigos(e){ if(!e||e.origem!=='SIGOS') return null; return String((e.extra&&e.extra['Status SIGOS'])||(e.sigos==='executada'?'EXECUTADA':e.sigos)||'—').trim(); }
 function fscStCor(s){ s=String(s||'').toUpperCase(); return /^EXECUTADA/.test(s)?'#16a34a':(/N[ÃA]O EXEC/.test(s)?'#ea580c':'#64748b'); }
 const fscStPill=s=>'<span class="fscpill" style="background:'+fscStCor(s)+'">'+vEsc(s)+'</span>';
-const FSC_ORIG_FONTE={SIGOS:'informada no SIGOS (OS origem)',AcquaHub:'registro da Gestão de Pavimento',provavel:'provável — mesma matrícula/endereço',nenhuma:''};
 // serviço de origem da recomposição de pavimento (extra._origem, montado no banco)
 function fscOrigemHtml(o){
   if(!o) return '';
-  if(o.fonte==='nenhuma'||!o.os) return '<div class="fscorig sem"><div class="l">Serviço de origem</div><div class="sub" style="margin:0">Não identificado (sem OS de origem no SIGOS, no registro de pavimento nem na mesma matrícula).</div></div>';
+  if(o.fonte==='nenhuma'||!o.os) return '<div class="fscorig sem"><div class="l">Serviço de origem</div><div class="sub" style="margin:0">Não identificado.</div></div>';
   const srv=o.servico?o.servico.charAt(0).toUpperCase()+o.servico.slice(1):(o.familia||'Serviço');
-  return '<div class="fscorig'+(o.fonte==='provavel'?' prov':'')+'"><div class="l">Serviço de origem · '+vEsc(FSC_ORIG_FONTE[o.fonte]||o.fonte||'')+'</div>'
+  return '<div class="fscorig"><div class="l">Serviço de origem</div>'
     +'<div><b>OS '+vEsc(o.os)+'</b> — '+vEsc(srv)+(o.familia&&!String(o.servico||'').toLowerCase().startsWith(o.familia.toLowerCase())?' <span class="sub" style="margin:0">('+vEsc(o.familia)+')</span>':'')+'</div>'
     +'<div class="m">'+vEsc([o.cod&&o.desc?o.cod+' — '+o.desc:(o.desc||o.cod),o.situacao,o.resultado].filter(Boolean).join(' · '))+'</div></div>';
 }
@@ -10524,14 +10523,14 @@ async function fscExcel(){
     const ini=fscS.mes, fim=new Date(new Date(ini+'T12:00:00').getFullYear(),new Date(ini+'T12:00:00').getMonth()+1,0).toLocaleDateString('sv-SE');
     const ate=fim>rdoHoje()?rdoHoje():fim, de=ini<FSC_MIN?FSC_MIN:ini;
     const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].per,{p_de:de,p_ate:ate,p_za:z})));
-    const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Status SIGOS','OS de origem','Serviço de origem','Origem identificada por','Latitude','Longitude','Fotos','Situação da linha']],
+    const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Status SIGOS','OS de origem','Serviço de origem','Latitude','Longitude','Fotos','Situação da linha']],
       obr=[['Dia','ZA','AL','Obra','Extensão (m)','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
     rs.forEach((r,i)=>{ if(r.error) throw r.error; const z=fscS.zas[i];
       (r.data||[]).forEach(d=>{ const sit=x=>d.validado?'validado':(x.status||'pendente');
         (d.linhas||[]).forEach(l=>{ (l.medidas||[]).forEach(m=>res.push([fmtData(d.dia),z,l.atividade,Number(m.dia),m.un,Number(m.acum),sit(l)]));
           (l.execs||[]).forEach(e=>{ const c=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null, o=(e.extra&&e.extra._origem)||{}, temO=o.os&&o.fonte!=='nenhuma';
             exs.push([fmtData(d.dia),z,l.atividade,e.servico||'',e.origem||'',e.desc||'',e.local||'',e.equipe||'',e.hora||'',e.os_app||'',e.os_sigos||'',e.sigos||'',fscStSigos(e)||'',
-              temO?o.os:'',temO?[o.servico||o.familia,o.cod&&o.desc?o.cod+' — '+o.desc:'',o.situacao].filter(Boolean).join(' · '):'',e.extra&&e.extra._origem?(temO?(FSC_ORIG_FONTE[o.fonte]||o.fonte):'não identificada'):'',c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
+              temO?o.os:'',temO?[o.servico||o.familia,o.cod&&o.desc?o.cod+' — '+o.desc:'',o.situacao].filter(Boolean).join(' · '):(e.extra&&e.extra._origem?'não identificado':''),c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
         (d.projetos||[]).forEach(p=>obr.push([fmtData(d.dia),z,fscAl(p)||'',p.codigo||'',fscExt(p)?Math.round(fscExt(p)):'',p.tipo||'',p.local||'',p.inicio?fmtData(p.inicio):'',Number(p.pct||0),Number(p.pct_ant||0),p.concluida?'sim':'não',
           (p.avancos||[]).map(a=>a.item+': +'+a.valor+(a.un==='%'?'%':' '+(a.un||''))).join('; '),sit(p)]));
       }); });
