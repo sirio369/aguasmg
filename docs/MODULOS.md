@@ -4285,7 +4285,7 @@ atual, então some nos dias anteriores à troca) e **todos os avanços até o di
 **recolhível**: cada grupo (Valas de perfuração › Vala 1, Ramais › Ramal N…) abre/resume no próprio botão; 1º nível
 aberto, subníveis resumidos, + "abrir tudo"/"resumir tudo"; o estado fica guardado enquanto a tela está aberta. Carregado sob demanda (não entra no snapshot do dia).
 
-**Validação (só admin, `fisc_pode_validar`):** tabelas `"12 - retaguarda".fisc_linha_val(dia, za, chave, status
+**Validação (`fisc_pode_validar` = admin **ou** `perfil.fisc_validar` + `aux_acesso`; desde 2026-11-13, sw v388, a ⚙️ do próprio Consolidador — só admin, tela `fisc_val_acesso`, RPCs `app_fisc_validador_listar`/`app_fisc_validador_set(uuid, bool)`, `docs/migracao_fisc_validador_acesso.sql` — marca quem valida; a lista mostra quem abre o Consolidador; o front já obedece ao `pode_validar` das RPCs):** tabelas `"12 - retaguarda".fisc_linha_val(dia, za, chave, status
 validada, hash, obs)` e `fisc_dia(dia, za, hash, snapshot)`. **Sem ocultar** (linha ou execução) — pedido do usuário: tudo o
 que foi executado vai para a fiscalização depois de validado. Chave da linha = `atv:<atividade>` ou `proj:<kind>:<gid>`; hash = md5 dos
 `exec_id`/descrição/qtd/situação SIGOS (obra: % + avanços do dia). Status do dia: vazio / pendente / pronto / validado /

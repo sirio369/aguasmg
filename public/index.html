@@ -1298,7 +1298,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="fisc" class="hidden">
-    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button><button id="fscCfg" class="hidden" title="Quem pode validar no Consolidador" style="all:unset;cursor:pointer;font-size:22px;line-height:1;margin-left:auto;padding:2px 6px">⚙️</button></div>
     <h1 id="fscTit">Consolidador</h1>
     <p class="sub" id="fscSub">O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (fotos e mapa).
       Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço.
@@ -1319,6 +1319,16 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.</p>
     <div class="frlbox" id="frlParams"></div>
     <div id="frlOut"></div>
+  </main>
+
+  <main id="fisc_val_acesso" class="hidden">
+    <div class="bar"><button class="bk" data-go="fisc">‹ Consolidador</button></div>
+    <h1>Consolidador · Quem valida</h1>
+    <p class="sub">Marque quem pode <b>validar</b> linhas e dias (e reabrir o dia) no Consolidador. A lista mostra quem abre o Consolidador
+      (acesso ao Auxiliar de Programação); o admin sempre valida. Quem não estiver marcado continua vendo tudo, sem os botões de validar.
+      A mudança vale na próxima vez que a pessoa abrir o Consolidador.</p>
+    <input id="fvaBusca" placeholder="Buscar por nome ou e-mail…" autocomplete="off" style="margin-bottom:10px"/>
+    <div id="fvaList"><p class="sub">Carregando…</p></div>
   </main>
 
   <main id="sigos_carga" class="hidden">
@@ -2285,7 +2295,7 @@ if($('#estCons')) $('#estCons').addEventListener('change',()=>{estFiltrosRender(
 if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvoRender();});
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','fisc_rel','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 const FISCAL_TELAS=['home','fisc','fiscv','cadastro','biblioteca','notificacoes'];
 function irPara(id){
   if(ME&&ME.is_fiscal){ if(!FISCAL_TELAS.includes(id)) id='home'; if(id==='fisc') id='fiscv'; }
@@ -2324,6 +2334,7 @@ function irPara(id){
   if(id==='rdo') rdoInit();
   if(id==='fisc') fscInit();
   if(id==='fisc_rel') frlInit();
+  if(id==='fisc_val_acesso') fvaInit();
   if(id==='recad_prog') rcInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
@@ -10132,6 +10143,7 @@ function fscModo(m){
   if(fscS.modo!==m){ fscS.modo=m; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={}; }
   const t=$('#fscTit'), sub=$('#fscSub'), lg=$('#fscLeg'), bk=document.querySelector('#fisc .bar .bk');
   if(t) t.textContent=m==='cons'?'Consolidador':'Execução Física';
+  const cfg=$('#fscCfg'); if(cfg){ cfg.classList.toggle('hidden',!(m==='cons'&&ME&&ME.is_admin)); if(!cfg.dataset.ready){ cfg.dataset.ready='1'; cfg.onclick=()=>irPara('fisc_val_acesso'); } }
   if(bk){ bk.dataset.go=m==='cons'?'auxiliar_programacao':'home'; bk.textContent=m==='cons'?'‹ Auxiliar de Programação':'‹ Início'; }
   if(sub) sub.innerHTML=m==='cons'
     ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço; obra <b>sem avanço no dia não precisa de validação</b>. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
@@ -10650,6 +10662,35 @@ async function fscExcel(){
   b.disabled=false; b.textContent=tx;
 }
 
+// ⚙️ do Consolidador (só admin): quem pode validar — perfil.fisc_validar; fisc_pode_validar() = admin | (fisc_validar & aux_acesso)
+let _fvaUsers=[];
+async function fvaInit(){
+  if(!(ME&&ME.is_admin)){ irPara('fisc'); return; }
+  const cont=$('#fvaList'); if(cont) cont.innerHTML='<p class="sub">Carregando…</p>';
+  const bu=$('#fvaBusca'); if(bu&&!bu.dataset.ready){ bu.dataset.ready='1'; bu.addEventListener('input',fvaRender); }
+  try{ const {data,error}=await sb.rpc('app_fisc_validador_listar'); if(error) throw error; _fvaUsers=data||[]; }
+  catch(e){ if(cont) cont.innerHTML='<div class="banner bad">Erro: '+vEsc(e.message||e)+'</div>'; return; }
+  fvaRender();
+}
+function fvaRender(){
+  const cont=$('#fvaList'); if(!cont) return;
+  const termo=(($('#fvaBusca')||{}).value||'').trim().toLowerCase();
+  const arr=_fvaUsers.filter(u=>!termo||(u.nome||'').toLowerCase().includes(termo)||(u.email||'').toLowerCase().includes(termo));
+  if(!arr.length){ cont.innerHTML='<p class="sub">Nenhum usuário encontrado.</p>'; return; }
+  const nv=_fvaUsers.filter(u=>u.validar).length;
+  cont.innerHTML='<p class="sub" style="margin:0 0 6px">'+nv+' pessoa'+(nv===1?'':'s')+' pode'+(nv===1?'':'m')+' validar.</p>'+arr.map(u=>{
+    const sel=u.admin?'<span class="sub" style="font-size:12px">admin — valida sempre</span>'
+      :'<label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;cursor:pointer"><input type="checkbox" data-fva="'+u.id+'"'+(u.validar?' checked':'')+' style="width:20px;height:20px;margin:0">Valida</label>';
+    const obs=!u.admin&&u.validar&&!u.aux?'sem acesso ao Auxiliar — não abre o Consolidador':(u.ativo===false?'inativo':null);
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-size:14px;overflow-wrap:anywhere">'+vEsc(u.nome||u.email||'—')+'</div>'
+      +'<span class="sub" style="font-size:11px">'+vEsc([u.cargo,u.email].filter(Boolean).join(' · '))+'</span>'+(obs?'<div class="sub" style="font-size:11px;color:var(--bad);margin:0">'+vEsc(obs)+'</div>':'')+'</div>'+sel+'</div>'; }).join('');
+  cont.querySelectorAll('[data-fva]').forEach(cb=>cb.addEventListener('change',async()=>{
+    const u=_fvaUsers.find(x=>x.id===cb.dataset.fva); if(!u) return; cb.disabled=true;
+    try{ const {error}=await sb.rpc('app_fisc_validador_set',{p_uuid:u.id,p_validar:cb.checked}); if(error) throw error;
+      u.validar=cb.checked; toast(cb.checked?'✓ '+(u.nome||u.email)+' pode validar':'✓ '+(u.nome||u.email)+' não valida mais'); fvaRender(); }
+    catch(e){ toast('⚠ '+(e.message||e)); cb.checked=u.validar; cb.disabled=false; }
+  }));
+}
 // ---------- RELATÓRIO DO CONSOLIDADOR (Excel formatado) (2026-11-13) ----------
 // Tela `fisc_rel` (Auxiliar › 📋 Gestão Geral). Lê o mesmo dado do Consolidador (app_fisc_periodo, em pedaços de 1 mês
 // por ZA — a RPC aceita no máx. 3 meses) e monta um .xlsx com cara de relatório (ExcelJS, cdnjs, carregado sob demanda):
