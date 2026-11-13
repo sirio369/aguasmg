@@ -4254,6 +4254,11 @@ frentes pendentes da AL, uma a uma — a validação continua por frente). AL co
 (reconstrução igual à do %; só **Puxamento/pullback** no HDD e **Assentamento de tubulação** na VCA, a regra do Resumo de
 Projetos `pjRsEhMetroRede`), devolvido como `ext` em cada obra por `fisc_dia_dados` (fora do hash: dias validados não
 mudam; snapshot antigo sem `ext` só não mostra a linha); Z = avanços do dia nesses itens. AL = soma das frentes. Não entra no Excel.
+**Agrupamento por tipo (2026-11-13, sw v382):** acima das ALs há uma linha por **tipo de intervenção** (`p.tipo`: HDD, VCA…;
+sem tipo = "Outros", por último) que junta todos os resultados daquele tipo num bloco só: nº de ALs/frentes/obras fora de AL,
+extensão total, extensão feita somada (+ no dia), % ponderado pela extensão de todas as obras do tipo, n/N validadas e "✔ todas"
+(valida todas as obras pendentes do tipo; `data-fscgrval` = `za|tipo:X` ou `za|al:AL n`). Hierarquia tipo › AL › frente, tudo
+resumido por padrão; obra sem AL fica direto sob o tipo.
 **Pesquisa de vazamento segue o SIGOS (2026-11-13, sw v383, `docs/migracao_fisc_pesquisa_os.sql`):** a atividade é feita num dia e
 registrada no SIGOS depois; a medição é pelo SIGOS (decisão do usuário). O traçado de campo (km por colaborador × dia) se liga à
 **OS SIGOS do dia** lançada no Relatório diário da pesquisa (`"12 - retaguarda".pesquisa_dia_os`; consórcio vazio só se não houver o
