@@ -335,7 +335,8 @@ pwa/
     tabela dia × ZA × atividade com acumulado, cada execução com fotos/mapa (feed `fisc_execucoes`: 1 execução = 1 registro na
     data do campo, OS SIGOS como atributo; vazamento localizado sem correção nunca aparece) + obras em andamento com % por dia;
     só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel; detalhe da
-    atividade abre com as OS do dia separadas por vírgula — ver `docs/MODULOS.md §21.6`.
+    atividade abre com as OS do dia separadas por vírgula; status SIGOS em destaque com as execuções agrupadas por status e
+    recomposição de pavimento com o **serviço de origem** (OS + do que se trata; sw v377, `docs/migracao_fisc_pav_origem.sql`) — ver `docs/MODULOS.md §21.6`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**
