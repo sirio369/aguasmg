@@ -10155,8 +10155,8 @@ function fscCss(){
 #fisc .fscorig.sem{border-left-color:var(--line);background:transparent}
 #fisc .fscorig .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:2px}
 #fisc .fscorig .m{color:var(--mut);margin-top:2px}
-#fisc .fscstg{margin:10px 0 4px}#fisc .fscstg>.h{display:flex;align-items:center;gap:6px;margin-bottom:2px}
-#fisc .fscstg .fscpill{font-size:12px;padding:3px 10px}
+#fisc .fscstg{margin:12px 0 4px}#fisc .fscstg>.h{display:flex;align-items:baseline;gap:6px;margin-bottom:2px;padding-bottom:3px;border-bottom:1px solid var(--line);font-size:13px}
+#fisc .fscos .g{font-size:12px;margin-top:6px}#fisc .fscos .l+.g{margin-top:0}
 #fisc .fscstc{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 #fisc .fscmapa{height:300px;border-radius:10px;border:1px solid var(--line);margin:6px 0}
 #fisc .fscpb{height:8px;background:var(--line);border-radius:6px;overflow:hidden;min-width:60px}
@@ -10266,20 +10266,32 @@ function fscFotos(arr){
     return /\.pdf$/i.test(p)?'<a class="doc" href="'+vEsc(u)+'" target="_blank" rel="noopener">📄 PDF</a>'
       :'<a href="'+vEsc(u)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+vEsc(u)+'" alt="foto"></a>'; }).join('')+'</div>';
 }
-// consolidado das OS do dia da linha: OS SIGOS (ou a do AcquaHub quando não há SIGOS), sem repetir, separadas por vírgula
+// consolidado das OS do dia da linha: OS SIGOS (ou a do AcquaHub quando não há SIGOS), sem repetir, separadas por vírgula;
+// com OS do SIGOS na linha, separadas pelo status SIGOS (mesmos grupos do detalhe, sem cor)
 function fscOsDia(execs){
-  const os=[], vistos=new Set(), sem=[];
+  const vistos=new Set(), sem=[];
   // a mesma OS pode vir com zeros à esquerda/sufixo (SIGOS) ou só a base digitada no app → não repete (base de 10 dígitos)
-  (execs||[]).forEach(e=>{ const n=e.os_sigos||e.os_app; if(n){ const t=String(n).trim(), b=t.replace(/\D/g,'').replace(/^0+/,'').slice(0,10)||t; if(!vistos.has(b)){ vistos.add(b); os.push(t); } } else sem.push(e); });
-  os.sort();
-  return '<div class="fscos"><div class="l">OS do dia ('+os.length+')</div>'
-    +(os.length?'<div class="v">'+vEsc(os.join(', '))+'</div>':'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>')
+  const lista=ex=>{ const os=[]; ex.forEach(e=>{ const n=e.os_sigos||e.os_app; if(n){ const t=String(n).trim(), b=t.replace(/\D/g,'').replace(/^0+/,'').slice(0,10)||t; if(!vistos.has(b)){ vistos.add(b); os.push(t); } } else sem.push(e); }); return os.sort(); };
+  const gs=fscGruposSt(execs).map(([k,ex])=>[k,lista(ex)]).filter(([,os])=>os.length), n=gs.reduce((a,[,os])=>a+os.length,0);
+  const corpo=!n?'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>'
+    :(gs.length===1&&gs[0][0]===null?'<div class="v">'+vEsc(gs[0][1].join(', '))+'</div>'
+      :gs.map(([k,os])=>'<div class="g"><b>'+vEsc(k)+' ('+os.length+')</b></div><div class="v">'+vEsc(os.join(', '))+'</div>').join(''));
+  return '<div class="fscos"><div class="l">OS do dia ('+n+')</div>'+corpo
     +(sem.length?'<div class="sub" style="margin:4px 0 0">+ '+sem.length+' registro'+(sem.length===1?'':'s')+' sem OS</div>':'')+'</div>';
+}
+// grupos por status SIGOS (EXECUTADA primeiro; lançamentos do app em "Lançado no AcquaHub"); linha sem SIGOS = 1 grupo [null, execs]
+function fscGruposSt(execs){
+  execs=execs||[];
+  if(!execs.some(e=>e.origem==='SIGOS')) return [[null,execs]];
+  const gs={}, ord=[];
+  execs.forEach(e=>{ const k=fscStSigos(e)||'Lançado no AcquaHub'; if(!gs[k]){ gs[k]=[]; ord.push(k); } gs[k].push(e); });
+  const peso=k=>k==='Lançado no AcquaHub'?9:(/^EXECUTADA/i.test(k)?(k.toUpperCase()==='EXECUTADA'?0:1):5);
+  ord.sort((a,b)=>peso(a)-peso(b)||a.localeCompare(b,'pt-BR'));
+  return ord.map(k=>[k,gs[k]]);
 }
 // status da OS no SIGOS (EXECUTADA, NÃO EXEC. C/ VISITA…) — só p/ execução que veio do SIGOS; null p/ lançamento do app
 function fscStSigos(e){ if(!e||e.origem!=='SIGOS') return null; return String((e.extra&&e.extra['Status SIGOS'])||(e.sigos==='executada'?'EXECUTADA':e.sigos)||'—').trim(); }
 function fscStCor(s){ s=String(s||'').toUpperCase(); return /^EXECUTADA/.test(s)?'#16a34a':(/N[ÃA]O EXEC/.test(s)?'#ea580c':'#64748b'); }
-const fscStPill=s=>'<span class="fscpill" style="background:'+fscStCor(s)+'">'+vEsc(s)+'</span>';
 // serviço de origem da recomposição de pavimento (extra._origem, montado no banco)
 function fscOrigemHtml(o){
   if(!o) return '';
@@ -10295,21 +10307,17 @@ function fscExecHtml(z,e){
   const kv=Object.entries(e.extra||{}).filter(([k])=>k.charAt(0)!=='_'&&!(st&&k==='Status SIGOS')).map(([k,v])=>k+': '+v).join(' · ');
   const meta=[e.local, e.equipe?'equipe '+e.equipe:null, e.hora].filter(Boolean).join(' · ');
   return '<div class="fscex">'
-    +'<div class="t">'+(st?fscStPill(st)+' ':'')+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
+    +'<div class="t">'+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
     +'<div>'+vEsc(e.desc||'')+'</div>'+(meta?'<div class="m">'+vEsc(meta)+'</div>':'')+(os?'<div class="m">'+vEsc(os)+'</div>':'')
     +fscOrigemHtml(e.extra&&e.extra._origem)
     +(kv?'<div class="kv">'+vEsc(kv)+'</div>':'')+fscFotos(e.fotos)+'</div>';
 }
-// execuções da linha agrupadas pelo status no SIGOS (EXECUTADA primeiro); lançamentos do app num grupo à parte
+// execuções da linha agrupadas pelo status no SIGOS (sem cor — a cor fica só nos chips da linha pai)
 function fscExecsAgrupadas(z,execs){
-  execs=execs||[];
-  if(!execs.some(e=>e.origem==='SIGOS')) return execs.map(e=>fscExecHtml(z,e)).join('');
-  const gs={}, ord=[];
-  execs.forEach(e=>{ const k=fscStSigos(e)||'Lançado no AcquaHub'; if(!gs[k]){ gs[k]=[]; ord.push(k); } gs[k].push(e); });
-  const peso=k=>k==='Lançado no AcquaHub'?9:(/^EXECUTADA/i.test(k)?(k.toUpperCase()==='EXECUTADA'?0:1):5);
-  ord.sort((a,b)=>peso(a)-peso(b)||a.localeCompare(b,'pt-BR'));
-  return ord.map(k=>'<div class="fscstg"><div class="h">'+(k==='Lançado no AcquaHub'?'<span class="fscpill" style="background:var(--acc)">'+vEsc(k)+'</span>':fscStPill(k))
-    +' <span class="sub" style="margin:0">'+gs[k].length+' OS</span></div>'+gs[k].map(e=>fscExecHtml(z,e)).join('')+'</div>').join('');
+  const gs=fscGruposSt(execs);
+  if(gs.length===1&&gs[0][0]===null) return gs[0][1].map(e=>fscExecHtml(z,e)).join('');
+  return gs.map(([k,ex])=>'<div class="fscstg"><div class="h"><b>'+vEsc(k)+'</b> <span class="sub" style="margin:0">'+ex.length+' OS</span></div>'
+    +ex.map(e=>fscExecHtml(z,e)).join('')+'</div>').join('');
 }
 // resumo na própria linha: contagem por status SIGOS (e, na recomposição, por família do serviço de origem)
 function fscResumoLinha(l){

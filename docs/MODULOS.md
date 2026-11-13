@@ -4273,8 +4273,9 @@ repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros se
 SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha,
 **status SIGOS em destaque (2026-11-13, sw v377, só front):** a linha da atividade mostra chips com a contagem por status
 (`EXECUTADA · 645`, `NÃO EXEC. C/ VISITA · 126`; `fscResumoLinha`) e, no detalhe, as execuções ficam **agrupadas por status
-SIGOS** dentro da atividade (`fscExecsAgrupadas`: EXECUTADA primeiro; lançamentos do app num grupo "Lançado no AcquaHub"),
-cada uma com o selo do status (verde executada, laranja não executada); na recomposição de pavimento, bloco **"Serviço de
+SIGOS** dentro da atividade (`fscGruposSt`/`fscExecsAgrupadas`: EXECUTADA primeiro; lançamentos do app num grupo "Lançado no
+AcquaHub"), e o "OS do dia" também sai separado por status (`fscOsDia`). **Cor só nos chips da linha pai** (verde executada,
+laranja não executada): no detalhe os grupos e as execuções ficam sem cor (pedido do usuário 13/11/2026, sw v379); na recomposição de pavimento, bloco **"Serviço de
 origem"** (`fscOrigemHtml`: OS + serviço + situação; **não mostra como a origem foi achada** — pedido do usuário 13/11/2026, sw v379;
 o `fonte` segue no banco só p/ auditoria) e resumo "origem: Ramal predial N · Correção de vazamento N · sem origem N" na
 linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de origem (sem a fonte). Chaves de `extra` começando com `_` não são listadas no "chave: valor". bloco **Obras em andamento** (% no dia, barra, avanços do
