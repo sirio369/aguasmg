@@ -10273,7 +10273,7 @@ function fscFotos(arr){
 function fscOsDia(execs){
   const vistos=new Set(), sem=[];
   // a mesma OS pode vir com zeros à esquerda/sufixo (SIGOS) ou só a base digitada no app → não repete (base de 10 dígitos)
-  const lista=ex=>{ const os=[]; ex.forEach(e=>{ const n=e.os_sigos||e.os_app; if(n){ const t=String(n).trim(), b=t.replace(/\D/g,'').replace(/^0+/,'').slice(0,10)||t; if(!vistos.has(b)){ vistos.add(b); os.push(t); } } else sem.push(e); }); return os.sort(); };
+  const lista=ex=>{ const os=[]; ex.forEach(e=>{ const n=e.os_sigos||e.os_app; if(n){ const t=String(n).trim(), b=fscOsBase(t); if(!vistos.has(b)){ vistos.add(b); os.push(t); } } else sem.push(e); }); return os.sort(); };
   const gs=fscGruposSt(execs).map(([k,ex])=>[k,lista(ex)]).filter(([,os])=>os.length), n=gs.reduce((a,[,os])=>a+os.length,0);
   const corpo=!n?'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>'
     :(gs.length===1&&gs[0][0]===null?'<div class="v">'+vEsc(gs[0][1].join(', '))+'</div>'
@@ -10282,12 +10282,23 @@ function fscOsDia(execs){
     +(sem.length?'<div class="sub" style="margin:4px 0 0">+ '+sem.length+' registro'+(sem.length===1?'':'s')+' sem OS</div>':'')+'</div>';
 }
 // grupos por status SIGOS (EXECUTADA primeiro; lançamentos do app em "Lançado no AcquaHub"); linha sem SIGOS = 1 grupo [null, execs]
-function fscGruposSt(execs){
+// base de 10 dígitos da OS (SIGOS vem com zeros à esquerda/sufixo; o app pode ter só a base)
+const fscOsBase=n=>{ const t=String(n||'').trim(); return t.replace(/\D/g,'').replace(/^0+/,'').slice(0,10)||t; };
+// lançamento do app que aponta para uma OS SIGOS da mesma linha (ex.: traçado da pesquisa × OS do dia) vira parte do card da OS
+// (e._filhos) e sai da lista; o SIGOS é a referência da medição
+function fscAninha(execs){
   execs=execs||[];
+  const sig={}; execs.forEach(e=>{ if(e.origem==='SIGOS'&&e.os_sigos) sig[fscOsBase(e.os_sigos)]=e; });
+  const fil={}, out=[];
+  execs.forEach(e=>{ const p=e.origem!=='SIGOS'&&e.os_sigos?sig[fscOsBase(e.os_sigos)]:null; if(p) (fil[p.id]=fil[p.id]||[]).push(e); else out.push(e); });
+  return out.map(e=>fil[e.id]?Object.assign({},e,{_filhos:fil[e.id]}):e);
+}
+function fscGruposSt(execs){
+  execs=fscAninha(execs);
   if(!execs.some(e=>e.origem==='SIGOS')) return [[null,execs]];
   const gs={}, ord=[];
-  execs.forEach(e=>{ const k=fscStSigos(e)||'Lançado no AcquaHub'; if(!gs[k]){ gs[k]=[]; ord.push(k); } gs[k].push(e); });
-  const peso=k=>k==='Lançado no AcquaHub'?9:(/^EXECUTADA/i.test(k)?(k.toUpperCase()==='EXECUTADA'?0:1):5);
+  execs.forEach(e=>{ const k=fscStSigos(e)||(e.extra&&e.extra._aguarda?'Aguardando SIGOS':'Lançado no AcquaHub'); if(!gs[k]){ gs[k]=[]; ord.push(k); } gs[k].push(e); });
+  const peso=k=>k==='Lançado no AcquaHub'?9:(k==='Aguardando SIGOS'?8:(/^EXECUTADA/i.test(k)?(k.toUpperCase()==='EXECUTADA'?0:1):5));
   ord.sort((a,b)=>peso(a)-peso(b)||a.localeCompare(b,'pt-BR'));
   return ord.map(k=>[k,gs[k]]);
 }
@@ -10311,8 +10322,16 @@ function fscExecHtml(z,e){
   return '<div class="fscex">'
     +'<div class="t">'+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
     +'<div>'+vEsc(e.desc||'')+'</div>'+(meta?'<div class="m">'+vEsc(meta)+'</div>':'')+(os?'<div class="m">'+vEsc(os)+'</div>':'')
-    +fscOrigemHtml(e.extra&&e.extra._origem)
+    +fscOrigemHtml(e.extra&&e.extra._origem)+fscFilhosHtml(e._filhos)
     +(kv?'<div class="kv">'+vEsc(kv)+'</div>':'')+fscFotos(e.fotos)+'</div>';
+}
+// lançamentos do app ligados à OS SIGOS (ex.: traçado de campo da pesquisa), em destaque menor dentro do card da OS
+function fscFilhosHtml(fs){
+  if(!fs||!fs.length) return '';
+  return fs.map(f=>{ const c=f.extra&&f.extra._campo;
+    return '<div class="fscorig"><div class="l">'+(f.servico==='Rede pesquisada'?'Traçado de campo':vEsc(f.servico||'Registro de campo'))+'</div>'
+      +'<div>'+vEsc(f.desc||'')+'</div>'
+      +'<div class="m">'+vEsc([c?'campo em '+fmtData(c):null,f.equipe,f.hora].filter(Boolean).join(' · '))+'</div></div>'; }).join('');
 }
 // execuções da linha agrupadas pelo status no SIGOS (sem cor — a cor fica só nos chips da linha pai)
 function fscExecsAgrupadas(z,execs){
@@ -10328,6 +10347,8 @@ function fscResumoLinha(l){
   let h='';
   const ks=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
   if(ks.length) h+='<div class="fscstc">'+ks.map(k=>'<span class="fscpill" style="background:'+fscStCor(k)+'">'+vEsc(k)+' · '+cnt[k]+'</span>').join('')+'</div>';
+  const ag=ex.filter(e=>e.extra&&e.extra._aguarda).length;   // traçado de pesquisa sem OS executada no SIGOS: não conta (0 km)
+  if(ag) h+='<div class="sub" style="margin:3px 0 0">'+ag+' registro'+(ag===1?'':'s')+' aguardando o SIGOS (não conta no dia)</div>';
   const orig=ex.map(e=>e.extra&&e.extra._origem).filter(Boolean);
   if(orig.length){ const fo={}; orig.forEach(o=>{ const f=o.os&&o.fonte!=='nenhuma'?(o.familia||o.servico||'outro'):'sem origem'; fo[f]=(fo[f]||0)+1; });
     h+='<div class="sub" style="margin:3px 0 0">origem: '+vEsc(Object.keys(fo).sort((a,b)=>(a==='sem origem')-(b==='sem origem')||fo[b]-fo[a]).map(f=>f+' '+fo[f]).join(' · '))+'</div>'; }

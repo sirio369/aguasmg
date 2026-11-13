@@ -4254,6 +4254,13 @@ frentes pendentes da AL, uma a uma — a validação continua por frente). AL co
 (reconstrução igual à do %; só **Puxamento/pullback** no HDD e **Assentamento de tubulação** na VCA, a regra do Resumo de
 Projetos `pjRsEhMetroRede`), devolvido como `ext` em cada obra por `fisc_dia_dados` (fora do hash: dias validados não
 mudam; snapshot antigo sem `ext` só não mostra a linha); Z = avanços do dia nesses itens. AL = soma das frentes. Não entra no Excel.
+**Pesquisa de vazamento segue o SIGOS (2026-11-13, sw v383, `docs/migracao_fisc_pesquisa_os.sql`):** a atividade é feita num dia e
+registrada no SIGOS depois; a medição é pelo SIGOS (decisão do usuário). O traçado de campo (km por colaborador × dia) se liga à
+**OS SIGOS do dia** lançada no Relatório diário da pesquisa (`"12 - retaguarda".pesquisa_dia_os`; consórcio vazio só se não houver o
+do consórcio). OS já contando no SIGOS → o traçado vai para o **dia da OS no SIGOS** e conta os km lá (`extra._campo` = dia do
+campo); na tela ele aparece **dentro do card da OS SIGOS** como "Traçado de campo" (`fscAninha`/`fscFilhosHtml`: qualquer
+lançamento do app com `os_sigos` = OS SIGOS da mesma linha). Sem OS executada → fica no dia do campo com **0 km**, grupo
+"Aguardando SIGOS" (`extra._aguarda`), **fora do hash** da linha (`fisc_linhas`), e a linha pai avisa "n registro(s) aguardando o SIGOS".
 **Detalhe acumulado da obra** (▾ da obra): `app_fisc_proj_detalhe(kind, gid, dia)` devolve a **árvore como estava no fim
 do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), **só os
 anexos já feitos até o dia** (`anexos`: `intervencao_documento` com data ≤ fim do dia + links informados nas etapas, com
