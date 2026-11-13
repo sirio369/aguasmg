@@ -1308,7 +1308,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="fsctop">
       <div class="fsczas" id="fscZas"></div>
       <div class="fscnav"><button type="button" id="fscPrev">‹</button><b id="fscMesTit"></b><button type="button" id="fscNext">›</button></div>
-      <button type="button" class="btn fscxl" id="fscXlsx">⬇️ Excel do mês</button>
     </div>
     <div class="fsccal" id="fscCal"></div>
     <div class="fscleg" id="fscLeg"><span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span></div>
@@ -10226,7 +10225,7 @@ function fscCss(){
 #fisc .fsczas button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
 #fisc .fscnav{display:flex;align-items:center;gap:6px;flex:1 1 220px;justify-content:space-between}
 #fisc .fscnav b{font-size:15px;text-align:center;flex:1}
-#fisc .fscnav button,#fisc .fscxl{font:inherit;width:auto;margin:0;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+#fisc .fscnav button{font:inherit;width:auto;margin:0;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 #fisc .fscnav button:disabled{opacity:.35;cursor:default}
 #fisc .fsccal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:6px 0 4px}
 #fisc .fsccal .wd{font-size:11px;color:var(--mut);text-align:center}
@@ -10304,10 +10303,9 @@ function fscInit(){
   fscCss();
   if(!fscS.mes){ const h=rdoHoje(); fscS.mes=(h<FSC_MIN?FSC_MIN:h).slice(0,7)+'-01'; }
   fscRenderZas();
-  const pv=$('#fscPrev'), nx=$('#fscNext'), xl=$('#fscXlsx');
+  const pv=$('#fscPrev'), nx=$('#fscNext');
   if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,-1); fscS.dia=null; fscCarregarMes(); }; }
   if(nx&&!nx.dataset.ready){ nx.dataset.ready='1'; nx.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,1); fscS.dia=null; fscCarregarMes(); }; }
-  if(xl&&!xl.dataset.ready){ xl.dataset.ready='1'; xl.onclick=fscExcel; }
   const dbox=$('#fscDia');
   if(dbox&&!dbox.dataset.arv){ dbox.dataset.arv='1';
     dbox.addEventListener('toggle',e=>{ const g=e.target; if(g&&g.dataset&&g.dataset.fscgr) fscS.arvAb[g.dataset.fscgr]=g.open; },true);
@@ -10706,33 +10704,7 @@ function fscMapa(k,l){
   if(window.ResizeObserver){ const ro=new ResizeObserver(()=>m.invalidateSize()); ro.observe(el); }
   setTimeout(()=>m.invalidateSize(),60);
 }
-// Excel do mês (aba Resumo = dia × ZA × atividade; aba Execuções = uma linha por execução; aba Obras = % por dia).
-// Dia validado sai do que foi validado (snapshot); os demais saem como estão agora, com a coluna "Situação".
-async function fscExcel(){
-  const b=$('#fscXlsx'); b.disabled=true; const tx=b.textContent; b.textContent='Gerando…';
-  try{
-    const ini=fscS.mes, fim=new Date(new Date(ini+'T12:00:00').getFullYear(),new Date(ini+'T12:00:00').getMonth()+1,0).toLocaleDateString('sv-SE');
-    const ate=fim>rdoHoje()?rdoHoje():fim, de=ini<FSC_MIN?FSC_MIN:ini;
-    const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].per,{p_de:de,p_ate:ate,p_za:z})));
-    const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Status SIGOS','OS de origem','Serviço de origem','Latitude','Longitude','Fotos','Situação da linha']],
-      obr=[['Dia','ZA','AL','Obra','Extensão (m)','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
-    rs.forEach((r,i)=>{ if(r.error) throw r.error; const z=fscS.zas[i];
-      (r.data||[]).forEach(d=>{ const sit=x=>d.validado?'validado':(x.status||'pendente');
-        (d.linhas||[]).forEach(l=>{ (l.medidas||[]).forEach(m=>res.push([fmtData(d.dia),z,l.atividade,Number(m.dia),fscUn(l.atividade,m.un),Number(m.acum),sit(l)]));
-          (l.execs||[]).forEach(e=>{ const c=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null, o=(e.extra&&e.extra._origem)||{}, temO=o.os&&o.fonte!=='nenhuma';
-            exs.push([fmtData(d.dia),z,l.atividade,e.servico||'',e.origem||'',e.desc||'',e.local||'',e.equipe||'',e.hora||'',e.os_app||'',e.os_sigos||'',e.sigos||'',fscStSigos(e)||'',
-              temO?o.os:'',temO?[o.servico||o.familia,o.cod&&o.desc?o.cod+' — '+o.desc:'',o.situacao].filter(Boolean).join(' · '):(e.extra&&e.extra._origem?'não identificado':''),c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
-        (d.projetos||[]).forEach(p=>obr.push([fmtData(d.dia),z,fscAl(p)||'',p.codigo||'',fscExt(p)?Math.round(fscExt(p)):'',p.tipo||'',p.local||'',p.inicio?fmtData(p.inicio):'',Number(p.pct||0),Number(p.pct_ant||0),p.concluida?'sim':'não',
-          (p.avancos||[]).map(a=>a.item+': +'+a.valor+(a.un==='%'?'%':' '+(a.un||''))).join('; '),sit(p)]));
-      }); });
-    const XLSX=await getXLSX(), wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(res),'Resumo');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(exs),'Execuções');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(obr),'Obras');
-    XLSX.writeFile(wb,(fscCons()?'consolidador_':'fiscalizacao_validado_')+fscS.zas.join('_')+'_'+de+'_a_'+ate+'.xlsx');
-  }catch(e){ toast('Erro ao exportar: '+(e.message||e)); }
-  b.disabled=false; b.textContent=tx;
-}
+// (botão "Excel do mês" removido 13/11 a pedido do usuário — o Excel agora é o Relatório consolidado, fisc_rel)
 
 // ⚙️ do Consolidador (só admin): quem pode validar — perfil.fisc_validar; fisc_pode_validar() = admin | (fisc_validar & aux_acesso)
 let _fvaUsers=[];
