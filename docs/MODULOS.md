@@ -4271,7 +4271,10 @@ lançado no dia e não concluída nele (`fisc_sem_avanco` / `fscSemAvanco`) cont
 cinza "sem avanço", sem ✔, fora do "✔ todas" (tipo/AL), do "Validar todas as linhas", da contagem "a validar" e da pendência do
 "Validar o dia" (`app_fisc_dia_validar`); no calendário (`app_fisc_mes`) não entra em n/pend → dia só com obra sem avanço fica
 **vazio** ("Nada a validar"). Entra no snapshot do dia validado (a Fiscalização vê o %); Excel = situação "sem avanço"
-(`app_fisc_periodo`). Hashes não mudam: dias já validados seguem validados; avanço lançado depois com data do dia volta a exigir validação.
+(`app_fisc_periodo`). Hashes não mudam: dias já validados seguem validados; avanço lançado depois com data do dia volta a exigir validação. **Trava no servidor**
+(`fisc_obra_sem_avanco_trava`): `app_fisc_linha_validar` recusa obra sem avanço e `app_fisc_dia_validar` recusa dia sem nada a
+validar. Limpeza 13/11 (pedido do usuário, com backup `_bkp_fisc_linha_val_semav_20261113` / `_bkp_fisc_dia_semav_20261113`):
+9 validações de obra sem avanço apagadas e os dias ZA1004 03/10 e 04/10 (só obra sem avanço) desvalidados → cinza/vazio.
 **Detalhe acumulado da obra** (▾ da obra): `app_fisc_proj_detalhe(kind, gid, dia)` devolve a **árvore como estava no fim
 do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), **só os
 anexos já feitos até o dia** (`anexos`: `intervencao_documento` com data ≤ fim do dia + links informados nas etapas, com

@@ -67,3 +67,32 @@ begin
   if d = d0 then raise exception 'app_fisc_periodo: trecho 1 não encontrado'; end if;
   execute d;
 end $mig$;
+
+-- ===================== 2ª parte (2026-11-13, pedido do usuário: "o que estiver validado e não tiver avanço, remova o validado") =====================
+-- APLICADO em produção em 2026-11-13 (migração `fisc_obra_sem_avanco_trava`).
+-- Limpeza feita antes (via MCP), com backup:
+--   · 9 validações de obra sem avanço apagadas de fisc_linha_val (ZA1004, AL 13 F01/F02 em 03–06/10 e F04 em 06/10)
+--     → backup "12 - retaguarda"._bkp_fisc_linha_val_semav_20261113;
+--   · 2 dias validados que só tinham obra sem avanço (ZA1004 03/10 e 04/10) desvalidados (viram "vazio")
+--     → backup "12 - retaguarda"._bkp_fisc_dia_semav_20261113.
+-- Os 21 dias validados restantes não mudaram (hash do dia não depende das validações de linha).
+-- Trava no servidor (vale também p/ app antigo): não valida obra sem avanço nem dia sem nada a validar.
+do $mig$
+declare d text; d0 text;
+begin
+  d0 := pg_get_functiondef('public.app_fisc_linha_validar(date,text,text,text,text)'::regprocedure);
+  d := replace(d0, $a$  if v_hash is null then raise exception 'linha não encontrada neste dia'; end if;$a$,
+                   $a$  if v_hash is null then raise exception 'linha não encontrada neste dia'; end if;
+  if exists (select 1 from jsonb_array_elements(coalesce(d->'projetos', '[]')) x where x->>'chave' = p_chave and public.fisc_sem_avanco(x))
+    then raise exception 'obra sem avanço neste dia — não precisa de validação'; end if;$a$);
+  if d = d0 then raise exception 'app_fisc_linha_validar: trecho 1 não encontrado'; end if;
+  execute d;
+
+  d0 := pg_get_functiondef('public.app_fisc_dia_validar(date,text)'::regprocedure);
+  d := replace(d0, $a$  if v_pend > 0 then raise exception '% linha(s) ainda sem validar', v_pend; end if;$a$,
+                   $a$  if v_pend > 0 then raise exception '% linha(s) ainda sem validar', v_pend; end if;
+  if not exists (select 1 from jsonb_array_elements(coalesce(d->'linhas', '[]') || coalesce(d->'projetos', '[]')) x where not public.fisc_sem_avanco(x))
+    then raise exception 'nada a validar neste dia (sem execuções e obras sem avanço)'; end if;$a$);
+  if d = d0 then raise exception 'app_fisc_dia_validar: trecho 3 não encontrado'; end if;
+  execute d;
+end $mig$;
