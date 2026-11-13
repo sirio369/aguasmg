@@ -11012,6 +11012,7 @@ async function frlExcel(){
   b.disabled=false; b.textContent=tx;
 }
 async function frlMontarXlsx(ExcelJS,M){
+  // enxuto (13/11): sem cartões, sem coluna Execuções, sem "Como ler", sem Situação do dia; bases sem gestor/origem da recomposição/fotos/situação
   // visual (pedido do usuário 13/11: "mais profissional e segregado"): faixa de título, ficha, cartões, blocos por agrupamento,
   // número sem vírgula sobrando (inteiro × 2 casas), datas legíveis, impressão A4 com cabeçalho/rodapé
   const NAVY='FF1F3864', NAVY2='FF2F5496', TEAL='FF0E7490', BLOCO='FFDCE6F1', ZEBRA='FFF7F9FC', CINZA='FF64748B', HAIR='FFE2E8F0', BRANCO='FFFFFFFF', FDS='FFF1F1F1';
@@ -11021,7 +11022,6 @@ async function frlMontarXlsx(ExcelJS,M){
   const fonte=o=>Object.assign({name:'Calibri',size:10},o||{});
   const wb=new ExcelJS.Workbook(); wb.creator='AcquaHub'; wb.created=new Date(); wb.title='Relatório de Execução — Consolidador';
   const dt=s=>{ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
-  const F=frlS.f, filtros=[['Atividade','atv'],['Gestor','gest'],['Agrupamento','grp'],['Origem','orig']].filter(([,k])=>F[k].size).map(([l,k])=>l+': '+[...F[k]].join(', '));
   const consorcios=frlS.zas.map(z=>FRL_ZA_NOME[z]||z).join('  ·  ');
   const subt=consorcios+'   |   '+fmtData(frlS.de)+' a '+fmtData(frlS.ate)+'   |   '+(frlS.base==='validado'?'somente dias validados':'validado + pendente');
   const folha=(nome,orient,extra)=>wb.addWorksheet(nome,Object.assign({
@@ -11043,66 +11043,43 @@ async function frlMontarXlsx(ExcelJS,M){
 
   // ================= Resumo =================
   const R=folha('Resumo','portrait',{views:[{showGridLines:false}]});
-  const NC=8; R.columns=[{width:44},{width:14},{width:24},{width:12},{width:12},{width:14},{width:12},{width:12}];
+  const NC=8; R.columns=[{width:44},{width:14},{width:24},{width:13},{width:14},{width:13},{width:13},{width:12}];
   banner(R,'Relatório de Execução — Consolidador',NC);
   let r=5;
+  // ficha só com consórcio, período e geração (pedido do usuário 13/11: sem dados considerados/filtros/segregação)
   const info=[['Consórcio(s)',consorcios],['Período',fmtData(frlS.de)+' a '+fmtData(frlS.ate)],
-    ['Dados considerados',frlS.base==='validado'?'Somente dias validados no Consolidador (o que vai para a fiscalização COPASA)':'Todas as informações — dias validados (como foram validados) + dias pendentes (como estão agora)'],
-    ['Filtros',filtros.length?filtros.join('  |  '):'nenhum (tudo)'],['Resumo segregado por',FRL_AGR[frlS.agr]],
     ['Gerado em',new Date().toLocaleString('pt-BR')+((ME&&(ME.nome||ME.email))?' por '+(ME.nome||ME.email):'')]];
   info.forEach(([k,v])=>{ const a=R.getCell(r,1); a.value=k; a.font=fonte({bold:true,color:{argb:NAVY}}); a.fill=fill(BLOCO); a.alignment={vertical:'middle',indent:1};
     R.mergeCells(r,2,r,NC); const b=R.getCell(r,2); b.value=v; b.font=fonte(); b.alignment={wrapText:true,vertical:'middle',indent:1};
     for(let i=1;i<=NC;i++) R.getCell(r,i).border={bottom:{style:'thin',color:{argb:BRANCO}}};
     R.getRow(r).height=String(v).length>95?30:18; r++; });
   r++;
-  const nVal=new Set((frlS.dias||[]).filter(d=>d.validado).map(d=>d.dia+d.za)).size, nTot=new Set((frlS.dias||[]).map(d=>d.dia+d.za)).size;
-  const kpis=[[M.recs.filter(x=>!x.aguarda).length,'execuções'],[M.diasExec.size,'dias com execução'],[M.cols.length,'atividades'],
-    [frlS.base==='validado'?nVal:(nVal+' de '+nTot),'dias validados (ZA × dia)']];
-  [[1,1],[2,3],[4,6],[7,8]].forEach(([c0,c1],i)=>{ const [v,k]=kpis[i];
-    if(c1>c0){ R.mergeCells(r,c0,r,c1); R.mergeCells(r+1,c0,r+1,c1); }
-    const cv=R.getCell(r,c0), ck=R.getCell(r+1,c0); cv.value=v; cv.numFmt='#,##0'; cv.font=fonte({bold:true,size:20,color:{argb:NAVY}}); cv.alignment={horizontal:'center',vertical:'middle'};
-    ck.value=k.toUpperCase(); ck.font=fonte({size:8,bold:true,color:{argb:CINZA}}); ck.alignment={horizontal:'center',vertical:'top'};
-    for(let x=c0;x<=c1;x++){ R.getCell(r,x).fill=fill(ZEBRA); R.getCell(r+1,x).fill=fill(ZEBRA);
-      R.getCell(r,x).border={top:{style:'thick',color:{argb:TEAL}},left:x===c0&&i?{style:'thick',color:{argb:BRANCO}}:undefined};
-      R.getCell(r+1,x).border={bottom:{style:'thin',color:{argb:HAIR}},left:x===c0&&i?{style:'thick',color:{argb:BRANCO}}:undefined}; } });
-  R.getRow(r).height=34; R.getRow(r+1).height=18; r+=3;
-  const ga=frlS.agr!=='atividade';
-  secao(R,r,'Atividades consolidadas'+(ga?' — por '+FRL_AGR[frlS.agr].toLowerCase():''),NC); r++;
-  const hq=R.getRow(r); hq.values=['Atividade','Quantidade','Unidade','Execuções','Dias c/ execução','Média por dia c/ execução','Primeira','Última']; cab(hq,1,NC); hq.height=32; r++;
+  const ga=frlS.agr!=='atividade', NQ=7;
+  secao(R,r,'Atividades consolidadas'+(ga?' — por '+FRL_AGR[frlS.agr].toLowerCase():''),NQ); r++;
+  const hq=R.getRow(r); hq.values=['Atividade','Quantidade','Unidade','Dias c/ execução','Média por dia c/ execução','Primeira','Última']; cab(hq,1,NQ); hq.height=32; r++;
   M.quadro.forEach(G=>{
     if(ga){ R.mergeCells(r,1,r,3); const c=R.getCell(r,1); c.value=G.nome; c.font=fonte({bold:true,size:11,color:{argb:NAVY}}); c.alignment={vertical:'middle',indent:1};
-      const e=R.getCell(r,4); e.value=G.n; e.numFmt='#,##0'; e.font=fonte({bold:true,color:{argb:NAVY}}); e.alignment={horizontal:'center',vertical:'middle'};
-      const l=R.getCell(r,5); l.value=G.n===1?'execução':'execuções'; l.font=fonte({size:9,color:{argb:CINZA}}); l.alignment={vertical:'middle'};
-      for(let i=1;i<=NC;i++){ R.getCell(r,i).fill=fill(BLOCO); R.getCell(r,i).border={top:{style:'thin',color:{argb:NAVY2}}}; }
+      for(let i=1;i<=NQ;i++){ R.getCell(r,i).fill=fill(BLOCO); R.getCell(r,i).border={top:{style:'thin',color:{argb:NAVY2}}}; }
       R.getRow(r).height=20; r++; }
     G.linhas.forEach((L,ix)=>{ const row=R.getRow(r);
-      row.values=[L.atividade,L.qtd,L.un,L.n,L.dias.size,L.dias.size?L.qtd/L.dias.size:0,dt(L.ini),dt(L.fim)];
-      corpo(row,1,NC,ix%2===1); row.getCell(1).alignment={vertical:'middle',indent:ga?2:1};
-      row.getCell(2).numFmt=nf(L.qtd); row.getCell(2).font=fonte({bold:true}); row.getCell(6).numFmt='#,##0.0'; row.getCell(4).numFmt='#,##0'; row.getCell(5).numFmt='#,##0';
-      row.getCell(7).numFmt='dd/mm/yyyy'; row.getCell(8).numFmt='dd/mm/yyyy'; row.getCell(3).font=fonte({color:{argb:CINZA}});
-      [4,5,7,8].forEach(i=>row.getCell(i).alignment={horizontal:'center',vertical:'middle'}); r++; });
+      row.values=[L.atividade,L.qtd,L.un,L.dias.size,L.dias.size?L.qtd/L.dias.size:0,dt(L.ini),dt(L.fim)];
+      corpo(row,1,NQ,ix%2===1); row.getCell(1).alignment={vertical:'middle',indent:ga?2:1};
+      row.getCell(2).numFmt=nf(L.qtd); row.getCell(2).font=fonte({bold:true}); row.getCell(4).numFmt='#,##0'; row.getCell(5).numFmt='#,##0.0';
+      row.getCell(6).numFmt='dd/mm/yyyy'; row.getCell(7).numFmt='dd/mm/yyyy'; row.getCell(3).font=fonte({color:{argb:CINZA}});
+      [4,6,7].forEach(i=>row.getCell(i).alignment={horizontal:'center',vertical:'middle'}); r++; });
     if(ga) r++;
   });
   if(!M.quadro.length){ R.getCell(r,1).value='Nenhuma execução com os filtros escolhidos.'; R.getCell(r,1).font=fonte({italic:true,color:{argb:CINZA}}); r++; }
   if(M.obras.length){
-    r++; secao(R,r,'Obras em andamento no período',NC); r++;
-    const ho=R.getRow(r); ho.values=['Obra','Tipo','AL','% no início','% no fim','Avanço (p.p.)','Rede instalada (m)','Dias c/ avanço']; cab(ho,1,NC); ho.height=32; r++;
+    r++; secao(R,r,'Obras em andamento no período',5); r++;
+    const ho=R.getRow(r); ho.values=['Obra','Tipo','AL','% atual da obra','Rede instalada no período (m)']; cab(ho,1,5); ho.height=32; r++;
     const po={}; M.obras.forEach(o=>{ const k=o.za+'|'+o.codigo, P=po[k]=po[k]||{codigo:o.codigo,za:o.za,tipo:o.tipo,al:o.al,ini:o.pct_ant,fim:o.pct,m:0,d:new Set()}; P.fim=o.pct; P.m+=o.qtd; P.d.add(o.dia); });
     Object.values(po).sort((a,b)=>a.tipo.localeCompare(b.tipo)||String(a.codigo).localeCompare(String(b.codigo),'pt-BR',{numeric:true})).forEach((P,ix)=>{ const row=R.getRow(r);
-      row.values=[P.codigo+(frlS.zas.length>1?' ('+P.za+')':''),P.tipo,P.al,P.ini/100,P.fim/100,P.fim-P.ini,P.m,P.d.size];
-      corpo(row,1,NC,ix%2===1); row.getCell(1).alignment={vertical:'middle',indent:1};
-      row.getCell(4).numFmt='0.0%'; row.getCell(5).numFmt='0.0%'; row.getCell(6).numFmt='+0.0;-0.0;0.0'; row.getCell(7).numFmt=nf(P.m); row.getCell(8).numFmt='#,##0';
-      [2,3,4,5,6,8].forEach(i=>row.getCell(i).alignment={horizontal:'center',vertical:'middle'}); r++; });
+      row.values=[P.codigo+(frlS.zas.length>1?' ('+P.za+')':''),P.tipo,P.al,P.fim/100,P.m];
+      corpo(row,1,5,ix%2===1); row.getCell(1).alignment={vertical:'middle',indent:1};
+      row.getCell(4).numFmt='0.0%'; row.getCell(4).font=fonte({bold:true}); row.getCell(5).numFmt=nf(P.m);
+      [2,3,4].forEach(i=>row.getCell(i).alignment={horizontal:'center',vertical:'middle'}); r++; });
   }
-  r+=2; secao(R,r,'Como ler este relatório',NC); r++;
-  ['Cada execução aparece uma vez só, na data do campo; a OS do SIGOS vai como atributo.',
-   'Gestor e agrupamento vêm do código de serviço da OS SIGOS (tabela de códigos × gestor); sem OS SIGOS, pela família da atividade. Recomposição de pavimento e manobra (compartilhados) seguem a OS de origem.',
-   'Fiscalização segue a regra do BI Produção: vistoria 676 79 00 sempre e confirmação de infração 152 05 00 gerada até 31/10/2026 = Fiscalização de irregularidade; 152 05 00 depois = Confirmação de fraude — as duas no bloco "Fiscalização de irregularidades e fraudes".',
-   'Pesquisa de vazamento: OS de detecção (SIGOS) × km de rede pesquisada (traçado do app). VRP: Vistoria primária (app) × Manutenção (OS). Setorização · DMC = mapeamento de pressão + loggers temporários e fixos.',
-   'Obras: quantidade = metros de rede instalada (pullback no HDD / assentamento na VCA); dias sem avanço não entram.',
-   'Traçados de pesquisa ainda sem OS executada no SIGOS aparecem na base como "Aguardando SIGOS" (cinza, itálico) e não contam.'].forEach(t=>{
-    R.mergeCells(r,1,r,NC); const c=R.getCell(r,1); c.value='•  '+t; c.font=fonte({size:9,color:{argb:CINZA}}); c.alignment={wrapText:true,vertical:'top',indent:1};
-    R.getRow(r).height=t.length>120?26:15; r++; });
 
   // ================= Avanço (segregado por agrupamento) =================
   const nomeAv='Avanço '+FRL_PER[frlS.per].toLowerCase();
@@ -11112,7 +11089,7 @@ async function frlMontarXlsx(ExcelJS,M){
   const blocos=[]; M.cols.forEach(c=>{ const g=grupoDe(c); let b=blocos.find(x=>x.nome===g); if(!b) blocos.push(b={nome:g,cols:[],ordem:c.ordem}); b.cols.push(c); });
   blocos.sort((a,b)=>(a.nome==='Não definido')-(b.nome==='Não definido')||a.ordem-b.ordem||a.nome.localeCompare(b.nome,'pt-BR'));
   const colsAv=[]; blocos.forEach(b=>b.cols.forEach((c,i)=>colsAv.push({c,ini:i===0})));
-  const diario=frlS.per==='dia', nd=1+colsAv.length*2, nc=nd+(diario?1:0);
+  const diario=frlS.per==='dia', nd=1+colsAv.length*2, nc=nd;
   const A=folha(nomeAv,'landscape',{views:[{state:'frozen',xSplit:1,ySplit:7,showGridLines:false}]});
   banner(A,'Avanço '+FRL_PER[frlS.per].toLowerCase()+' e acumulado — por agrupamento',Math.max(nc,8));
   const lab=k=>frlS.per==='mes'?new Date(k+'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}):(frlS.per==='semana'?'Semana de '+fmtData(k).slice(0,5):dt(k));
@@ -11122,7 +11099,6 @@ async function frlMontarXlsx(ExcelJS,M){
   blocos.forEach(b=>{ const c1=cc+b.cols.length*2-1; if(c1>cc) A.mergeCells(5,cc,5,c1); A.getCell(5,cc).value=b.nome;
     b.cols.forEach(c=>{ A.mergeCells(6,cc,6,cc+1); A.getCell(6,cc).value=c.atividade+'\n('+c.un+')';
       A.getCell(7,cc).value=diario?'No dia':'No período'; A.getCell(7,cc+1).value='Acumulado'; A.getColumn(cc).width=11; A.getColumn(cc+1).width=11; cc+=2; }); });
-  if(diario){ A.getCell(5,nc).value='Situação do dia'; A.mergeCells(5,nc,7,nc); A.getColumn(nc).width=36; }
   cab(A.getRow(5),1,nc,NAVY); cab(A.getRow(6),2,nd,NAVY2); cab(A.getRow(7),2,nd,'FFB4C6E7');
   for(let i=2;i<=nd;i++) A.getCell(7,i).font=fonte({bold:true,size:9,color:{argb:NAVY}});
   A.getRow(5).height=22; A.getRow(6).height=44; A.getRow(7).height=16;
@@ -11135,14 +11111,12 @@ async function frlMontarXlsx(ExcelJS,M){
     row.getCell(1).value=lab(p); if(diario) row.getCell(1).numFmt='dd/mm/yyyy  ddd';
     colsAv.forEach((x,i)=>{ const k=M.key(x.c), v=q[k]||0; acum[k]=(acum[k]||0)+v; const c0=2+i*2;
       const cv=row.getCell(c0), ca=row.getCell(c0+1); cv.value=v||null; ca.value=acum[k]||null; cv.numFmt=nfc(k); ca.numFmt=nfc(k); });
-    if(diario){ const s=M.sitDia[p]||{}; row.getCell(nc).value=frlS.zas.map(z=>(frlS.zas.length>1?z+': ':'')+(s[z]||'sem execução')).join(' · '); }
     for(let i=1;i<=nc;i++){ const c=row.getCell(i), j=(i-2)/2; c.font=fonte();
-      c.border=Object.assign({},linha,(i>=2&&i<=nd&&i%2===0&&colsAv[j].ini&&j)?{left:sepB}:{},i===nc&&diario?{left:sepB}:{});
-      c.alignment={vertical:'middle',horizontal:(i===1||(diario&&i===nc))?'left':'right',indent:i===1?1:0};
+      c.border=Object.assign({},linha,(i>=2&&i<=nd&&i%2===0&&colsAv[j].ini&&j)?{left:sepB}:{});
+      c.alignment={vertical:'middle',horizontal:i===1?'left':'right',indent:i===1?1:0};
       if(fds) c.fill=fill(FDS); else if(ix%2) c.fill=fill(ZEBRA); }
     for(let i=0;i<colsAv.length;i++) row.getCell(3+i*2).font=fonte({color:{argb:CINZA}});
     if(fds) row.getCell(1).font=fonte({italic:true,color:{argb:CINZA}});
-    if(diario) row.getCell(nc).font=fonte({size:8,color:{argb:CINZA}});
     ra++; });
   const tr=A.getRow(ra); tr.getCell(1).value='Total do período';
   colsAv.forEach((x,i)=>{ const c0=2+i*2, v=acum[M.key(x.c)]||0; tr.getCell(c0).value=v; tr.getCell(c0).numFmt=nfc(M.key(x.c)); A.mergeCells(ra,c0,ra,c0+1); });
@@ -11154,11 +11128,10 @@ async function frlMontarXlsx(ExcelJS,M){
   // ordenadas por agrupamento → atividade → data (segregadas); coluna sem valor na aba inteira sai (as 10 primeiras ficam)
   const WD=['dom','seg','ter','qua','qui','sex','sáb'];
   const BC=[['Data',11,x=>dt(x.dia),'dd/mm/yyyy'],['Dia',6,x=>WD[new Date(x.dia+'T12:00:00').getDay()]],['Consórcio',10,x=>x.za],['Agrupamento',26,x=>x.grupo],
-    ['Atividade',28,x=>x.atividade],['Gestor',13,x=>x.gestor],['Serviço',32,x=>x.servico],['Origem',10,x=>x.origem],['Quantidade',11,x=>x.qtd,'q'],['Unidade',20,x=>x.un],
+    ['Atividade',28,x=>x.atividade],['Serviço',32,x=>x.servico],['Origem',10,x=>x.origem],['Quantidade',11,x=>x.qtd,'q'],['Unidade',20,x=>x.un],
     ['OS SIGOS',17,x=>x.os_sigos],['Status SIGOS',18,x=>x.stSigos],['Resultado SIGOS',26,x=>x.resultado],['OS AcquaHub',18,x=>x.os_app],['Matrícula',12,x=>x.matricula],
-    ['Descrição',44,x=>x.desc],['Local',36,x=>x.local],['Equipe',18,x=>x.equipe],['Hora',7,x=>x.hora],['Serviço de origem (recomposição)',40,x=>x.origRecomp],
-    ['Latitude',11,x=>x.lat,'0.000000'],['Longitude',11,x=>x.lon,'0.000000'],
-    ['Fotos',9,x=>x.fotos&&x.fotos.length?{text:x.fotos.length+' foto'+(x.fotos.length>1?'s':''),hyperlink:SBASE+x.fotos[0]}:null],['Situação',22,x=>x.sit]];
+    ['Descrição',44,x=>x.desc],['Local',36,x=>x.local],['Equipe',18,x=>x.equipe],['Hora',7,x=>x.hora],
+    ['Latitude',11,x=>x.lat,'0.000000'],['Longitude',11,x=>x.lon,'0.000000']];
   const baseObra=o=>({dia:o.dia,za:o.za,gestor:o.gestor,grupo:o.grupo,atividade:o.atividade,ordem:o.ordem,servico:o.codigo+(o.al?' · '+o.al:''),origem:'Obra',qtd:o.qtd,un:o.un,
     desc:o.avancos,local:o.local,sit:o.sit,fotos:[]});
   const ord=(a,b)=>((a.grupo==='Não definido')-(b.grupo==='Não definido'))||String(a.grupo||'').localeCompare(String(b.grupo||''),'pt-BR')||((a.ordem||0)-(b.ordem||0))
@@ -11189,7 +11162,7 @@ async function frlMontarXlsx(ExcelJS,M){
   if(M.obras.length){
     const OC=[['Data',11,o=>dt(o.dia),'dd/mm/yyyy'],['Consórcio',10,o=>o.za],['Tipo',8,o=>o.tipo],['AL',8,o=>o.al],['Obra',26,o=>o.codigo],['Local',32,o=>o.local],
       ['Início',11,o=>dt(o.inicio),'dd/mm/yyyy'],['% dia anterior',11,o=>o.pct_ant/100,'0.0%'],['% no fim do dia',11,o=>o.pct/100,'0.0%'],['Avanço (p.p.)',10,o=>o.pct-o.pct_ant,'+0.0;-0.0;0.0'],
-      ['Rede instalada no dia (m)',13,o=>o.qtd,'q'],['Concluída',9,o=>o.concluida?'sim':'não'],['Avanços do dia',60,o=>o.avancos],['Situação',18,o=>o.sit]];
+      ['Rede instalada no dia (m)',13,o=>o.qtd,'q'],['Concluída',9,o=>o.concluida?'sim':'não'],['Avanços do dia',60,o=>o.avancos]];
     tabela('Obras',M.obras.slice().sort((a,b)=>String(a.codigo).localeCompare(String(b.codigo),'pt-BR',{numeric:true})||a.dia.localeCompare(b.dia)),OC);
   }
   return wb.xlsx.writeBuffer();

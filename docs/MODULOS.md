@@ -4352,6 +4352,11 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   (agrupamento › atividade › no dia/acumulado) e separadores por bloco, fim de semana sombreado, total em faixa; bases
   ordenadas por agrupamento → atividade → data com linha separando blocos; casas decimais por coluna (sem "44,");
   impressão A4 com cabeçalho/rodapé e paginação, títulos repetidos.
+- **Enxuto (13/11, sw v393, pedido do usuário):** sem cartões de indicadores, sem coluna Execuções no quadro, sem
+  "Como ler", sem coluna "Situação do dia" no avanço; bases sem Gestor, Serviço de origem (recomposição), Fotos e Situação
+  (Obras também sem Situação).
+- **13/11, sw v394:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
+  **% atual da obra** e rede instalada no período (saíram % no início, avanço p.p. e dias c/ avanço).
 - **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
   **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
   no lugar de "VRP" — vale no Consolidador, relatório e validação. A migração passou as validações `atv:VRP` em dia para as
