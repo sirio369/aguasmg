@@ -2604,7 +2604,8 @@ const pjILrep=(nome,n,m,ex,t)=>({...pjG(nome,Array.from({length:n},(_,i)=>pjIL(n
 const pjRamal=(i,os,hd,im,esc,ass,lig)=>pjG('Ramal '+i,[
   pjR('OS SIGOS',os||'—'),pjR('Nº do Hidrômetro',hd||'—'),pjR('Nº do imóvel',im||'—'),
   pjR('A1 (as-built)','—'),pjR('A2 (as-built)','—'),pjR('A3 (as-built)','—'),pjR('P1 (as-built)','—'),
-  pjP('Escavação',esc||0),pjP('Assentamento',ass||0),pjP('Ligação à rede',lig||0)]);
+  pjP('Escavação',esc||0),pjP('Assentamento',ass||0),pjP('Ligação à rede',lig||0),
+  pjP('Reaterro',0),pjP('Recomposição de pavimento',0)]);   // 2026-11-13: reaterro → recomposição com a pergunta do ensaio, igual às valas
 const pjRamais=(kids)=>({...pjG('Ramais',kids),rep:kids.length,ativo:true});
 // peças/acessórios: bloco replicável. Especificação (tipo do componente) primeiro + etapas físicas (todas ativáveis).
 const pjPeca=(i,tipo,esc,esco,mont,rea,rec)=>pjG('Peça/acessório '+i,[
@@ -2724,6 +2725,11 @@ function pjReconcilia(iv){ if(!Array.isArray(iv.arv)) return;
   iv.arv.forEach(n=>{ const lb=String(n.n||'').trim().toLowerCase();
     const m=n.c?md.find(x=>x.chave===n.c):md.find(x=>x.nome.toLowerCase()===lb||(x.aliases||[]).some(a=>String(a).toLowerCase()===lb));
     if(m){ n.c=m.chave; n.n=m.nome; } });
+  // ramais (2026-11-13): cada Ramal N ganha Reaterro + Recomposição de pavimento no fim (o ramal salvo antes não tinha); some ao regravar
+  const ram=iv.arv.find(n=>n.c==='av_ramais'||/^ramais$/i.test(n.n||''));
+  if(ram&&Array.isArray(ram.f)) ram.f.forEach(r=>{ if(r&&Array.isArray(r.f)){
+    if(!r.f.some(x=>x.k==='%'&&/^reaterro/i.test(x.n||''))) r.f.push(pjP('Reaterro',0));
+    if(!r.f.some(x=>x.k==='%'&&x.n==='Recomposição de pavimento')) r.f.push(pjP('Recomposição de pavimento',0)); } });
   // VRP: "Execução da câmara" antes do reaterro (ordem de obra)
   const cam=iv.arv.find(n=>n.c==='av_camara');
   if(cam&&Array.isArray(cam.f)){ const i=cam.f.findIndex(x=>/^execução da câmara/i.test(x.n||'')), r=cam.f.findIndex(x=>/^reaterro/i.test(x.n||'')); if(r>=0&&i>r) cam.f.splice(r,0,cam.f.splice(i,1)[0]); }
@@ -2746,19 +2752,26 @@ function pjReatBloco(iv,node){ if(!pjReatOn||!iv||!node||node.k!=='%'||node.n!==
   const rea=(kids||[]).find(x=>x.k==='%'&&/^Reaterro/i.test(x.n)); if(!rea||rea.ativo===false) return null;
   const rot=gp.join(' › '), key=gp.length?pjAvKey(iv.arv.find(n=>n.n===gp[0]),gp):'';
   const req=pjReatCur.find(r=>r.rotulo===rot)||pjReatCur.find(r=>r.bloco===key)||null;
-  return {rot,rea,req,livre:!!(req&&(req.status==='aprovado'||req.status==='legado'))}; }
-// caixa do ensaio de compactação embaixo da Recomposição de pavimento (projeto_det)
-function pjReatBox(rb){ const r=rb.req, h=((r&&r.hist)||[]).filter(e=>e.ev!=='pedido'), u=h.filter(e=>e.ev==='ensaio').pop(), hoje=pavDiaISO(Date.now()), pode=pjExecOk;
+  return {rot,rea,rec:node,req,livre:!!(req&&['aprovado','legado','dispensado'].includes(req.status))}; }
+// caixa do ensaio de compactação embaixo da Recomposição de pavimento (projeto_det). Reaterro 100% → Obras responde
+// "É necessário ensaio de compactação?" (2026-11-13): Sim = pipeline do ensaio (Qualidade); Não = 'dispensado', recomposição liberada.
+function pjReatBox(rb){ const r=rb.req, h=((r&&r.hist)||[]).filter(e=>e.ev!=='pedido'&&e.ev!=='dispensado'), u=h.filter(e=>e.ev==='ensaio').pop(), hoje=pavDiaISO(Date.now()), pode=pjExecOk;
   if(r&&r.status==='legado') return '';
+  if(r&&r.status==='dispensado'){ const dz=((r.hist||[]).filter(e=>e.ev==='dispensado').pop())||{};
+    return `<div class="pjreat"><b style="color:#2f8b6c">✅ Ensaio de compactação dispensado</b> · ${pavH(dz.por||r.pedido_nome||'—')}${dz.em?(' em '+pavFmtEm(dz.em)):''}`
+      +((pode&&!(rb.rec.p>0))?`<div style="margin-top:4px">${pjReatAlt(rb.rot,1,'Precisa de ensaio? Pedir à Qualidade')}</div>`:'')+`</div>`; }
   const md=PJ_MODELO.find(m=>m.chave==='ensaio_reaterro'), sla=[(md&&md.prazo_aten)||1,(md&&md.prazo_atraso)||2];
   let x;
   if(r&&r.status==='aprovado') x=`<b style="color:#2f8b6c">✅ Reaterro aprovado no ensaio</b>${u?(' em '+pavFmtEm(u.em)+' · '+pavLink(u.laudo,'📄 Laudo')):''}`;
   else if(r&&r.status==='aguardando'){ const d=pavDias(r.status_em), b=pavBucket(d,sla); x=`<b style="color:#7c3aed">🧪 Aguardando o ensaio da Qualidade</b> · <span style="color:${b.c};font-weight:700">${b.lbl} · ${pavDiasTxt(d)}</span>${u?(' · '+(u.tentativa+1)+'º ensaio'):''}`; }
   else if(r&&r.status==='reprovado') x=`<b style="color:#d6336c">❌ Reaterro reprovado no ensaio ${u?u.tentativa:''}</b>${u?(' em '+pavFmtEm(u.em)+(u.obs?(' · “'+pavH(u.obs)+'”'):'')+' · '+pavLink(u.laudo,'📄 Laudo')):''}`
     +(pode?`<div style="display:flex;gap:6px;margin-top:6px;align-items:center"><span class="sub" style="font-size:12px;white-space:nowrap">Refeito em</span><input type="date" class="pjrfdt" value="${hoje}" max="${hoje}" min="${u?pavDiaISO(u.em):''}" style="flex:1;min-width:0;font-size:13px;padding:8px"/><button class="btn" data-reatref="${r.id}" style="width:auto;margin:0;padding:8px 12px;white-space:nowrap">Reaterro refeito</button></div>`:'');
-  else if((rb.rea.p||0)<100) x='🔒 Travada até o reaterro chegar a 100% e passar no ensaio de compactação da Qualidade';
-  else x='🔒 Travada até o ensaio de compactação do reaterro'+(pode?`<button class="btn" data-reatpedir="${pavH(rb.rot)}" style="margin:8px 0 0">🧪 Solicitar ensaio de compactação</button>`:' — o responsável de obras pede o ensaio à Qualidade');
+  else if((rb.rea.p||0)<100) x='🔒 Travada até o reaterro chegar a 100% (aí o responsável de obras diz se precisa de ensaio de compactação)';
+  else x=pode
+    ? `<b>Reaterro concluído — é necessário ensaio de compactação?</b><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-reatdec="${pavH(rb.rot)}" data-v="1" style="flex:1;margin:0">🧪 Sim — pedir à Qualidade</button><button class="btn ghost" data-reatdec="${pavH(rb.rot)}" data-v="0" style="flex:1;margin:0">Não — liberar a pavimentação</button></div>`
+    : '🔒 Travada até o responsável de obras dizer se o reaterro precisa de ensaio de compactação';
   return `<div class="pjreat">${x}${pavReatHistHtml(h)}</div>`; }
+const pjReatAlt=(rot,v,txt)=>`<button type="button" data-reatdec="${pavH(rot)}" data-v="${v}" style="all:unset;cursor:pointer;color:var(--acc);font-size:12px;text-decoration:underline">${txt}</button>`;
 let pjAvancosCur={};   // chave -> [entradas] da intervenção corrente (para o histórico por etapa); chave = etapa de topo (c) + resto do caminho
 function pjNodePath(nodes,target,trail){ trail=trail||[]; for(const n of (nodes||[])){ const t2=trail.concat(n.n); if(n===target) return t2; if(n.f&&n.f.length){ const r=pjNodePath(n.f,target,t2); if(r) return r; } } return null; }
 // chave do histórico de avanço: a etapa de topo entra pela chave estável (renomear o rótulo não perde o vínculo)
@@ -3272,9 +3285,9 @@ function pjRsTopoHtml(ev){
     ivs.forEach(iv=>{ const v=iv.pipe&&iv.pipe.atores&&iv.pipe.atores[a]; if(!v) return; c.iv++; c.n+=v.n||0; if(v.faixa) c[v.faixa]++; });
     return `<div class="pjrskpi"><b>${c.iv}</b><span>${PJ_ATOR[a][0]} com ${PJ_ATOR[a][1]}${c.n?' · '+c.n+' pend.':''}${(c.aten||c.atraso)?'<br>🟡 '+c.aten+' · 🔴 '+c.atraso:''}</span></div>`; }).join('');
   const k=x=>ev.filter(x).length;
-  const kp=`<div class="pjrskpis"><div class="pjrskpi"><b>${k(e=>e.evento==='liberado')}</b><span>liberadas</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='enviado'&&e.natureza==='doc')}</b><span>documentos enviados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='aprovado')}</b><span>aprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='reprovado')}</b><span>reprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='enviado'&&e.natureza==='os')}</b><span>OS lançadas</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_pedido')}</b><span>ensaios de reaterro pedidos</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_aprovado')}</b><span>ensaios aprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_reprovado')}</b><span>ensaios reprovados</span></div></div>`;
+  const kp=`<div class="pjrskpis"><div class="pjrskpi"><b>${k(e=>e.evento==='liberado')}</b><span>liberadas</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='enviado'&&e.natureza==='doc')}</b><span>documentos enviados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='aprovado')}</b><span>aprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='reprovado')}</b><span>reprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='enviado'&&e.natureza==='os')}</b><span>OS lançadas</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_pedido')}</b><span>ensaios de reaterro pedidos</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_dispensado')}</b><span>ensaios dispensados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_aprovado')}</b><span>ensaios aprovados</span></div><div class="pjrskpi"><b>${k(e=>e.evento==='ensaio_reprovado')}</b><span>ensaios reprovados</span></div></div>`;
   const EVN={liberado:'🔓 liberada',reaberto:'🔒 reaberta',enviado:'📤 enviado',aprovado:'✔ aprovado',reprovado:'✖ reprovado',escopo:'escopo',removido:'removido',fase:'fase aberta',nao_aplica:'🚫 não se aplica',aplica:'↩ voltou a se aplicar',
-    ensaio_pedido:'🧪 ensaio pedido',reaterro_refeito:'🔁 reaterro refeito',ensaio_aprovado:'🧪 ✔ ensaio aprovado',ensaio_reprovado:'🧪 ✖ ensaio reprovado'};
+    ensaio_pedido:'🧪 ensaio pedido',ensaio_dispensado:'🧪 ensaio dispensado',reaterro_refeito:'🔁 reaterro refeito',ensaio_aprovado:'🧪 ✔ ensaio aprovado',ensaio_reprovado:'🧪 ✖ ensaio reprovado'};
   const byDay={}; ev.forEach(e=>{ (byDay[e.d+'/'+e.ano]=byDay[e.d+'/'+e.ano]||[]).push(e); });
   const lista=Object.keys(byDay).map(dd=>`<div class="pjrsday"><div class="h"><b>${dd}</b><span>${byDay[dd].length} evento(s)</span></div>`+byDay[dd].map(e=>`<div class="pjet-b" style="padding:3px 0">${pjFmtDH(e.em).slice(6)} · <b>${e.iv||e.projeto||'#'+e.gid}</b> · ${e.evento==='fase'?(PJ_FASE_N[e.valor]||'fase '+e.valor):(e.nome||'')} · ${EVN[e.evento]||e.evento}${e.por?' · '+e.por:''}${e.comentario?' · <i>'+e.comentario+'</i>':''}</div>`).join('')+'</div>').join('');
   return `<div class="sec">📌 Situação atual</div>${tab}<div class="pjrskpis" style="margin-top:8px">${pend}</div>
@@ -3678,11 +3691,14 @@ function pjWireTree(d,rerender){
     }catch(e){ toast('Erro ao lançar: '+(e.message||e)); }
     finally{ b.disabled=false; }
   });
-  d.querySelectorAll('[data-reatpedir]').forEach(b=>b.onclick=async e=>{ e.stopPropagation(); const iv=pjCurIv(); if(!iv) return; b.disabled=true;
+  // "É necessário ensaio de compactação?" — Sim pede o ensaio à Qualidade; Não dispensa e libera a recomposição
+  d.querySelectorAll('[data-reatdec]').forEach(b=>b.onclick=async e=>{ e.stopPropagation(); const iv=pjCurIv(); if(!iv) return; const sim=b.dataset.v==='1', rot=b.dataset.reatdec;
+    if(!sim&&!confirm('Dispensar o ensaio de compactação de "'+(rot||'Vala da rede')+'"? A recomposição de pavimento fica liberada.')) return;
+    b.disabled=true;
     try{ const k=iv.kind+'|'+iv.gid; if(pjSaveT[k]){ clearTimeout(pjSaveT[k]); delete pjSaveT[k]; await pjSaveNow(iv); }   // o servidor confere o reaterro 100% na árvore gravada
       const g=(gps&&gps.acc<=50)?gps:null;
-      const {error}=await sb.rpc('app_proj_reaterro_solicitar',{p_kind:iv.kind,p_gid:iv.gid,p_bloco_caminho:b.dataset.reatpedir,p_lat:g?g.lat:null,p_lon:g?g.lon:null,p_precisao:g?Math.round(g.acc*10)/10:null});
-      if(error) throw error; toast('✓ Ensaio pedido à Qualidade'); const k2=pjSnapOpen(d); await pjReatLoad(iv); rerender(k2); }
+      const {error}=await sb.rpc('app_proj_reaterro_decidir',{p_kind:iv.kind,p_gid:iv.gid,p_bloco_caminho:rot,p_necessita:sim,p_lat:g?g.lat:null,p_lon:g?g.lon:null,p_precisao:g?Math.round(g.acc*10)/10:null});
+      if(error) throw error; toast(sim?'✓ Ensaio pedido à Qualidade':'✓ Ensaio dispensado — recomposição liberada'); const k2=pjSnapOpen(d); await pjReatLoad(iv); rerender(k2); }
     catch(err){ toast('Erro: '+(err.message||err)); b.disabled=false; } });
   d.querySelectorAll('[data-reatref]').forEach(b=>b.onclick=async e=>{ e.stopPropagation(); const iv=pjCurIv(), dt=((b.parentElement.querySelector('.pjrfdt'))||{}).value; if(!iv) return; if(!dt) return toast('Informe o dia em que o reaterro foi refeito');
     if(!confirm('Reaterro refeito em '+pavFmtDia(dt)+'? O bloco volta para a fila de ensaio da Qualidade.')) return; b.disabled=true;
@@ -5118,7 +5134,7 @@ function pavProgExport(){ const arr=pavProgFiltrado(); if(!arr.length) return to
 let pqlUltimo=[], pqlView='lista', pqlPrazo='', pqlMap=null, pqlMarkers=null, pqe=null; // pqe = ensaio em preenchimento {g,it,id,res,laudo,f1,f2}
 // pedido de ensaio de um bloco de obra dos Projetos (Reaterro → Recomposição) no formato de "ponto" da fila do pavimento
 const pqlProjGrupo=p=>({grupo:'pj:'+p.id,proj:p,ivId:(p.kind==='ponto'?'pt':'ln')+p.gid,servico_origem:'projeto',consorcio:p.consorcio,lat:p.lat,lon:p.lon,usuario:p.pedido_nome,
-  itens:[{id:p.id,lbl:p.rotulo||'Vala da rede',reaterro_resp_por:p.pedido_nome,reaterro_resp_em:p.pedido_em,reaterro_status_em:p.status_em,reaterro_hist:(p.hist||[]).filter(e=>e.ev!=='pedido'),origem:p.origem||[]}]});
+  itens:[{id:p.id,lbl:p.rotulo||'Vala da rede',reaterro_resp_por:p.pedido_nome,reaterro_resp_em:p.pedido_em,reaterro_status_em:p.status_em,reaterro_hist:(p.hist||[]).filter(e=>e.ev!=='pedido'&&e.ev!=='dispensado'),origem:p.origem||[]}]});
 const pqlTit=g=>g.proj?('📐 '+pavH(g.proj.lbl||'Projeto')):(PAV_ORIGEM[g.servico_origem]||g.servico_origem);
 const pqlItLbl=it=>it.lbl?pavH(it.lbl):PAV_TIPO_LBL(it.tipo);
 function pqlDias(g){ let m=null; (g.itens||[]).forEach(it=>{ const d=pavDias(it.reaterro_status_em); if(d!=null&&(m==null||d>m))m=d; }); return m; }

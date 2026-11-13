@@ -2826,6 +2826,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   toggle "No escopo?", quantidade (±), tipo de peça, registro, **cadeado** (liberar/reabrir) e **lançamento de
   avanço** no campo — o "Lançar avanço" agora é **real** (lê o input `.pjinp` e soma ao `%`/`exec` da folha) e
   persiste. `pjLeafHist` (histórico fabricado) foi zerado e `hasAdv` usa `pjHasAdv` (avanço real).
+- **"É necessário ensaio de compactação?" + ramais com reaterro (2026-11-13, sw v375, `docs/migracao_proj_reaterro_decisao.sql`):**
+  em todo bloco Reaterro → Recomposição de pavimento, quando o reaterro chega a 100% o `pjReatBox` pergunta a Obras
+  (`pjExecOk`) se precisa de ensaio: **Sim** → `app_proj_reaterro_decidir(p_necessita=true)` = pipeline de sempre (`aguardando` →
+  Qualidade na `pavqual`, com aviso); **Não** → status novo **`dispensado`** (evento `nao` em `pav_reaterro_evento`, com confirmação)
+  e a recomposição fica liberada (trava em `app_proj_avanco_registrar`/`app_proj_estado_set` e `pjReatBloco` aceitam
+  aprovado/legado/dispensado). Dispensado com recomposição em 0% ainda pode virar pedido ("Precisa de ensaio? Pedir à Qualidade").
+  Histórico (`proj_reat_hist`, ev `dispensado`) e Resumo (`app_proj_eventos`, evento `ensaio_dispensado` + KPI). `app_proj_reaterro_solicitar`
+  segue no banco só p/ app em cache. **Legado:** os blocos `legado` sem recomposição lançada (17 valas HDD) foram apagados e caem na
+  pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
+  (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
+  pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
 - **"Esse avanço foi realizado ontem?" (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):** todo
   "Lançar avanço" do `projeto_det` exige responder Sim/Não (`.pjontem`). **Não** = rito normal (`ts = now()`); **Sim** =
   pede o **horário de execução** e grava a data de **ontem** nessa hora (`p_executado_em`, parâmetro novo opcional — drop +
