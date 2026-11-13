@@ -10096,7 +10096,7 @@ function fscModo(m){
   if(t) t.textContent=m==='cons'?'Consolidador':'Execução Física';
   if(bk){ bk.dataset.go=m==='cons'?'auxiliar_programacao':'home'; bk.textContent=m==='cons'?'‹ Auxiliar de Programação':'‹ Início'; }
   if(sub) sub.innerHTML=m==='cons'
-    ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
+    ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço; obra <b>sem avanço no dia não precisa de validação</b>. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
     :'Somente os dias <b>validados</b> no Consolidador, exatamente como foram validados. Uma linha por atividade, com o acumulado desde 01/09/2026, as OS do dia e o detalhe de cada execução (fotos e mapa).';
   if(lg) lg.innerHTML=m==='cons'
     ?'<span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span>'
@@ -10407,11 +10407,13 @@ function fscTabObras(z,D,pode,travado){
   function linhaGrupo(gk,gab,sel,rot,desc,gps,tit,titAbre,nivel){
     const n=gps.length, exts=gps.map(fscExt), temExt=exts.every(x=>x>0), ext=temExt?exts.reduce((a,x)=>a+x,0):0, w=i=>temExt?exts[i]/ext:1/n;
     const med=gps.reduce((a,p,i)=>a+(p.pct||0)*w(i),0), ant=gps.reduce((a,p,i)=>a+(p.pct_ant||0)*w(i),0), dl=med-ant;
-    const comAv=gps.filter(p=>(p.avancos||[]).length).length, nVal=gps.filter(p=>p.val&&p.val.ok).length, nMud=gps.filter(p=>p.val&&!p.val.ok).length;
-    const pill=nVal===n?'<span class="fscpill" style="background:#16a34a">validadas</span>':'<span class="fscpill" style="background:'+(nMud?'#dc2626':'#f59e0b')+'">'+nVal+'/'+n+' validadas</span>';
-    const bGr=pode&&!travado&&nVal<n?'<button type="button" data-fscgrval="'+vEsc(z+'|'+sel)+'" title="'+vEsc(tit)+'">✔ todas</button>':'';
+    // só as obras com avanço (ou concluídas) no dia precisam de validação; obra sem avanço não entra na conta
+    const req=gps.filter(p=>!fscSemAvanco(p)), nr=req.length;
+    const comAv=gps.filter(p=>(p.avancos||[]).length).length, nVal=req.filter(p=>p.val&&p.val.ok).length, nMud=req.filter(p=>p.val&&!p.val.ok).length;
+    const pill=!nr?FSC_PILL_SEMAV:(nVal===nr?'<span class="fscpill" style="background:#16a34a">validadas</span>':'<span class="fscpill" style="background:'+(nMud?'#dc2626':'#f59e0b')+'">'+nVal+'/'+nr+' validadas</span>');
+    const bGr=pode&&!travado&&nVal<nr?'<button type="button" data-fscgrval="'+vEsc(z+'|'+sel)+'" title="'+vEsc(tit)+'">✔ todas</button>':'';
     const sub=desc.concat([temExt?fscNum(Math.round(ext))+' m':null, comAv?comAv+' com avanço no dia':null]).filter(Boolean).join(' · ');
-    return '<tr class="'+(nivel?'fscalrow fscfilha':'fsctiporow')+(nVal===n?' val':(nMud?' mud':''))+'"><td><b>'+(gab?'▾ ':'▸ ')+rot+'</b><div class="sub" style="margin:2px 0 0">'+sub+'</div>'+fscExtFeitaHtml(gps)+'</td>'
+    return '<tr class="'+(nivel?'fscalrow fscfilha':'fsctiporow')+(nr&&nVal===nr?' val':(nMud?' mud':''))+'"><td><b>'+(gab?'▾ ':'▸ ')+rot+'</b><div class="sub" style="margin:2px 0 0">'+sub+'</div>'+fscExtFeitaHtml(gps)+'</td>'
       +'<td class="n"><b>'+fscNum(med,1)+'%</b><div class="sub" style="margin:2px 0 0">'+(comAv?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia')+' · '+(temExt?'ponderado pela extensão':'média simples')+'</div></td>'
       +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,med))+'%"></i></div></td>'+(cs?'<td>'+pill+'</td>':'')
       +'<td class="ac">'+bGr+'<button type="button" data-fscabre="'+vEsc(gk)+'" title="'+titAbre+'">'+(gab?'▴':'▾')+'</button></td></tr>';
@@ -10419,8 +10421,8 @@ function fscTabObras(z,D,pode,travado){
   function linhaObra(p,nivel){
     const filha=nivel>0;
     let h='';
-    const k=z+'|'+p.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(p), dl=(p.pct||0)-(p.pct_ant||0);
-    const bVal=pode&&!travado?(p.val&&p.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
+    const k=z+'|'+p.chave, ab=fscS.abertos.has(k), sa=fscSemAvanco(p), st=sa?{cls:'',pill:FSC_PILL_SEMAV}:fscStatusLinha(p), dl=(p.pct||0)-(p.pct_ant||0);
+    const bVal=pode&&!travado&&!sa?(p.val&&p.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
       :'';
     const sit=p.concluida?'concluída (100%)':((p.avancos||[]).length?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia');
     h+='<tr class="'+st.cls+(nivel===2?' fscneta':(filha?' fscfilha':''))+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,fscExt(p)?fscNum(Math.round(fscExt(p)))+' m':null,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div>'+fscExtFeitaHtml([p])+'</td>'
@@ -10439,6 +10441,9 @@ function fscTabObras(z,D,pode,travado){
     return h;
   }
 }
+// obra sem avanço lançado no dia e não concluída nele: aparece (com o % do dia), mas não precisa de validação (banco: fisc_sem_avanco)
+const fscSemAvanco=p=>!!p&&Array.isArray(p.avancos)&&!p.avancos.length&&!p.concluida;
+const FSC_PILL_SEMAV='<span class="fscpill" style="background:#94a3b8" title="Sem avanço no dia — não precisa de validação">sem avanço</span>';
 // AL da obra pelo código (CON-08-AL-13-F01, CON_06_AL_15_FL01) ou pelo local ("AL 14", "AL_15"); sem AL = obra sozinha
 // extensão (m) da intervenção linear pela linha do mapa (GeoJSON em WGS84, haversine); 0 = sem linha
 function fscExt(p){
@@ -10512,13 +10517,15 @@ async function fscCarregarDetObra(kind,gid,dia){
 function fscSecao(z){
   if(!fscCons()) return fscSecaoFisc(z);
   const D=fscS.dias[z]||{}, pode=!!D.pode_validar, V=D.validado, travado=!!V;
-  const todas=(D.linhas||[]).concat(D.projetos||[]), pend=todas.filter(l=>!(l.val&&l.val.ok)).length;
+  const todas=(D.linhas||[]).concat((D.projetos||[]).filter(p=>!fscSemAvanco(p))), pend=todas.filter(l=>!(l.val&&l.val.ok)).length;   // obra sem avanço não conta
   let h='<div class="fscza"><h3><span>'+vEsc(rdoZaNome(z))+'</span><span class="sub" style="margin:0">'+todas.length+' linha'+(todas.length===1?'':'s')+(pend?' · '+pend+' a validar':'')+'</span></h3>';
   if(D.sigos==='aguardando') h+='<div class="fscaviso">⏳ O SIGOS chegou só até '+fmtData((D.cobertura||{}).encerradas_ate)+'. Este dia ainda pode ganhar OS executadas — a validação do dia fica liberada depois da próxima carga.</div>';
   else if(D.sigos==='sem_base') h+='<div class="fscaviso">Sem relatório SIGOS para este dia — aqui entra só o que foi lançado no AcquaHub.</div>';
   if(V) h+='<div class="fscaviso '+(V.desatualizado?'bad':'ok')+'">'+(V.desatualizado?'⚠️ Dia validado por '+vEsc(V.por||'')+' em '+new Date(V.em).toLocaleString('pt-BR')+', mas <b>os dados mudaram depois</b>. A fiscalização vê a versão validada; reabra para revisar.'
       :'✔ Dia validado por '+vEsc(V.por||'')+' em '+new Date(V.em).toLocaleString('pt-BR')+'. É esta versão que a fiscalização vê.')+'</div>';
-  if(pode){
+  const soSemAv=!V&&!todas.length&&(D.projetos||[]).length;
+  if(soSemAv) h+='<div class="fscaviso">Nada a validar: as obras não tiveram avanço neste dia.</div>';
+  if(pode&&!soSemAv){
     h+='<div class="fscbar">';
     if(travado) h+='<button type="button" class="btn" data-fscreab="'+z+'">↺ Reabrir o dia</button>';
     else{ if(pend) h+='<button type="button" class="btn" data-fsctodas="'+z+'">✔ Validar todas as linhas</button>';
@@ -10550,7 +10557,7 @@ function fscRenderDia(){
     const k=b.dataset.fscgrval, i=k.indexOf('|'), z=k.slice(0,i), sel=k.slice(i+1), D=fscS.dias[z]||{};
     const tp=p=>String(p.tipo||'').trim()||'Outros';
     const ok=sel.startsWith('tipo:')?(p=>tp(p)===sel.slice(5)):(p=>fscAl(p)===sel.slice(3));
-    const fs=(D.projetos||[]).filter(p=>ok(p)&&!(p.val&&p.val.ok));
+    const fs=(D.projetos||[]).filter(p=>ok(p)&&!fscSemAvanco(p)&&!(p.val&&p.val.ok));
     for(const p of fs){ const {error}=await sb.rpc('app_fisc_linha_validar',{p_dia:fscS.dia,p_za:z,p_chave:p.chave,p_status:'validada',p_obs:null}); if(error){ toast(error.message); break; } }
     toast(fs.length+' obra(s) validada(s).'); fscRecarregar(); });
   box.querySelectorAll('[data-fsctodas]').forEach(b=>b.onclick=async()=>{ b.disabled=true; const {data,error}=await sb.rpc('app_fisc_linhas_validar_todas',{p_dia:fscS.dia,p_za:b.dataset.fsctodas}); if(error){ toast(error.message); b.disabled=false; return; } toast((data&&data.n||0)+' linha(s) validada(s).'); fscRecarregar(); });

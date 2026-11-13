@@ -4266,6 +4266,12 @@ do consórcio). OS já contando no SIGOS → o traçado vai para o **dia da OS n
 campo); na tela ele aparece **dentro do card da OS SIGOS** como "Traçado de campo" (`fscAninha`/`fscFilhosHtml`: qualquer
 lançamento do app com `os_sigos` = OS SIGOS da mesma linha). Sem OS executada → fica no dia do campo com **0 km**, grupo
 "Aguardando SIGOS" (`extra._aguarda`), **fora do hash** da linha (`fisc_linhas`), e a linha pai avisa "n registro(s) aguardando o SIGOS".
+**Obra sem avanço não precisa de validação (2026-11-13, sw v384, `docs/migracao_fisc_obra_sem_avanco.sql`):** obra sem avanço
+lançado no dia e não concluída nele (`fisc_sem_avanco` / `fscSemAvanco`) continua aparecendo com o % do dia, mas fica com selo
+cinza "sem avanço", sem ✔, fora do "✔ todas" (tipo/AL), do "Validar todas as linhas", da contagem "a validar" e da pendência do
+"Validar o dia" (`app_fisc_dia_validar`); no calendário (`app_fisc_mes`) não entra em n/pend → dia só com obra sem avanço fica
+**vazio** ("Nada a validar"). Entra no snapshot do dia validado (a Fiscalização vê o %); Excel = situação "sem avanço"
+(`app_fisc_periodo`). Hashes não mudam: dias já validados seguem validados; avanço lançado depois com data do dia volta a exigir validação.
 **Detalhe acumulado da obra** (▾ da obra): `app_fisc_proj_detalhe(kind, gid, dia)` devolve a **árvore como estava no fim
 do dia** achatada (`fisc_arv_linhas`: nível, nome, % / exec÷meta, e os campos `reg`/`sel` como informação), **só os
 anexos já feitos até o dia** (`anexos`: `intervencao_documento` com data ≤ fim do dia + links informados nas etapas, com
