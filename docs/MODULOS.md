@@ -2826,6 +2826,14 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   toggle "No escopo?", quantidade (±), tipo de peça, registro, **cadeado** (liberar/reabrir) e **lançamento de
   avanço** no campo — o "Lançar avanço" agora é **real** (lê o input `.pjinp` e soma ao `%`/`exec` da folha) e
   persiste. `pjLeafHist` (histórico fabricado) foi zerado e `hasAdv` usa `pjHasAdv` (avanço real).
+- **"Esse avanço foi realizado ontem?" (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):** todo
+  "Lançar avanço" do `projeto_det` exige responder Sim/Não (`.pjontem`). **Não** = rito normal (`ts = now()`); **Sim** =
+  pede o **horário de execução** e grava a data de **ontem** nessa hora (`p_executado_em`, parâmetro novo opcional — drop +
+  create, chamada antiga sem ele continua valendo). O servidor só aceita data = ontem no fuso de Brasília. `intervencao_avanco.ts`
+  passa a ser **o momento da execução** (o que Resumo, RDO, Consolidador, Vitrine e BI já leem como data); colunas novas
+  **`registrado_em`** (quando foi lançado; antigas = `ts`) e **`retroativo`**. No histórico da etapa o lançamento de ontem
+  ganha ⏪ e o tooltip "executado em … · lançado em …". ⚠️ Se o dia de ontem já foi **validado no Consolidador**
+  (`fisc_dia`), o avanço retroativo aparece no feed mas não no snapshot validado.
 - **⭐ Log de avanço REAL (2026-09-25):** cada "Lançar avanço" grava um registro **append-only** em
   **`"13 - projetos_obra".intervencao_avanco`** (kind,gid, iv_cod/iv_local/consorcio/tipo denormalizados,
   **caminho** "Atividade › … › Sub", atividade, sub, valor, unidade %/m, obs, **fotos[]** no bucket `fotos-campo`
@@ -2874,6 +2882,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   renomeado; some ao regravar, igual ao bloco Ramais); (2) `pjAvancosLoad` **normaliza** o avanço legado em memória
   (`atividade`/`caminho` antigos → `Valas de perfuração › Vala 1 › …`) — faz o histórico, o bloco de avanços e o
   **Gantt** (que casa por `atividade`) baterem com a árvore renomeada. Forward-compatible com migração futura do banco.
+- **Valas HDD pela equipe de obras + tipo Intermediária (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):**
+  a **quantidade de valas de perfuração saiu da Engenharia** — no `projeto_cfg` o stepper some do bloco `av_valas` (só mostra
+  a contagem). No `projeto_det`, quem é de obras (`pjPodeObras`) tem **＋ Adicionar vala** no bloco (`pjValaAdd`: "Vala N+1"
+  zerada, tipo a escolher) e **🗑️ Remover esta vala** em cada vala **sem avanço** (`pjValaDel`; qualquer vala, não só a última;
+  renumera as seguintes só se nenhuma delas tiver avanço — histórico e ensaio de reaterro casam pelo nome "Vala N"); mínimo
+  agora **1** (`min:1`). Tipo = **Entrada / Intermediária / Saída** (`PJ_VALA_TIPOS`, seletor `PJ_VALA_SEL`) e **editável a
+  qualquer momento**, mesmo já preenchido ou com a intervenção liberada (obras no campo, Engenharia na config). `pjLoad`
+  atualiza o seletor das valas já salvas (rótulo/opções; o valor escolhido fica). **Servidor:** `app_proj_estado_set` recusa
+  a árvore em que some uma "Vala N" que tinha avanço (% > 0 na árvore gravada **ou** linha no log com `etapa='av_valas'`).
 - **Mapa — traçados distinguíveis (2026-09-28):** cada linha recebe uma **cor distinta** de `PJ_LINE_PAL` (indexada por
   `gid`) p/ separar traçados sobrepostos — o tipo (VCA/HDD) fica no tooltip, não mais na cor da linha. (Tentativa
   anterior de marcadores início/fim "I"/"F" foi descartada: sobrepunham nas pontas.) **Removidos** a legenda de cores
