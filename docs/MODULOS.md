@@ -4315,7 +4315,7 @@ laranja não executada): no detalhe os grupos e as execuções ficam sem cor (pe
 origem"** (`fscOrigemHtml`: OS + serviço + situação; **não mostra como a origem foi achada** — pedido do usuário 13/11/2026, sw v379;
 o `fonte` segue no banco só p/ auditoria) e resumo "origem: Ramal predial N · Correção de vazamento N · sem origem N" na
 linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de origem (sem a fonte). Chaves de `extra` começando com `_` não são listadas no "chave: valor". Avanços de obra **sem "equipe"** (sw v381): a coluna `intervencao_avanco.equipe` é só o responsável do cadastro da intervenção (ex.: INOVA), não quem executou — sai da tela do Consolidador/Execução Física. bloco **Obras em andamento** (% no dia, barra, avanços do
-dia, acumulado recolhível, anexos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
+dia, acumulado recolhível, anexos) (o botão "Excel do mês" foi removido em 13/11, sw v396 — o Excel é o Relatório consolidado, §21.6.1). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
 corte da Fiscalização mudar no BI, mudar `sigos_fisc_corte()` (vale aqui também). Nova fonte de execução = novo CTE em
@@ -4357,6 +4357,11 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   (Obras também sem Situação).
 - **13/11, sw v395:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
   **% atual da obra** e rede instalada no período (saíram % no início, avanço p.p. e dias c/ avanço).
+- **Versão Fiscalização (13/11, sw v395, `docs/migracao_fiscv_relatorio.sql`):** botão 📊 Relatório consolidado no bloco
+  🏛️ Fiscalização (tela `fiscv_rel` → `fisc_rel` em modo `fisc`, `frlModo`). Só filtro de data e consórcio; só dias
+  validados (`app_fiscv_periodo` = snapshot, o mesmo da Execução Física); resumo por agrupamento e avanço diário fixos;
+  sem filtros no navegador; Excel "Relatório de Execução Física". `app_fisc_rel_classes` passou a aceitar quem vê o validado
+  (`fisc_pode_ver_validado`: admin | fiscal | fisc_acesso).
 - **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
   **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
   no lugar de "VRP" — vale no Consolidador, relatório e validação. A migração passou as validações `atv:VRP` em dia para as
