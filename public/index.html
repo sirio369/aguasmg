@@ -227,6 +227,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjlaunch .lin{display:flex;gap:8px;align-items:center;margin-bottom:9px}
 .pjlaunch input{flex:1;font-size:15px;padding:9px 10px}
 .pjlaunch .btn{margin-top:0}
+.pjrecos{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:2px 0 8px 27px;font-size:13px}
+.pjrecos .lbl{font-weight:700;color:var(--mut);font-size:12px}
+.pjrecos input{flex:1 1 170px;min-width:0;font-size:14px;padding:7px 9px}
 .pjontem{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:8px 0;font-size:13px}
 .pjontem .pjontq{font-weight:700;flex-basis:100%}
 .pjontem label{display:flex;align-items:center;gap:5px;cursor:pointer}
@@ -3607,6 +3610,12 @@ function pjNodeHtml(node){
   if(isG){ const sc=node.f&&node.f.find(c=>c.k==='sel'&&c.v); if(sc) nm+=` <span class="pjtype">· ${sc.v}</span>`; }
   const rowAttr=isG?`data-det="${rid}"`:((pjMode==='campo'&&(t==='%'||t==='m'))?`data-leaf="${rid}"`:'');
   let h=`<div class="pjnode ${isG?'g':''} ${inact?'inact':''}"><div class="pjnrow" ${rowAttr}><span class="tw">${isG?'▸':'·'}</span><div class="pjnn">${nm}${tags}</div>${right}</div>`;
+  // OS SIGOS da recomposição de pavimento (2026-11-13): mora no próprio nó (sgos/sgos_em, salvo no snapshot); selo + aviso ao digitar
+  // pelo vínculo SIGOS (SGX_INPUTS) e entra no painel de Vínculos (vw_os_vinculo, campo "OS da recomposição")
+  if(pjMode==='campo'&&t==='%'&&node.n==='Recomposição de pavimento'&&!inact){ const ed=pjPodeObras(), os=node.sgos||'';
+    h+=`<div class="pjrecos"><span class="lbl">OS SIGOS da recomposição</span>`
+      +(ed?`<input class="pjrecosinp" data-recos="${rid}" inputmode="numeric" value="${pavH(os)}" placeholder="ex.: 00127516560801">`:`<b>${os?pavH(os):'—'}</b>`)
+      +`<span class="pjrecosel">${sgxS(os)}</span></div>`; }
   if(rb) h+=pjReatBox(rb);
   if(isG&&!inact){ const ls=pjLeaves(node),done=ls.filter(x=>pjPct(x)>=100).length; h+=`<div class="pjgsum"><span class="chipx">${done}/${ls.length} etapas ✓</span><span>${p}% concluído</span></div>`; }
   if(node.sub)h+=`<div class="pjmeta">${node.sub}</div>`;
@@ -3712,6 +3721,11 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-toggle]').forEach(s=>s.onclick=()=>{ const n=pjReg[s.dataset.toggle]; if(n){ const k=pjSnapOpen(d); n.ativo=!s.classList.contains('on'); pjSave(pjCurIv()); rerender(k); } });
   d.querySelectorAll('[data-repadd]').forEach(b=>b.onclick=()=>{ const n=pjReg[b.dataset.repadd]; if(n){ const k=pjSnapOpen(d); pjRepAdd(n); pjSave(pjCurIv()); rerender(k); } });
   d.querySelectorAll('[data-repdel]').forEach(b=>{ if(!b.disabled) b.onclick=()=>{ const n=pjReg[b.dataset.repdel]; if(n){ const k=pjSnapOpen(d); pjRepDel(n); pjSave(pjCurIv()); rerender(k); } }; });
+  d.querySelectorAll('[data-recos]').forEach(inp=>{ inp.onclick=e=>e.stopPropagation(); inp.onchange=()=>{ const n=pjReg[inp.dataset.recos]; if(!n) return;
+    const v=inp.value.replace(/\s+/g,'').trim(); inp.value=v; if((n.sgos||'')===v) return;
+    if(v){ n.sgos=v; n.sgos_em=new Date().toISOString(); } else { delete n.sgos; delete n.sgos_em; }
+    const sel=inp.parentElement.querySelector('.pjrecosel'); if(sel) sel.innerHTML=sgxS(v);
+    pjSave(pjCurIv()); toast(v?'OS da recomposição salva':'OS da recomposição removida'); }; });
   d.querySelectorAll('.pjontem input[type=radio]').forEach(r=>r.onchange=()=>{ const w=r.closest('.pjontem'), h=w&&w.querySelector('.pjontem-h'); if(h){ h.hidden=r.value!=='sim'; if(r.value==='sim'){ const t=h.querySelector('.pjonth'); if(t&&!t.value) t.focus(); } } });
   d.querySelectorAll('[data-valaadd]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const n=pjReg[b.dataset.valaadd]; if(!n) return; const k=pjSnapOpen(d); const v=pjValaAdd(n); k.add(n); k.add(v); pjSave(pjCurIv()); rerender(k); toast(v.n+' adicionada — escolha o tipo'); });
   d.querySelectorAll('[data-valadel]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const v=pjReg[b.dataset.valadel], pai=v&&pjValaPai.get(v); if(!pai) return;
@@ -7763,7 +7777,7 @@ async function sgcProcessar(id){
 // RPC app_sigos_os_status(p_os text[]) — qualquer usuário ativo; devolve só serviço/status/datas.
 const SGX_CACHE=new Map();          // texto digitado → info (ou Promise)
 let sgxFila=new Set(), sgxTimer=null;
-const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,#vmPgSig,#vmGcSig,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial,#di_os,#fzOs,#lgSigIn';
+const SGX_INPUTS='.svcorinp,#pav_os,.pavosinp,#segOs,#sstOs,#supCOs,#vmSgIn,#vmPgSig,#vmGcSig,.pgOs,.pgOcOs,.pdosinp,input[data-eos],#edOs,#edOsInst,#edOsRem,#edOsSocial,#di_os,#fzOs,#lgSigIn,.pjrecosinp';
 function sgxS(v){ v=(v==null?'':String(v)).trim(); return v?'<span class="sgx" data-sgx="'+vEsc(v)+'"></span>':''; }
 function sgxCss(){
   if(document.getElementById('sgxCss')) return;
