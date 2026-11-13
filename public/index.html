@@ -10253,7 +10253,9 @@ async function fscCarregarDia(silencioso){
   fscRenderDia();
 }
 const fscNum=(v,dec)=>{ const n=Number(v||0); return n.toLocaleString('pt-BR',{maximumFractionDigits:dec==null?(Number.isInteger(n)?0:2):dec}); };
-const fscMed=(ms,k)=>(ms||[]).map(m=>fscNum(m[k])+' '+m.un).join(' + ');
+// medidas com saldo:true (ex.: loggers temporários "em campo") não se somam às outras: só no Acumulado, separadas por "·"
+const fscMed=(ms,k)=>{ ms=ms||[]; const s=ms.filter(m=>m.saldo), q=ms.filter(m=>!m.saldo).map(m=>fscNum(m[k])+' '+m.un).join(' + ');
+  return k==='acum'&&s.length?[q].concat(s.map(m=>fscNum(m.acum)+' '+m.un)).filter(Boolean).join(' · '):q; };
 function fscStatusLinha(l){
   const v=l.val;
   if(!v) return {cls:'',pill:'<span class="fscpill" style="background:#f59e0b">pendente</span>'};
