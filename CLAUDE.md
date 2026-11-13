@@ -288,7 +288,7 @@ pwa/
   **engrenagem exclusiva de VRP saiu**: a Gestão de VRPs agora é liberada pelo mesmo acesso geral
   (`app_me.vrp_gestao` e `vrp_pode_gestao()` passaram a incluir `aux_acesso`). Seed de continuidade: os
   **aprovadores** existentes receberam `aux_acesso=true`. `apInit()` monta o hub (barra as não-autorizadas); a **1ª categoria é 📋 Gestão Geral** (2026-11-12, sw v372:
-  Consolidador + **OS Pendentes** = ex-"OS não executadas" + **📊 Relatório consolidado** `fisc_rel` = Excel formatado do Consolidador com período, só validado × tudo, filtros por atividade/gestor/agrupamento, sw v386; base separada AcquaHub × SIGOS e VRP = Vistoria primária × Manutenção no banco, sw v391, versão Fiscalização no bloco 🏛️ (`fiscv_rel`, só validado, sw v395), `docs/MODULOS.md §21.6.1`); depois:
+  Consolidador + **OS Pendentes** = ex-"OS não executadas" + **📊 Relatório consolidado** `fisc_rel` = Excel formatado do Consolidador com período, só validado × tudo, filtros por atividade/gestor/agrupamento, sw v386; base separada AcquaHub × SIGOS e VRP = Vistoria primária × Manutenção no banco, sw v391, versão Fiscalização no bloco 🏛️ (`fiscv_rel`, só validado, sw v397), `docs/MODULOS.md §21.6.1`); depois:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
     (`ent_oc_gestao`) · ~~Roteiro de leitura~~ (removido em 2026-11-09, sw v338; RPCs `app_roteiro_*` e views seguem no banco) · **Priorização de troca de HD** e
@@ -483,7 +483,7 @@ Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão
 Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
 direto do hub deve ser `irPara('frota')`, nunca `='home'`. **Fluxos de 2026-10-16 (e-mail Amanda):** multas/ocorrências/avarias (`frota_registro`, cadastro só da equipe de frotas, aviso só ao colaborador + gestor), manutenção preventiva agendada direto pela Frotas e aviso de ocorrência de checklist pra equipe de frotas — avisos pra "equipe de frotas" usam `frota_responsaveis()` (inclui a engrenagem `frota_admin`), ver docs/MODULOS.md §6.6.
 
-**RH** (`rh`, home › 🚧 Em desenvolvimento — só `ME.dev_acesso` por enquanto; Meus colaboradores segue em Suporte; 2026-11-13, sw v395) — hub com **Meus colaboradores** (abaixo),
+**RH** (`rh`, home › 🚧 Em desenvolvimento — só `ME.dev_acesso` por enquanto; Meus colaboradores segue em Suporte; 2026-11-13, sw v397) — hub com **Meus colaboradores** (abaixo),
 **Carga RH** (`rh_carga`: "Relatório de Ponto do Funcionário" do Kairos em Excel (.xls = HTML; emissão = data do arquivo) ou PDF lido no navegador → base única
 funcionário × dia no schema `18 - rh`; gate `ME.rh_acesso` = admin ou ⚙️ do hub `rh_acesso`), **Validação gestor** (`rh_val`: dias estranhos do
 ponto → gestor ajusta marcações / confirma falta / justifica / ok → RH valida depois de corrigir no Kairos ou devolve) e **Análise do
