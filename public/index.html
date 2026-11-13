@@ -10137,6 +10137,13 @@ function fscCss(){
 #fisc .fscos{border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;padding:8px 10px;margin:4px 0 8px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
 #fisc .fscos .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:3px}
 #fisc .fscos .v{user-select:all;font-variant-numeric:tabular-nums}
+#fisc .fscorig{border:1px solid var(--line);border-left:4px solid #b45309;border-radius:8px;padding:6px 8px;margin:6px 0 2px;background:rgba(180,83,9,.06);overflow-wrap:anywhere}
+#fisc .fscorig.prov{border-left-style:dashed}#fisc .fscorig.sem{border-left-color:var(--line);background:transparent}
+#fisc .fscorig .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--mut);margin-bottom:2px}
+#fisc .fscorig .m{color:var(--mut);margin-top:2px}
+#fisc .fscstg{margin:10px 0 4px}#fisc .fscstg>.h{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+#fisc .fscstg .fscpill{font-size:12px;padding:3px 10px}
+#fisc .fscstc{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 #fisc .fscmapa{height:300px;border-radius:10px;border:1px solid var(--line);margin:6px 0}
 #fisc .fscpb{height:8px;background:var(--line);border-radius:6px;overflow:hidden;min-width:60px}
 #fisc .fscpb i{display:block;height:100%;background:var(--acc)}
@@ -10255,14 +10262,53 @@ function fscOsDia(execs){
     +(os.length?'<div class="v">'+vEsc(os.join(', '))+'</div>':'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>')
     +(sem.length?'<div class="sub" style="margin:4px 0 0">+ '+sem.length+' registro'+(sem.length===1?'':'s')+' sem OS</div>':'')+'</div>';
 }
+// status da OS no SIGOS (EXECUTADA, NÃO EXEC. C/ VISITA…) — só p/ execução que veio do SIGOS; null p/ lançamento do app
+function fscStSigos(e){ if(!e||e.origem!=='SIGOS') return null; return String((e.extra&&e.extra['Status SIGOS'])||(e.sigos==='executada'?'EXECUTADA':e.sigos)||'—').trim(); }
+function fscStCor(s){ s=String(s||'').toUpperCase(); return /^EXECUTADA/.test(s)?'#16a34a':(/N[ÃA]O EXEC/.test(s)?'#ea580c':'#64748b'); }
+const fscStPill=s=>'<span class="fscpill" style="background:'+fscStCor(s)+'">'+vEsc(s)+'</span>';
+const FSC_ORIG_FONTE={SIGOS:'informada no SIGOS (OS origem)',AcquaHub:'registro da Gestão de Pavimento',provavel:'provável — mesma matrícula/endereço',nenhuma:''};
+// serviço de origem da recomposição de pavimento (extra._origem, montado no banco)
+function fscOrigemHtml(o){
+  if(!o) return '';
+  if(o.fonte==='nenhuma'||!o.os) return '<div class="fscorig sem"><div class="l">Serviço de origem</div><div class="sub" style="margin:0">Não identificado (sem OS de origem no SIGOS, no registro de pavimento nem na mesma matrícula).</div></div>';
+  const srv=o.servico?o.servico.charAt(0).toUpperCase()+o.servico.slice(1):(o.familia||'Serviço');
+  return '<div class="fscorig'+(o.fonte==='provavel'?' prov':'')+'"><div class="l">Serviço de origem · '+vEsc(FSC_ORIG_FONTE[o.fonte]||o.fonte||'')+'</div>'
+    +'<div><b>OS '+vEsc(o.os)+'</b> — '+vEsc(srv)+(o.familia&&!String(o.servico||'').toLowerCase().startsWith(o.familia.toLowerCase())?' <span class="sub" style="margin:0">('+vEsc(o.familia)+')</span>':'')+'</div>'
+    +'<div class="m">'+vEsc([o.cod&&o.desc?o.cod+' — '+o.desc:(o.desc||o.cod),o.situacao,o.resultado].filter(Boolean).join(' · '))+'</div></div>';
+}
 function fscExecHtml(z,e){
   const os=[e.os_app?'OS '+e.os_app:null, e.os_sigos?'OS SIGOS '+e.os_sigos+(e.sigos&&e.origem!=='SIGOS'?' — '+e.sigos:''):(e.sigos&&e.origem!=='SIGOS'?e.sigos:null)].filter(Boolean).join(' · ');
-  const kv=Object.entries(e.extra||{}).map(([k,v])=>k+': '+v).join(' · ');
+  const st=fscStSigos(e);
+  const kv=Object.entries(e.extra||{}).filter(([k])=>k.charAt(0)!=='_'&&!(st&&k==='Status SIGOS')).map(([k,v])=>k+': '+v).join(' · ');
   const meta=[e.local, e.equipe?'equipe '+e.equipe:null, e.hora].filter(Boolean).join(' · ');
   return '<div class="fscex">'
-    +'<div class="t">'+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
+    +'<div class="t">'+(st?fscStPill(st)+' ':'')+vEsc(e.servico||'')+' <span style="font-weight:400;color:var(--mut)">· '+vEsc(e.origem||'')+'</span></div>'
     +'<div>'+vEsc(e.desc||'')+'</div>'+(meta?'<div class="m">'+vEsc(meta)+'</div>':'')+(os?'<div class="m">'+vEsc(os)+'</div>':'')
+    +fscOrigemHtml(e.extra&&e.extra._origem)
     +(kv?'<div class="kv">'+vEsc(kv)+'</div>':'')+fscFotos(e.fotos)+'</div>';
+}
+// execuções da linha agrupadas pelo status no SIGOS (EXECUTADA primeiro); lançamentos do app num grupo à parte
+function fscExecsAgrupadas(z,execs){
+  execs=execs||[];
+  if(!execs.some(e=>e.origem==='SIGOS')) return execs.map(e=>fscExecHtml(z,e)).join('');
+  const gs={}, ord=[];
+  execs.forEach(e=>{ const k=fscStSigos(e)||'Lançado no AcquaHub'; if(!gs[k]){ gs[k]=[]; ord.push(k); } gs[k].push(e); });
+  const peso=k=>k==='Lançado no AcquaHub'?9:(/^EXECUTADA/i.test(k)?(k.toUpperCase()==='EXECUTADA'?0:1):5);
+  ord.sort((a,b)=>peso(a)-peso(b)||a.localeCompare(b,'pt-BR'));
+  return ord.map(k=>'<div class="fscstg"><div class="h">'+(k==='Lançado no AcquaHub'?'<span class="fscpill" style="background:var(--acc)">'+vEsc(k)+'</span>':fscStPill(k))
+    +' <span class="sub" style="margin:0">'+gs[k].length+' OS</span></div>'+gs[k].map(e=>fscExecHtml(z,e)).join('')+'</div>').join('');
+}
+// resumo na própria linha: contagem por status SIGOS (e, na recomposição, por família do serviço de origem)
+function fscResumoLinha(l){
+  const ex=l.execs||[], cnt={};
+  ex.forEach(e=>{ const s=fscStSigos(e); if(s) cnt[s]=(cnt[s]||0)+1; });
+  let h='';
+  const ks=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
+  if(ks.length) h+='<div class="fscstc">'+ks.map(k=>'<span class="fscpill" style="background:'+fscStCor(k)+'">'+vEsc(k)+' · '+cnt[k]+'</span>').join('')+'</div>';
+  const orig=ex.map(e=>e.extra&&e.extra._origem).filter(Boolean);
+  if(orig.length){ const fo={}; orig.forEach(o=>{ const f=o.os&&o.fonte!=='nenhuma'?(o.familia||o.servico||'outro'):'sem origem'; fo[f]=(fo[f]||0)+1; });
+    h+='<div class="sub" style="margin:3px 0 0">origem: '+vEsc(Object.keys(fo).sort((a,b)=>(a==='sem origem')-(b==='sem origem')||fo[b]-fo[a]).map(f=>f+' '+fo[f]).join(' · '))+'</div>'; }
+  return h;
 }
 function fscTabAtividades(z,D,pode,travado){
   const ls=D.linhas||[];
@@ -10273,11 +10319,11 @@ function fscTabAtividades(z,D,pode,travado){
     const k=z+'|'+l.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(l);
     const bVal=pode&&!travado?(l.val&&l.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
       :'';
-    h+='<tr class="'+st.cls+'"><td><b>'+vEsc(l.atividade)+'</b><div class="sub" style="margin:2px 0 0">'+l.n+' registro'+(l.n===1?'':'s')+'</div></td>'
+    h+='<tr class="'+st.cls+'"><td><b>'+vEsc(l.atividade)+'</b><div class="sub" style="margin:2px 0 0">'+l.n+' registro'+(l.n===1?'':'s')+'</div>'+fscResumoLinha(l)+'</td>'
       +'<td class="n">'+vEsc(fscMed(l.medidas,'dia'))+'</td><td class="n hm">'+vEsc(fscMed(l.medidas,'acum'))+'</td>'+(cs?'<td>'+st.pill+'</td>':'')
       +'<td class="ac">'+bVal+'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button><button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
     h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
-    if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+fscOsDia(l.execs)+(l.execs||[]).map(e=>fscExecHtml(z,e)).join('')+'</td></tr>';
+    if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+fscOsDia(l.execs)+fscExecsAgrupadas(z,l.execs)+'</td></tr>';
   });
   return h+'</tbody></table>';
 }
@@ -10447,7 +10493,8 @@ function fscMapa(k,l){
   const m=L.map(el); mapAddCamadaBase(m); fscS._leaf[k]=m;
   const grp=L.featureGroup().addTo(m);
   const add=(geo,pop)=>{ if(!geo) return; try{ L.geoJSON(geo,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:7,weight:2,color:'#fff',fillColor:'#2563eb',fillOpacity:.9}),style:{color:'#2563eb',weight:4}}).bindPopup(pop).addTo(grp); }catch(_){} };
-  if(l.execs) l.execs.forEach(e=>add(e.geo,'<b>'+vEsc(e.servico||'')+'</b><br>'+vEsc(e.desc||'')+(e.local?'<br>'+vEsc(e.local):'')
+  if(l.execs) l.execs.forEach(e=>add(e.geo,'<b>'+vEsc(e.servico||'')+'</b>'+(fscStSigos(e)?' · '+vEsc(fscStSigos(e)):'')+'<br>'+vEsc(e.desc||'')+(e.local?'<br>'+vEsc(e.local):'')
+    +((o=>o&&o.os&&o.fonte!=='nenhuma'?'<br>Origem: OS '+vEsc(o.os)+' — '+vEsc(o.servico||o.familia||''):'')(e.extra&&e.extra._origem))
     +((e.fotos||[]).length&&!/\.pdf$/i.test(e.fotos[0])?'<br><img src="'+vEsc(SBASE+e.fotos[0])+'" style="width:160px;margin-top:4px;border-radius:6px">':'')));
   else add(l.geo,'<b>'+vEsc(l.codigo||'')+'</b><br>'+fscNum(l.pct,1)+'%');
   const b=grp.getBounds();
@@ -10463,13 +10510,14 @@ async function fscExcel(){
     const ini=fscS.mes, fim=new Date(new Date(ini+'T12:00:00').getFullYear(),new Date(ini+'T12:00:00').getMonth()+1,0).toLocaleDateString('sv-SE');
     const ate=fim>rdoHoje()?rdoHoje():fim, de=ini<FSC_MIN?FSC_MIN:ini;
     const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].per,{p_de:de,p_ate:ate,p_za:z})));
-    const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Latitude','Longitude','Fotos','Situação da linha']],
+    const res=[['Dia','ZA','Atividade','Qtd no dia','Unidade','Acumulado','Situação']], exs=[['Dia','ZA','Atividade','Serviço','Origem','Descrição','Local','Equipe','Hora','OS AcquaHub','OS SIGOS','Situação SIGOS','Status SIGOS','OS de origem','Serviço de origem','Origem identificada por','Latitude','Longitude','Fotos','Situação da linha']],
       obr=[['Dia','ZA','AL','Obra','Extensão (m)','Tipo','Local','Início','% no dia','% dia anterior','Concluída','Avanços do dia','Situação']];
     rs.forEach((r,i)=>{ if(r.error) throw r.error; const z=fscS.zas[i];
       (r.data||[]).forEach(d=>{ const sit=x=>d.validado?'validado':(x.status||'pendente');
         (d.linhas||[]).forEach(l=>{ (l.medidas||[]).forEach(m=>res.push([fmtData(d.dia),z,l.atividade,Number(m.dia),m.un,Number(m.acum),sit(l)]));
-          (l.execs||[]).forEach(e=>{ const c=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null;
-            exs.push([fmtData(d.dia),z,l.atividade,e.servico||'',e.origem||'',e.desc||'',e.local||'',e.equipe||'',e.hora||'',e.os_app||'',e.os_sigos||'',e.sigos||'',c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
+          (l.execs||[]).forEach(e=>{ const c=e.geo&&e.geo.type==='Point'?e.geo.coordinates:null, o=(e.extra&&e.extra._origem)||{}, temO=o.os&&o.fonte!=='nenhuma';
+            exs.push([fmtData(d.dia),z,l.atividade,e.servico||'',e.origem||'',e.desc||'',e.local||'',e.equipe||'',e.hora||'',e.os_app||'',e.os_sigos||'',e.sigos||'',fscStSigos(e)||'',
+              temO?o.os:'',temO?[o.servico||o.familia,o.cod&&o.desc?o.cod+' — '+o.desc:'',o.situacao].filter(Boolean).join(' · '):'',e.extra&&e.extra._origem?(temO?(FSC_ORIG_FONTE[o.fonte]||o.fonte):'não identificada'):'',c?c[1]:'',c?c[0]:'',(e.fotos||[]).map(p=>SBASE+p).join(' '),sit(l)]); }); });
         (d.projetos||[]).forEach(p=>obr.push([fmtData(d.dia),z,fscAl(p)||'',p.codigo||'',fscExt(p)?Math.round(fscExt(p)):'',p.tipo||'',p.local||'',p.inicio?fmtData(p.inicio):'',Number(p.pct||0),Number(p.pct_ant||0),p.concluida?'sim':'não',
           (p.avancos||[]).map(a=>a.item+': +'+a.valor+(a.un==='%'?'%':' '+(a.un||''))).join('; '),sit(p)]));
       }); });

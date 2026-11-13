@@ -4199,6 +4199,13 @@ Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_v
   (`fisc_familia` separa da família SIGOS "Pesquisa de vazamento"). **Vazamento localizado (ocorrência do app) sem
   correção executada nunca aparece** — a ocorrência só empresta foto/local à correção da mesma OS.
  - **Pavimento:** **só as OS SIGOS** de recomposição (pela data do SIGOS). Registros do AcquaHub (recomposição executada no app e ensaios de reaterro) não entram desde 12/11/2026 (decisão do usuário; antes a OS casada era atributo do registro do app).
+   **Serviço de origem (2026-11-13, sw v377, `docs/migracao_fisc_pav_origem.sql`):** cada recomposição ganha `extra._origem`
+   `{os, fonte, cod, desc, servico, familia, situacao, resultado}` — a OS que abriu o buraco, buscada nesta ordem: (1) **SIGOS**
+   `os_origem` da própria OS (raro: 4 de 98); (2) **AcquaHub** — registro da Gestão de Pavimento cuja `os_recomposicao` (base de
+   10 dígitos) é esta OS → `os_sigos` de origem; (3) **provável** — OS SIGOS EXECUTADA de Ramal predial / Correção de vazamento /
+   Manobra / VRP na **mesma matrícula** (ou mesmo endereço) até **120 dias antes** (a mais recente). Origem que aponta para outra
+   recomposição é descartada (cai p/ a próxima fonte); sem nada → `{fonte:'nenhuma'}`. Em 13/11: 4 SIGOS + 22 AcquaHub + ~60
+   prováveis, ~10 sem origem. `_origem` fica **fora do hash** da linha (dia validado não vira "mudou").
 - **Demais famílias SIGOS:** regra do BI (`sigos_conta`: executada; Fiscalização também NÃO EXEC. C/ VISITA).
 - **Fora:** pontos de pavimento levantados (pendência), atendimento comercial (solicitações/ocorrências), encerradas sem
   execução que não contam, "dados concluídos" do logger (é escritório).
@@ -4255,7 +4262,14 @@ fiscalização; `FSC_RPC` escolhe as RPCs):** ZAs (seleção múltipla), calend�
 dias validados ficam clicáveis), tabela por ZA (Atividade · No dia · Acumulado · Situação · ✔/🗺️/▾; sem Situação nem ✔ na
 fiscalização), detalhe da atividade com **"OS do dia" primeiro** (`fscOsDia`: OS SIGOS, ou a do AcquaHub sem SIGOS, sem
 repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros sem OS) e depois cada execução (OS, situação
-SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha, bloco **Obras em andamento** (% no dia, barra, avanços do
+SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha,
+**status SIGOS em destaque (2026-11-13, sw v377, só front):** a linha da atividade mostra chips com a contagem por status
+(`EXECUTADA · 645`, `NÃO EXEC. C/ VISITA · 126`; `fscResumoLinha`) e, no detalhe, as execuções ficam **agrupadas por status
+SIGOS** dentro da atividade (`fscExecsAgrupadas`: EXECUTADA primeiro; lançamentos do app num grupo "Lançado no AcquaHub"),
+cada uma com o selo do status (verde executada, laranja não executada); na recomposição de pavimento, bloco **"Serviço de
+origem"** (`fscOrigemHtml`: OS + serviço + como foi identificada; tracejado = provável) e resumo "origem: Ramal predial N ·
+Correção de vazamento N · sem origem N" na linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de
+origem / Origem identificada por. Chaves de `extra` começando com `_` não são listadas no "chave: valor". bloco **Obras em andamento** (% no dia, barra, avanços do
 dia, acumulado recolhível, anexos) e **⬇️ Excel do mês** (abas Resumo / Execuções / Obras). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
