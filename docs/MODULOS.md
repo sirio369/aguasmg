@@ -3368,6 +3368,18 @@ para não haver serviço executado no AcquaHub sem OS no SIGOS.
   mesmo selo do Vínculo SIGOS (`sgxGet` → `app_sigos_os_status`, em lote); filtro só no navegador, sem RPC nova. Chips
   com contagem zero ficam escondidos. Vale para lista e mapa.
 
+**✏️ Correção da OS pela gestão (2026-11-13, sw v376, `docs/migracao_vrp_os_editar.sql`):** na ficha da OS
+(`vrpman_os`), quem tem gestão de VRP (`ME.vrp_gestao`/admin) vê um **lápis** ao lado do título quando a OS já foi
+executada (status ≠ `programada`). Abre o modal `vmOsEditar` com os campos do formulário de campo — chegada, pressões
+(conectou? + encontrada), condição (OK/Intervir/Não verificado + descrição), serviços (chips + peça/outro + detalhe por
+serviço), finalização (pressões finais, justificativa da jusante, estabilizada/vazamento/liberada) e observação — e
+**motivo da correção obrigatório**. Grava por `app_vrp_os_editar(p_os_id, p_respostas, p_campos, p_motivo)` (gate
+`vrp_pode_gestao()`): faz *merge* em `respostas` (preserva `vrp_anterior`/`vrp_nova` etc.) e sobrescreve as colunas
+espelhadas `press_*`, `estabilizada`, `vazamento_pos`, `liberada`, `obs`. **Não muda status, pendências, fotos nem GPS**
+(nem o cadastro da VRP numa substituição) — o trigger de aviso não dispara (status igual). Cada correção fica em
+`"8 - coleta_campo".vrp_os_edicao` (antes/depois + motivo + quem/quando, RLS sem policy) e aparece na ficha na seção
+"Correções da gestão" (`app_vrp_os_ver.edicoes`). A ficha também passou a mostrar a observação e a justificativa da jusante.
+
 ## 16. Telemetria (CCO COPASA) — `// MÓDULO TELEMETRIA (CCO COPASA)` · tela `telemetria` (admin-only)
 
 Importa os **CSVs horários/sub-horários exportados do sistema CCO da COPASA** (telemetria de macro,
