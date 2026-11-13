@@ -4351,3 +4351,11 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   instalações/remoções do período).
 - **Cuidados:** o acumulado do relatório começa na data inicial escolhida (não é o "desde 01/09" do Consolidador, a menos que
   o período comece lá). Relatório de períodos longos = muitos pedaços; se a RPC ficar lenta, trocar por uma RPC só do relatório.
+- **2026-11-13 (sw v389) — nomes e agrupamento:** unidade com o que mede quando a mesma atividade tem duas (`FSC_UN`/`fscUn`, só
+  rótulo de tela e Excel, no Consolidador, na Execução Física e no relatório — banco, hash e snapshot seguem `OS`/`km`/`visita`):
+  Pesquisa de vazamento = **OS de detecção** (SIGOS 248 79 00) × **km de rede pesquisada** (traçado do app); VRP = **visita
+  primária** (app, sem OS) × **OS de manutenção** (163 79 00); Correção de vazamento = OS de correção. Agrupamento do relatório
+  pela regra do BI (`frlGrupo`, antes do código SIGOS): **Fiscalização de irregularidade** (676 79 00 + 152 05 00 gerada até
+  31/10 — `sigos_familia`) e **Confirmação de fraude** (152 05 00 depois) no bloco único **"Fiscalização de irregularidades e
+  fraudes"**; Mapeamento de pressão e visita primária de VRP → Setorização · DMC e VRP; OS de VRP → Manutenção de VRP existente.
+  Ramal predial: hoje só há substituição (143 79 00) no período — sem instalação para separar.
