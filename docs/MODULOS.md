@@ -3154,8 +3154,8 @@ A antiga **Gestão de Pessoas** (schema `"14 - pessoas"`: candidatos, aprovaçã
 checklist de setup, desligamento, premissas de benefícios, RH/`pessoas_admin`) **foi removida do app**. A
 admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaHub.xlsx` → `public.perfil`).
 
-- **Quem vê:** card **📇 Meus colaboradores** na home › 🧰 Suporte (`#homeMeusColab`, `homeGate()` → só
-  `ME.pode_aprovar`). **Aprovador** vê os colaboradores **ativos** que o têm como Aprovador 1 ou 2; **admin** vê
+- **Quem vê:** desde 2026-11-13 (sw v391) o card **📇 Meus colaboradores** fica **dentro do hub 👥 RH** (§22), que tomou o
+  lugar dele na home › 🧰 Suporte; no hub ele só aparece para `ME.pode_aprovar`. **Aprovador** vê os colaboradores **ativos** que o têm como Aprovador 1 ou 2; **admin** vê
   todos os ativos. O próprio usuário não aparece na lista dele.
 - **Tela:** busca (nome/e-mail/cargo), chips de consórcio (com contagem), select de área; total + quantitativos
   **por área, consórcio, projeto, cargo, modalidade e direto/indireto** (barras simples, `mcBloco`), e a lista —
@@ -4355,7 +4355,7 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
 - **Enxuto (13/11, sw v393, pedido do usuário):** sem cartões de indicadores, sem coluna Execuções no quadro, sem
   "Como ler", sem coluna "Situação do dia" no avanço; bases sem Gestor, Serviço de origem (recomposição), Fotos e Situação
   (Obras também sem Situação).
-- **13/11, sw v394:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
+- **13/11, sw v395:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
   **% atual da obra** e rede instalada no período (saíram % no início, avanço p.p. e dias c/ avanço).
 - **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
   **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
@@ -4380,3 +4380,97 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   remoção) + Logger fixo (instalação; hoje só Betim, desde 20/10); **VRP** = duas atividades no relatório (`frlAtv`/`FRL_VRP`):
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
+
+## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v395; migrações aplicadas em 13/11/2026)
+
+Card **👥 RH** na home › **🚧 Em desenvolvimento** (`#homeRh`, padrão da Vitrine: "RH 🔒" para quem não tem `ME.dev_acesso`; decisão do
+usuário em 13/11/2026 — o módulo fica em desenvolvimento por enquanto). Todas as telas `rh*` checam `rhDev()` (= `ME.dev_acesso`) além do
+gate próprio. O card **📇 Meus colaboradores** continua em 🧰 Suporte para aprovador/admin (`#homeMeusColab`). Quando sair de
+desenvolvimento, o plano é o RH substituir o card Meus colaboradores em Suporte (`ME.pode_aprovar || ME.rh_acesso`).
+O hub (`rhInit`) mostra: **📇 Meus colaboradores** (só aprovador/admin — a tela `meus_colab` de sempre, §12, agora com "‹ RH"),
+**📥 Carga RH** (`rh_carga`, só `ME.rh_acesso`), **✅ Validação gestor** (`rh_val`, §22.2) e **📊 Análise do ponto** (`rh_analise`, §22.3) — essas duas para aprovador (só a equipe)
+ou RH (todos).
+⚙️ do hub (admin) → tela **`rh_acesso`** (quem faz a carga; `perfil.rh_acesso`, RPCs `app_rh_acesso_listar`/`_set`, admin-only).
+
+### 22.1 Carga RH — tela `rh_carga` · `// ---------- CARGA RH`
+Base **única** de horas a partir do **"Relatório de Ponto do Funcionário" do DIMEP Kairos (PDF)**, um por consórcio.
+- **Leitura no navegador:** `rhParsePdf` (pdf.js 3.11.174 via `pjLoadPdfJs`, o mesmo de Projetos) lê cada página (1 funcionário por
+  página; continuação na página seguinte é juntada pelo CPF): cabeçalho (empresa, CNPJ, emissão `dd/mm/aaaa - hh:mm` do topo, nome,
+  matrícula, PIS, CPF, admissão, base de horas), linhas de dia (horário previsto, marcações, H.Trab, H.E., Ad.N., Ad.N.HE.N., C.Ponte,
+  descontos `hh:mm Atraso|Falta|DSR`, banco de horas débito/crédito, justificativa) e rodapé (dias trabalhados, atrasos, faltas, DSR,
+  saldos, HE por percentual). As colunas são **faixas fixas de x** (`RH_COLS`, página deitada, em pt); antes de ler, o cabeçalho da
+  tabela é conferido (`RH_HDR`) — se o Kairos mudar o layout, o PDF é **recusado** ("o layout do relatório mudou"), nunca gravado com
+  coluna trocada. Conferido com os relatórios de 08–13/11/2026: AI 51 funcionários / 304 dias / HE 222:56; EH 43 / 254 / 290:22
+  (bate com a análise manual).
+- **Fluxo** (um PDF de cada vez): sha256 → `app_rh_ponto_checar(sha)` (mesmo PDF já carregado com sucesso → "♻️ Já carregado em …",
+  nada sobe) → lê o PDF → upload no bucket **privado `rh-ponto`** (`<AAAA-MM-DD>/<uuid>_<nome>.pdf`, só PDF ≤ 20 MB, sem update/delete
+  = prova da carga) → `app_rh_registrar(path, nome, tamanho, sha)` → `app_rh_ponto_processar(arquivo, dados)`. Falha depois do registro
+  → `app_rh_falha`; **↻ Reprocessar** em Últimas cargas baixa o PDF do bucket, lê de novo e reenvia com o mesmo `arquivo_id`.
+- **Regras (no SQL, `app_rh_ponto_processar`):**
+  - Empresa pelo **CNPJ** → consórcio pelo de-para `"18 - rh".empresa` (AI 66.149.888/0001-37 = ZA1004; EH 66.475.418/0001-63 =
+    ZA0200). CNPJ fora do de-para → arquivo recusado, banco intacto.
+  - **Funcionário = CNPJ + CPF** (`funcionario`, único). `perfil_id` casado pelo CPF com `public.perfil` (só dígitos, 11 com zero à
+    esquerda) → o **gestor** de cada um, na validação, será o Aprovador 1/2 desse perfil. Quem não casa aparece em "sem usuário no
+    AcquaHub" no painel (em 13/11/2026: 6 dos 94).
+  - **Base única = `ponto_dia` (PK funcionário × data).** Relatórios com períodos sobrepostos: o dia fica com o **emitido por último**
+    (`emitido_em`). Relatório mais antigo que o gravado para aquele dia → o dia não muda (conta em `dias_antigos`). Mesmo conteúdo →
+    `dias_iguais` (só atualiza emissão/arquivo/parcial). Conteúdo diferente → a versão anterior vai para **`ponto_dia_hist`** e `versao`
+    sobe (`dias_alterados`) — é o rastro que a RH vai usar para conferir as correções feitas no Kairos depois da validação do gestor.
+  - `hash` do dia = md5 do conteúdo (horário, marcações, rendimentos, descontos, BH, justificativa) — não da carga.
+  - **`parcial`** = dia ≥ data da emissão (relatório tirado no meio do expediente: batidas incompletas). A próxima carga completa o dia.
+  - Mesmo sha256 que chegue ao banco mesmo assim → processa (tudo "igual") e grava **aviso** "idêntico ao já carregado em …".
+  - Nunca levanta erro de validação: grava `status='erro'` + mensagem; erro inesperado na gravação desfaz só os dados (subbloco).
+    Cargas serializadas por `pg_advisory_xact_lock('rh:ponto')`.
+- **Tela:** campo único (seletor `multiple` ou arrastar), fila da sessão com o resumo de cada PDF (empresa · ZA · funcionários · período;
+  novos / alterados / iguais / ignorados), **No banco agora** (`app_rh_painel`: por empresa — funcionários, dias, parciais, período,
+  última emissão e a lista recolhível de quem não casou com usuário) e **Últimas cargas** (`app_rh_cargas_listar(40)`). Prefixo `rhc*`/`RH_*`.
+
+**Banco (`"18 - rh"`, app-only, RLS sem policy, acesso só por RPC definer):** `empresa` (de-para CNPJ → ZA), `arquivo` (log de cargas,
+nunca apaga: path, sha256, CNPJ, ZA, emissão, período, contagens, status/erro/aviso), `funcionario`, `ponto_dia` (marcações `text[]`,
+minutos em `*_min`, `descontos` jsonb + `atraso_min`/`falta_min`/`dsr_min` somados, `parcial`, `versao`, `hash`), `ponto_dia_hist`,
+`ponto_resumo` (rodapé por carga × funcionário: HE por percentual, saldos). Helper `public.rh_pode_carregar(uid)` = admin ou
+`perfil.rh_acesso` (ativo) — usado nas RPCs e nas policies do bucket. `app_me` devolve `rh_acesso`.
+
+**Cuidados:**
+- **LGPD:** CPF e PIS ficam só no schema 18 (app-only); a tela não mostra CPF. Sem acesso GIS/BI por enquanto — se for ao BI, criar
+  view curada sem CPF/PIS.
+- O almoço da Águas Integradas vem **sempre 12:00/13:00** (pré-assinalado no Kairos) e o da Eficiência Hídrica quase sempre não vem
+  (2 batidas, sem desconto do intervalo) — é dado do relógio, não erro de leitura; a tela de inconsistências vai tratar isso.
+- Coluna nova no relatório / mudança de posição → `RH_HDR` recusa o PDF; ajustar `RH_COLS`/`RH_HDR` com um PDF novo de referência.
+- O período do PDF é o que o RH exportou: em 13/11/2026 o zip "01 a 13/11" trazia só 08–13/11.
+
+### 22.2 Validação gestor — tela `rh_val` · `// ---------- RH · VALIDAÇÃO GESTOR` · `docs/migracao_rh_ponto_validacao.sql`
+Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH faz a 2ª validação depois de corrigir no Kairos.
+- **Quem vê:** `"18 - rh".func_visiveis(uid)` — RH (`rh_pode_carregar`) e admin veem todos; o aprovador vê os funcionários cujo perfil
+  (casado pelo CPF) o tem como **Aprovador 1 ou 2**. Funcionário sem usuário no app só aparece para a RH.
+- **Inconsistências** (`"18 - rh".inconsistencias(ini, fim)`, dias `parcial` ficam fora):
+  `marc_impar` (nº ímpar de batidas) · `sem_intervalo` (2 batidas e jornada > 6h — almoço não descontado) · `falta` (dia previsto sem
+  batida e sem justificativa) · `falta_pos_deslig` (falta depois de um dia com justificativa de desligamento) · `atraso` (≥ 15 min) ·
+  `he_excesso` (HE > 2h no dia) · `trab_descanso` (batida em dia de folga/DSR) · `interjornada` (< 11h entre a última batida do dia
+  anterior e a primeira do dia; devolve `interjornada_min`).
+- **Ação do gestor** (`app_rh_val_tratar(funcionário, data, ação, marcações, motivo, obs)`): **ajustar** (marcações corretas em pares
+  entrada/saída, HH:MM em ordem crescente) · **falta** (faltou / não trabalhou) · **justificar** (motivo obrigatório da lista
+  `RH_MOTIVOS` + obs) · **ok** (está correto). Grava `tratativa` (PK funcionário × dia, `status='tratado'`, `versao_dia` = versão do
+  `ponto_dia` no momento) e o evento em `tratativa_evento` (log append-only). Pode refazer enquanto não for validado.
+- **RH** (`app_rh_val_rh(funcionário, data, validar, obs)`, só `rh_pode_carregar`): **✓ Corrigido no Kairos** → `validado` (travado)
+  ou **Devolver** com observação obrigatória → `devolvido` (volta para "A tratar" do gestor, com a observação em vermelho).
+- **Conferência com o Kairos:** `app_rh_val_lista` devolve `kairos_atualizado` (chegou carga nova do dia depois da tratativa:
+  `versao` > `versao_dia`) e `kairos_bate` (ajustar → marcações iguais às do gestor; falta → falta lançada; justificar de falta →
+  falta zerada). A tela mostra "✓ o Kairos já reflete" / "⚠ chegou relatório novo mas ainda não reflete" / "aguardando nova carga".
+- **Tela:** período (padrão últimos 30 dias, máx. 3 meses), chips **A tratar / Aguardando RH / Validados / Todos**, chips de consórcio,
+  filtro por inconsistência e busca. Cards agrupados por colaborador (sigla, matrícula, gestor), com as batidas, horário, H.trab/HE/
+  falta/atraso e a justificativa do Kairos. Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
+
+### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
+`app_rh_analise(ini, fim, consórcio)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências:
+- **KPIs:** colaboradores, horas trabalhadas, horas extras, dias com **HE > 2h**, **descansos < 11h**, dias de falta (e horas),
+  atrasos, adicional noturno. Dias `parcial` aparecem no aviso do período.
+- **Inconsistências do período** (casos e pessoas por tipo) + andamento das tratativas (a tratar / aguardando RH / validadas).
+- **Horas extras por dia** (barras), **por consórcio** (H.trab, HE, % HE, faltas, atraso), lista de **descanso < 11h** (colaborador,
+  dia, descanso, quanto faltou para 11h) e **ranking por colaborador** (HE, dias HE > 2h, descansos < 11h, faltas, atraso, H.trab —
+  ordena tocando no título da coluna; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
+
+**Banco da validação** (`docs/migracao_rh_ponto_validacao.sql`, roda **depois** da migração da carga): `tratativa`, `tratativa_evento`,
+helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
+`app_rh_analise` (definer, só `authenticated`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
+inconsistência (sem intervalo 136, HE > 2h 94, falta 55, atraso 55, batida ímpar 18, descanso < 11h 13, falta após desligamento 2).
