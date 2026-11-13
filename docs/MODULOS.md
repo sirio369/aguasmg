@@ -4357,6 +4357,11 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   (Obras também sem Situação).
 - **13/11, sw v395:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
   **% atual da obra** e rede instalada no período (saíram % no início, avanço p.p. e dias c/ avanço).
+- **Versão Fiscalização (13/11, sw v395, `docs/migracao_fiscv_relatorio.sql`):** botão 📊 Relatório consolidado no bloco
+  🏛️ Fiscalização (tela `fiscv_rel` → `fisc_rel` em modo `fisc`, `frlModo`). Só filtro de data e consórcio; só dias
+  validados (`app_fiscv_periodo` = snapshot, o mesmo da Execução Física); resumo por agrupamento e avanço diário fixos;
+  sem filtros no navegador; Excel "Relatório de Execução Física". `app_fisc_rel_classes` passou a aceitar quem vê o validado
+  (`fisc_pode_ver_validado`: admin | fiscal | fisc_acesso).
 - **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
   **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
   no lugar de "VRP" — vale no Consolidador, relatório e validação. A migração passou as validações `atv:VRP` em dia para as

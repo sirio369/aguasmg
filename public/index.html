@@ -461,6 +461,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🏛️ Fiscalização<button id="homeFiscAcesso" class="hidden" title="Quem acessa a Fiscalização" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
       <div class="grid" style="margin-top:10px">
         <button class="mod" data-go="fiscv"><div class="ic">📋</div><div class="nm">Execução Física</div></button>
+        <button class="mod" data-go="fiscv_rel"><div class="ic">📊</div><div class="nm">Relatório consolidado</div></button>
         <button class="mod" data-go="cadastro"><div class="ic">🗺️</div><div class="nm">Cadastro técnico</div></button>
         <button class="mod" data-go="biblioteca"><div class="ic">📚</div><div class="nm">Biblioteca</div></button>
       </div>
@@ -1316,8 +1317,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="fisc_rel" class="hidden">
     <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
-    <h1>Relatório consolidado</h1>
-    <p class="sub">Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.</p>
+    <h1 id="frlTit">Relatório consolidado</h1>
+    <p class="sub" id="frlSub">Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.</p>
     <div class="frlbox" id="frlParams"></div>
     <div id="frlOut"></div>
   </main>
@@ -2354,10 +2355,11 @@ if($('#prAlvoX')) $('#prAlvoX').addEventListener('click',()=>{prAlvo=null;prAlvo
 
 // ---------- navegação ----------
 const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','estanqueidade','suprimentos','pr_prod','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
-const FISCAL_TELAS=['home','fisc','fiscv','cadastro','biblioteca','notificacoes'];
+const FISCAL_TELAS=['home','fisc','fiscv','fiscv_rel','cadastro','biblioteca','notificacoes'];
 function irPara(id){
   if(ME&&ME.is_fiscal){ if(!FISCAL_TELAS.includes(id)) id='home'; if(id==='fisc') id='fiscv'; }
   if(id==='fiscv'){ fscModo('fisc'); id='fisc'; } else if(id==='fisc') fscModo('cons');
+  if(id==='fiscv_rel'){ frlModo('fisc'); id='fisc_rel'; } else if(id==='fisc_rel') frlModo('int');
   SCREENS.forEach(s=>$('#'+s).classList.toggle('hidden',s!==id));
   document.querySelectorAll('nav button[data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
   if(id==='home') homeGate();
@@ -10787,7 +10789,7 @@ function frlGrupo(atv,un,gr){
 const FRL_VRP={visita:'Vistoria primária de VRP',OS:'Manutenção de VRP'};
 const frlAtv=(atv,un)=>atv==='VRP'&&FRL_VRP[un]?FRL_VRP[un]:atv;
 const FRL_FAM_ATV=a=>/^Logger |^Mapeamento de pressão/.test(a)?'Loggers de pressão':(/^Obra/.test(a)?'Rede de água':(a==='Correção de vazamento'?'Pesquisa de vazamento':a));
-let frlS={de:FSC_MIN,ate:null,zas:['ZA1004','ZA0200'],base:'tudo',agr:'grupo',per:'dia',chave:null,dias:null,cls:null,recs:[],obras:[],
+let frlS={modo:'int',de:FSC_MIN,ate:null,zas:['ZA1004','ZA0200'],base:'tudo',agr:'grupo',per:'dia',chave:null,dias:null,cls:null,recs:[],obras:[],
   f:{atv:new Set(),gest:new Set(),grp:new Set(),orig:new Set()}};
 function frlCss(){
   if(document.getElementById('frlCss')) return;
@@ -10819,8 +10821,22 @@ function frlCss(){
 @media(max-width:640px){#fisc_rel .frltab .hm{display:none}}`;
   document.head.appendChild(st);
 }
+// Versão FISCALIZAÇÃO (13/11, pedido do usuário): bloco 🏛️ Fiscalização › Relatório consolidado (tela fiscv_rel → fisc_rel em
+// modo 'fisc'). Só data e consórcio; só o validado (snapshot, app_fiscv_periodo — mesmo dado da Execução Física);
+// resumo por agrupamento e avanço diário fixos; sem filtros. Classes via app_fisc_rel_classes (liberada p/ quem vê o validado).
+function frlModo(m){
+  if(frlS.modo!==m){ frlS.modo=m; frlS.dias=null; frlS.cls=null; frlS.recs=[]; frlS.obras=[]; frlS.chave=null; Object.values(frlS.f).forEach(x=>x.clear()); }
+  if(m==='fisc'){ frlS.base='validado'; frlS.agr='grupo'; frlS.per='dia'; } else if(frlS.base==='validado'&&!frlS.chave) frlS.base='tudo';
+  const bk=document.querySelector('#fisc_rel .bar .bk'), t=$('#frlTit'), sub=$('#frlSub');
+  if(bk){ bk.dataset.go=m==='fisc'?'home':'auxiliar_programacao'; bk.textContent=m==='fisc'?'‹ Início':'‹ Auxiliar de Programação'; }
+  if(t) t.textContent=m==='fisc'?'Relatório consolidado · Fiscalização':'Relatório consolidado';
+  if(sub) sub.innerHTML=m==='fisc'
+    ?'Relatório em Excel somente com os dias <b>validados</b> no Consolidador: resumo por agrupamento, avanço diário com o acumulado e a base de dados com cada execução.'
+    :'Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.';
+}
+const frlFisc=()=>frlS.modo==='fisc';
 function frlInit(){
-  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  if(frlFisc()?!(ME&&(ME.fisc_acesso||ME.is_fiscal||ME.is_admin)):!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara(frlFisc()?'home':'auxiliar_programacao'); return; }
   frlCss();
   if(!frlS.ate) frlS.ate=rdoHoje();
   frlRenderParams();
@@ -10837,9 +10853,9 @@ function frlRenderParams(){
     +'<label>Até<input type="date" id="frlAte" min="'+FSC_MIN+'" max="'+rdoHoje()+'" value="'+frlS.ate+'"></label>'
     +'<div class="frlchips" style="align-self:flex-end">'+atalhos.map((a,i)=>chip(frlS.de===a[1]&&frlS.ate===a[2],'data-frlat="'+i+'"',a[0])).join('')+'</div></div>'
     +'<div class="frlf"><b>Consórcio</b><div class="frlchips">'+RDO_ZAS.map(([z,l])=>chip(frlS.zas.includes(z),'data-frlza="'+z+'"',vEsc(l))).join('')+'</div></div>'
-    +'<div class="frlf"><b>Dados considerados</b><div class="frlchips">'
+    +(frlFisc()?'':'<div class="frlf"><b>Dados considerados</b><div class="frlchips">'
       +chip(frlS.base==='validado','data-frlbase="validado"','Só o validado no Consolidador')
-      +chip(frlS.base==='tudo','data-frlbase="tudo"','Todas as informações (validado + pendente)')+'</div></div>'
+      +chip(frlS.base==='tudo','data-frlbase="tudo"','Todas as informações (validado + pendente)')+'</div></div>')
     +'<div class="frlbar"><button type="button" class="btn" id="frlCarregar">'+(frlS.chave?'↻ Recarregar dados':'Carregar dados')+'</button><span class="sub" id="frlSt" style="margin:0"></span></div>';
   const P=$('#frlParams');
   $('#frlDe').onchange=e=>{ frlS.de=e.target.value||FSC_MIN; frlRenderParams(); };
@@ -10854,7 +10870,7 @@ function frlRenderParams(){
   const mud=frlS.chave&&frlS.chave!==frlChave();
   $('#frlSt').textContent=mud?'Período, consórcio ou base mudou — recarregue os dados.':'';
 }
-const frlChave=()=>[frlS.de,frlS.ate,frlS.zas.join(','),frlS.base].join('|');
+const frlChave=()=>[frlS.modo,frlS.de,frlS.ate,frlS.zas.join(','),frlS.base].join('|');
 // pedaços de até 1 mês (a RPC limita a 3 meses e cada mês por ZA leva ~2 s)
 function frlPedacos(de,ate){
   const r=[]; let a=de;
@@ -10873,7 +10889,7 @@ async function frlCarregar(){
     const jobs=[]; frlS.zas.forEach(z=>peds.forEach(([a,f])=>jobs.push({z,a,f})));
     const out=[]; let i=0;
     const run=async()=>{ while(i<jobs.length){ const j=jobs[i++];
-      const {data,error}=await sb.rpc('app_fisc_periodo',{p_de:j.a,p_ate:j.f,p_za:j.z}); if(error) throw error;
+      const {data,error}=await sb.rpc(frlFisc()?'app_fiscv_periodo':'app_fisc_periodo',{p_de:j.a,p_ate:j.f,p_za:j.z}); if(error) throw error;
       (data||[]).forEach(d=>out.push(Object.assign({za:j.z},d))); feitos++; st.textContent='Carregando '+feitos+' de '+tot+'…'; } };
     await Promise.all([run(),run(),run()]);
     const dias=out.filter(d=>frlS.base==='tudo'||d.validado);
@@ -10972,7 +10988,7 @@ function frlRender(){
       +o.map(([v,n])=>'<button type="button" class="frlchip'+(frlS.f[k].has(v)?' on':'')+'" data-frlf="'+k+'" data-v="'+vEsc(v)+'">'+vEsc(v)+'<small>'+n+'</small></button>').join('')+'</div></div>'; };
   const M=frlModelo();
   const nDiasVal=new Set((frlS.dias||[]).filter(d=>d.validado).map(d=>d.dia+d.za)).size, nDias=new Set((frlS.dias||[]).map(d=>d.dia+d.za)).size;
-  let h='<div class="frlbox"><h3>Filtros</h3>'
+  let h=frlFisc()?'':'<div class="frlbox"><h3>Filtros</h3>'
     +bloco('atv','Atividade',r=>r.atividade)+bloco('gest','Gestor',r=>r.gestor)+bloco('grp','Agrupamento',r=>r.grupo)+bloco('orig','Origem',r=>r.origem||'Obra')
     +'<div class="frlf"><b>Agrupar o resumo por</b><div class="frlchips">'+Object.entries(FRL_AGR).map(([k,l])=>'<button type="button" class="frlchip'+(frlS.agr===k?' on':'')+'" data-frlagr="'+k+'">'+l+'</button>').join('')+'</div></div>'
     +'<div class="frlf"><b>Avanço por</b><div class="frlchips">'+Object.entries(FRL_PER).map(([k,l])=>'<button type="button" class="frlchip'+(frlS.per===k?' on':'')+'" data-frlper="'+k+'">'+l+'</button>').join('')+'</div></div></div>';
@@ -11006,7 +11022,7 @@ async function frlExcel(){
   const b=$('#frlXlsx'); b.disabled=true; const tx=b.textContent; b.textContent='Gerando…';
   try{ const ExcelJS=await excelJsLib(); const buf=await frlMontarXlsx(ExcelJS,frlModelo());
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), a=document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download='relatorio_consolidado_'+frlS.zas.join('_')+'_'+frlS.de+'_a_'+frlS.ate+(frlS.base==='validado'?'_validado':'')+'.xlsx';
+    a.href=URL.createObjectURL(blob); a.download=(frlFisc()?'relatorio_execucao_fisica_':'relatorio_consolidado_')+frlS.zas.join('_')+'_'+frlS.de+'_a_'+frlS.ate+(frlS.base==='validado'?'_validado':'')+'.xlsx';
     document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
   }catch(e){ toast('Erro ao gerar o Excel: '+(e.message||e)); }
   b.disabled=false; b.textContent=tx;
@@ -11020,14 +11036,14 @@ async function frlMontarXlsx(ExcelJS,M){
   const linha={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}};
   const nf=v=>v==null||Number.isInteger(Number(v))?'#,##0':'#,##0.00';
   const fonte=o=>Object.assign({name:'Calibri',size:10},o||{});
-  const wb=new ExcelJS.Workbook(); wb.creator='AcquaHub'; wb.created=new Date(); wb.title='Relatório de Execução — Consolidador';
+  const wb=new ExcelJS.Workbook(); wb.creator='AcquaHub'; wb.created=new Date(); const TIT=frlFisc()?'Relatório de Execução Física':'Relatório de Execução — Consolidador'; wb.title=TIT;
   const dt=s=>{ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
   const consorcios=frlS.zas.map(z=>FRL_ZA_NOME[z]||z).join('  ·  ');
   const subt=consorcios+'   |   '+fmtData(frlS.de)+' a '+fmtData(frlS.ate)+'   |   '+(frlS.base==='validado'?'somente dias validados':'validado + pendente');
   const folha=(nome,orient,extra)=>wb.addWorksheet(nome,Object.assign({
     pageSetup:{paperSize:9,orientation:orient,fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,
       margins:{left:0.4,right:0.4,top:0.6,bottom:0.6,header:0.25,footer:0.25}},
-    headerFooter:{oddHeader:'&L&8&K64748BAcquaHub · Relatório de Execução — Consolidador&R&8&K64748B'+fmtData(frlS.de)+' a '+fmtData(frlS.ate),
+    headerFooter:{oddHeader:'&L&8&K64748BAcquaHub · '+TIT+'&R&8&K64748B'+fmtData(frlS.de)+' a '+fmtData(frlS.ate),
       oddFooter:'&L&8&K64748B'+nome+'&R&8&K64748BPágina &P de &N'}},extra||{}));
   const banner=(ws,t,ncol)=>{
     ws.mergeCells(1,1,1,ncol); const c=ws.getCell(1,1); c.value=t; c.font=fonte({bold:true,size:16,color:{argb:BRANCO}}); c.alignment={vertical:'middle',indent:1};
@@ -11044,7 +11060,7 @@ async function frlMontarXlsx(ExcelJS,M){
   // ================= Resumo =================
   const R=folha('Resumo','portrait',{views:[{showGridLines:false}]});
   const NC=8; R.columns=[{width:44},{width:14},{width:24},{width:13},{width:14},{width:13},{width:13},{width:12}];
-  banner(R,'Relatório de Execução — Consolidador',NC);
+  banner(R,TIT,NC);
   let r=5;
   // ficha só com consórcio, período e geração (pedido do usuário 13/11: sem dados considerados/filtros/segregação)
   const info=[['Consórcio(s)',consorcios],['Período',fmtData(frlS.de)+' a '+fmtData(frlS.ate)],
