@@ -5,6 +5,7 @@
 -- (os_sigos = OS, extra._campo = dia do campo). Sem OS executada → fica no dia do campo com 0 km e situação "aguardando
 -- execução no SIGOS" / "sem OS SIGOS lançada" (extra._aguarda), fora do hash da linha (fisc_linhas) → não marca "mudou".
 -- Nenhuma linha de Pesquisa validada até hoje e nenhum dia validado (set/2026) tem pesquisa → nada validado muda.
+-- APLICADO em produção em 2026-11-13 (migração `fisc_pesquisa_os`, via MCP), antes do merge do PR #351 (retrocompatível).
 -- Patch textual sobre a definição vigente (mesmo padrão de migracao_fisc_loggers.sql); falha se algum trecho não casar.
 
 -- 1) fisc_execucoes: e_pq com janela maior + pq_os/pq_sg + e_pesq seguindo o SIGOS
