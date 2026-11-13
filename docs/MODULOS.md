@@ -4355,7 +4355,7 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
 - **Enxuto (13/11, sw v393, pedido do usuário):** sem cartões de indicadores, sem coluna Execuções no quadro, sem
   "Como ler", sem coluna "Situação do dia" no avanço; bases sem Gestor, Serviço de origem (recomposição), Fotos e Situação
   (Obras também sem Situação).
-- **13/11, sw v394:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
+- **13/11, sw v395:** ficha do Resumo só com consórcio, período e "gerado em"; quadro de obras só com obra, tipo, AL,
   **% atual da obra** e rede instalada no período (saíram % no início, avanço p.p. e dias c/ avanço).
 - **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
   **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
@@ -4381,7 +4381,7 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
 
-## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v394; migrações aplicadas em 13/11/2026)
+## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v395; migrações aplicadas em 13/11/2026)
 
 Card **👥 RH** na home › **🚧 Em desenvolvimento** (`#homeRh`, padrão da Vitrine: "RH 🔒" para quem não tem `ME.dev_acesso`; decisão do
 usuário em 13/11/2026 — o módulo fica em desenvolvimento por enquanto). Todas as telas `rh*` checam `rhDev()` (= `ME.dev_acesso`) além do
