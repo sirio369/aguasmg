@@ -4202,6 +4202,14 @@ Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_v
 - **Loggers:** só o registro do app (instalação/remoção, `os_copasa_instalacao/_remocao` como atributo). **OS SIGOS de
   logger sem vínculo NÃO vira linha** (sem esse cuidado contava 2×; não dá p/ casar por GPS — as coordenadas do SIGOS
   não batem). Com a OS obrigatória no app (§2.2) o vínculo passa a existir.
+  **Separados por tipo e etapa (2026-11-13, sw v380, `docs/migracao_fisc_loggers.sql`):** 4 atividades pela flag
+  `logger_temporario` — *Logger temporário — instalação/remoção* e *Logger fixo — instalação/remoção* (ordem 20–23;
+  Mapeamento de pressão 25). O acumulado de logger conta **desde a 1ª instalação** (não desde 01/09; as remoções de
+  setembro eram de loggers instalados em julho/agosto). As linhas de temporário trazem a medida extra
+  `{un:'em campo', saldo:true}` = instalados − removidos ao fim do dia; o front (`fscMed`) mostra o saldo só na coluna
+  Acumulado ("25 un · 0 em campo") e nunca o soma às outras medidas. Validações da chave antiga `atv:Loggers de pressão`
+  foram migradas e os snapshots de `fisc_dia` regerados (o `fisc_dia_hash` não inclui medidas). RDO/Vitrine seguem com a
+  família única "Loggers de pressão".
 - **Vazamento:** "Pesquisa de vazamento" = km de rede pesquisada (`pp_execucao`, 1 registro por pesquisador × dia, ZA pela
   rede) + detecção SIGOS 2487900; "Correção de vazamento" = OS SIGOS `COR.VAZ` (2587901/04/05) **só executadas**
   (`fisc_familia` separa da família SIGOS "Pesquisa de vazamento"). **Vazamento localizado (ocorrência do app) sem
