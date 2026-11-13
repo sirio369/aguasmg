@@ -10346,7 +10346,9 @@ const fscNum=(v,dec)=>{ const n=Number(v||0); return n.toLocaleString('pt-BR',{m
 // medidas com saldo:true (ex.: loggers temporários "em campo") não se somam às outras: só no Acumulado, separadas por "·"
 // unidade com o que ela mede, quando a mesma atividade tem duas (pedido do usuário 13/11): só rótulo de tela/Excel —
 // o banco (e o hash/snapshot da validação) continua com 'OS'/'km'/'visita'
+// VRP virou duas atividades no banco (13/11, docs/migracao_fisc_vrp_separado.sql); 'VRP' fica p/ dados antigos
 const FSC_UN={'Pesquisa de vazamento':{OS:'OS de detecção',km:'km de rede pesquisada'},'VRP':{visita:'visita primária',OS:'OS de manutenção'},
+  'Vistoria primária de VRP':{visita:'visita primária'},'Manutenção de VRP':{OS:'OS de manutenção'},
   'Correção de vazamento':{OS:'OS de correção'}};
 const fscUn=(atv,un)=>((FSC_UN[atv]||{})[un])||un;
 const fscMed=(ms,k,atv)=>{ ms=ms||[]; const s=ms.filter(m=>m.saldo), q=ms.filter(m=>!m.saldo).map(m=>fscNum(m[k])+' '+fscUn(atv,m.un)).join(' + ');
@@ -10738,7 +10740,7 @@ function fvaRender(){
 // Tela `fisc_rel` (Auxiliar › 📋 Gestão Geral). Lê o mesmo dado do Consolidador (app_fisc_periodo, em pedaços de 1 mês
 // por ZA — a RPC aceita no máx. 3 meses) e monta um .xlsx com cara de relatório (ExcelJS, cdnjs, carregado sob demanda):
 // Resumo (capa + quadro por agrupamento + obras) · Avanço diário/semanal/mensal (no período + acumulado por atividade) ·
-// Base de dados (1 linha por execução) · Obras (avanço por dia). Base "validado" = só dias validados (o snapshot que vai
+// Base AcquaHub × Base SIGOS (1 linha por execução; obras na do AcquaHub) · Obras (avanço por dia). Base "validado" = só dias validados (o snapshot que vai
 // para a COPASA); "tudo" = validado + pendente como está agora. Gestor e agrupamento vêm do código SIGOS da OS
 // (app_fisc_rel_classes → "17 - sigos".codigo_servico); sem OS = pela família da atividade. Filtros e agrupamento são
 // aplicados no navegador sobre o dado carregado (recarrega só ao mudar período, consórcio ou base).
@@ -11068,22 +11070,27 @@ async function frlMontarXlsx(ExcelJS,M){
   const tr=A.getRow(ra); tr.getCell(1).value='Total';
   M.cols.forEach((c,i)=>{ const c0=2+i*2; tr.getCell(c0).value=acum[M.key(c)]||0; tr.getCell(c0).numFmt=NUM; });
   tr.eachCell({includeEmpty:true},c=>{ c.font={bold:true}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZC}}; c.border=borda; });
-  // ---------- Base de dados ----------
-  const B=wb.addWorksheet('Base de dados',{views:[{state:'frozen',ySplit:1}]});
-  const bc=[['Data',11],['Dia da semana',11],['Consórcio',10],['Gestor',13],['Agrupamento',22],['Atividade',26],['Serviço',30],['Origem',10],['Quantidade',11],['Unidade',9],
-    ['OS SIGOS',17],['Status SIGOS',18],['Resultado SIGOS',26],['OS AcquaHub',18],['Matrícula',12],['Descrição',40],['Local',34],['Equipe',18],['Hora',7],
-    ['Serviço de origem (recomposição)',40],['Latitude',11],['Longitude',11],['Fotos',9],['Situação',20]];
-  B.columns=bc.map(([h,w])=>({header:h,width:w}));
+  // ---------- Base de dados: AcquaHub × SIGOS (pedido do usuário 13/11) — obras vão com o AcquaHub ----------
+  // coluna sem nenhum valor na aba sai (ex.: OS AcquaHub/Fotos na aba SIGOS); as 10 primeiras ficam sempre
   const WD=['dom','seg','ter','qua','qui','sex','sáb'];
-  M.recs.forEach(x=>{ const row=B.addRow([dt(x.dia),WD[new Date(x.dia+'T12:00:00').getDay()],x.za,x.gestor,x.grupo,x.atividade,x.servico,x.origem,x.qtd,x.un,
-      x.os_sigos,x.stSigos,x.resultado,x.os_app,x.matricula||'',x.desc,x.local,x.equipe,x.hora,x.origRecomp,x.lat,x.lon,null,x.sit]);
-    if(x.fotos.length) row.getCell(23).value={text:x.fotos.length+' foto'+(x.fotos.length>1?'s':''),hyperlink:SBASE+x.fotos[0]};
-    if(x.aguarda) row.font={color:{argb:CINZA},italic:true}; });
-  M.obras.forEach(o=>B.addRow([dt(o.dia),WD[new Date(o.dia+'T12:00:00').getDay()],o.za,o.gestor,o.grupo,o.atividade,o.codigo+(o.al?' · '+o.al:''),'Obra',o.qtd,o.un,
-    '','','','','',o.avancos,o.local,'','','',null,null,null,o.sit]));
-  cab(B.getRow(1)); B.getRow(1).height=30;
-  B.getColumn(1).numFmt='dd/mm/yyyy'; B.getColumn(9).numFmt=NUM; B.getColumn(21).numFmt='0.000000'; B.getColumn(22).numFmt='0.000000';
-  B.autoFilter={from:{row:1,column:1},to:{row:1,column:bc.length}};
+  const BC=[['Data',11,x=>dt(x.dia)],['Dia da semana',11,x=>WD[new Date(x.dia+'T12:00:00').getDay()]],['Consórcio',10,x=>x.za],['Gestor',13,x=>x.gestor],
+    ['Agrupamento',22,x=>x.grupo],['Atividade',26,x=>x.atividade],['Serviço',30,x=>x.servico],['Origem',10,x=>x.origem],['Quantidade',11,x=>x.qtd,NUM],['Unidade',9,x=>x.un],
+    ['OS SIGOS',17,x=>x.os_sigos],['Status SIGOS',18,x=>x.stSigos],['Resultado SIGOS',26,x=>x.resultado],['OS AcquaHub',18,x=>x.os_app],['Matrícula',12,x=>x.matricula],
+    ['Descrição',40,x=>x.desc],['Local',34,x=>x.local],['Equipe',18,x=>x.equipe],['Hora',7,x=>x.hora],['Serviço de origem (recomposição)',40,x=>x.origRecomp],
+    ['Latitude',11,x=>x.lat,'0.000000'],['Longitude',11,x=>x.lon,'0.000000'],
+    ['Fotos',9,x=>x.fotos&&x.fotos.length?{text:x.fotos.length+' foto'+(x.fotos.length>1?'s':''),hyperlink:SBASE+x.fotos[0]}:null],['Situação',20,x=>x.sit]];
+  const baseObra=o=>({dia:o.dia,za:o.za,gestor:o.gestor,grupo:o.grupo,atividade:o.atividade,servico:o.codigo+(o.al?' · '+o.al:''),origem:'Obra',qtd:o.qtd,un:o.un,
+    desc:o.avancos,local:o.local,sit:o.sit,fotos:[]});
+  const ehSigos=x=>x.origem==='SIGOS';
+  [['Base — AcquaHub',M.recs.filter(x=>!ehSigos(x)).concat(M.obras.map(baseObra))],['Base — SIGOS',M.recs.filter(ehSigos)]].forEach(([nome,rs])=>{
+    const B=wb.addWorksheet(nome,{views:[{state:'frozen',ySplit:1}]});
+    const cols=BC.filter((c,i)=>i<10||rs.some(x=>{ const v=c[2](x); return v!=null&&v!==''; }));
+    B.columns=cols.map(([h,w])=>({header:h,width:w}));
+    rs.forEach(x=>{ const row=B.addRow(cols.map(c=>{ const v=c[2](x); return v===''||v==null?(c[3]?null:''):v; })); if(x.aguarda) row.font={color:{argb:CINZA},italic:true}; });
+    cab(B.getRow(1)); B.getRow(1).height=30;
+    cols.forEach((c,i)=>{ if(i===0) B.getColumn(1).numFmt='dd/mm/yyyy'; else if(c[3]) B.getColumn(i+1).numFmt=c[3]; });
+    B.autoFilter={from:{row:1,column:1},to:{row:1,column:cols.length}};
+  });
   // ---------- Obras ----------
   if(M.obras.length){
     const O=wb.addWorksheet('Obras',{views:[{state:'frozen',ySplit:1}]});

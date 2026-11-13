@@ -288,7 +288,7 @@ pwa/
   **engrenagem exclusiva de VRP saiu**: a Gestão de VRPs agora é liberada pelo mesmo acesso geral
   (`app_me.vrp_gestao` e `vrp_pode_gestao()` passaram a incluir `aux_acesso`). Seed de continuidade: os
   **aprovadores** existentes receberam `aux_acesso=true`. `apInit()` monta o hub (barra as não-autorizadas); a **1ª categoria é 📋 Gestão Geral** (2026-11-12, sw v372:
-  Consolidador + **OS Pendentes** = ex-"OS não executadas" + **📊 Relatório consolidado** `fisc_rel` = Excel formatado do Consolidador com período, só validado × tudo, filtros por atividade/gestor/agrupamento, sw v386, `docs/MODULOS.md §21.6.1`); depois:
+  Consolidador + **OS Pendentes** = ex-"OS não executadas" + **📊 Relatório consolidado** `fisc_rel` = Excel formatado do Consolidador com período, só validado × tudo, filtros por atividade/gestor/agrupamento, sw v386; base separada AcquaHub × SIGOS e VRP = Vistoria primária × Manutenção no banco, sw v391, `docs/MODULOS.md §21.6.1`); depois:
   - **🧾 Serviços comerciais:** Criação de matrículas (`matriculas`) · **Abertura de serviços** (`programacao_servicos`
     em `pgModo='comercial'` — só a seção de **solicitações** `app_abertura_fila`/`_os`) · Ocorrências registradas
     (`ent_oc_gestao`) · ~~Roteiro de leitura~~ (removido em 2026-11-09, sw v338; RPCs `app_roteiro_*` e views seguem no banco) · **Priorização de troca de HD** e

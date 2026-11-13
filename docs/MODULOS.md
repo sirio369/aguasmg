@@ -4342,9 +4342,16 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
 - **Abas:** **Resumo** (capa com período/base/filtros/gerado por, 4 indicadores, quadro atividade × unidade com quantidade,
   execuções, dias, média por dia, 1ª/última data — subtotal por grupo — e obras: % no início/fim, p.p., rede instalada) ·
   **Avanço diário/semanal/mensal** (todos os dias do período, por atividade+unidade: no período + acumulado desde a data
-  inicial; no diário, coluna com a situação do dia por ZA) · **Base de dados** (1 linha por execução, autofiltro: data, gestor,
+  inicial; no diário, coluna com a situação do dia por ZA) · **Base — AcquaHub** e **Base — SIGOS** (separadas a pedido do usuário 13/11, sw v391;
+  pela `origem` da execução; obras entram na do AcquaHub com origem "Obra"; 1 linha por execução, autofiltro: data, gestor,
   agrupamento, atividade, serviço, origem, qtd/un, OS SIGOS/status/resultado, OS AcquaHub, matrícula, descrição, local, equipe,
-  serviço de origem da recomposição, lat/lon, link da 1ª foto, situação) · **Obras** (avanço por dia).
+  serviço de origem da recomposição, lat/lon, link da 1ª foto, situação — coluna vazia na aba inteira sai, as 10 primeiras ficam) ·
+  **Obras** (avanço por dia).
+- **VRP em duas atividades no banco (13/11, sw v391, `docs/migracao_fisc_vrp_separado.sql`):** `fisc_execucoes` devolve
+  **Vistoria primária de VRP** (`app:vrp_visita:*`, ordem 30) e **Manutenção de VRP** (OS do app e OS SIGOS de VRP, ordem 31)
+  no lugar de "VRP" — vale no Consolidador, relatório e validação. A migração passou as validações `atv:VRP` em dia para as
+  chaves novas e refez hash/snapshot dos dias validados em dia (mesmo autor/data); backups `_bkp_fisc_*_vrp_20261113`.
+  O front ainda entende "VRP" (dados antigos).
 - **Regras:** 1 execução = 1 registro na data do campo (feed `fisc_execucoes`); traçado de pesquisa "Aguardando SIGOS" fica
   na base em cinza e **não conta**; obra **sem avanço no dia não entra**; quantidade da obra = metros de rede instalada
   (`fscEhMetroRede`: pullback no HDD / assentamento na VCA). O saldo "em campo" dos loggers temporários não entra (só
