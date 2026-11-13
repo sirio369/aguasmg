@@ -4376,11 +4376,12 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
 
-## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` (2026-11-13, sw v391)
+## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v393)
 
 Card **👥 RH** na home › 🧰 Suporte, **no lugar do card Meus colaboradores** (`#homeRh`, `homeGate()` → `ME.pode_aprovar || ME.rh_acesso`).
 O hub (`rhInit`) mostra: **📇 Meus colaboradores** (só aprovador/admin — a tela `meus_colab` de sempre, §12, agora com "‹ RH"),
-**📥 Carga RH** (`rh_carga`, só `ME.rh_acesso`), **✅ Validação gestor** e **📊 Análise do ponto** (ainda "em breve", `data-rhsoon`).
+**📥 Carga RH** (`rh_carga`, só `ME.rh_acesso`), **✅ Validação gestor** (`rh_val`, §22.2) e **📊 Análise do ponto** (`rh_analise`, §22.3) — essas duas para aprovador (só a equipe)
+ou RH (todos).
 ⚙️ do hub (admin) → tela **`rh_acesso`** (quem faz a carga; `perfil.rh_acesso`, RPCs `app_rh_acesso_listar`/`_set`, admin-only).
 
 ### 22.1 Carga RH — tela `rh_carga` · `// ---------- CARGA RH`
@@ -4429,3 +4430,39 @@ minutos em `*_min`, `descontos` jsonb + `atraso_min`/`falta_min`/`dsr_min` somad
   (2 batidas, sem desconto do intervalo) — é dado do relógio, não erro de leitura; a tela de inconsistências vai tratar isso.
 - Coluna nova no relatório / mudança de posição → `RH_HDR` recusa o PDF; ajustar `RH_COLS`/`RH_HDR` com um PDF novo de referência.
 - O período do PDF é o que o RH exportou: em 13/11/2026 o zip "01 a 13/11" trazia só 08–13/11.
+
+### 22.2 Validação gestor — tela `rh_val` · `// ---------- RH · VALIDAÇÃO GESTOR` · `docs/migracao_rh_ponto_validacao.sql`
+Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH faz a 2ª validação depois de corrigir no Kairos.
+- **Quem vê:** `"18 - rh".func_visiveis(uid)` — RH (`rh_pode_carregar`) e admin veem todos; o aprovador vê os funcionários cujo perfil
+  (casado pelo CPF) o tem como **Aprovador 1 ou 2**. Funcionário sem usuário no app só aparece para a RH.
+- **Inconsistências** (`"18 - rh".inconsistencias(ini, fim)`, dias `parcial` ficam fora):
+  `marc_impar` (nº ímpar de batidas) · `sem_intervalo` (2 batidas e jornada > 6h — almoço não descontado) · `falta` (dia previsto sem
+  batida e sem justificativa) · `falta_pos_deslig` (falta depois de um dia com justificativa de desligamento) · `atraso` (≥ 15 min) ·
+  `he_excesso` (HE > 2h no dia) · `trab_descanso` (batida em dia de folga/DSR) · `interjornada` (< 11h entre a última batida do dia
+  anterior e a primeira do dia; devolve `interjornada_min`).
+- **Ação do gestor** (`app_rh_val_tratar(funcionário, data, ação, marcações, motivo, obs)`): **ajustar** (marcações corretas em pares
+  entrada/saída, HH:MM em ordem crescente) · **falta** (faltou / não trabalhou) · **justificar** (motivo obrigatório da lista
+  `RH_MOTIVOS` + obs) · **ok** (está correto). Grava `tratativa` (PK funcionário × dia, `status='tratado'`, `versao_dia` = versão do
+  `ponto_dia` no momento) e o evento em `tratativa_evento` (log append-only). Pode refazer enquanto não for validado.
+- **RH** (`app_rh_val_rh(funcionário, data, validar, obs)`, só `rh_pode_carregar`): **✓ Corrigido no Kairos** → `validado` (travado)
+  ou **Devolver** com observação obrigatória → `devolvido` (volta para "A tratar" do gestor, com a observação em vermelho).
+- **Conferência com o Kairos:** `app_rh_val_lista` devolve `kairos_atualizado` (chegou carga nova do dia depois da tratativa:
+  `versao` > `versao_dia`) e `kairos_bate` (ajustar → marcações iguais às do gestor; falta → falta lançada; justificar de falta →
+  falta zerada). A tela mostra "✓ o Kairos já reflete" / "⚠ chegou relatório novo mas ainda não reflete" / "aguardando nova carga".
+- **Tela:** período (padrão últimos 30 dias, máx. 3 meses), chips **A tratar / Aguardando RH / Validados / Todos**, chips de consórcio,
+  filtro por inconsistência e busca. Cards agrupados por colaborador (sigla, matrícula, gestor), com as batidas, horário, H.trab/HE/
+  falta/atraso e a justificativa do Kairos. Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
+
+### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
+`app_rh_analise(ini, fim, consórcio)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências:
+- **KPIs:** colaboradores, horas trabalhadas, horas extras, dias com **HE > 2h**, **descansos < 11h**, dias de falta (e horas),
+  atrasos, adicional noturno. Dias `parcial` aparecem no aviso do período.
+- **Inconsistências do período** (casos e pessoas por tipo) + andamento das tratativas (a tratar / aguardando RH / validadas).
+- **Horas extras por dia** (barras), **por consórcio** (H.trab, HE, % HE, faltas, atraso), lista de **descanso < 11h** (colaborador,
+  dia, descanso, quanto faltou para 11h) e **ranking por colaborador** (HE, dias HE > 2h, descansos < 11h, faltas, atraso, H.trab —
+  ordena tocando no título da coluna; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
+
+**Banco da validação** (`docs/migracao_rh_ponto_validacao.sql`, roda **depois** da migração da carga): `tratativa`, `tratativa_evento`,
+helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
+`app_rh_analise` (definer, só `authenticated`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
+inconsistência (sem intervalo 136, HE > 2h 94, falta 55, atraso 55, batida ímpar 18, descanso < 11h 13, falta após desligamento 2).
