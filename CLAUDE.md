@@ -554,7 +554,9 @@ a qualquer momento; todo lançamento de avanço pergunta **"Esse avanço foi rea
 de execução em `intervencao_avanco.ts`; `registrado_em`/`retroativo` guardam quando foi lançado).
 **Ensaio de reaterro opcional (2026-11-13, sw v375, `docs/migracao_proj_reaterro_decisao.sql`):** reaterro 100% → Obras responde
 "É necessário ensaio de compactação?" (Sim = Qualidade; Não = `dispensado`, recomposição liberada); ramais ganharam Reaterro +
-Recomposição de pavimento; legado só fica onde o pavimento já foi lançado. **Hub em 3 atores** (🏗️ Obras · 📐 Engenharia [ex-Suporte] · ✅ Qualidade → tela
+Recomposição de pavimento; legado só fica onde o pavimento já foi lançado.
+**OS SIGOS da recomposição (2026-11-13, sw v378, `docs/migracao_proj_recomp_os_sigos.sql`):** cada "Recomposição de pavimento"
+da árvore tem o campo da OS SIGOS (nó `sgos`), com selo/aviso do vínculo SIGOS e entrada no painel de Vínculos. **Hub em 3 atores** (🏗️ Obras · 📐 Engenharia [ex-Suporte] · ✅ Qualidade → tela
 `projeto_qual`); lista/mapa com status do pipeline, "com quem está" e chips de prazo; **Etapas** em acordeão na
 configuração (No escopo?, Liberar) e no detalhe (anexar com folha A0–A4, link da vistoria, OS, aprovar/reprovar); a
 árvore ficou só com a execução (chave estável `c` por etapa de topo). **Lançar avanço e salvar a árvore exigem ator**

@@ -2826,6 +2826,13 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   toggle "No escopo?", quantidade (±), tipo de peça, registro, **cadeado** (liberar/reabrir) e **lançamento de
   avanço** no campo — o "Lançar avanço" agora é **real** (lê o input `.pjinp` e soma ao `%`/`exec` da folha) e
   persiste. `pjLeafHist` (histórico fabricado) foi zerado e `hasAdv` usa `pjHasAdv` (avanço real).
+- **OS SIGOS da recomposição de pavimento (2026-11-13, sw v378, `docs/migracao_proj_recomp_os_sigos.sql`):** todo nó
+  "Recomposição de pavimento" do `projeto_det` mostra o campo **OS SIGOS da recomposição** (`.pjrecosinp`, só Obras edita; os
+  demais veem o número). O valor mora **no próprio nó** da árvore (`sgos` + `sgos_em`, gravados pelo `pjSave` →
+  `app_proj_estado_set`, sem RPC nova). Checagem = a do vínculo SIGOS: selo `sgxS` ao lado + aviso ao digitar (`.pjrecosinp` em
+  `SGX_INPUTS`). No banco, `vw_os_vinculo` ganhou o ramo projetos/**"OS da recomposição"** (ref = `kind:gid:rótulo do bloco`, via
+  `proj_reat_blocos`; `estado_app='executada'` com recomposição 100%) com divergências próprias, e `app_sigos_os_corrigir` corrige
+  dentro da árvore só no bloco do ref (helper `proj_rec_sgos_set`). A regra antiga de divergência de projetos ficou só para a OS da pré-obra.
 - **"É necessário ensaio de compactação?" + ramais com reaterro (2026-11-13, sw v375, `docs/migracao_proj_reaterro_decisao.sql`):**
   em todo bloco Reaterro → Recomposição de pavimento, quando o reaterro chega a 100% o `pjReatBox` pergunta a Obras
   (`pjExecOk`) se precisa de ensaio: **Sim** → `app_proj_reaterro_decidir(p_necessita=true)` = pipeline de sempre (`aguardando` →
@@ -3923,6 +3930,7 @@ Detalhes:
 - Se a Relação mudar o formato do endereço, a chave muda e o cache "esquece". Conferir o `end_partes` com uma amostra.
 
 ### 21.2 Vínculo das OS com o SIGOS · `docs/migracao_sigos_vinculo.sql` (2026-11-09, sw v335)
+> 2026-11-13: entrou o campo **projetos · OS da recomposição** (OS SIGOS no nó "Recomposição de pavimento" da árvore de execução — §8).
 
 Liga **todo campo de OS do app** à base dos relatórios SIGOS e mostra a situação de cada OS: executada / encerrada sem
 execução / pendente / aguardando relatório / suspeita de erro / formato inválido.
