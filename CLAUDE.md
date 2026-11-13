@@ -334,7 +334,7 @@ pwa/
     só esse bloco, sw v371, `docs/migracao_fiscal_acesso.sql`) —
     tabela dia × ZA × atividade com acumulado, cada execução com fotos/mapa (feed `fisc_execucoes`: 1 execução = 1 registro na
     data do campo, OS SIGOS como atributo; vazamento localizado sem correção nunca aparece) + obras em andamento com % por dia;
-    só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`, só admin) e Excel; detalhe da
+    só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`; valida o admin e quem for marcado na ⚙️ do próprio Consolidador, `perfil.fisc_validar`, sw v388) e Excel; detalhe da
     atividade abre com as OS do dia separadas por vírgula; status SIGOS em destaque com as execuções agrupadas por status e
     recomposição de pavimento com o **serviço de origem** (OS + do que se trata; sw v377, `docs/migracao_fisc_pav_origem.sql`) — ver `docs/MODULOS.md §21.6`.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
