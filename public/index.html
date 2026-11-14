@@ -1212,7 +1212,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="oaGeo" class="oageo hidden"></div>
     <div class="oafilt">
-      <select id="oaZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option><option value="F:ZA1004">Fora da ZA — Contagem</option><option value="F:ZA0200">Fora da ZA — Betim</option></select>
+      <div class="msdd" id="oaZaDd"><button type="button" class="msdd-btn" id="oaZaBtn">Todas as ZAs ▾</button><div class="msdd-panel hidden" id="oaZaPanel"></div></div>
       <select id="oaGest"><option value="">Todos os gestores</option></select>
       <div class="msdd" id="oaFamDd"><button type="button" class="msdd-btn" id="oaFamBtn">Agrupamento ▾</button><div class="msdd-panel hidden" id="oaFamPanel"></div></div>
       <div class="msdd" id="oaCodDd"><button type="button" class="msdd-btn" id="oaCodFBtn">Código / serviço ▾</button><div class="msdd-panel hidden" id="oaCodPanel"></div></div>
@@ -8286,7 +8286,7 @@ async function rdoClip(txt,html,msg){
 // Vitrine/RDO), categoria e fluxo. A "classificação" que vem do SIGOS não é usada (decisão do usuário, 10/11/2026).
 // Códigos compartilhados (pavimento, manobras) recebem o gestor pela origem: Gestão de Pavimento › OS de origem › matrícula.
 let oaDados=[], oaCart={}, oaMap=null, oaPtsLayer=null, oaDrawn=null, oaPoly=null, oaPin=null, oaGeoBusy=false, oaLimite=150, oaLegenda=null;
-const oaF={za:'',gest:'',cat:'',st:'',vis:'',q:'',fam:new Set(),cods:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
+const oaF={za:'',zas:new Set(),gest:'',cat:'',st:'',vis:'',q:'',fam:new Set(),cods:new Set(),faixa:new Set(),prazo:new Set(),reinc:false,exec:false,semloc:false};
 let oaCorModo='tempo', oaCodigos=null;
 const OA_FAIXAS=[['f1','0–7 dias','#1a7f4b'],['f2','8–30 dias','#d49b00'],['f3','31–90 dias','#ea6a12'],['f4','> 90 dias','#b3261e']];
 const OA_PRAZOS=[['prazo','Dentro do prazo','#1a7f4b'],['vence7','Prestes a vencer (até 7 dias)','#d49b00'],['vencida','Vencido','#b3261e']];
@@ -8427,7 +8427,7 @@ function oaInit(){
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
   oaCss();
   const bind=(id,k)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(el.tagName==='INPUT'&&el.type==='search'?'input':'change',()=>{ oaF[k]=el.value.trim(); oaLimite=150; oaRender(); }); } };
-  bind('#oaZa','za'); bind('#oaGest','gest'); bind('#oaSt','st'); bind('#oaVis','vis');
+  bind('#oaGest','gest'); bind('#oaSt','st'); bind('#oaVis','vis');
   const pb=$('#oaPainelBtn'); if(pb&&!pb.dataset.ready){ pb.dataset.ready='1';
     const pn=$('#oaPainel'), set=ab=>{ pn.classList.toggle('hidden',!ab); pb.classList.toggle('on',ab); pb.setAttribute('aria-expanded',ab); pb.textContent='📊 Resumo e gráficos '+(ab?'▴':'▾'); };
     let ab=true; try{ ab=localStorage.getItem('oaPainel')!=='0'; }catch(e){} set(ab);
@@ -8439,7 +8439,7 @@ function oaInit(){
   const cx=$('#oaCodX'); if(cx&&!cx.dataset.ready){ cx.dataset.ready='1'; cx.onclick=oaCodFechar;
     $('#oaCodOv').addEventListener('click',e=>{ if(e.target.id==='oaCodOv') oaCodFechar(); });
     document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('#oaCodOv').classList.contains('hidden')) oaCodFechar(); }); }
-  oaMsBind('oaFam','fam','Agrupamento',false); oaMsBind('oaCod','cods','Código / serviço',true);
+  oaMsBind('oaZa','zas','Todas as ZAs',false); oaMsBind('oaFam','fam','Agrupamento',false); oaMsBind('oaCod','cods','Código / serviço',true);
   oaMapaInit();
   oaCarregar().then(()=>oaGeoRodar());
   oaLimiteZa().then(()=>{ if(oaDados.length) oaRender(); });
@@ -8476,6 +8476,8 @@ function oaMsBind(pre,k,rot,busca){
   btn.dataset.rot=rot;
 }
 function oaMsOpcoes(k){
+  if(k==='zas'){ const n={}; oaDados.filter(o=>oaBase(o,k)).filter(oaNoPoly).forEach(o=>{ const c=oaZaCat(o); n[c]=(n[c]||0)+1; });
+    return OA_ZAS.map(([v,lbl,cor])=>({v,lbl,cor,n:n[v]||0})); }
   const base=oaDados.filter(o=>oaBase(o,k)).filter(oaNoPoly), m=new Map();
   base.forEach(o=>{ const v=k==='fam'?o.fam:o.cod; if(!v) return; let r=m.get(v); if(!r){ r={v,n:0,lbl:k==='fam'?v:(oaCodFmt(o.cod)+' · '+(o.cdesc||o.srv||'')),cor:k==='fam'?OA_FAM_COR(v):(OA_GEST_COR[o.gest]||'#94a3b8')}; m.set(v,r); } r.n++; });
   oaF[k].forEach(v=>{ if(!m.has(v)) m.set(v,{v,n:0,lbl:k==='fam'?v:oaCodFmt(v),cor:'#94a3b8'}); });
@@ -8493,13 +8495,14 @@ function oaMsPainel(pre,k,busca){
   const q=panel.querySelector('.oams-q'); if(q){ q.oninput=()=>{ const pos=q.selectionStart; oaMsPainel(pre,k,busca); const n=panel.querySelector('.oams-q'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }; }
 }
 function oaMsRotulo(){
-  const b1=$('#oaFamBtn'), b2=$('#oaCodFBtn');
+  const b1=$('#oaFamBtn'), b2=$('#oaCodFBtn'), b3=$('#oaZaBtn');
+  if(b3) b3.textContent=(oaF.zas.size?(oaF.zas.size===1?OA_ZAS.find(z=>z[0]===[...oaF.zas][0])[1]:oaF.zas.size+' ZAs'):'Todas as ZAs')+' ▾';
   if(b1) b1.textContent=oaF.fam.size?(oaF.fam.size===1?[...oaF.fam][0]:oaF.fam.size+' agrupamentos')+' ▾':'Agrupamento ▾';
   if(b2) b2.textContent=oaF.cods.size?(oaF.cods.size===1?oaCodFmt([...oaF.cods][0]):oaF.cods.size+' códigos')+' ▾':'Código / serviço ▾';
 }
 // filtros "de base" (tudo menos faixa, que é painel clicável). `sem` = filtro ignorado (p/ contar as opções dele mesmo)
 function oaBase(o,sem){
-  if(oaF.za){ const fo=oaF.za.startsWith('F:'), za=fo?oaF.za.slice(2):oaF.za; if(o.za!==za||oaForaZa(o)!==fo) return false; }
+  if(oaF.zas.size&&sem!=='zas'&&!oaF.zas.has(oaZaCat(o))) return false;
   if(oaF.gest&&sem!=='gest'&&!oaGestDe(o).includes(oaF.gest)) return false;
   if(oaF.fam.size&&sem!=='fam'&&!oaF.fam.has(o.fam)) return false;
   if(oaF.cods.size&&sem!=='cods'&&!oaF.cods.has(o.cod)) return false;
@@ -8524,6 +8527,9 @@ function oaForaZa(o){
       if(d) dentro=true; }); });
   o._fzk=k; o._fz=!dentro; return o._fz;
 }
+// opções do filtro de ZA (seleção múltipla): carteira do consórcio dentro / fora do limite da própria ZA
+const OA_ZAS=[['ZA1004','ZA1004 — Contagem','#2563eb'],['ZA0200','ZA0200 — Betim','#16a34a'],['F:ZA1004','Fora da ZA — Contagem','#93c5fd'],['F:ZA0200','Fora da ZA — Betim','#86efac']];
+const oaZaCat=o=>(oaForaZa(o)?'F:':'')+o.za;
 async function oaLimiteZa(){
   if(_limiteZaData) return;
   try{ const {data,error}=await sb.rpc('app_limite_za',{}); if(!error&&data) _limiteZaData=data; }catch(e){}
@@ -8594,7 +8600,7 @@ function oaMapaFit(){
   if(m.style.height!==h+'px'){ m.style.height=h+'px'; if(oaMap) oaMap.invalidateSize(); }
 }
 function oaLimparFiltros(){
-  Object.assign(oaF,{za:'',gest:'',cat:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.fam.clear(); oaF.cods.clear(); oaF.faixa.clear(); oaF.prazo.clear();
+  Object.assign(oaF,{za:'',gest:'',cat:'',st:'',vis:'',q:'',reinc:false,exec:false,semloc:false}); oaF.zas.clear(); oaF.fam.clear(); oaF.cods.clear(); oaF.faixa.clear(); oaF.prazo.clear();
   ['#oaZa','#oaGest','#oaSt','#oaVis'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
   oaLimite=150; oaRender();
 }
