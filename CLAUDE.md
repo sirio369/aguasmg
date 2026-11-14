@@ -483,7 +483,7 @@ Manutenção) ganhou variável de contexto `condOcorrenciaBackTo`, mesmo padrão
 Detalhe em `docs/MODULOS.md §6` "Cuidados". **Regra pra telas novas:** "‹ Voltar" de subtela aberta
 direto do hub deve ser `irPara('frota')`, nunca `='home'`. **Fluxos de 2026-10-16 (e-mail Amanda):** multas/ocorrências/avarias (`frota_registro`, cadastro só da equipe de frotas, aviso só ao colaborador + gestor), manutenção preventiva agendada direto pela Frotas e aviso de ocorrência de checklist pra equipe de frotas — avisos pra "equipe de frotas" usam `frota_responsaveis()` (inclui a engrenagem `frota_admin`), ver docs/MODULOS.md §6.6.
 
-**RH** (`rh`, home › 🚧 Em desenvolvimento — só `ME.dev_acesso` por enquanto; Meus colaboradores segue em Suporte; 2026-11-13, sw v397) — hub com **Meus colaboradores** (abaixo),
+**RH** (`rh`, home › 🧰 Suporte desde a sw v402; ⚙️ do hub (admin) libera por pessoa o módulo e cada tela — `perfil.rh_telas` + `rh_acesso` (Carga RH), `rh_tela()`/`rhTela()`) — hub com **Meus colaboradores** (abaixo),
 **Carga RH** (`rh_carga`: "Relatório de Ponto do Funcionário" do Kairos em Excel (.xls = HTML; emissão = data do arquivo) ou PDF lido no navegador; recarga do mesmo período desconsidera o que já está no banco, como as Encerradas do SIGOS → base única
 funcionário × dia no schema `18 - rh`; gate `ME.rh_acesso` = admin ou ⚙️ do hub `rh_acesso`), **Validação gestor** (`rh_val`: tabela compacta só com os dias estranhos do
 ponto, filtro por gestor → gestor ajusta marcações / confirma falta / justifica / ok → RH valida depois de corrigir no Kairos ou devolve) e **Análise do

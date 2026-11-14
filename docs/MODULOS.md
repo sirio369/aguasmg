@@ -4388,14 +4388,24 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
 
 ## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v397; migrações aplicadas em 13/11/2026)
 
-Card **👥 RH** na home › **🚧 Em desenvolvimento** (`#homeRh`, padrão da Vitrine: "RH 🔒" para quem não tem `ME.dev_acesso`; decisão do
-usuário em 13/11/2026 — o módulo fica em desenvolvimento por enquanto). Todas as telas `rh*` checam `rhDev()` (= `ME.dev_acesso`) além do
-gate próprio. O card **📇 Meus colaboradores** continua em 🧰 Suporte para aprovador/admin (`#homeMeusColab`). Quando sair de
-desenvolvimento, o plano é o RH substituir o card Meus colaboradores em Suporte (`ME.pode_aprovar || ME.rh_acesso`).
-O hub (`rhInit`) mostra: **📇 Meus colaboradores** (só aprovador/admin — a tela `meus_colab` de sempre, §12, agora com "‹ RH"),
-**📥 Carga RH** (`rh_carga`, só `ME.rh_acesso`), **✅ Validação gestor** (`rh_val`, §22.2) e **📊 Análise do ponto** (`rh_analise`, §22.3) — essas duas para aprovador (só a equipe)
-ou RH (todos).
-⚙️ do hub (admin) → tela **`rh_acesso`** (quem faz a carga; `perfil.rh_acesso`, RPCs `app_rh_acesso_listar`/`_set`, admin-only).
+Card **👥 RH** na home › **🧰 Suporte** (`#homeRh`, sw v402 — saiu de "Em desenvolvimento" a pedido do usuário em 14/11/2026),
+visível só para quem tem o **módulo** liberado. **Acesso por tela** (`docs/migracao_rh_acessos_telas.sql`):
+- **⚙️ do hub (só admin) → tela `rh_acesso` ("RH · Acessos")**: tabela pessoa × **Módulo RH · Meus colaboradores · Carga RH ·
+  Validação gestor · Análise do ponto** (chips Com acesso / Aprovadores / Todos + busca). Marcar uma tela já libera o módulo; tirar o
+  módulo tira todas (pede confirmação). "Meus colaboradores" só pode ser marcado para aprovador. Admin = sempre tudo.
+- **Banco:** `perfil.rh_telas text[]` ⊂ {modulo, colab, val, analise}; a **Carga RH continua em `perfil.rh_acesso`** (= "visão RH":
+  carrega, vê todos na Validação/Análise e valida/devolve). Helper **`public.rh_tela(uid, tela)`** (admin | ativo + 'modulo' + a tela;
+  'carga' = rh_acesso). RPCs `app_rh_acesso_listar` (devolve `telas`, `aprovador`, `rh`) e **`app_rh_tela_set(uuid, tela, on)`**
+  (admin-only); `app_rh_acesso_set` antigo continua no banco, sem uso. `app_me` devolve **`rh_telas`** (admin = todas).
+- **Gates:** front `rhTela(t)` em cada tela (`rhInit`, `rh_carga`, `rhvInit`, `rhanInit`); banco confere de novo:
+  `app_rh_val_lista`/`_tratar` exigem `rh_tela('val')`, `app_rh_val_rh` exige Carga RH + `val`, `app_rh_analise` exige `rh_tela('analise')`.
+  O **escopo dos dados não mudou**: aprovador vê só a equipe (Aprovador 1/2), Carga RH vê todos.
+- **Seed (14/11/2026):** quem já usava o RH (dev_acesso + aprovador) ficou com módulo + Meus colaboradores + Validação + Análise
+  (Amanda, Yasmin, Heron, João Momonuki); ninguém tinha Carga RH.
+- **📇 Meus colaboradores** solto em Suporte (`#homeMeusColab`) só aparece para o aprovador que **não** tem essa tela no RH.
+
+O hub (`rhInit`) mostra só os cards liberados: **📇 Meus colaboradores** (tela `meus_colab`, §12, com "‹ RH"; precisa ser aprovador),
+**📥 Carga RH** (`rh_carga`), **✅ Validação gestor** (`rh_val`, §22.2) e **📊 Análise do ponto** (`rh_analise`, §22.3).
 
 ### 22.1 Carga RH — tela `rh_carga` · `// ---------- CARGA RH`
 Base **única** de horas a partir do **"Relatório de Ponto do Funcionário" do DIMEP Kairos (PDF)**, um por consórcio.
