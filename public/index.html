@@ -1212,7 +1212,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div id="oaGeo" class="oageo hidden"></div>
     <div class="oafilt">
-      <select id="oaZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option></select>
+      <select id="oaZa"><option value="">Todas as ZAs</option><option value="ZA1004">ZA1004 — Contagem</option><option value="ZA0200">ZA0200 — Betim</option><option value="F:ZA1004">Fora da ZA — Contagem</option><option value="F:ZA0200">Fora da ZA — Betim</option></select>
       <select id="oaGest"><option value="">Todos os gestores</option></select>
       <div class="msdd" id="oaFamDd"><button type="button" class="msdd-btn" id="oaFamBtn">Agrupamento ▾</button><div class="msdd-panel hidden" id="oaFamPanel"></div></div>
       <div class="msdd" id="oaCodDd"><button type="button" class="msdd-btn" id="oaCodFBtn">Código / serviço ▾</button><div class="msdd-panel hidden" id="oaCodPanel"></div></div>
@@ -8442,6 +8442,7 @@ function oaInit(){
   oaMsBind('oaFam','fam','Agrupamento',false); oaMsBind('oaCod','cods','Código / serviço',true);
   oaMapaInit();
   oaCarregar().then(()=>oaGeoRodar());
+  oaLimiteZa().then(()=>{ if(oaDados.length) oaRender(); });
 }
 async function oaCarregar(){
   if(!oaDados.length) $('#oaLista').innerHTML='<p class="sub">Carregando…</p>';
@@ -8498,7 +8499,7 @@ function oaMsRotulo(){
 }
 // filtros "de base" (tudo menos faixa, que é painel clicável). `sem` = filtro ignorado (p/ contar as opções dele mesmo)
 function oaBase(o,sem){
-  if(oaF.za&&o.za!==oaF.za) return false;
+  if(oaF.za){ const fo=oaF.za.startsWith('F:'), za=fo?oaF.za.slice(2):oaF.za; if(o.za!==za||oaForaZa(o)!==fo) return false; }
   if(oaF.gest&&sem!=='gest'&&!oaGestDe(o).includes(oaF.gest)) return false;
   if(oaF.fam.size&&sem!=='fam'&&!oaF.fam.has(o.fam)) return false;
   if(oaF.cods.size&&sem!=='cods'&&!oaF.cods.has(o.cod)) return false;
@@ -8509,6 +8510,24 @@ function oaBase(o,sem){
   return true;
 }
 const oaPassa=o=>oaBase(o)&&(!oaF.faixa.size||oaF.faixa.has(oaFaixa(o)));
+// "Fora da ZA" = OS da carteira do consórcio cujo ponto cai fora do limite da própria ZA (limite_za).
+// Sem localização (ou limite ainda não carregado) conta como dentro da ZA.
+function oaForaZa(o){
+  if(o.lat==null||!(_limiteZaData&&_limiteZaData.features)) return false;
+  const k=o.lat+','+o.lon; if(o._fzk===k) return o._fz;
+  const x=o.lon, y=o.lat; let dentro=false;
+  _limiteZaData.features.forEach(f=>{ if(dentro||!f.geometry||(f.properties||{}).consorcio!==o.za) return;
+    const g=f.geometry, polys=g.type==='Polygon'?[g.coordinates]:g.type==='MultiPolygon'?g.coordinates:[];
+    polys.forEach(rings=>{ if(dentro) return; let d=false;
+      rings.forEach(ring=>{ for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const [xi,yi]=ring[i],[xj,yj]=ring[j];
+        if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi)) d=!d; } });
+      if(d) dentro=true; }); });
+  o._fzk=k; o._fz=!dentro; return o._fz;
+}
+async function oaLimiteZa(){
+  if(_limiteZaData) return;
+  try{ const {data,error}=await sb.rpc('app_limite_za',{}); if(!error&&data) _limiteZaData=data; }catch(e){}
+}
 function oaNoPoly(o){
   if(!oaPoly) return true; if(o.lat==null) return false;
   const x=o.lon, y=o.lat; let dentro=false;
