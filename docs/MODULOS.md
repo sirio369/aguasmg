@@ -4510,6 +4510,7 @@ Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
   **descanso < 11h** e **ranking por colaborador** (área, a tratar, inconsistências, absenteísmo, HE, HE > 2h, descanso < 11h, faltas,
   atraso, H.trab — ordena no título da coluna; padrão = a tratar; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
 - Na v400 as telas de Validação e Análise perderam o texto de descrição; datas + consórcio (+ situação, na Validação) ficam numa linha.
+- **Largura (sw v401):** no computador (≥ 860 px) as duas telas usam a largura toda da janela, sem a coluna de 1040 px das outras telas (mesmo padrão de `sigos_abertas`), para a tabela da Validação caber inteira.
 
 **Banco da validação** (`docs/migracao_rh_ponto_validacao.sql`, roda **depois** da migração da carga): `tratativa`, `tratativa_evento`,
 helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
