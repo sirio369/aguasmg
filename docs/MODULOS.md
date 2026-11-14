@@ -4481,22 +4481,37 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
   falta zerada). A tela mostra "✓ o Kairos já reflete" / "⚠ chegou relatório novo mas ainda não reflete" / "aguardando nova carga".
 - **Tela:** período (padrão últimos 30 dias, máx. 3 meses), chips **A tratar / Aguardando RH / Validados / Todos**, chips de consórcio,
   filtro por **gestor** (Aprovador 1 ou 2 do colaborador; "Sem gestor no app" = sem usuário/aprovador, sw v399), filtro por inconsistência
-  e busca. **Tabela compacta** (sw v399): 1 linha por dia × colaborador — Colaborador (só na 1ª linha de cada um, com sigla, matrícula
-  e gestores) · Data · Inconsistência · Batidas em pares (com a justificativa do Kairos) · Horário previsto · H.trab · HE · Falta ·
-  Atraso · Situação (com a tratativa do gestor, devolução/validação da RH e conferência com o Kairos) · ação. O formulário abre numa
+  e busca. **Tabela compacta** (sw v399; refeita na v400): uma **faixa por colaborador** (nome, sigla, matrícula, gestores, nº de dias)
+  e, abaixo, **1 linha por dia, todas da mesma altura** (sem quebra) — Data · Inconsistência · Batidas em pares (com a justificativa
+  do Kairos) · Horário previsto · H.trab · HE · Falta · Atraso · Situação + botão na mesma célula (tratativa do gestor,
+  devolução/validação da RH e conferência com o Kairos aparecem logo abaixo). O formulário abre numa
   linha logo abaixo. **Só aparecem os dias com inconsistência** — dias corretos, folgas/DSR e dias parciais ficam fora (na 1ª carga
   real, 01–13/11: 257 dias com inconsistência de 520; 61 dias trabalhados sem nada, 157 de folga/DSR/feriado, 40 parciais). Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
 
 ### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
-`app_rh_analise(ini, fim, consórcio)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências:
-- **KPIs:** colaboradores, horas trabalhadas, horas extras, dias com **HE > 2h**, **descansos < 11h**, dias de falta (e horas),
-  atrasos, adicional noturno. Dias `parcial` aparecem no aviso do período.
-- **Inconsistências do período** (casos e pessoas por tipo) + andamento das tratativas (a tratar / aguardando RH / validadas).
-- **Horas extras por dia** (barras), **por consórcio** (H.trab, HE, % HE, faltas, atraso), lista de **descanso < 11h** (colaborador,
-  dia, descanso, quanto faltou para 11h) e **ranking por colaborador** (HE, dias HE > 2h, descansos < 11h, faltas, atraso, H.trab —
-  ordena tocando no título da coluna; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
+`app_rh_analise(ini, fim, consórcio, área)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências.
+Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
+- **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
+  sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
+- **KPIs estratégicos** (com selo ok / atenção / crítico — só visual):
+  - **Inconsistências ainda não tratadas** (destaque): % dos dias com inconsistência sem tratativa do gestor (devolvido conta como
+    não tratado) + barra empilhada a tratar / aguardando RH / validadas.
+  - **Conformidade do ponto** = dias avaliados (não parciais) sem inconsistência ÷ dias avaliados (≥ 90% ok, ≥ 75% atenção).
+  - **Absenteísmo** = minutos de falta ÷ minutos previstos (dias não parciais). Previsto = soma dos intervalos do texto de horário do
+    Kairos (`"18 - rh".prev_min`: "07:00 - 12:00 | 13:00 - 17:00" = 9h; Descanso/Compensado/Feriado = 0) (≤ 3% ok, ≤ 6% atenção).
+  - **Horas extras** = HE ÷ horas trabalhadas (≤ 5% ok, ≤ 10% atenção).
+  - **Pontualidade** = dias trabalhados com jornada prevista sem atraso ÷ esses dias (≥ 95% ok, ≥ 85% atenção).
+  - Linha de apoio: horas trabalhadas, dias de falta, dias HE > 2h, descansos < 11h, dias sem intervalo, adicional noturno.
+- **Por área** (tabela): pessoas, dias com inconsistência, **% não tratada** (com barra), conformidade, absenteísmo, % HE,
+  pontualidade, HE > 2h, descanso < 11h.
+- **Inconsistências por tipo** e **Tratativa por gestor** (Aprovador 1, senão 2; "Sem gestor no app"): barras empilhadas pela situação
+  da tratativa + % não tratada.
+- **Inconsistências por dia** (vermelho = não tratadas) e **Horas extras por dia** (dois gráficos, um eixo cada), **por consórcio**,
+  **descanso < 11h** e **ranking por colaborador** (área, a tratar, inconsistências, absenteísmo, HE, HE > 2h, descanso < 11h, faltas,
+  atraso, H.trab — ordena no título da coluna; padrão = a tratar; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
+- Na v400 as telas de Validação e Análise perderam o texto de descrição; datas + consórcio (+ situação, na Validação) ficam numa linha.
 
 **Banco da validação** (`docs/migracao_rh_ponto_validacao.sql`, roda **depois** da migração da carga): `tratativa`, `tratativa_evento`,
 helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
-`app_rh_analise` (definer, só `authenticated`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
+`app_rh_analise` (definer, só `authenticated`; recriada com o parâmetro de área em `docs/migracao_rh_analise_area.sql`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
 inconsistência (sem intervalo 136, HE > 2h 94, falta 55, atraso 55, batida ímpar 18, descanso < 11h 13, falta após desligamento 2).
