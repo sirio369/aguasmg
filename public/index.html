@@ -1766,8 +1766,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <h1>Carga RH</h1>
     <p class="sub">Envie o <b>Relatório de Ponto do Funcionário</b> do Kairos em <b>Excel (.xls)</b> ou <b>PDF</b> — pode soltar vários de uma vez (Águas
       Integradas, Eficiência Hídrica…); o consórcio sai do CNPJ do relatório. A base de horas é <b>única</b>: cada funcionário × dia
-      existe uma vez só. Períodos que se sobrepõem ficam com o relatório <b>emitido por último</b>; um relatório mais antigo não
-      sobrescreve o que já está no banco, e o mesmo PDF de novo não é carregado.</p>
+      existe uma vez só. Igual às <b>Encerradas do SIGOS</b>: pode mandar o mesmo período de novo — o que já está no banco é
+      <b>desconsiderado</b> e entram só as <b>datas novas</b> e os dias com <b>informação nova</b> (correção feita no Kairos; a versão
+      anterior fica no histórico). Um relatório mais antigo nunca sobrescreve um mais novo, e o mesmo arquivo de novo nem é carregado.</p>
     <div id="rhcSlot"><p class="sub">Carregando…</p></div>
     <div class="sec" style="margin-top:20px">No banco agora</div>
     <div id="rhcBanco"><p class="sub">Carregando…</p></div>
@@ -1793,7 +1794,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="rhv-per"><input id="rhvIni" type="date"/><span class="sub">a</span><input id="rhvFim" type="date"/></div>
     <div id="rhvSt" class="rhv-chips"></div>
     <div id="rhvCons" class="rhv-chips"></div>
-    <div class="rhv-per"><select id="rhvTipo"><option value="">Todas as inconsistências</option></select>
+    <div class="rhv-per"><select id="rhvGestor"><option value="">Todos os gestores</option></select><select id="rhvTipo"><option value="">Todas as inconsistências</option></select>
       <input id="rhvBusca" placeholder="Buscar colaborador…" autocomplete="off"/></div>
     <div id="rhvLista" style="margin-top:8px"><p class="sub">Carregando…</p></div>
   </main>
@@ -16356,8 +16357,10 @@ function rhcResumo(f){
   const novos=f.dias_novos!=null?f.dias_novos:f.novos, alt=f.dias_alterados!=null?f.dias_alterados:f.alterados,
         ig=f.dias_iguais!=null?f.dias_iguais:f.iguais, ant=f.dias_antigos!=null?f.dias_antigos:f.antigos;
   return '✅ '+vEsc(f.sigla||'')+(f.consorcio?' · '+vEsc(f.consorcio)+(RH_ZA[f.consorcio]?' '+RH_ZA[f.consorcio]:''):'')+' · '+rhcN(f.funcionarios)+' funcionários · '+rhcPer(f.periodo_ini,f.periodo_fim)
-    +'<div class="m">'+rhcN(f.dias)+' dias no relatório: '+rhcN(novos)+' novos · '+rhcN(alt)+' alterados · '+rhcN(ig)+' iguais'
-    +(ant?' · '+rhcN(ant)+' ignorados (o banco já tem versão mais nova)':'')+(f.emitido_em?' · emitido em '+rhcDH(f.emitido_em):'')+'</div>'
+    // Igual às Encerradas do SIGOS: o que já está no banco é desconsiderado; entram só dias novos e dias com informação nova
+    +'<div class="m">'+rhcN(f.dias)+' dias no relatório → <b>'+rhcN(novos)+' dias novos</b> · <b>'+rhcN(alt)+' com informação nova</b> (atualizados; a versão anterior fica no histórico)'
+    +' · '+rhcN((ig||0)+(ant||0))+' já estavam no banco — desconsiderados'+(f.emitido_em?' · emitido em '+rhcDH(f.emitido_em):'')+'</div>'
+    +(!novos&&!alt&&f.dias?'<div class="m">ℹ️ Nada novo neste relatório: o período já estava todo no banco.</div>':'')
     +(f.aviso?'<div class="m">ℹ️ '+vEsc(f.aviso)+'</div>':'');
 }
 function rhcRender(){
@@ -16513,7 +16516,7 @@ const rhDia=iso=>{ try{ return new Date(iso+'T12:00:00').toLocaleDateString('pt-
 function rhStatus(it){ const t=it.trat; if(!t) return 'pend'; return t.status==='devolvido'?'dev':(t.status==='validado'?'val':'trat'); }
 function rhPeriodo(ini,fim,dias){ const a=$(ini), b=$(fim); if(!a.value||!b.value){ b.value=rhHoje(); a.value=rhAddDias(b.value,-dias); } return [a.value,b.value]; }
 
-let rhvDados=null, rhvF={st:'pend',tipo:'',cons:'',q:''}, rhvAberto=null, rhvForm=null, rhvDev=null;
+let rhvDados=null, rhvF={st:'pend',tipo:'',cons:'',q:'',gestor:''}, rhvAberto=null, rhvForm=null, rhvDev=null;
 function rhvCss(){
   if(document.getElementById('rhvCss')) return;
   const st=document.createElement('style'); st.id='rhvCss';
@@ -16522,20 +16525,28 @@ function rhvCss(){
 .rhv-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;font-size:12px}
 .rhv-chips button{all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;background:var(--card);border:1px solid var(--line)}
 .rhv-chips button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
-.rhv-pes{margin-top:14px;font-size:14px;font-weight:600;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
-.rhv-pes .sub{font-weight:400;font-size:12px;margin:0}
-.rhv-card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:9px 11px;margin-top:6px;font-size:13px;overflow-wrap:anywhere}
-.rhv-card.dev{border-left-color:var(--bad)} .rhv-card.trat{border-left-color:var(--acc)} .rhv-card.val{border-left-color:var(--ok)}
-.rhv-card .hd{display:flex;justify-content:space-between;gap:8px;align-items:center}
 .rhv-tag{font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .rhv-tag.warn{background:var(--warn-bg);color:var(--warn)} .rhv-tag.bad{background:var(--bad-bg);color:var(--bad)}
 .rhv-tag.ok{background:var(--ok-bg);color:var(--ok)} .rhv-tag.acc{background:var(--bg);color:var(--acc);border:1px solid var(--acc)}
-.rhv-tps{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}
-.rhv-tp{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--bg);border:1px solid var(--line)}
-.rhv-mk{font-variant-numeric:tabular-nums;letter-spacing:.2px}
 .rhv-m{color:var(--mut);font-size:12px;margin-top:3px}
-.rhv-box{border-radius:8px;padding:7px 9px;margin-top:7px;font-size:12.5px;background:var(--bg)}
-.rhv-box.bad{background:var(--bad-bg);color:var(--bad)} .rhv-box.ok{background:var(--ok-bg);color:var(--ok)}
+.rhv-tw{overflow-x:auto;margin-top:6px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.rhv-t{width:100%;border-collapse:collapse;font-size:12.5px}
+.rhv-t th{color:var(--mut);font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.rhv-t td{padding:5px 8px;border-top:1px solid var(--line);vertical-align:top}
+.rhv-t tr.g1 td{border-top:2px solid var(--mut)}
+.rhv-t tbody tr:first-child td{border-top:0}
+.rhv-t .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rhv-t td.nm{min-width:150px;font-weight:600} .rhv-t td.nm .sub{display:block;font-weight:400;font-size:11px;margin:1px 0 0}
+.rhv-t .nw{white-space:nowrap} .rhv-t .mk{white-space:nowrap;font-variant-numeric:tabular-nums}
+.rhv-t .tp{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--bg);border:1px solid var(--line);margin:0 3px 3px 0;white-space:nowrap}
+.rhv-t .m{color:var(--mut);font-size:11px;margin-top:2px;max-width:220px}
+.rhv-t .m.bad{color:var(--bad)} .rhv-t .m.ok{color:var(--ok)}
+.rhv-t .ac{white-space:nowrap;text-align:right}
+.rhv-t .ac button{all:unset;cursor:pointer;padding:4px 10px;border-radius:7px;font-size:12px;background:var(--acc);color:var(--acc-ink);margin:1px 0 1px 4px}
+.rhv-t .ac button.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.rhv-t tr.ab td{background:var(--bg)}
+.rhv-t tr.rhv-x td{background:var(--bg);border-top:0;padding:4px 10px 10px}
+.rhv-t tr.rhv-x .rhv-form{max-width:560px;margin:0;border:0;padding:0}
 .rhv-bt{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .rhv-bt .btn{margin:0;width:auto;flex:1;min-width:110px;padding:8px 10px;font-size:13px}
 .rhv-bt .btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
@@ -16559,6 +16570,7 @@ function rhvInit(){
     ['#rhvIni','#rhvFim'].forEach(s=>$(s).addEventListener('change',rhvCarregar));
     $('#rhvBusca').addEventListener('input',()=>{ rhvF.q=$('#rhvBusca').value; rhvRender(); });
     $('#rhvTipo').addEventListener('change',()=>{ rhvF.tipo=$('#rhvTipo').value; rhvRender(); });
+    $('#rhvGestor').addEventListener('change',()=>{ rhvF.gestor=$('#rhvGestor').value; rhvAberto=null; rhvRender(); });
     lst.addEventListener('click',rhvClique);
     lst.addEventListener('input',e=>{ if(e.target.closest('.rhv-form')) rhvSync(); });
   }
@@ -16576,11 +16588,12 @@ function rhvRender(){
   const D=rhvDados; if(!D) return;
   const its=D.itens||[];
   $('#rhvSub').innerHTML=D.rh
-    ?'<b>Visão da RH</b> (todos os colaboradores). O gestor trata cada dia estranho; depois de corrigir no <b>Kairos</b>, valide aqui ou devolva com uma observação.'
-    :'Dias com ponto estranho dos colaboradores que têm você como <b>Aprovador 1 ou 2</b>. Para cada um, diga o que aconteceu: ajuste a entrada/saída, confirme a falta, justifique um problema ou confirme que está correto. Depois a RH corrige no Kairos e valida.';
+    ?'<b>Visão da RH</b> (todos os colaboradores). O gestor trata cada dia estranho; depois de corrigir no <b>Kairos</b>, valide aqui ou devolva com uma observação. <span class="sub">Só aparecem os dias com inconsistência — dias corretos, folgas/DSR e dias ainda parciais ficam fora.</span>'
+    :'Dias com ponto estranho dos colaboradores que têm você como <b>Aprovador 1 ou 2</b>. Para cada um, diga o que aconteceu: ajuste a entrada/saída, confirme a falta, justifique um problema ou confirme que está correto. Depois a RH corrige no Kairos e valida. Só aparecem os dias com inconsistência — os dias corretos ficam fora.';
   const q=rhNorm(rhvF.q.trim());
   const consOk=it=>!rhvF.cons||it.consorcio===rhvF.cons;
-  const base=its.filter(it=>consOk(it)&&(!rhvF.tipo||(it.tipos||[]).includes(rhvF.tipo))&&(!q||rhNorm(it.nome+' '+(it.matricula||'')).includes(q)));
+  const gOk=it=>!rhvF.gestor||(rhvF.gestor==='__sem'?(!it.gestor&&!it.gestor2):(it.gestor===rhvF.gestor||it.gestor2===rhvF.gestor));
+  const base=its.filter(it=>consOk(it)&&gOk(it)&&(!rhvF.tipo||(it.tipos||[]).includes(rhvF.tipo))&&(!q||rhNorm(it.nome+' '+(it.matricula||'')).includes(q)));
   const cnt={pend:0,trat:0,val:0}; base.forEach(it=>{ const s=rhStatus(it); cnt[s==='dev'?'pend':s]++; });
   $('#rhvSt').innerHTML=[['pend','A tratar',cnt.pend],['trat','Aguardando RH',cnt.trat],['val','Validados',cnt.val],['todos','Todos',base.length]]
     .map(([v,l,n])=>`<button data-st="${v}" class="${v===rhvF.st?'on':''}">${l} ${n}</button>`).join('');
@@ -16589,46 +16602,53 @@ function rhvRender(){
   $('#rhvCons').innerHTML=cs.length<2?'':[['','Ambos'],['ZA1004','Contagem · AI'],['ZA0200','Betim · EH']]
     .map(([v,l])=>`<button data-c="${v}" class="${v===rhvF.cons?'on':''}">${l} ${its.filter(it=>!v||it.consorcio===v).length}</button>`).join('');
   $('#rhvCons').querySelectorAll('button').forEach(b=>b.onclick=()=>{ rhvF.cons=b.dataset.c; rhvRender(); });
-  const tc={}; its.filter(consOk).forEach(it=>(it.tipos||[]).forEach(t=>tc[t]=(tc[t]||0)+1));
+  const gc={}; let gsem=0; its.filter(consOk).forEach(it=>{ const gs=[...new Set([it.gestor,it.gestor2].filter(Boolean))]; if(!gs.length) gsem++; gs.forEach(g=>gc[g]=(gc[g]||0)+1); });
+  if(rhvF.gestor&&rhvF.gestor!=='__sem'&&!gc[rhvF.gestor]) rhvF.gestor='';
+  $('#rhvGestor').innerHTML='<option value="">Todos os gestores</option>'+Object.keys(gc).sort((x,y)=>x.localeCompare(y))
+    .map(g=>`<option value="${vEsc(g)}"${g===rhvF.gestor?' selected':''}>${vEsc(g)} (${gc[g]})</option>`).join('')
+    +(gsem?`<option value="__sem"${rhvF.gestor==='__sem'?' selected':''}>Sem gestor no app (${gsem})</option>`:'');
+  const tc={}; its.filter(consOk).filter(gOk).forEach(it=>(it.tipos||[]).forEach(t=>tc[t]=(tc[t]||0)+1));
   $('#rhvTipo').innerHTML='<option value="">Todas as inconsistências</option>'+Object.keys(RH_TIPOS).filter(t=>tc[t])
     .map(t=>`<option value="${t}"${t===rhvF.tipo?' selected':''}>${RH_TIPOS[t][0]} (${tc[t]})</option>`).join('');
   const lista=base.filter(it=>{ const s=rhStatus(it); return rhvF.st==='todos'||(rhvF.st==='pend'?(s==='pend'||s==='dev'):s===rhvF.st); });
   if(!its.length){ $('#rhvLista').innerHTML='<p class="sub">Nenhuma inconsistência no período. 🎉</p>'; return; }
   if(!lista.length){ $('#rhvLista').innerHTML='<p class="sub">Nada nesse filtro.</p>'; return; }
-  const grupos=[]; lista.forEach(it=>{ const g=grupos[grupos.length-1]; if(g&&g.fid===it.fid) g.itens.push(it); else grupos.push({fid:it.fid,itens:[it]}); });
-  $('#rhvLista').innerHTML=grupos.map(g=>{ const p=g.itens[0];
-    const gest=[p.gestor,p.gestor2].filter(Boolean).join(' / ');
-    return `<div class="rhv-pes">${vEsc(p.nome)} <span class="sub">${vEsc(p.sigla||'')}${p.matricula?' · mat. '+vEsc(p.matricula):''}${gest?' · gestor: '+vEsc(gest):''}${p.sem_usuario?' · <span style="color:var(--warn)">sem usuário no app (só a RH vê)</span>':''}</span></div>`
-      +g.itens.map(rhvCard).join(''); }).join('');
+  let ant=null;
+  $('#rhvLista').innerHTML='<div class="rhv-tw"><table class="rhv-t"><thead><tr><th>Colaborador</th><th>Data</th><th>Inconsistência</th><th>Batidas</th><th>Horário previsto</th>'
+    +'<th class="n">H.trab</th><th class="n">HE</th><th class="n">Falta</th><th class="n">Atraso</th><th>Situação</th><th></th></tr></thead><tbody>'
+    +lista.map(it=>{ const novo=it.fid!==ant; ant=it.fid; return rhvLinha(it,novo); }).join('')+'</tbody></table></div>';
 }
-function rhvCard(it){
+// Uma linha por dia × colaborador (o nome só na 1ª linha de cada colaborador); formulário abre numa linha logo abaixo
+function rhvLinha(it,novo){
   const k=rhvKey(it), s=rhStatus(it), t=it.trat, D=rhvDados;
-  const tps=(it.tipos||[]).map(tp=>{ const L=RH_TIPOS[tp]||[tp,'']; return `<span class="rhv-tp" title="${vEsc(L[1])}">${vEsc(L[0])}${tp==='interjornada'&&it.interjornada_min!=null?' · '+rhHM(it.interjornada_min):''}</span>`; }).join('');
-  const mk=(it.marcacoes||[]).length?(it.marcacoes||[]).join('  '):'sem batidas';
-  const nums=[['H.trab',it.htrab],['HE',it.he],['Falta',it.falta],['Atraso',it.atraso]].filter(([,v])=>v).map(([l,v])=>l+' '+rhHM(v)).join(' · ');
-  let h=`<div class="rhv-card ${s==='pend'?'':s}"><div class="hd"><b>${fmtData(it.data)} <span class="sub" style="font-weight:400">${vEsc(rhDia(it.data))}</span></b><span class="rhv-tag ${RH_ST[s][1]}">${RH_ST[s][0]}</span></div>`
-    +`<div class="rhv-tps">${tps}</div><div class="rhv-mk">🕘 ${vEsc(mk)}</div>`
-    +`<div class="rhv-m">${it.horario?'Horário '+vEsc(it.horario):''}${nums?(it.horario?' · ':'')+nums:''}${it.justificativa?' · Kairos: '+vEsc(it.justificativa):''}</div>`;
+  const gest=[it.gestor,it.gestor2].filter(Boolean).join(' / ');
+  const nm=novo?`${vEsc(it.nome)}<span class="sub">${vEsc(it.sigla||'')}${it.matricula?' · mat. '+vEsc(it.matricula):''}${gest?' · '+vEsc(gest):''}${it.sem_usuario?' · <span style="color:var(--warn)">sem usuário no app</span>':''}</span>`:'';
+  const tps=(it.tipos||[]).map(tp=>{ const L=RH_TIPOS[tp]||[tp,'']; return `<span class="tp" title="${vEsc(L[1])}">${vEsc(L[0])}${tp==='interjornada'&&it.interjornada_min!=null?' '+rhHM(it.interjornada_min):''}</span>`; }).join('');
+  const mk=(it.marcacoes||[]).length?rhPares(it.marcacoes).map(p=>p[1]?p[0]+'–'+p[1]:p[0]+'–?').join('  '):'<span class="sub" style="margin:0">sem batidas</span>';
+  let sit=`<span class="rhv-tag ${RH_ST[s][1]}">${RH_ST[s][0]}</span>`;
   if(t){
     let o=RH_ACOES[t.acao]||t.acao;
     if(t.acao==='ajustar'&&t.marcacoes) o+=': '+rhPares(t.marcacoes).map(p=>p.join('–')).join('  ');
     if(t.acao==='justificar'&&t.motivo) o+=': '+t.motivo;
-    h+=`<div class="rhv-box"><b>${vEsc(t.gestor||'Gestor')}</b> <span class="sub" style="margin:0">${t.gestor_em?rhcDH(t.gestor_em):''}</span><div>${vEsc(o)}</div>${t.obs?'<div class="sub" style="margin:2px 0 0">“'+vEsc(t.obs)+'”</div>':''}</div>`;
-    if(s==='dev') h+=`<div class="rhv-box bad"><b>RH devolveu</b>${t.rh?' ('+vEsc(t.rh)+')':''}: ${vEsc(t.rh_obs||'')}</div>`;
-    if(s==='val') h+=`<div class="rhv-box ok">✓ Validado por ${vEsc(t.rh||'RH')} em ${rhcDH(t.rh_em)}${t.rh_obs?' · '+vEsc(t.rh_obs):''}</div>`;
-    if((s==='trat'||s==='val')&&t.kairos_bate!=null){
-      h+=`<div class="rhv-m">${t.kairos_bate?'✓ O relatório mais recente do Kairos já reflete a tratativa.':(t.kairos_atualizado?'⚠ Chegou relatório novo do Kairos, mas ele ainda não reflete a tratativa.':'Kairos: aguardando nova carga com a correção.')}</div>`;
-    }
+    sit+=`<div class="m" title="${vEsc((t.gestor||'Gestor')+(t.gestor_em?' · '+rhcDH(t.gestor_em):'')+(t.obs?' · '+t.obs:''))}">${vEsc(o)}${t.obs?' · “'+vEsc(t.obs)+'”':''}</div>`;
+    if(s==='dev') sit+=`<div class="m bad">RH: ${vEsc(t.rh_obs||'')}</div>`;
+    if(s==='val') sit+=`<div class="m ok">✓ ${vEsc(t.rh||'RH')} · ${rhcDH(t.rh_em)}</div>`;
+    if((s==='trat'||s==='val')&&t.kairos_bate!=null) sit+=`<div class="m">${t.kairos_bate?'✓ Kairos já reflete':(t.kairos_atualizado?'⚠ Kairos novo não reflete':'Aguardando carga do Kairos')}</div>`;
   }
-  if(rhvAberto===k) h+=rhvFormHtml(it);
-  else if(rhvDev===k) h+=`<div class="rhv-form"><textarea id="rhvDevObs" rows="2" placeholder="O que o gestor precisa rever?"></textarea><div class="rhv-bt"><button class="btn" data-a="devok" data-k="${k}">Devolver ao gestor</button><button class="btn sec" data-a="fechar">Cancelar</button></div></div>`;
-  else {
-    const bt=[];
-    if(s!=='val') bt.push(`<button class="btn${t?' sec':''}" data-a="tratar" data-k="${k}">${t?'Refazer tratativa':'Tratar'}</button>`);
-    if(D.rh&&s==='trat') bt.push(`<button class="btn" data-a="validar" data-k="${k}">✓ Corrigido no Kairos</button>`,`<button class="btn sec" data-a="devolver" data-k="${k}">Devolver</button>`);
-    if(bt.length) h+=`<div class="rhv-bt">${bt.join('')}</div>`;
+  const bt=[];
+  if(rhvAberto!==k&&rhvDev!==k){
+    if(s!=='val') bt.push(`<button class="${t?'sec':''}" data-a="tratar" data-k="${k}">${t?'Refazer':'Tratar'}</button>`);
+    if(D.rh&&s==='trat') bt.push(`<button data-a="validar" data-k="${k}" title="Corrigido no Kairos">✓ Validar</button>`,`<button class="sec" data-a="devolver" data-k="${k}">Devolver</button>`);
   }
-  return h+'</div>';
+  const n=v=>v?rhHM(v):'';
+  let h=`<tr class="${novo?'g1':''}${rhvAberto===k||rhvDev===k?' ab':''}"><td class="nm">${nm}</td>`
+    +`<td class="nw"><b>${fmtData(it.data).slice(0,5)}</b> <span class="sub" style="margin:0">${vEsc(rhDia(it.data))}</span></td>`
+    +`<td>${tps}</td><td><div class="mk">${mk}</div>${it.justificativa?'<div class="m">Kairos: '+vEsc(it.justificativa)+'</div>':''}</td>`
+    +`<td class="nw">${vEsc(it.horario||'')}</td><td class="n">${n(it.htrab)}</td><td class="n">${n(it.he)}</td><td class="n">${n(it.falta)}</td><td class="n">${n(it.atraso)}</td>`
+    +`<td>${sit}</td><td class="ac">${bt.join('')}</td></tr>`;
+  if(rhvAberto===k) h+=`<tr class="rhv-x"><td colspan="11">${rhvFormHtml(it)}</td></tr>`;
+  else if(rhvDev===k) h+=`<tr class="rhv-x"><td colspan="11"><div class="rhv-form"><textarea id="rhvDevObs" rows="2" placeholder="O que o gestor precisa rever?"></textarea><div class="rhv-bt"><button class="btn" data-a="devok" data-k="${k}">Devolver ao gestor</button><button class="btn sec" data-a="fechar">Cancelar</button></div></div></td></tr>`;
+  return h;
 }
 function rhPares(m){ const a=[...(m||[])], r=[]; for(let i=0;i<a.length;i+=2) r.push([a[i]||'',a[i+1]||'']); return r; }
 function rhvFormHtml(it){
