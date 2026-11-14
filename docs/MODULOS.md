@@ -4418,6 +4418,12 @@ Base **única** de horas a partir do **"Relatório de Ponto do Funcionário" do 
   tabela é conferido (`RH_HDR`) — se o Kairos mudar o layout, o PDF é **recusado** ("o layout do relatório mudou"), nunca gravado com
   coluna trocada. Conferido com os relatórios de 08–13/11/2026: AI 51 funcionários / 304 dias / HE 222:56; EH 43 / 254 / 290:22
   (bate com a análise manual).
+- **Recarga do mesmo período = igual às Encerradas do SIGOS** (decisão do usuário, 14/11/2026): o que já está no banco é
+  **desconsiderado**; entram só **datas novas** e dias com **informação nova** (alterados no Kairos → atualiza, versão anterior em
+  `ponto_dia_hist`). Já era a regra do `app_rh_ponto_processar` (dia igual = só atualiza emissão/parcial); a tela passou a mostrar
+  "N dias novos · N com informação nova · N já estavam no banco — desconsiderados" (sw v399). Teste com rollback: o mesmo Excel
+  com emissão posterior → 0 novos / 0 alterados / 260 desconsiderados; + 1 dia novo e 1 correção → 1 novo, 1 alterado, 259
+  desconsiderados.
 - **Fluxo** (um arquivo de cada vez; `rhLerArquivo` escolhe Excel ou PDF pela extensão): sha256 → `app_rh_ponto_checar(sha)` (mesmo PDF já carregado com sucesso → "♻️ Já carregado em …",
   nada sobe) → lê o PDF → upload no bucket **privado `rh-ponto`** (`<AAAA-MM-DD>/<uuid>_<nome>.pdf`, só PDF ≤ 20 MB, sem update/delete
   = prova da carga) → `app_rh_registrar(path, nome, tamanho, sha)` → `app_rh_ponto_processar(arquivo, dados)`. Falha depois do registro
@@ -4474,8 +4480,12 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
   `versao` > `versao_dia`) e `kairos_bate` (ajustar → marcações iguais às do gestor; falta → falta lançada; justificar de falta →
   falta zerada). A tela mostra "✓ o Kairos já reflete" / "⚠ chegou relatório novo mas ainda não reflete" / "aguardando nova carga".
 - **Tela:** período (padrão últimos 30 dias, máx. 3 meses), chips **A tratar / Aguardando RH / Validados / Todos**, chips de consórcio,
-  filtro por inconsistência e busca. Cards agrupados por colaborador (sigla, matrícula, gestor), com as batidas, horário, H.trab/HE/
-  falta/atraso e a justificativa do Kairos. Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
+  filtro por **gestor** (Aprovador 1 ou 2 do colaborador; "Sem gestor no app" = sem usuário/aprovador, sw v399), filtro por inconsistência
+  e busca. **Tabela compacta** (sw v399): 1 linha por dia × colaborador — Colaborador (só na 1ª linha de cada um, com sigla, matrícula
+  e gestores) · Data · Inconsistência · Batidas em pares (com a justificativa do Kairos) · Horário previsto · H.trab · HE · Falta ·
+  Atraso · Situação (com a tratativa do gestor, devolução/validação da RH e conferência com o Kairos) · ação. O formulário abre numa
+  linha logo abaixo. **Só aparecem os dias com inconsistência** — dias corretos, folgas/DSR e dias parciais ficam fora (na 1ª carga
+  real, 01–13/11: 257 dias com inconsistência de 520; 61 dias trabalhados sem nada, 157 de folga/DSR/feriado, 40 parciais). Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
 
 ### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
 `app_rh_analise(ini, fim, consórcio)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências:
