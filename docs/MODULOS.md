@@ -4218,6 +4218,15 @@ Por enquanto os dois são internos; o acesso da COPASA entra em `fisc_pode_ver_v
   Acumulado ("25 un · 0 em campo") e nunca o soma às outras medidas. Validações da chave antiga `atv:Loggers de pressão`
   foram migradas e os snapshots de `fisc_dia` regerados (o `fisc_dia_hash` não inclui medidas). RDO/Vitrine seguem com a
   família única "Loggers de pressão".
+  **Logger fixo = Telemetria (2026-11-16, só banco, `docs/migracao_fisc_logger_fixo_telemetria.sql`):** a OS SIGOS
+  **280 79 00** ("EQUIP.DE TELEMETRIA INST.CONT.PERF.PERDA" = instalação de logger definitivo) caía na família *Telemetria*
+  e aparecia numa linha própria, contando de novo o mesmo serviço do *Logger fixo — instalação* (Betim: 51 das 54 OS
+  tinham logger no app). Causa: `fisc_execucoes` casava pelo campo antigo `os_copasa_instalacao`, mas desde a OS
+  obrigatória (§2.2) o app grava em **`os_sigos`**. Agora o vínculo e a situação SIGOS da instalação usam
+  `coalesce(os_sigos, os_copasa_instalacao)`, e a OS 2807900 **sem** logger no app entra na própria linha *Logger fixo —
+  instalação* (unidade `un`, origem SIGOS). Os códigos de telemetria de suporte (2808000/100/200 — manutenção,
+  substituição, retirada) seguem na família *Telemetria*. Backup da definição anterior em
+  `"12 - retaguarda"._bkp_funcdef_20261116`.
 - **Vazamento:** "Pesquisa de vazamento" = km de rede pesquisada (`pp_execucao`, 1 registro por pesquisador × dia, ZA pela
   rede) + detecção SIGOS 2487900; "Correção de vazamento" = OS SIGOS `COR.VAZ` (2587901/04/05) **só executadas**
   (`fisc_familia` separa da família SIGOS "Pesquisa de vazamento"). **Vazamento localizado (ocorrência do app) sem
