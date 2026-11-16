@@ -4320,6 +4320,12 @@ obra: % do dia, concluída, avanços novos/removidos. Aparece em 3 lugares, só 
 vermelho embaixo da atividade, quadro "O que mudou desde a validação" (antes riscado → agora) no topo do ▾, e lista das linhas que
 mudaram no aviso vermelho do dia. Não mexe em hash, snapshot nem no que a fiscalização vê. Caso típico (out/2026, Betim): instalação de
 logger fixo validada "sem OS SIGOS informada" que depois casou com a OS executada no SIGOS.
+**Linha que saiu do dia (2026-11-16, sw v406, `docs/migracao_fisc_mudou_sumiu.sql`):** `fisc_dia_dados` ganha `sumiram` (linhas
+validadas no dia que não existem mais: chave/por/em/antes) e `destinos` (`{exec_id: {dia, atividade, desc, id}}` das execuções validadas
+que saíram do dia — procuradas ±45 dias pelo mesmo id ou pela mesma OS SIGOS; só roda quando há execução sumida, +~1,3 s nesse dia).
+Tela: bloco "Linhas validadas que saíram do dia" no fim da tabela, item "Saiu" com "→ agora em DD/MM · atividade" e a linha no aviso
+do dia. Caso que motivou: 21/10 ZA0200 "Telemetria" (OS 2807900 executada no SIGOS em 21/10) virou a instalação do Logger Id12 lançada no
+app em 22/10 — vale a data do campo. A OS SIGOS **não** move a execução do app de dia.
 
 **RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+
 cobertura SIGOS, `validado.desatualizado`), `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
