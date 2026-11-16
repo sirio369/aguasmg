@@ -3182,6 +3182,12 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
 > categoria "Gestão de VRPs"** (renderizadas por `apInit()`, gate `ME.vrp_gestao`, ⚙️ `vrpman_cfg` admin). As
 > telas em si não mudaram; seus back-buttons e os redirects de gate agora apontam para `auxiliar_programacao`.
 >
+> **Ficha cadastral no Campo (2026-11-16, sw v404):** o hub `vrpman` ganhou o botão **📇 Ficha cadastral**
+> (`#vmHubFichas`), que abre a mesma tela `vrpman_fichas`. O back-button (`#vmFichasBack`) volta para quem abriu
+> (`vmFichasBack` = `vrpman` ou `auxiliar_programacao`). Sem gate de gestão no front; no banco,
+> `app_vrp_ficha_listar` passou a exigir só login (`docs/migracao_vrp_ficha_campo.sql`). Na ficha aberta, **＋ Abrir OS**
+> e "gerar OS" da pendência seguem só para gestão/admin.
+>
 > **Melhorias 2026-10 (UX):** (1) **Ficha cadastral** (`vmFichasRender`) ganhou **busca pesquisável de VRP**
 > (input + `datalist`, filtra os cards ao digitar); (2) na **ficha aberta** (`vmFichaOpen`) há botão **＋ Abrir OS**
 > (gest.) que reusa `vmProgramar(vrp,num)` → escolhe tipo (corretiva/preventiva/substituição) + usuário + data;

@@ -917,7 +917,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div id="vmServ"></div>
   </main>
   <main id="vrpman_fichas" class="hidden">
-    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <div class="bar"><button class="bk" id="vmFichasBack">‹ Auxiliar de Programação</button></div>
     <h1>Ficha cadastral · VRPs</h1>
     <div id="vmFichas"></div>
   </main>
@@ -5485,7 +5485,7 @@ function apInit(){
   if(grid){
     grid.innerHTML=[['vrpman_serv','🧾','Gestão de serviços'],['vrpman_fichas','📇','Ficha cadastral'],['vrpman_prev','🚦','Cronograma preventivo']]
       .map(c=>`<button class="mod" data-g="${c[0]}"><div class="ic">${c[1]}</div><div class="nm">${c[2]}</div></button>`).join('');
-    grid.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>irPara(b.dataset.g));
+    grid.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ if(b.dataset.g==='vrpman_fichas') vmFichasBack='auxiliar_programacao'; irPara(b.dataset.g); });
   }
   // engrenagem geral: quem acessa o Auxiliar de Programação (admin)
   const cf=$('#apCfg'); if(cf){ cf.classList.toggle('hidden', !(ME&&ME.is_admin)); cf.onclick=()=>irPara('aux_acesso'); }
@@ -6176,9 +6176,11 @@ function vmHub(){
    <div class="grid">
      <button class="mod" data-go="vrpman_campo"><div class="ic">🧰</div><div class="nm">Minhas OS / Executar</div></button>
      <button class="mod" data-go="vrp"><div class="ic">🎛️</div><div class="nm">Visita primária</div></button>
+     <button class="mod" id="vmHubFichas"><div class="ic">📇</div><div class="nm">Ficha cadastral</div></button>
    </div>
    <p class="sub" style="margin-top:16px;font-size:12px">A gestão de VRPs (serviços, ficha cadastral, cronograma preventivo) agora fica em <b>Auxiliar de Programação › Gestão de VRPs</b>.</p>`;
   $('#vmHub').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>irPara(b.dataset.go));
+  $('#vmHubFichas').onclick=()=>{ vmFichasBack='vrpman'; irPara('vrpman_fichas'); };
 }
 
 let vmCampoView='lista', vmCampoMap=null, vmCampoLayer=null;
@@ -6665,9 +6667,10 @@ async function vmPrevInit(){
   vmGLoadPrev();
 }
 // Área 2 — Ficha cadastral (lista/mapa de todas as VRPs)
-let vmFichasCache=[];
+let vmFichasCache=[], vmFichasBack='auxiliar_programacao';
 async function vmFichasInit(){
-  if(!(ME&&ME.vrp_gestao)){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  // aberta tanto pela gestão (Auxiliar) quanto pelo campo (VRPs – Campo); ações de gestão na ficha seguem com gate próprio
+  const bk=$('#vmFichasBack'); if(bk){ bk.textContent=vmFichasBack==='vrpman'?'‹ VRPs – Campo':'‹ Auxiliar de Programação'; bk.onclick=()=>irPara(vmFichasBack); }
   await vmGShared(); vmFichasRender();
 }
 async function vmFichasRender(){
