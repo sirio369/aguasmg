@@ -3814,6 +3814,9 @@ oferece "Reprocessar" no histórico (chama a função de novo com o mesmo `arqui
 - `arquivo` — log de cargas (nunca apaga): campo (`slot_tipo`; `slot_za` só nas cargas do app antigo, null desde v368), path, nome, sha256, tipo/ZA(s) detectados (`za_detectada` pode ser "ZA0200, ZA1004"), unidades (`gerencias`), período
   (das Encerradas, lido do nome `EncerradasAAAAMMDDaAAAAMMDD…`), linhas/ignoradas/inseridas/já existentes/removidas, status
   `pendente|ok|erro`, erro, aviso, quem/quando.
+- `vw_carga_cobertura` — até quando cada ZA tem Relação/Encerradas (usada pelo Consolidador, RDO, Vitrine e Vínculo para o aviso
+  "⏳ SIGOS ainda não chegou"). Arquivo com `slot_za` **null** (carga em 2 campos, v368+) conta para **as duas ZAs**; antes
+  de 16/11/2026 só contava o arquivo com `slot_za` e a cobertura travou em 11/11 (`docs/migracao_sigos_cobertura_slot_nulo.sql`).
 - `os_aberta` (PK `numero`) — carteira atual = última Relação de cada **unidade** (`unidade`; `consorcio` vem da linha). `equipe` e `responsavel` saem de "Equipe e Responsável".
 - `os_encerrada` (PK `numero`) — histórico acumulado; `geom_imovel`/`geom_foto` (Point 31983, de lat/lon WGS84; 0,0 → null).
 - Views `vw_os_aberta` (+ `idade_dias`, `vencida`, `carteira_de`), `vw_os_encerrada` (+ `no_prazo`, `dist_foto_m`,
