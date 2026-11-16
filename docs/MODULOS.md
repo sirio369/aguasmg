@@ -4311,6 +4311,16 @@ que foi executado vai para a fiscalização depois de validado. Chave da linha =
 validadas e o SIGOS cobrindo o dia; o snapshot é o que a Fiscalização vê (sem `val`/`hash`). Linha/dia
 validado trava a edição até **Reabrir**.
 
+**Detalhe do "mudou" (2026-11-16, sw v405, `docs/migracao_fisc_mudou_detalhe.sql`):** a validação da linha grava também
+`fisc_linha_val.antes` = resumo enxuto da linha (`fisc_val_resumo(jsonb)`: execuções com id/serviço/descrição/qtd/un/situação e OS
+SIGOS/OS app/hora/local; obra: %/concluída/avanços) — o passado foi preenchido pelo snapshot do `fisc_dia` (todas as 388 linhas
+validadas tinham dia fechado). `fisc_dia_dados` devolve `val.antes` **só nas linhas cujo hash mudou**. O front (`fscMudou`) compara com o
+banco de hoje pelo id da execução: **nova / saiu / alterada** (quantidade, descrição, situação/OS no SIGOS) + total do dia por unidade;
+obra: % do dia, concluída, avanços novos/removidos. Aparece em 3 lugares, só no Consolidador (não na Execução Física): resumo em
+vermelho embaixo da atividade, quadro "O que mudou desde a validação" (antes riscado → agora) no topo do ▾, e lista das linhas que
+mudaram no aviso vermelho do dia. Não mexe em hash, snapshot nem no que a fiscalização vê. Caso típico (out/2026, Betim): instalação de
+logger fixo validada "sem OS SIGOS informada" que depois casou com a OS executada no SIGOS.
+
 **RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+
 cobertura SIGOS, `validado.desatualizado`), `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
 validado sai do snapshot) · escrita: `app_fisc_linha_validar(dia, za, chave, status|null, obs)`,
