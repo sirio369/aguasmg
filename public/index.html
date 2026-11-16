@@ -10282,6 +10282,7 @@ function fscCss(){
 #fisc .fscdiff .it{padding:5px 0;border-top:1px dashed var(--line)}#fisc .fscdiff .x{margin:2px 0 4px}
 #fisc .fscdiff .m{font-size:12px;margin-top:3px;padding-left:4px}
 #fisc .fscdiff .ant{text-decoration:line-through;color:var(--mut)}
+#fisc .fscsumiu{border:1px solid var(--line);border-left:4px solid #dc2626;border-radius:10px;padding:8px 10px;margin:0 0 8px;background:var(--card)}
 #fisc .fsctab tr.fscalrow td{background:rgba(14,116,144,.06)}
 #fisc .fsctab tr.fscfilha>td:first-child{padding-left:22px}
 #fisc .fsctab tr.fscneta>td:first-child{padding-left:40px}
@@ -10437,7 +10438,7 @@ function fscMudou(l){
       if((a.sigos||'')!==(e.sigos||'')||(a.os_sigos||'')!==(e.os_sigos||'')){ ch.push('SIGOS '+de(sig(a),sig(e))); oq['situação SIGOS']=1; }
       if(ch.length){ cnt.alt++; itens.push({t:'alt',h:ex(e)+'<div class="m">'+ch.join('<br>')+'</div>'}); }
     });
-    ant.forEach((a,id)=>{ if(!ag.has(id)){ cnt.saiu++; itens.push({t:'saiu',h:ex(a)+' <span class="sub" style="margin:0">· '+fscNum(a.qtd)+' '+vEsc(a.un||'')+' · SIGOS: '+vEsc(sig(a))+'</span>'}); } });
+    ant.forEach((a,id)=>{ if(!ag.has(id)){ cnt.saiu++; itens.push({t:'saiu',h:ex(a)+' <span class="sub" style="margin:0">· '+fscNum(a.qtd)+' '+vEsc(a.un||'')+' · SIGOS: '+vEsc(sig(a))+'</span>'+fscDestinoHtml((l._dest||{})[id])}); } });
     // total do dia por unidade, quando mudou (ex.: 3 → 5 un)
     const soma=xs=>xs.reduce((m,e)=>{ m[e.un||'']=(m[e.un||'']||0)+Number(e.qtd||0); return m; },{});
     const sa=soma(A.execs), sg=soma(l.execs||[]);
@@ -10455,6 +10456,23 @@ function fscMudou(l){
     obra?n('nova','avanço novo','avanços novos'):n('nova','nova','novas'), obra?n('saiu','avanço removido','avanços removidos'):n('saiu','saiu','saíram')]
     .filter(Boolean).concat(obra&&!itens.length&&extra.length?[extra[0].replace(/<[^>]+>/g,'')]:[]).join(' · ');
   return {resumo,itens,extra};
+}
+// para onde foi uma execução que saiu do dia (banco: fisc_dia_dados.destinos, mesmo id ou mesma OS SIGOS, ±45 dias)
+function fscDestinoHtml(d){
+  if(!d) return '<div class="m">Não aparece mais no Consolidador (±45 dias).</div>';
+  return '<div class="m">→ agora em <b>'+fmtData(d.dia)+'</b> · '+vEsc(d.atividade||'')+(d.desc?' · '+vEsc(d.desc):'')
+    +(d.id&&String(d.id).startsWith('app:')?' <span class="sub" style="margin:0">(mesma OS, lançada no AcquaHub nesta data)</span>':'')+'</div>';
+}
+// linhas validadas que não existem mais no dia (banco: fisc_dia_dados.sumiram) → mesmo formato do detalhe, tudo "Saiu"
+function fscSumiram(D){
+  return (D.sumiram||[]).map(s=>{ const ob=String(s.chave).startsWith('proj:'), nome=ob?'Obra '+s.chave.split(':').slice(1).join(' '):String(s.chave).replace(/^atv:/,'');
+    const A=s.antes||null, l={atividade:nome,execs:[],avancos:[],pct:0,concluida:false,_dest:D.destinos||{},val:{ok:false,por:s.por,em:s.em,antes:A&&ob?null:A}};
+    return {nome,l,ob}; });
+}
+function fscSumiramHtml(D){
+  const ss=fscSumiram(D); if(!ss.length) return '';
+  return '<h4 style="margin:14px 0 6px">Linhas validadas que saíram do dia</h4>'+ss.map(({nome,l,ob})=>'<div class="fscsumiu"><b>'+vEsc(nome)+'</b>'
+    +(ob?'<div class="sub" style="margin:2px 0 0">A obra não aparece mais neste dia.</div>':fscMudouHtml(l))+'</div>').join('');
 }
 function fscMudouLinhaHtml(l){
   const m=fscMudou(l); if(!m) return '';
@@ -10725,6 +10743,7 @@ async function fscCarregarDetObra(kind,gid,dia){
 function fscSecao(z){
   if(!fscCons()) return fscSecaoFisc(z);
   const D=fscS.dias[z]||{}, pode=!!D.pode_validar, V=D.validado, travado=!!V;
+  (D.linhas||[]).forEach(l=>{ l._dest=D.destinos||{}; });
   const todas=(D.linhas||[]).concat((D.projetos||[]).filter(p=>!fscSemAvanco(p))), pend=todas.filter(l=>!(l.val&&l.val.ok)).length;   // obra sem avanço não conta
   let h='<div class="fscza"><h3><span>'+vEsc(rdoZaNome(z))+'</span><span class="sub" style="margin:0">'+todas.length+' linha'+(todas.length===1?'':'s')+(pend?' · '+pend+' a validar':'')+'</span></h3>';
   if(D.sigos==='aguardando') h+='<div class="fscaviso">⏳ O SIGOS chegou só até '+fmtData((D.cobertura||{}).encerradas_ate)+'. Este dia ainda pode ganhar OS executadas — a validação do dia fica liberada depois da próxima carga.</div>';
@@ -10741,17 +10760,20 @@ function fscSecao(z){
       h+='<button type="button" class="btn" data-fscdiaval="'+z+'"'+(pend||D.sigos==='aguardando'||!todas.length?' disabled':'')+'>🏛️ Validar o dia</button>'; }
     h+='</div>';
   }
-  h+=fscTabAtividades(z,D,pode,travado)+fscTabObras(z,D,pode,travado);
+  h+=fscTabAtividades(z,D,pode,travado)+fscTabObras(z,D,pode,travado)+fscSumiramHtml(D);
   return h+'</div>';
 }
 // aviso do dia "mudou": quais linhas mudaram e, em uma frase, o quê (o detalhe fica no ▾ de cada linha)
 function fscMudouDiaHtml(D){
   const ls=(D.linhas||[]).map(l=>[l.atividade,l]).concat((D.projetos||[]).filter(p=>!fscSemAvanco(p)).map(p=>[p.codigo||'obra',p]))
     .filter(([,l])=>l.val&&!l.val.ok);
-  if(!ls.length) return '';
+  const ss=fscSumiram(D);
+  if(!ls.length&&!ss.length) return '';
   return '<ul class="fscmudl">'+ls.map(([n,l])=>{ const m=fscMudou(l);
-    return '<li><b>'+vEsc(n)+'</b>'+(m&&m.resumo?': '+vEsc(m.resumo):'')+'</li>'; }).join('')+'</ul>'
-    +'<div class="sub" style="margin:2px 0 0">Abra a linha (▾) para ver o antes → agora.</div>';
+    return '<li><b>'+vEsc(n)+'</b>'+(m&&m.resumo?': '+vEsc(m.resumo):'')+'</li>'; }).join('')
+    +ss.map(({nome,l,ob})=>{ const ex=(l.val.antes&&l.val.antes.execs)||[], ds=[...new Set(ex.map(e=>{ const d=(D.destinos||{})[e.id]; return d?fmtData(d.dia)+' ('+d.atividade+')':null; }).filter(Boolean))];
+      return '<li><b>'+vEsc(nome)+'</b>: saiu do dia'+(ex.length?' ('+ex.length+' execuç'+(ex.length===1?'ão':'ões')+(ds.length?' → '+vEsc(ds.join(', ')):'')+')':'')+'</li>'; }).join('')+'</ul>'
+    +'<div class="sub" style="margin:2px 0 0">'+(ls.length?'Abra a linha (▾) para ver o antes → agora.':'')+(ss.length?(ls.length?' ':'')+'As linhas que saíram estão no fim da tabela.':'')+'</div>';
 }
 function fscSecaoFisc(z){
   const D=fscS.dias[z]||{}, V=D.validado, n=(D.linhas||[]).length+(D.projetos||[]).length;
