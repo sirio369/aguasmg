@@ -10275,6 +10275,13 @@ function fscCss(){
 #fisc .fsctab td.n,#fisc .fsctab th.n{text-align:right;white-space:nowrap}
 #fisc .fsctab tr.val td:first-child{box-shadow:inset 4px 0 0 #16a34a}
 #fisc .fsctab tr.mud td:first-child{box-shadow:inset 4px 0 0 #dc2626}
+#fisc .fscmudr{font-size:12px;color:#dc2626;font-weight:600;margin-top:3px}
+#fisc .fscmudl{margin:6px 0 0;padding-left:18px}#fisc .fscmudl li{margin:2px 0}
+#fisc .fscdiff{border:1px solid var(--line);border-left:4px solid #dc2626;border-radius:10px;padding:8px 10px;margin:4px 0 8px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
+#fisc .fscdiff .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:#dc2626;margin-bottom:3px}
+#fisc .fscdiff .it{padding:5px 0;border-top:1px dashed var(--line)}#fisc .fscdiff .x{margin:2px 0 4px}
+#fisc .fscdiff .m{font-size:12px;margin-top:3px;padding-left:4px}
+#fisc .fscdiff .ant{text-decoration:line-through;color:var(--mut)}
 #fisc .fsctab tr.fscalrow td{background:rgba(14,116,144,.06)}
 #fisc .fsctab tr.fscfilha>td:first-child{padding-left:22px}
 #fisc .fsctab tr.fscneta>td:first-child{padding-left:40px}
@@ -10409,6 +10416,62 @@ function fscStatusLinha(l){
   if(!v.ok) return {cls:'mud',pill:'<span class="fscpill" style="background:#dc2626" title="Validada por '+vEsc(v.por||'')+', mas os dados mudaram depois">mudou</span>'};
   return {cls:'val',pill:'<span class="fscpill" style="background:#16a34a" title="'+vEsc((v.por||'')+' · '+(v.em?new Date(v.em).toLocaleString('pt-BR'):''))+'">validada</span>'};
 }
+// "mudou": o que mudou desde a validação. O banco devolve em val.antes (só nas linhas que mudaram) o resumo gravado ao validar
+// (fisc_val_resumo: execuções ou %/avanços da obra — os mesmos campos do hash) e aqui comparamos com o que está no banco hoje.
+// Execução casa pelo id: nova / saiu / alterada (quantidade, descrição, situação/OS no SIGOS). Obra: %, concluída e avanços.
+// Retorna {resumo (1 linha p/ a tabela), itens [{t:'nova'|'saiu'|'alt', h:html}], extra (linhas soltas, ex.: total/%)} ou null.
+function fscMudou(l){
+  const v=l&&l.val; if(!v||v.ok) return null;
+  const A=v.antes, sig=e=>e.os_sigos?'OS '+e.os_sigos+(e.sigos?' — '+e.sigos:''):(e.sigos||'—');
+  if(!A) return {resumo:'',itens:[],extra:[],semBase:true};
+  const ex=e=>'<b>'+vEsc(e.servico||'')+'</b>'+(e.desc?' · '+vEsc(e.desc):'')+(e.hora?' <span class="sub" style="margin:0">'+vEsc(e.hora)+'</span>':'');
+  const de=(a,b)=>'<span class="ant">'+vEsc(a)+'</span> → <b>'+vEsc(b)+'</b>';
+  const itens=[], extra=[], cnt={nova:0,saiu:0,alt:0}, oq={};
+  if(Array.isArray(A.execs)){
+    const ant=new Map(A.execs.map(e=>[e.id,e])), ag=new Map((l.execs||[]).map(e=>[e.id,e]));
+    ag.forEach((e,id)=>{ const a=ant.get(id);
+      if(!a){ cnt.nova++; itens.push({t:'nova',h:ex(e)+' <span class="sub" style="margin:0">· '+fscNum(e.qtd)+' '+vEsc(e.un||'')+' · SIGOS: '+vEsc(sig(e))+'</span>'}); return; }
+      const ch=[];
+      if(Number(a.qtd)!==Number(e.qtd)){ ch.push('quantidade '+de(fscNum(a.qtd)+' '+(a.un||''),fscNum(e.qtd)+' '+(e.un||''))); oq.quantidade=1; }
+      if((a.desc||'')!==(e.desc||'')){ ch.push('descrição '+de(a.desc||'—',e.desc||'—')); oq['descrição']=1; }
+      if((a.sigos||'')!==(e.sigos||'')||(a.os_sigos||'')!==(e.os_sigos||'')){ ch.push('SIGOS '+de(sig(a),sig(e))); oq['situação SIGOS']=1; }
+      if(ch.length){ cnt.alt++; itens.push({t:'alt',h:ex(e)+'<div class="m">'+ch.join('<br>')+'</div>'}); }
+    });
+    ant.forEach((a,id)=>{ if(!ag.has(id)){ cnt.saiu++; itens.push({t:'saiu',h:ex(a)+' <span class="sub" style="margin:0">· '+fscNum(a.qtd)+' '+vEsc(a.un||'')+' · SIGOS: '+vEsc(sig(a))+'</span>'}); } });
+    // total do dia por unidade, quando mudou (ex.: 3 → 5 un)
+    const soma=xs=>xs.reduce((m,e)=>{ m[e.un||'']=(m[e.un||'']||0)+Number(e.qtd||0); return m; },{});
+    const sa=soma(A.execs), sg=soma(l.execs||[]);
+    [...new Set(Object.keys(sa).concat(Object.keys(sg)))].forEach(u=>{ if((sa[u]||0)!==(sg[u]||0)) extra.push('No dia: '+de(fscNum(sa[u]||0)+' '+u,fscNum(sg[u]||0)+' '+u)); });
+  }else{
+    if(Number(A.pct||0)!==Number(l.pct||0)) extra.push('% da obra no dia: '+de(fscNum(A.pct||0,1)+'%',fscNum(l.pct||0,1)+'%'));
+    if(!!A.concluida!==!!l.concluida) extra.push('Concluída no dia: '+de(A.concluida?'sim':'não',l.concluida?'sim':'não'));
+    const av=a=>'<b>'+vEsc(a.item||'')+'</b> · +'+fscNum(a.valor)+(a.un==='%'?'%':' '+vEsc(a.un||''))+' <span class="sub" style="margin:0">'+vEsc([a.hora,a.por].filter(Boolean).join(' · '))+'</span>';
+    const ant=new Map((A.avancos||[]).map(a=>[String(a.id),a])), ag=new Map((l.avancos||[]).map(a=>[String(a.id),a]));
+    ag.forEach((a,id)=>{ if(!ant.has(id)){ cnt.nova++; itens.push({t:'nova',h:av(a)}); } });
+    ant.forEach((a,id)=>{ if(!ag.has(id)){ cnt.saiu++; itens.push({t:'saiu',h:av(a)}); } });
+  }
+  const obra=!Array.isArray(A.execs), n=(k,s,p)=>cnt[k]?cnt[k]+' '+(cnt[k]===1?s:p):null;
+  const resumo=[n('alt','alterada','alteradas')&&(n('alt','alterada','alteradas')+(Object.keys(oq).length?' ('+Object.keys(oq).join(', ')+')':'')),
+    obra?n('nova','avanço novo','avanços novos'):n('nova','nova','novas'), obra?n('saiu','avanço removido','avanços removidos'):n('saiu','saiu','saíram')]
+    .filter(Boolean).concat(obra&&!itens.length&&extra.length?[extra[0].replace(/<[^>]+>/g,'')]:[]).join(' · ');
+  return {resumo,itens,extra};
+}
+function fscMudouLinhaHtml(l){
+  const m=fscMudou(l); if(!m) return '';
+  return '<div class="fscmudr">⚠️ '+(m.semBase?'mudou depois da validação':(vEsc(m.resumo)||'mudou depois da validação'))+'</div>';
+}
+function fscMudouHtml(l){
+  const m=fscMudou(l); if(!m) return '';
+  const v=l.val, quando='Validada por '+vEsc(v.por||'—')+(v.em?' em '+new Date(v.em).toLocaleString('pt-BR'):'');
+  if(m.semBase) return '<div class="fscdiff"><div class="l">O que mudou desde a validação</div><div class="sub" style="margin:0">'+quando
+    +'. Esta validação não guardou o detalhe do que foi validado — compare com a lista abaixo.</div></div>';
+  const ROT={alt:'Alterada',nova:'Nova',saiu:'Saiu'}, COR={alt:'#d97706',nova:'#2563eb',saiu:'#dc2626'};
+  return '<div class="fscdiff"><div class="l">O que mudou desde a validação</div><div class="sub" style="margin:0 0 6px">'+quando+'. Antes → agora:</div>'
+    +m.extra.map(x=>'<div class="x">'+x+'</div>').join('')
+    +m.itens.map(i=>'<div class="it"><span class="fscpill" style="background:'+COR[i.t]+'">'+ROT[i.t]+'</span> '+i.h+'</div>').join('')
+    +(!m.itens.length&&!m.extra.length?'<div class="sub" style="margin:0">Nenhuma diferença nos campos validados (o registro foi regravado).</div>':'')
+    +'</div>';
+}
 function fscFotos(arr){
   arr=(arr||[]).filter(Boolean); if(!arr.length) return '';
   return '<div class="ft">'+arr.map(p=>{ const u=SBASE+p;
@@ -10510,11 +10573,11 @@ function fscTabAtividades(z,D,pode,travado){
     const k=z+'|'+l.chave, ab=fscS.abertos.has(k), st=fscStatusLinha(l);
     const bVal=pode&&!travado?(l.val&&l.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
       :'';
-    h+='<tr class="'+st.cls+'"><td><b>'+vEsc(l.atividade)+'</b><div class="sub" style="margin:2px 0 0">'+l.n+' registro'+(l.n===1?'':'s')+'</div>'+fscResumoLinha(l)+'</td>'
+    h+='<tr class="'+st.cls+'"><td><b>'+vEsc(l.atividade)+'</b><div class="sub" style="margin:2px 0 0">'+l.n+' registro'+(l.n===1?'':'s')+'</div>'+fscResumoLinha(l)+(cs?fscMudouLinhaHtml(l):'')+'</td>'
       +'<td class="n">'+vEsc(fscMed(l.medidas,'dia',l.atividade))+'</td><td class="n hm">'+vEsc(fscMed(l.medidas,'acum',l.atividade))+'</td>'+(cs?'<td>'+st.pill+'</td>':'')
       +'<td class="ac">'+bVal+'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button><button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
     h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
-    if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+fscOsDia(l.execs)+fscExecsAgrupadas(z,l.execs)+'</td></tr>';
+    if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+(cs?fscMudouHtml(l):'')+fscOsDia(l.execs)+fscExecsAgrupadas(z,l.execs)+'</td></tr>';
   });
   return h+'</tbody></table>';
 }
@@ -10570,14 +10633,14 @@ function fscTabObras(z,D,pode,travado){
     const bVal=pode&&!travado&&!sa?(p.val&&p.val.ok?'<button type="button" data-fscval="'+vEsc(k)+'" data-st="" title="Desfazer">↺</button>':'<button type="button" data-fscval="'+vEsc(k)+'" data-st="validada" title="Validar linha">✔</button>')
       :'';
     const sit=p.concluida?'concluída (100%)':((p.avancos||[]).length?'+'+fscNum(dl,1)+' p.p. no dia':'sem avanço no dia');
-    h+='<tr class="'+st.cls+(nivel===2?' fscneta':(filha?' fscfilha':''))+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,fscExt(p)?fscNum(Math.round(fscExt(p)))+' m':null,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div>'+fscExtFeitaHtml([p])+'</td>'
+    h+='<tr class="'+st.cls+(nivel===2?' fscneta':(filha?' fscfilha':''))+'"><td><b>'+vEsc(p.codigo||'—')+'</b><div class="sub" style="margin:2px 0 0">'+vEsc([p.tipo,p.local,fscExt(p)?fscNum(Math.round(fscExt(p)))+' m':null,p.inicio?'desde '+fmtData(p.inicio):null].filter(Boolean).join(' · '))+'</div>'+fscExtFeitaHtml([p])+(cs&&!sa?fscMudouLinhaHtml(p):'')+'</td>'
       +'<td class="n"><b>'+fscNum(p.pct,1)+'%</b><div class="sub" style="margin:2px 0 0">'+vEsc(sit)+'</div></td>'
       +'<td class="hm"><div class="fscpb"><i style="width:'+Math.min(100,Math.max(0,p.pct||0))+'%"></i></div></td>'+(cs?'<td>'+st.pill+'</td>':'')
       +'<td class="ac">'+bVal+(p.geo?'<button type="button" data-fscmapa="'+vEsc(k)+'" title="Mapa">🗺️</button>':'')+'<button type="button" data-fscabre="'+vEsc(k)+'" title="Detalhe">'+(ab?'▴':'▾')+'</button></td></tr>';
     h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
     if(ab){
       const dk=p.kind+':'+p.gid+':'+fscS.dia, dt=fscS.detObra[dk];
-      h+='<tr><td colspan="'+nc+'" class="det"><div class="fscsec" style="margin-top:2px">🗓️ Avanços lançados neste dia</div>'
+      h+='<tr><td colspan="'+nc+'" class="det">'+(cs&&!sa?fscMudouHtml(p):'')+'<div class="fscsec" style="margin-top:2px">🗓️ Avanços lançados neste dia</div>'
         +((p.avancos||[]).length?(p.avancos||[]).map(fscAvHtml).join('')
           :'<p class="sub">Nenhum avanço lançado neste dia.</p>')
         +'<div data-fscdet="'+vEsc(dk)+'">'+(dt?fscObraDetHtml(dt,dk):'<p class="sub">Carregando o acumulado…</p>')+'</div></td></tr>';
@@ -10667,6 +10730,7 @@ function fscSecao(z){
   if(D.sigos==='aguardando') h+='<div class="fscaviso">⏳ O SIGOS chegou só até '+fmtData((D.cobertura||{}).encerradas_ate)+'. Este dia ainda pode ganhar OS executadas — a validação do dia fica liberada depois da próxima carga.</div>';
   else if(D.sigos==='sem_base') h+='<div class="fscaviso">Sem relatório SIGOS para este dia — aqui entra só o que foi lançado no AcquaHub.</div>';
   if(V) h+='<div class="fscaviso '+(V.desatualizado?'bad':'ok')+'">'+(V.desatualizado?'⚠️ Dia validado por '+vEsc(V.por||'')+' em '+new Date(V.em).toLocaleString('pt-BR')+', mas <b>os dados mudaram depois</b>. A fiscalização vê a versão validada; reabra para revisar.'
+        +fscMudouDiaHtml(D)
       :'✔ Dia validado por '+vEsc(V.por||'')+' em '+new Date(V.em).toLocaleString('pt-BR')+'. É esta versão que a fiscalização vê.')+'</div>';
   const soSemAv=!V&&!todas.length&&(D.projetos||[]).length;
   if(soSemAv) h+='<div class="fscaviso">Nada a validar: as obras não tiveram avanço neste dia.</div>';
@@ -10679,6 +10743,15 @@ function fscSecao(z){
   }
   h+=fscTabAtividades(z,D,pode,travado)+fscTabObras(z,D,pode,travado);
   return h+'</div>';
+}
+// aviso do dia "mudou": quais linhas mudaram e, em uma frase, o quê (o detalhe fica no ▾ de cada linha)
+function fscMudouDiaHtml(D){
+  const ls=(D.linhas||[]).map(l=>[l.atividade,l]).concat((D.projetos||[]).filter(p=>!fscSemAvanco(p)).map(p=>[p.codigo||'obra',p]))
+    .filter(([,l])=>l.val&&!l.val.ok);
+  if(!ls.length) return '';
+  return '<ul class="fscmudl">'+ls.map(([n,l])=>{ const m=fscMudou(l);
+    return '<li><b>'+vEsc(n)+'</b>'+(m&&m.resumo?': '+vEsc(m.resumo):'')+'</li>'; }).join('')+'</ul>'
+    +'<div class="sub" style="margin:2px 0 0">Abra a linha (▾) para ver o antes → agora.</div>';
 }
 function fscSecaoFisc(z){
   const D=fscS.dias[z]||{}, V=D.validado, n=(D.linhas||[]).length+(D.projetos||[]).length;
