@@ -16884,6 +16884,7 @@ function rhvInit(){
     $('#rhvTipo').addEventListener('change',()=>{ rhvF.tipo=$('#rhvTipo').value; rhvRender(); });
     $('#rhvGestor').addEventListener('change',()=>{ rhvF.gestor=$('#rhvGestor').value; rhvAberto=null; rhvRender(); });
     lst.addEventListener('click',rhvClique);
+    lst.addEventListener('change',e=>{ if(e.target.id==='rhvEnt'||e.target.id==='rhvSai'){ rhvSync(); rhvRender(); } });   // atualiza o almoço automático
     lst.addEventListener('input',e=>{ if(e.target.closest('.rhv-form')) rhvSync(); });
   }
   rhvCarregar();
@@ -16990,16 +16991,24 @@ function rhvSugMarc(marc,horario){
   const sug=fx.length===2&&fx[1]===fx[0]+1&&fx[0]%2===1?'almoço '+B[fx[0]]+'–'+B[fx[1]]:fx.map(i=>B[i]).join(', ');
   return {m:r,sug};
 }
+// Almoço automático do ajuste (espelha "18 - rh".rh_ajuste_almoco): intervalos internos do horário previsto que cabem
+// inteiros entre a entrada e a saída informadas pelo gestor (2026-11-17, sw v413)
+function rhvAlmoco(horario,e,sa){
+  const B=[]; String(horario||'').replace(/(\d{1,2}:\d{2})/g,x=>{ B.push(x.padStart(5,'0')); return x; });
+  const r=[]; for(let k=1;k+1<=B.length-2;k+=2) if(B[k]<B[k+1]&&(!e||B[k]>e)&&(!sa||B[k+1]<sa)) r.push([B[k],B[k+1]]);
+  return r;
+}
 function rhPares(m){ const a=[...(m||[])], r=[]; for(let i=0;i<a.length;i+=2) r.push([a[i]||'',a[i+1]||'']); return r; }
 function rhvFormHtml(it){
   const f=rhvForm;
   let h=`<div class="rhv-form"><div class="sub" style="margin:0 0 6px">O que aconteceu neste dia?</div><div class="rhv-ac">`
     +Object.entries(RH_ACOES).map(([v,l])=>`<button data-a="acao" data-v="${v}" class="${f.acao===v?'on':''}">${l}</button>`).join('')+'</div>';
   if(f.acao==='ajustar'){
-    h+='<div class="sub" style="margin:8px 0 0">Marcações corretas (entrada e saída de cada período):</div>'
-      +f.pares.map((p,i)=>`<div class="rhv-par"><input type="time" data-par="${i}" data-l="0" value="${vEsc(p[0])}" aria-label="Entrada ${i+1}"/><span class="sub" style="margin:0">→</span><input type="time" data-par="${i}" data-l="1" value="${vEsc(p[1])}" aria-label="Saída ${i+1}"/>${f.pares.length>1?`<button data-a="delpar" data-i="${i}" title="Remover período">✕</button>`:''}</div>`).join('')
-      +'<button class="rhv-lk" data-a="addpar">+ período</button>'
-      +(f.sug?`<div class="rhv-sug">Completado pelo horário previsto: ${vEsc(f.sug)} — confira antes de salvar.</div>`:'');
+    // o gestor informa só entrada e saída; o almoço entra sozinho pelo horário previsto (o servidor faz o mesmo)
+    const al=rhvAlmoco(it.horario,f.ent,f.sai);
+    h+='<div class="sub" style="margin:8px 0 0">Entrada e saída corretas:</div>'
+      +`<div class="rhv-par"><input type="time" id="rhvEnt" value="${vEsc(f.ent)}" aria-label="Entrada"/><span class="sub" style="margin:0">→</span><input type="time" id="rhvSai" value="${vEsc(f.sai)}" aria-label="Saída"/></div>`
+      +`<div class="rhv-sug">${al.length?'Almoço '+al.map(x=>x.join('–')).join(', ')+' entra automaticamente pelo horário previsto.':'Sem intervalo do horário previsto entre a entrada e a saída.'}</div>`;
   }
   if(f.acao==='justificar') h+='<select id="rhvMot"><option value="">Motivo…</option>'+RH_MOTIVOS.map(m=>`<option${m===f.motivo?' selected':''}>${vEsc(m)}</option>`).join('')+'</select>';
   if(f.acao) h+=`<textarea id="rhvObs" rows="2" placeholder="${f.acao==='justificar'?'Detalhe o que aconteceu':'Observação para a RH (opcional)'}">${vEsc(f.obs||'')}</textarea>`
@@ -17009,7 +17018,7 @@ function rhvFormHtml(it){
 }
 function rhvSync(){
   const f=rhvForm; if(!f) return;
-  document.querySelectorAll('#rhvLista [data-par]').forEach(x=>{ const p=f.pares[+x.dataset.par]; if(p) p[+x.dataset.l]=x.value; });
+  const en=$('#rhvEnt'); if(en) f.ent=en.value.slice(0,5); const sa=$('#rhvSai'); if(sa) f.sai=sa.value.slice(0,5);
   const m=$('#rhvMot'); if(m) f.motivo=m.value; const o=$('#rhvObs'); if(o) f.obs=o.value;
 }
 const rhvItem=k=>(rhvDados.itens||[]).find(it=>rhvKey(it)===k);
@@ -17018,12 +17027,10 @@ async function rhvClique(e){
   const a=b.dataset.a, it=b.dataset.k?rhvItem(b.dataset.k):null;
   if(a==='tratar'){ const t=it.trat; const ja=t&&t.acao==='ajustar'&&t.marcacoes;
     const sg=ja?{m:t.marcacoes,sug:''}:rhvSugMarc(it.marcacoes,it.horario);
-    const pares=rhPares(sg.m); if(!pares.length) pares.push(['','']);
-    rhvForm={acao:t?t.acao:null,pares,sug:sg.sug,motivo:t&&t.motivo||'',obs:t&&t.obs||''}; rhvAberto=rhvKey(it); rhvDev=null; return rhvRender(); }
+    const m=sg.m||[];
+    rhvForm={acao:t?t.acao:null,ent:m[0]||'',sai:m.length>1?m[m.length-1]:'',motivo:t&&t.motivo||'',obs:t&&t.obs||''}; rhvAberto=rhvKey(it); rhvDev=null; return rhvRender(); }
   if(a==='fechar'){ rhvAberto=null; rhvDev=null; rhvForm=null; return rhvRender(); }
   if(a==='acao'){ rhvSync(); rhvForm.acao=b.dataset.v; return rhvRender(); }
-  if(a==='addpar'){ rhvSync(); rhvForm.pares.push(['','']); return rhvRender(); }
-  if(a==='delpar'){ rhvSync(); rhvForm.pares.splice(+b.dataset.i,1); return rhvRender(); }
   if(a==='devolver'){ rhvDev=b.dataset.k; rhvAberto=null; rhvRender(); const o=$('#rhvDevObs'); if(o) o.focus(); return; }
   if(a==='salvar') return rhvSalvar(it,b);
   if(a==='validar'||a==='devok'){
@@ -17039,9 +17046,9 @@ async function rhvSalvar(it,b){
   rhvSync(); const f=rhvForm; let marc=null;
   if(!f.acao) return toast('Escolha o que aconteceu');
   if(f.acao==='ajustar'){
-    marc=f.pares.flat().map(x=>(x||'').slice(0,5));
-    if(!marc.length||marc.some(x=>!/^\d{2}:\d{2}$/.test(x))) return toast('Preencha a entrada e a saída de cada período');
-    for(let i=1;i<marc.length;i++) if(marc[i]<=marc[i-1]) return toast('Os horários precisam estar em ordem crescente');
+    if(![f.ent,f.sai].every(x=>/^\d{2}:\d{2}$/.test(x||''))) return toast('Preencha a entrada e a saída');
+    if(f.sai<=f.ent) return toast('A saída precisa ser depois da entrada');
+    marc=[f.ent,...rhvAlmoco(it.horario,f.ent,f.sai).flat(),f.sai];
   }
   if(f.acao==='justificar'){ if(!f.motivo) return toast('Escolha o motivo'); if(f.motivo==='Outro'&&!(f.obs||'').trim()) return toast('Detalhe o motivo'); }
   b.disabled=true;
