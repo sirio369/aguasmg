@@ -4555,6 +4555,19 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
   **sem botão Tratar**; dia parcial sem inconsistência mostra "dia parcial". A tela chama `app_rh_val_lista(ini, fim, p_todos => true)`
   (cada item traz `inc` = tem inconsistência, e `parcial`) e filtra no navegador: as 4 primeiras abas e as contagens de gestor/consórcio
   só olham `inc`. Sem `p_todos` a RPC devolve só os dias com inconsistência, como antes (compatível com a v409).
+- **Ajuste com almoço + números validados** (sw v411, `docs/migracao_rh_val_ajuste_calculo.sql`):
+  - Ao abrir **Ajustar** num dia com menos batidas que o horário previsto (ex.: só entrada/saída, comum na EH), o formulário já vem
+    com os pares completos: cada batida vai para um limite previsto (mantendo a ordem, menor distância) e o que falta — em geral o
+    **almoço 12:00–13:00** — vem do texto de horário (`rhvSugMarc`), com o aviso "Completado pelo horário previsto … confira".
+    Dia sem batida continua abrindo vazio.
+  - Depois que a RH **valida** um ajuste, a linha mostra as **batidas ajustadas** com o selo verde "✓ validado" (as do Kairos ficam
+    riscadas embaixo) e **H.trab / HE / Falta / Atraso recalculados** com elas, em verde (o valor do Kairos fica no tooltip). Quando
+    uma carga nova do Kairos já traz o ajuste (`kairos_bate`), os números passam a ser os do próprio Kairos.
+  - Cálculo: `"18 - rh".calc_marcacoes(horário, marcações)` → `{htrab, he, atraso, falta, prev}`, devolvido em `trat.calc` só para
+    `acao='ajustar'`. Regra (calibrada contra o Kairos: bate 100% do H.trab e da falta, ~93% da HE e ~97% do atraso nos dias de 4
+    batidas): HE = trabalhado fora do previsto, atraso = previsto não trabalhado; tolerância CLT de 5 min por marcação / 10 min no dia,
+    separada para HE e atraso (passou, conta tudo); sem batida = falta do previsto inteiro; dia sem horário = tudo HE. É uma
+    estimativa até o Kairos ser corrigido; a **Análise do ponto ainda usa os números do Kairos**.
 
 ### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
 `app_rh_analise(ini, fim, consórcio, área, funcionário)` (máx. 1 ano) sobre `ponto_dia` + inconsistências. **Desde 2026-11-17 (sw v410,
