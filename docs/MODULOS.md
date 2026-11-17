@@ -186,8 +186,13 @@
 
 ### 2.1 Mapeamento de pressão — `// MAPEAMENTO DE PRESSÃO — tela inicial em mapa` · telas `pressao` (mapa) + `pressao_reg` (formulário)
 - **Tela inicial = mapa (2026-11-17, sw v407):** `pressao` abre o mapa da região (`prMap`, `prMapInit`) com **limites das ZAs**
-  (`app_limites_zas`, chip liga/desliga) e os **DMCs oficiais** (`"7 - setorizacao".dmc` vigentes, RPC **`app_pressao_dmcs()`**,
-  chip liga/desliga + painel "Escolher DMCs" com Todos/Nenhum/só esta ZA; seleção guardada no aparelho em `localStorage.pr_dmc_sel`),
+  (`app_limites_zas`, chip liga/desliga), os **DMCs oficiais** (`"7 - setorizacao".dmc` vigentes, RPC **`app_pressao_dmcs()`**, chip
+  liga/desliga) e a **rede de água** (chip "Rede", ligado por padrão, a partir do zoom 14, azul com opacidade 0,45 e sem clique — pane
+  `prRede` entre DMCs e pontos; reaproveita `cadReq`/`cadData` do Cadastro técnico = mesma RPC e cache por área no IndexedDB, sw v408).
+  **Filtros ZA + DMC** (2026-11-17, sw v408; dois `select` `#prFZa`/`#prFDmc`, substituíram o painel de chips por DMC): ZA = Todas/ZA1004/
+  ZA0200; DMC = Todos ou **um só** DMC (lista da ZA escolhida). Recortam limites, DMCs e pontos, ajustam a frase de contagem e
+  enquadram o mapa na seleção; guardados no aparelho em `localStorage.pr_filtro`. Ponto entra no filtro de DMC pelo `dmc`+`consorcio`
+  que a RPC devolve,
   ponto **"Você"** (GPS + círculo de precisão, pane próprio por cima; `prMapOnGps` é chamado pelo `iniciarGPS`; botão 📍 centraliza)
   e as **pressões aferidas nas últimas 36 h por qualquer usuário** (RPC **`app_pressao_recentes(p_horas default 36)`**, máx. 168 h,
   devolve pressão/cota/consórcio/DMC pelo ponto/HD/foto/coletor (nome do `perfil`)/data). Cor = escala fixa 10–50 mca (`prPCor`),
