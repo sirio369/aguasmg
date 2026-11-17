@@ -599,8 +599,12 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <h1>Mapeamento de pressão</h1>
     <p class="sub" id="prMapSub">Pressões aferidas nas últimas 36 h, de todas as equipes.</p>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <select id="prFZa" title="Filtrar por ZA" style="flex:1;min-width:0;font-size:13px;padding:8px 9px"></select>
+      <select id="prFDmc" title="Filtrar por DMC" style="flex:1;min-width:0;font-size:13px;padding:8px 9px"></select>
+    </div>
     <div id="prMapCamadas" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
-    <div id="prMapDmcSel" class="hidden" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 11px;margin-bottom:8px;font-size:13px"></div>
+    <div id="prRedeHint" style="font-size:12px;color:var(--mut);margin:-2px 0 6px"></div>
     <div style="position:relative">
       <div id="prMapa" style="height:60vh;min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--line)"></div>
       <button id="prMeuLocal" title="Ir para minha localização" style="position:absolute;right:10px;bottom:22px;z-index:500;width:40px;height:40px;font-size:18px;line-height:40px;text-align:center;background:#fff;border:1px solid #bbb;border-radius:8px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25);padding:0">📍</button>
@@ -2216,68 +2220,78 @@ async function mapAddLimiteZA(map){
 }
 
 // ---------- MAPEAMENTO DE PRESSÃO — tela inicial em mapa (2026-11-17) ----------
-// Mapa da região com limites das ZAs + DMCs oficiais ("7 - setorizacao".dmc, liga/desliga por DMC),
-// ponto "Você" (GPS) e as pressões aferidas nas últimas 36 h por QUALQUER usuário (app_pressao_recentes).
+// Mapa da região com limites das ZAs + DMCs oficiais ("7 - setorizacao".dmc) + rede de água (mesmo cache/RPC do
+// Cadastro técnico, com opacidade), ponto "Você" (GPS) e as pressões aferidas nas últimas 36 h por QUALQUER usuário
+// (app_pressao_recentes). Filtros ZA + DMC (um só DMC ou todos) recortam DMCs, limites e pontos e enquadram o mapa.
 // O formulário de coleta fica na tela pressao_reg (botão "Registrar pressão").
 // A antiga tela de pontos sugeridos do Teste de estanqueidade saiu; as leituras feitas nela seguem no banco.
-const PR_HORAS=36;
-let prMap=null, prZaLayer=null, prDmcLayer=null, prPtsLayer=null, prEuMk=null, prEuAcc=null, prMapTimer=null;
+const PR_HORAS=36, PR_REDE_MIN=14;
+let prMap=null, prZaLayer=null, prDmcLayer=null, prPtsLayer=null, prRedeLayer=null, prRedeKey=null, prEuMk=null, prEuAcc=null, prMapTimer=null, prRedeDeb=null;
 let prDmcGj=null, prPtsGj=null, prLimZa=null;
-let prZaOn=true, prDmcOn=true, prDmcSel=null, prDmcPainel=false;   // prDmcSel = Set de cod_za ligados
-try{ ['est_cache','est_limites','est_cam_zp','est_cam_dmc'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
-function prDmcSelLoad(){
-  try{ const c=localStorage.getItem('pr_dmc_sel'); if(c) return new Set(JSON.parse(c)); }catch(e){}
-  return null;   // null = todos
-}
-function prDmcSelSave(){ try{ localStorage.setItem('pr_dmc_sel',JSON.stringify([...prDmcSel])); }catch(e){} }
+let prZaOn=true, prDmcOn=true, prRedeOn=true, prFZa='', prFDmc='';   // prFDmc = cod_za do DMC (ex. ZA1004-DMC-03) ou '' = todos
+try{ ['est_cache','est_limites','est_cam_zp','est_cam_dmc','pr_dmc_sel'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+try{ const f=JSON.parse(localStorage.getItem('pr_filtro')||'{}'); prFZa=f.za||''; prFDmc=f.dmc||''; }catch(e){}
+function prFiltroSave(){ try{ localStorage.setItem('pr_filtro',JSON.stringify({za:prFZa,dmc:prFDmc})); }catch(e){} }
+const PR_ZA_NOME={ZA1004:'ZA1004 — Contagem',ZA0200:'ZA0200 — Betim'};
 function prChip(on,cor,txt,attr){
   return `<button ${attr} style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;white-space:nowrap;font-size:13px;${on?('background:'+cor+';color:#fff;'):'background:var(--card);border:1px solid var(--line);'}">${txt}</button>`;
 }
+function prDmcFeat(){ return prDmcGj?prDmcGj.features.filter(f=>{const p=f.properties||{}; return (!prFZa||p.consorcio===prFZa)&&(!prFDmc||p.cod_za===prFDmc);}):[]; }
+function prFiltrosRender(){
+  const sZa=$('#prFZa'), sDmc=$('#prFDmc'); if(!sZa||!sDmc) return;
+  sZa.innerHTML='<option value="">Todas as ZAs</option>'+Object.keys(PR_ZA_NOME).map(z=>`<option value="${z}">${PR_ZA_NOME[z]}</option>`).join('');
+  sZa.value=prFZa;
+  const lst=prDmcGj?prDmcGj.features.map(f=>f.properties||{}).filter(p=>!prFZa||p.consorcio===prFZa):[];
+  if(prFDmc&&!lst.some(p=>p.cod_za===prFDmc)) prFDmc='';
+  sDmc.innerHTML='<option value="">Todos os DMCs</option>'+lst.map(p=>`<option value="${p.cod_za}">${p.codigo}${prFZa?'':(' · '+p.consorcio)}</option>`).join('');
+  sDmc.value=prFDmc;
+}
 function prCamRender(){
   const el=$('#prMapCamadas'); if(!el) return;
-  const nDmc=prDmcGj?prDmcGj.features.length:0, nSel=prDmcSel?prDmcSel.size:0;
   el.innerHTML=prChip(prZaOn,'#111827','Limites das ZAs','data-prc="za"')
-    +prChip(prDmcOn,'#ef6c00','DMCs'+(nDmc?(' '+nSel+'/'+nDmc):''),'data-prc="dmc"')
-    +`<button data-prc="sel" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;font-size:13px;background:var(--card);border:1px solid var(--line)">Escolher DMCs ${prDmcPainel?'▴':'▾'}</button>`
+    +prChip(prDmcOn,'#ef6c00','DMCs','data-prc="dmc"')
+    +prChip(prRedeOn,'#1565c0','Rede','data-prc="rede"')
     +`<button data-prc="rel" title="Atualizar pressões" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;font-size:13px;background:var(--card);border:1px solid var(--line)">⟳</button>`;
   el.querySelectorAll('[data-prc]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.dataset.prc;
     if(k==='za'){ prZaOn=!prZaOn; prDesenharZa(); }
     else if(k==='dmc'){ prDmcOn=!prDmcOn; prDesenharDmc(); }
-    else if(k==='sel'){ prDmcPainel=!prDmcPainel; prDmcSelRender(); }
+    else if(k==='rede'){ prRedeOn=!prRedeOn; prRedeAtualizar(); }
     else if(k==='rel'){ prCarregarPontos(); return; }
     prCamRender();
   }));
 }
-function prDmcSelRender(){
-  const el=$('#prMapDmcSel'); if(!el) return;
-  el.classList.toggle('hidden',!prDmcPainel);
-  if(!prDmcPainel) return;
-  if(!prDmcGj){ el.innerHTML='<span style="color:var(--mut)">Carregando DMCs…</span>'; return; }
-  const grupos={};
-  prDmcGj.features.forEach(f=>{ const p=f.properties||{}; (grupos[p.consorcio]=grupos[p.consorcio]||[]).push(p); });
-  const nomeZa={ZA1004:'ZA1004 — Contagem',ZA0200:'ZA0200 — Betim'};
-  el.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:8px"><button data-prs="todos" style="all:unset;cursor:pointer;color:var(--acc);font-weight:600">Todos</button><span style="color:var(--mut)">·</span><button data-prs="nenhum" style="all:unset;cursor:pointer;color:var(--acc);font-weight:600">Nenhum</button></div>`
-    +Object.keys(grupos).sort().map(c=>`<div style="margin-bottom:6px"><div style="font-size:12px;color:var(--mut);margin-bottom:4px">${nomeZa[c]||c} <button data-prz="${c}" style="all:unset;cursor:pointer;color:var(--acc);margin-left:6px">só esta ZA</button></div><div style="display:flex;gap:6px;flex-wrap:wrap">`
-      +grupos[c].map(p=>prChip(prDmcSel.has(p.cod_za),'#ef6c00',p.codigo,'data-prd="'+p.cod_za+'"')).join('')+'</div></div>').join('');
-  el.querySelectorAll('[data-prd]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.prd; prDmcSel.has(k)?prDmcSel.delete(k):prDmcSel.add(k); prDmcMudou(); }));
-  el.querySelectorAll('[data-prs]').forEach(b=>b.addEventListener('click',()=>{ prDmcSel=new Set(b.dataset.prs==='todos'?prDmcGj.features.map(f=>f.properties.cod_za):[]); prDmcMudou(); }));
-  el.querySelectorAll('[data-prz]').forEach(b=>b.addEventListener('click',()=>{ prDmcSel=new Set(prDmcGj.features.filter(f=>f.properties.consorcio===b.dataset.prz).map(f=>f.properties.cod_za)); prDmcMudou(); }));
+// mudou ZA/DMC → redesenha tudo recortado e enquadra a seleção
+function prFiltroMudou(){
+  prFiltroSave(); prFiltrosRender();
+  prDesenharZa(); prDesenharDmc(); prDesenharPontos(); prEnquadrar();
 }
-function prDmcMudou(){ prDmcSelSave(); if(prDmcSel.size&&!prDmcOn) prDmcOn=true; prDesenharDmc(); prCamRender(); prDmcSelRender(); }
+function prEnquadrar(){
+  if(!prMap) return;
+  let bb=null;
+  try{
+    if(prFDmc||prFZa){ const fs=prDmcFeat(); if(fs.length) bb=L.geoJSON({type:'FeatureCollection',features:fs}).getBounds(); }
+    if(prFZa&&!prFDmc&&prLimZa){ const z=prLimZa.features.filter(f=>(f.properties||{}).consorcio===prFZa); if(z.length) bb=L.geoJSON({type:'FeatureCollection',features:z}).getBounds(); }
+    if(!bb&&prLimZa) bb=L.geoJSON(prLimZa).getBounds();
+    if(bb&&bb.isValid()) prMap.fitBounds(bb,{padding:[10,10]});
+  }catch(e){}
+}
 function prMapInit(){
   const cont=$('#prMapa'); if(!cont) return;
-  prCamRender(); prDmcSelRender();
+  prCamRender(); prFiltrosRender();
   if(!window.L){ cont.innerHTML='<p style="padding:14px;color:var(--mut);font-size:14px">Mapa indisponível (precisa de conexão).</p>'; return; }
   if(!prMap){
     cont.innerHTML='';
     prMap=L.map('prMapa');
     mapAddCamadaBase(prMap);
-    prMap.createPane('prEu'); prMap.getPane('prEu').style.zIndex=650;   // "Você" sempre por cima
+    prMap.createPane('prRede').style.zIndex=410;  prMap.getPane('prRede').style.pointerEvents='none';  // rede acima dos DMCs, sem roubar o toque
+    prMap.createPane('prPts').style.zIndex=450;    // pressões acima da rede
+    prMap.createPane('prEu').style.zIndex=650;     // "Você" sempre por cima
     prMap.setView([-19.93,-44.05],12);
+    prMap.on('moveend',()=>{ clearTimeout(prRedeDeb); prRedeDeb=setTimeout(prRedeAtualizar,300); });
     prCarregarCamadas();
   }
-  setTimeout(()=>{ if(prMap) prMap.invalidateSize(); },60);
+  setTimeout(()=>{ if(prMap){ prMap.invalidateSize(); prRedeAtualizar(); } },60);
   prMapOnGps();
   prCarregarPontos();
   if(!prMapTimer) prMapTimer=setInterval(()=>{ const t=$('#pressao'); if(t&&!t.classList.contains('hidden')&&navigator.onLine) prCarregarPontos(true); },120000);
@@ -2287,35 +2301,48 @@ async function prCarregarCamadas(){
     if(!prLimZa){ const c=localStorage.getItem('pr_limites_za'); if(c) prLimZa=JSON.parse(c); }
     if(navigator.onLine){ const {data,error}=await sb.rpc('app_limites_zas'); if(!error&&data){ prLimZa=data; try{localStorage.setItem('pr_limites_za',JSON.stringify(data));}catch(e){} } }
   }catch(e){}
-  prDesenharZa(true);
   try{
     const c=localStorage.getItem('pr_dmcs'); if(c) prDmcGj=JSON.parse(c);
     if(navigator.onLine){ const {data,error}=await sb.rpc('app_pressao_dmcs'); if(!error&&data){ prDmcGj=data; try{localStorage.setItem('pr_dmcs',JSON.stringify(data));}catch(e){} } }
   }catch(e){}
-  if(prDmcGj){
-    const salvos=prDmcSelLoad(), todos=prDmcGj.features.map(f=>f.properties.cod_za);
-    prDmcSel=new Set(salvos?todos.filter(k=>salvos.has(k)):todos);
-  } else prDmcSel=new Set();
-  prDesenharDmc(); prCamRender(); prDmcSelRender();
+  prFiltrosRender(); prDesenharZa(); prDesenharDmc(); prDesenharPontos(); prEnquadrar();
 }
-function prDesenharZa(enquadrar){
+function prDesenharZa(){
   if(!prMap) return;
   if(prZaLayer){ prMap.removeLayer(prZaLayer); prZaLayer=null; }
   if(!prZaOn||!prLimZa) return;
-  prZaLayer=L.geoJSON(prLimZa,{interactive:false,style:{color:'#111827',weight:2.5,opacity:.9,dashArray:'7 5',fill:false}}).addTo(prMap);
+  prZaLayer=L.geoJSON(prLimZa,{filter:f=>!prFZa||(f.properties||{}).consorcio===prFZa,interactive:false,
+    style:{color:'#111827',weight:2.5,opacity:.9,dashArray:'7 5',fill:false}}).addTo(prMap);
   prZaLayer.bringToBack();
-  if(enquadrar){ try{ prMap.fitBounds(prZaLayer.getBounds(),{padding:[10,10]}); }catch(e){} }
 }
 function prDesenharDmc(){
   if(!prMap) return;
   if(prDmcLayer){ prMap.removeLayer(prDmcLayer); prDmcLayer=null; }
-  if(!prDmcOn||!prDmcGj||!prDmcSel||!prDmcSel.size) return;
-  prDmcLayer=L.geoJSON(prDmcGj,{
-    filter:f=>prDmcSel.has((f.properties||{}).cod_za),
+  if(!prDmcOn||!prDmcGj) return;
+  const fs=prDmcFeat(); if(!fs.length) return;
+  prDmcLayer=L.geoJSON({type:'FeatureCollection',features:fs},{
     style:{color:'#ef6c00',weight:2,opacity:1,fillColor:'#ef6c00',fillOpacity:.08},
     onEachFeature:(f,ly)=>{ const p=f.properties||{}; ly.bindTooltip('<b>'+p.codigo+'</b> · '+p.consorcio,{sticky:true}); }
   }).addTo(prMap);
   prDmcLayer.bringToBack(); if(prZaLayer) prZaLayer.bringToBack();
+}
+// rede de água: reaproveita cadReq/cadData do Cadastro técnico (mesma RPC e cache por área no IndexedDB); só a partir do zoom 14
+async function prRedeAtualizar(){
+  if(!prMap) return;
+  const z=prMap.getZoom(), hint=$('#prRedeHint');
+  const tira=()=>{ if(prRedeLayer){ prMap.removeLayer(prRedeLayer); prRedeLayer=null; prRedeKey=null; } };
+  if(hint) hint.textContent=(prRedeOn&&z<PR_REDE_MIN)?'Aproxime o mapa para ver a rede.':'';
+  if(!prRedeOn||z<PR_REDE_MIN){ tira(); return; }
+  const d=CAD_DEF.find(x=>x.k==='rede'); if(!d) return;
+  const rq=cadReq(d,prMap.getBounds());
+  if(prRedeLayer&&prRedeKey===rq.key) return;
+  try{
+    const data=await cadData(rq.key,rq.params,rq.rpc);
+    if(!prRedeOn||prMap.getZoom()<PR_REDE_MIN) return;
+    tira();
+    prRedeLayer=L.geoJSON(data,{pane:'prRede',interactive:false,style:{color:'#1565c0',weight:2,opacity:.45}}).addTo(prMap);
+    prRedeKey=rq.key;
+  }catch(e){ if(hint) hint.textContent=navigator.onLine?'Não consegui carregar a rede.':'Sem conexão — rede indisponível nesta área.'; }
 }
 async function prCarregarPontos(silencioso){
   try{
@@ -2327,17 +2354,26 @@ async function prCarregarPontos(silencioso){
   }
   prDesenharPontos();
 }
-function prDesenharPontos(){
+function prPtsFiltrados(){
   const fc=(prPtsGj&&prPtsGj.features)||[];
+  const dm=prFDmc&&prDmcGj?(prDmcGj.features.find(f=>f.properties.cod_za===prFDmc)||{}).properties:null;
+  return fc.filter(f=>{ const p=f.properties||{};
+    if(prFZa&&p.consorcio!==prFZa) return false;
+    if(dm&&!(p.dmc===dm.codigo&&p.consorcio===dm.consorcio)) return false;
+    return true; });
+}
+function prDesenharPontos(){
+  const fc=prPtsFiltrados();
   const sub=$('#prMapSub');
-  if(sub) sub.textContent=(fc.length?(fc.length+(fc.length===1?' pressão aferida':' pressões aferidas')):'Nenhuma pressão aferida')+' nas últimas '+PR_HORAS+' h, de todas as equipes.';
+  const onde=prFDmc?(' no '+prFDmc.replace(/^(ZA\d+)-(.*)$/,'$2 ($1)')):(prFZa?(' na '+prFZa):'');
+  if(sub) sub.textContent=(fc.length?(fc.length+(fc.length===1?' pressão aferida':' pressões aferidas')):'Nenhuma pressão aferida')+onde+' nas últimas '+PR_HORAS+' h, de todas as equipes.';
   if(!prMap) return;
   if(prPtsLayer){ prMap.removeLayer(prPtsLayer); prPtsLayer=null; }
   if(!fc.length) return;
-  prPtsLayer=L.geoJSON(prPtsGj,{
+  prPtsLayer=L.geoJSON({type:'FeatureCollection',features:fc},{
     pointToLayer:(f,ll)=>{
       const pr=f.properties||{};
-      const m=L.circleMarker(ll,{radius:9,color:'#fff',weight:1.5,fillColor:prPCor(pr.pressao),fillOpacity:1});
+      const m=L.circleMarker(ll,{pane:'prPts',radius:9,color:'#fff',weight:1.5,fillColor:prPCor(pr.pressao),fillOpacity:1});
       m.bindTooltip(prpFmt(pr.pressao),{permanent:true,direction:'top',offset:[0,-6],className:'prlbl'});
       const h=pr.quando?Math.max(0,Math.round((Date.now()-new Date(pr.quando).getTime())/3600000)):null;
       m.bindPopup('<b>'+prpFmt(pr.pressao)+' mca</b>'
@@ -2361,6 +2397,8 @@ function prMapOnGps(){
 }
 // após salvar: volta ao mapa e recarrega (offline: a leitura entra quando a fila sincronizar)
 function prAposSalvar(){ irPara('pressao'); }
+if($('#prFZa')) $('#prFZa').addEventListener('change',e=>{ prFZa=e.target.value; prFDmc=''; prFiltroMudou(); });
+if($('#prFDmc')) $('#prFDmc').addEventListener('change',e=>{ prFDmc=e.target.value; prFiltroMudou(); });
 if($('#prRegistrar')) $('#prRegistrar').addEventListener('click',()=>irPara('pressao_reg'));
 if($('#prRegBack')) $('#prRegBack').addEventListener('click',()=>irPara('pressao'));
 if($('#prMeuLocal')) $('#prMeuLocal').addEventListener('click',()=>{
