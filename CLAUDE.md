@@ -216,7 +216,7 @@ pwa/
 > editar antes de mexer** — este mapa aqui é só o panorama.
 
 **Coleta de campo** (schema `8 - coleta_campo`):
-- **Mapeamento de pressão** (`pressao`) — leitura de manômetro + foto + GPS. `app_registrar_pressao`.
+- **Mapeamento de pressão** (`pressao`) — tela inicial é o **mapa** (limites das ZAs + DMCs oficiais liga/desliga, ponto "Você" e as pressões das **últimas 36 h de todos**, `app_pressao_recentes`/`app_pressao_dmcs`, 2026-11-17, sw v407); **➕ Registrar pressão** abre o formulário `pressao_reg` (leitura de manômetro + foto + GPS, `app_registrar_pressao`). Tela de pontos sugeridos do Teste de estanqueidade **removida** (ficam só as leituras).
 - **Loggers** (card "Loggers" → hub `loggers_hub` com **Temporários**/**Fixos** → `loggers`/`logger_det`) —
   os dois modos usam a **mesma tela**; `lgModo` filtra pela flag `logger_temporario` (true=temp, false=fixo)
   e define a flag na criação (`app_logger_criar.p_temporario`). Ciclo do temporário: **pendente → instalado → dados pendentes

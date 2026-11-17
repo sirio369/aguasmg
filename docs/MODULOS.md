@@ -184,7 +184,17 @@
 
 ## 2. Coleta de campo (schema `"8 - coleta_campo"`)
 
-### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
+### 2.1 Mapeamento de pressão — `// MAPEAMENTO DE PRESSÃO — tela inicial em mapa` · telas `pressao` (mapa) + `pressao_reg` (formulário)
+- **Tela inicial = mapa (2026-11-17, sw v407):** `pressao` abre o mapa da região (`prMap`, `prMapInit`) com **limites das ZAs**
+  (`app_limites_zas`, chip liga/desliga) e os **DMCs oficiais** (`"7 - setorizacao".dmc` vigentes, RPC **`app_pressao_dmcs()`**,
+  chip liga/desliga + painel "Escolher DMCs" com Todos/Nenhum/só esta ZA; seleção guardada no aparelho em `localStorage.pr_dmc_sel`),
+  ponto **"Você"** (GPS + círculo de precisão, pane próprio por cima; `prMapOnGps` é chamado pelo `iniciarGPS`; botão 📍 centraliza)
+  e as **pressões aferidas nas últimas 36 h por qualquer usuário** (RPC **`app_pressao_recentes(p_horas default 36)`**, máx. 168 h,
+  devolve pressão/cota/consórcio/DMC pelo ponto/HD/foto/coletor (nome do `perfil`)/data). Cor = escala fixa 10–50 mca (`prPCor`),
+  rótulo com o valor e popup com o detalhe + foto. Recarrega ao abrir a tela, no ⟳, a cada 2 min com a tela aberta e quando a fila
+  offline sincroniza. Caches no aparelho: `pr_limites_za`, `pr_dmcs`, `pr_recentes`. Botões: **➕ Registrar pressão** (→ `pressao_reg`)
+  e **📊 Produtividade** (→ `pr_prod`). Migração: `docs/migracao_pressao_mapa.sql`.
+- **Formulário** (`pressao_reg`, "‹ Mapa" volta): o mesmo de antes; ao salvar volta ao mapa (`prAposSalvar`).
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
 - **Duas fotos (2026-09):** **Foto do manômetro** (obrigatória, `fotoBlob`→`p_foto`) e **Foto do número HD**
   (opcional, `fotoHdBlob`→`p_foto_hd`, inputs `.fFotoHd`/preview `#fotoHdPrev`). Ambas vão no `item.fotos`
@@ -192,10 +202,11 @@
   + param `p_foto_hd` na RPC (recriada com `drop`+`create` p/ não gerar overload — regra §0.6; grant só `authenticated`).
 - **Unidade de medida (2026-09):** ao lado do valor há `#pressao_un` (**MCA/BAR/KPA**, default MCA). O valor é
   **convertido p/ mca no cliente** antes de enviar (`vmca`: kpa÷9,80665; bar×10,1971621; mca as-is) — a coluna
-  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend. `prAposSalvar(vmca)`.
-- Alvo opcional vindo do Teste de estanqueidade (`prAlvo`). Botões: `#prEst` (estanqueidade), `#prProd`.
-- Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
-  `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
+  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend.
+- **Teste de estanqueidade — REMOVIDO (2026-11-17):** a tela `estanqueidade` (pontos sugeridos, alvo `prAlvo`) saiu do app.
+  Ficam só os resultados: as leituras feitas nela seguem em `mapeamento_pressao` (coluna `ponto_estanqueidade_id`); a tabela
+  `ponto_estanqueidade` e as RPCs `app_estanqueidade_listar`/`app_estanq_poligonos` seguem no banco sem uso (app em cache ≤ v406).
+- Subtela **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
   No mapa da produtividade, o **popup de cada ponto** traz pressão/**cota**/**cota+pressão**/HD/data/coletor +
   **link "📷 Ver foto do manômetro"** (`SBASE+pr.foto`, aba nova) quando há foto. **Chips de métrica**
@@ -203,15 +214,6 @@
   cor fixa 10–50), **Cota** e **Cota + Pressão** (m, escala de cor **automática** por min/máx dos pontos) —
   muda a cor + o rótulo do marcador e recalcula os cards (média/mín/máx) no cliente a partir de `prpData`.
   `app_pressao_produtividade` devolve `foto` **e `cota`** (=`cota_m`) nas `properties` dos pontos.
-- **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
-  `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
-  137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
-  borda weight 2** (mesmo padrão de ativar/desativar do Cadastro técnico). GeoJSON (4326, `ST_SimplifyPreserveTopology 1m`)
-  via RPC **`app_estanq_poligonos(p_layer)`** (`zonas_pressao`|`dmcs`, definer, só `authenticated`); cache em
-  localStorage (`est_cam_zp`/`est_cam_dmc`). Camadas ficam **abaixo** dos pontos (`bringToBack`); começam desligadas.
-- **Popup no ponto do mapa (2026-09):** clicar num marcador abre popup (`bindPopup`+`popupopen`) com **🧭 Navegar
-  até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
-  → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
 ### 2.2 Loggers — `// MÓDULO LOGGERS` (~L782) · telas `loggers_hub` / `loggers` / `logger_det`
 - **Card "Loggers"** (home, antes "Loggers temporários") → **hub `loggers_hub`** com 2 botões:
@@ -2130,7 +2132,7 @@ na UI desde 2026-10-14).
 ## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
-**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`, `app_estanq_poligonos` (camadas ZP/DMC COPASA).
+**Pressão:** `app_pressao_dmcs`, `app_pressao_recentes` (mapa inicial, 36 h), `app_pressao_filtros`, `app_pressao_produtividade`. (`app_estanqueidade_listar`/`app_estanq_poligonos` sem uso desde 2026-11-17.)
 **Loggers:** `app_loggers_listar`, `app_logger_criar/instalar/remover/finalizar/editar`,
 `logger_pressao_importar/stats`.
 **Pesquisa/Ocorrência:** `app_pesquisa_filtros`, `app_pesquisa_produtividade`,
