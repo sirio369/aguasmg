@@ -4560,6 +4560,11 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
     com os pares completos: cada batida vai para um limite previsto (mantendo a ordem, menor distância) e o que falta — em geral o
     **almoço 12:00–13:00** — vem do texto de horário (`rhvSugMarc`), com o aviso "Completado pelo horário previsto … confira".
     Dia sem batida continua abrindo vazio.
+  - **Almoço automático** (sw v413, `docs/migracao_rh_ajuste_almoco_auto.sql`, pedido do usuário 17/11/2026): o gestor informa **só
+    entrada e saída** (pré-preenchidas pela sugestão acima); o almoço do horário previsto entra sozinho quando cabe inteiro entre as
+    duas (`rhvAlmoco` no front, `"18 - rh".rh_ajuste_almoco` no servidor — a `app_rh_val_tratar` normaliza sempre, mesmo vindo de
+    app em cache com 4 batidas). Os 3 ajustes já gravados sem almoço foram corrigidos (evento `almoco_auto` em `tratativa_evento`).
+    Antes, o ajuste 06:46–17:00 contava o dia corrido (10:14 em vez de 9:14).
   - Depois que a RH **valida** um ajuste, a linha mostra as **batidas ajustadas** com o selo verde "✓ validado" (as do Kairos ficam
     riscadas embaixo) e **H.trab / HE / Falta / Atraso recalculados** com elas, em verde (o valor do Kairos fica no tooltip). Quando
     uma carga nova do Kairos substitui o dia **sem** trazer as batidas validadas, os números validados continuam valendo. Quando a carga
