@@ -17103,11 +17103,18 @@ function rhanCss(){
 .rhan-sb i.xp{background:var(--bad)} .rhan-sb i.xt{background:var(--warn)} .rhan-sb i.xv{background:var(--acc)} .rhan-sb i.xc{background:var(--ok)}
 .rhan-lg{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:8px}
 .rhan-lg span:before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
-.rhan-lg .xp:before{background:var(--bad)} .rhan-lg .xt:before{background:var(--warn)} .rhan-lg .xv:before{background:var(--acc)} .rhan-lg .xc:before{background:var(--ok)}
-.rhan-pl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
-.rhan-pl div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 11px;border-top:3px solid var(--line)}
-.rhan-pl b{display:block;font-size:19px;font-variant-numeric:tabular-nums} .rhan-pl span{font-size:11.5px;color:var(--mut)}
-.rhan-pl .s0{border-top-color:var(--ink)} .rhan-pl .s1{border-top-color:var(--bad)} .rhan-pl .s2{border-top-color:var(--warn)} .rhan-pl .s3{border-top-color:var(--acc)} .rhan-pl .s4{border-top-color:var(--ok)}
+.rhan-lg .fs:before{background:var(--line)} .rhan-lg .xp:before{background:var(--bad)} .rhan-lg .xt:before{background:var(--warn)} .rhan-lg .xv:before{background:var(--acc)} .rhan-lg .xc:before{background:var(--ok)}
+.rhan-fn{margin-top:10px}
+.rhan-fr{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) 92px;align-items:center;gap:12px;padding:5px 0}
+.rhan-fr+.rhan-fr{border-top:1px dashed var(--line)}
+.rhan-fr .l{font-size:12.5px;font-weight:600;min-width:0} .rhan-fr .l small{display:block;font-weight:400;font-size:11.5px;color:var(--mut)}
+.rhan-fr .b{display:flex;justify-content:center;height:22px}
+.rhan-fr .b>div{display:flex;gap:2px;height:100%;min-width:3px}
+.rhan-fr .b i{display:block;height:100%;border-radius:4px}
+.rhan-fr .b i.fs{background:var(--line)}
+.rhan-fr .b i.xp{background:var(--bad)} .rhan-fr .b i.xt{background:var(--warn)} .rhan-fr .b i.xv{background:var(--acc)} .rhan-fr .b i.xc{background:var(--ok)}
+.rhan-fr .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap} .rhan-fr .n b{font-size:16px} .rhan-fr .n span{display:block;font-size:11.5px;color:var(--mut)}
+@media (max-width:560px){ .rhan-fr{grid-template-columns:1fr 70px} .rhan-fr .b{grid-column:1/-1;grid-row:2} }
 .rhan-mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
 .rhan-mini div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
 .rhan-mini b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
@@ -17186,10 +17193,20 @@ function rhanRender(){
     +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
     +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
     +'</div>';
-  const pl=(c,v,l)=>`<div class="${c}"><b>${rhcN(v)}</b><span>${l}</span></div>`;
-  h+='<div class="rhan-pl" title="Cada dia com inconsistência está em uma etapa; a corrigida no Kairos continua contando aqui como rastro, mas já é conforme">'
-    +pl('s0',nInc,'inconsistências identificadas')+pl('s1',TR.pendentes||0,'a tratar pelo gestor')+pl('s2',TR.tratadas||0,'tratadas · aguardando RH')
-    +pl('s3',TR.validadas||0,'validadas pela RH · aguardam o Kairos')+pl('s4',TR.corrigidas||0,'corrigidas no Kairos ('+rhPc(TR.corrigidas||0,nInc,0)+')')+'</div>';
+  // Funil do pipeline (2026-11-17, sw v414): cada etapa = quantas inconsistências chegaram até ela (largura ∝ identificadas);
+  // a parte colorida é o que parou nessa etapa, a cinza é o que já seguiu adiante. A corrigida no Kairos é rastro, já conforme.
+  { const P=TR.pendentes||0, Tt=TR.tratadas||0, V=TR.validadas||0, C=TR.corrigidas||0;
+    const et=[['Identificadas','inconsistências do período',nInc,P,'xp','a tratar pelo gestor'],
+      ['Tratadas pelo gestor','justificadas ou ajustadas',Tt+V+C,Tt,'xt','aguardando a RH'],
+      ['Validadas pela RH','conferidas e lançadas no Kairos',V+C,V,'xv','aguardando a carga do Kairos'],
+      ['Corrigidas no Kairos','o Kairos não acusa mais · conforme',C,C,'xc','corrigidas']];
+    h+='<div class="rhan-c rhan-fn"><h3>Pipeline das inconsistências <span class="sub">· quantas chegaram a cada etapa; a cor é o que parou nela</span></h3>'
+      +et.map(([l,d,n,par,cx,lp],i)=>{ const w=nInc?n/nInc*100:0, seg=n?par/n*100:0;
+        const tt=`${l}: ${rhcN(n)} (${rhPc(n,nInc,0)} das identificadas)`+(i<3?` · ${rhcN(par)} ${lp} · ${rhcN(n-par)} seguiram`:'');
+        return `<div class="rhan-fr" title="${vEsc(tt)}"><div class="l">${l}<small>${i<3?`${rhcN(par)} ${lp}`:d}</small></div>`
+          +`<div class="b">${n?`<div style="width:${w}%">${par?`<i class="${cx}" style="width:${seg}%"></i>`:''}${n-par?`<i class="fs" style="width:${100-seg}%"></i>`:''}</div>`:''}</div>`
+          +`<div class="n"><b>${rhcN(n)}</b><span>${i?rhPc(n,nInc,0)+' das identif.':'100%'}</span></div></div>`; }).join('')
+      +'<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Aguardando Kairos</span><span class="xc">Corrigidas</span><span class="fs">Seguiram para a próxima etapa</span></div></div>'; }
   const mi=(v,l)=>`<div><b>${v}</b><span>${l}</span></div>`;
   h+='<div class="rhan-mini">'+mi(rhHM(T.htrab),'horas trabalhadas')+mi(rhcN(T.dias_falta),'dias de falta')
     +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')

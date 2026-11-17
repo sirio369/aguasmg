@@ -4602,8 +4602,11 @@ Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
   `tot.dias_ajuste_val` aparece no cabeçalho como "✓ N dia(s) com ajuste validado".
   · **Pipeline das inconsistências** (sw v412): o universo das inconsistências = as que o Kairos acusa hoje + as **corrigidas no Kairos**
   (tratativa com `tipos` num dia que o Kairos não acusa mais; situação `corr`, CTE `inc0`). Cada dia está numa etapa: **a tratar** →
-  **aguardando RH** → **validada (aguarda o Kairos)** → **corrigida no Kairos**. Os 5 cartões abaixo dos KPIs mostram identificadas e cada
-  etapa, e as barras (destaque, por tipo, por gestor) têm as 4 cores. `tratativas.corrigidas`, `corr` em `por_area`/`por_gestor`/`por_dia`/
+  **aguardando RH** → **validada (aguarda o Kairos)** → **corrigida no Kairos**. Abaixo dos KPIs, o **funil "Pipeline das inconsistências"** (sw v414,
+  substituiu os 5 cartões da v412) tem uma barra horizontal centralizada por etapa — Identificadas → Tratadas pelo gestor → Validadas
+  pela RH → Corrigidas no Kairos — com largura = quantas **chegaram** à etapa (∝ identificadas, nº e % à direita); a parte colorida é o
+  que **parou** nela (a tratar / aguardando RH / aguardando Kairos / corrigidas) e a cinza o que seguiu adiante. Só front, sem RPC nova.
+  As barras (destaque, por tipo, por gestor) têm as 4 cores. `tratativas.corrigidas`, `corr` em `por_area`/`por_gestor`/`por_dia`/
   `inc_st`/`func`. **Conformidade** = dias avaliados sem inconsistência **em aberto** (a corrigida conta como conforme); "Dias c/
   inconsist." e os tipos contam as identificadas (com as corrigidas); a tabela Por área ganhou a coluna Corrigidas. Inconsistência que
   some sem nunca ter sido tratada não tem tratativa e não entra no rastro.
