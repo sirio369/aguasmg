@@ -615,6 +615,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <span>50 mca</span>
     </div>
     <button id="prRegistrar" class="btn">➕ Registrar pressão</button>
+    <div id="prEstBox" class="hidden" style="margin-top:14px"></div>
   </main>
 
   <main id="pressao_reg" class="hidden">
@@ -2242,7 +2243,7 @@ function prFiltrosRender(){
   sZa.innerHTML='<option value="">Todas as ZAs</option>'+Object.keys(PR_ZA_NOME).map(z=>`<option value="${z}">${PR_ZA_NOME[z]}</option>`).join('');
   sZa.value=prFZa;
   const lst=prDmcGj?prDmcGj.features.map(f=>f.properties||{}).filter(p=>!prFZa||p.consorcio===prFZa):[];
-  if(prFDmc&&!lst.some(p=>p.cod_za===prFDmc)) prFDmc='';
+  if(prDmcGj&&prFDmc&&!lst.some(p=>p.cod_za===prFDmc)) prFDmc='';   // só limpa depois que a lista de DMCs carregou
   sDmc.innerHTML='<option value="">Todos os DMCs</option>'+lst.map(p=>`<option value="${p.cod_za}">${p.codigo}${prFZa?'':(' · '+p.consorcio)}</option>`).join('');
   sDmc.value=prFDmc;
 }
@@ -2251,6 +2252,7 @@ function prCamRender(){
   el.innerHTML=prChip(prZaOn,'#111827','Limites das ZAs','data-prc="za"')
     +prChip(prDmcOn,'#ef6c00','DMCs','data-prc="dmc"')
     +prChip(prRedeOn,'#1565c0','Rede','data-prc="rede"')
+    +(prFDmc?prChip(prEstOn,'#2e7d32','Estanqueidade','data-prc="est"'):'')
     +`<button data-prc="rel" title="Atualizar pressões" style="all:unset;cursor:pointer;padding:5px 11px;border-radius:999px;font-size:13px;background:var(--card);border:1px solid var(--line)">⟳</button>`;
   el.querySelectorAll('[data-prc]').forEach(b=>b.addEventListener('click',()=>{
     const k=b.dataset.prc;
@@ -2258,13 +2260,14 @@ function prCamRender(){
     else if(k==='dmc'){ prDmcOn=!prDmcOn; prDesenharDmc(); }
     else if(k==='rede'){ prRedeOn=!prRedeOn; prRedeAtualizar(); }
     else if(k==='rel'){ prCarregarPontos(); return; }
+    else if(k==='est'){ prEstOn=!prEstOn; prEstDesenhar(); return; }
     prCamRender();
   }));
 }
 // mudou ZA/DMC → redesenha tudo recortado e enquadra a seleção
 function prFiltroMudou(){
   prFiltroSave(); prFiltrosRender();
-  prDesenharZa(); prDesenharDmc(); prDesenharPontos(); prEnquadrar();
+  prDesenharZa(); prDesenharDmc(); prDesenharPontos(); prEnquadrar(); prEstCarregar();
 }
 function prEnquadrar(){
   if(!prMap) return;
@@ -2285,6 +2288,7 @@ function prMapInit(){
     prMap=L.map('prMapa');
     mapAddCamadaBase(prMap);
     prMap.createPane('prRede').style.zIndex=410;  prMap.getPane('prRede').style.pointerEvents='none';  // rede acima dos DMCs, sem roubar o toque
+    prMap.createPane('prEst').style.zIndex=440;    // pontos sugeridos p/ estanqueidade (abaixo das pressões medidas)
     prMap.createPane('prPts').style.zIndex=450;    // pressões acima da rede
     prMap.createPane('prEu').style.zIndex=650;     // "Você" sempre por cima
     prMap.setView([-19.93,-44.05],12);
@@ -2305,7 +2309,7 @@ async function prCarregarCamadas(){
     const c=localStorage.getItem('pr_dmcs'); if(c) prDmcGj=JSON.parse(c);
     if(navigator.onLine){ const {data,error}=await sb.rpc('app_pressao_dmcs'); if(!error&&data){ prDmcGj=data; try{localStorage.setItem('pr_dmcs',JSON.stringify(data));}catch(e){} } }
   }catch(e){}
-  prFiltrosRender(); prDesenharZa(); prDesenharDmc(); prDesenharPontos(); prEnquadrar();
+  prFiltrosRender(); prDesenharZa(); prDesenharDmc(); prDesenharPontos(); prEnquadrar(); prEstCarregar();
 }
 function prDesenharZa(){
   if(!prMap) return;
@@ -2352,7 +2356,7 @@ async function prCarregarPontos(silencioso){
     if(!prPtsGj){ try{ const c=localStorage.getItem('pr_recentes'); if(c) prPtsGj=JSON.parse(c); }catch(e2){} }
     if(!silencioso) toast(navigator.onLine?'Não consegui carregar as pressões':'Sem conexão — mostrando a última lista salva');
   }
-  prDesenharPontos();
+  prDesenharPontos(); prEstDesenhar();
 }
 function prPtsFiltrados(){
   const fc=(prPtsGj&&prPtsGj.features)||[];
@@ -2394,6 +2398,104 @@ function prMapOnGps(){
     prEuAcc=L.circle(ll,{radius:gps.acc||0,pane:'prEu',color:'#3a9bde',weight:1,fillColor:'#3a9bde',fillOpacity:.12,interactive:false}).addTo(prMap);
     prEuMk=L.circleMarker(ll,{pane:'prEu',radius:7,color:'#fff',weight:2.5,fillColor:'#1a73e8',fillOpacity:1}).bindTooltip('Você').addTo(prMap);
   } else { prEuMk.setLatLng(ll); prEuAcc.setLatLng(ll); prEuAcc.setRadius(gps.acc||0); }
+}
+// ---- Pontos sugeridos p/ teste de estanqueidade do DMC escolhido (2026-11-17) ----
+// app_pressao_estanq_pontos(cod_za): 1 par por cruzamento da rede com o limite do DMC (trecho com uma ponta
+// dentro e outra fora; cruzamentos a ≤30 m viram um só). Cada par = ponto DENTRO + ponto FORA: ligação ativa do
+// próprio trecho (≤250 m) ou de outro trecho a ≤60 m; sem ligação → ponto na rede a ~20 m do limite (hidrante/registro).
+// "Medido" = alguma pressão das últimas 36 h a ≤30 m do ponto (qualquer usuário) → mostra o valor e o Δ dentro−fora.
+const PR_EST_RAIO=30;
+let prEstOn=true, prEstGj=null, prEstDmc=null, prEstLayer=null;
+const prEstCache={};
+function prDistM(a,b){ const R=6371000,t=Math.PI/180,dl=(b[0]-a[0])*t,dn=(b[1]-a[1])*t;
+  const h=Math.sin(dl/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+// pressão mais recente das 36 h perto do ponto (todas as ZAs, sem o filtro da tela)
+function prEstMedida(pt){
+  if(!pt) return null; let best=null;
+  ((prPtsGj&&prPtsGj.features)||[]).forEach(f=>{ const c=(f.geometry||{}).coordinates; if(!c) return;
+    const d=prDistM([pt.lat,pt.lon],[c[1],c[0]]); const p=f.properties||{};
+    if(d<=PR_EST_RAIO&&(!best||String(p.quando)>String(best.quando))) best=Object.assign({d:Math.round(d)},p); });
+  return best;
+}
+async function prEstCarregar(){
+  const dmc=prFDmc;
+  if(!dmc){ prEstGj=null; prEstDmc=null; prEstDesenhar(); return; }
+  if(prEstCache[dmc]){ prEstGj=prEstCache[dmc]; prEstDmc=dmc; prEstDesenhar(); return; }
+  const box=$('#prEstBox'); if(box&&prEstOn){ box.classList.remove('hidden'); box.innerHTML='<p class="sub" style="margin:0">Calculando pontos de estanqueidade…</p>'; }
+  let data=null;
+  try{ const r=await sb.rpc('app_pressao_estanq_pontos',{p_dmc:dmc}); if(r.error) throw r.error; data=r.data;
+       try{ localStorage.setItem('pr_est_'+dmc,JSON.stringify(data)); }catch(e){} }
+  catch(e){ try{ const c=localStorage.getItem('pr_est_'+dmc); if(c) data=JSON.parse(c); }catch(e2){}
+            if(!data) toast(navigator.onLine?'Não consegui calcular os pontos de estanqueidade':'Sem conexão — pontos de estanqueidade indisponíveis'); }
+  if(prFDmc!==dmc) return;   // trocou de DMC enquanto carregava
+  if(data) prEstCache[dmc]=data;
+  prEstGj=data; prEstDmc=dmc; prEstDesenhar();
+}
+function prEstIcone(lado,n,med){
+  const cor=lado==='D'?'#2e7d32':'#6a1b9a';
+  const txt=lado+n+(med?(' · '+prpFmt(med.pressao)):'');
+  const est=med?('background:'+cor+';color:#fff;border:2px solid #fff'):('background:#fff;color:'+cor+';border:2px solid '+cor);
+  return L.divIcon({className:'',iconSize:null,iconAnchor:[0,0],
+    html:`<div style="transform:translate(-50%,-50%);white-space:nowrap;font:700 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.35);${est}">${txt}</div>`});
+}
+function prEstLadoHtml(lbl,pt,med){
+  if(!pt) return '<br><b>'+lbl+'</b>: <span style="color:var(--mut)">sem ligação nem rede cadastrada a ≥10 m do limite</span>';
+  return '<br><b>'+lbl+'</b>: '+(pt.tipo==='rede'?'ponto na rede (hidrante/registro)':('matrícula '+pt.matricula+(pt.endereco?(' · '+pt.endereco):'')))
+    +' · '+pt.dist_limite+' m do limite'+(med?(' · <b>'+prpFmt(med.pressao)+' mca</b> '+(med.data||'')):' · <span style="color:var(--warn)">pendente</span>');
+}
+function prEstPopup(p,lado){
+  const md=prEstMedida(p.dentro), mf=prEstMedida(p.fora), pt=lado==='D'?p.dentro:p.fora;
+  const v=p.valvula;
+  const delta=(md&&mf)?('<br>Δ dentro − fora: <b>'+prpFmt(md.pressao-mf.pressao)+' mca</b>'):'';
+  return '<div style="min-width:190px"><b>Par '+p.n+' — '+(lado==='D'?'dentro':'fora')+' do '+(prEstDmc||'').replace(/^ZA\d+-/,'')+'</b>'
+    +'<br><span style="color:var(--mut)">Trecho que cruza o limite: '+(p.trechos||[]).join(', ')+(p.dn?(' · DN '+Math.round(p.dn)):'')+(p.material?(' '+p.material):'')+'</span>'
+    +(v?('<br><span style="color:var(--mut)">Válvula '+(v.tipo||'')+' '+(v.cd||'')+(v.estado?(' ('+v.estado+')'):'')+' a '+v.dist+' m</span>'):'')
+    +(pt&&pt.tipo==='ligacao'&&!pt.no_trecho?'<br><span style="color:var(--mut)">Ligação de outro trecho, a '+pt.dist+' m do cruzamento</span>':'')
+    +prEstLadoHtml('Dentro',p.dentro,md)+prEstLadoHtml('Fora',p.fora,mf)+delta
+    +(pt?('<br><a href="https://www.google.com/maps/dir/?api=1&destination='+pt.lat+','+pt.lon+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:var(--acc);font-weight:600">🧭 Navegar até o ponto</a>'):'')
+    +'<br><a class="prEstReg" style="display:inline-block;margin-top:6px;color:var(--acc);font-weight:600;cursor:pointer">📝 Registrar pressão</a></div>';
+}
+function prEstDesenhar(){
+  const box=$('#prEstBox');
+  if(prMap&&prEstLayer){ prMap.removeLayer(prEstLayer); prEstLayer=null; }
+  prCamRender();
+  const pares=(prEstGj&&prEstDmc===prFDmc&&prEstGj.pares)||[];
+  if(!prFDmc||!prEstOn||!pares.length){ if(box){ box.classList.toggle('hidden',!(prFDmc&&prEstOn&&prEstGj)); if(prFDmc&&prEstOn&&prEstGj) box.innerHTML='<p class="sub" style="margin:0">Nenhum trecho de rede cruza o limite deste DMC.</p>'; } return; }
+  if(prMap&&window.L){
+    prEstLayer=L.layerGroup().addTo(prMap);
+    pares.forEach(p=>{
+      const cz=[p.cruz[1],p.cruz[0]], ll=[];
+      if(p.dentro) ll.push([p.dentro.lat,p.dentro.lon]); ll.push(cz); if(p.fora) ll.push([p.fora.lat,p.fora.lon]);
+      L.polyline(ll,{pane:'prEst',color:'#37474f',weight:1.5,dashArray:'4 4',opacity:.8,interactive:false}).addTo(prEstLayer);
+      L.circleMarker(cz,{pane:'prEst',radius:4,color:'#37474f',weight:1.5,fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(prEstLayer);
+      [['D',p.dentro],['F',p.fora]].forEach(([lado,pt])=>{ if(!pt) return;
+        const m=L.marker([pt.lat,pt.lon],{pane:'prEst',icon:prEstIcone(lado,p.n,prEstMedida(pt))}).addTo(prEstLayer);
+        m.bindPopup(()=>prEstPopup(p,lado),{minWidth:200});
+        m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const a=el&&el.querySelector('.prEstReg'); if(a) a.onclick=()=>{ prMap.closePopup(); irPara('pressao_reg'); }; });
+        p['_mk'+lado]=m;
+      });
+    });
+  }
+  if(!box) return;
+  let nMed=0, nTot=0;
+  const linhas=pares.map(p=>{
+    const md=prEstMedida(p.dentro), mf=prEstMedida(p.fora);
+    nTot+=(p.dentro?1:0)+(p.fora?1:0); nMed+=(md?1:0)+(mf?1:0);
+    const cel=(pt,med,cor)=>!pt?'<span style="color:var(--mut)">—</span>':(med?('<b style="color:'+cor+'">'+prpFmt(med.pressao)+'</b>'):'<span style="color:var(--mut)">pendente</span>');
+    const dl=(md&&mf)?('Δ '+prpFmt(md.pressao-mf.pressao)):'';
+    return `<div data-prp="${p.n}" style="display:grid;grid-template-columns:52px 1fr 1fr 64px;gap:6px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px">
+      <b>Par ${p.n}</b><span>D ${cel(p.dentro,md,'#2e7d32')}</span><span>F ${cel(p.fora,mf,'#6a1b9a')}</span><span style="text-align:right;color:var(--mut)">${dl}</span></div>`;
+  }).join('');
+  box.classList.remove('hidden');
+  box.innerHTML=`<div class="sec" style="margin:0 0 4px">Teste de estanqueidade — ${prFDmc.replace(/^(ZA\d+)-(.*)$/,'$2 ($1)')}</div>
+    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#2e7d32">D</b> = dentro · <b style="color:#6a1b9a">F</b> = fora.</p>${linhas}`;
+  box.querySelectorAll('[data-prp]').forEach(el=>el.addEventListener('click',()=>{
+    const p=pares.find(x=>String(x.n)===el.dataset.prp); if(!p||!prMap) return;
+    const pts=[[p.cruz[1],p.cruz[0]]]; if(p.dentro) pts.push([p.dentro.lat,p.dentro.lon]); if(p.fora) pts.push([p.fora.lat,p.fora.lon]);
+    prMap.fitBounds(pts,{padding:[50,50],maxZoom:18});
+    $('#prMapa').scrollIntoView({behavior:'smooth',block:'center'});
+    setTimeout(()=>{ const m=p._mkD||p._mkF; if(m) m.openPopup(); },400);
+  }));
 }
 // após salvar: volta ao mapa e recarrega (offline: a leitura entra quando a fila sincronizar)
 function prAposSalvar(){ irPara('pressao'); }

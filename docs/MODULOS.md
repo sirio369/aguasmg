@@ -199,6 +199,17 @@
   rótulo com o valor e popup com o detalhe + foto. Recarrega ao abrir a tela, no ⟳, a cada 2 min com a tela aberta e quando a fila
   offline sincroniza. Caches no aparelho: `pr_limites_za`, `pr_dmcs`, `pr_recentes`. Botões: **➕ Registrar pressão** (→ `pressao_reg`)
   e **📊 Produtividade** (→ `pr_prod`). Migração: `docs/migracao_pressao_mapa.sql`.
+- **Pontos sugeridos p/ teste de estanqueidade do DMC (2026-11-17, sw v409):** com um DMC escolhido no filtro aparece o chip
+  **Estanqueidade** (ligado por padrão) + lista de pares abaixo do botão de registrar. RPC **`app_pressao_estanq_pontos(p_dmc cod_za)`**
+  (`docs/migracao_pressao_estanq_pontos.sql`): cada trecho de `"2 - infra_agua".rede` com uma ponta dentro e outra fora do DMC é um
+  cruzamento; cruzamentos a ≤30 m viram 1 **par** (numerado no sentido do azimute a partir do centro). Cada par = ponto **D** (dentro) +
+  **F** (fora): ligação ativa (`situacao='R'`) do próprio trecho que cruza (`ligacoes.nu_trecho`, ≤250 m) ou de outro trecho a ≤60 m,
+  sempre ≥5 m do limite; sem ligação → **ponto na rede** a ≥10 m do limite e ≤120 m do cruzamento (medir em hidrante/registro). Traz
+  também a válvula de manobra mais próxima do cruzamento (≤40 m), DN/material, matrícula e endereço. Lado vazio = sem ligação nem rede
+  cadastrada (borda da ZA). **Medido** = pressão das últimas 36 h (qualquer usuário) a ≤30 m do ponto (cliente, `prEstMedida`) → o
+  marcador mostra o valor e a lista o **Δ dentro − fora**. Pane `prEst` (z 440) abaixo das pressões. Cache por DMC em memória +
+  `localStorage.pr_est_<cod_za>`; leva até ~2 s nos DMCs grandes de Betim (05/06, ~85 pares). Substitui a antiga tabela fixa
+  `ponto_estanqueidade` (calculada sobre outra camada de DMC).
 - **Formulário** (`pressao_reg`, "‹ Mapa" volta): o mesmo de antes; ao salvar volta ao mapa (`prAposSalvar`).
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
 - **Duas fotos (2026-09):** **Foto do manômetro** (obrigatória, `fotoBlob`→`p_foto`) e **Foto do número HD**
@@ -2137,7 +2148,7 @@ na UI desde 2026-10-14).
 ## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
-**Pressão:** `app_pressao_dmcs`, `app_pressao_recentes` (mapa inicial, 36 h), `app_pressao_filtros`, `app_pressao_produtividade`. (`app_estanqueidade_listar`/`app_estanq_poligonos` sem uso desde 2026-11-17.)
+**Pressão:** `app_pressao_dmcs`, `app_pressao_recentes` (mapa inicial, 36 h), `app_pressao_estanq_pontos` (pares D/F do DMC), `app_pressao_filtros`, `app_pressao_produtividade`. (`app_estanqueidade_listar`/`app_estanq_poligonos` sem uso desde 2026-11-17.)
 **Loggers:** `app_loggers_listar`, `app_logger_criar/instalar/remover/finalizar/editar`,
 `logger_pressao_importar/stats`.
 **Pesquisa/Ocorrência:** `app_pesquisa_filtros`, `app_pesquisa_produtividade`,
