@@ -16937,11 +16937,11 @@ function rhvFaixa(it,n){
 // Uma linha por dia (o colaborador vem na faixa acima); formulário abre numa linha logo abaixo
 function rhvLinha(it){
   const k=rhvKey(it), s=rhStatus(it), t=it.trat, D=rhvDados;
-  const tps=(it.parcial&&!(it.tipos||[]).length?'<span class="sub" style="margin:0">dia parcial</span>':'')+(it.tipos||[]).map(tp=>{ const L=RH_TIPOS[tp]||[tp,'']; return `<span class="tp" title="${vEsc(L[1])}">${vEsc(L[0])}${tp==='interjornada'&&it.interjornada_min!=null?' '+rhHM(it.interjornada_min):''}</span>`; }).join('');
+  const tps=(it.corrigido?'<span class="tp" style="color:var(--ok);border-color:var(--ok)" title="O Kairos não acusa mais nada neste dia: a inconsistência foi tratada e corrigida">✓ corrigida no Kairos</span>':'')+(it.parcial&&!(it.tipos||[]).length?'<span class="sub" style="margin:0">dia parcial</span>':'')+(it.tipos||[]).map(tp=>{ const L=RH_TIPOS[tp]||[tp,'']; return `<span class="tp" title="${vEsc(L[1])}">${vEsc(L[0])}${tp==='interjornada'&&it.interjornada_min!=null?' '+rhHM(it.interjornada_min):''}</span>`; }).join('');
   const mkTxt=m=>rhPares(m).map(p=>p[1]?p[0]+'–'+p[1]:p[0]+'–?').join('  ');
   // ajuste validado pela RH: a linha passa a mostrar as batidas ajustadas e os números recalculados com elas
-  // (t.calc = "18 - rh".calc_marcacoes) — valem sempre, mesmo que uma carga nova do Kairos tenha substituído o dia
-  const aj=!!(t&&t.acao==='ajustar'&&s==='val'&&(t.marcacoes||[]).length), cv=aj&&t.calc?t.calc:null;
+  // (t.calc = "18 - rh".calc_marcacoes) enquanto o Kairos não refletir o ajuste; quando reflete (kairos_bate), valem os do Kairos
+  const aj=!!(t&&t.acao==='ajustar'&&s==='val'&&(t.marcacoes||[]).length), cv=aj&&!t.kairos_bate&&t.calc?t.calc:null;
   const mk=aj?mkTxt(t.marcacoes)+'<span class="vdb" title="Batidas ajustadas pelo gestor e validadas pela RH">✓ validado</span>'
     :((it.marcacoes||[]).length?mkTxt(it.marcacoes):'<span class="sub" style="margin:0">sem batidas</span>');
   const mkOrig=aj&&!t.kairos_bate?'<div class="m">Kairos: <s>'+((it.marcacoes||[]).length?mkTxt(it.marcacoes):'sem batidas')+'</s></div>':'';
@@ -17055,7 +17055,8 @@ async function rhvSalvar(it,b){
 // ---------- RH · ANÁLISE DO PONTO ----------
 // Tela `rh_analise` → app_rh_analise(ini, fim, consórcio): KPIs, inconsistências (HE > 2h, descanso < 11h…), HE por dia,
 // por empresa, lista de interjornada < 11h, ranking por colaborador e andamento das tratativas. Dia com ajuste validado pela RH
-// usa as batidas do gestor e os números de calc_marcacoes (tot.dias_ajuste_val), mesmo após carga nova. Quem tem a tela vê todas
+// usa as batidas do gestor e os números de calc_marcacoes (tot.dias_ajuste_val) enquanto o Kairos não refletir o ajuste; refletiu,
+// vale o Kairos. Inconsistência tratada que o Kairos corrigiu fica como rastro ('corrigidas'), já conforme. Quem tem a tela vê todas
 // as áreas (2026-11-17); o filtro de colaborador (p_funcionario) mostra os indicadores de uma pessoa só.
 let rhanCons='', rhanArea='', rhanFunc='', rhanDados=null, rhanOrd='pend', rhanTodos=false;
 function rhanInit(){
@@ -17092,10 +17093,14 @@ function rhanCss(){
 .rhan-kp .st.bad{background:var(--bad-bg);color:var(--bad)} .rhan-kp .st.warn{background:var(--warn-bg);color:var(--warn)} .rhan-kp .st.ok{background:var(--ok-bg);color:var(--ok)}
 .rhan-sb{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;background:var(--line);margin-top:8px}
 .rhan-sb i{display:block;height:100%;min-width:0}
-.rhan-sb i.xp{background:var(--bad)} .rhan-sb i.xt{background:var(--warn)} .rhan-sb i.xv{background:var(--ok)}
+.rhan-sb i.xp{background:var(--bad)} .rhan-sb i.xt{background:var(--warn)} .rhan-sb i.xv{background:var(--acc)} .rhan-sb i.xc{background:var(--ok)}
 .rhan-lg{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin-top:8px}
 .rhan-lg span:before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
-.rhan-lg .xp:before{background:var(--bad)} .rhan-lg .xt:before{background:var(--warn)} .rhan-lg .xv:before{background:var(--ok)}
+.rhan-lg .xp:before{background:var(--bad)} .rhan-lg .xt:before{background:var(--warn)} .rhan-lg .xv:before{background:var(--acc)} .rhan-lg .xc:before{background:var(--ok)}
+.rhan-pl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
+.rhan-pl div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 11px;border-top:3px solid var(--line)}
+.rhan-pl b{display:block;font-size:19px;font-variant-numeric:tabular-nums} .rhan-pl span{font-size:11.5px;color:var(--mut)}
+.rhan-pl .s0{border-top-color:var(--ink)} .rhan-pl .s1{border-top-color:var(--bad)} .rhan-pl .s2{border-top-color:var(--warn)} .rhan-pl .s3{border-top-color:var(--acc)} .rhan-pl .s4{border-top-color:var(--ok)}
 .rhan-mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
 .rhan-mini div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
 .rhan-mini b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
@@ -17153,12 +17158,13 @@ function rhanRender(){
     +fns.map(x=>`<option value="${x.id}"${String(x.id)===String(rhanFunc)?' selected':''}>${vEsc(x.nome)}${x.sigla?' · '+vEsc(x.sigla):''}</option>`).join('');
   if(!T.funcionarios){ $('#rhanView').innerHTML='<p class="sub">Nenhum ponto carregado nesse período.</p>'; return; }
   const P=D.periodo||{}, I=D.inc||{}, IS=D.inc_st||{}, TR=D.tratativas||{};
-  const nInc=(TR.pendentes||0)+(TR.tratadas||0)+(TR.validadas||0);
+  // pipeline: identificadas = a tratar + aguardando RH + validadas (aguardam Kairos) + corrigidas no Kairos (rastro, já conformes)
+  const nAb=(TR.pendentes||0)+(TR.tratadas||0)+(TR.validadas||0), nInc=nAb+(TR.corrigidas||0);
   const abs=T.prev?T.falta_aval/T.prev:null, phe=T.htrab?T.he/T.htrab:null;
-  const pont=T.dias_prev_trab?1-T.n_atrasos/T.dias_prev_trab:null, conf=T.dias_aval?1-nInc/T.dias_aval:null;
+  const pont=T.dias_prev_trab?1-T.n_atrasos/T.dias_prev_trab:null, conf=T.dias_aval?1-nAb/T.dias_aval:null;
   const ic=t=>(I[t]||{casos:0,pessoas:0});
-  const sb=(p,t,v)=>{ const n=(p+t+v)||1; return `<div class="rhan-sb">${p?`<i class="xp" style="width:${p/n*100}%"></i>`:''}${t?`<i class="xt" style="width:${t/n*100}%"></i>`:''}${v?`<i class="xv" style="width:${v/n*100}%"></i>`:''}</div>`; };
-  const lg='<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Validadas</span></div>';
+  const sb=(p,t,v,c=0)=>{ const n=(p+t+v+c)||1; return `<div class="rhan-sb">${p?`<i class="xp" style="width:${p/n*100}%"></i>`:''}${t?`<i class="xt" style="width:${t/n*100}%"></i>`:''}${v?`<i class="xv" style="width:${v/n*100}%"></i>`:''}${c?`<i class="xc" style="width:${c/n*100}%"></i>`:''}</div>`; };
+  const lg='<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Validadas · aguardam Kairos</span><span class="xc">Corrigidas no Kairos</span></div>';
   const stTag=f=>f?`<span class="st ${f}">${({ok:'✓ ok',warn:'! atenção',bad:'▲ crítico'})[f]}</span>`:'';
   const kp=(lb,v,d,f)=>`<div class="rhan-c rhan-kp"><span class="lb">${lb}</span>${stTag(f)}<b class="v">${v}</b><span class="d">${d}</span></div>`;
   const fSel=rhanFunc?fns.find(x=>String(x.id)===String(rhanFunc)):null;
@@ -17167,12 +17173,16 @@ function rhanRender(){
   // ---- KPIs estratégicos
   h+='<div class="rhan-g k5">'
     +`<div class="rhan-c rhan-kp hero"><span class="lb">Inconsistências ainda não tratadas</span><b class="v">${nInc?rhPc(TR.pendentes,nInc,0):'—'}</b>`
-    +`<span class="d"><b>${rhcN(TR.pendentes||0)}</b> de ${rhcN(nInc)} dias com inconsistência</span>${sb(TR.pendentes||0,TR.tratadas||0,TR.validadas||0)}${lg}</div>`
-    +kp('Conformidade do ponto',conf==null?'—':rhPc(T.dias_aval-nInc,T.dias_aval),`dias sem inconsistência · ${rhcN(T.dias_aval)} avaliados`,conf==null?'':(conf>=.9?'ok':conf>=.75?'warn':'bad'))
+    +`<span class="d"><b>${rhcN(TR.pendentes||0)}</b> de ${rhcN(nInc)} dias com inconsistência</span>${sb(TR.pendentes||0,TR.tratadas||0,TR.validadas||0,TR.corrigidas||0)}${lg}</div>`
+    +kp('Conformidade do ponto',conf==null?'—':rhPc(T.dias_aval-nAb,T.dias_aval),`dias sem inconsistência em aberto · ${rhcN(T.dias_aval)} avaliados`,conf==null?'':(conf>=.9?'ok':conf>=.75?'warn':'bad'))
     +kp('Absenteísmo',rhPc(T.falta_aval,T.prev),`${rhHM(T.falta_aval)} de falta sobre ${rhHM(T.prev)} previstas`,rhFx(abs,.03,.06))
     +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
     +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
     +'</div>';
+  const pl=(c,v,l)=>`<div class="${c}"><b>${rhcN(v)}</b><span>${l}</span></div>`;
+  h+='<div class="rhan-pl" title="Cada dia com inconsistência está em uma etapa; a corrigida no Kairos continua contando aqui como rastro, mas já é conforme">'
+    +pl('s0',nInc,'inconsistências identificadas')+pl('s1',TR.pendentes||0,'a tratar pelo gestor')+pl('s2',TR.tratadas||0,'tratadas · aguardando RH')
+    +pl('s3',TR.validadas||0,'validadas pela RH · aguardam o Kairos')+pl('s4',TR.corrigidas||0,'corrigidas no Kairos ('+rhPc(TR.corrigidas||0,nInc,0)+')')+'</div>';
   const mi=(v,l)=>`<div><b>${v}</b><span>${l}</span></div>`;
   h+='<div class="rhan-mini">'+mi(rhHM(T.htrab),'horas trabalhadas')+mi(rhcN(T.dias_falta),'dias de falta')
     +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')
@@ -17183,19 +17193,19 @@ function rhanRender(){
   const ln=x=>{ const ni=x.dias_inc||0, pp=ni?x.pend/ni:0;
     return `<td class="n">${x.funcionarios}</td><td class="n">${ni}</td>`
       +`<td class="n"><span class="pb"><span class="${pp>=.5?'bad':''}">${ni?rhPc(x.pend,ni,0):'—'}</span><i><b style="width:${pp*100}%"></b></i></span></td>`
-      +`<td class="n">${x.dias_aval?rhPc(x.dias_aval-ni,x.dias_aval,0):'—'}</td>`
+      +`<td class="n">${x.corr||''}</td><td class="n">${x.dias_aval?rhPc(x.dias_aval-ni+(x.corr||0),x.dias_aval,0):'—'}</td>`
       +`<td class="n ${x.prev&&x.falta/x.prev>.06?'bad':''}">${rhPc(x.falta,x.prev)}</td><td class="n ${x.htrab&&x.he/x.htrab>.10?'warn':''}">${rhPc(x.he,x.htrab)}</td>`
       +`<td class="n">${x.dias_prev_trab?rhPc(x.dias_prev_trab-x.n_atrasos,x.dias_prev_trab,0):'—'}</td><td class="n">${x.dias_he2||''}</td><td class="n">${x.interj||''}</td>`; };
-  const hdA='<th class="n">Pessoas</th><th class="n">Dias c/ inconsist.</th><th class="n">Não tratadas</th><th class="n">Conformidade</th><th class="n">Absenteísmo</th><th class="n">% HE</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>';
+  const hdA='<th class="n">Pessoas</th><th class="n">Dias c/ inconsist.</th><th class="n">Não tratadas</th><th class="n">Corrigidas</th><th class="n">Conformidade</th><th class="n">Absenteísmo</th><th class="n">% HE</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>';
   if(pa.length) h+=`<div class="rhan-c" style="margin-top:10px"><h3>Por área ${pa.length>1?'<span class="sub">· clique numa área para filtrar</span>':''}</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Área</th>${hdA}</tr>`
     +pa.map(x=>`<tr${pa.length>1?` data-area="${vEsc(x.nome)}"`:''}><td class="nm">${vEsc(x.nome)}</td>${ln(x)}</tr>`).join('')+'</table></div></div>';
   // ---- Inconsistências por tipo  ×  Tratativa por gestor
   const its=Object.keys(RH_TIPOS).filter(t=>I[t]).sort((a,b)=>I[b].casos-I[a].casos); const mx=Math.max(1,...its.map(t=>I[t].casos));
-  const blTipo='<div class="rhan-c"><h3>Inconsistências por tipo <span class="sub">· dias, por situação da tratativa</span></h3>'+(its.length?its.map(t=>{ const s=IS[t]||{pend:I[t].casos,trat:0,val:0};
-      return `<div class="rhan-r" title="${vEsc(RH_TIPOS[t][1])} — ${I[t].pessoas} pessoa(s): ${s.pend} a tratar, ${s.trat} aguardando RH, ${s.val} validadas"><span class="l">${RH_TIPOS[t][0]}</span>`
-        +`<span><span style="display:block;width:${Math.max(6,I[t].casos/mx*100)}%">${sb(s.pend,s.trat,s.val)}</span></span><span class="n"><b>${I[t].casos}</b> · ${rhPc(s.pend,I[t].casos,0)}</span></div>`; }).join('')+lg:'<p class="sub" style="margin:0">Nenhuma.</p>')+'</div>';
+  const blTipo='<div class="rhan-c"><h3>Inconsistências por tipo <span class="sub">· dias, por situação da tratativa</span></h3>'+(its.length?its.map(t=>{ const s=IS[t]||{pend:I[t].casos,trat:0,val:0,corr:0};
+      return `<div class="rhan-r" title="${vEsc(RH_TIPOS[t][1])} — ${I[t].pessoas} pessoa(s): ${s.pend} a tratar, ${s.trat} aguardando RH, ${s.val} validadas, ${s.corr||0} corrigidas no Kairos"><span class="l">${RH_TIPOS[t][0]}</span>`
+        +`<span><span style="display:block;width:${Math.max(6,I[t].casos/mx*100)}%">${sb(s.pend,s.trat,s.val,s.corr||0)}</span></span><span class="n"><b>${I[t].casos}</b> · ${rhPc(s.pend,I[t].casos,0)}</span></div>`; }).join('')+lg:'<p class="sub" style="margin:0">Nenhuma.</p>')+'</div>';
   const pg=(D.por_gestor||[]).filter(g=>g.dias_inc);
-  const blGest='<div class="rhan-c"><h3>Tratativa por gestor <span class="sub">· % ainda não tratada</span></h3>'+(pg.length?pg.map(g=>`<div class="rhan-r" title="${vEsc(g.nome)}: ${g.pend} a tratar, ${g.trat} aguardando RH, ${g.val} validadas · ${g.funcionarios} colaborador(es)"><span class="l">${vEsc(g.nome)} <span class="sub" style="margin:0">· ${g.funcionarios} pess.</span></span>${sb(g.pend,g.trat,g.val)}<span class="n"><b>${rhPc(g.pend,g.dias_inc,0)}</b> de ${g.dias_inc}</span></div>`).join('')+lg:'<p class="sub" style="margin:0">Nenhuma inconsistência.</p>')+'</div>';
+  const blGest='<div class="rhan-c"><h3>Tratativa por gestor <span class="sub">· % ainda não tratada</span></h3>'+(pg.length?pg.map(g=>`<div class="rhan-r" title="${vEsc(g.nome)}: ${g.pend} a tratar, ${g.trat} aguardando RH, ${g.val} validadas, ${g.corr||0} corrigidas no Kairos · ${g.funcionarios} colaborador(es)"><span class="l">${vEsc(g.nome)} <span class="sub" style="margin:0">· ${g.funcionarios} pess.</span></span>${sb(g.pend,g.trat,g.val,g.corr||0)}<span class="n"><b>${rhPc(g.pend,g.dias_inc,0)}</b> de ${g.dias_inc}</span></div>`).join('')+lg:'<p class="sub" style="margin:0">Nenhuma inconsistência.</p>')+'</div>';
   h+='<div class="rhan-g c2">'+blTipo+blGest+'</div>';
   // ---- Por dia: inconsistências  ×  HE (dois gráficos, um eixo cada)
   const pd=(D.por_dia||[]).filter(d=>d.presentes||d.inc||d.he);

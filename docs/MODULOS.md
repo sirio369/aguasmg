@@ -4562,12 +4562,16 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
     Dia sem batida continua abrindo vazio.
   - Depois que a RH **valida** um ajuste, a linha mostra as **batidas ajustadas** com o selo verde "✓ validado" (as do Kairos ficam
     riscadas embaixo) e **H.trab / HE / Falta / Atraso recalculados** com elas, em verde (o valor do Kairos fica no tooltip). Quando
-    uma carga nova do Kairos substitui o dia, **os números validados continuam valendo** (sw v412; antes a v411 trocava pelos do Kairos).
+    uma carga nova do Kairos substitui o dia **sem** trazer as batidas validadas, os números validados continuam valendo. Quando a carga
+    **traz as mesmas batidas** (`kairos_bate`), valem os do Kairos, que é a informação oficial (decisão do usuário, 17/11/2026).
   - Cálculo: `"18 - rh".calc_marcacoes(horário, marcações)` → `{htrab, he, atraso, falta, prev}`, devolvido em `trat.calc` só para
     `acao='ajustar'`. Regra (calibrada contra o Kairos: bate 100% do H.trab e da falta, ~93% da HE e ~97% do atraso nos dias de 4
     batidas): HE = trabalhado fora do previsto, atraso = previsto não trabalhado; tolerância CLT de 5 min por marcação / 10 min no dia,
     separada para HE e atraso (passou, conta tudo); sem batida = falta do previsto inteiro; dia sem horário = tudo HE. É uma
     estimativa do app; desde a sw v412 a **Análise do ponto também usa esses números** (§22.3).
+- **Rastro da inconsistência corrigida** (sw v412, `docs/migracao_rh_pipeline_inconsistencias.sql`): dia que teve inconsistência e
+  tratativa e que o Kairos já corrigiu (não acusa mais nada) continua na lista (`inc` = true, `corrigido` = true, tipos guardados em
+  `tratativa.tipos`), com o selo "✓ corrigida no Kairos" — fica nas abas Validados / Todas inconsistências.
 - **Desligamento vale para os dias seguintes** (sw v412, `docs/migracao_rh_desligamento_propaga.sql`): o 1º dia que o gestor justifica
   com o motivo **"Desligado da empresa"** vira a origem, e todo dia com inconsistência **depois** dele, do mesmo colaborador, recebe a
   mesma tratativa automaticamente (`tratativa.auto_de` = data da origem, obs "Desligado desde dd/mm/aaaa (automático)").
@@ -4587,10 +4591,17 @@ equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
-  · **Números validados** (sw v412, `docs/migracao_rh_analise_validados.sql`): dia com ajuste de batidas validado pela RH usa as
-  marcações do gestor e H.trab/HE/Atraso/Falta de `calc_marcacoes`, mesmo que uma carga nova do Kairos tenha substituído o dia
-  (CTE `d0`→`d`; `tot.dias_ajuste_val` aparece no cabeçalho como "✓ N dia(s) com ajuste validado"). As inconsistências continuam
-  sendo as do Kairos.
+  · **Números validados** (sw v412, `docs/migracao_rh_analise_validados.sql` + `docs/migracao_rh_pipeline_inconsistencias.sql`): dia com
+  ajuste de batidas validado pela RH usa as marcações do gestor e H.trab/HE/Atraso/Falta de `calc_marcacoes` **enquanto o Kairos não
+  refletir o ajuste** (`tv.marcacoes is distinct from pd.marcacoes`); refletiu, valem os números do Kairos (oficial). CTE `d0`→`d`;
+  `tot.dias_ajuste_val` aparece no cabeçalho como "✓ N dia(s) com ajuste validado".
+  · **Pipeline das inconsistências** (sw v412): o universo das inconsistências = as que o Kairos acusa hoje + as **corrigidas no Kairos**
+  (tratativa com `tipos` num dia que o Kairos não acusa mais; situação `corr`, CTE `inc0`). Cada dia está numa etapa: **a tratar** →
+  **aguardando RH** → **validada (aguarda o Kairos)** → **corrigida no Kairos**. Os 5 cartões abaixo dos KPIs mostram identificadas e cada
+  etapa, e as barras (destaque, por tipo, por gestor) têm as 4 cores. `tratativas.corrigidas`, `corr` em `por_area`/`por_gestor`/`por_dia`/
+  `inc_st`/`func`. **Conformidade** = dias avaliados sem inconsistência **em aberto** (a corrigida conta como conforme); "Dias c/
+  inconsist." e os tipos contam as identificadas (com as corrigidas); a tabela Por área ganhou a coluna Corrigidas. Inconsistência que
+  some sem nunca ter sido tratada não tem tratativa e não entra no rastro.
   · **colaborador** (sw v410): `p_funcionario` recalcula todos os indicadores para uma pessoa só; a lista (`funcs`) traz quem tem ponto no
   período, já com consórcio + área aplicados. Clicar num nome do ranking "Por colaborador" também filtra; "✕ limpar" no cabeçalho volta.
 - **KPIs estratégicos** (com selo ok / atenção / crítico — só visual):
@@ -4611,6 +4622,11 @@ Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
   atraso, H.trab — ordena no título da coluna; padrão = a tratar; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
 - Na v400 as telas de Validação e Análise perderam o texto de descrição; datas + consórcio (+ situação, na Validação) ficam numa linha.
 - **Largura (sw v401):** no computador (≥ 860 px) as duas telas usam a largura toda da janela, sem a coluna de 1040 px das outras telas (mesmo padrão de `sigos_abertas`), para a tabela da Validação caber inteira.
+
+**Cuidado (17/11/2026):** `"18 - rh".calc_marcacoes(horário, NULL)` devolve um dia **sem batida** (falta = previsto), não NULL. Ao usar
+num LEFT JOIN, chame só quando a linha existe (`case when tv.funcionario_id is not null then calc_marcacoes(...) end`). Esse erro deixou
+a Análise com H.trab 0 em todos os dias por cerca de uma hora antes da correção. Nas migrações com `do $$ … replace(…) $$`, as marcas de
+texto `$a$`/`$b$` fazem o MCP do Supabase falhar sem mensagem; use `$xa$`/`$xb$`.
 
 **Banco da validação** (`docs/migracao_rh_ponto_validacao.sql`, roda **depois** da migração da carga): `tratativa`, `tratativa_evento`,
 helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
