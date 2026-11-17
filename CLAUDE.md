@@ -486,8 +486,8 @@ direto do hub deve ser `irPara('frota')`, nunca `='home'`. **Fluxos de 2026-10-1
 **RH** (`rh`, home › 🧰 Suporte desde a sw v402; ⚙️ do hub (admin) libera por pessoa o módulo e cada tela — `perfil.rh_telas` + `rh_acesso` (Carga RH), `rh_tela()`/`rhTela()`) — hub com **Meus colaboradores** (abaixo),
 **Carga RH** (`rh_carga`: "Relatório de Ponto do Funcionário" do Kairos em Excel (.xls = HTML; emissão = data do arquivo) ou PDF lido no navegador; recarga do mesmo período desconsidera o que já está no banco, como as Encerradas do SIGOS → base única
 funcionário × dia no schema `18 - rh`; gate `ME.rh_acesso` = admin ou ⚙️ do hub `rh_acesso`), **Validação gestor** (`rh_val`: tabela compacta só com os dias estranhos do
-ponto, filtro por gestor → gestor ajusta marcações / confirma falta / justifica / ok → RH valida depois de corrigir no Kairos ou devolve) e **Análise do
-ponto** (`rh_analise`, estilo BI, sw v400: filtro de área (`perfil.area`), % de inconsistências não tratadas, conformidade, absenteísmo, % HE, pontualidade, por área/gestor/tipo/dia, ranking). Ver docs/MODULOS.md §22.
+ponto, filtro por gestor → gestor ajusta marcações / confirma falta / justifica / ok → RH valida depois de corrigir no Kairos ou devolve; chip **📅 Todo o período** mostra todos os dias, com ou sem inconsistência, sw v410) e **Análise do
+ponto** (`rh_analise`, estilo BI, sw v400: filtro de área (`perfil.area`) e de colaborador (sw v410; todas as áreas para quem tem a tela), % de inconsistências não tratadas, conformidade, absenteísmo, % HE, pontualidade, por área/gestor/tipo/dia, ranking). Ver docs/MODULOS.md §22.
 
 **Meus colaboradores** (`meus_colab`, dentro do hub RH, só aprovador/admin) — substitui a antiga Gestão de
 Pessoas (removida em 2026-10). Aprovador vê os colaboradores **ativos** que o têm como Aprovador 1/2 (admin vê todos):
