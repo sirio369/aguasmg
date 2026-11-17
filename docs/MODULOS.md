@@ -4562,12 +4562,23 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
     Dia sem batida continua abrindo vazio.
   - Depois que a RH **valida** um ajuste, a linha mostra as **batidas ajustadas** com o selo verde "✓ validado" (as do Kairos ficam
     riscadas embaixo) e **H.trab / HE / Falta / Atraso recalculados** com elas, em verde (o valor do Kairos fica no tooltip). Quando
-    uma carga nova do Kairos já traz o ajuste (`kairos_bate`), os números passam a ser os do próprio Kairos.
+    uma carga nova do Kairos substitui o dia, **os números validados continuam valendo** (sw v412; antes a v411 trocava pelos do Kairos).
   - Cálculo: `"18 - rh".calc_marcacoes(horário, marcações)` → `{htrab, he, atraso, falta, prev}`, devolvido em `trat.calc` só para
     `acao='ajustar'`. Regra (calibrada contra o Kairos: bate 100% do H.trab e da falta, ~93% da HE e ~97% do atraso nos dias de 4
     batidas): HE = trabalhado fora do previsto, atraso = previsto não trabalhado; tolerância CLT de 5 min por marcação / 10 min no dia,
     separada para HE e atraso (passou, conta tudo); sem batida = falta do previsto inteiro; dia sem horário = tudo HE. É uma
-    estimativa até o Kairos ser corrigido; a **Análise do ponto ainda usa os números do Kairos**.
+    estimativa do app; desde a sw v412 a **Análise do ponto também usa esses números** (§22.3).
+- **Desligamento vale para os dias seguintes** (sw v412, `docs/migracao_rh_desligamento_propaga.sql`): o 1º dia que o gestor justifica
+  com o motivo **"Desligado da empresa"** vira a origem, e todo dia com inconsistência **depois** dele, do mesmo colaborador, recebe a
+  mesma tratativa automaticamente (`tratativa.auto_de` = data da origem, obs "Desligado desde dd/mm/aaaa (automático)").
+  - Os automáticos **seguem a situação da origem**: aguardando RH, validado (mesma RH/data) ou devolvido. A RH valida ou devolve **só a
+    origem**: `app_rh_val_rh` recusa um dia automático, e a tela esconde Validar/Devolver nele e mostra "↳ segue o dia dd/mm".
+  - Dias que chegarem em cargas futuras entram sozinhos: gatilho `trg_arquivo_deslig` quando `"18 - rh".arquivo.status` vira `ok`. O
+    gatilho fica no arquivo, não em `ponto_dia`, porque o processamento grava dia a dia num loop.
+  - Dia tratado à mão não é tocado. Refazer um dia automático o torna manual. Se o gestor informar um dia anterior, a origem passa para
+    ele. Se a origem deixar de ser desligamento, os automáticos dela são apagados.
+  - Tudo em `"18 - rh".rh_deslig_sync(funcionário)` (sem grant; chamada por `app_rh_val_tratar`, que devolve `auto` = nº de dias
+    preenchidos para o aviso, por `app_rh_val_rh` e pelo gatilho).
 
 ### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
 `app_rh_analise(ini, fim, consórcio, área, funcionário)` (máx. 1 ano) sobre `ponto_dia` + inconsistências. **Desde 2026-11-17 (sw v410,
@@ -4576,6 +4587,10 @@ equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
+  · **Números validados** (sw v412, `docs/migracao_rh_analise_validados.sql`): dia com ajuste de batidas validado pela RH usa as
+  marcações do gestor e H.trab/HE/Atraso/Falta de `calc_marcacoes`, mesmo que uma carga nova do Kairos tenha substituído o dia
+  (CTE `d0`→`d`; `tot.dias_ajuste_val` aparece no cabeçalho como "✓ N dia(s) com ajuste validado"). As inconsistências continuam
+  sendo as do Kairos.
   · **colaborador** (sw v410): `p_funcionario` recalcula todos os indicadores para uma pessoa só; a lista (`funcs`) traz quem tem ponto no
   período, já com consórcio + área aplicados. Clicar num nome do ranking "Por colaborador" também filtra; "✕ limpar" no cabeçalho volta.
 - **KPIs estratégicos** (com selo ok / atenção / crítico — só visual):
