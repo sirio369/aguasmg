@@ -1800,7 +1800,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-go="rh">‹ RH</button></div>
     <h1>Análise do ponto</h1>
     <div class="rh-fl"><span class="rh-dt"><input id="rhanIni" type="date"/><span>a</span><input id="rhanFim" type="date"/></span>
-      <div id="rhanCons" class="rhv-chips"></div><select id="rhanArea" class="rh-sel"><option value="">Todas as áreas</option></select></div>
+      <div id="rhanCons" class="rhv-chips"></div><select id="rhanArea" class="rh-sel"><option value="">Todas as áreas</option></select><select id="rhanFunc" class="rh-sel"><option value="">Todos os colaboradores</option></select></div>
     <div id="rhanView"><p class="sub">Carregando…</p></div>
   </main>
 
@@ -16803,13 +16803,13 @@ const RH_TIPOS={
 };
 const RH_MOTIVOS=['Esquecimento de batida','Problema no relógio / aplicativo','Serviço externo / em campo','Atestado médico','Folga compensada / banco de horas','Desligado da empresa','Outro'];
 const RH_ACOES={ajustar:'✏️ Ajustar entrada/saída',falta:'🚫 Faltou / não trabalhou',justificar:'📝 Teve um problema (justificar)',ok:'✓ Está correto'};
-const RH_ST={pend:['A tratar','warn'],dev:['Devolvido pela RH','bad'],trat:['Tratado · aguarda RH','acc'],val:['Validado pela RH','ok']};
+const RH_ST={pend:['A tratar','warn'],dev:['Devolvido pela RH','bad'],trat:['Tratado · aguarda RH','acc'],val:['Validado pela RH','ok'],sem:['Sem inconsistência','mu']};
 const rhHM=m=>{ if(m==null||m==='') return '—'; m=Math.round(+m); const s=m<0?'-':''; m=Math.abs(m); return s+Math.floor(m/60)+':'+String(m%60).padStart(2,'0'); };
 const rhHoje=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
 const rhAddDias=(iso,n)=>{ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 const rhNorm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const rhDia=iso=>{ try{ return new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.',''); }catch(e){ return ''; } };
-function rhStatus(it){ const t=it.trat; if(!t) return 'pend'; return t.status==='devolvido'?'dev':(t.status==='validado'?'val':'trat'); }
+function rhStatus(it){ const t=it.trat; if(!t) return it.inc===false?'sem':'pend'; return t.status==='devolvido'?'dev':(t.status==='validado'?'val':'trat'); }
 function rhPeriodo(ini,fim,dias){ const a=$(ini), b=$(fim); if(!a.value||!b.value){ b.value=rhHoje(); a.value=rhAddDias(b.value,-dias); } return [a.value,b.value]; }
 
 let rhvDados=null, rhvF={st:'pend',tipo:'',cons:'',q:'',gestor:''}, rhvAberto=null, rhvForm=null, rhvDev=null;
@@ -16835,6 +16835,7 @@ function rhvCss(){
 .rhv-tag{font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .rhv-tag.warn{background:var(--warn-bg);color:var(--warn)} .rhv-tag.bad{background:var(--bad-bg);color:var(--bad)}
 .rhv-tag.ok{background:var(--ok-bg);color:var(--ok)} .rhv-tag.acc{background:var(--bg);color:var(--acc);border:1px solid var(--acc)}
+.rhv-tag.mu{background:var(--bg);color:var(--mut);border:1px solid var(--line)}
 .rhv-m{color:var(--mut);font-size:12px;margin-top:3px}
 .rhv-tw{overflow-x:auto;margin-top:6px;background:var(--card);border:1px solid var(--line);border-radius:10px}
 .rhv-t{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -16888,20 +16889,22 @@ function rhvInit(){
 async function rhvCarregar(){
   const ini=$('#rhvIni').value, fim=$('#rhvFim').value; if(!ini||!fim) return;
   $('#rhvLista').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_rh_val_lista',{p_ini:ini,p_fim:fim}); if(error) throw error; rhvDados=data||{itens:[]}; }
+  try{ const {data,error}=await sb.rpc('app_rh_val_lista',{p_ini:ini,p_fim:fim,p_todos:true}); if(error) throw error; rhvDados=data||{itens:[]}; }
   catch(e){ rhvDados=null; $('#rhvSt').innerHTML=''; $('#rhvCons').innerHTML=''; $('#rhvLista').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc(e.message||e)+'</div>'; return; }
   rhvAberto=null; rhvForm=null; rhvDev=null; rhvRender();
 }
 const rhvKey=it=>it.fid+'|'+it.data;
 function rhvRender(){
   const D=rhvDados; if(!D) return;
-  const its=D.itens||[];
+  // 'tudo' = Todo o período: todos os dias de ponto (com ou sem inconsistência); as outras abas só olham os dias com inconsistência
+  const tudo=rhvF.st==='tudo', all=D.itens||[], its=tudo?all:all.filter(it=>it.inc!==false);
   const q=rhNorm(rhvF.q.trim());
   const consOk=it=>!rhvF.cons||it.consorcio===rhvF.cons;
   const gOk=it=>!rhvF.gestor||(rhvF.gestor==='__sem'?(!it.gestor&&!it.gestor2):(it.gestor===rhvF.gestor||it.gestor2===rhvF.gestor));
-  const base=its.filter(it=>consOk(it)&&gOk(it)&&(!rhvF.tipo||(it.tipos||[]).includes(rhvF.tipo))&&(!q||rhNorm(it.nome+' '+(it.matricula||'')).includes(q)));
+  const fOk=it=>consOk(it)&&gOk(it)&&(!rhvF.tipo||(it.tipos||[]).includes(rhvF.tipo))&&(!q||rhNorm(it.nome+' '+(it.matricula||'')).includes(q));
+  const baseAll=all.filter(fOk), base=baseAll.filter(it=>it.inc!==false);
   const cnt={pend:0,trat:0,val:0}; base.forEach(it=>{ const s=rhStatus(it); cnt[s==='dev'?'pend':s]++; });
-  $('#rhvSt').innerHTML=[['pend','A tratar',cnt.pend],['trat','Aguardando RH',cnt.trat],['val','Validados',cnt.val],['todos','Todos',base.length]]
+  $('#rhvSt').innerHTML=[['pend','A tratar',cnt.pend],['trat','Aguardando RH',cnt.trat],['val','Validados',cnt.val],['todos','Todas inconsistências',base.length],['tudo','📅 Todo o período',baseAll.length]]
     .map(([v,l,n])=>`<button data-st="${v}" class="${v===rhvF.st?'on':''}">${l} ${n}</button>`).join('');
   $('#rhvSt').querySelectorAll('button').forEach(b=>b.onclick=()=>{ rhvF.st=b.dataset.st; rhvAberto=null; rhvRender(); });
   const cs=[...new Set(its.map(it=>it.consorcio).filter(Boolean))];
@@ -16916,8 +16919,8 @@ function rhvRender(){
   const tc={}; its.filter(consOk).filter(gOk).forEach(it=>(it.tipos||[]).forEach(t=>tc[t]=(tc[t]||0)+1));
   $('#rhvTipo').innerHTML='<option value="">Todas as inconsistências</option>'+Object.keys(RH_TIPOS).filter(t=>tc[t])
     .map(t=>`<option value="${t}"${t===rhvF.tipo?' selected':''}>${RH_TIPOS[t][0]} (${tc[t]})</option>`).join('');
-  const lista=base.filter(it=>{ const s=rhStatus(it); return rhvF.st==='todos'||(rhvF.st==='pend'?(s==='pend'||s==='dev'):s===rhvF.st); });
-  if(!its.length){ $('#rhvLista').innerHTML='<p class="sub">Nenhuma inconsistência no período. 🎉</p>'; return; }
+  const lista=tudo?baseAll:base.filter(it=>{ const s=rhStatus(it); return rhvF.st==='todos'||(rhvF.st==='pend'?(s==='pend'||s==='dev'):s===rhvF.st); });
+  if(!its.length){ $('#rhvLista').innerHTML=tudo?'<p class="sub">Nenhum ponto carregado no período.</p>':'<p class="sub">Nenhuma inconsistência no período. 🎉</p>'; return; }
   if(!lista.length){ $('#rhvLista').innerHTML='<p class="sub">Nada nesse filtro.</p>'; return; }
   let ant=null; const nDias={}; lista.forEach(it=>nDias[it.fid]=(nDias[it.fid]||0)+1);
   $('#rhvLista').innerHTML='<div class="rhv-tw"><table class="rhv-t"><thead><tr><th>Data</th><th>Inconsistência</th><th>Batidas</th><th>Horário previsto</th>'
@@ -16932,7 +16935,7 @@ function rhvFaixa(it,n){
 // Uma linha por dia (o colaborador vem na faixa acima); formulário abre numa linha logo abaixo
 function rhvLinha(it){
   const k=rhvKey(it), s=rhStatus(it), t=it.trat, D=rhvDados;
-  const tps=(it.tipos||[]).map(tp=>{ const L=RH_TIPOS[tp]||[tp,'']; return `<span class="tp" title="${vEsc(L[1])}">${vEsc(L[0])}${tp==='interjornada'&&it.interjornada_min!=null?' '+rhHM(it.interjornada_min):''}</span>`; }).join('');
+  const tps=(it.parcial&&!(it.tipos||[]).length?'<span class="sub" style="margin:0">dia parcial</span>':'')+(it.tipos||[]).map(tp=>{ const L=RH_TIPOS[tp]||[tp,'']; return `<span class="tp" title="${vEsc(L[1])}">${vEsc(L[0])}${tp==='interjornada'&&it.interjornada_min!=null?' '+rhHM(it.interjornada_min):''}</span>`; }).join('');
   const mk=(it.marcacoes||[]).length?rhPares(it.marcacoes).map(p=>p[1]?p[0]+'–'+p[1]:p[0]+'–?').join('  '):'<span class="sub" style="margin:0">sem batidas</span>';
   let sit=`<span class="rhv-tag ${RH_ST[s][1]}">${RH_ST[s][0]}</span>`;
   if(t){
@@ -16946,7 +16949,7 @@ function rhvLinha(it){
   }
   const bt=[];
   if(rhvAberto!==k&&rhvDev!==k){
-    if(s!=='val') bt.push(`<button class="${t?'sec':''}" data-a="tratar" data-k="${k}">${t?'Refazer':'Tratar'}</button>`);
+    if(s!=='val'&&s!=='sem') bt.push(`<button class="${t?'sec':''}" data-a="tratar" data-k="${k}">${t?'Refazer':'Tratar'}</button>`);
     if(D.rh&&s==='trat') bt.push(`<button data-a="validar" data-k="${k}" title="Corrigido no Kairos">✓ Validar</button>`,`<button class="sec" data-a="devolver" data-k="${k}">Devolver</button>`);
   }
   const n=v=>v?rhHM(v):'';
@@ -17021,16 +17024,20 @@ async function rhvSalvar(it,b){
 
 // ---------- RH · ANÁLISE DO PONTO ----------
 // Tela `rh_analise` → app_rh_analise(ini, fim, consórcio): KPIs, inconsistências (HE > 2h, descanso < 11h…), HE por dia,
-// por empresa, lista de interjornada < 11h, ranking por colaborador e andamento das tratativas. Aprovador vê só a equipe.
-let rhanCons='', rhanArea='', rhanDados=null, rhanOrd='pend', rhanTodos=false;
+// por empresa, lista de interjornada < 11h, ranking por colaborador e andamento das tratativas. Quem tem a tela vê todas
+// as áreas (2026-11-17); o filtro de colaborador (p_funcionario) mostra os indicadores de uma pessoa só.
+let rhanCons='', rhanArea='', rhanFunc='', rhanDados=null, rhanOrd='pend', rhanTodos=false;
 function rhanInit(){
   if(!rhTela('analise')){ toast('Acesso restrito'); irPara('home'); return; }
   rhvCss(); rhanCss(); rhPeriodo('#rhanIni','#rhanFim',30);
   const v=$('#rhanView');
   if(!v.dataset.ready){ v.dataset.ready='1'; ['#rhanIni','#rhanFim'].forEach(s=>$(s).addEventListener('change',rhanCarregar));
     $('#rhanArea').addEventListener('change',()=>{ rhanArea=$('#rhanArea').value; rhanCarregar(); });
+    $('#rhanFunc').addEventListener('change',()=>{ rhanFunc=$('#rhanFunc').value; rhanCarregar(); });
     v.addEventListener('click',e=>{ const b=e.target.closest('[data-o]'); if(b){ rhanOrd=b.dataset.o; rhanRender(); return; }
+      if(e.target.closest('[data-limpafunc]')){ rhanFunc=''; rhanCarregar(); return; }
       if(e.target.closest('[data-todos]')){ rhanTodos=!rhanTodos; rhanRender(); return; }
+      const fu=e.target.closest('[data-fid]'); if(fu){ rhanFunc=fu.dataset.fid; rhanCarregar(); window.scrollTo(0,0); return; }
       const ar=e.target.closest('[data-area]'); if(ar){ rhanArea=ar.dataset.area; rhanCarregar(); window.scrollTo(0,0); return; }
       if(e.target.closest('[data-irval]')) irPara('rh_val'); }); }
   rhanConsRender(); rhanCarregar();
@@ -17096,7 +17103,7 @@ function rhanConsRender(){
 async function rhanCarregar(){
   const ini=$('#rhanIni').value, fim=$('#rhanFim').value; if(!ini||!fim) return;
   $('#rhanView').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_rh_analise',{p_ini:ini,p_fim:fim,p_consorcio:rhanCons||null,p_area:rhanArea||null}); if(error) throw error; rhanDados=data; }
+  try{ const {data,error}=await sb.rpc('app_rh_analise',{p_ini:ini,p_fim:fim,p_consorcio:rhanCons||null,p_area:rhanArea||null,p_funcionario:rhanFunc?+rhanFunc:null}); if(error) throw error; rhanDados=data; }
   catch(e){ rhanDados=null; $('#rhanView').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc(e.message||e)+'</div>'; return; }
   rhanRender();
 }
@@ -17109,6 +17116,10 @@ function rhanRender(){
   const ars=D.areas||[]; if(rhanArea&&!ars.some(x=>x.nome===rhanArea)) rhanArea='';
   $('#rhanArea').innerHTML='<option value="">Todas as áreas ('+ars.reduce((s,x)=>s+x.n,0)+')</option>'
     +ars.map(x=>`<option value="${vEsc(x.nome)}"${x.nome===rhanArea?' selected':''}>${vEsc(x.nome)} (${x.n})</option>`).join('');
+  // filtro de colaborador (a lista vem do banco com consórcio + área aplicados, sem o próprio filtro)
+  const fns=D.funcs||[]; if(rhanFunc&&!fns.some(x=>String(x.id)===String(rhanFunc))){ rhanFunc=''; return rhanCarregar(); }
+  $('#rhanFunc').innerHTML='<option value="">Todos os colaboradores ('+fns.length+')</option>'
+    +fns.map(x=>`<option value="${x.id}"${String(x.id)===String(rhanFunc)?' selected':''}>${vEsc(x.nome)}${x.sigla?' · '+vEsc(x.sigla):''}</option>`).join('');
   if(!T.funcionarios){ $('#rhanView').innerHTML='<p class="sub">Nenhum ponto carregado nesse período.</p>'; return; }
   const P=D.periodo||{}, I=D.inc||{}, IS=D.inc_st||{}, TR=D.tratativas||{};
   const nInc=(TR.pendentes||0)+(TR.tratadas||0)+(TR.validadas||0);
@@ -17119,7 +17130,8 @@ function rhanRender(){
   const lg='<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Validadas</span></div>';
   const stTag=f=>f?`<span class="st ${f}">${({ok:'✓ ok',warn:'! atenção',bad:'▲ crítico'})[f]}</span>`:'';
   const kp=(lb,v,d,f)=>`<div class="rhan-c rhan-kp"><span class="lb">${lb}</span>${stTag(f)}<b class="v">${v}</b><span class="d">${d}</span></div>`;
-  let h=`<div class="rhan-hd"><span>${rhanArea?'<b style="color:var(--ink)">'+vEsc(rhanArea)+'</b> · ':''}${rhcN(T.funcionarios)} colaboradores · dados de ${fmtData(P.data_min)} a ${fmtData(P.data_max)}${P.parciais?' · '+P.parciais+' dia(s) ainda parciais':''}</span>`
+  const fSel=rhanFunc?fns.find(x=>String(x.id)===String(rhanFunc)):null;
+  let h=`<div class="rhan-hd"><span>${fSel?'<b style="color:var(--ink)">'+vEsc(fSel.nome)+'</b> <button class="rhv-lk" style="margin:0" data-limpafunc>✕ limpar</button> · ':''}${rhanArea?'<b style="color:var(--ink)">'+vEsc(rhanArea)+'</b> · ':''}${rhcN(T.funcionarios)} colaboradores · dados de ${fmtData(P.data_min)} a ${fmtData(P.data_max)}${P.parciais?' · '+P.parciais+' dia(s) ainda parciais':''}</span>`
     +`<button class="rhv-lk" style="margin:0" data-irval>Abrir a Validação gestor ›</button></div>`;
   // ---- KPIs estratégicos
   h+='<div class="rhan-g k5">'
@@ -17176,9 +17188,9 @@ function rhanRender(){
   const fs=[...(D.func||[])].map(f=>({...f,abs:f.prev?f.falta/f.prev:0})).sort((a,b)=>(b[rhanOrd]||0)-(a[rhanOrd]||0)||String(a.nome).localeCompare(b.nome));
   const vis=rhanTodos?fs:fs.slice(0,20);
   const fmt=(c,v,f)=>c==='abs'?(f.prev?rhPc(f.falta,f.prev,0):'—'):(c==='he'||c==='atraso'||c==='htrab')?rhHM(v):(v||'')+(v&&(c==='dias_falta'||c==='dias_he2')?' d':'');
-  h+='<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
+  h+='<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar ou num nome para filtrar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
     +cols.map(([c,l])=>`<th class="n${c===rhanOrd?' on':''}" data-o="${c}">${vEsc(l)}</th>`).join('')+'</tr>'
-    +vis.map(f=>`<tr><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
+    +vis.map(f=>`<tr${f.fid&&!rhanFunc?` data-fid="${f.fid}" style="cursor:pointer" title="Ver os indicadores só desta pessoa"`:''}><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
       +cols.map(([c])=>`<td class="n${c==='pend'&&f.pend?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
     +'</table></div>'+(fs.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fs.length+')'}</button>`:'')+'</div>';
   $('#rhanView').innerHTML=h;

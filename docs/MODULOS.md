@@ -4549,12 +4549,22 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
   devolução/validação da RH e conferência com o Kairos aparecem logo abaixo). O formulário abre numa
   linha logo abaixo. **Só aparecem os dias com inconsistência** — dias corretos, folgas/DSR e dias parciais ficam fora (na 1ª carga
   real, 01–13/11: 257 dias com inconsistência de 520; 61 dias trabalhados sem nada, 157 de folga/DSR/feriado, 40 parciais). Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
+- **📅 Todo o período** (sw v410, `docs/migracao_rh_val_todo_periodo.sql`): 5º chip, depois de A tratar / Aguardando RH / Validados /
+  **Todas inconsistências** (ex-"Todos"). Mostra **todos os dias de ponto** dos colaboradores que o gestor vê, com ou sem inconsistência,
+  para ver o histórico inteiro de uma pessoa (use a busca). Dia sem inconsistência aparece com o selo cinza "Sem inconsistência" e
+  **sem botão Tratar**; dia parcial sem inconsistência mostra "dia parcial". A tela chama `app_rh_val_lista(ini, fim, p_todos => true)`
+  (cada item traz `inc` = tem inconsistência, e `parcial`) e filtra no navegador: as 4 primeiras abas e as contagens de gestor/consórcio
+  só olham `inc`. Sem `p_todos` a RPC devolve só os dias com inconsistência, como antes (compatível com a v409).
 
 ### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
-`app_rh_analise(ini, fim, consórcio, área)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências.
+`app_rh_analise(ini, fim, consórcio, área, funcionário)` (máx. 1 ano) sobre `ponto_dia` + inconsistências. **Desde 2026-11-17 (sw v410,
+`docs/migracao_rh_val_todo_periodo.sql`) quem tem a tela `analise` vê todos os colaboradores de todas as áreas** (antes: aprovador só a
+equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
+  · **colaborador** (sw v410): `p_funcionario` recalcula todos os indicadores para uma pessoa só; a lista (`funcs`) traz quem tem ponto no
+  período, já com consórcio + área aplicados. Clicar num nome do ranking "Por colaborador" também filtra; "✕ limpar" no cabeçalho volta.
 - **KPIs estratégicos** (com selo ok / atenção / crítico — só visual):
   - **Inconsistências ainda não tratadas** (destaque): % dos dias com inconsistência sem tratativa do gestor (devolvido conta como
     não tratado) + barra empilhada a tratar / aguardando RH / validadas.
