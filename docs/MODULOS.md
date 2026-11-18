@@ -3788,6 +3788,12 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     **Desktop (sw v426):** a tela usa a largura toda (como RH/OS Pendentes); gráficos em 2 colunas a partir de 1040 px,
     tabelas e cartões na linha inteira, SVG do gráfico mensal na largura da coluna (re-render no resize), barras com largura máxima.
     **Visão geral removida** (2026-11-18, a pedido do usuário): a tela abre em Acidentes; a matriz por Área saiu junto.
+    **Layout novo (sw v427):** páginas em abas no topo (`#sbNav`, sublinhado, fixas ao rolar logo abaixo do cabeçalho do app; no
+    celular rolam na horizontal e a aba ativa fica visível); filtros num cartão `.sbfil` com rótulo em cada campo — Período (de/até +
+    atalhos Tudo / Mês atual / Últimos 3 meses / Ano atual, pelo `hoje` do banco), Consórcio, Área e as segmentações da página
+    (`#sbSegs`) — e **Limpar filtros** (zera tudo, inclusive segmentações; desabilitado sem filtro). Campo com valor fica em negrito;
+    sem o contorno azul global de `select` (escopado em `#sst_bi .sbfil`). Cartões `.sbk` (rótulo em cima, valor grande, contexto
+    embaixo), tabelas com cabeçalho fixo e linhas zebradas.
   - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
     acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com OS + responsável pela
     intervenção e assinatura, e **tratativa de NC** (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
