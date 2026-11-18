@@ -1676,6 +1676,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="sec" style="margin-top:20px">📊 Indicadores SST</div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-go="sst_painel"><div class="ic">📈</div><div class="nm">Painel SST</div></button>
+      <button class="mod" data-go="sst_bi"><div class="ic">📊</div><div class="nm">BI QSMS</div></button>
       <button class="mod" data-go="sst_lanc"><div class="ic">📋</div><div class="nm">Inspeções, DDS e ocorrências</div></button>
       <button class="mod" data-go="sst_aso"><div class="ic">🩺</div><div class="nm">ASO</div></button>
       <button class="mod" data-go="sst_trein"><div class="ic">🎓</div><div class="nm">Treinamentos</div></button>
@@ -1729,6 +1730,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Os mesmos indicadores do BI QSMS, calculados pelas mesmas views: acidentes, inspeções, DDS, saúde, treinamentos e CIPA. Toque num número para abrir a lista.</p>
     <div class="segfil"><input type="date" id="spDe" title="De"/><input type="date" id="spAte" title="Até"/><select id="spCons"><option value="">Ambos os consórcios</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select></div>
     <div id="spView"></div>
+  </main>
+
+  <main id="sst_bi" class="hidden">
+    <div class="bar"><button class="bk" data-go="qsms">‹ QSMS</button></div>
+    <h1>BI QSMS</h1>
+    <p class="sub">As páginas do BI QSMS (Power BI) dentro do app: as mesmas views e a mesma regra de cálculo. Sem datas = todo o histórico, como o BI aberto sem filtro.</p>
+    <div class="segfil"><input type="date" id="sbDe" title="De"/><input type="date" id="sbAte" title="Até"/><button type="button" class="btn ghost" id="sbLimpa" style="margin:0;width:auto;padding:9px 12px">Todo o período</button><select id="sbCons"><option value="">Ambos os consórcios</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select><select id="sbArea"><option value="">Todas as áreas</option></select></div>
+    <div id="sbView"></div>
   </main>
 
   <main id="sst_lanc" class="hidden">
@@ -2594,7 +2603,7 @@ if($('#prMeuLocal')) $('#prMeuLocal').addEventListener('click',()=>{
 });
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','suprimentos','pr_prod','pressao_reg','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','hd_caixas','hdcx_cad','hdcx_mov','hdcx_bi','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','suprimentos','pr_prod','pressao_reg','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','hd_caixas','hdcx_cad','hdcx_mov','hdcx_bi','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_bi','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 const FISCAL_TELAS=['home','fisc','fiscv','fiscv_rel','cadastro','biblioteca','notificacoes'];
 function irPara(id){
   if(ME&&ME.is_fiscal){ if(!FISCAL_TELAS.includes(id)) id='home'; if(id==='fisc') id='fiscv'; }
@@ -2658,6 +2667,7 @@ function irPara(id){
   if(id==='qsms_cesta') qsmsCestaInit();
   if(id==='qsms_acesso') qsmsAcInit();
   if(id==='sst_painel') sgPainelInit();
+  if(id==='sst_bi') sbInit();
   if(id==='sst_lanc') sgLancInit();
   if(id==='sst_aso') sgAsoInit();
   if(id==='sst_trein') sgTreinInit();
@@ -15023,6 +15033,249 @@ async function sgPainelCarregar(){ const v=$('#spView'); v.innerHTML='<p class="
     // NC pendente/vencida e ação aberta não dependem do período: abre com um ano para trás
     if(['pend','venc','acoes','registrada'].includes(f)){ const h0=new Date(); h0.setFullYear(h0.getFullYear()-1); $('#slDe').value=qsmsDia(h0); $('#slAte').value=qsmsDia(new Date()); }
     irPara('sst_lanc'); }); }
+
+// ===== BI QSMS (sst_bi): as 8 páginas do Power BI QSMS no app =====
+// Mesmas views do BI (app_sst_bi devolve as linhas de bi_sst_*) e a mesma regra das medidas DAX, calculada aqui.
+// Período = relação com o Calendário do BI (Data; Treinamentos pela Data de Realização). Saúde e CIPA Membros não têm
+// data (situação de hoje); as medidas de situação dos treinamentos e "Dias sem acidente" ignoram o período, como no BI.
+// Área filtra tudo menos a CIPA (no BI a CIPA não tem relação com Área). "Sem dados" = tabela inteira vazia (cartão do BI).
+const SB_ABAS=[['geral','Visão geral'],['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA']];
+// segmentações de cada página do BI: [tabela, coluna]
+const SB_SEG={acid:[['acidentes','Gravidade'],['acidentes','Tipo']],vinc:[['vinculo','Vínculo'],['vinculo','Empresa']],
+  insp:[['inspecoes','Cargo'],['inspecoes','Responsável']],saude:[['saude','Cargo'],['saude','Tipo de Exame'],['saude','Situação ASO']],
+  dds:[['dds','Tema'],['dds','Responsável']],trein:[['treinamentos','Treinamento'],['treinamentos','Cargo'],['treinamentos','Situação']],
+  cipa:[['cipa_membros','Tipo'],['cipa_membros','Representação'],['cipa_membros','Situação do Mandato']]};
+let sbi={aba:'geral',r:null,seg:{}};
+const SB_COR=['#0e639c','#e07b39','#1a7f4b','#b3261e','#8a5a00','#7c3aed','#94a3b8'];
+const SB_OK='#1a7f4b', SB_AV='#d97706', SB_VE='#b3261e', SB_PR='#0e639c', SB_SD='#94a3b8';
+const SB_MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const sbN=v=>+v||0;
+const sbPct=v=>v==null||Number.isNaN(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';   // formato 0.0% do BI
+const sbCnt=(rows,c,v)=>rows.filter(x=>Array.isArray(v)?v.includes(x[c]):x[c]===v).length;
+const sbSum=(rows,c)=>rows.reduce((s,x)=>s+sbN(x[c]),0);
+const sbDiv=(a,b)=>b?a/b:null;   // DIVIDE do DAX: divisor 0 → vazio
+const sbDias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
+const sbMesL=k=>SB_MES[+k.slice(5,7)-1]+'/'+k.slice(2,4);
+const sbNum1=v=>(+v).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const sbFmt=(v,t)=>v==null||Number.isNaN(v)?'Sem dados':t==='%'?sbPct(v):t==='d'?sgDia(v):t==='1'?(Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}):Math.round(v).toLocaleString('pt-BR');
+const sbVz=tab=>!!(sbi.r&&sbi.r.vazias&&sbi.r.vazias[tab]);
+const sbC=(v,t,tab)=>sbVz(tab)?'Sem dados':sbFmt(v,t);
+const sbK=(l,v,t,tab,ctx,al)=>{ const s=sbC(v,t,tab); return `<div class="segkpi ${al&&v&&s!=='Sem dados'?'alerta':''}"><b${s==='Sem dados'?' class="sbsd"':''}>${s}</b><span>${l}</span>${ctx?`<i class="sbctx">${ctx}</i>`:''}</div>`; };
+const sbKs=a=>'<div class="segkpis">'+a.join('')+'</div>';
+const sbBox=(t,html)=>`<div class="sbbox"><div class="sbt">${t}</div>${html}</div>`;
+const sbVazio='<p class="sub" style="font-size:12px">Sem dados no filtro.</p>';
+// linhas de uma tabela com os filtros da tela: Área (menos CIPA), período (col de data) e as segmentações da página
+function sbF(tab,{periodo=true,col='Data'}={}){ const r=sbi.r||{}, de=$('#sbDe').value, ate=$('#sbAte').value, ar=$('#sbArea').value;
+  const seg=(SB_SEG[sbi.aba]||[]).filter(([t])=>t===tab);
+  return (r[tab]||[]).filter(x=>{
+    if(ar && tab!=='cipa_membros' && tab!=='cipa_reunioes' && x['Área']!==ar) return false;
+    if(periodo && (de||ate)){ const d=x[col]; if(!d) return false; if(de&&d<de) return false; if(ate&&d>ate) return false; }
+    for(const [,c] of seg){ const f=sbi.seg[sbi.aba+'|'+c]; if(f && String(x[c]??'')!==f) return false; }
+    return true; }); }
+// ---- medidas (espelho do _Medidas do BI) ----
+function sbAcid(A){ return {n:A.length,com:sbCnt(A,'Classificação','Com Afastamento'),sem:sbCnt(A,'Classificação','Sem Afastamento'),
+  graves:sbCnt(A,'Gravidade',['Grave','Fatal']),dp:sbSum(A,'Dias Perdidos'),dd:sbSum(A,'Dias Debitados')}; }
+function sbDiasSem(Aall){ const u=Aall.filter(x=>x['Classificação']==='Com Afastamento').map(x=>x['Data']).filter(Boolean).sort().pop(); return u?sbDias(u,sbi.r.hoje):null; }
+function sbVinc(V){ const n=V.length, ter=sbCnt(V,'Vínculo','Terceiro'), ac=V.filter(x=>x['Ação Corretiva']!=null), conc=sbCnt(ac,'Status da Ação','Concluída');
+  return {n,pro:sbCnt(V,'Vínculo','Próprio'),ter,pTer:sbDiv(ter,n),pCat:sbDiv(sbCnt(V,'CAT Emitida','Sim'),n),dp:sbSum(V,'Dias Perdidos'),
+    acoes:ac.length,conc,aberto:ac.length-conc,venc:sbCnt(ac,'Ação Vencida','Sim')}; }
+function sbInsp(I){ const it=sbSum(I,'Itens Verificados'), nc=sbSum(I,'NCs Encontradas'), tr=sbSum(I,'NCs Tratadas');
+  return {n:I.length,it,nc,tr,pend:nc-tr,conf:sbDiv(it-nc,it),trat:sbDiv(tr,nc)}; }
+function sbSaude(S){ const n=S.length, em=sbCnt(S,'Situação ASO','Em dia'), av=sbCnt(S,'Situação ASO','A vencer (30 dias)'), ve=sbCnt(S,'Situação ASO','Vencido');
+  return {n,colab:new Set(S.map(x=>x['Matrícula'])).size,em,av,ve,valid:sbDiv(em+av,n),
+    audV:sbCnt(S,'Situação Audiometria','Vencida'),audA:sbCnt(S,'Situação Audiometria','A vencer (30 dias)')}; }
+function sbDds(D){ const p=sbSum(D,'Participantes'), e=sbSum(D,'Efetivo da Área');
+  return {n:D.length,p,e,part:sbDiv(p,e),horas:sbSum(D,'Duração (min)')/60,hh:D.reduce((s,x)=>s+sbN(x['Participantes'])*sbN(x['Duração (min)']),0)/60}; }
+// T = filtrada pelo período (Data de Realização); Tt = sem período (medidas de situação têm REMOVEFILTERS('Calendário'))
+function sbTrein(T,Tt){ const ok=sbCnt(Tt,'Situação','Válido'), av=sbCnt(Tt,'Situação','A vencer (60 dias)'), ve=sbCnt(Tt,'Situação','Vencido');
+  const conc=T.filter(x=>x['Status de Realização']==='Concluído'), hid=new Map();
+  conc.forEach(x=>hid.set(x['ID']+'|'+x['Carga Horária (h)'],sbN(x['Carga Horária (h)'])));
+  return {reg:T.length,colab:new Set(T.map(x=>x['Colaborador'])).size,real:conc.length,horas:[...hid.values()].reduce((a,b)=>a+b,0),
+    semData:sbCnt(Tt,'Situação','Sem data de realização'),ok,av,ve,prog:sbCnt(Tt,'Situação','Não realizado'),emDia:sbDiv(ok+av,ok+av+ve)}; }
+function sbCipa(CM,CR){ const at=CM.filter(x=>x['Situação do Mandato']==='Ativo'), fim=at.map(x=>x['Fim do Mandato']).filter(Boolean).sort().pop()||null;
+  return {at:at.length,tit:sbCnt(at,'Tipo','Titular'),sup:sbCnt(at,'Tipo','Suplente'),reun:CR.length,
+    pres:sbDiv(sbSum(CR,'Presentes'),sbSum(CR,'Total de Membros')),fim,dias:fim?sbDias(sbi.r.hoje,fim):null}; }
+// ---- agrupamentos ----
+function sbMeses(sets){ const k=new Set(); sets.forEach(([rows,col])=>rows.forEach(x=>{ if(x[col]) k.add(String(x[col]).slice(0,7)); })); return [...k].sort(); }
+const sbSerie=(ks,rows,col,f)=>ks.map(k=>f(rows.filter(x=>x[col]&&String(x[col]).slice(0,7)===k)));
+// [{k, v:[...]}] por categoria; ordem pelo 1º valor (maior primeiro), como os gráficos de barra do BI
+function sbPor(rows,col,fns){ const g=new Map(); rows.forEach(x=>{ const k=x[col]==null||x[col]===''?'(em branco)':String(x[col]); if(!g.has(k)) g.set(k,[]); g.get(k).push(x); });
+  return [...g.entries()].map(([k,rs])=>({k,v:fns.map(f=>f(rs))})).filter(o=>o.v.some(v=>v)).sort((a,b)=>(b.v.reduce((s,v)=>s+(v||0),0)-a.v.reduce((s,v)=>s+(v||0),0))||a.k.localeCompare(b.k,'pt-BR')); }
+const sbStep=m=>{ const r=Math.max(1,m/4), p=Math.pow(10,Math.floor(Math.log10(r))), f=r/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; };
+const sbLeg=ss=>ss.length>1||ss.some(s=>s.linha)?'<div class="sbleg">'+ss.map(s=>`<span><i style="background:${s.cor}${s.linha?';height:3px;border-radius:0':''}"></i>${segH(s.nome)}</span>`).join('')+'</div>':'';
+// colunas por mês (empilhadas ou agrupadas) + linha de % opcional no eixo da direita (0–100%)
+function sbColChart(ks,series,linha,{stack=false}={}){ if(!ks.length) return sbVazio;
+  const W=Math.max(340,ks.length*58+70), H=210, pl=34, pr=linha?40:12, pt=16, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
+  const tot=ks.map((_,i)=>stack?series.reduce((s,se)=>s+(se.v[i]||0),0):Math.max(0,...series.map(se=>se.v[i]||0)));
+  const mx=sbStep(Math.max(1,...tot))*4; let g='';
+  for(let j=0;j<=4;j++){ const y=pt+ih-ih*j/4; g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+3}" text-anchor="end" class="sbax">${sbNum1(mx*j/4)}</text>`;
+    if(linha) g+=`<text x="${W-pr+5}" y="${y+3}" class="sbax">${j*25}%</text>`; }
+  ks.forEach((k,i)=>{ const x0=pl+i*bw; g+=`<text x="${x0+bw/2}" y="${H-pb+15}" text-anchor="middle" class="sbax">${sbMesL(k)}</text>`;
+    if(stack){ let acc=0; series.forEach(se=>{ const v=se.v[i]||0; if(!v) return; const y=pt+ih-ih*(acc+v)/mx; acc+=v;
+        g+=`<rect x="${x0+bw*.2}" y="${y}" width="${bw*.6}" height="${ih*v/mx}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
+      if(tot[i]) g+=`<text x="${x0+bw/2}" y="${pt+ih-ih*tot[i]/mx-4}" text-anchor="middle" class="sbval">${sbNum1(tot[i])}</text>`; }
+    else { const w=bw*.7/series.length; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x0+bw*.15+j*w;
+        g+=`<rect x="${x}" y="${pt+ih-h}" width="${Math.max(1,w-2)}" height="${h}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`+(v?`<text x="${x+w/2-1}" y="${pt+ih-h-4}" text-anchor="middle" class="sbval">${sbNum1(v)}</text>`:''); }); } });
+  if(linha){ const pts=ks.map((k,i)=>linha.v[i]==null?null:[pl+i*bw+bw/2,pt+ih-ih*Math.max(0,Math.min(1,linha.v[i])),k,linha.v[i]]).filter(Boolean);
+    if(pts.length>1) g+=`<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" stroke="${linha.cor}" stroke-width="2"/>`;
+    pts.forEach(p=>{ g+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${linha.cor}"><title>${segH(sbMesL(p[2])+' · '+linha.nome+': '+sbPct(p[3]))}</title></circle><text x="${p[0]}" y="${p[1]-7}" text-anchor="middle" class="sbval" style="fill:${linha.cor}">${sbPct(p[3])}</text>`; }); }
+  return `<div class="sbchart"><svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block">${g}</svg></div>`+sbLeg([...series,...(linha?[{nome:linha.nome,cor:linha.cor,linha:1}]:[])]); }
+// barras horizontais por categoria: empilhadas (1 barra com segmentos) ou agrupadas (1 barra por série)
+function sbBarH(rows,series,{stack=false,pct=false,max=20}={}){ if(!rows.length) return sbVazio;
+  const fm=v=>pct?sbPct(v):sbNum1(v||0), rs=rows.slice(0,max);
+  const mx=pct?Math.max(1,...rs.flatMap(r=>r.v.map(v=>v||0))):Math.max(1e-9,...rs.map(r=>stack?r.v.reduce((s,v)=>s+(v||0),0):Math.max(...r.v.map(v=>v||0))));
+  const h=rs.map(r=>{ const tip=segH(r.k+' · '+series.map((s,i)=>s.nome+': '+fm(r.v[i])).join(' · '));
+    const barra=stack?`<span>${r.v.map((v,i)=>v?`<i style="width:${v*100/mx}%;background:${series[i].cor}"></i>`:'').join('')}</span>`
+      :series.map((s,i)=>`<span><i style="width:${(r.v[i]||0)*100/mx}%;background:${s.cor}"></i></span>`).join('');
+    const val=stack?fm(r.v.reduce((s,v)=>s+(v||0),0)):r.v.map(fm).join(' · ');
+    return `<div class="sbhb" title="${tip}"><span class="l">${segH(r.k)}</span><span class="t">${barra}</span><span class="v">${val}</span></div>`; }).join('');
+  return h+(rows.length>max?`<p class="sub" style="font-size:11px">Mostrando ${max} de ${rows.length}.</p>`:'')+sbLeg(series); }
+// tabela de detalhe: cols = [rótulo, coluna|fn, tipo t|n|d|%]
+function sbTab(rows,cols,max=300){ if(!rows.length) return sbVazio;
+  const cel=(v,t)=>v==null||v===''?'—':t==='d'?sgDia(v):t==='%'?sbPct(v):t==='n'?sbNum1(v):segH(v);
+  return `<div class="sbtw"><table class="sgtab"><tr>${cols.map(([l,,t])=>`<th${t==='n'||t==='%'?' class="n"':''}>${l}</th>`).join('')}</tr>${rows.slice(0,max).map(x=>'<tr>'+cols.map(([,k,t])=>`<td${t==='n'||t==='%'?' class="n"':''}>${cel(typeof k==='function'?k(x):x[k],t)}</td>`).join('')+'</tr>').join('')}</table></div>`
+    +(rows.length>max?`<p class="sub" style="font-size:11px">Mostrando ${max} de ${rows.length}.</p>`:''); }
+// ---- páginas (mesmos visuais do BI) ----
+const SB_PAG={
+geral(){ const A=sbF('acidentes'), I=sbF('inspecoes'), D=sbF('dds'), S=sbF('saude',{periodo:false}), T=sbF('treinamentos',{col:'Data de Realização'}), Tt=sbF('treinamentos',{periodo:false});
+  const a=sbAcid(A), i=sbInsp(I), d=sbDds(D), s=sbSaude(S), t=sbTrein(T,Tt);
+  let h=sbKs([sbK('Acidentes',a.n,'n','acidentes',`C/ afast.: ${sbC(a.com,'n','acidentes')} · dias perdidos: ${sbC(a.dp,'n','acidentes')}`,1),
+    sbK('Dias sem acidente c/ afastamento',sbDiasSem(sbF('acidentes',{periodo:false})),'n','acidentes'),
+    sbK('% Conformidade',i.conf,'%','inspecoes',`Participação no DDS: ${sbC(d.part,'%','dds')}`),
+    sbK('% ASO válidos',s.valid,'%','saude',`Treinamentos em dia: ${sbC(t.emDia,'%','treinamentos')}`)]);
+  const ka=sbMeses([[A,'Data']]);
+  h+=sbBox('Acidentes por mês',sbColChart(ka,[{nome:'Com afastamento',cor:SB_VE,v:sbSerie(ka,A,'Data',x=>sbCnt(x,'Classificação','Com Afastamento'))},
+    {nome:'Sem afastamento',cor:SB_COR[1],v:sbSerie(ka,A,'Data',x=>sbCnt(x,'Classificação','Sem Afastamento'))}],null,{stack:true}));
+  const ki=sbMeses([[I,'Data'],[D,'Data']]);
+  h+=sbBox('Inspeções, DDS e conformidade por mês',sbColChart(ki,[{nome:'Inspeções',cor:SB_COR[0],v:sbSerie(ki,I,'Data',x=>x.length)},{nome:'DDS realizados',cor:SB_COR[1],v:sbSerie(ki,D,'Data',x=>x.length)}],
+    {nome:'% Conformidade',cor:SB_OK,v:sbSerie(ki,I,'Data',x=>sbInsp(x).conf)}));
+  // matriz por Área (mesmas 10 medidas do BI)
+  const ar=[...new Set([A,I,D,S,Tt].flatMap(rs=>rs.map(x=>x['Área'])).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'pt-BR'));
+  const lin=k=>{ const f=rs=>k==null?rs:rs.filter(x=>x['Área']===k); const a=sbAcid(f(A)), i=sbInsp(f(I)), d=sbDds(f(D)), s=sbSaude(f(S)), t=sbTrein([],f(Tt));
+    return {k:k==null?'Total':k,v:[a.n,a.com,a.dp,i.n,i.conf,i.pend,d.n,d.part,s.ve,t.ve]}; };
+  const rows=ar.map(lin).filter(o=>o.v.some(v=>v)), tot=lin(null), tp=['n','n','n','n','%','n','n','%','n','n'];
+  const cel=(v,t)=>`<td class="n">${v==null?'—':t==='%'?sbPct(v):sbNum1(v)}</td>`;
+  h+=sbBox('Indicadores por área',rows.length?`<div class="sbtw"><table class="sgtab"><tr><th>Área</th>${['Acidentes','C/ afast.','Dias perdidos','Inspeções','% Conf.','NCs pend.','DDS','% Part. DDS','ASO venc.','Trein. venc.'].map(x=>`<th class="n">${x}</th>`).join('')}</tr>
+    ${rows.map(o=>`<tr><td>${segH(o.k)}</td>${o.v.map((v,j)=>cel(v,tp[j])).join('')}</tr>`).join('')}<tr class="sbtot"><td>Total</td>${tot.v.map((v,j)=>cel(v,tp[j])).join('')}</tr></table></div>`:sbVazio);
+  return h; },
+acid(){ const A=sbF('acidentes'), a=sbAcid(A);
+  let h=sbKs([sbK('Acidentes',a.n,'n','acidentes',`C/ afast.: ${sbC(a.com,'n','acidentes')} · s/ afast.: ${sbC(a.sem,'n','acidentes')}`,1),
+    sbK('Acidentes graves',a.graves,'n','acidentes','',1),sbK('Dias perdidos',a.dp,'n','acidentes',`Dias debitados: ${sbC(a.dd,'n','acidentes')}`),
+    sbK('Dias sem acidente c/ afastamento',sbDiasSem(sbF('acidentes',{periodo:false})),'n','acidentes')]);
+  h+=sbBox('Acidentes por área',sbBarH(sbPor(A,'Área',[x=>sbCnt(x,'Classificação','Com Afastamento'),x=>sbCnt(x,'Classificação','Sem Afastamento')]),
+    [{nome:'Com afastamento',cor:SB_VE},{nome:'Sem afastamento',cor:SB_COR[1]}],{stack:true}));
+  h+=sbBox('Parte do corpo',sbBarH(sbPor(A,'Parte do Corpo',[x=>x.length]),[{nome:'Acidentes',cor:SB_COR[0]}]));
+  h+=sbBox('Causa principal',sbBarH(sbPor(A,'Causa Principal',[x=>x.length]),[{nome:'Acidentes',cor:SB_COR[0]}]));
+  h+=sbBox('Acidentes',sbTab(A,[['Data','Data','d'],['Área','Área'],['Setor','Setor'],['Tipo','Tipo'],['Classificação','Classificação'],['Gravidade','Gravidade'],
+    ['Parte do corpo','Parte do Corpo'],['Dias perdidos','Dias Perdidos','n'],['Causa principal','Causa Principal'],['Descrição','Descrição']]));
+  return h; },
+vinc(){ const V=sbF('vinculo'), v=sbVinc(V);
+  let h=sbKs([sbK('Acidentes (vínculo)',v.n,'n','vinculo',`Próprios: ${sbC(v.pro,'n','vinculo')} · terceiros: ${sbC(v.ter,'n','vinculo')}`),
+    sbK('% Terceiros',v.pTer,'%','vinculo'),sbK('% com CAT',v.pCat,'%','vinculo'),
+    sbK('Ações em aberto',v.aberto,'n','vinculo',`Vencidas: ${sbC(v.venc,'n','vinculo')}`,1)]);
+  const k=sbMeses([[V,'Data']]);
+  h+=sbBox('Próprios × terceiros por mês',sbColChart(k,[{nome:'Próprios',cor:SB_COR[0],v:sbSerie(k,V,'Data',x=>sbCnt(x,'Vínculo','Próprio'))},
+    {nome:'Terceiros',cor:SB_COR[1],v:sbSerie(k,V,'Data',x=>sbCnt(x,'Vínculo','Terceiro'))}],null,{stack:true}));
+  h+=sbBox('Por empresa',sbBarH(sbPor(V,'Empresa',[x=>x.length,x=>sbSum(x,'Dias Perdidos')]),[{nome:'Acidentes',cor:SB_COR[0]},{nome:'Dias perdidos',cor:SB_COR[4]}]));
+  h+=sbBox('Ações corretivas por status',sbBarH(sbPor(V.filter(x=>x['Ação Corretiva']!=null),'Status da Ação',[x=>x.length]),[{nome:'Ações corretivas',cor:SB_COR[0]}]));
+  h+=sbBox('Acidentes e ações',sbTab(V,[['Data','Data','d'],['Vínculo','Vínculo'],['Empresa','Empresa'],['Área','Área'],['Gravidade','Gravidade'],['CAT','CAT Emitida'],
+    ['Ação corretiva','Ação Corretiva'],['Responsável','Responsável'],['Prazo','Prazo','d'],['Status','Status da Ação'],['Vencida','Ação Vencida']]));
+  return h; },
+insp(){ const I=sbF('inspecoes'), i=sbInsp(I);
+  let h=sbKs([sbK('Inspeções',i.n,'n','inspecoes',`Itens verificados: ${sbC(i.it,'n','inspecoes')}`),
+    sbK('NCs encontradas',i.nc,'n','inspecoes',`Tratadas: ${sbC(i.tr,'n','inspecoes')} · pendentes: ${sbC(i.pend,'n','inspecoes')}`),
+    sbK('% Conformidade',i.conf,'%','inspecoes'),sbK('% Tratativas concluídas',i.trat,'%','inspecoes')]);
+  const k=sbMeses([[I,'Data']]);
+  h+=sbBox('Inspeções e conformidade por mês',sbColChart(k,[{nome:'Inspeções',cor:SB_COR[0],v:sbSerie(k,I,'Data',x=>x.length)}],{nome:'% Conformidade',cor:SB_OK,v:sbSerie(k,I,'Data',x=>sbInsp(x).conf)}));
+  h+=sbBox('Inspeções por cargo',sbBarH(sbPor(I,'Cargo',[x=>x.length]),[{nome:'Inspeções',cor:SB_COR[0]}]));
+  h+=sbBox('NCs por área',sbBarH(sbPor(I,'Área',[x=>sbSum(x,'NCs Encontradas'),x=>sbSum(x,'NCs Tratadas')]),[{nome:'NCs encontradas',cor:SB_VE},{nome:'NCs tratadas',cor:SB_OK}]));
+  h+=sbBox('Inspeções',sbTab(I,[['Data','Data','d'],['Área','Área'],['Responsável','Responsável'],['Cargo','Cargo'],['Itens','Itens Verificados','n'],['NCs','NCs Encontradas','n'],
+    ['% Conf.',x=>sbInsp([x]).conf,'%'],['Tratadas','NCs Tratadas','n'],['% Trat.',x=>sbInsp([x]).trat,'%'],['Observações','Observações']]));
+  return h; },
+saude(){ const S=sbF('saude',{periodo:false}), s=sbSaude(S);
+  let h=sbKs([sbK('Colaboradores (ASO)',s.colab,'n','saude',`ASO em dia: ${sbC(s.em,'n','saude')}`),
+    sbK('ASO vencidos',s.ve,'n','saude',`A vencer em 30 dias: ${sbC(s.av,'n','saude')}`,1),sbK('% ASO válidos',s.valid,'%','saude'),
+    sbK('Audiometrias vencidas',s.audV,'n','saude',`A vencer em 30 dias: ${sbC(s.audA,'n','saude')}`,1)]);
+  h+=sbBox('Situação do ASO por área',sbBarH(sbPor(S,'Área',[x=>sbCnt(x,'Situação ASO','Em dia'),x=>sbCnt(x,'Situação ASO','A vencer (30 dias)'),x=>sbCnt(x,'Situação ASO','Vencido')]),
+    [{nome:'Em dia',cor:SB_OK},{nome:'A vencer (30 dias)',cor:SB_AV},{nome:'Vencido',cor:SB_VE}],{stack:true}));
+  h+=sbBox('Tipo de exame',sbBarH(sbPor(S,'Tipo de Exame',[x=>x.length]),[{nome:'ASOs',cor:SB_COR[0]}]));
+  h+=sbBox('Situação da audiometria',sbBarH(sbPor(S,'Situação Audiometria',[x=>x.length]),[{nome:'ASOs',cor:SB_COR[0]}]));
+  h+=sbBox('Colaboradores',sbTab(S,[['Matrícula','Matrícula'],['Colaborador','Colaborador'],['Área','Área'],['Cargo','Cargo'],['Exame','Tipo de Exame'],['Data do exame','Data do Exame','d'],
+    ['Vencimento','Vencimento ASO','d'],['Situação ASO','Situação ASO'],['Dias p/ vencer','Dias p/ Vencer ASO','n'],['Audiometria','Situação Audiometria'],['Próx. audiometria','Próxima Audiometria','d']]));
+  return h; },
+dds(){ const D=sbF('dds'), d=sbDds(D);
+  let h=sbKs([sbK('DDS realizados',d.n,'n','dds',`Horas de DDS: ${sbC(d.horas,'1','dds')}`),
+    sbK('Participações',d.p,'n','dds',`Efetivo previsto: ${sbC(d.e,'n','dds')}`),sbK('% Participação',d.part,'%','dds'),sbK('Homem-hora',d.hh,'n','dds')]);
+  const k=sbMeses([[D,'Data']]);
+  h+=sbBox('DDS e participação por mês',sbColChart(k,[{nome:'DDS realizados',cor:SB_COR[0],v:sbSerie(k,D,'Data',x=>x.length)}],{nome:'% Participação',cor:SB_OK,v:sbSerie(k,D,'Data',x=>sbDds(x).part)}));
+  h+=sbBox('% Participação por área',sbBarH(sbPor(D,'Área',[x=>sbDds(x).part]),[{nome:'% Participação',cor:SB_OK}],{pct:true}));
+  h+=sbBox('DDS por tema',sbBarH(sbPor(D,'Tema',[x=>x.length]),[{nome:'DDS realizados',cor:SB_COR[0]}]));
+  h+=sbBox('DDS',sbTab(D,[['Data','Data','d'],['Área','Área'],['Tema','Tema'],['Responsável','Responsável'],['Participantes','Participantes','n'],['Efetivo','Efetivo da Área','n'],
+    ['% Part.',x=>sbDds([x]).part,'%'],['Duração (min)','Duração (min)','n']]));
+  return h; },
+trein(){ const T=sbF('treinamentos',{col:'Data de Realização'}), Tt=sbF('treinamentos',{periodo:false}), t=sbTrein(T,Tt);
+  let h=sbKs([sbK('Treinamentos registrados',t.reg,'n','treinamentos',`Colaboradores: ${sbC(t.colab,'n','treinamentos')} · sem data: ${sbC(t.semData,'n','treinamentos')}`),
+    sbK('Treinamentos válidos',t.ok,'n','treinamentos',`A vencer em 60 dias: ${sbC(t.av,'n','treinamentos')}`),
+    sbK('Treinamentos vencidos',t.ve,'n','treinamentos','',1),sbK('% Treinamentos em dia',t.emDia,'%','treinamentos')]);
+  const sits=[['Válido','Válidos',SB_OK],['A vencer (60 dias)','A vencer (60 dias)',SB_AV],['Vencido','Vencidos',SB_VE],['Não realizado','Programados',SB_PR],['Sem data de realização','Sem data',SB_SD]];
+  const fs=sits.map(([s])=>x=>sbCnt(x,'Situação',s)), ser=sits.map(([,n,c])=>({nome:n,cor:c}));
+  h+=sbBox('Situação por treinamento',sbBarH(sbPor(Tt,'Treinamento',fs),ser,{stack:true,max:25}));
+  h+=sbBox('Situação por área',sbBarH(sbPor(Tt,'Área',fs),ser,{stack:true}));
+  h+=sbBox('Treinamentos',sbTab(T,[['Colaborador','Colaborador'],['Área','Área'],['Cargo','Cargo'],['Treinamento','Treinamento'],['Realização','Data de Realização','d'],
+    ['Carga (h)','Carga Horária (h)','n'],['Instrutor','Instrutor'],['Vencimento','Vencimento','d'],['Situação','Situação'],['Status','Status de Realização']]));
+  return h; },
+cipa(){ const CM=sbF('cipa_membros',{periodo:false}), CR=sbF('cipa_reunioes'), c=sbCipa(CM,CR);
+  let h=sbKs([sbK('Membros com mandato ativo',c.at,'n','cipa_membros',`Titulares: ${sbC(c.tit,'n','cipa_membros')} · suplentes: ${sbC(c.sup,'n','cipa_membros')}`),
+    sbK('Reuniões',c.reun,'n','cipa_reunioes'),sbK('% Presença',c.pres,'%','cipa_reunioes'),
+    sbK('Fim do mandato atual',c.fim,'d','cipa_membros',`Dias para o fim: ${sbC(c.dias,'n','cipa_membros')}`)]);
+  const k=sbMeses([[CR,'Data']]);
+  h+=sbBox('Reuniões e presença por mês',sbColChart(k,[{nome:'Reuniões',cor:SB_COR[0],v:sbSerie(k,CR,'Data',x=>x.length)}],{nome:'% Presença',cor:SB_OK,v:sbSerie(k,CR,'Data',x=>sbDiv(sbSum(x,'Presentes'),sbSum(x,'Total de Membros')))}));
+  const at=CM.filter(x=>x['Situação do Mandato']==='Ativo');
+  h+=sbBox('Representação (mandato ativo)',sbBarH(sbPor(at,'Representação',[x=>sbCnt(x,'Tipo','Titular'),x=>sbCnt(x,'Tipo','Suplente')]),[{nome:'Titulares',cor:SB_COR[0]},{nome:'Suplentes',cor:SB_COR[1]}],{stack:true}));
+  h+=sbBox('Membros',sbTab(CM,[['Membro','Membro'],['Representação','Representação'],['Tipo','Tipo'],['Cargo na CIPA','Cargo na CIPA'],['Área','Área'],['Fim do mandato','Fim do Mandato','d'],['Situação','Situação do Mandato']]));
+  h+=sbBox('Reuniões',sbTab(CR,[['Data','Data','d'],['Pauta','Pauta'],['Presentes','Presentes','n'],['Total de membros','Total de Membros','n'],
+    ['% Presença',x=>sbDiv(sbN(x['Presentes']),sbN(x['Total de Membros'])),'%'],['Encaminhamentos','Encaminhamentos']]));
+  return h; } };
+function sbSegHtml(){ const s=SB_SEG[sbi.aba]; if(!s||!sbi.r) return '';
+  return '<div class="segfil">'+s.map(([t,c])=>{ const vals=[...new Set((sbi.r[t]||[]).map(x=>x[c]).filter(v=>v!=null&&v!==''))].map(String).sort((a,b)=>a.localeCompare(b,'pt-BR')), cur=sbi.seg[sbi.aba+'|'+c]||'';
+    return `<select data-sbseg="${segH(c)}"><option value="">${segH(c)}: todos</option>${vals.map(v=>`<option${v===cur?' selected':''}>${segH(v)}</option>`).join('')}</select>`; }).join('')+'</div>'; }
+function sbRender(){ const v=$('#sbView'); if(!sbi.r) return;
+  let h=''; try{ h=SB_PAG[sbi.aba](); }catch(e){ h='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; }
+  const de=$('#sbDe').value, ate=$('#sbAte').value;
+  v.innerHTML=`<div class="sbabas">${SB_ABAS.map(([k,l])=>`<button type="button" data-sba="${k}" class="${sbi.aba===k?'sel':''}">${l}</button>`).join('')}</div>`+sbSegHtml()+h
+    +`<p class="sub" style="font-size:11px;margin-top:12px">Período: ${de||ate?(de?sgDia(de):'início')+' a '+(ate?sgDia(ate):'hoje'):'todo o histórico'}. Fonte: views <code>bi_sst_*</code>, as mesmas do Power BI QSMS. Saúde, membros da CIPA e situação dos treinamentos são a posição de hoje (não dependem do período).</p>`;
+  v.querySelectorAll('[data-sba]').forEach(b=>b.onclick=()=>{ sbi.aba=b.dataset.sba; sbRender(); });
+  v.querySelectorAll('[data-sbseg]').forEach(s=>s.onchange=()=>{ sbi.seg[sbi.aba+'|'+s.dataset.sbseg]=s.value; sbRender(); }); }
+async function sbCarregar(){ const v=$('#sbView'); v.innerHTML='<p class="sub">Carregando…</p>';
+  try{ sbi.r=await sgRpc('app_sst_bi',{p_consorcio:$('#sbCons').value||null})||{}; }catch(e){ return sgErr(v,e); }
+  const a=$('#sbArea'), cur=a.value;
+  a.innerHTML='<option value="">Todas as áreas</option>'+(sbi.r.areas||[]).map(x=>`<option${x===cur?' selected':''}>${segH(x)}</option>`).join('');
+  sbRender(); }
+function sbInit(){ if(!sgInit()) return; sbCss();
+  [['sbDe',sbRender],['sbAte',sbRender],['sbArea',sbRender],['sbCons',sbCarregar]].forEach(([id,fn])=>{ const el=$('#'+id); if(!el.dataset.w){ el.dataset.w='1'; el.addEventListener('change',fn); } });
+  const lp=$('#sbLimpa'); if(lp&&!lp.dataset.w){ lp.dataset.w='1'; lp.onclick=()=>{ $('#sbDe').value=''; $('#sbAte').value=''; sbRender(); }; }
+  sbCarregar(); }
+function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.createElement('style'); st.id='sbcss'; st.textContent=`
+ .sbabas{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:4px 0 8px;-webkit-overflow-scrolling:touch}
+ .sbabas button{flex:0 0 auto;font:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--mut);white-space:nowrap;cursor:pointer}
+ .sbabas button.sel{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
+ .sbbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}
+ .sbt{font-size:13px;font-weight:700;margin-bottom:8px}
+ .sbchart{overflow-x:auto}
+ .sbax{font-size:10px;fill:var(--mut)} .sbval{font-size:10px;fill:var(--ink);font-weight:600}
+ .sbleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--mut);margin-top:6px}
+ .sbleg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+ .sbhb{display:grid;grid-template-columns:minmax(90px,36%) 1fr auto;gap:8px;align-items:center;font-size:12px;margin:5px 0}
+ .sbhb .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .sbhb .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+ .sbhb .t>span{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--bg)}
+ .sbhb .t i{display:block;height:100%}
+ .sbhb .v{font-variant-numeric:tabular-nums;color:var(--mut);text-align:right;white-space:nowrap}
+ .sbctx{display:block;font-style:normal;font-size:11px;color:var(--mut);margin-top:3px}
+ .segkpi b.sbsd{font-size:16px;color:var(--mut)}
+ .sbtw{overflow:auto;max-height:60vh}
+ .sbtw .sgtab th{position:sticky;top:0;background:var(--card)}
+ .sbtot td{font-weight:700}`; document.head.appendChild(st); }
 
 // ===== Lançamentos (inspeções, DDS, ocorrências) + detalhe =====
 let sgL={aba:'inspecao',filtro:'',busca:'',dados:null,det:null,reg:null};
