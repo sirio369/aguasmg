@@ -14983,7 +14983,9 @@ const SB_SEG={acid:[['acidentes','Gravidade'],['acidentes','Tipo']],vinc:[['vinc
   dds:[['dds','Tema'],['dds','Responsável']],trein:[['treinamentos','Treinamento'],['treinamentos','Cargo'],['treinamentos','Situação']],
   cipa:[['cipa_membros','Tipo'],['cipa_membros','Representação'],['cipa_membros','Situação do Mandato']],
   apr:[['apr','Tipo de intervenção'],['apr','Responsável'],['apr','Verificação']]};
-let sbi={aba:'acid',r:null,seg:{}};
+let sbi={aba:'acid',r:null,seg:{},tg:{}};
+// eixo de tempo dos gráficos (por página): g = 'mes' | 'dia'; m = mês aberto no drill-down (aaaa-mm) ou null
+const sbTG=()=>sbi.tg[sbi.aba]||(sbi.tg[sbi.aba]={g:'mes',m:null});
 const SB_COR=['#0e639c','#e07b39','#1a7f4b','#b3261e','#8a5a00','#7c3aed','#94a3b8'];
 const SB_OK='#1a7f4b', SB_AV='#d97706', SB_VE='#b3261e', SB_PR='#0e639c', SB_SD='#94a3b8';
 const SB_MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -14994,6 +14996,12 @@ const sbSum=(rows,c)=>rows.reduce((s,x)=>s+sbN(x[c]),0);
 const sbDiv=(a,b)=>b?a/b:null;   // DIVIDE do DAX: divisor 0 → vazio
 const sbDias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
 const sbMesL=k=>SB_MES[+k.slice(5,7)-1]+'/'+k.slice(2,4);
+const sbKL=k=>k.length===7?sbMesL(k):k.slice(8,10)+'/'+k.slice(5,7);   // rótulo do eixo: mês (out/26) ou dia (17/11)
+const sbPorT=()=>{ const t=sbTG(); return t.g==='mes'?'por mês':t.m?('por dia · '+sbMesL(t.m)):'por dia'; };
+// controles do eixo (Mês | Dia + voltar do drill-down), no título do gráfico
+function sbTempoCtl(){ const t=sbTG();
+  return (t.m?`<button type="button" class="sbup" data-sbg="mes" title="Voltar à visão por mês">‹ ${sbMesL(t.m)}</button>`:'')
+    +`<span class="sbseg" role="group" aria-label="Eixo do gráfico"><button type="button" data-sbg="mes" class="${t.g==='mes'?'sel':''}">Mês</button><button type="button" data-sbg="dia" class="${t.g==='dia'?'sel':''}">Dia</button></span>`; }
 const sbNum1=v=>(+v).toLocaleString('pt-BR',{maximumFractionDigits:1});
 const sbFmt=(v,t)=>v==null||Number.isNaN(v)?'Sem dados':t==='%'?sbPct(v):t==='d'?sgDia(v):t==='1'?(Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}):Math.round(v).toLocaleString('pt-BR');
 const sbVz=tab=>!!(sbi.r&&sbi.r.vazias&&sbi.r.vazias[tab]);
@@ -15002,7 +15010,7 @@ const sbC=(v,t,tab)=>sbVz(tab)?'Sem dados':sbFmt(v,t);
 const sbK=(l,v,t,tab,ctx,al)=>{ const s=sbC(v,t,tab), sd=s==='Sem dados'; return `<div class="sbk${al&&v&&!sd?' alerta':''}${sd?' sd':''}"><span class="sbkl">${l}</span><b>${s}</b>${ctx?`<i class="sbctx">${ctx}</i>`:''}</div>`; };
 const sbKs=a=>'<div class="sbks">'+a.join('')+'</div>';
 // caixa de visual; tabela ocupa a linha inteira, gráfico divide a linha em 2 colunas na tela larga
-const sbBox=(t,html)=>`<div class="sbbox${html.includes('class="sbtw"')?' sbfull':''}"><div class="sbt">${t}</div>${html}</div>`;
+const sbBox=(t,html,ctl)=>`<div class="sbbox${html.includes('class="sbtw"')?' sbfull':''}"><div class="sbt"><span>${t}</span>${ctl?`<span class="sbctl">${ctl}</span>`:''}</div>${html}</div>`;
 // largura útil de um gráfico (meia linha quando o grid tem 2 colunas), para o SVG não ficar pequeno no desktop
 function sbChartW(){ const w=($('#sbView')||{}).clientWidth||360; return Math.round((w>=1000?(w-14)/2:w)-34); }
 const sbVazio='<p class="sbvz">Sem dados no filtro.</p>';
@@ -15038,8 +15046,14 @@ function sbCipa(CM,CR){ const at=CM.filter(x=>x['Situação do Mandato']==='Ativ
   return {at:at.length,tit:sbCnt(at,'Tipo','Titular'),sup:sbCnt(at,'Tipo','Suplente'),reun:CR.length,
     pres:sbDiv(sbSum(CR,'Presentes'),sbSum(CR,'Total de Membros')),fim,dias:fim?sbDias(sbi.r.hoje,fim):null}; }
 // ---- agrupamentos ----
-function sbMeses(sets){ const k=new Set(); sets.forEach(([rows,col])=>rows.forEach(x=>{ if(x[col]) k.add(String(x[col]).slice(0,7)); })); return [...k].sort(); }
-const sbSerie=(ks,rows,col,f)=>ks.map(k=>f(rows.filter(x=>x[col]&&String(x[col]).slice(0,7)===k)));
+// chaves do eixo de tempo: meses com dado, ou dias seguidos (do 1º ao último dia com dado; no drill-down, o mês inteiro)
+function sbMeses(sets){ const t=sbTG(), ds=[]; sets.forEach(([rows,col])=>rows.forEach(x=>{ if(x[col]) ds.push(String(x[col]).slice(0,10)); }));
+  if(t.g==='mes') return [...new Set(ds.map(d=>d.slice(0,7)))].sort();
+  const dd=t.m?ds.filter(d=>d.slice(0,7)===t.m):ds; if(!dd.length&&!t.m) return [];
+  const ini=t.m?t.m+'-01':dd.reduce((a,b)=>a<b?a:b), fim=t.m?sbIsoU(new Date(Date.UTC(+t.m.slice(0,4),+t.m.slice(5,7),0))):dd.reduce((a,b)=>a>b?a:b);
+  const out=[]; for(let d=new Date(ini+'T00:00:00Z'); sbIsoU(d)<=fim && out.length<1100; d.setUTCDate(d.getUTCDate()+1)) out.push(sbIsoU(d)); return out; }
+const sbIsoU=d=>d.toISOString().slice(0,10);
+const sbSerie=(ks,rows,col,f)=>ks.map(k=>f(rows.filter(x=>x[col]&&String(x[col]).slice(0,k.length)===k)));
 // [{k, v:[...]}] por categoria; ordem pelo 1º valor (maior primeiro), como os gráficos de barra do BI
 function sbPor(rows,col,fns){ const g=new Map(); rows.forEach(x=>{ const k=x[col]==null||x[col]===''?'(em branco)':String(x[col]); if(!g.has(k)) g.set(k,[]); g.get(k).push(x); });
   return [...g.entries()].map(([k,rs])=>({k,v:fns.map(f=>f(rs))})).filter(o=>o.v.some(v=>v)).sort((a,b)=>(b.v.reduce((s,v)=>s+(v||0),0)-a.v.reduce((s,v)=>s+(v||0),0))||a.k.localeCompare(b.k,'pt-BR')); }
@@ -15047,21 +15061,28 @@ const sbStep=m=>{ const r=Math.max(1,m/4), p=Math.pow(10,Math.floor(Math.log10(r
 const sbLeg=ss=>ss.length>1||ss.some(s=>s.linha)?'<div class="sbleg">'+ss.map(s=>`<span><i style="background:${s.cor}${s.linha?';height:3px;border-radius:0':''}"></i>${segH(s.nome)}</span>`).join('')+'</div>':'';
 // colunas por mês (empilhadas ou agrupadas) + linha de % opcional no eixo da direita (0–100%)
 function sbColChart(ks,series,linha,{stack=false}={}){ if(!ks.length) return sbVazio;
-  const W=Math.max(340,ks.length*58+70,sbChartW()), H=230, pl=34, pr=linha?40:12, pt=16, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
+  const dia=ks[0].length===10, passo=dia?20:58;
+  const W=Math.max(340,ks.length*passo+70,sbChartW()), H=240, pl=34, pr=linha?40:12, pt=18, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
+  const lbEvery=Math.max(1,Math.ceil(38/bw)), valOk=bw>=22, pctOk=bw>=44;
   const tot=ks.map((_,i)=>stack?series.reduce((s,se)=>s+(se.v[i]||0),0):Math.max(0,...series.map(se=>se.v[i]||0)));
   const mx=sbStep(Math.max(1,...tot))*4; let g='';
   for(let j=0;j<=4;j++){ const y=pt+ih-ih*j/4; g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+3}" text-anchor="end" class="sbax">${sbNum1(mx*j/4)}</text>`;
     if(linha) g+=`<text x="${W-pr+5}" y="${y+3}" class="sbax">${j*25}%</text>`; }
-  ks.forEach((k,i)=>{ const x0=pl+i*bw; g+=`<text x="${x0+bw/2}" y="${H-pb+15}" text-anchor="middle" class="sbax">${sbMesL(k)}</text>`;
+  ks.forEach((k,i)=>{ const x0=pl+i*bw, L=sbKL(k), fds=dia&&[0,6].includes(new Date(k+'T12:00:00Z').getUTCDay());
+    if(fds) g+=`<rect x="${x0}" y="${pt}" width="${bw}" height="${ih}" fill="var(--bg)" opacity=".7"/>`;
+    if(i%lbEvery===0) g+=`<text x="${x0+bw/2}" y="${H-pb+15}" text-anchor="middle" class="sbax">${L}</text>`;
     if(stack){ let acc=0; series.forEach(se=>{ const v=se.v[i]||0; if(!v) return; const y=pt+ih-ih*(acc+v)/mx; acc+=v;
-        const cw=Math.min(bw*.6,64); g+=`<rect x="${x0+(bw-cw)/2}" y="${y}" width="${cw}" height="${ih*v/mx}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
-      if(tot[i]) g+=`<text x="${x0+bw/2}" y="${pt+ih-ih*tot[i]/mx-4}" text-anchor="middle" class="sbval">${sbNum1(tot[i])}</text>`; }
-    else { const w=Math.min(bw*.7/series.length,48), x1=x0+(bw-w*series.length)/2; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x1+j*w;
-        g+=`<rect x="${x}" y="${pt+ih-h}" width="${Math.max(1,w-2)}" height="${h}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`+(v?`<text x="${x+w/2-1}" y="${pt+ih-h-4}" text-anchor="middle" class="sbval">${sbNum1(v)}</text>`:''); }); } });
+        const cw=Math.min(bw*(dia?.75:.6),64); g+=`<rect x="${x0+(bw-cw)/2}" y="${y}" width="${cw}" height="${ih*v/mx}" fill="${se.cor}" rx="2"><title>${segH(L+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
+      if(tot[i]&&valOk) g+=`<text x="${x0+bw/2}" y="${pt+ih-ih*tot[i]/mx-4}" text-anchor="middle" class="sbval">${sbNum1(tot[i])}</text>`; }
+    else { const w=Math.min(bw*(dia?.8:.7)/series.length,48), x1=x0+(bw-w*series.length)/2; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x1+j*w;
+        g+=`<rect x="${x}" y="${pt+ih-h}" width="${Math.max(1,w-(dia?1:2))}" height="${h}" fill="${se.cor}" rx="2"><title>${segH(L+' · '+se.nome+': '+sbNum1(v))}</title></rect>`+(v&&valOk?`<text x="${x+w/2}" y="${pt+ih-h-4}" text-anchor="middle" class="sbval">${sbNum1(v)}</text>`:''); }); }
+    // área clicável da coluna inteira: no mês abre os dias (drill-down, como no BI)
+    if(!dia) g+=`<rect class="sbhit" data-sbdrill="${k}" x="${x0}" y="${pt}" width="${bw}" height="${ih+pb}" fill="transparent"><title>${segH(L)} · clique para ver os dias</title></rect>`; });
   if(linha){ const pts=ks.map((k,i)=>linha.v[i]==null?null:[pl+i*bw+bw/2,pt+ih-ih*Math.max(0,Math.min(1,linha.v[i])),k,linha.v[i]]).filter(Boolean);
-    if(pts.length>1) g+=`<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" stroke="${linha.cor}" stroke-width="2"/>`;
-    pts.forEach(p=>{ g+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${linha.cor}"><title>${segH(sbMesL(p[2])+' · '+linha.nome+': '+sbPct(p[3]))}</title></circle><text x="${p[0]}" y="${p[1]-7}" text-anchor="middle" class="sbval" style="fill:${linha.cor}">${sbPct(p[3])}</text>`; }); }
-  return `<div class="sbchart"><svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block">${g}</svg></div>`+sbLeg([...series,...(linha?[{nome:linha.nome,cor:linha.cor,linha:1}]:[])]); }
+    if(pts.length>1) g+=`<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" stroke="${linha.cor}" stroke-width="2" style="pointer-events:none"/>`;
+    pts.forEach(p=>{ g+=`<circle cx="${p[0]}" cy="${p[1]}" r="${dia?3:3.5}" fill="${linha.cor}"><title>${segH(sbKL(p[2])+' · '+linha.nome+': '+sbPct(p[3]))}</title></circle>`+(pctOk?`<text x="${p[0]}" y="${p[1]-7}" text-anchor="middle" class="sbval" style="fill:${linha.cor};pointer-events:none">${sbPct(p[3])}</text>`:''); }); }
+  return `<div class="sbchart"><svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block">${g}</svg></div>`+sbLeg([...series,...(linha?[{nome:linha.nome,cor:linha.cor,linha:1}]:[])])
+    +(dia?'':'<p class="sbdica">Clique num mês para abrir os dias.</p>'); }
 // barras horizontais por categoria: empilhadas (1 barra com segmentos) ou agrupadas (1 barra por série)
 function sbBarH(rows,series,{stack=false,pct=false,max=20}={}){ if(!rows.length) return sbVazio;
   const fm=v=>pct?sbPct(v):sbNum1(v||0), rs=rows.slice(0,max);
@@ -15095,8 +15116,8 @@ vinc(){ const V=sbF('vinculo'), v=sbVinc(V);
     sbK('% Terceiros',v.pTer,'%','vinculo'),sbK('% com CAT',v.pCat,'%','vinculo'),
     sbK('Ações em aberto',v.aberto,'n','vinculo',`Vencidas: ${sbC(v.venc,'n','vinculo')}`,1)]);
   const k=sbMeses([[V,'Data']]);
-  h+=sbBox('Próprios × terceiros por mês',sbColChart(k,[{nome:'Próprios',cor:SB_COR[0],v:sbSerie(k,V,'Data',x=>sbCnt(x,'Vínculo','Próprio'))},
-    {nome:'Terceiros',cor:SB_COR[1],v:sbSerie(k,V,'Data',x=>sbCnt(x,'Vínculo','Terceiro'))}],null,{stack:true}));
+  h+=sbBox('Próprios × terceiros '+sbPorT(),sbColChart(k,[{nome:'Próprios',cor:SB_COR[0],v:sbSerie(k,V,'Data',x=>sbCnt(x,'Vínculo','Próprio'))},
+    {nome:'Terceiros',cor:SB_COR[1],v:sbSerie(k,V,'Data',x=>sbCnt(x,'Vínculo','Terceiro'))}],null,{stack:true}),sbTempoCtl());
   h+=sbBox('Por empresa',sbBarH(sbPor(V,'Empresa',[x=>x.length,x=>sbSum(x,'Dias Perdidos')]),[{nome:'Acidentes',cor:SB_COR[0]},{nome:'Dias perdidos',cor:SB_COR[4]}]));
   h+=sbBox('Ações corretivas por status',sbBarH(sbPor(V.filter(x=>x['Ação Corretiva']!=null),'Status da Ação',[x=>x.length]),[{nome:'Ações corretivas',cor:SB_COR[0]}]));
   h+=sbBox('Acidentes e ações',sbTab(V,[['Data','Data','d'],['Vínculo','Vínculo'],['Empresa','Empresa'],['Área','Área'],['Gravidade','Gravidade'],['CAT','CAT Emitida'],
@@ -15107,7 +15128,7 @@ insp(){ const I=sbF('inspecoes'), i=sbInsp(I);
     sbK('NCs encontradas',i.nc,'n','inspecoes',`Tratadas: ${sbC(i.tr,'n','inspecoes')} · pendentes: ${sbC(i.pend,'n','inspecoes')}`),
     sbK('% Conformidade',i.conf,'%','inspecoes'),sbK('% Tratativas concluídas',i.trat,'%','inspecoes')]);
   const k=sbMeses([[I,'Data']]);
-  h+=sbBox('Inspeções e conformidade por mês',sbColChart(k,[{nome:'Inspeções',cor:SB_COR[0],v:sbSerie(k,I,'Data',x=>x.length)}],{nome:'% Conformidade',cor:SB_OK,v:sbSerie(k,I,'Data',x=>sbInsp(x).conf)}));
+  h+=sbBox('Inspeções e conformidade '+sbPorT(),sbColChart(k,[{nome:'Inspeções',cor:SB_COR[0],v:sbSerie(k,I,'Data',x=>x.length)}],{nome:'% Conformidade',cor:SB_OK,v:sbSerie(k,I,'Data',x=>sbInsp(x).conf)}),sbTempoCtl());
   h+=sbBox('Inspeções por cargo',sbBarH(sbPor(I,'Cargo',[x=>x.length]),[{nome:'Inspeções',cor:SB_COR[0]}]));
   h+=sbBox('NCs por área',sbBarH(sbPor(I,'Área',[x=>sbSum(x,'NCs Encontradas'),x=>sbSum(x,'NCs Tratadas')]),[{nome:'NCs encontradas',cor:SB_VE},{nome:'NCs tratadas',cor:SB_OK}]));
   h+=sbBox('Inspeções',sbTab(I,[['Data','Data','d'],['Área','Área'],['Responsável','Responsável'],['Cargo','Cargo'],['Itens','Itens Verificados','n'],['NCs','NCs Encontradas','n'],
@@ -15129,7 +15150,7 @@ dds(){ const D=sbF('dds'), d=sbDds(D);
   let h=sbKs([sbK('DDS realizados',d.n,'n','dds',`Horas de DDS: ${sbC(d.horas,'1','dds')}`),
     sbK('Participações',d.p,'n','dds',`Efetivo previsto: ${sbC(d.e,'n','dds')}`),sbK('% Participação',d.part,'%','dds'),sbK('Homem-hora',d.hh,'n','dds')]);
   const k=sbMeses([[D,'Data']]);
-  h+=sbBox('DDS e participação por mês',sbColChart(k,[{nome:'DDS realizados',cor:SB_COR[0],v:sbSerie(k,D,'Data',x=>x.length)}],{nome:'% Participação',cor:SB_OK,v:sbSerie(k,D,'Data',x=>sbDds(x).part)}));
+  h+=sbBox('DDS e participação '+sbPorT(),sbColChart(k,[{nome:'DDS realizados',cor:SB_COR[0],v:sbSerie(k,D,'Data',x=>x.length)}],{nome:'% Participação',cor:SB_OK,v:sbSerie(k,D,'Data',x=>sbDds(x).part)}),sbTempoCtl());
   h+=sbBox('% Participação por área',sbBarH(sbPor(D,'Área',[x=>sbDds(x).part]),[{nome:'% Participação',cor:SB_OK}],{pct:true}));
   h+=sbBox('DDS por tema',sbBarH(sbPor(D,'Tema',[x=>x.length]),[{nome:'DDS realizados',cor:SB_COR[0]}]));
   h+=sbBox('DDS',sbTab(D,[['Data','Data','d'],['Área','Área'],['Tema','Tema'],['Responsável','Responsável'],['Participantes','Participantes','n'],['Efetivo','Efetivo da Área','n'],
@@ -15154,7 +15175,7 @@ apr(){ if(sbi.aprErr) return `<div class="banner bad">APR: ${segH(sbi.aprErr)}</
     sbK('A verificar',cnt(a=>!a.verif_status),'n','apr','Verificação QSMS pendente'),sbK('Conformes',cnt(a=>a.verif_status==='conforme'),'n','apr'),
     sbK('Com ressalva',cnt(a=>a.verif_status==='ressalva'),'n','apr'),sbK('Não conformes',cnt(a=>a.verif_status==='nao_conforme'),'n','apr','',1)]);
   const k=sbMeses([[R,'Data']]), vs=[['A verificar',SB_SD],['Conforme',SB_OK],['Com ressalva',SB_AV],['Não conforme',SB_VE]];
-  h+=sbBox('Atividades por mês (situação da verificação)',sbColChart(k,vs.map(([n,c])=>({nome:n,cor:c,v:sbSerie(k,R,'Data',x=>sbCnt(x,'Verificação',n))})),null,{stack:true}));
+  h+=sbBox('Atividades '+sbPorT()+' (situação da verificação)',sbColChart(k,vs.map(([n,c])=>({nome:n,cor:c,v:sbSerie(k,R,'Data',x=>sbCnt(x,'Verificação',n))})),null,{stack:true}),sbTempoCtl());
   h+=sbBox('Por tipo de intervenção',sbBarH(sbPor(R,'Tipo de intervenção',[x=>x.length]),[{nome:'Atividades',cor:SB_COR[0]}]));
   h+=sbBox('Por responsável',sbBarH(sbPor(R,'Responsável',[x=>x.length]),[{nome:'Atividades',cor:SB_COR[0]}],{max:10}));
   const rc=SEG_RISCOS.filter(r=>!r[3]).map(r=>({k:(s=>s.charAt(0).toUpperCase()+s.slice(1))(r[1].replace(/^Existe(m)? (o )?risco (de |na )?/i,'').replace(/^Existem pessoas trabalhando em /i,'pessoas em ').replace('?','')),
@@ -15168,7 +15189,7 @@ cipa(){ const CM=sbF('cipa_membros',{periodo:false}), CR=sbF('cipa_reunioes'), c
     sbK('Reuniões',c.reun,'n','cipa_reunioes'),sbK('% Presença',c.pres,'%','cipa_reunioes'),
     sbK('Fim do mandato atual',c.fim,'d','cipa_membros',`Dias para o fim: ${sbC(c.dias,'n','cipa_membros')}`)]);
   const k=sbMeses([[CR,'Data']]);
-  h+=sbBox('Reuniões e presença por mês',sbColChart(k,[{nome:'Reuniões',cor:SB_COR[0],v:sbSerie(k,CR,'Data',x=>x.length)}],{nome:'% Presença',cor:SB_OK,v:sbSerie(k,CR,'Data',x=>sbDiv(sbSum(x,'Presentes'),sbSum(x,'Total de Membros')))}));
+  h+=sbBox('Reuniões e presença '+sbPorT(),sbColChart(k,[{nome:'Reuniões',cor:SB_COR[0],v:sbSerie(k,CR,'Data',x=>x.length)}],{nome:'% Presença',cor:SB_OK,v:sbSerie(k,CR,'Data',x=>sbDiv(sbSum(x,'Presentes'),sbSum(x,'Total de Membros')))}),sbTempoCtl());
   const at=CM.filter(x=>x['Situação do Mandato']==='Ativo');
   h+=sbBox('Representação (mandato ativo)',sbBarH(sbPor(at,'Representação',[x=>sbCnt(x,'Tipo','Titular'),x=>sbCnt(x,'Tipo','Suplente')]),[{nome:'Titulares',cor:SB_COR[0]},{nome:'Suplentes',cor:SB_COR[1]}],{stack:true}));
   h+=sbBox('Membros',sbTab(CM,[['Membro','Membro'],['Representação','Representação'],['Tipo','Tipo'],['Cargo na CIPA','Cargo na CIPA'],['Área','Área'],['Fim do mandato','Fim do Mandato','d'],['Situação','Situação do Mandato']]));
@@ -15178,10 +15199,16 @@ cipa(){ const CM=sbF('cipa_membros',{periodo:false}), CR=sbF('cipa_reunioes'), c
 function sbSegHtml(){ const s=SB_SEG[sbi.aba]; if(!s||!sbi.r) return '';
   return s.map(([t,c])=>{ const vals=[...new Set((sbi.r[t]||[]).map(x=>x[c]).filter(v=>v!=null&&v!==''))].map(String).sort((a,b)=>a.localeCompare(b,'pt-BR')), cur=sbi.seg[sbi.aba+'|'+c]||'';
     return `<div class="sbf"><span class="sbfl">${segH(c)}</span><select data-sbseg="${segH(c)}" aria-label="${segH(c)}"${cur?' class="on"':''}><option value="">Todos</option>${vals.map(v=>`<option${v===cur?' selected':''}>${segH(v)}</option>`).join('')}</select></div>`; }).join(''); }
-// gráficos de meia largura vão para um mosaico de 2 colunas (sem buraco quando um é mais baixo que o outro)
+// gráficos de meia largura: 2 colunas (cada caixa vai para a coluna mais baixa) e a última de cada coluna estica até o fim,
+// para as duas colunas terminarem na mesma linha
 function sbMosaico(g){ if(!g) return; let grupo=null; [...g.children].forEach(el=>{ const meia=el.classList.contains('sbbox')&&!el.classList.contains('sbfull');
     if(!meia){ grupo=null; return; } if(!grupo){ grupo=document.createElement('div'); grupo.className='sbmas'; g.insertBefore(grupo,el); } grupo.appendChild(el); });
-  g.querySelectorAll('.sbmas').forEach(m=>{ if(m.children.length===1) m.classList.add('um'); }); }
+  if(!window.matchMedia('(min-width:1040px)').matches) return;
+  g.querySelectorAll('.sbmas').forEach(m=>{ const bx=[...m.children]; if(bx.length<2) return;
+    m.classList.add('medir'); const hs=bx.map(b=>b.offsetHeight); m.classList.remove('medir');
+    const cols=[document.createElement('div'),document.createElement('div')], alt=[0,0];
+    bx.forEach((b,i)=>{ const c=alt[0]<=alt[1]?0:1; cols[c].appendChild(b); alt[c]+=hs[i]+14; });
+    cols.forEach(c=>{ c.className='sbcol'; m.appendChild(c); }); m.classList.add('cols'); }); }
 function sbFiltrosAtivos(){ return !!($('#sbDe').value||$('#sbAte').value||$('#sbArea').value||$('#sbCons').value||Object.values(sbi.seg).some(Boolean)); }
 function sbRender(){ const v=$('#sbView'); if(!sbi.r) return;
   $('#sbNav').innerHTML=SB_ABAS.map(([k,l])=>`<button type="button" data-sba="${k}" class="${sbi.aba===k?'sel':''}"${sbi.aba===k?' aria-current="page"':''}>${l}</button>`).join('');
@@ -15195,6 +15222,8 @@ function sbRender(){ const v=$('#sbView'); if(!sbi.r) return;
   $('#sbNav').querySelectorAll('[data-sba]').forEach(b=>b.onclick=()=>{ sbi.aba=b.dataset.sba; sbRender(); });
   { const n=$('#sbNav'), b=n.querySelector('.sel'), hd=document.querySelector('#app>header'); n.style.top=(hd&&getComputedStyle(hd).position==='sticky'?hd.offsetHeight:0)+'px'; if(b&&(b.offsetLeft<n.scrollLeft||b.offsetLeft+b.offsetWidth>n.scrollLeft+n.clientWidth)) n.scrollLeft=b.offsetLeft-16; }
   sbMosaico(v.querySelector('.sbgrid'));
+  v.querySelectorAll('[data-sbg]').forEach(b=>b.onclick=()=>{ const t=sbTG(); t.g=b.dataset.sbg; if(t.g==='mes') t.m=null; sbRender(); });
+  v.querySelectorAll('[data-sbdrill]').forEach(r=>r.addEventListener('click',()=>{ const t=sbTG(); t.g='dia'; t.m=r.getAttribute('data-sbdrill'); sbRender(); }));
   v.querySelectorAll('[data-sbrel]').forEach(b=>b.onclick=()=>sgLancAbrir('inspecao',b.dataset.sbrel,'sst_bi'));
   $('#sbArea').disabled=sbi.aba==='apr'; $('#sbArea').title=sbi.aba==='apr'?'A APR não tem área':'';
   $('#sbSegs').querySelectorAll('[data-sbseg]').forEach(s=>s.onchange=()=>{ sbi.seg[sbi.aba+'|'+s.dataset.sbseg]=s.value; sbRender(); }); }
@@ -15241,7 +15270,7 @@ function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.
  .sbk.sd b{font-size:17px;font-weight:600;color:var(--mut)}
  .sbctx{display:block;font-style:normal;font-size:12px;color:var(--mut)}
  .sbbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px}
- .sbt{font-size:14.5px;font-weight:700;margin:0 0 12px;color:var(--ink)}
+ .sbt{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14.5px;font-weight:700;margin:0 0 12px;color:var(--ink)}
  .sbchart{overflow-x:auto}
  .sbax{font-size:11px;fill:var(--mut)} .sbval{font-size:11px;fill:var(--ink);font-weight:600}
  .sbleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--mut);margin-top:8px}
@@ -15264,8 +15293,16 @@ function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.
  .sbnota{font-size:11.5px;color:var(--mut);margin:8px 0 0;line-height:1.45}
  @media(min-width:860px){#app.wrap:has(#sst_bi:not(.hidden)){max-width:none;padding:0 24px} #app main#sst_bi{max-width:none}}
  .sbgrid{display:block}
- .sbmas>.sbbox{break-inside:avoid;min-width:0}
- @media(min-width:1040px){.sbmas:not(.um){column-count:2;column-gap:14px}}
+ .sbmas>.sbbox{min-width:0}
+ @media(min-width:1040px){.sbmas.medir{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;align-items:start} .sbmas.cols{display:flex;gap:14px;align-items:stretch}}
+ .sbcol{flex:1 1 0;min-width:0;display:flex;flex-direction:column} .sbcol>.sbbox{min-width:0} .sbcol>.sbbox:last-child{flex:1 1 auto}
+ .sbctl{margin-left:auto;display:flex;align-items:center;gap:6px;font-weight:400}
+ .sbseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+ .sbseg button{font:inherit;font-size:12px;padding:4px 12px;border:0;background:var(--card);color:var(--mut);cursor:pointer}
+ .sbseg button+button{border-left:1px solid var(--line)} .sbseg button.sel{background:var(--ink);color:var(--card);font-weight:600}
+ .sbup{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--acc);cursor:pointer;white-space:nowrap}
+ .sbhit{cursor:pointer} .sbhit:hover{fill:var(--acc);fill-opacity:.06}
+ .sbdica{font-size:11px;color:var(--mut);margin:4px 0 0}
  .sbrel{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--acc);cursor:pointer;white-space:nowrap}
  .sbrel:hover{border-color:var(--acc)}
  @media(max-width:600px){.sbfil{gap:10px}.sbf{flex:1 1 calc(50% - 5px);max-width:none} .sbf-per,.sbf-clr{flex:1 1 100%;margin-left:0} .sbclr{width:100%} #sst_bi .sbfil select,#sst_bi .sbfil input{font-size:16px;padding:7px 8px} .sbk b{font-size:24px} .sbks{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .sbk{padding:12px}}`; document.head.appendChild(st); }

@@ -3802,6 +3802,10 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     `app_qsms_listar` com o histórico inteiro do consórcio, período e segmentações (tipo de intervenção, responsável, verificação)
     no aparelho; Área não se aplica (o campo fica desabilitado); KPIs de atividades/PT/PET/impedida/gás/alertas e verificação,
     atividades por mês pela situação da verificação, por tipo, por responsável, riscos das APRs e a lista de atividades.
+    **sw v429:** o mosaico virou 2 colunas de verdade (`sbMosaico` mede cada caixa e põe na coluna mais baixa; a última de cada
+    coluna estica, então as duas terminam na mesma linha). Gráficos de tempo com **eixo Mês | Dia** no título (`sbTempoCtl`,
+    estado por página em `sbi.tg`) e **drill-down**: clicar num mês abre os dias daquele mês (dias seguidos, fim de semana
+    sombreado; "‹ mês" volta). No modo Dia sem mês aberto, vai do 1º ao último dia com dado no filtro.
   - `sst_lanc` — **desde sw v428 são 3 botões/telas no hub (Inspeções, DDS, Ocorrências)**: `sgLancAbrir(tipo, id?, volta?)` abre
     a tela travada num tipo (título/subtítulo de `SG_TELA`, sem abas, carrega só aquele tipo); em Inspeções há o botão
     **✅ Checklist da inspeção** (`sst_modelo`, que volta para Inspeções). O BI abre direto o relatório de uma inspeção
