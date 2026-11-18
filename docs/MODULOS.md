@@ -603,6 +603,8 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 - **Onde:** Home › 🧰 Suporte. **Gate:** só `pode_aprovar`/admin — botão `#homeAuxProg` nasce
   `hidden`, revelado por `homeGate()` (em `irPara('home')` **e** quando `app_me` resolve).
 - Hub com dois botões (retaguarda):
+- **📅 Planejamento** (2026-11-18, sw v431): última categoria do hub, **vazia por enquanto** (só o texto
+  "Nenhum módulo ainda." `#apPlanVazio`); os módulos de planejamento entram aqui. Mesmo gate do Auxiliar.
 
 ### 4.1 Criação de matrículas — `// CRIAÇÃO DE MATRÍCULAS` (~L1504) · tela `matriculas`
 - Fila de captações aguardando matrícula. RPCs `app_captacao_fila(p_filtro)` (pendente/criada/todas)
