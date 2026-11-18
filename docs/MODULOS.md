@@ -4438,6 +4438,31 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
 
+### 21.7 Logística reversa de HD (`hd_caixas`) · `docs/migracao_hd_caixas.sql` (2026-11-18, sw v415)
+
+Controle das **caixas de hidrômetros** que a COPASA entrega aos consórcios para a substituição de HD. Card **📦 Logística reversa de HD**
+no Auxiliar de Programação › 🧾 Serviços comerciais; gate `aux_acesso`/admin (front `hxInit`, banco `sigos_pode_ver`).
+**Qualquer pessoa com acesso ao Auxiliar faz todos os passos** (decisão do usuário, 18/11/2026).
+
+- **Caixa** = consórcio (ZA1004/ZA0200) + **nº da caixa** (único por consórcio) + **HD inicial** + **HD final** (+ observação). A quantidade
+  de HDs e a busca "em qual caixa está o HD X" são calculadas no app quando os dois HDs têm o mesmo prefixo e final numérico (`hxParte`/`hxQtd`/`hxTemHd`).
+- **Fluxo:** `disponivel` (cadastrada = **pendente de retirada**) → `em_execucao` (**vinculada** a um responsável = retirada) →
+  `devolvida` (o **gestor desvincula** = registra a devolução, com observação opcional). Não há passo intermediário de "devolução pendente";
+  caixa devolvida não volta para o ciclo. Corrigir/excluir só enquanto `disponivel`.
+- **Tela:** cards Pendentes de retirada / Em execução / Devolvidas / Total (com nº de HDs, clicáveis como filtro), filtros consórcio + pessoa + busca
+  (nº da caixa ou nº do HD), abas **Caixas** (tabela com seleção em lote → "Vincular N a um responsável" / "Registrar devolução de N"; ações por linha)
+  e **Por pessoa** (em execução, HDs em execução, devolvidas e caixa mais antiga em execução, por responsável × consórcio; clique filtra as caixas dela),
+  **➕ Cadastrar caixas** (uma a uma ou colando do Excel `Nº · HD inicial · HD final` — tab, `;` ou `,`; cabeçalho e linhas incompletas são ignorados;
+  repetidas na lista e já cadastradas ficam de fora, com aviso) e **⬇️ Exportar** CSV do filtro. Responsável no vínculo: lista de perfis ativos,
+  primeiro os do consórcio da caixa.
+- **Banco** (schema `12 - retaguarda`, app-only, RLS sem policy): `hd_caixa` (status, `responsavel`, `vinculado_em/_por`, `devolvido_em/_por`,
+  `devolucao_obs`, `criado_em/_por`; `unique(consorcio,numero)`) + `hd_caixa_evento` (log cadastro/vinculo/devolucao/edicao).
+  RPCs: `app_hdcx_listar()`, `app_hdcx_pessoas()`, `app_hdcx_cadastrar(p_consorcio, p_itens jsonb [{num,ini,fim,obs}])` → `{ins, dup[]}` (até 5.000),
+  `app_hdcx_vincular(p_ids bigint[], p_responsavel uuid)` (recusa se alguma não estiver disponível), `app_hdcx_devolver(p_ids bigint[], p_obs)`
+  (recusa se alguma não estiver em execução), `app_hdcx_editar(...)`, `app_hdcx_excluir(p_id)`.
+- **Cuidados:** os HDs são guardados em maiúsculas; a caixa não registra quais HDs foram instalados (só a faixa recebida). Testado com rollback no banco
+  e num harness local com as RPCs simuladas — falta QA logado.
+
 ## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v397; migrações aplicadas em 13/11/2026)
 
 Card **👥 RH** na home › **🧰 Suporte** (`#homeRh`, sw v402 — saiu de "Em desenvolvimento" a pedido do usuário em 14/11/2026),
