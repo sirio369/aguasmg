@@ -4491,6 +4491,11 @@ no Auxiliar de Programação › 🧾 Serviços comerciais; gate `aux_acesso`/ad
   RPCs: `app_hdcx_listar()`, `app_hdcx_pessoas()`, `app_hdcx_cadastrar(p_consorcio, p_itens jsonb [{num,ini,fim,obs}])` → `{ins, dup[]}` (até 5.000),
   `app_hdcx_vincular(p_ids bigint[], p_responsavel uuid)` (recusa se alguma não estiver disponível), `app_hdcx_devolver(p_ids bigint[], p_obs)`
   (recusa se alguma não estiver em execução), `app_hdcx_editar(...)`, `app_hdcx_excluir(p_id)`.
+- **Carga da COPASA (2026-11-18):** planilha "BANCO - HD" (aba Export, 1 linha por HD com `ID_CAIXA` e `DESTINO_LOC`) → 100 caixas (50 por consórcio,
+  1.000 HDs) carregadas direto no banco depois de apagar as 4 caixas de teste. Colunas novas `qtd_hd` e `hds text[]` (`docs/migracao_hd_caixas_lista_hds.sql`):
+  **19 caixas de Betim (A25HX…) têm HDs fora de sequência** (obs "HDs não sequenciais na caixa"), então o app usa `qtd`/`hds` quando existem
+  (quantidade, busca por HD, lista no hover da faixa e coluna "HDs da caixa" no CSV, sw v419) e só calcula pela faixa no cadastro manual.
+  Corrigir a faixa na tela zera `qtd_hd`/`hds`.
 - **Cuidados:** os HDs são guardados em maiúsculas; a caixa não registra quais HDs foram instalados (só a faixa recebida). Testado com rollback no banco
   e num harness local com as RPCs simuladas — falta QA logado.
 

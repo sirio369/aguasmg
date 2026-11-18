@@ -9476,8 +9476,10 @@ const hxDias=v=>v?Math.max(0,Math.floor((Date.now()-new Date(v).getTime())/864e5
 const hxPl=(n,s,p)=>hxN(n)+' '+(n===1?s:p);
 // HD = prefixo + número; quantidade e busca por faixa só quando os dois lados têm o mesmo prefixo
 const hxParte=h=>{ const m=/^(.*?)(\d+)$/.exec(String(h||'').trim().toUpperCase()); return m?{p:m[1],n:parseInt(m[2],10)}:null; };
-function hxQtd(c){ const a=hxParte(c.ini), b=hxParte(c.fim); return (a&&b&&a.p===b.p&&b.n>=a.n)?b.n-a.n+1:null; }
-function hxTemHd(c,q){ const h=hxParte(q), a=hxParte(c.ini), b=hxParte(c.fim);
+// caixa vinda da carga da COPASA traz qtd e a lista de HDs (hd_caixa.qtd_hd/hds) — vale mesmo quando a numeração não é sequencial
+function hxQtd(c){ if(c.qtd!=null) return c.qtd; const a=hxParte(c.ini), b=hxParte(c.fim); return (a&&b&&a.p===b.p&&b.n>=a.n)?b.n-a.n+1:null; }
+function hxTemHd(c,q){ if(Array.isArray(c.hds)&&c.hds.length) return c.hds.includes(String(q).trim().toUpperCase());
+  const h=hxParte(q), a=hxParte(c.ini), b=hxParte(c.fim);
   if(!h||!a||!b||h.p!==a.p||a.p!==b.p) return false; return h.n>=a.n&&h.n<=b.n; }
 const hxHds=arr=>arr.reduce((s,c)=>s+(hxQtd(c)||0),0);
 function hxCss(){
@@ -9678,7 +9680,7 @@ function hxRenderCaixas(vis){
       const sub=c.st==='devolvida'?`<div class="hxsub">devolvida por ${vEsc(c.dev_por||'—')}${c.dev_obs?' · '+vEsc(c.dev_obs):''}</div>`
         :c.st==='em_execucao'?`<div class="hxsub">vinculada por ${vEsc(c.vinc_por||'—')}</div>`:'';
       return `<tr class="${hxSel.has(c.id)?'on':''}"><td>${c.st==='devolvida'?'':`<input type="checkbox" data-sel="${c.id}"${hxSel.has(c.id)?' checked':''}/>`}</td>
-        <td><b>${vEsc(c.num)}</b>${c.obs?`<div class="hxsub">${vEsc(c.obs)}</div>`:''}</td><td>${vEsc(c.cons)}</td><td>${vEsc(c.ini)} → ${vEsc(c.fim)}</td><td class="n">${q==null?'—':hxN(q)}</td>
+        <td><b>${vEsc(c.num)}</b>${c.obs?`<div class="hxsub">${vEsc(c.obs)}</div>`:''}</td><td>${vEsc(c.cons)}</td><td${c.hds&&c.hds.length?` title="${vEsc(c.hds.join(', '))}"`:''}>${vEsc(c.ini)} → ${vEsc(c.fim)}</td><td class="n">${q==null?'—':hxN(q)}</td>
         <td><span class="hxst"><i style="background:${cor[c.st]}"></i>${HX_ST1[c.st]||c.st}</span></td>
         <td>${vEsc(c.resp_nome||'')}${sub}</td><td>${hxDt(d)}${dd!=null&&c.st!=='devolvida'?`<div class="hxsub">há ${hxPl(dd,'dia','dias')}</div>`:''}</td><td>${acao}</td></tr>`; }).join('')
     +'</tbody></table></div>'+(vis.length>lim?`<p class="sub">Mostrando ${hxN(lim)} de ${hxN(vis.length)} caixas — refine os filtros (o export traz todas).</p>`:'');
@@ -9783,8 +9785,8 @@ function hxBaixarCsv(nome,cab,linhas){
 }
 function hxExport(){
   const sel=hxBase().filter(c=>!hxF.st||c.st===hxF.st); if(!sel.length) return toast('Nada para exportar.');
-  if(hxBaixarCsv('logistica_reversa_hd',['Consórcio','Nº da caixa','HD inicial','HD final','Qtd de HDs','Situação','Responsável','Vinculada em','Vinculada por','Devolvida em','Devolvida por','Obs. da devolução','Cadastrada em','Cadastrada por','Observação'],
-    sel.map(x=>[x.cons,x.num,x.ini,x.fim,hxQtd(x),HX_ST1[x.st]||x.st,x.resp_nome,hxDtH(x.vinc_em),x.vinc_por,hxDtH(x.dev_em),x.dev_por,x.dev_obs,hxDtH(x.cad_em),x.cad_por,x.obs])))
+  if(hxBaixarCsv('logistica_reversa_hd',['Consórcio','Nº da caixa','HD inicial','HD final','Qtd de HDs','Situação','Responsável','Vinculada em','Vinculada por','Devolvida em','Devolvida por','Obs. da devolução','Cadastrada em','Cadastrada por','Observação','HDs da caixa'],
+    sel.map(x=>[x.cons,x.num,x.ini,x.fim,hxQtd(x),HX_ST1[x.st]||x.st,x.resp_nome,hxDtH(x.vinc_em),x.vinc_por,hxDtH(x.dev_em),x.dev_por,x.dev_obs,hxDtH(x.cad_em),x.cad_por,x.obs,(x.hds||[]).join(', ')])))
     toast(hxPl(sel.length,'caixa exportada','caixas exportadas'));
 }
 
