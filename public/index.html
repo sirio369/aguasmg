@@ -1455,6 +1455,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       </div>
     </div>
     <p class="sub" id="spbAtual">Carregando…</p>
+    <div id="spbAreas" class="sbseg" style="margin:0 0 12px"></div>
     <nav id="spbNav" class="sbnav" aria-label="Páginas do BI"></nav>
     <section class="sbfil" id="spbFil" aria-label="Filtros"></section>
     <div id="spbView"></div>
@@ -1463,7 +1464,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sup_carga" class="hidden spbmain">
     <div class="bar"><button class="bk" data-go="sup_bi">‹ BI Suprimentos</button></div>
     <h1>Cargas do SIENGE</h1>
-    <p class="sub">Envie os 3 relatórios exportados do SIENGE em Excel. O arquivo novo <b>substitui o anterior</b> (o Mapa de Cotações, só a obra que vier no arquivo) e o antigo só sai quando o novo chega inteiro e dentro do escopo (obras 430 e 440). Arquivo no campo errado é recusado sem mexer no banco.</p>
+    <p class="sub">Envie os relatórios exportados do SIENGE em Excel. O arquivo novo <b>substitui o anterior</b> (o Mapa de Cotações, só a obra que vier no arquivo; no Estoque, a mesma obra no mesmo dia) e o antigo só sai quando o novo chega inteiro e dentro do escopo (obras 430 e 440). Arquivo no campo errado é recusado sem mexer no banco.</p>
     <div id="spbcSlots" class="sggrid"><p class="sub">Carregando…</p></div>
     <div class="sec" style="margin-top:20px">Últimas cargas</div>
     <div id="spbcHist"><p class="sub">Carregando…</p></div>
@@ -8360,21 +8361,40 @@ const SPB_P=(()=>{
     });
     return {linhas:itens, lidas:itens.length+fora, fora};
   }
+  // Posições de Estoque Atual (relatório, 11 colunas A..K) — 1 arquivo = 1 obra numa data
+  const numEst=x=>{ if(x==null||x==='') return null; if(typeof x==='number') return x; const s=String(x).trim(); if(s==='') return null; const n=s.includes(',')?Number(s.replace(/\./g,'').replace(',','.')):Number(s); return Number.isFinite(n)?n:null; };
+  function lerEstoque(rows){
+    const T=rows.map(r=>{ const c=pad(r,11); return {A:fnTxt(c[0]),C:fnTxt(c[2]),D:fnTxt(c[3]),E:fnTxt(c[4]),c}; });
+    const achar=rot=>T.find(x=>x.A===rot)||null, rEmp=achar('Empresa'), rObra=achar('Obra'), rTot=achar('Total da obra');
+    const rod=T.find(x=>x.D!=null&&x.D.toUpperCase().includes('SIENGE')); let exportado=null;
+    if(rod&&rod.A){ const m=/^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*(\d{2}):(\d{2}):(\d{2})$/.exec(rod.A.trim()); if(m) exportado=m[3]+'-'+m[2]+'-'+m[1]+'T'+m[4]+':'+m[5]+':'+m[6]; }
+    const mo=rObra&&rObra.C?/^\s*(\d+)/.exec(rObra.C):null; let grupo=null, familia=null; const linhas=[];
+    T.forEach((x,i)=>{
+      if(x.A==='Grupo') grupo=x.C;
+      if(x.A!=null&&x.A.startsWith('Fam')) familia=x.C;
+      if(x.A!=null&&x.E!=null&&x.A!=='Insumo'){ const ins=x.A, k=ins.indexOf(' - ');
+        linhas.push({seq:i,insumo:ins,codigo:(k<0?ins:ins.slice(0,k)).trim(),descricao:(k<0?'':ins.slice(k+3)).trim(),grupo,familia,unidade:x.E,
+          quantidade:numEst(x.c[5]),custo_medio:numEst(x.c[6]),custo_total:numEst(x.c[7]),estoque_minimo:numEst(x.c[9]),qtd_reservada:numEst(x.c[10])}); }
+    });
+    return {cabecalho:{empresa:rEmp?rEmp.C:null,obra_sienge:rObra?rObra.C:null,obra:mo?+mo[1]:null,exportado_em:exportado,total_obra:rTot?numEst(rTot.c[7]):null},linhas,lidas:linhas.length,fora:0};
+  }
   // Descobre o tipo do relatório pelo conteúdo (arquivo no campo errado é recusado sem mexer no banco)
   function detectar(rows){
     const topo=rows.slice(0,14).map(r=>(r||[]).map(v=>tx(v)).join(' ')).join(' ');
+    if(topo.includes('Posições de Estoque Atual')) return 'estoque';
     if(topo.includes('Cotações e Pedidos Vinculados')) return 'vinculados';
     if(topo.includes('Mapa de Cotações')) return 'mapa';
     for(const r of rows.slice(0,6)){ if(r&&r.length>=38&&r[0]!=null&&r[1]!=null&&Number.isFinite(Number(r[0]))&&Number.isFinite(Number(r[1]))) return 'painel'; }
     return null;
   }
-  return {lerPainel, lerMapa, lerVinculados, detectar};
+  return {lerPainel, lerMapa, lerVinculados, lerEstoque, detectar};
 })();
-const SPB_TIPOS=['painel','mapa','vinculados'];
-const SPB_TIPO={painel:'Painel de Compras',mapa:'Mapa de Cotações',vinculados:'Cotações e Pedidos Vinculados'};
+const SPB_TIPOS=['painel','mapa','vinculados','estoque'];
+const SPB_TIPO={painel:'Painel de Compras',mapa:'Mapa de Cotações',vinculados:'Cotações e Pedidos Vinculados',estoque:'Posições de Estoque Atual'};
 const SPB_SUB={painel:'SIENGE › Compras › Painel de Compras · todas as colunas, linhas "Todas" · substitui o anterior (as 2 obras juntas)',
   mapa:'SIENGE › Cotações de Preços › Mapa de Cotações · um arquivo por obra (430 e/ou 440) · substitui só a obra que vier no arquivo',
-  vinculados:'SIENGE › Cotações de Preços › Cotações e Pedidos Vinculados · substitui o anterior'};
+  vinculados:'SIENGE › Cotações de Preços › Cotações e Pedidos Vinculados · substitui o anterior',
+  estoque:'SIENGE › Estoque › Posições de Estoque Atual · um arquivo por obra · mesma obra no mesmo dia: vale a exportação mais recente; outros dias ficam de histórico'};
 const SPB_OBRA={430:'ZA1004 · Contagem',440:'ZA0200 · Betim'};
 let SPB_AC=null, SPB_AC_T=0, spbcDados=null, spbcFila={painel:[],mapa:[],vinculados:[]}, spbcRodando={}, spbcAlvo=null;
 async function spbAcesso(force){
@@ -8386,7 +8406,7 @@ async function spbGate(){ const b=document.getElementById('homeGI'); if(!b||!ME)
 function spbCss(){
   if(document.getElementById('spbCss')) return;
   const st=document.createElement('style'); st.id='spbCss';
-  st.textContent=`.spbmain .sggrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+  st.textContent=`.spbmain .sggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:10px}
 @media(max-width:900px){.spbmain .sggrid{grid-template-columns:1fr}}
 .spbmain .sgslot{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .spbmain .sgslot.drag{outline:2px dashed var(--acc);outline-offset:-2px}
@@ -8424,7 +8444,7 @@ const SPB_FILT={ger:['sc','per','obra','comp','grupo'],comp:['sc','per','obra','
   sla:['sc','per','obra','comp','grupo'],est:['sc','per','obra','grupo','solic'],itens:['sc','per','obra','estagio','grupo','comp']};
 const SPB_FL={obra:'Obra',comp:'Comprador',grupo:'Grupo de insumo',solic:'Solicitante',estagio:'Estágio',faixa:'Faixa de concorrência'};
 const SPB_FCOL={obra:'Obra',comp:'Comprador',grupo:'Grupo de Insumo',solic:'Solicitante',estagio:'Estágio',faixa:'Faixa de Concorrência'};
-let spb={aba:'ger',r:null,f:{sc:'',de:'',ate:'',obra:'',comp:'',grupo:'',solic:'',estagio:'',cotn:'',faixa:''},exp:{}};
+let spb={aba:'ger',area:'compras',atual:'',r:null,f:{sc:'',de:'',ate:'',obra:'',comp:'',grupo:'',solic:'',estagio:'',cotn:'',faixa:''},exp:{}};
 const SPB_URG=[['OK','0–7 dias','#1a7f4b'],['Atenção','8–15 dias','#d97706'],['Prioritário','16–30 dias','#e07b39'],['Crítico','> 30 dias','#b3261e']];
 const spbBRL=v=>v==null||Number.isNaN(+v)?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const spbI=v=>v==null||Number.isNaN(+v)?'—':Math.round(+v).toLocaleString('pt-BR');
@@ -8459,6 +8479,12 @@ function spbExpDo(id){ const e=SPB_EXP[id]; if(!e) return;
   const aoa=[e.cols.map(c=>c[0])].concat(e.rows.map(x=>e.cols.map(([,k,t])=>{ const v=typeof k==='function'?k(x):x[k]; return v==null?'':(t==='d'?spbDia(v):v); })));
   exportarXlsx('suprimentos_'+e.nome+'_'+new Date().toISOString().slice(0,10)+'.xlsx',e.nome.slice(0,31),aoa); }
 const spbBox=(t,html,ctl)=>sbBox(t,html,ctl);
+// barras horizontais com valores em R$ exatos (o sbBarH arredonda para 1 casa)
+function spbBarMoney(rows,series,{max=20}={}){ if(!rows.length) return '<p class="sbvz">Sem dados no filtro.</p>';
+  const rs=rows.slice(0,max), mx=Math.max(1e-9,...rs.map(r=>Math.max(...r.v.map(v=>v||0))));
+  const h=rs.map(r=>{ const tip=segH(r.k+' · '+series.map((s,i)=>s.nome+': '+spbBRL(r.v[i])).join(' · '));
+    return `<div class="sbhb" title="${tip}"><span class="l">${segH(r.k)}</span><span class="t">${series.map((s,i)=>`<span><i style="width:${(r.v[i]||0)*100/mx}%;background:${s.cor}"></i></span>`).join('')}</span><span class="v">${r.v.map(v=>spbBRL(v||0)).join(' · ')}</span></div>`; }).join('');
+  return h+(rows.length>max?`<p class="sub" style="font-size:11px">Mostrando ${max} de ${rows.length}.</p>`:'')+sbLeg(series); }
 // ---- páginas ----
 const SPB_PAG={
 ger(){ const S=spbFiltraSol(), ab=spbCnt(S,x=>x['Backlog Aberto']==='Sim'), cr=spbCnt(S,x=>x['Backlog Aberto']==='Sim'&&x['Urgência']==='Crítico');
@@ -8525,8 +8551,8 @@ est(){ const S=spbFiltraSol(), E=S.filter(x=>x['Escopo da Estimativa']==='Sim');
     spbK('Com preço de referência',spbI(spbCnt(E,x=>x['Situação da Estimativa']==='Com preço de referência'))),spbK('Valor total estimado',spbBRL(vt),'menor proposta ÷ qtd da cotação mais recente')]);
   const g=new Map(); E.forEach(x=>{ const k=x['Grupo de Insumo']; g.set(k,(g.get(k)||0)+(+x['Valor Estimado (sem pedido)']||0)); });
   const top=[...g.entries()].filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({k,v:[v]}));
-  const e1=sbBarH(top,[{nome:'Valor estimado',cor:SB_COR[0]}]).replace(/(<span class="v">)([\d.,]+)(<\/span>)/g,(m,a,b,c)=>a+spbBRL(+b.replace(/\./g,'').replace(',','.'))+c);
-  const e2=sbBarH(SPB_URG.map(([u,l])=>({k:l,v:[E.filter(x=>x['Urgência']===u).reduce((s,x)=>s+(+x['Valor Estimado (sem pedido)']||0),0)]})),[{nome:'Valor estimado',cor:SB_COR[1]}]).replace(/(<span class="v">)([\d.,]+)(<\/span>)/g,(m,a,b,c)=>a+spbBRL(+b.replace(/\./g,'').replace(',','.'))+c);
+  const e1=spbBarMoney(top,[{nome:'Valor estimado',cor:SB_COR[0]}]);
+  const e2=spbBarMoney(SPB_URG.map(([u,l])=>({k:l,v:[E.filter(x=>x['Urgência']===u).reduce((s,x)=>s+(+x['Valor Estimado (sem pedido)']||0),0)]})),[{nome:'Valor estimado',cor:SB_COR[1]}]);
   h+='<div class="sbmas medir">'+spbBox('Top 10 grupos de insumo por valor estimado (R$)',e1)+spbBox('Valor estimado por tempo em aberto (R$)',e2)+'</div>';
   const R1=E.filter(x=>x['Valor Estimado (sem pedido)']!=null).sort((a,b)=>b['Valor Estimado (sem pedido)']-a['Valor Estimado (sem pedido)']);
   const c1=[['Urgência','Urgência'],['Nº da solicitação','Nº da Solicitação','t'],['Item','Item'],['Obra','Obra Sigla'],['Qtd solicitada','Qtd Solicitada','n'],['Preço unit. estimado','Preço Unit. Estimado (exibição)','m'],['Valor estimado','Valor Estimado (sem pedido)','m'],['Dias em aberto','Dias em Aberto','i']];
@@ -8543,10 +8569,17 @@ itens(){ const S=spbFiltraSol();
   h+=spbBox('Itens solicitados (mais recentes primeiro) — use os filtros acima para localizar',spbTab(R,cols),spbExp('itens','itens_solicitados',R,cols));
   return h; }
 };
-function spbNav(){ const n=$('#spbNav'); if(!n) return;
-  n.innerHTML=SPB_ABAS.map(([k,l])=>`<button type="button" data-spba="${k}" class="${k===spb.aba?'sel':''}">${l}</button>`).join('');
-  n.querySelectorAll('[data-spba]').forEach(b=>b.onclick=()=>{ spb.aba=b.dataset.spba; spbNav(); spbFiltrosHtml(); spbRender(); }); }
-function spbFiltrosHtml(){ const box=$('#spbFil'); if(!box||!spb.r) return; const need=SPB_FILT[spb.aba]||[], f=spb.f, r=spb.r;
+function spbNav(){ const n=$('#spbNav'); if(!n) return; const est=spb.area==='estoque', ab=est?SPE_ABAS:SPB_ABAS, cur=est?spe.aba:spb.aba;
+  n.innerHTML=ab.map(([k,l])=>`<button type="button" data-spba="${k}" class="${k===cur?'sel':''}">${l}</button>`).join('');
+  n.querySelectorAll('[data-spba]').forEach(bt=>bt.onclick=()=>{ if(est) spe.aba=bt.dataset.spba; else spb.aba=bt.dataset.spba; spbNav(); spbFiltrosHtml(); spbRender(); }); }
+function spbFiltrosHtml(){ return spb.area==='estoque'?speFiltrosHtml():spbFiltrosCompras(); }
+function spbRender(){ return spb.area==='estoque'?speRender():spbRenderCompras(); }
+function spbAreasHtml(){ const a=$('#spbAreas'); if(!a) return;
+  a.innerHTML=[['compras','📦 Compras'],['estoque','🏬 Estoque']].map(([k,l])=>`<button type="button" data-spbar="${k}" class="${spb.area===k?'sel':''}">${l}</button>`).join('');
+  a.querySelectorAll('[data-spbar]').forEach(x=>x.onclick=()=>{ spb.area=x.dataset.spbar; spbAreasHtml(); spbNav(); const est=spb.area==='estoque', ok=est?spe.r:spb.r;
+    $('#spbAtual').textContent=(est?spe.atual:spb.atual)||'Carregando…';
+    if(ok){ spbFiltrosHtml(); spbRender(); } else (est?speCarregar():spbCarregarBI()); }); }
+function spbFiltrosCompras(){ const box=$('#spbFil'); if(!box||!spb.r) return; const need=SPB_FILT[spb.aba]||[], f=spb.f, r=spb.r;
   let h='';
   if(need.includes('sc')) h+=`<div class="sbf"><label class="sbfl" for="spbF_sc">Nº da SC</label><input id="spbF_sc" data-spbf="sc" placeholder="digite (vários: 1890, 1891)" value="${segH(f.sc)}" autocomplete="off"/></div>`;
   if(need.includes('cotn')) h+=`<div class="sbf"><label class="sbfl" for="spbF_cotn">Nº da cotação</label><input id="spbF_cotn" data-spbf="cotn" placeholder="digite" value="${segH(f.cotn)}" autocomplete="off"/></div>`;
@@ -8559,7 +8592,7 @@ function spbFiltrosHtml(){ const box=$('#spbFil'); if(!box||!spb.r) return; cons
   box.querySelectorAll('[data-spbf]').forEach(el=>{ const k=el.dataset.spbf, ev=(el.tagName==='SELECT'||el.type==='date')?'change':'input';
     el.addEventListener(ev,()=>{ spb.f[k]=el.value; if(el.tagName==='SELECT') el.classList.toggle('on',!!el.value); clearTimeout(spb._t); spb._t=setTimeout(spbRender,ev==='input'?250:0); }); });
   const lp=$('#spbLimpa'); if(lp) lp.onclick=()=>{ Object.keys(spb.f).forEach(k=>spb.f[k]=''); spbFiltrosHtml(); spbRender(); }; }
-function spbRender(){ const v=$('#spbView'); if(!v||!spb.r) return;
+function spbRenderCompras(){ const v=$('#spbView'); if(!v||!spb.r) return;
   v.innerHTML='<div class="sbgrid">'+SPB_PAG[spb.aba]()+'</div>';
   v.querySelectorAll('[data-spbx]').forEach(b=>b.onclick=()=>spbExpDo(b.dataset.spbx));
   v.querySelectorAll('.spbexp').forEach(tr=>tr.onclick=()=>{ const o=tr.dataset.spbo; spb.exp[o]=!spb.exp[o]; spbRender(); }); }
@@ -8567,8 +8600,8 @@ async function spbCarregarBI(){ const v=$('#spbView'); v.innerHTML='<p class="sb
   try{ const {data,error}=await sb.rpc('app_sup_bi'); if(error) throw error; spb.r=data||{sol:[],cot:[],cargas:[]}; }
   catch(e){ v.innerHTML='<div class="banner bad">Não foi possível carregar o BI: '+segH(e.message||e)+'</div>'; return; }
   const c=(spb.r.cargas||[]).find(k=>k.tipo==='painel'); const up=(spb.r.cargas||[]).map(k=>k.em).filter(Boolean).sort().pop();
-  $('#spbAtual').textContent=c?('Painel de Compras de '+spbDH(c.em)+' · referência '+spbDia(spb.r.hoje)+(up&&up!==c.em?' · última carga '+spbDH(up):'')):'Nenhum relatório carregado ainda — use "Cargas do SIENGE".';
-  spbFiltrosHtml(); spbRender(); }
+  spb.atual=c?('Painel de Compras de '+spbDH(c.em)+' · referência '+spbDia(spb.r.hoje)+(up&&up!==c.em?' · última carga '+spbDH(up):'')):'Nenhum relatório carregado ainda — use "Cargas do SIENGE".';
+  $('#spbAtual').textContent=spb.atual; spbFiltrosHtml(); spbRender(); }
 async function spbInit(){
   spbCss(); sbCss(); if(!document.getElementById('spbcss2')){ const st=document.createElement('style'); st.id='spbcss2';
     st.textContent=document.getElementById('sbcss').textContent.split('\n').filter(l=>/^\s*#sst_bi/.test(l)).join('\n').replace(/#sst_bi/g,'#sup_bi')+'\n#sup_bi h1{margin-bottom:2px} #sup_bi>.sub{margin:0 0 12px}\n@media(min-width:860px){#app.wrap:has(#sup_bi:not(.hidden)){max-width:none;padding:0 24px} #app main#sup_bi{max-width:none}}'; document.head.appendChild(st); }
@@ -8576,8 +8609,100 @@ async function spbInit(){
   if(!(a&&a.ver)){ toast('Acesso restrito'); irPara('home'); return; }
   $('#spbCargaBtn').classList.toggle('hidden',!a.carregar);
   $('#spbAcessoBtn').classList.toggle('hidden',!a.admin);
-  spbNav(); spbCarregarBI(); }
+  spbAreasHtml(); spbNav(); spb.area==='estoque'?speCarregar():spbCarregarBI(); }
 
+// ----- Gestão de Suprimentos › Estoque (BI Estoque do Power BI, 4 páginas) -----
+// Dados: app_sup_bi_estoque() = linhas de sup_bi_estoque (itens por posição, com Classe ABC/pendências) e sup_bi_estoque_posicoes.
+const SPE_ABAS=[['ger','Visão Geral'],['conc','Concentração e Obras'],['itens','Itens'],['qual','Qualidade dos Dados']];
+const SPE_FILT={ger:['cons','grupo','fam','ins','data'],conc:['cons','grupo','fam','ins','data'],itens:['cons','grupo','fam','ins','data'],qual:['cons','data']};
+const SPE_FL={cons:'Consórcio',grupo:'Grupo',fam:'Família',ins:'Insumo',data:'Data da posição'};
+let spe={aba:'ger',r:null,f:{cons:'',grupo:'',fam:'',ins:'',data:''},exp:{}};
+const SPE_C=['Águas Integradas','Eficiência Hídrica'];
+// base do BI: com "Data da posição" filtrada vale aquela data; sem filtro vale só a posição MAIS RECENTE de cada obra
+function speBase(tab){ const f=spe.f, need=SPE_FILT[spe.aba]||[]; let L=spe.r.itens;
+  L=(need.includes('data')&&f.data)?L.filter(x=>String(x['Data da Posição']).slice(0,10)===f.data):L.filter(x=>x['Mais Recente']==='Sim');
+  [['cons','Consórcio'],['grupo','Grupo'],['fam','Família']].forEach(([k,c])=>{ if(need.includes(k)&&f[k]) L=L.filter(x=>x[c]===f[k]); });
+  if(need.includes('ins')&&f.ins.trim()){ const t=f.ins.trim().toLowerCase(); L=L.filter(x=>String(x['Insumo']||'').toLowerCase().includes(t)); }
+  return L; }
+const speV=L=>L.reduce((s,x)=>s+(+x['Custo Total']||0),0), speQ=L=>L.reduce((s,x)=>s+(+x['Quantidade']||0),0);
+const speDiv=(a,b)=>b?a/b:null;
+function speGrupos(L,c){ const g=new Map(); L.forEach(x=>{ const k=x[c]==null?'(sem '+c.toLowerCase()+')':x[c]; if(!g.has(k)) g.set(k,[]); g.get(k).push(x); }); return [...g.entries()]; }
+function spePosTxt(L){ const d=[...new Set(L.map(x=>String(x['Data da Posição']).slice(0,10)))].sort(); if(!d.length) return 'Sem posição carregada'; return d.length===1?'Posição de '+spbDia(d[0]):'Posições de '+spbDia(d[0])+' a '+spbDia(d[d.length-1]); }
+const SPE_PAG={
+ger(){ const L=speBase(), V=speV(L), A=spbCnt(L,x=>x['Classe ABC']==='A');
+  let h='<p class="sub" style="margin:0 0 10px">'+segH(spePosTxt(L))+'</p>'+sbKs([spbK('Valor em estoque',spbBRL(V)),spbK('Itens em estoque',spbI(L.length)),spbK('Insumos distintos',spbI(new Set(L.map(x=>x['Código'])).size)),spbK('Itens classe A',spbI(A),'até 80% do valor acumulado da obra')]);
+  const c1=spbBarMoney(SPE_C.map(c=>({k:c,v:[speV(L.filter(x=>x['Consórcio']===c))]})).filter(r=>r.v[0]>0),[{nome:'Valor em estoque',cor:SB_COR[0]}]);
+  const fam=speGrupos(L,'Família').map(([k,rs])=>({k,v:[speV(rs)]})).sort((a,b)=>b.v[0]-a.v[0]);
+  const c2=spbBarMoney(fam,[{nome:'Valor em estoque',cor:SB_COR[1]}],{max:12});
+  h+='<div class="sbmas medir">'+spbBox('Valor em estoque por consórcio',c1)+spbBox('Onde está o valor: estoque por família',c2)+'</div>';
+  const cel=rs=>`<td class="n">${spbBRL(speV(rs))}</td><td class="n">${spbP1(speDiv(speV(rs),V))}</td><td class="n">${spbI(rs.length)}</td>`;
+  let t='<div class="sbtw"><table class="sgtab"><tr><th>Consórcio › grupo › família</th><th class="n">Valor em estoque</th><th class="n">% do valor</th><th class="n">Itens</th></tr>';
+  speGrupos(L,'Consórcio').sort((a,b)=>speV(b[1])-speV(a[1])).forEach(([c,rs])=>{ const kc='c|'+c, oc=!!spe.exp[kc];
+    t+=`<tr class="sbtot spbexp" data-spek="${segH(kc)}" style="cursor:pointer"><td>${oc?'▾':'▸'} ${segH(c)}</td>${cel(rs)}</tr>`;
+    if(oc) speGrupos(rs,'Grupo').sort((a,b)=>speV(b[1])-speV(a[1])).forEach(([g,r2])=>{ const kg=kc+'|g|'+g, og=!!spe.exp[kg];
+      t+=`<tr class="spbexp" data-spek="${segH(kg)}" style="cursor:pointer"><td style="padding-left:22px">${og?'▾':'▸'} ${segH(g)}</td>${cel(r2)}</tr>`;
+      if(og) speGrupos(r2,'Família').sort((a,b)=>speV(b[1])-speV(a[1])).forEach(([fm,r3])=>{ t+=`<tr><td style="padding-left:44px">${segH(fm)}</td>${cel(r3)}</tr>`; }); }); });
+  t+=`<tr class="sbtot"><td>Total</td>${cel(L)}</tr></table></div>`;
+  h+=spbBox('Por consórcio › grupo › família (clique para abrir)',L.length?t:'<p class="sbvz">Sem dados no filtro.</p>');
+  return h; },
+conc(){ const L=speBase(), V=speV(L);
+  let h='<p class="sub" style="margin:0 0 10px">'+segH(spePosTxt(L))+'</p>';
+  const abc=['A','B','C'].map(c=>{ const rs=L.filter(x=>x['Classe ABC']===c); return {c,n:rs.length,v:speV(rs)}; });
+  let t='<div class="sbtw"><table class="sgtab"><tr><th>Classe ABC</th><th class="n">Itens em estoque</th><th class="n">Valor em estoque</th><th class="n">% do valor</th></tr>'
+    +abc.map(a=>`<tr><td>${a.c}</td><td class="n">${spbI(a.n)}</td><td class="n">${spbBRL(a.v)}</td><td class="n">${spbP1(speDiv(a.v,V))}</td></tr>`).join('')+'</table></div>';
+  t+='<p class="sbnota">Curva ABC por obra: A = itens até 80% do valor acumulado, B = até 95%, C = o resto.</p>';
+  h+=spbBox('Curva ABC por obra',L.length?t:'<p class="sbvz">Sem dados no filtro.</p>');
+  // insumos nas duas obras
+  const por=new Map(); L.forEach(x=>{ const k=x['Código']; if(!por.has(k)) por.set(k,{ins:x['Insumo'],un:x['Unidade'],ai:[],eh:[]}); (x['Consórcio']==='Águas Integradas'?por.get(k).ai:por.get(k).eh).push(x); });
+  const duas=[...por.values()].filter(o=>o.ai.length&&o.eh.length).map(o=>{ const qa=speQ(o.ai), qe=speQ(o.eh), ca=speDiv(speV(o.ai),qa), ce=speDiv(speV(o.eh),qe);
+    return {Insumo:o.ins,Unidade:o.un,qa,qe,ca,ce,dif:(ca==null||ce==null||!ca)?null:(ce-ca)/ca}; }).sort((a,b)=>Math.abs(b.dif||0)-Math.abs(a.dif||0));
+  const cols=[['Insumo','Insumo'],['Unidade','Unidade'],['Qtd Águas Integradas','qa','n'],['Qtd Eficiência Hídrica','qe','n'],['Custo médio Águas Integradas','ca','m'],['Custo médio Eficiência Hídrica','ce','m'],['Diferença custo médio (EH vs AI)',x=>x.dif==null?null:spbP1(x.dif),'t']];
+  const tab=duas.length?spbTab(duas,cols).replace(/<td>(-?[\d.,]+%)<\/td>/g,'<td class="n">$1</td>'):'<p class="sbvz">Nenhum insumo nas duas obras no filtro.</p>';
+  const fam=speGrupos(L,'Família').map(([k,rs])=>({k,v:[speV(rs.filter(x=>x['Consórcio']==='Águas Integradas')),speV(rs.filter(x=>x['Consórcio']==='Eficiência Hídrica'))]})).sort((a,b)=>(b.v[0]+b.v[1])-(a.v[0]+a.v[1]));
+  const top=speGrupos(L,'Insumo').map(([k,rs])=>({k,v:[speV(rs)]})).sort((a,b)=>b.v[0]-a.v[0]).slice(0,10);
+  h+='<div class="sbmas medir">'+spbBox('Valor por família: Águas Integradas × Eficiência Hídrica',spbBarMoney(fam,[{nome:'Águas Integradas',cor:SB_COR[0]},{nome:'Eficiência Hídrica',cor:SB_COR[1]}],{max:12}))
+    +spbBox('Top 10 insumos por valor em estoque',spbBarMoney(top,[{nome:'Valor em estoque',cor:SB_COR[2]}]))+'</div>';
+  h+=spbBox('Insumos em estoque nas duas obras — custo médio de cada obra ('+duas.length+')',tab,spbExp('duas','insumos_nas_duas_obras',duas,cols));
+  return h; },
+itens(){ const L=speBase().slice().sort((a,b)=>(b['Custo Total']||0)-(a['Custo Total']||0));
+  const cols=[['Consórcio','Consórcio'],['Família','Família'],['Código','Código'],['Descrição','Descrição'],['Unidade','Unidade'],['Qtd em estoque','Quantidade','n'],['Custo médio','Custo Médio','m'],['Valor em estoque','Custo Total','m'],
+    ['Classe ABC','Classe ABC'],['Estoque mínimo','Estoque Mínimo','n'],['Qtd reservada','Quantidade Reservada','n'],['Data da posição','Data da Posição','d']];
+  return '<p class="sub" style="margin:0 0 10px">'+segH(spePosTxt(L))+'</p>'+spbBox('Todos os itens (maior valor primeiro)',spbTab(L,cols,400),spbExp('estoque','itens_estoque',L,cols)); },
+qual(){ const f=spe.f; let P=spe.r.posicoes; if(f.cons) P=P.filter(x=>x['Consórcio']===f.cons); if(f.data) P=P.filter(x=>String(x['Data da Posição']).slice(0,10)===f.data);
+  const L=speBase(), dif=P.reduce((s,x)=>s+(+x['Diferença Itens x Relatório']||0),0), pend=L.filter(x=>x['Pendências']!=null);
+  let h=sbKs([spbK('Posições carregadas',spbI(P.length)),spbK('Diferença vs relatório',spbBRL(Math.round(dif*100)/100),'soma dos itens − "Total da obra" do SIENGE'),
+    spbK('Itens com estoque mínimo',spbI(spbCnt(L,x=>x['Estoque Mínimo']>0)),'estoque mínimo cadastrado > 0'),spbK('Itens com pendência',spbI(pend.length),'',1)]);
+  const c1=[['Consórcio','Consórcio'],['Insumo','Insumo'],['Unidade','Unidade'],['Qtd em estoque','Quantidade','n'],['Custo médio','Custo Médio','m'],['Valor em estoque','Custo Total','m'],['Pendências','Pendências']];
+  h+=spbBox('Itens com pendência no relatório de origem (nada é corrigido: só sinalizado)',spbTab(pend,c1));
+  const c2=[['Arquivo','Arquivo'],['Consórcio','Consórcio'],['Obra SIENGE','Obra SIENGE'],['Exportado em','Exportado em',x=>spbDH(x)],['Itens na posição','Itens na Posição','i'],['Valor calculado (itens)','Valor Calculado (itens)','m'],
+    ['Total da obra (relatório)','Total da Obra (relatório)','m'],['Diferença','Diferença Itens x Relatório','m'],['Mais recente','Mais Recente']];
+  const c2x=c2.map(c=>c[2]&&typeof c[2]==='function'?[c[0],x=>spbDH(x[c[1]]),'t']:c);
+  h+=spbBox('Posições carregadas (1 por obra e data)',spbTab(P,c2x),spbExp('posicoes','posicoes_estoque',P,c2x));
+  return h; }
+};
+function speFiltrosHtml(){ const box=$('#spbFil'); if(!box||!spe.r) return; const need=SPE_FILT[spe.aba]||[], f=spe.f, it=spe.r.itens;
+  const opt=(k,vals)=>`<div class="sbf"><label class="sbfl" for="speF_${k}">${SPE_FL[k]}</label><select id="speF_${k}" data-spef="${k}" class="${f[k]?'on':''}"><option value="">Todos</option>${vals.map(v=>`<option value="${segH(v[0])}"${f[k]===v[0]?' selected':''}>${segH(v[1])}</option>`).join('')}</select></div>`;
+  let h='';
+  if(need.includes('cons')) h+=opt('cons',spbUniq(it,'Consórcio').map(v=>[v,v]));
+  if(need.includes('grupo')) h+=opt('grupo',spbUniq(it,'Grupo').map(v=>[v,v]));
+  if(need.includes('fam')) h+=opt('fam',spbUniq(it,'Família').map(v=>[v,v]));
+  if(need.includes('ins')) h+=`<div class="sbf"><label class="sbfl" for="speF_ins">Insumo</label><input id="speF_ins" data-spef="ins" placeholder="digite parte do nome" value="${segH(f.ins)}" autocomplete="off"/></div>`;
+  if(need.includes('data')) h+=opt('data',[...new Set(spe.r.posicoes.map(x=>String(x['Data da Posição']).slice(0,10)))].sort().reverse().map(d=>[d,spbDia(d)]));
+  h+='<div class="sbf sbf-clr"><button type="button" class="sbclr" id="speLimpa">Limpar filtros</button></div>';
+  box.innerHTML=h;
+  box.querySelectorAll('[data-spef]').forEach(el=>{ const k=el.dataset.spef, ev=el.tagName==='SELECT'?'change':'input';
+    el.addEventListener(ev,()=>{ spe.f[k]=el.value; if(el.tagName==='SELECT') el.classList.toggle('on',!!el.value); clearTimeout(spe._t); spe._t=setTimeout(speRender,ev==='input'?250:0); }); });
+  const lp=$('#speLimpa'); if(lp) lp.onclick=()=>{ Object.keys(spe.f).forEach(k=>spe.f[k]=''); speFiltrosHtml(); speRender(); }; }
+function speRender(){ const v=$('#spbView'); if(!v||!spe.r) return;
+  v.innerHTML='<div class="sbgrid">'+(spe.r.itens.length||spe.aba==='qual'?SPE_PAG[spe.aba]():'<p class="sbvz">Nenhuma posição de estoque carregada ainda — use "Cargas do SIENGE" › Posições de Estoque Atual.</p>')+'</div>';
+  v.querySelectorAll('[data-spbx]').forEach(b=>b.onclick=()=>spbExpDo(b.dataset.spbx));
+  v.querySelectorAll('.spbexp[data-spek]').forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.spek; spe.exp[k]=!spe.exp[k]; speRender(); }); }
+async function speCarregar(){ const v=$('#spbView'); v.innerHTML='<p class="sbvz">Carregando…</p>';
+  try{ const {data,error}=await sb.rpc('app_sup_bi_estoque'); if(error) throw error; spe.r=data||{itens:[],posicoes:[],cargas:[]}; }
+  catch(e){ v.innerHTML='<div class="banner bad">Não foi possível carregar o estoque: '+segH(e.message||e)+'</div>'; return; }
+  const up=(spe.r.cargas||[]).map(k=>k.em).filter(Boolean).sort().pop();
+  $('#spbAtual').textContent=up?('Posições de estoque carregadas · última carga '+spbDH(up)):'Nenhuma posição de estoque carregada ainda — use "Cargas do SIENGE".';
+  speFiltrosHtml(); speRender(); }
 // ----- cargas -----
 async function spbcInit(){
   spbCss();
@@ -8601,26 +8726,26 @@ function spbcResumo(r){
   if(!r) return '';
   if(r.status==='erro') return '⚠️ '+vEsc(r.erro||'Erro no processamento.');
   if(r.status==='pendente') return '⏳ Enviado, ainda não concluído.';
-  return '✅ '+spbN(r.linhas)+' linhas · '+vEsc(spbObras(r.obras))+(r.aviso?'<br>ℹ️ '+vEsc(r.aviso):'');
+  return '✅ '+spbN(r.linhas)+(r.tipo==='estoque'?' itens':' linhas')+' · '+vEsc(spbObras(r.obras))+(r.data_posicao?' · posição de '+vEsc(String(r.data_posicao).slice(8,10)+'/'+String(r.data_posicao).slice(5,7)+'/'+String(r.data_posicao).slice(0,4)):'')+(r.aviso?'<br>ℹ️ '+vEsc(r.aviso):'');
 }
 function spbcRender(){
   const box=$('#spbcSlots'); if(!box) return;
   box.innerHTML=SPB_TIPOS.map(tipo=>{
     const fila=spbcFila[tipo], busy=!!spbcRodando[tipo];
     const st=fila.length?fila.map(it=>'<div class="sgst '+(it.r?(it.r.status==='ok'?'ok':'erro'):'wait')+'"><b>'+vEsc(it.nome)+'</b><br>'+(it.r?spbcResumo(it.r):'⏳ '+vEsc(it.msg||'Na fila…'))+'</div>').join('')
-      :'<div class="sgst">Solte aqui o arquivo .xlsx exportado do SIENGE'+(tipo==='mapa'?' (pode ser mais de um: uma obra por arquivo)':'')+'.</div>';
+      :'<div class="sgst">Solte aqui o arquivo .xlsx exportado do SIENGE'+((tipo==='mapa'||tipo==='estoque')?' (pode ser mais de um: uma obra por arquivo)':'')+'.</div>';
     return '<div class="sgslot" data-k="'+tipo+'"><div class="sgh"><b>'+SPB_TIPO[tipo]+'</b></div><div class="sgsub">'+SPB_SUB[tipo]+'</div>'+st
-      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo'+(tipo==='mapa'?'s':'')+'</button>'
+      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo'+((tipo==='mapa'||tipo==='estoque')?'s':'')+'</button>'
       +(fila.length&&!busy?'<button class="btn ghost" data-limpa>Limpar lista</button>':'')+'</div>'
       +'<div class="sgbanco" style="margin-top:4px"><b>No banco agora</b></div>'+spbcBanco(tipo)+'</div>';
   }).join('');
   box.querySelectorAll('.sgslot').forEach(el=>{
     const tipo=el.dataset.k;
-    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ spbcAlvo=tipo; const f=$('#spbcFile'); f.multiple=(tipo==='mapa'); f.click(); };
+    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ spbcAlvo=tipo; const f=$('#spbcFile'); f.multiple=(tipo==='mapa'||tipo==='estoque'); f.click(); };
     const lp=el.querySelector('[data-limpa]'); if(lp) lp.onclick=()=>{ spbcFila[tipo]=[]; spbcRender(); };
     el.ondragover=ev=>{ ev.preventDefault(); el.classList.add('drag'); };
     el.ondragleave=()=>el.classList.remove('drag');
-    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); let fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])]; if(tipo!=='mapa') fs=fs.slice(0,1); if(fs.length&&!spbcRodando[tipo]) spbcEnfileirar(tipo,fs); };
+    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); let fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])]; if(tipo!=='mapa'&&tipo!=='estoque') fs=fs.slice(0,1); if(fs.length&&!spbcRodando[tipo]) spbcEnfileirar(tipo,fs); };
   });
   const h=$('#spbcHist'), H=(spbcDados||{}).historico||[];
   h.innerHTML=H.length?H.map(f=>'<div class="sgrow"><div class="t"><span>'+vEsc(SPB_TIPO[f.tipo]||f.tipo)+' · '+vEsc(spbObras(f.obras))+'</span><span>'+spbDH(f.enviado_em)+'</span></div>'
@@ -8650,18 +8775,20 @@ async function spbcEnviar(it,tipo){
     const rows=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null});
     const det=SPB_P.detectar(rows);
     if(det!==tipo) throw new Error(det?'Esse arquivo é do '+SPB_TIPO[det]+', não do '+SPB_TIPO[tipo]+' — nada foi alterado.':'Não reconheci o arquivo como relatório do SIENGE — nada foi alterado.');
-    const L=tipo==='painel'?SPB_P.lerPainel(rows):tipo==='mapa'?SPB_P.lerMapa(rows):SPB_P.lerVinculados(rows);
-    if(!L.linhas.length) throw new Error('Nenhuma linha das obras 430/440 no arquivo — nada foi alterado.');
+    const L=tipo==='painel'?SPB_P.lerPainel(rows):tipo==='mapa'?SPB_P.lerMapa(rows):tipo==='estoque'?SPB_P.lerEstoque(rows):SPB_P.lerVinculados(rows);
+    if(tipo==='estoque'){ const c=L.cabecalho; if(c.obra!==430&&c.obra!==440) throw new Error('Obra '+(c.obra||'?')+' fora do escopo (só 430 e 440) — nada foi alterado.'); if(!c.exportado_em) throw new Error('Não achei a data/hora do rodapé do relatório — nada foi alterado.'); }
+    if(!L.linhas.length) throw new Error(tipo==='estoque'?'Nenhum item no arquivo — nada foi alterado.':'Nenhuma linha das obras 430/440 no arquivo — nada foi alterado.');
     it.msg='Enviando…'; spbcRender();
     const {data:ini,error:e0}=await sb.rpc('app_sup_carga_iniciar',{p_tipo:tipo,p_nome:it.file.name,p_sha256:sha}); if(e0) throw e0;
     cargaId=ini.carga_id;
+    if(tipo==='estoque'){ const c=L.cabecalho; const {error:eh}=await sb.rpc('app_sup_estoque_posicao',{p_carga:cargaId,p_obra:c.obra,p_empresa:c.empresa,p_obra_sienge:c.obra_sienge,p_exportado_em:c.exportado_em,p_total_obra:c.total_obra}); if(eh) throw eh; }
     for(let i=0;i<L.linhas.length;i+=400){
       const {error}=await sb.rpc('app_sup_carga_lote',{p_carga:cargaId,p_linhas:L.linhas.slice(i,i+400)}); if(error) throw error;
       it.msg='Enviando… '+spbN(Math.min(i+400,L.linhas.length))+' de '+spbN(L.linhas.length); spbcRender();
     }
     it.msg='Conferindo e trocando o relatório…'; spbcRender();
     const {data:fim,error:e2}=await sb.rpc('app_sup_carga_finalizar',{p_carga:cargaId,p_lidas:L.lidas,p_fora:L.fora}); if(e2) throw e2;
-    it.r={status:'ok',linhas:fim.linhas,obras:fim.obras,aviso:fim.aviso};
+    it.r={status:'ok',tipo,linhas:fim.linhas,obras:fim.obras,aviso:fim.aviso,data_posicao:fim.data_posicao};
   }catch(e){
     if(cargaId) try{ await sb.rpc('app_sup_carga_falha',{p_carga:cargaId,p_erro:String((e&&e.message)||e)}); }catch(_){}
     it.r={status:'erro',erro:(e&&e.message)||String(e)};
