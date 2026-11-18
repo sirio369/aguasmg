@@ -1079,6 +1079,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" id="apFraudePri"><div class="ic">🕵️</div><div class="nm">Fiscalização de irregularidades</div></button>
       <button class="mod" id="apSitImoveis"><div class="ic">🏘️</div><div class="nm">Situação dos Imóveis</div></button>
       <button class="mod" data-go="recad_prog"><div class="ic">📝</div><div class="nm">Programação do recadastramento</div></button>
+      <button class="mod" data-go="hd_caixas"><div class="ic">📦</div><div class="nm">Logística reversa de HD</div></button>
     </div>
 
     <div class="sec" style="margin-top:20px">🎧 Pesquisa de Vazamentos</div>
@@ -1269,6 +1270,48 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     </div>
     <div class="sec" style="margin-top:14px">Por colaborador <span style="font-weight:400;color:var(--mut)">(equipe da OS atual de cada matrícula — clique para filtrar)</span></div>
     <div id="rcColab" style="margin-top:8px"></div>
+  </main>
+
+  <main id="hd_caixas" class="hidden">
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>Logística reversa de HD</h1>
+    <p class="sub" id="hxSub">Caixas de hidrômetros recebidas da COPASA: cadastre por consórcio, vincule ao responsável pela substituição e registre a devolução.</p>
+    <div id="hxCards" class="hxcards"></div>
+    <div class="hxfilt">
+      <select id="hxCons"><option value="">Todos os consórcios</option><option value="ZA1004">ZA1004 — Águas Integradas</option><option value="ZA0200">ZA0200 — Eficiência Hídrica</option></select>
+      <select id="hxPes"><option value="">Todas as pessoas</option></select>
+      <input type="search" id="hxQ" placeholder="Buscar nº da caixa ou nº do HD"/>
+    </div>
+    <div class="hxbar">
+      <div class="seg" id="hxAba" style="flex:1 1 260px">
+        <button type="button" data-aba="caixas" class="sel">Caixas</button>
+        <button type="button" data-aba="pessoas">Por pessoa</button>
+      </div>
+      <button type="button" class="btn" id="hxNovo">➕ Cadastrar caixas</button>
+      <button type="button" class="btn ghost" id="hxCsv">⬇️ Exportar</button>
+    </div>
+
+    <div id="hxCad" class="hxpanel hidden">
+      <div class="sec" style="margin:0 0 6px">Cadastrar caixas recebidas</div>
+      <label for="hxCadCons" style="margin-top:4px">Consórcio *</label>
+      <select id="hxCadCons"><option value="">Selecione…</option><option value="ZA1004">ZA1004 — Águas Integradas</option><option value="ZA0200">ZA0200 — Eficiência Hídrica</option></select>
+      <div class="hxrow">
+        <div><label for="hxCadNum">Nº da caixa *</label><input id="hxCadNum" autocomplete="off"/></div>
+        <div><label for="hxCadIni">HD inicial *</label><input id="hxCadIni" autocomplete="off"/></div>
+        <div><label for="hxCadFim">HD final *</label><input id="hxCadFim" autocomplete="off"/></div>
+        <button type="button" class="btn ghost" id="hxCadAdd">Adicionar</button>
+      </div>
+      <label for="hxCadCola">Ou cole do Excel — uma caixa por linha: <b>Nº da caixa · HD inicial · HD final</b></label>
+      <textarea id="hxCadCola" rows="4" placeholder="CX001&#9;Y25A000001&#9;Y25A000020"></textarea>
+      <div id="hxCadPrev" style="margin-top:8px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button type="button" class="btn" id="hxCadSalvar" disabled>Salvar caixas</button>
+        <button type="button" class="btn ghost" id="hxCadCancelar">Cancelar</button>
+      </div>
+    </div>
+
+    <div id="hxAcao" class="hxpanel hidden"></div>
+    <div id="hxLista"></div>
   </main>
 
   <main id="sigos_vinculo" class="hidden">
@@ -2509,7 +2552,7 @@ if($('#prMeuLocal')) $('#prMeuLocal').addEventListener('click',()=>{
 });
 
 // ---------- navegação ----------
-const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','suprimentos','pr_prod','pressao_reg','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','suprimentos','pr_prod','pressao_reg','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','hd_caixas','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_ind','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_painel','sst_lanc','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 const FISCAL_TELAS=['home','fisc','fiscv','fiscv_rel','cadastro','biblioteca','notificacoes'];
 function irPara(id){
   if(ME&&ME.is_fiscal){ if(!FISCAL_TELAS.includes(id)) id='home'; if(id==='fisc') id='fiscv'; }
@@ -2551,6 +2594,7 @@ function irPara(id){
   if(id==='fisc_rel') frlInit();
   if(id==='fisc_val_acesso') fvaInit();
   if(id==='recad_prog') rcInit();
+  if(id==='hd_caixas') hxInit();
   if(id==='matriculas') mtInit();
   if(id==='pavimento') pavInit();
   if(id==='pavprog') pavProgInit();
@@ -9305,6 +9349,275 @@ async function rcExport(){
     a.download='recadastramento_'+new Date().toISOString().slice(0,10)+(rcPoly?'_poligono':'')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
     toast(rcN(sel.length)+' matrículas exportadas.'); }catch(e){ toast('Não consegui gerar o arquivo'); }
   rcRender();
+}
+
+// ---------- LOGÍSTICA REVERSA DE HD (caixas de hidrômetros da COPASA) — Auxiliar de Programação › Serviços comerciais ----------
+// (docs/migracao_hd_caixas.sql, MODULOS §21.7). Caixa = nº + HD inicial + HD final, por consórcio.
+// Fluxo: cadastrada (pendente de retirada) → vinculada a um responsável (em execução) → devolvida (gestor desvincula).
+// Qualquer pessoa com acesso ao Auxiliar faz todos os passos. Filtros e contagens rodam no app sobre app_hdcx_listar().
+let hxCx=[], hxPessoas=[], hxNovas=[], hxSel=new Set(), hxAba='caixas';
+const hxF={st:'',cons:'',pes:'',q:''};
+const HX_ST=[['disponivel','Pendentes de retirada','#f59f00'],['em_execucao','Em execução','#1c7ed6'],['devolvida','Devolvidas','#1a7f4b']];
+const HX_ST1={disponivel:'Pendente de retirada',em_execucao:'Em execução',devolvida:'Devolvida'};
+const HX_CONS={ZA1004:'Águas Integradas',ZA0200:'Eficiência Hídrica'};
+const hxN=n=>Number(n||0).toLocaleString('pt-BR');
+const hxDt=v=>v?new Date(v).toLocaleDateString('pt-BR'):'';
+const hxDias=v=>v?Math.max(0,Math.floor((Date.now()-new Date(v).getTime())/864e5)):null;
+// HD = prefixo + número; quantidade e busca por faixa só quando os dois lados têm o mesmo prefixo
+const hxParte=h=>{ const m=/^(.*?)(\d+)$/.exec(String(h||'').trim().toUpperCase()); return m?{p:m[1],n:parseInt(m[2],10)}:null; };
+function hxQtd(c){ const a=hxParte(c.ini), b=hxParte(c.fim); return (a&&b&&a.p===b.p&&b.n>=a.n)?b.n-a.n+1:null; }
+function hxTemHd(c,q){ const h=hxParte(q), a=hxParte(c.ini), b=hxParte(c.fim);
+  if(!h||!a||!b||h.p!==a.p||a.p!==b.p) return false; return h.n>=a.n&&h.n<=b.n; }
+function hxCss(){
+  if(document.getElementById('hxCss')) return;
+  const st=document.createElement('style'); st.id='hxCss';
+  st.textContent=`#hd_caixas .hxcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 6px}
+@media(max-width:640px){#hd_caixas .hxcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#hd_caixas .hxcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;font:inherit;color:inherit;min-width:0;cursor:pointer}
+#hd_caixas .hxcard b{display:block;font-size:22px;line-height:1.15}
+#hd_caixas .hxcard span{font-size:12px;color:var(--mut)}
+#hd_caixas .hxcard i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#hd_caixas .hxcard.on{outline:2px solid var(--acc);outline-offset:-2px}
+#hd_caixas .hxfilt{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+#hd_caixas .hxfilt select,#hd_caixas .hxfilt input{flex:1 1 180px;min-width:0;font-size:14px;padding:9px 10px}
+#hd_caixas .hxbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 10px}
+#hd_caixas .hxbar .btn,#hd_caixas .hxpanel .btn{margin:0;width:auto;padding:9px 14px;font-size:14px}
+#hd_caixas .hxbar .seg button{padding:8px}
+#hd_caixas .hxpanel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px}
+#hd_caixas .hxpanel select,#hd_caixas .hxpanel input,#hd_caixas .hxpanel textarea{font-size:14px;padding:9px 10px}
+#hd_caixas .hxrow{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end}
+@media(max-width:640px){#hd_caixas .hxrow{grid-template-columns:1fr 1fr}}
+#hd_caixas .hxrow label{margin:10px 0 4px}
+#hd_caixas .hxtabw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 8px}
+#hd_caixas .hxtab{width:100%;border-collapse:collapse;font-size:13px}
+#hd_caixas .hxtab th,#hd_caixas .hxtab td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+#hd_caixas .hxtab th{font-size:12px;color:var(--mut);font-weight:600}
+#hd_caixas .hxtab td.n,#hd_caixas .hxtab th.n{text-align:right}
+#hd_caixas .hxtab tr.on td{background:var(--ok-bg)}
+#hd_caixas .hxtab input[type=checkbox]{width:18px;height:18px;padding:0;margin:0}
+#hd_caixas .hxtab .btn{margin:0;width:auto;padding:5px 10px;font-size:12.5px}
+#hd_caixas .hxtab tr.pes{cursor:pointer}
+#hd_caixas .hxst{display:inline-flex;align-items:center;gap:5px;font-size:12px}
+#hd_caixas .hxst i{display:inline-block;width:9px;height:9px;border-radius:50%}
+#hd_caixas .hxsub{font-size:11.5px;color:var(--mut)}
+#hd_caixas .hxdup{color:var(--bad)}`;
+  document.head.appendChild(st);
+}
+function hxInit(){
+  if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); return; }
+  hxCss();
+  const once=(id,ev,fn)=>{ const el=$(id); if(el&&!el.dataset.ready){ el.dataset.ready='1'; el.addEventListener(ev,fn); } };
+  once('#hxCons','change',e=>{ hxF.cons=e.target.value; hxSel.clear(); hxPesOpts(); hxRender(); });
+  once('#hxPes','change',e=>{ hxF.pes=e.target.value; hxSel.clear(); hxRender(); });
+  once('#hxQ','input',e=>{ hxF.q=e.target.value.trim(); hxRender(); });
+  document.querySelectorAll('#hxAba button').forEach(b=>{ if(!b.dataset.ready){ b.dataset.ready='1'; b.onclick=()=>hxSetAba(b.dataset.aba); } });
+  once('#hxNovo','click',hxCadAbrir);
+  once('#hxCsv','click',hxExport);
+  once('#hxCadAdd','click',hxCadAdd);
+  once('#hxCadCola','input',hxCadPrev);
+  once('#hxCadCons','change',hxCadPrev);
+  once('#hxCadSalvar','click',hxCadSalvar);
+  once('#hxCadCancelar','click',hxCadFechar);
+  ['#hxCadNum','#hxCadIni','#hxCadFim'].forEach(id=>once(id,'keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); hxCadAdd(); } }));
+  hxAcaoFechar();
+  hxCarregar();
+}
+function hxSetAba(a){ hxAba=a; document.querySelectorAll('#hxAba button').forEach(x=>x.classList.toggle('sel',x.dataset.aba===a)); hxRender(); }
+async function hxCarregar(){
+  $('#hxLista').innerHTML='<p class="sub">Carregando…</p>';
+  try{
+    const [c,p]=await Promise.all([sb.rpc('app_hdcx_listar'), hxPessoas.length?{data:hxPessoas}:sb.rpc('app_hdcx_pessoas')]);
+    if(c.error) throw c.error; if(p.error) throw p.error;
+    hxCx=c.data||[]; hxPessoas=p.data||[];
+  }catch(e){ $('#hxLista').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc((e&&e.message)||e)+'</div>'; return; }
+  const ids=new Set(hxCx.map(c=>c.id)); [...hxSel].forEach(i=>{ if(!ids.has(i)) hxSel.delete(i); });
+  hxPesOpts(); hxRender();
+}
+// filtro de pessoa: só quem tem ou já teve caixa (no consórcio escolhido)
+function hxPesOpts(){
+  const el=$('#hxPes'), m=new Map();
+  hxCx.forEach(c=>{ if(c.resp&&(!hxF.cons||c.cons===hxF.cons)) m.set(c.resp,c.resp_nome||'—'); });
+  const arr=[...m].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
+  if(hxF.pes&&!m.has(hxF.pes)) hxF.pes='';
+  el.innerHTML='<option value="">Todas as pessoas</option>'+arr.map(([id,n])=>`<option value="${vEsc(id)}"${id===hxF.pes?' selected':''}>${vEsc(n)}</option>`).join('');
+}
+function hxBase(){ return hxCx.filter(c=>(!hxF.cons||c.cons===hxF.cons)&&(!hxF.pes||c.resp===hxF.pes)&&hxBusca(c)); }
+function hxBusca(c){ const q=hxF.q.toUpperCase(); if(!q) return true;
+  return String(c.num).toUpperCase().includes(q)||String(c.ini).includes(q)||String(c.fim).includes(q)||hxTemHd(c,q); }
+function hxRender(){
+  const base=hxBase(), vis=base.filter(c=>!hxF.st||c.st===hxF.st);
+  const cont=Object.fromEntries(HX_ST.map(s=>[s[0],0])); base.forEach(c=>cont[c.st]=(cont[c.st]||0)+1);
+  const qtdHd=arr=>arr.reduce((s,c)=>s+(hxQtd(c)||0),0);
+  $('#hxCards').innerHTML=HX_ST.map(([k,l,cor])=>{ const arr=base.filter(c=>c.st===k), q=qtdHd(arr);
+    return `<button type="button" class="hxcard${hxF.st===k?' on':''}" data-st="${k}"><b>${hxN(cont[k])}</b><span><i style="background:${cor}"></i>${l}${q?' · '+hxN(q)+' HDs':''}</span></button>`; }).join('')
+    +`<button type="button" class="hxcard${!hxF.st?' on':''}" data-st=""><b>${hxN(base.length)}</b><span>Total de caixas${qtdHd(base)?' · '+hxN(qtdHd(base))+' HDs':''}</span></button>`;
+  $('#hxCards').querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{ hxF.st=(hxF.st===b.dataset.st?'':b.dataset.st); hxSel.clear(); hxRender(); });
+  if(hxAba==='pessoas') return hxRenderPessoas(base);
+  hxRenderCaixas(vis);
+}
+function hxRenderCaixas(vis){
+  const box=$('#hxLista');
+  if(!hxCx.length){ box.innerHTML='<p class="sub">Nenhuma caixa cadastrada ainda. Use ➕ Cadastrar caixas.</p>'; hxSelBar(); return; }
+  if(!vis.length){ box.innerHTML='<p class="sub">Nenhuma caixa com esses filtros.</p>'; hxSelBar(); return; }
+  const lim=1000, arr=vis.slice(0,lim), cor=Object.fromEntries(HX_ST.map(s=>[s[0],s[2]]));
+  const todos=arr.every(c=>c.st==='devolvida'||hxSel.has(c.id));
+  box.innerHTML=`<div id="hxSelBar"></div><div class="hxtabw"><table class="hxtab"><thead><tr>
+    <th><input type="checkbox" id="hxSelAll" title="Selecionar todas"${todos&&hxSel.size?' checked':''}/></th><th>Caixa</th><th>Consórcio</th><th>HD inicial → final</th><th class="n">HDs</th><th>Situação</th><th>Responsável</th><th>Desde</th><th></th></tr></thead><tbody>`
+    +arr.map(c=>{ const q=hxQtd(c), d=c.st==='em_execucao'?c.vinc_em:c.st==='devolvida'?c.dev_em:c.cad_em, dd=hxDias(d);
+      const acao=c.st==='disponivel'?`<button type="button" class="btn ghost" data-vinc="${c.id}">Vincular</button> <button type="button" class="btn ghost" data-ed="${c.id}" title="Corrigir ou excluir">✏️</button>`
+        :c.st==='em_execucao'?`<button type="button" class="btn ghost" data-dev="${c.id}">Devolver</button>`:'';
+      const sub=c.st==='devolvida'?`<div class="hxsub">devolvida por ${vEsc(c.dev_por||'—')}${c.dev_obs?' · '+vEsc(c.dev_obs):''}</div>`
+        :c.st==='em_execucao'?`<div class="hxsub">vinculada por ${vEsc(c.vinc_por||'—')}</div>`:'';
+      return `<tr class="${hxSel.has(c.id)?'on':''}"><td>${c.st==='devolvida'?'':`<input type="checkbox" data-sel="${c.id}"${hxSel.has(c.id)?' checked':''}/>`}</td>
+        <td><b>${vEsc(c.num)}</b>${c.obs?`<div class="hxsub">${vEsc(c.obs)}</div>`:''}</td><td>${vEsc(c.cons)}</td><td>${vEsc(c.ini)} → ${vEsc(c.fim)}</td><td class="n">${q==null?'—':hxN(q)}</td>
+        <td><span class="hxst"><i style="background:${cor[c.st]}"></i>${HX_ST1[c.st]||c.st}</span></td>
+        <td>${vEsc(c.resp_nome||'')}${sub}</td><td>${hxDt(d)}${dd!=null&&c.st!=='devolvida'?`<div class="hxsub">há ${hxN(dd)} dia${dd===1?'':'s'}</div>`:''}</td><td>${acao}</td></tr>`; }).join('')
+    +'</tbody></table></div>'+(vis.length>lim?`<p class="sub">Mostrando ${hxN(lim)} de ${hxN(vis.length)} caixas — refine os filtros (o export traz todas).</p>`:'');
+  box.querySelectorAll('[data-sel]').forEach(i=>i.onchange=()=>{ const id=+i.dataset.sel; i.checked?hxSel.add(id):hxSel.delete(id); i.closest('tr').classList.toggle('on',i.checked); hxSelBar(); });
+  const all=$('#hxSelAll'); if(all) all.onchange=()=>{ arr.forEach(c=>{ if(c.st!=='devolvida'){ all.checked?hxSel.add(c.id):hxSel.delete(c.id); } }); hxRender(); };
+  box.querySelectorAll('[data-vinc]').forEach(b=>b.onclick=()=>hxVincAbrir([+b.dataset.vinc]));
+  box.querySelectorAll('[data-dev]').forEach(b=>b.onclick=()=>hxDevAbrir([+b.dataset.dev]));
+  box.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>hxEdAbrir(+b.dataset.ed));
+  hxSelBar();
+}
+// ações em lote sobre a seleção: vincular as pendentes de retirada / devolver as em execução
+function hxSelBar(){
+  const el=$('#hxSelBar'); if(!el) return;
+  const sel=hxCx.filter(c=>hxSel.has(c.id)); if(!sel.length){ el.innerHTML=''; return; }
+  const disp=sel.filter(c=>c.st==='disponivel'), exe=sel.filter(c=>c.st==='em_execucao');
+  el.innerHTML=`<div class="hxbar" style="margin-top:0"><span class="sub" style="margin:0">${hxN(sel.length)} selecionada${sel.length===1?'':'s'}</span>`
+    +(disp.length?`<button type="button" class="btn" id="hxSelVinc">Vincular ${hxN(disp.length)} a um responsável</button>`:'')
+    +(exe.length?`<button type="button" class="btn" id="hxSelDev">Registrar devolução de ${hxN(exe.length)}</button>`:'')
+    +`<button type="button" class="btn ghost" id="hxSelLimpa">Limpar seleção</button></div>`;
+  const v=$('#hxSelVinc'); if(v) v.onclick=()=>hxVincAbrir(disp.map(c=>c.id));
+  const d=$('#hxSelDev'); if(d) d.onclick=()=>hxDevAbrir(exe.map(c=>c.id));
+  $('#hxSelLimpa').onclick=()=>{ hxSel.clear(); hxRender(); };
+}
+function hxRenderPessoas(base){
+  const m=new Map();
+  base.forEach(c=>{ if(!c.resp) return; const k=c.resp+'|'+c.cons;
+    const r=m.get(k)||{id:c.resp,nome:c.resp_nome||'—',cons:c.cons,exe:0,dev:0,hdExe:0,desde:null};
+    if(c.st==='em_execucao'){ r.exe++; r.hdExe+=hxQtd(c)||0; if(!r.desde||c.vinc_em<r.desde) r.desde=c.vinc_em; } else if(c.st==='devolvida') r.dev++;
+    m.set(k,r); });
+  const arr=[...m.values()].sort((a,b)=>b.exe-a.exe||a.nome.localeCompare(b.nome,'pt-BR'));
+  const pend=base.filter(c=>c.st==='disponivel').length;
+  $('#hxLista').innerHTML=(arr.length?`<div class="hxtabw"><table class="hxtab"><thead><tr><th>Responsável</th><th>Consórcio</th><th class="n">Em execução</th><th class="n">HDs em execução</th><th class="n">Devolvidas</th><th class="n">Total</th><th>Caixa mais antiga em execução</th></tr></thead><tbody>`
+    +arr.map(r=>{ const dd=hxDias(r.desde);
+      return `<tr class="pes" data-p="${vEsc(r.id)}" data-c="${r.cons}"><td><b>${vEsc(r.nome)}</b></td><td>${r.cons}</td><td class="n">${hxN(r.exe)}</td><td class="n">${r.hdExe?hxN(r.hdExe):'—'}</td><td class="n">${hxN(r.dev)}</td><td class="n">${hxN(r.exe+r.dev)}</td><td>${r.desde?hxDt(r.desde)+' (há '+hxN(dd)+' dia'+(dd===1?'':'s')+')':'—'}</td></tr>`; }).join('')
+    +'</tbody></table></div>':'<p class="sub">Nenhuma caixa vinculada com esses filtros.</p>')
+    +`<p class="sub" style="margin-top:8px">${hxN(pend)} caixa${pend===1?'':'s'} pendente${pend===1?'':'s'} de retirada (sem responsável). Clique numa pessoa para ver as caixas dela.</p>`;
+  $('#hxLista').querySelectorAll('tr.pes').forEach(tr=>tr.onclick=()=>{
+    hxF.cons=tr.dataset.c; $('#hxCons').value=hxF.cons; hxPesOpts(); hxF.pes=tr.dataset.p; $('#hxPes').value=hxF.pes; hxF.st=''; hxSetAba('caixas'); });
+}
+// ---- painel de ação (vincular / devolver / corrigir) ----
+function hxAcaoFechar(){ const p=$('#hxAcao'); if(p){ p.classList.add('hidden'); p.innerHTML=''; } }
+function hxAcaoAbrir(html){ hxCadFechar(); const p=$('#hxAcao'); p.innerHTML=html; p.classList.remove('hidden'); p.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+const hxNums=ids=>{ const n=hxCx.filter(c=>ids.includes(c.id)).map(c=>c.num); return n.slice(0,12).join(', ')+(n.length>12?' e mais '+(n.length-12):''); };
+function hxVincAbrir(ids){
+  const cx=hxCx.filter(c=>ids.includes(c.id)&&c.st==='disponivel'); if(!cx.length) return;
+  const cons=[...new Set(cx.map(c=>c.cons))];
+  const opt=(lst)=>lst.map(p=>`<option value="${vEsc(p.id)}">${vEsc(p.nome)}${p.cargo?' — '+vEsc(p.cargo):''}</option>`).join('');
+  const doCons=hxPessoas.filter(p=>cons.length===1&&p.cons===cons[0]), outros=hxPessoas.filter(p=>!doCons.includes(p));
+  hxAcaoAbrir(`<div class="sec" style="margin:0 0 4px">Vincular ${hxN(cx.length)} caixa${cx.length===1?'':'s'} (retirada)</div>
+    <p class="sub" style="margin:0 0 6px">${vEsc(hxNums(cx.map(c=>c.id)))}</p>
+    <label for="hxVincPes" style="margin-top:6px">Responsável pela substituição *</label>
+    <select id="hxVincPes"><option value="">Selecione…</option>${doCons.length?`<optgroup label="${vEsc(cons[0]+' — '+(HX_CONS[cons[0]]||''))}">${opt(doCons)}</optgroup><optgroup label="Outros">${opt(outros)}</optgroup>`:opt(hxPessoas)}</select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" id="hxVincOk" disabled>Vincular</button><button type="button" class="btn ghost" id="hxVincX">Cancelar</button></div>`);
+  $('#hxVincPes').onchange=e=>{ $('#hxVincOk').disabled=!e.target.value; };
+  $('#hxVincX').onclick=hxAcaoFechar;
+  $('#hxVincOk').onclick=async()=>{ const b=$('#hxVincOk'); b.disabled=true; b.textContent='Salvando…';
+    const {data,error}=await sb.rpc('app_hdcx_vincular',{p_ids:cx.map(c=>c.id),p_responsavel:$('#hxVincPes').value});
+    if(error){ toast('Erro: '+error.message); b.disabled=false; b.textContent='Vincular'; return; }
+    toast('✓ '+hxN(data)+' caixa'+(data===1?'':'s')+' vinculada'+(data===1?'':'s')); hxSel.clear(); hxAcaoFechar(); hxCarregar(); };
+}
+function hxDevAbrir(ids){
+  const cx=hxCx.filter(c=>ids.includes(c.id)&&c.st==='em_execucao'); if(!cx.length) return;
+  const resp=[...new Set(cx.map(c=>c.resp_nome||'—'))];
+  hxAcaoAbrir(`<div class="sec" style="margin:0 0 4px">Devolução — desvincular ${hxN(cx.length)} caixa${cx.length===1?'':'s'}</div>
+    <p class="sub" style="margin:0 0 6px">${vEsc(hxNums(cx.map(c=>c.id)))} · com ${vEsc(resp.join(', '))}</p>
+    <label for="hxDevObs" style="margin-top:6px">Observação (opcional)</label>
+    <input id="hxDevObs" placeholder="Ex.: caixa devolvida com 18 HDs retirados"/>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" id="hxDevOk">Confirmar devolução</button><button type="button" class="btn ghost" id="hxDevX">Cancelar</button></div>`);
+  $('#hxDevX').onclick=hxAcaoFechar;
+  $('#hxDevOk').onclick=async()=>{ const b=$('#hxDevOk'); b.disabled=true; b.textContent='Salvando…';
+    const {data,error}=await sb.rpc('app_hdcx_devolver',{p_ids:cx.map(c=>c.id),p_obs:$('#hxDevObs').value.trim()||null});
+    if(error){ toast('Erro: '+error.message); b.disabled=false; b.textContent='Confirmar devolução'; return; }
+    toast('✓ '+hxN(data)+' caixa'+(data===1?'':'s')+' devolvida'+(data===1?'':'s')); hxSel.clear(); hxAcaoFechar(); hxCarregar(); };
+}
+function hxEdAbrir(id){
+  const c=hxCx.find(x=>x.id===id); if(!c||c.st!=='disponivel') return;
+  hxAcaoAbrir(`<div class="sec" style="margin:0 0 4px">Corrigir caixa ${vEsc(c.num)} (${c.cons})</div>
+    <div class="hxrow" style="grid-template-columns:1fr 1fr 1fr">
+      <div><label for="hxEdNum">Nº da caixa *</label><input id="hxEdNum" value="${vEsc(c.num)}"/></div>
+      <div><label for="hxEdIni">HD inicial *</label><input id="hxEdIni" value="${vEsc(c.ini)}"/></div>
+      <div><label for="hxEdFim">HD final *</label><input id="hxEdFim" value="${vEsc(c.fim)}"/></div></div>
+    <label for="hxEdObs">Observação</label><input id="hxEdObs" value="${vEsc(c.obs||'')}"/>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" id="hxEdOk">Salvar</button><button type="button" class="btn ghost" id="hxEdX">Cancelar</button>
+      <button type="button" class="btn ghost" id="hxEdDel" style="margin-left:auto;color:var(--bad)">🗑️ Excluir caixa</button></div>`);
+  $('#hxEdX').onclick=hxAcaoFechar;
+  $('#hxEdOk').onclick=async()=>{ const v=k=>$('#hxEd'+k).value.trim();
+    if(!v('Num')||!v('Ini')||!v('Fim')) return toast('Preencha nº da caixa, HD inicial e HD final');
+    const {error}=await sb.rpc('app_hdcx_editar',{p_id:id,p_num:v('Num'),p_ini:v('Ini'),p_fim:v('Fim'),p_obs:v('Obs')||null});
+    if(error) return toast('Erro: '+(/hd_caixa_consorcio_numero_key/.test(error.message)?'já existe caixa com esse número neste consórcio':error.message));
+    toast('✓ Caixa corrigida'); hxAcaoFechar(); hxCarregar(); };
+  $('#hxEdDel').onclick=()=>{ const b=$('#hxEdDel');
+    if(!b.dataset.conf){ b.dataset.conf='1'; b.textContent='Confirmar exclusão da caixa '+c.num; return; }
+    sb.rpc('app_hdcx_excluir',{p_id:id}).then(({error})=>{ if(error) return toast('Erro: '+error.message); toast('Caixa excluída'); hxAcaoFechar(); hxCarregar(); }); };
+}
+// ---- cadastro em lote ----
+function hxCadAbrir(){ hxAcaoFechar(); const p=$('#hxCad'); p.classList.remove('hidden');
+  if(!$('#hxCadCons').value&&hxF.cons) $('#hxCadCons').value=hxF.cons; hxCadPrev(); $('#hxCadNum').focus(); }
+function hxCadFechar(){ const p=$('#hxCad'); if(!p) return; p.classList.add('hidden'); hxNovas=[]; $('#hxCadCola').value=''; ['#hxCadNum','#hxCadIni','#hxCadFim'].forEach(i=>$(i).value=''); hxCadPrev(); }
+function hxCadAdd(){
+  const n=$('#hxCadNum').value.trim(), i=$('#hxCadIni').value.trim(), f=$('#hxCadFim').value.trim();
+  if(!n||!i||!f) return toast('Preencha nº da caixa, HD inicial e HD final');
+  hxNovas.push({num:n,ini:i.toUpperCase(),fim:f.toUpperCase()}); ['#hxCadNum','#hxCadIni','#hxCadFim'].forEach(x=>$(x).value=''); $('#hxCadNum').focus(); hxCadPrev();
+}
+// linhas coladas: tab (Excel), ponto e vírgula ou vírgula; ignora cabeçalho e linhas incompletas
+function hxCadColadas(){
+  return $('#hxCadCola').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/\t|;|,/).map(x=>x.trim()))
+    .filter(p=>p.length>=3&&p[0]&&p[1]&&p[2]&&!/caixa/i.test(p[0])).map(p=>({num:p[0],ini:p[1].toUpperCase(),fim:p[2].toUpperCase()}));
+}
+function hxCadTodas(){ return hxNovas.concat(hxCadColadas()); }
+function hxCadPrev(){
+  const box=$('#hxCadPrev'); if(!box) return;
+  const cons=$('#hxCadCons').value, arr=hxCadTodas();
+  const exist=new Set(hxCx.filter(c=>c.cons===cons).map(c=>c.num)), vistos=new Map();
+  arr.forEach(c=>vistos.set(c.num,(vistos.get(c.num)||0)+1));
+  const ruim=c=>exist.has(c.num)||vistos.get(c.num)>1;
+  const nOk=arr.filter(c=>!ruim(c)).length;
+  const btn=$('#hxCadSalvar'); btn.disabled=!(cons&&nOk); btn.textContent=nOk?'Salvar '+hxN(nOk)+' caixa'+(nOk===1?'':'s'):'Salvar caixas';
+  if(!arr.length){ box.innerHTML=''; return; }
+  box.innerHTML=`<div class="hxtabw"><table class="hxtab"><thead><tr><th>Caixa</th><th>HD inicial → final</th><th class="n">HDs</th><th></th></tr></thead><tbody>`
+    +arr.slice(0,300).map((c,ix)=>{ const q=hxQtd(c), avul=ix<hxNovas.length;
+      const aviso=exist.has(c.num)?'<span class="hxdup">já cadastrada</span>':vistos.get(c.num)>1?'<span class="hxdup">repetida na lista</span>':(q==null?'<span class="hxsub">faixa não numérica</span>':'');
+      return `<tr><td><b>${vEsc(c.num)}</b></td><td>${vEsc(c.ini)} → ${vEsc(c.fim)}</td><td class="n">${q==null?'—':hxN(q)}</td><td>${aviso} ${avul?`<button type="button" class="btn ghost" data-rm="${ix}">✕</button>`:''}</td></tr>`; }).join('')
+    +'</tbody></table></div>'+(arr.length>300?`<p class="sub">+ ${hxN(arr.length-300)} linhas</p>`:'')
+    +(cons?'':'<p class="sub hxdup">Escolha o consórcio.</p>');
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ hxNovas.splice(+b.dataset.rm,1); hxCadPrev(); });
+}
+async function hxCadSalvar(){
+  const cons=$('#hxCadCons').value; if(!cons) return toast('Escolha o consórcio');
+  const exist=new Set(hxCx.filter(c=>c.cons===cons).map(c=>c.num)), vistos=new Map(), arr=hxCadTodas();
+  arr.forEach(c=>vistos.set(c.num,(vistos.get(c.num)||0)+1));
+  const ok=arr.filter(c=>!exist.has(c.num)&&vistos.get(c.num)===1); if(!ok.length) return;
+  const b=$('#hxCadSalvar'); b.disabled=true; b.textContent='Salvando…';
+  const {data,error}=await sb.rpc('app_hdcx_cadastrar',{p_consorcio:cons,p_itens:ok});
+  if(error){ toast('Erro: '+error.message); hxCadPrev(); return; }
+  const dup=(data&&data.dup)||[];
+  toast('✓ '+hxN(data.ins)+' caixa'+(data.ins===1?'':'s')+' cadastrada'+(data.ins===1?'':'s')+(dup.length?' · '+dup.length+' já existia'+(dup.length===1?'':'m'):''));
+  hxCadFechar(); hxCarregar();
+}
+function hxExport(){
+  const base=hxBase(), sel=base.filter(c=>!hxF.st||c.st===hxF.st); if(!sel.length) return toast('Nada para exportar.');
+  const c=v=>{ const s=v==null?'':String(v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const dt=v=>v?new Date(v).toLocaleString('pt-BR'):'';
+  const cab=['Consórcio','Nº da caixa','HD inicial','HD final','Qtd de HDs','Situação','Responsável','Vinculada em','Vinculada por','Devolvida em','Devolvida por','Obs. da devolução','Cadastrada em','Cadastrada por','Observação'];
+  const lin=sel.map(x=>[x.cons,x.num,x.ini,x.fim,hxQtd(x),HX_ST1[x.st]||x.st,x.resp_nome,dt(x.vinc_em),x.vinc_por,dt(x.dev_em),x.dev_por,x.dev_obs,dt(x.cad_em),x.cad_por,x.obs].map(c).join(';'));
+  const csv=cab.map(c).join(';')+'\r\n'+lin.join('\r\n')+'\r\n';
+  try{ const u=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); const a=document.createElement('a'); a.href=u;
+    a.download='logistica_reversa_hd_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),5000);
+    toast(hxN(sel.length)+' caixas exportadas.'); }catch(e){ toast('Não consegui gerar o arquivo'); }
 }
 
 function pdInit(){
