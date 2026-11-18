@@ -4002,11 +4002,11 @@ function pjNodeHtml(node){
     const acc=cur>0?`<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec||0}/${node.meta||0} ${node.un} · ${p}%`:`${node.p||0}%`}</b></div>`:'';
     h+=`<div class="pjlaunch" id="${rid}L">
       <div class="pjhistwrap"><div class="pjhisttit">📋 Lançamentos anteriores</div>${rows}${acc}</div>
-      <div class="pjnewtit">➕ Novo avanço de hoje</div>
+      <div class="pjnewtit">➕ Novo avanço</div>
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
-      <div class="pjontem"><span class="pjontq">Esse avanço foi realizado ontem?</span>
-        <label><input type="radio" name="${rid}O" value="nao"> Não</label><label><input type="radio" name="${rid}O" value="sim"> Sim</label>
-        <div class="pjontem-h" hidden><span class="sub" style="margin:0;font-size:12px">Ontem (${pjDDMM(Date.now()-864e5)}) às</span><input type="time" class="pjonth" step="300"></div></div>
+      <div class="pjontem"><span class="pjontq">Esse avanço foi realizado em outra data?</span>
+        <label><input type="radio" name="${rid}O" value="nao"> Não (agora)</label><label><input type="radio" name="${rid}O" value="sim"> Sim</label>
+        <div class="pjontem-h" hidden><span class="sub" style="margin:0;font-size:12px">Executado em</span><input type="datetime-local" class="pjonth" step="300"></div></div>
       <div class="pjfotos"><label class="pjph2"><input type="file" accept="image/*" capture="environment" hidden><span>📷 Foto 1</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 2</span></label><label class="pjph2"><input type="file" accept="image/*" hidden><span>🖼️ Foto 3</span></label></div>
       <textarea class="pjobs" rows="2" placeholder="Observação (opcional)"></textarea>
       <button class="btn" data-launch="${rid}">Lançar avanço</button>
@@ -4032,13 +4032,15 @@ function pjWireTree(d,rerender){
     const wrap=b.closest('.pjlaunch'), inp=wrap&&wrap.querySelector('.pjinp');
     const val=parseFloat(((inp&&inp.value)||'').replace(',','.'));
     if(!(val>0)){ toast('Informe o avanço (número > 0)'); return; }
-    // "Esse avanço foi realizado ontem?" — Sim = data de ontem + horário de execução; Não = agora (rito normal)
+    // "Esse avanço foi realizado em outra data?" — Sim = data/hora livre escolhida (só não pode ser no futuro); Não = agora
     const ont=wrap.querySelector('.pjontem input[type=radio]:checked');
-    if(!ont){ toast('Responda: esse avanço foi realizado ontem?'); return; }
+    if(!ont){ toast('Responda: esse avanço foi realizado em outra data?'); return; }
     let execEm=null;
-    if(ont.value==='sim'){ const hm=((wrap.querySelector('.pjonth')||{}).value||'').split(':');
-      if(hm.length<2||hm[0]===''){ toast('Informe o horário de execução de ontem'); return; }
-      const d0=new Date(); d0.setDate(d0.getDate()-1); d0.setHours(+hm[0],+hm[1],0,0); execEm=d0.toISOString(); }
+    if(ont.value==='sim'){ const dv=((wrap.querySelector('.pjonth')||{}).value||'');
+      const d0=dv?new Date(dv):null;   // datetime-local = horário local do aparelho
+      if(!d0||isNaN(d0)){ toast('Informe a data e o horário de execução'); return; }
+      if(d0.getTime()>Date.now()+5*60e3){ toast('A data de execução não pode estar no futuro'); return; }
+      execEm=d0.toISOString(); }
     const iv=pjCurIv(); if(!iv||iv.gid==null){ toast('Intervenção inválida'); return; }
     b.disabled=true; toast('Registrando avanço…');
     try{
@@ -4053,7 +4055,7 @@ function pjWireTree(d,rerender){
       if(error) throw error;
       // aplica no snapshot + histórico local (sem refetch)
       if(n.k==='m') n.exec=Math.max(0,(n.exec||0)+val); else n.p=Math.max(0,Math.min(100,(n.p||0)+val));
-      const ak=pjNodeKey(iv,n); (pjAvancosCur[ak]=pjAvancosCur[ak]||[]).push(row); pjAvancosCur[ak].sort((a,b)=>new Date(a.ts)-new Date(b.ts));   // avanço de ontem entra na ordem da execução
+      const ak=pjNodeKey(iv,n); (pjAvancosCur[ak]=pjAvancosCur[ak]||[]).push(row); pjAvancosCur[ak].sort((a,b)=>new Date(a.ts)-new Date(b.ts));   // avanço retroativo entra na ordem da execução
       pjSave(iv); toast('Avanço lançado'); const k=pjSnapOpen(d); rerender(k);
     }catch(e){ toast('Erro ao lançar: '+(e.message||e)); }
     finally{ b.disabled=false; }
@@ -4080,7 +4082,7 @@ function pjWireTree(d,rerender){
     if(v){ n.sgos=v; n.sgos_em=new Date().toISOString(); } else { delete n.sgos; delete n.sgos_em; }
     const sel=inp.parentElement.querySelector('.pjrecosel'); if(sel) sel.innerHTML=sgxS(v);
     pjSave(pjCurIv()); toast(v?'OS da recomposição salva':'OS da recomposição removida'); }; });
-  d.querySelectorAll('.pjontem input[type=radio]').forEach(r=>r.onchange=()=>{ const w=r.closest('.pjontem'), h=w&&w.querySelector('.pjontem-h'); if(h){ h.hidden=r.value!=='sim'; if(r.value==='sim'){ const t=h.querySelector('.pjonth'); if(t&&!t.value) t.focus(); } } });
+  d.querySelectorAll('.pjontem input[type=radio]').forEach(r=>r.onchange=()=>{ const w=r.closest('.pjontem'), h=w&&w.querySelector('.pjontem-h'); if(h){ h.hidden=r.value!=='sim'; if(r.value==='sim'){ const t=h.querySelector('.pjonth'); if(t){ const z=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16); t.max=z; if(!t.value) t.focus(); } } } });
   d.querySelectorAll('[data-valaadd]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const n=pjReg[b.dataset.valaadd]; if(!n) return; const k=pjSnapOpen(d); const v=pjValaAdd(n); k.add(n); k.add(v); pjSave(pjCurIv()); rerender(k); toast(v.n+' adicionada — escolha o tipo'); });
   d.querySelectorAll('[data-valadel]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const v=pjReg[b.dataset.valadel], pai=v&&pjValaPai.get(v); if(!pai) return;
     if(!confirm('Remover a '+v.n+'? (só é possível porque ela não tem avanço)')) return;

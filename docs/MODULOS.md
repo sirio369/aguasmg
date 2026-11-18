@@ -2883,6 +2883,9 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **Data de execução livre (2026-11-18, sw v422, `docs/migracao_proj_avanco_data_livre.sql`):** a pergunta virou **"Esse avanço foi
+  realizado em outra data?"** — Sim abre um campo de **data e hora** (`datetime-local`, `max` = agora) e aceita **qualquer data**
+  que não esteja no futuro (front e `app_proj_avanco_registrar`, tolerância de 5 min). O texto abaixo (só ontem) é o histórico.
 - **"Esse avanço foi realizado ontem?" (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):** todo
   "Lançar avanço" do `projeto_det` exige responder Sim/Não (`.pjontem`). **Não** = rito normal (`ts = now()`); **Sim** =
   pede o **horário de execução** e grava a data de **ontem** nessa hora (`p_executado_em`, parâmetro novo opcional — drop +

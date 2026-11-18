@@ -558,8 +558,8 @@ viraram uma etapa só (`alvara`) com nome pela região — **Liberação TransCo
 **Sem portões de fase (2026-11-18, sw v420, `docs/migracao_proj_sem_portoes.sql`):** todas as fases ficam abertas desde o início (aprovar, pré-obra, lançar avanço e encerramento não esperam a fase anterior); o status só mostra onde o pipeline está (`proj_calc.chegou`); seguem os papéis, os anexos do Liberar e o ensaio de reaterro.
 **HDD + avanço de ontem (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):** as **valas de perfuração** são
 adicionadas/removidas (só sem avanço) pela **equipe de obras** no `projeto_det`, tipo Entrada/**Intermediária**/Saída editável
-a qualquer momento; todo lançamento de avanço pergunta **"Esse avanço foi realizado ontem?"** (Sim = data de ontem + horário
-de execução em `intervencao_avanco.ts`; `registrado_em`/`retroativo` guardam quando foi lançado).
+a qualquer momento; todo lançamento de avanço pergunta **"Esse avanço foi realizado em outra data?"** (Sim = qualquer data/hora não futura,
+sw v422, `docs/migracao_proj_avanco_data_livre.sql` — antes só ontem — em `intervencao_avanco.ts`; `registrado_em`/`retroativo` guardam quando foi lançado).
 **Ensaio de reaterro opcional (2026-11-13, sw v375, `docs/migracao_proj_reaterro_decisao.sql`):** reaterro 100% → Obras responde
 "É necessário ensaio de compactação?" (Sim = Qualidade; Não = `dispensado`, recomposição liberada); ramais ganharam Reaterro +
 Recomposição de pavimento; legado só fica onde o pavimento já foi lançado.
