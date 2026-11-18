@@ -15062,7 +15062,10 @@ const sbVz=tab=>!!(sbi.r&&sbi.r.vazias&&sbi.r.vazias[tab]);
 const sbC=(v,t,tab)=>sbVz(tab)?'Sem dados':sbFmt(v,t);
 const sbK=(l,v,t,tab,ctx,al)=>{ const s=sbC(v,t,tab); return `<div class="segkpi ${al&&v&&s!=='Sem dados'?'alerta':''}"><b${s==='Sem dados'?' class="sbsd"':''}>${s}</b><span>${l}</span>${ctx?`<i class="sbctx">${ctx}</i>`:''}</div>`; };
 const sbKs=a=>'<div class="segkpis">'+a.join('')+'</div>';
-const sbBox=(t,html)=>`<div class="sbbox"><div class="sbt">${t}</div>${html}</div>`;
+// caixa de visual; tabela ocupa a linha inteira, gráfico divide a linha em 2 colunas na tela larga
+const sbBox=(t,html)=>`<div class="sbbox${html.includes('class="sbtw"')?' sbfull':''}"><div class="sbt">${t}</div>${html}</div>`;
+// largura útil de um gráfico (meia linha quando o grid tem 2 colunas), para o SVG não ficar pequeno no desktop
+function sbChartW(){ const w=($('#sbView')||{}).clientWidth||360; return Math.round((w>=1000?(w-12)/2:w)-26); }
 const sbVazio='<p class="sub" style="font-size:12px">Sem dados no filtro.</p>';
 // linhas de uma tabela com os filtros da tela: Área (menos CIPA), período (col de data) e as segmentações da página
 function sbF(tab,{periodo=true,col='Data'}={}){ const r=sbi.r||{}, de=$('#sbDe').value, ate=$('#sbAte').value, ar=$('#sbArea').value;
@@ -15105,16 +15108,16 @@ const sbStep=m=>{ const r=Math.max(1,m/4), p=Math.pow(10,Math.floor(Math.log10(r
 const sbLeg=ss=>ss.length>1||ss.some(s=>s.linha)?'<div class="sbleg">'+ss.map(s=>`<span><i style="background:${s.cor}${s.linha?';height:3px;border-radius:0':''}"></i>${segH(s.nome)}</span>`).join('')+'</div>':'';
 // colunas por mês (empilhadas ou agrupadas) + linha de % opcional no eixo da direita (0–100%)
 function sbColChart(ks,series,linha,{stack=false}={}){ if(!ks.length) return sbVazio;
-  const W=Math.max(340,ks.length*58+70), H=210, pl=34, pr=linha?40:12, pt=16, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
+  const W=Math.max(340,ks.length*58+70,sbChartW()), H=230, pl=34, pr=linha?40:12, pt=16, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
   const tot=ks.map((_,i)=>stack?series.reduce((s,se)=>s+(se.v[i]||0),0):Math.max(0,...series.map(se=>se.v[i]||0)));
   const mx=sbStep(Math.max(1,...tot))*4; let g='';
   for(let j=0;j<=4;j++){ const y=pt+ih-ih*j/4; g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+3}" text-anchor="end" class="sbax">${sbNum1(mx*j/4)}</text>`;
     if(linha) g+=`<text x="${W-pr+5}" y="${y+3}" class="sbax">${j*25}%</text>`; }
   ks.forEach((k,i)=>{ const x0=pl+i*bw; g+=`<text x="${x0+bw/2}" y="${H-pb+15}" text-anchor="middle" class="sbax">${sbMesL(k)}</text>`;
     if(stack){ let acc=0; series.forEach(se=>{ const v=se.v[i]||0; if(!v) return; const y=pt+ih-ih*(acc+v)/mx; acc+=v;
-        g+=`<rect x="${x0+bw*.2}" y="${y}" width="${bw*.6}" height="${ih*v/mx}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
+        const cw=Math.min(bw*.6,64); g+=`<rect x="${x0+(bw-cw)/2}" y="${y}" width="${cw}" height="${ih*v/mx}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
       if(tot[i]) g+=`<text x="${x0+bw/2}" y="${pt+ih-ih*tot[i]/mx-4}" text-anchor="middle" class="sbval">${sbNum1(tot[i])}</text>`; }
-    else { const w=bw*.7/series.length; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x0+bw*.15+j*w;
+    else { const w=Math.min(bw*.7/series.length,48), x1=x0+(bw-w*series.length)/2; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x1+j*w;
         g+=`<rect x="${x}" y="${pt+ih-h}" width="${Math.max(1,w-2)}" height="${h}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`+(v?`<text x="${x+w/2-1}" y="${pt+ih-h-4}" text-anchor="middle" class="sbval">${sbNum1(v)}</text>`:''); }); } });
   if(linha){ const pts=ks.map((k,i)=>linha.v[i]==null?null:[pl+i*bw+bw/2,pt+ih-ih*Math.max(0,Math.min(1,linha.v[i])),k,linha.v[i]]).filter(Boolean);
     if(pts.length>1) g+=`<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" stroke="${linha.cor}" stroke-width="2"/>`;
@@ -15242,7 +15245,7 @@ function sbSegHtml(){ const s=SB_SEG[sbi.aba]; if(!s||!sbi.r) return '';
 function sbRender(){ const v=$('#sbView'); if(!sbi.r) return;
   let h=''; try{ h=SB_PAG[sbi.aba](); }catch(e){ h='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; }
   const de=$('#sbDe').value, ate=$('#sbAte').value;
-  v.innerHTML=`<div class="sbabas">${SB_ABAS.map(([k,l])=>`<button type="button" data-sba="${k}" class="${sbi.aba===k?'sel':''}">${l}</button>`).join('')}</div>`+sbSegHtml()+h
+  v.innerHTML=`<div class="sbabas">${SB_ABAS.map(([k,l])=>`<button type="button" data-sba="${k}" class="${sbi.aba===k?'sel':''}">${l}</button>`).join('')}</div>`+sbSegHtml()+'<div class="sbgrid">'+h+'</div>'
     +`<p class="sub" style="font-size:11px;margin-top:12px">Período: ${de||ate?(de?sgDia(de):'início')+' a '+(ate?sgDia(ate):'hoje'):'todo o histórico'}. Fonte: views <code>bi_sst_*</code>, as mesmas do Power BI QSMS. Saúde, membros da CIPA e situação dos treinamentos são a posição de hoje (não dependem do período).</p>`;
   v.querySelectorAll('[data-sba]').forEach(b=>b.onclick=()=>{ sbi.aba=b.dataset.sba; sbRender(); });
   v.querySelectorAll('[data-sbseg]').forEach(s=>s.onchange=()=>{ sbi.seg[sbi.aba+'|'+s.dataset.sbseg]=s.value; sbRender(); }); }
@@ -15254,6 +15257,7 @@ async function sbCarregar(){ const v=$('#sbView'); v.innerHTML='<p class="sub">C
 function sbInit(){ if(!sgInit()) return; sbCss();
   [['sbDe',sbRender],['sbAte',sbRender],['sbArea',sbRender],['sbCons',sbCarregar]].forEach(([id,fn])=>{ const el=$('#'+id); if(!el.dataset.w){ el.dataset.w='1'; el.addEventListener('change',fn); } });
   const lp=$('#sbLimpa'); if(lp&&!lp.dataset.w){ lp.dataset.w='1'; lp.onclick=()=>{ $('#sbDe').value=''; $('#sbAte').value=''; sbRender(); }; }
+  if(!window.__sbRs){ window.__sbRs=1; let t; window.addEventListener('resize',()=>{ clearTimeout(t); t=setTimeout(()=>{ if(!$('#sst_bi').classList.contains('hidden')) sbRender(); },250); }); }
   sbCarregar(); }
 function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.createElement('style'); st.id='sbcss'; st.textContent=`
  .sbabas{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:4px 0 8px;-webkit-overflow-scrolling:touch}
@@ -15275,7 +15279,13 @@ function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.
  .segkpi b.sbsd{font-size:16px;color:var(--mut)}
  .sbtw{overflow:auto;max-height:60vh}
  .sbtw .sgtab th{position:sticky;top:0;background:var(--card)}
- .sbtot td{font-weight:700}`; document.head.appendChild(st); }
+ .sbtot td{font-weight:700}
+ @media(min-width:860px){#app.wrap:has(#sst_bi:not(.hidden)){max-width:none;padding:0 20px} #app main#sst_bi{max-width:none}}
+ .sbgrid{display:grid;grid-template-columns:1fr;gap:0 12px;align-items:start}
+ .sbgrid>.segkpis{grid-column:1/-1;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+ @media(min-width:1040px){.sbgrid{grid-template-columns:1fr 1fr} .sbgrid>.sbfull{grid-column:1/-1}}
+ .sbgrid>.sbbox{min-width:0}
+ @media(min-width:860px){#sst_bi .segfil input,#sst_bi .segfil select{width:auto;flex:1 1 200px;max-width:340px}}`; document.head.appendChild(st); }
 
 // ===== Lançamentos (inspeções, DDS, ocorrências) + detalhe =====
 let sgL={aba:'inspecao',filtro:'',busca:'',dados:null,det:null,reg:null};

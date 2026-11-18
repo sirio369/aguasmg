@@ -3785,6 +3785,8 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     Mandato). Saúde, membros da CIPA, situação dos treinamentos e "Dias sem acidente" não dependem do período (no BI:
     sem data ou `REMOVEFILTERS('Calendário')`). Só leitura. A segmentação "Mês de Realização" dos Treinamentos não foi
     reproduzida (o período cobre).
+    **Desktop (sw v426):** a tela usa a largura toda (como RH/OS Pendentes); gráficos em 2 colunas a partir de 1040 px,
+    tabelas e cartões na linha inteira, SVG do gráfico mensal na largura da coluna (re-render no resize), barras com largura máxima.
   - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
     acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com OS + responsável pela
     intervenção e assinatura, e **tratativa de NC** (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
