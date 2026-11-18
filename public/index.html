@@ -1735,8 +1735,15 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sst_bi" class="hidden">
     <div class="bar"><button class="bk" data-go="qsms">‹ QSMS</button></div>
     <h1>BI QSMS</h1>
-    <p class="sub">As páginas do BI QSMS (Power BI) dentro do app: as mesmas views e a mesma regra de cálculo. Sem datas = todo o histórico, como o BI aberto sem filtro.</p>
-    <div class="segfil"><input type="date" id="sbDe" title="De"/><input type="date" id="sbAte" title="Até"/><button type="button" class="btn ghost" id="sbLimpa" style="margin:0;width:auto;padding:9px 12px">Todo o período</button><select id="sbCons"><option value="">Ambos os consórcios</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select><select id="sbArea"><option value="">Todas as áreas</option></select></div>
+    <p class="sub">Indicadores de SST com as mesmas views e regras de cálculo do Power BI QSMS.</p>
+    <nav id="sbNav" class="sbnav" aria-label="Páginas do BI"></nav>
+    <section class="sbfil" aria-label="Filtros">
+      <div class="sbf sbf-per"><span class="sbfl">Período</span><div class="sbper"><input type="date" id="sbDe" aria-label="De"/><span>até</span><input type="date" id="sbAte" aria-label="Até"/></div><div class="sbpre" id="sbPre"></div></div>
+      <div class="sbf"><label class="sbfl" for="sbCons">Consórcio</label><select id="sbCons"><option value="">Ambos</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select></div>
+      <div class="sbf"><label class="sbfl" for="sbArea">Área</label><select id="sbArea"><option value="">Todas</option></select></div>
+      <div id="sbSegs" class="sbsegs"></div>
+      <div class="sbf sbf-clr"><button type="button" id="sbLimpa" class="sbclr">Limpar filtros</button></div>
+    </section>
     <div id="sbView"></div>
   </main>
 
@@ -15034,18 +15041,18 @@ async function sgPainelCarregar(){ const v=$('#spView'); v.innerHTML='<p class="
     if(['pend','venc','acoes','registrada'].includes(f)){ const h0=new Date(); h0.setFullYear(h0.getFullYear()-1); $('#slDe').value=qsmsDia(h0); $('#slAte').value=qsmsDia(new Date()); }
     irPara('sst_lanc'); }); }
 
-// ===== BI QSMS (sst_bi): as 8 páginas do Power BI QSMS no app =====
+// ===== BI QSMS (sst_bi): as páginas do Power BI QSMS no app (sem a Visão geral, retirada a pedido em 2026-11-18) =====
 // Mesmas views do BI (app_sst_bi devolve as linhas de bi_sst_*) e a mesma regra das medidas DAX, calculada aqui.
 // Período = relação com o Calendário do BI (Data; Treinamentos pela Data de Realização). Saúde e CIPA Membros não têm
 // data (situação de hoje); as medidas de situação dos treinamentos e "Dias sem acidente" ignoram o período, como no BI.
 // Área filtra tudo menos a CIPA (no BI a CIPA não tem relação com Área). "Sem dados" = tabela inteira vazia (cartão do BI).
-const SB_ABAS=[['geral','Visão geral'],['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA']];
+const SB_ABAS=[['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA']];
 // segmentações de cada página do BI: [tabela, coluna]
 const SB_SEG={acid:[['acidentes','Gravidade'],['acidentes','Tipo']],vinc:[['vinculo','Vínculo'],['vinculo','Empresa']],
   insp:[['inspecoes','Cargo'],['inspecoes','Responsável']],saude:[['saude','Cargo'],['saude','Tipo de Exame'],['saude','Situação ASO']],
   dds:[['dds','Tema'],['dds','Responsável']],trein:[['treinamentos','Treinamento'],['treinamentos','Cargo'],['treinamentos','Situação']],
   cipa:[['cipa_membros','Tipo'],['cipa_membros','Representação'],['cipa_membros','Situação do Mandato']]};
-let sbi={aba:'geral',r:null,seg:{}};
+let sbi={aba:'acid',r:null,seg:{}};
 const SB_COR=['#0e639c','#e07b39','#1a7f4b','#b3261e','#8a5a00','#7c3aed','#94a3b8'];
 const SB_OK='#1a7f4b', SB_AV='#d97706', SB_VE='#b3261e', SB_PR='#0e639c', SB_SD='#94a3b8';
 const SB_MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -15060,10 +15067,14 @@ const sbNum1=v=>(+v).toLocaleString('pt-BR',{maximumFractionDigits:1});
 const sbFmt=(v,t)=>v==null||Number.isNaN(v)?'Sem dados':t==='%'?sbPct(v):t==='d'?sgDia(v):t==='1'?(Math.round(v*10)/10).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}):Math.round(v).toLocaleString('pt-BR');
 const sbVz=tab=>!!(sbi.r&&sbi.r.vazias&&sbi.r.vazias[tab]);
 const sbC=(v,t,tab)=>sbVz(tab)?'Sem dados':sbFmt(v,t);
-const sbK=(l,v,t,tab,ctx,al)=>{ const s=sbC(v,t,tab); return `<div class="segkpi ${al&&v&&s!=='Sem dados'?'alerta':''}"><b${s==='Sem dados'?' class="sbsd"':''}>${s}</b><span>${l}</span>${ctx?`<i class="sbctx">${ctx}</i>`:''}</div>`; };
-const sbKs=a=>'<div class="segkpis">'+a.join('')+'</div>';
-const sbBox=(t,html)=>`<div class="sbbox"><div class="sbt">${t}</div>${html}</div>`;
-const sbVazio='<p class="sub" style="font-size:12px">Sem dados no filtro.</p>';
+// card de indicador: rótulo em cima, valor grande, contexto embaixo
+const sbK=(l,v,t,tab,ctx,al)=>{ const s=sbC(v,t,tab), sd=s==='Sem dados'; return `<div class="sbk${al&&v&&!sd?' alerta':''}${sd?' sd':''}"><span class="sbkl">${l}</span><b>${s}</b>${ctx?`<i class="sbctx">${ctx}</i>`:''}</div>`; };
+const sbKs=a=>'<div class="sbks">'+a.join('')+'</div>';
+// caixa de visual; tabela ocupa a linha inteira, gráfico divide a linha em 2 colunas na tela larga
+const sbBox=(t,html)=>`<div class="sbbox${html.includes('class="sbtw"')?' sbfull':''}"><div class="sbt">${t}</div>${html}</div>`;
+// largura útil de um gráfico (meia linha quando o grid tem 2 colunas), para o SVG não ficar pequeno no desktop
+function sbChartW(){ const w=($('#sbView')||{}).clientWidth||360; return Math.round((w>=1000?(w-12)/2:w)-26); }
+const sbVazio='<p class="sbvz">Sem dados no filtro.</p>';
 // linhas de uma tabela com os filtros da tela: Área (menos CIPA), período (col de data) e as segmentações da página
 function sbF(tab,{periodo=true,col='Data'}={}){ const r=sbi.r||{}, de=$('#sbDe').value, ate=$('#sbAte').value, ar=$('#sbArea').value;
   const seg=(SB_SEG[sbi.aba]||[]).filter(([t])=>t===tab);
@@ -15105,16 +15116,16 @@ const sbStep=m=>{ const r=Math.max(1,m/4), p=Math.pow(10,Math.floor(Math.log10(r
 const sbLeg=ss=>ss.length>1||ss.some(s=>s.linha)?'<div class="sbleg">'+ss.map(s=>`<span><i style="background:${s.cor}${s.linha?';height:3px;border-radius:0':''}"></i>${segH(s.nome)}</span>`).join('')+'</div>':'';
 // colunas por mês (empilhadas ou agrupadas) + linha de % opcional no eixo da direita (0–100%)
 function sbColChart(ks,series,linha,{stack=false}={}){ if(!ks.length) return sbVazio;
-  const W=Math.max(340,ks.length*58+70), H=210, pl=34, pr=linha?40:12, pt=16, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
+  const W=Math.max(340,ks.length*58+70,sbChartW()), H=230, pl=34, pr=linha?40:12, pt=16, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
   const tot=ks.map((_,i)=>stack?series.reduce((s,se)=>s+(se.v[i]||0),0):Math.max(0,...series.map(se=>se.v[i]||0)));
   const mx=sbStep(Math.max(1,...tot))*4; let g='';
   for(let j=0;j<=4;j++){ const y=pt+ih-ih*j/4; g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+3}" text-anchor="end" class="sbax">${sbNum1(mx*j/4)}</text>`;
     if(linha) g+=`<text x="${W-pr+5}" y="${y+3}" class="sbax">${j*25}%</text>`; }
   ks.forEach((k,i)=>{ const x0=pl+i*bw; g+=`<text x="${x0+bw/2}" y="${H-pb+15}" text-anchor="middle" class="sbax">${sbMesL(k)}</text>`;
     if(stack){ let acc=0; series.forEach(se=>{ const v=se.v[i]||0; if(!v) return; const y=pt+ih-ih*(acc+v)/mx; acc+=v;
-        g+=`<rect x="${x0+bw*.2}" y="${y}" width="${bw*.6}" height="${ih*v/mx}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
+        const cw=Math.min(bw*.6,64); g+=`<rect x="${x0+(bw-cw)/2}" y="${y}" width="${cw}" height="${ih*v/mx}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`; });
       if(tot[i]) g+=`<text x="${x0+bw/2}" y="${pt+ih-ih*tot[i]/mx-4}" text-anchor="middle" class="sbval">${sbNum1(tot[i])}</text>`; }
-    else { const w=bw*.7/series.length; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x0+bw*.15+j*w;
+    else { const w=Math.min(bw*.7/series.length,48), x1=x0+(bw-w*series.length)/2; series.forEach((se,j)=>{ const v=se.v[i]||0, h=ih*v/mx, x=x1+j*w;
         g+=`<rect x="${x}" y="${pt+ih-h}" width="${Math.max(1,w-2)}" height="${h}" fill="${se.cor}"><title>${segH(sbMesL(k)+' · '+se.nome+': '+sbNum1(v))}</title></rect>`+(v?`<text x="${x+w/2-1}" y="${pt+ih-h-4}" text-anchor="middle" class="sbval">${sbNum1(v)}</text>`:''); }); } });
   if(linha){ const pts=ks.map((k,i)=>linha.v[i]==null?null:[pl+i*bw+bw/2,pt+ih-ih*Math.max(0,Math.min(1,linha.v[i])),k,linha.v[i]]).filter(Boolean);
     if(pts.length>1) g+=`<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none" stroke="${linha.cor}" stroke-width="2"/>`;
@@ -15134,30 +15145,9 @@ function sbBarH(rows,series,{stack=false,pct=false,max=20}={}){ if(!rows.length)
 function sbTab(rows,cols,max=300){ if(!rows.length) return sbVazio;
   const cel=(v,t)=>v==null||v===''?'—':t==='d'?sgDia(v):t==='%'?sbPct(v):t==='n'?sbNum1(v):segH(v);
   return `<div class="sbtw"><table class="sgtab"><tr>${cols.map(([l,,t])=>`<th${t==='n'||t==='%'?' class="n"':''}>${l}</th>`).join('')}</tr>${rows.slice(0,max).map(x=>'<tr>'+cols.map(([,k,t])=>`<td${t==='n'||t==='%'?' class="n"':''}>${cel(typeof k==='function'?k(x):x[k],t)}</td>`).join('')+'</tr>').join('')}</table></div>`
-    +(rows.length>max?`<p class="sub" style="font-size:11px">Mostrando ${max} de ${rows.length}.</p>`:''); }
+    +(rows.length>max?`<p class="sbnota">Mostrando ${max} de ${rows.length}.</p>`:''); }
 // ---- páginas (mesmos visuais do BI) ----
 const SB_PAG={
-geral(){ const A=sbF('acidentes'), I=sbF('inspecoes'), D=sbF('dds'), S=sbF('saude',{periodo:false}), T=sbF('treinamentos',{col:'Data de Realização'}), Tt=sbF('treinamentos',{periodo:false});
-  const a=sbAcid(A), i=sbInsp(I), d=sbDds(D), s=sbSaude(S), t=sbTrein(T,Tt);
-  let h=sbKs([sbK('Acidentes',a.n,'n','acidentes',`C/ afast.: ${sbC(a.com,'n','acidentes')} · dias perdidos: ${sbC(a.dp,'n','acidentes')}`,1),
-    sbK('Dias sem acidente c/ afastamento',sbDiasSem(sbF('acidentes',{periodo:false})),'n','acidentes'),
-    sbK('% Conformidade',i.conf,'%','inspecoes',`Participação no DDS: ${sbC(d.part,'%','dds')}`),
-    sbK('% ASO válidos',s.valid,'%','saude',`Treinamentos em dia: ${sbC(t.emDia,'%','treinamentos')}`)]);
-  const ka=sbMeses([[A,'Data']]);
-  h+=sbBox('Acidentes por mês',sbColChart(ka,[{nome:'Com afastamento',cor:SB_VE,v:sbSerie(ka,A,'Data',x=>sbCnt(x,'Classificação','Com Afastamento'))},
-    {nome:'Sem afastamento',cor:SB_COR[1],v:sbSerie(ka,A,'Data',x=>sbCnt(x,'Classificação','Sem Afastamento'))}],null,{stack:true}));
-  const ki=sbMeses([[I,'Data'],[D,'Data']]);
-  h+=sbBox('Inspeções, DDS e conformidade por mês',sbColChart(ki,[{nome:'Inspeções',cor:SB_COR[0],v:sbSerie(ki,I,'Data',x=>x.length)},{nome:'DDS realizados',cor:SB_COR[1],v:sbSerie(ki,D,'Data',x=>x.length)}],
-    {nome:'% Conformidade',cor:SB_OK,v:sbSerie(ki,I,'Data',x=>sbInsp(x).conf)}));
-  // matriz por Área (mesmas 10 medidas do BI)
-  const ar=[...new Set([A,I,D,S,Tt].flatMap(rs=>rs.map(x=>x['Área'])).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'pt-BR'));
-  const lin=k=>{ const f=rs=>k==null?rs:rs.filter(x=>x['Área']===k); const a=sbAcid(f(A)), i=sbInsp(f(I)), d=sbDds(f(D)), s=sbSaude(f(S)), t=sbTrein([],f(Tt));
-    return {k:k==null?'Total':k,v:[a.n,a.com,a.dp,i.n,i.conf,i.pend,d.n,d.part,s.ve,t.ve]}; };
-  const rows=ar.map(lin).filter(o=>o.v.some(v=>v)), tot=lin(null), tp=['n','n','n','n','%','n','n','%','n','n'];
-  const cel=(v,t)=>`<td class="n">${v==null?'—':t==='%'?sbPct(v):sbNum1(v)}</td>`;
-  h+=sbBox('Indicadores por área',rows.length?`<div class="sbtw"><table class="sgtab"><tr><th>Área</th>${['Acidentes','C/ afast.','Dias perdidos','Inspeções','% Conf.','NCs pend.','DDS','% Part. DDS','ASO venc.','Trein. venc.'].map(x=>`<th class="n">${x}</th>`).join('')}</tr>
-    ${rows.map(o=>`<tr><td>${segH(o.k)}</td>${o.v.map((v,j)=>cel(v,tp[j])).join('')}</tr>`).join('')}<tr class="sbtot"><td>Total</td>${tot.v.map((v,j)=>cel(v,tp[j])).join('')}</tr></table></div>`:sbVazio);
-  return h; },
 acid(){ const A=sbF('acidentes'), a=sbAcid(A);
   let h=sbKs([sbK('Acidentes',a.n,'n','acidentes',`C/ afast.: ${sbC(a.com,'n','acidentes')} · s/ afast.: ${sbC(a.sem,'n','acidentes')}`,1),
     sbK('Acidentes graves',a.graves,'n','acidentes','',1),sbK('Dias perdidos',a.dp,'n','acidentes',`Dias debitados: ${sbC(a.dd,'n','acidentes')}`),
@@ -15237,45 +15227,94 @@ cipa(){ const CM=sbF('cipa_membros',{periodo:false}), CR=sbF('cipa_reunioes'), c
     ['% Presença',x=>sbDiv(sbN(x['Presentes']),sbN(x['Total de Membros'])),'%'],['Encaminhamentos','Encaminhamentos']]));
   return h; } };
 function sbSegHtml(){ const s=SB_SEG[sbi.aba]; if(!s||!sbi.r) return '';
-  return '<div class="segfil">'+s.map(([t,c])=>{ const vals=[...new Set((sbi.r[t]||[]).map(x=>x[c]).filter(v=>v!=null&&v!==''))].map(String).sort((a,b)=>a.localeCompare(b,'pt-BR')), cur=sbi.seg[sbi.aba+'|'+c]||'';
-    return `<select data-sbseg="${segH(c)}"><option value="">${segH(c)}: todos</option>${vals.map(v=>`<option${v===cur?' selected':''}>${segH(v)}</option>`).join('')}</select>`; }).join('')+'</div>'; }
+  return s.map(([t,c])=>{ const vals=[...new Set((sbi.r[t]||[]).map(x=>x[c]).filter(v=>v!=null&&v!==''))].map(String).sort((a,b)=>a.localeCompare(b,'pt-BR')), cur=sbi.seg[sbi.aba+'|'+c]||'';
+    return `<div class="sbf"><span class="sbfl">${segH(c)}</span><select data-sbseg="${segH(c)}" aria-label="${segH(c)}"${cur?' class="on"':''}><option value="">Todos</option>${vals.map(v=>`<option${v===cur?' selected':''}>${segH(v)}</option>`).join('')}</select></div>`; }).join(''); }
+// atalhos de período (a data de referência é o "hoje" do banco)
+const sbIso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function sbPresets(){ const h=sbi.r&&sbi.r.hoje?new Date(String(sbi.r.hoje).slice(0,10)+'T12:00:00'):new Date(), y=h.getFullYear(), m=h.getMonth(), hj=sbIso(h);
+  return [['tudo','Tudo','',''],['mes','Mês atual',sbIso(new Date(y,m,1)),hj],['3m','Últimos 3 meses',sbIso(new Date(y,m-2,1)),hj],['ano','Ano atual',sbIso(new Date(y,0,1)),hj]]; }
+function sbFiltrosAtivos(){ return !!($('#sbDe').value||$('#sbAte').value||$('#sbArea').value||$('#sbCons').value||Object.values(sbi.seg).some(Boolean)); }
 function sbRender(){ const v=$('#sbView'); if(!sbi.r) return;
-  let h=''; try{ h=SB_PAG[sbi.aba](); }catch(e){ h='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; }
+  $('#sbNav').innerHTML=SB_ABAS.map(([k,l])=>`<button type="button" data-sba="${k}" class="${sbi.aba===k?'sel':''}"${sbi.aba===k?' aria-current="page"':''}>${l}</button>`).join('');
   const de=$('#sbDe').value, ate=$('#sbAte').value;
-  v.innerHTML=`<div class="sbabas">${SB_ABAS.map(([k,l])=>`<button type="button" data-sba="${k}" class="${sbi.aba===k?'sel':''}">${l}</button>`).join('')}</div>`+sbSegHtml()+h
-    +`<p class="sub" style="font-size:11px;margin-top:12px">Período: ${de||ate?(de?sgDia(de):'início')+' a '+(ate?sgDia(ate):'hoje'):'todo o histórico'}. Fonte: views <code>bi_sst_*</code>, as mesmas do Power BI QSMS. Saúde, membros da CIPA e situação dos treinamentos são a posição de hoje (não dependem do período).</p>`;
-  v.querySelectorAll('[data-sba]').forEach(b=>b.onclick=()=>{ sbi.aba=b.dataset.sba; sbRender(); });
-  v.querySelectorAll('[data-sbseg]').forEach(s=>s.onchange=()=>{ sbi.seg[sbi.aba+'|'+s.dataset.sbseg]=s.value; sbRender(); }); }
-async function sbCarregar(){ const v=$('#sbView'); v.innerHTML='<p class="sub">Carregando…</p>';
+  $('#sbPre').innerHTML=sbPresets().map(([k,l,a,b])=>`<button type="button" data-sbp="${k}" class="${de===a&&ate===b?'sel':''}">${l}</button>`).join('');
+  $('#sbSegs').innerHTML=sbSegHtml();
+  ['sbDe','sbAte','sbArea','sbCons'].forEach(id=>$('#'+id).classList.toggle('on',!!$('#'+id).value));
+  $('#sbLimpa').disabled=!sbFiltrosAtivos();
+  let h=''; try{ h=SB_PAG[sbi.aba](); }catch(e){ h='<div class="banner bad">Erro: '+segH(e.message||e)+'</div>'; }
+  v.innerHTML='<div class="sbgrid">'+h+'</div>'
+    +`<p class="sbnota">Período: ${de||ate?(de?sgDia(de):'início')+' a '+(ate?sgDia(ate):'hoje'):'todo o histórico'}. Fonte: views <code>bi_sst_*</code>, as mesmas do Power BI QSMS. Saúde, membros da CIPA e situação dos treinamentos são a posição de hoje (não dependem do período).</p>`;
+  $('#sbNav').querySelectorAll('[data-sba]').forEach(b=>b.onclick=()=>{ sbi.aba=b.dataset.sba; sbRender(); });
+  { const n=$('#sbNav'), b=n.querySelector('.sel'), hd=document.querySelector('#app>header'); n.style.top=(hd&&getComputedStyle(hd).position==='sticky'?hd.offsetHeight:0)+'px'; if(b&&(b.offsetLeft<n.scrollLeft||b.offsetLeft+b.offsetWidth>n.scrollLeft+n.clientWidth)) n.scrollLeft=b.offsetLeft-16; }
+  $('#sbPre').querySelectorAll('[data-sbp]').forEach(b=>b.onclick=()=>{ const p=sbPresets().find(x=>x[0]===b.dataset.sbp); $('#sbDe').value=p[2]; $('#sbAte').value=p[3]; sbRender(); });
+  $('#sbSegs').querySelectorAll('[data-sbseg]').forEach(s=>s.onchange=()=>{ sbi.seg[sbi.aba+'|'+s.dataset.sbseg]=s.value; sbRender(); }); }
+async function sbCarregar(){ const v=$('#sbView'); v.innerHTML='<p class="sbvz">Carregando…</p>';
   try{ sbi.r=await sgRpc('app_sst_bi',{p_consorcio:$('#sbCons').value||null})||{}; }catch(e){ return sgErr(v,e); }
   const a=$('#sbArea'), cur=a.value;
-  a.innerHTML='<option value="">Todas as áreas</option>'+(sbi.r.areas||[]).map(x=>`<option${x===cur?' selected':''}>${segH(x)}</option>`).join('');
+  a.innerHTML='<option value="">Todas</option>'+(sbi.r.areas||[]).map(x=>`<option${x===cur?' selected':''}>${segH(x)}</option>`).join('');
   sbRender(); }
 function sbInit(){ if(!sgInit()) return; sbCss();
   [['sbDe',sbRender],['sbAte',sbRender],['sbArea',sbRender],['sbCons',sbCarregar]].forEach(([id,fn])=>{ const el=$('#'+id); if(!el.dataset.w){ el.dataset.w='1'; el.addEventListener('change',fn); } });
-  const lp=$('#sbLimpa'); if(lp&&!lp.dataset.w){ lp.dataset.w='1'; lp.onclick=()=>{ $('#sbDe').value=''; $('#sbAte').value=''; sbRender(); }; }
+  const lp=$('#sbLimpa'); if(lp&&!lp.dataset.w){ lp.dataset.w='1'; lp.onclick=()=>{ const recarrega=!!$('#sbCons').value; $('#sbDe').value=''; $('#sbAte').value=''; $('#sbArea').value=''; $('#sbCons').value=''; sbi.seg={}; recarrega?sbCarregar():sbRender(); }; }
+  if(!window.__sbRs){ window.__sbRs=1; let t; window.addEventListener('resize',()=>{ clearTimeout(t); t=setTimeout(()=>{ if(!$('#sst_bi').classList.contains('hidden')) sbRender(); },250); }); }
   sbCarregar(); }
 function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.createElement('style'); st.id='sbcss'; st.textContent=`
- .sbabas{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:4px 0 8px;-webkit-overflow-scrolling:touch}
- .sbabas button{flex:0 0 auto;font:inherit;font-size:13px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--mut);white-space:nowrap;cursor:pointer}
- .sbabas button.sel{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
- .sbbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}
- .sbt{font-size:13px;font-weight:700;margin-bottom:8px}
+ #sst_bi h1{margin-bottom:2px} #sst_bi>.sub{margin:0 0 12px}
+ .sbnav{position:sticky;top:0;z-index:6;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;background:var(--bg);border-bottom:1px solid var(--line);margin:0 0 12px;-webkit-overflow-scrolling:touch}
+ .sbnav::-webkit-scrollbar{display:none}
+ .sbnav button{flex:0 0 auto;font:inherit;font-size:14px;padding:11px 14px 10px;border:0;border-bottom:3px solid transparent;background:none;color:var(--mut);white-space:nowrap;cursor:pointer;margin-bottom:-1px}
+ .sbnav button:hover{color:var(--ink)}
+ .sbnav button.sel{color:var(--acc);border-bottom-color:var(--acc);font-weight:700}
+ .sbfil{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 14px}
+ .sbsegs{display:contents}
+ .sbf{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 170px;max-width:280px}
+ .sbf-per{flex:2 1 300px;max-width:440px}
+ .sbf-clr{flex:0 0 auto;margin-left:auto}
+ #sst_bi .sbfl{display:block;margin:0;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+ #sst_bi .sbfil select,#sst_bi .sbfil input{width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);outline:none;box-shadow:none;min-height:38px}
+ #sst_bi .sbfil select:focus-visible,#sst_bi .sbfil input:focus-visible{border-color:var(--mut)}
+ #sst_bi .sbfil select.on,#sst_bi .sbfil input.on{background:var(--card);border-color:var(--ink);font-weight:600}
+ .sbper{display:flex;align-items:center;gap:8px} .sbper>span{font-size:13px;color:var(--mut)} .sbper input{flex:1 1 0;min-width:0}
+ .sbpre{display:flex;flex-wrap:wrap;gap:6px}
+ .sbpre button,.sbclr{font:inherit;font-size:12.5px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--mut);cursor:pointer;white-space:nowrap}
+ .sbpre button.sel{background:var(--ink);color:var(--card);border-color:var(--ink);font-weight:600}
+ .sbclr{padding:9px 14px;border-radius:8px;color:var(--ink);min-height:38px}
+ .sbclr:disabled{opacity:.45;cursor:default}
+ .sbks{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:0 0 14px}
+ .sbk{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+ .sbkl{font-size:12.5px;font-weight:600;color:var(--mut);line-height:1.3}
+ .sbk b{font-size:28px;line-height:1.1;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+ .sbk.alerta b{color:var(--bad)}
+ .sbk.sd b{font-size:17px;font-weight:600;color:var(--mut)}
+ .sbctx{display:block;font-style:normal;font-size:12px;color:var(--mut)}
+ .sbbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px}
+ .sbt{font-size:14.5px;font-weight:700;margin:0 0 12px;color:var(--ink)}
  .sbchart{overflow-x:auto}
- .sbax{font-size:10px;fill:var(--mut)} .sbval{font-size:10px;fill:var(--ink);font-weight:600}
- .sbleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--mut);margin-top:6px}
- .sbleg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
- .sbhb{display:grid;grid-template-columns:minmax(90px,36%) 1fr auto;gap:8px;align-items:center;font-size:12px;margin:5px 0}
+ .sbax{font-size:11px;fill:var(--mut)} .sbval{font-size:11px;fill:var(--ink);font-weight:600}
+ .sbleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--mut);margin-top:8px}
+ .sbleg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+ .sbhb{display:grid;grid-template-columns:minmax(100px,34%) 1fr auto;gap:10px;align-items:center;font-size:13px;margin:7px 0}
  .sbhb .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .sbhb .t{display:flex;flex-direction:column;gap:2px;min-width:0}
- .sbhb .t>span{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--bg)}
+ .sbhb .t>span{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--bg)}
  .sbhb .t i{display:block;height:100%}
- .sbhb .v{font-variant-numeric:tabular-nums;color:var(--mut);text-align:right;white-space:nowrap}
- .sbctx{display:block;font-style:normal;font-size:11px;color:var(--mut);margin-top:3px}
- .segkpi b.sbsd{font-size:16px;color:var(--mut)}
- .sbtw{overflow:auto;max-height:60vh}
- .sbtw .sgtab th{position:sticky;top:0;background:var(--card)}
- .sbtot td{font-weight:700}`; document.head.appendChild(st); }
+ .sbhb .v{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;text-align:right;white-space:nowrap}
+ .sbtw{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:8px}
+ #sst_bi .sbtw .sgtab{margin:0;font-size:13px}
+ #sst_bi .sbtw .sgtab th{position:sticky;top:0;background:var(--bg);font-size:12px;font-weight:700;color:var(--mut);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+ #sst_bi .sbtw .sgtab td{padding:7px 10px;border-bottom:1px solid var(--line)}
+ #sst_bi .sbtw .sgtab tr:nth-child(odd) td{background:color-mix(in srgb,var(--bg) 45%,var(--card))}
+ #sst_bi .sbtw .sgtab tr:last-child td{border-bottom:0}
+ #sst_bi .sbtw .sgtab .n{text-align:right;font-variant-numeric:tabular-nums}
+ .sbtot td{font-weight:700}
+ .sbvz{font-size:13px;color:var(--mut);margin:6px 0;padding:14px;text-align:center;background:var(--bg);border-radius:8px}
+ .sbnota{font-size:11.5px;color:var(--mut);margin:8px 0 0;line-height:1.45}
+ @media(min-width:860px){#app.wrap:has(#sst_bi:not(.hidden)){max-width:none;padding:0 24px} #app main#sst_bi{max-width:none}}
+ .sbgrid{display:grid;grid-template-columns:1fr;gap:0 14px;align-items:start}
+ .sbgrid>.sbks,.sbgrid>.banner{grid-column:1/-1}
+ @media(min-width:1040px){.sbgrid{grid-template-columns:1fr 1fr} .sbgrid>.sbfull{grid-column:1/-1}}
+ .sbgrid>.sbbox{min-width:0}
+ @media(max-width:600px){.sbfil{gap:10px}.sbf{flex:1 1 calc(50% - 5px);max-width:none} .sbf-per,.sbf-clr{flex:1 1 100%;margin-left:0} .sbclr{width:100%} #sst_bi .sbfil select,#sst_bi .sbfil input{font-size:16px;padding:7px 8px} .sbk b{font-size:24px} .sbks{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .sbk{padding:12px}}`; document.head.appendChild(st); }
 
 // ===== Lançamentos (inspeções, DDS, ocorrências) + detalhe =====
 let sgL={aba:'inspecao',filtro:'',busca:'',dados:null,det:null,reg:null};
