@@ -3628,8 +3628,9 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
 (`"16 - qsms".qsms_pode`). ⚙️ (admin, no hub) → `qsms_acesso` (`app_qsms_acesso_listar/_set`).
 **Hub `qsms` em categorias (reorganizado em 2026-11-18, sw v428):** **📊 Indicadores** → `sst_bi` (BI QSMS); **🦺 EPI** →
-painel, cesta e EPI por colaborador; **⛑️ SST** → `qsms_form` (**Formulários APR**), Inspeções, ASO, Treinamentos, CIPA, DDS e
-Ocorrências (Inspeções/DDS/Ocorrências = a tela `sst_lanc` travada em um tipo, ver §20). Antes (2026-10-28): **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
+painel, cesta e EPI por colaborador; **⛑️ SST** → `qsms_form` (**Formulários APR**), Inspeções, ASO, Treinamentos, CIPA, DDS,
+Ocorrências (Inspeções/DDS/Ocorrências = a tela `sst_lanc` travada em um tipo, ver §20) e **Checklists de reaterro e pavimento**
+(`sst_ck`, POP-022, sw v430 — §20.1). Antes (2026-10-28): **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
 `qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_painel` (Painel de EPI), `qsms_cesta` (Cesta de EPI) e `qsms_epi_col` (EPI
 por colaborador), nessa ordem. Cada
 tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`/`qf`/`qe`; `qsmsPeriodo`/`qsmsFiltros`/
@@ -3873,6 +3874,43 @@ outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo par
 - Os nomes das colunas das views são o contrato com o BI: renomear uma coluna quebra o relatório.
 - O `Área` mistura áreas do cadastro (`perfil.area`, em ASO/treinamentos) e as escolhidas no campo (inspeção/DDS/ocorrência) —
   o app de campo deve oferecer a lista de `perfil.area` + "Geral" para não espalhar grafias.
+
+### 20.1 Checklists do POP-022 — reaterro e recomposição de pavimento (2026-11-18, sw v430) — `docs/migracao_sst_checklist_pop022.sql`
+
+Os dois checklists do **POP-022 Rev. 03** (fonte: `checklists_reaterro_recomposicao_POP022.pdf`) saíram do papel:
+**01 · Reaterro** (4 grupos, 23 itens) e **02 · Recomposição de pavimento** (3 grupos, 25 itens). Preenchidos pela equipe de
+segurança no QSMS campo, vistos na gestão do QSMS e acompanhados numa página nova do BI QSMS.
+- **Campo (`sst`/`sst_form`, gate `ME.qsms_campo`):** 2 botões novos no hub — 🧱 **Checklist de reaterro** (`SST_TIPO.rea`) e
+  🛣️ **Checklist de recomposição** (`SST_TIPO.rec`), mesmo formulário `sst_form` (rascunho, fila offline, pasta `sst/`).
+  Itens na constante `SST_CK` (código `1.1`…, grupo, texto; `pav` = item que só vale para um tipo de pavimento).
+  Blocos: **Identificação** (data, **Nº da OS***, **tipo de intervenção*** Implantação/Manutenção/Reparo/Ligação/HDD/Outra,
+  **equipe/contratada***, endereço/local opcional, **tipo de pavimento*** na recomposição; fiscal = quem preenche) ·
+  **Checklist** (C / NC / N/A em todos; **NC exige observação/evidência**, foto opcional `nc_<i>`; escolher o tipo de
+  pavimento põe **N/A automático** nos itens dos outros tipos — `sstCkPav`, `it.auto`) · **Resultado** (Conforme / Não conforme /
+  Pendente; com item NC não pode ser "Conforme"; resultado ≠ conforme exige observação/ação corretiva) · **Fotos** antes/depois
+  (opcionais, `foto_antes`/`foto_depois`) · **Assinaturas** do **encarregado** (nome da lista ou digitado, p/ terceiro) e da
+  **fiscalização** (quem preenche). **GPS travado** obrigatório. "Meus lançamentos" mostra os checklists (`app_sst_minhas.checklists`).
+- **Gestão (`sst_ck`, hub QSMS › ⛑️ SST › Checklists de reaterro e pavimento, gate `ME.qsms`):** período + consórcio, KPIs
+  (total, por checklist, % itens conformes, itens NC, resultado não conforme, pendentes), filtro por checklist/resultado
+  (incl. "com item NC" e "com alerta"), busca, **XLSX**; detalhe (`app_sst_ck_ver`) com cabeçalho, itens por grupo (NC com
+  observação e foto), fotos, as 2 assinaturas e **anular** (`app_sst_anular` tipo `checklist`). `ckAbrir(id, volta)` abre direto
+  um checklist (usado pelo BI, com "Voltar ao BI QSMS").
+- **BI QSMS (`sst_bi`, página "Reaterro e pavimento", `SB_PAG.ck`):** KPIs (checklists, **% conformidade dos itens** =
+  C ÷ (C + NC), N/A fora; itens NC; resultado não conforme/pendentes), checklists por mês/dia empilhados por resultado + linha
+  de % (drill-down igual às outras páginas), itens com mais NC, por equipe, resultado por tipo de intervenção, NCs por etapa,
+  recomposição por tipo de pavimento e tabela com **📄 Abrir**. Segmentações: Checklist, Equipe, Fiscal. **Área desabilitada**
+  (checklist não tem área). Os itens seguem os checklists filtrados (pelo `Checklist ID`).
+
+**Banco:** `"16 - qsms".sst_checklist` (cabeçalho: `tipo` reaterro|recomposicao, OS, tipo de intervenção, equipe, local,
+tipo de pavimento, `resultado` conforme|nao_conforme|pendente, observações, encarregado + assinatura, assinatura do fiscal,
+GPS/geom 31983 + endereço/bairro/município/consórcio por `qsms_local`, fotos, alertas, anulado_*) e `sst_checklist_item`
+(ordem, código, grupo, **texto do item gravado junto** — mudar `SST_CK` não altera o que já foi respondido —, C/NC/NA, obs,
+foto). RLS deny-all, `qsms_sem_delete` nas duas, `sst_trg_audit` no cabeçalho. RPCs: `app_sst_ck_registrar` (campo,
+idempotente pelo id; inválido vira **alerta**: sem OS/GPS/resultado/assinatura, NC sem observação, "conforme" com NC),
+`app_sst_ck_listar` (gestão), `app_sst_ck_ver` (gestão ou autor); `app_sst_anular`, `app_sst_minhas` e `app_sst_bi`
+redefinidas (+ `checklists`, `checklist_itens`, `vazias.checklists`). Views **`bi_sst_checklist`** e
+**`bi_sst_checklist_item`** (grant `bi_qsms_leitura`) — o Power BI QSMS ainda não tem essas tabelas; dá pra incluir depois
+pela mesma API. **Aplicado em 18/11/2026** (migração `sst_checklist_pop022`, E2E com rollback ok).
 
 ---
 
