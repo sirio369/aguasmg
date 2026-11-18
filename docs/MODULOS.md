@@ -4359,6 +4359,13 @@ dias validados ficam clicáveis), tabela por ZA (Atividade · No dia · Acumulad
 fiscalização), detalhe da atividade com **"OS do dia" primeiro** (`fscOsDia`: OS SIGOS, ou a do AcquaHub sem SIGOS, sem
 repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros sem OS) e depois cada execução (OS, situação
 SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha,
+**EXECUTADA(E) = sincronização entre relatórios (2026-11-18, sw v417, só front):** `EXECUTADA(E)` é o status da **carteira**
+(Relação de Serviços) para OS executada em campo e ainda **não encerrada** no SIGOS; `EXECUTADA` vem das **Encerradas**. A
+`vw_os_situacao` dá prioridade às Encerradas, então na próxima carga de Encerradas a OS só troca de chip (`(E)` → `EXECUTADA`) e
+o total do dia não muda (só muda se a data de execução das Encerradas for outra ou se a OS for encerrada sem execução). Na tela:
+chip `⟳ EXECUTADA(E)` **contornado/tracejado** com tooltip (`fscPill`, `fscStSync`), grupos do detalhe e do "OS do dia" com o
+sufixo "— aguardando encerramento no SIGOS" (`fscStRot`) e **legenda única** abaixo da tabela de atividades quando o dia tem
+alguma OS `(E)` (`fscLegendaE`).
 **status SIGOS em destaque (2026-11-13, sw v377, só front):** a linha da atividade mostra chips com a contagem por status
 (`EXECUTADA · 645`, `NÃO EXEC. C/ VISITA · 126`; `fscResumoLinha`) e, no detalhe, as execuções ficam **agrupadas por status
 SIGOS** dentro da atividade (`fscGruposSt`/`fscExecsAgrupadas`: EXECUTADA primeiro; lançamentos do app num grupo "Lançado no

@@ -11036,6 +11036,8 @@ function fscCss(){
 #fisc .fscstg{margin:12px 0 4px}#fisc .fscstg>.h{display:flex;align-items:baseline;gap:6px;margin-bottom:2px;padding-bottom:3px;border-bottom:1px solid var(--line);font-size:13px}
 #fisc .fscos .g{font-size:12px;margin-top:6px}#fisc .fscos .l+.g{margin-top:0}
 #fisc .fscstc{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+#fisc .fscpill.fscsync{background:transparent;color:#16a34a;border:1.5px dashed #16a34a;padding:1px 7px;cursor:help}
+#fisc .fsclegE{font-size:12px;color:var(--mut);margin:6px 0 2px;line-height:1.5}#fisc .fsclegE .fscpill{margin-right:4px}
 #fisc .fscmapa{height:300px;border-radius:10px;border:1px solid var(--line);margin:6px 0}
 #fisc .fscpb{height:8px;background:var(--line);border-radius:6px;overflow:hidden;min-width:60px}
 #fisc .fscpb i{display:block;height:100%;background:var(--acc)}
@@ -11234,7 +11236,7 @@ function fscOsDia(execs){
   const gs=fscGruposSt(execs).map(([k,ex])=>[k,lista(ex)]).filter(([,os])=>os.length), n=gs.reduce((a,[,os])=>a+os.length,0);
   const corpo=!n?'<div class="sub" style="margin:0">Nenhuma OS nesta linha.</div>'
     :(gs.length===1&&gs[0][0]===null?'<div class="v">'+vEsc(gs[0][1].join(', '))+'</div>'
-      :gs.map(([k,os])=>'<div class="g"><b>'+vEsc(k)+' ('+os.length+')</b></div><div class="v">'+vEsc(os.join(', '))+'</div>').join(''));
+      :gs.map(([k,os])=>'<div class="g"><b>'+vEsc(fscStRot(k))+' ('+os.length+')</b></div><div class="v">'+vEsc(os.join(', '))+'</div>').join(''));
   return '<div class="fscos"><div class="l">OS do dia ('+n+')</div>'+corpo
     +(sem.length?'<div class="sub" style="margin:4px 0 0">+ '+sem.length+' registro'+(sem.length===1?'':'s')+' sem OS</div>':'')+'</div>';
 }
@@ -11262,6 +11264,17 @@ function fscGruposSt(execs){
 // status da OS no SIGOS (EXECUTADA, NÃO EXEC. C/ VISITA…) — só p/ execução que veio do SIGOS; null p/ lançamento do app
 function fscStSigos(e){ if(!e||e.origem!=='SIGOS') return null; return String((e.extra&&e.extra['Status SIGOS'])||(e.sigos==='executada'?'EXECUTADA':e.sigos)||'—').trim(); }
 function fscStCor(s){ s=String(s||'').toUpperCase(); return /^EXECUTADA/.test(s)?'#16a34a':(/N[ÃA]O EXEC/.test(s)?'#ea580c':'#64748b'); }
+// EXECUTADA(E) = executada em campo, mas ainda na carteira (Relação) do SIGOS, sem encerramento: é só a sincronização
+// entre os relatórios — na próxima carga de Encerradas vira EXECUTADA e o total do dia não muda (vw_os_situacao: Encerradas tem prioridade)
+const fscStSync=s=>/^EXECUTADA\s*\(E\)/i.test(String(s||'').trim());
+const FSC_E_TIT='Executada em campo, aguardando encerramento no SIGOS. Vem da carteira (Relação de Serviços) e passa a EXECUTADA quando a OS aparecer numa carga de Encerradas — o total do dia não muda.';
+const fscStRot=k=>fscStSync(k)?k+' — aguardando encerramento no SIGOS':k;
+function fscPill(k,n){
+  return fscStSync(k)?'<span class="fscpill fscsync" title="'+vEsc(FSC_E_TIT)+'">⟳ '+vEsc(k)+' · '+n+'</span>'
+    :'<span class="fscpill" style="background:'+fscStCor(k)+'">'+vEsc(k)+' · '+n+'</span>';
+}
+// legenda (1× por tabela) quando alguma linha tem OS EXECUTADA(E)
+const fscLegendaE=()=>'<div class="fsclegE"><span class="fscpill fscsync">⟳ EXECUTADA(E)</span> executada em campo, ainda não encerrada no SIGOS — é a sincronização entre a Relação de Serviços e as Encerradas. Na próxima carga de Encerradas passa a <b>EXECUTADA</b>; o total do dia não muda.</div>';
 // serviço de origem da recomposição de pavimento (extra._origem, montado no banco)
 function fscOrigemHtml(o){
   if(!o) return '';
@@ -11294,7 +11307,7 @@ function fscFilhosHtml(fs){
 function fscExecsAgrupadas(z,execs){
   const gs=fscGruposSt(execs);
   if(gs.length===1&&gs[0][0]===null) return gs[0][1].map(e=>fscExecHtml(z,e)).join('');
-  return gs.map(([k,ex])=>'<div class="fscstg"><div class="h"><b>'+vEsc(k)+'</b> <span class="sub" style="margin:0">'+ex.length+' OS</span></div>'
+  return gs.map(([k,ex])=>'<div class="fscstg"><div class="h"><b>'+vEsc(fscStRot(k))+'</b> <span class="sub" style="margin:0">'+ex.length+' OS</span></div>'
     +ex.map(e=>fscExecHtml(z,e)).join('')+'</div>').join('');
 }
 // resumo na própria linha: contagem por status SIGOS (e, na recomposição, por família do serviço de origem)
@@ -11303,7 +11316,7 @@ function fscResumoLinha(l){
   ex.forEach(e=>{ const s=fscStSigos(e); if(s) cnt[s]=(cnt[s]||0)+1; });
   let h='';
   const ks=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
-  if(ks.length) h+='<div class="fscstc">'+ks.map(k=>'<span class="fscpill" style="background:'+fscStCor(k)+'">'+vEsc(k)+' · '+cnt[k]+'</span>').join('')+'</div>';
+  if(ks.length) h+='<div class="fscstc">'+ks.map(k=>fscPill(k,cnt[k])).join('')+'</div>';
   const ag=ex.filter(e=>e.extra&&e.extra._aguarda).length;   // traçado de pesquisa sem OS executada no SIGOS: não conta (0 km)
   if(ag) h+='<div class="sub" style="margin:3px 0 0">'+ag+' registro'+(ag===1?'':'s')+' aguardando o SIGOS (não conta no dia)</div>';
   const orig=ex.map(e=>e.extra&&e.extra._origem).filter(Boolean);
@@ -11326,7 +11339,8 @@ function fscTabAtividades(z,D,pode,travado){
     h+='<tr class="'+(fscS.mapas[k]?'':'hidden')+'"><td colspan="'+nc+'" class="det"><div class="fscmapa" id="fscmap_'+fscId(k)+'"></div></td></tr>';
     if(ab) h+='<tr><td colspan="'+nc+'" class="det">'+(cs?fscMudouHtml(l):'')+fscOsDia(l.execs)+fscExecsAgrupadas(z,l.execs)+'</td></tr>';
   });
-  return h+'</tbody></table>';
+  const temE=ls.some(l=>(l.execs||[]).some(e=>fscStSync(fscStSigos(e))));
+  return h+'</tbody></table>'+(temE?fscLegendaE():'');
 }
 const fscId=k=>k.replace(/[^a-zA-Z0-9]/g,'_');
 function fscTabObras(z,D,pode,travado){
