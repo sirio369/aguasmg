@@ -1735,7 +1735,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sst_bi" class="hidden">
     <div class="bar"><button class="bk" data-go="qsms">‹ QSMS</button></div>
     <h1>BI QSMS</h1>
-    <p class="sub">As páginas do BI QSMS (Power BI) dentro do app: as mesmas views e a mesma regra de cálculo. Sem datas = todo o histórico, como o BI aberto sem filtro.</p>
+    <p class="sub">As páginas do BI QSMS (Power BI) dentro do app, por assunto: as mesmas views e a mesma regra de cálculo. Sem datas = todo o histórico, como o BI aberto sem filtro.</p>
     <div class="segfil"><input type="date" id="sbDe" title="De"/><input type="date" id="sbAte" title="Até"/><button type="button" class="btn ghost" id="sbLimpa" style="margin:0;width:auto;padding:9px 12px">Todo o período</button><select id="sbCons"><option value="">Ambos os consórcios</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select><select id="sbArea"><option value="">Todas as áreas</option></select></div>
     <div id="sbView"></div>
   </main>
@@ -15034,18 +15034,18 @@ async function sgPainelCarregar(){ const v=$('#spView'); v.innerHTML='<p class="
     if(['pend','venc','acoes','registrada'].includes(f)){ const h0=new Date(); h0.setFullYear(h0.getFullYear()-1); $('#slDe').value=qsmsDia(h0); $('#slAte').value=qsmsDia(new Date()); }
     irPara('sst_lanc'); }); }
 
-// ===== BI QSMS (sst_bi): as 8 páginas do Power BI QSMS no app =====
+// ===== BI QSMS (sst_bi): as páginas do Power BI QSMS no app (sem a Visão geral, retirada a pedido em 2026-11-18) =====
 // Mesmas views do BI (app_sst_bi devolve as linhas de bi_sst_*) e a mesma regra das medidas DAX, calculada aqui.
 // Período = relação com o Calendário do BI (Data; Treinamentos pela Data de Realização). Saúde e CIPA Membros não têm
 // data (situação de hoje); as medidas de situação dos treinamentos e "Dias sem acidente" ignoram o período, como no BI.
 // Área filtra tudo menos a CIPA (no BI a CIPA não tem relação com Área). "Sem dados" = tabela inteira vazia (cartão do BI).
-const SB_ABAS=[['geral','Visão geral'],['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA']];
+const SB_ABAS=[['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA']];
 // segmentações de cada página do BI: [tabela, coluna]
 const SB_SEG={acid:[['acidentes','Gravidade'],['acidentes','Tipo']],vinc:[['vinculo','Vínculo'],['vinculo','Empresa']],
   insp:[['inspecoes','Cargo'],['inspecoes','Responsável']],saude:[['saude','Cargo'],['saude','Tipo de Exame'],['saude','Situação ASO']],
   dds:[['dds','Tema'],['dds','Responsável']],trein:[['treinamentos','Treinamento'],['treinamentos','Cargo'],['treinamentos','Situação']],
   cipa:[['cipa_membros','Tipo'],['cipa_membros','Representação'],['cipa_membros','Situação do Mandato']]};
-let sbi={aba:'geral',r:null,seg:{}};
+let sbi={aba:'acid',r:null,seg:{}};
 const SB_COR=['#0e639c','#e07b39','#1a7f4b','#b3261e','#8a5a00','#7c3aed','#94a3b8'];
 const SB_OK='#1a7f4b', SB_AV='#d97706', SB_VE='#b3261e', SB_PR='#0e639c', SB_SD='#94a3b8';
 const SB_MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -15140,27 +15140,6 @@ function sbTab(rows,cols,max=300){ if(!rows.length) return sbVazio;
     +(rows.length>max?`<p class="sub" style="font-size:11px">Mostrando ${max} de ${rows.length}.</p>`:''); }
 // ---- páginas (mesmos visuais do BI) ----
 const SB_PAG={
-geral(){ const A=sbF('acidentes'), I=sbF('inspecoes'), D=sbF('dds'), S=sbF('saude',{periodo:false}), T=sbF('treinamentos',{col:'Data de Realização'}), Tt=sbF('treinamentos',{periodo:false});
-  const a=sbAcid(A), i=sbInsp(I), d=sbDds(D), s=sbSaude(S), t=sbTrein(T,Tt);
-  let h=sbKs([sbK('Acidentes',a.n,'n','acidentes',`C/ afast.: ${sbC(a.com,'n','acidentes')} · dias perdidos: ${sbC(a.dp,'n','acidentes')}`,1),
-    sbK('Dias sem acidente c/ afastamento',sbDiasSem(sbF('acidentes',{periodo:false})),'n','acidentes'),
-    sbK('% Conformidade',i.conf,'%','inspecoes',`Participação no DDS: ${sbC(d.part,'%','dds')}`),
-    sbK('% ASO válidos',s.valid,'%','saude',`Treinamentos em dia: ${sbC(t.emDia,'%','treinamentos')}`)]);
-  const ka=sbMeses([[A,'Data']]);
-  h+=sbBox('Acidentes por mês',sbColChart(ka,[{nome:'Com afastamento',cor:SB_VE,v:sbSerie(ka,A,'Data',x=>sbCnt(x,'Classificação','Com Afastamento'))},
-    {nome:'Sem afastamento',cor:SB_COR[1],v:sbSerie(ka,A,'Data',x=>sbCnt(x,'Classificação','Sem Afastamento'))}],null,{stack:true}));
-  const ki=sbMeses([[I,'Data'],[D,'Data']]);
-  h+=sbBox('Inspeções, DDS e conformidade por mês',sbColChart(ki,[{nome:'Inspeções',cor:SB_COR[0],v:sbSerie(ki,I,'Data',x=>x.length)},{nome:'DDS realizados',cor:SB_COR[1],v:sbSerie(ki,D,'Data',x=>x.length)}],
-    {nome:'% Conformidade',cor:SB_OK,v:sbSerie(ki,I,'Data',x=>sbInsp(x).conf)}));
-  // matriz por Área (mesmas 10 medidas do BI)
-  const ar=[...new Set([A,I,D,S,Tt].flatMap(rs=>rs.map(x=>x['Área'])).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'pt-BR'));
-  const lin=k=>{ const f=rs=>k==null?rs:rs.filter(x=>x['Área']===k); const a=sbAcid(f(A)), i=sbInsp(f(I)), d=sbDds(f(D)), s=sbSaude(f(S)), t=sbTrein([],f(Tt));
-    return {k:k==null?'Total':k,v:[a.n,a.com,a.dp,i.n,i.conf,i.pend,d.n,d.part,s.ve,t.ve]}; };
-  const rows=ar.map(lin).filter(o=>o.v.some(v=>v)), tot=lin(null), tp=['n','n','n','n','%','n','n','%','n','n'];
-  const cel=(v,t)=>`<td class="n">${v==null?'—':t==='%'?sbPct(v):sbNum1(v)}</td>`;
-  h+=sbBox('Indicadores por área',rows.length?`<div class="sbtw"><table class="sgtab"><tr><th>Área</th>${['Acidentes','C/ afast.','Dias perdidos','Inspeções','% Conf.','NCs pend.','DDS','% Part. DDS','ASO venc.','Trein. venc.'].map(x=>`<th class="n">${x}</th>`).join('')}</tr>
-    ${rows.map(o=>`<tr><td>${segH(o.k)}</td>${o.v.map((v,j)=>cel(v,tp[j])).join('')}</tr>`).join('')}<tr class="sbtot"><td>Total</td>${tot.v.map((v,j)=>cel(v,tp[j])).join('')}</tr></table></div>`:sbVazio);
-  return h; },
 acid(){ const A=sbF('acidentes'), a=sbAcid(A);
   let h=sbKs([sbK('Acidentes',a.n,'n','acidentes',`C/ afast.: ${sbC(a.com,'n','acidentes')} · s/ afast.: ${sbC(a.sem,'n','acidentes')}`,1),
     sbK('Acidentes graves',a.graves,'n','acidentes','',1),sbK('Dias perdidos',a.dp,'n','acidentes',`Dias debitados: ${sbC(a.dd,'n','acidentes')}`),
