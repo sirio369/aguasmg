@@ -556,6 +556,8 @@ por etapa, legado sem portões. **Pré-obra (2026-11-11, sw v367, `docs/migracao
 **OS SIGOS** trava a Execução; os demais itens têm **"Não se aplica"** (Obras, status `nao_aplica`); prefeitura e Transcon
 viraram uma etapa só (`alvara`) com nome pela região — **Liberação TransCon** (ZA1004) / **Liberação Transbetim** (ZA0200).
 **Sem portões de fase (2026-11-18, sw v420, `docs/migracao_proj_sem_portoes.sql`):** todas as fases ficam abertas desde o início (aprovar, pré-obra, lançar avanço e encerramento não esperam a fase anterior); o status só mostra onde o pipeline está (`proj_calc.chegou`); seguem os papéis, os anexos do Liberar e o ensaio de reaterro.
+**Vários PDFs no Encerramento (2026-11-18, sw v424, `docs/migracao_proj_doc_extras.sql`):** os documentos da fase 5 aceitam PDFs a mais
+(➕ Mais PDFs → `intervencao_documento_extra`); cada um reenvia a etapa para a aprovação da Qualidade.
 **HDD + avanço de ontem (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):** as **valas de perfuração** são
 adicionadas/removidas (só sem avanço) pela **equipe de obras** no `projeto_det`, tipo Entrada/**Intermediária**/Saída editável
 a qualquer momento; todo lançamento de avanço pergunta **"Esse avanço foi realizado em outra data?"** (Sim = qualquer data/hora não futura,
