@@ -2722,6 +2722,22 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     Status `preobra` agora = falta a OS SIGOS.
   - Testado com rollback (11/11/2026, linha 47 / ZA0200): nome "Liberação Transbetim", vistoria "não se aplica" com a aprovação
     inativa, OS SIGOS recusa "não se aplica", lançar a OS abriu a Execução com GASMIG ainda pendente/acionável, desfazer ok.
+- **🔓 Sem portões de fase (2026-11-18, sw v420, `docs/migracao_proj_sem_portoes.sql`).** Pedido do usuário: tirar as travas que
+  impediam o avanço do pipeline do início ao fim.
+  - **Toda fase fica aberta desde o início:** `proj_calc` devolve `aberta` = true nas fases 2–5 (e em cada item delas). A Qualidade
+    aprova sem esperar o Liberar, Obras anexa a pré-obra/Encerramento e **lança avanço sem OS SIGOS** nem aprovação da Qualidade
+    (`app_proj_avanco_registrar`, `app_proj_etapa_enviar`, `app_proj_etapa_nao_aplica`, `app_proj_reaterro_*` conferem essas flags).
+    A fase 1 continua como era (Engenharia edita até o Liberar; depois só item em correção).
+  - **Continuam:** os papéis (Engenharia/Qualidade/3 cargos de Obras), o **Liberar exigindo os anexos da fase 1** (ele só manda o
+    pacote para a Qualidade), a **trava do ensaio de reaterro → recomposição** e "Concluída" só com tudo feito.
+  - **Fase alcançada ≠ fase aberta:** status, `fase`, "com quem está", `exec_pendente` e os carimbos/avisos de "fase aberta"
+    (`proj_fase_sync`) seguem a ordem do pipeline, agora em **`c->'chegou'`** (= o antigo `aberta`). Item de fase ainda não
+    alcançada só entra na fila (`acionavel`) se estiver **aguardando aprovação ou em correção**; as pendências comuns só entram
+    quando o pipeline chega na fase (as filas não lotam).
+  - Front: o aviso da Execução no `projeto_det` virou "Execução aberta" e, se o pipeline ainda não chegou lá, diz em que fase está.
+  - Testado com rollback (18/11/2026, 86 intervenções): status/fase/concluída/progresso iguais, `chegou` = `aberta` antigo em todas,
+    Execução aberta 42 → 86, 7 documentos já enviados (executivo de 2 em configuração, relatório de furo de 5 HDD em execução)
+    entram na fila da Qualidade; OS SIGOS lançada antes do Liberar aceita sem gerar evento de fase.
 - **🔁 Pipeline — FRONT (2026-11-02, sw v317).** Depende de `docs/migracao_proj_pipeline.sql` aplicado (sem ele
   `app_proj_pipeline_resumo` falha e toda intervenção aparece como "Em configuração").
   - **Hub em 3 atores:** 🏗️ **Obras** (Intervenções · Resumo · Indicadores) · 📐 **Engenharia** (ex-"Suporte":

@@ -4097,10 +4097,12 @@ function pjRenderDet(keep){
   const t=PJ_TIPOS[iv.tipo],p=Math.round(pjIvPct(iv)),pp=iv.pipe||{},st=pjPipeStatus(iv),[sl,sc]=PJ_PST[st]||PJ_PST.configuracao;
   const leaves=iv.arv.flatMap(n=>pjLeaves(n)),done=leaves.filter(x=>pjPct(x)>=100).length,run=leaves.filter(x=>{const v=pjPct(x);return v>0&&v<100;}).length,zero=leaves.length-done-run;
   const ringc=p>=100?'var(--ok)':'var(--acc)';
+  // sem portões de fase (2026-11-18): a Execução fica aberta desde o início; o status mostra só onde o pipeline está
+  const antes=pp.chegou&&!pp.chegou['4']?` O pipeline ainda está em <b>${sl}</b> — as etapas anteriores não travam.`:'';
   const banner=ab4
-    ? (pjExecOk?`<div class="pjbanner ok">🏗️ <b>Execução liberada</b> — registre os avanços do dia.</div>`
-               :`<div class="pjbanner ok">🏗️ <b>Execução liberada</b> — só os responsáveis de obras (Supervisor de Produção, Coordenador de Serviços, Gestor de Obras) lançam avanço.</div>`)
-    : `<div class="pjbanner warn">⏳ <b>Execução fechada</b> — abre quando a OS SIGOS for lançada na pré-obra (os demais documentos não travam).</div>`;
+    ? (pjExecOk?`<div class="pjbanner ok">🏗️ <b>Execução aberta</b> — registre os avanços do dia.${antes}</div>`
+               :`<div class="pjbanner ok">🏗️ <b>Execução aberta</b> — só os responsáveis de obras (Supervisor de Produção, Coordenador de Serviços, Gestor de Obras) lançam avanço.${antes}</div>`)
+    : `<div class="pjbanner warn">⏳ <b>Execução fechada</b> — atualize a tela para carregar o pipeline.</div>`;
   $('#pjDet').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
    <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
    ${pjSpecs(iv)}
