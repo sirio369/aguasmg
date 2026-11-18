@@ -3772,6 +3772,19 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   - `sst_painel` — `app_sst_painel` (mesmas views do BI): acidentes/ocorrências, inspeções, DDS, produção por responsável e
     por semana, ASO, treinamentos por tipo, CIPA. Cada número abre a lista certa (NC pendente/vencida, ocorrência a validar
     e ação aberta abrem com 1 ano para trás, porque não dependem do período).
+  - `sst_bi` — **BI QSMS dentro do app** (2026-11-18, sw v425, `docs/migracao_sst_bi.sql`; código `sb*`): as 8 páginas do
+    Power BI QSMS (Visão geral, Acidentes, Próprios × terceiros, Inspeções, Saúde ocupacional, DDS, Treinamentos, CIPA) em abas,
+    com os mesmos cartões (incl. a frase de contexto e "Sem dados" quando a tabela inteira está vazia), gráficos por mês
+    (colunas + linha de %, SVG próprio) e por categoria (barras), matriz por Área e tabelas de detalhe. `app_sst_bi(de, ate,
+    consorcio)` (gate `sst_gestao_check`) devolve as **linhas** das views `bi_sst_*` + `vazias` + `hoje`; o app chama sem
+    período (só consórcio) e calcula as medidas no aparelho com a regra do `_Medidas` do BI (conferido número a número
+    com o modelo pelo MCP do Power BI em 18/11/2026, sem filtro, com período e com Área). Filtros = os do BI: período
+    (= relação com o Calendário: Data; Treinamentos pela Data de Realização; sem datas = todo o histórico), consórcio, Área
+    (não filtra a CIPA, que no BI não tem relação com Área) e as segmentações de cada página (Gravidade/Tipo, Vínculo/Empresa,
+    Cargo/Responsável, Cargo/Exame/Situação ASO, Tema/Responsável, Treinamento/Cargo/Situação, Tipo/Representação/Situação do
+    Mandato). Saúde, membros da CIPA, situação dos treinamentos e "Dias sem acidente" não dependem do período (no BI:
+    sem data ou `REMOVEFILTERS('Calendário')`). Só leitura. A segmentação "Mês de Realização" dos Treinamentos não foi
+    reproduzida (o período cobre).
   - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
     acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com OS + responsável pela
     intervenção e assinatura, e **tratativa de NC** (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
