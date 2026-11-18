@@ -16737,7 +16737,7 @@ function rhvRender(){
   const its=D.itens||[];
   const q=rhNorm(rhvF.q.trim());
   const consOk=it=>!rhvF.cons||it.consorcio===rhvF.cons;
-  const gOk=it=>!rhvF.gestor||(rhvF.gestor==='__sem'?(!it.gestor&&!it.gestor2):(it.gestor===rhvF.gestor||it.gestor2===rhvF.gestor));
+  const gOk=it=>!rhvF.gestor||(rhvF.gestor==='__sem'?!it.gestor:it.gestor===rhvF.gestor);
   const base=its.filter(it=>consOk(it)&&gOk(it)&&(!rhvF.tipo||(it.tipos||[]).includes(rhvF.tipo))&&(!q||rhNorm(it.nome+' '+(it.matricula||'')).includes(q)));
   const cnt={pend:0,trat:0,val:0}; base.forEach(it=>{ const s=rhStatus(it); cnt[s==='dev'?'pend':s]++; });
   $('#rhvSt').innerHTML=[['pend','A tratar',cnt.pend],['trat','Aguardando RH',cnt.trat],['val','Validados',cnt.val],['todos','Todos',base.length]]
@@ -16747,7 +16747,7 @@ function rhvRender(){
   $('#rhvCons').innerHTML=cs.length<2?'':[['','Ambos'],['ZA1004','Contagem · AI'],['ZA0200','Betim · EH']]
     .map(([v,l])=>`<button data-c="${v}" class="${v===rhvF.cons?'on':''}">${l} ${its.filter(it=>!v||it.consorcio===v).length}</button>`).join('');
   $('#rhvCons').querySelectorAll('button').forEach(b=>b.onclick=()=>{ rhvF.cons=b.dataset.c; rhvRender(); });
-  const gc={}; let gsem=0; its.filter(consOk).forEach(it=>{ const gs=[...new Set([it.gestor,it.gestor2].filter(Boolean))]; if(!gs.length) gsem++; gs.forEach(g=>gc[g]=(gc[g]||0)+1); });
+  const gc={}; let gsem=0; its.filter(consOk).forEach(it=>{ const gs=it.gestor?[it.gestor]:[]; if(!gs.length) gsem++; gs.forEach(g=>gc[g]=(gc[g]||0)+1); });
   if(rhvF.gestor&&rhvF.gestor!=='__sem'&&!gc[rhvF.gestor]) rhvF.gestor='';
   $('#rhvGestor').innerHTML='<option value="">Todos os gestores</option>'+Object.keys(gc).sort((x,y)=>x.localeCompare(y))
     .map(g=>`<option value="${vEsc(g)}"${g===rhvF.gestor?' selected':''}>${vEsc(g)} (${gc[g]})</option>`).join('')
@@ -16765,7 +16765,7 @@ function rhvRender(){
 }
 // Faixa do colaborador (nome, empresa, matrícula, gestores) acima dos dias dele
 function rhvFaixa(it,n){
-  const gest=[it.gestor,it.gestor2].filter(Boolean).join(' / ');
+  const gest=it.gestor||'';
   return `<tr class="gp"><td colspan="9"><b>${vEsc(it.nome)}</b><span class="sub">${vEsc(it.sigla||'')}${it.matricula?' · mat. '+vEsc(it.matricula):''}${gest?' · gestor: '+vEsc(gest):''}${it.sem_usuario?' · <span style="color:var(--warn)">sem usuário no app</span>':''} · ${n} dia${n===1?'':'s'}</span></td></tr>`;
 }
 // Uma linha por dia (o colaborador vem na faixa acima); formulário abre numa linha logo abaixo
