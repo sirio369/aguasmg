@@ -3665,7 +3665,14 @@ function pjResumoCsv(feed,ev){
 // ---------- documentos + ETAPAS DO PIPELINE (Storage bucket fotos-campo, prefixo projetos/) — 1 arquivo por etapa ----------
 // documento = etapa de natureza 'doc' do etapa_modelo (tipo do arquivo = chave da etapa); link (vistoria) e OS ficam no valor da etapa
 let pjDocsCur={};   // tipo/chave -> {tipo,nome,path,folha} da intervenção corrente
-async function pjDocsLoad(iv){ pjDocsCur={}; if(!iv||iv.gid==null) return pjDocsCur; try{ const {data,error}=await sb.rpc('app_proj_docs_listar',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(dd=>{ pjDocsCur[dd.tipo]=dd; }); }catch(e){} return pjDocsCur; }
+let pjDocsExtra={};   // chave -> [{id,nome,path,folha}] — PDFs a mais das etapas de documento do Encerramento (o 1º fica em pjDocsCur)
+async function pjDocsLoad(iv){ pjDocsCur={}; pjDocsExtra={}; if(!iv||iv.gid==null) return pjDocsCur;
+  await Promise.all([
+    (async()=>{ try{ const {data,error}=await sb.rpc('app_proj_docs_listar',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(dd=>{ pjDocsCur[dd.tipo]=dd; }); }catch(e){} })(),
+    (async()=>{ try{ const {data,error}=await sb.rpc('app_proj_docs_extras_listar',{p_kind:iv.kind,p_gid:iv.gid}); if(!error&&Array.isArray(data)) data.forEach(dd=>{ (pjDocsExtra[dd.tipo]=pjDocsExtra[dd.tipo]||[]).push(dd); }); }catch(e){} })()]);
+  return pjDocsCur; }
+// todos os PDFs de uma etapa de documento: o 1º + os a mais
+function pjDocsTodos(chave){ const d=pjDocsCur[chave]; return d?[d,...(pjDocsExtra[chave]||[])]:(pjDocsExtra[chave]||[]).slice(); }
 // pipeline da intervenção (itens + eventos). quiet = só atualiza o status/ator do card (sem toast de erro)
 async function pjPipeLoad(iv,quiet){ if(!iv||iv.gid==null) return null;
   try{ const {data,error}=await sb.rpc('app_proj_pipeline',{p_kind:iv.kind,p_gid:iv.gid}); if(error) throw error;
@@ -3725,6 +3732,7 @@ function pjEtapaRow(iv,it,ctx,ev){ const cfg=ctx==='cfg', P=pjPipeCur||{}, lib=!
   // informações: arquivo / folha / link / OS / comentário / justificativa
   const doc=pjDocsCur[it.natureza==='aprovacao'?it.aprova:it.chave];
   const info=[];
+  const extras=it.natureza==='doc'?(pjDocsExtra[it.chave]||[]):[];
   if(it.natureza==='doc'&&doc) info.push(`📄 ${String(doc.nome||'documento').slice(0,40)}${doc.folha?' · folha <b>'+doc.folha+'</b>':''}`);
   if(it.natureza==='link'&&it.valor) info.push(`🔗 <a href="${it.valor}" target="_blank" rel="noopener">abrir pasta do SharePoint</a>`);
   if(it.natureza==='os'&&it.valor) info.push(`OS SIGOS <b class="pjmono">${it.valor}</b>${sgxS(it.valor)}`);
@@ -3736,7 +3744,10 @@ function pjEtapaRow(iv,it,ctx,ev){ const cfg=ctx==='cfg', P=pjPipeCur||{}, lib=!
   const acts=[]; const pode=pjPodeAtor(it.ator);
   const apAprov=it.natureza!=='aprovacao'&&((P.itens||[]).some(x=>x.natureza==='aprovacao'&&x.aprova===it.chave&&x.status==='aprovado'));
   const na=it.status==='nao_aplica';
-  if(doc&&!na) acts.push(`<button class="btn ghost pjmini" data-eopen="${doc.path}">👁 Abrir</button>`);
+  if(doc&&!na) acts.push(`<button class="btn ghost pjmini" data-eopen="${doc.path}">👁 Abrir${extras.length?' 1º':''}</button>`);
+  // PDFs a mais (Encerramento): cada um com abrir e, enquanto não aprovado, remover
+  const podeExtra=it.fase===5&&it.ativo&&pode&&it.aberta&&!apAprov;
+  extras.forEach(x=>{ info.push(`📄 ${String(x.nome||'documento').slice(0,40)}${x.folha?' · folha <b>'+x.folha+'</b>':''} <button class="btn ghost pjmini" data-eopen="${x.path}">👁 Abrir</button>${podeExtra?`<button class="btn ghost pjmini bad" data-exrem="${x.id}" title="Remover este PDF">🗑</button>`:''}`); });
   // "Não se aplica" (Obras): itens da pré-obra, menos a OS SIGOS — conta como feito; dá para desfazer
   if(it.ativo&&pode&&it.aberta&&it.fase===3&&(it.natureza==='doc'||it.natureza==='link')){
     if(na) acts.push(`<button class="btn ghost pjmini" data-enaplica="${it.chave}" data-v="0">↩ Desfazer "não se aplica"</button>`);
@@ -3744,7 +3755,8 @@ function pjEtapaRow(iv,it,ctx,ev){ const cfg=ctx==='cfg', P=pjPipeCur||{}, lib=!
   }
   if(!na&&it.ativo&&pode&&it.aberta&&!apAprov&&it.natureza==='doc'){
     if(it.pede_folha) acts.push(`<select data-efolha="${it.chave}"><option value="">Folha…</option>${PJ_FOLHAS.map(f=>`<option${doc&&doc.folha===f?' selected':''}>${f}</option>`).join('')}</select>`);
-    acts.push(`<button class="btn ghost pjmini" data-eanexar="${it.chave}">📎 ${doc?'Substituir':'Anexar PDF'}</button><input type="file" accept="application/pdf" hidden data-efile="${it.chave}">`);
+    acts.push(`<button class="btn ghost pjmini" data-eanexar="${it.chave}">📎 ${doc?(extras.length?'Substituir 1º':'Substituir'):'Anexar PDF'}</button><input type="file" accept="application/pdf" hidden data-efile="${it.chave}">`);
+    if(doc&&it.fase===5) acts.push(`<button class="btn ghost pjmini" data-exadd="${it.chave}">➕ Mais PDFs</button><input type="file" accept="application/pdf" multiple hidden data-exfile="${it.chave}">`);
     if(doc&&cfg&&!lib&&pjPodeEng()) acts.push(`<button class="btn ghost pjmini bad" data-eremover="${it.chave}">🗑 Remover</button>`);
   }
   if(!na&&it.ativo&&pode&&it.aberta&&!apAprov&&it.natureza==='link') acts.push(`<input type="url" data-elink="${it.chave}" placeholder="https://… (pasta no SharePoint)" value="${it.valor?String(it.valor).replace(/"/g,'&quot;'):''}"><button class="btn ghost pjmini" data-esalvar="${it.chave}">Salvar link</button>`);
@@ -3772,6 +3784,11 @@ function pjWireEtapas(d,iv){
     const inp=d.querySelector('[data-efile="'+ch+'"]'); if(inp) inp.click(); });
   d.querySelectorAll('[data-efile]').forEach(inp=>inp.onchange=()=>{ const f=inp.files&&inp.files[0], ch=inp.dataset.efile; if(!f) return; const s=d.querySelector('[data-efolha="'+ch+'"]'); pjEtapaAnexar(iv,ch,f,s?s.value:null); });
   d.querySelectorAll('[data-eremover]').forEach(b=>b.onclick=()=>pjDocRemover(iv,b.dataset.eremover));
+  d.querySelectorAll('[data-exadd]').forEach(b=>b.onclick=()=>{ const ch=b.dataset.exadd, it=pjPipeItem(ch);
+    if(it&&it.pede_folha){ const s=d.querySelector('[data-efolha="'+ch+'"]'); if(!s||!s.value){ toast('Escolha o tamanho da folha (A0 a A4) antes de anexar'); if(s) s.focus(); return; } }
+    const inp=d.querySelector('[data-exfile="'+ch+'"]'); if(inp) inp.click(); });
+  d.querySelectorAll('[data-exfile]').forEach(inp=>inp.onchange=()=>{ const fs=[...(inp.files||[])], ch=inp.dataset.exfile; if(!fs.length) return; const s=d.querySelector('[data-efolha="'+ch+'"]'); pjDocExtraAdd(iv,ch,fs,s?s.value:null); });
+  d.querySelectorAll('[data-exrem]').forEach(b=>b.onclick=()=>pjDocExtraRemover(iv,b.dataset.exrem));
   d.querySelectorAll('[data-eos]').forEach(inp=>inp.oninput=()=>{ const v=inp.value.replace(/\D/g,''); if(v!==inp.value) inp.value=v; });   // só dígitos
   d.querySelectorAll('[data-esalvar]').forEach(b=>b.onclick=()=>{ const ch=b.dataset.esalvar, inp=d.querySelector('[data-elink="'+ch+'"],[data-eos="'+ch+'"]'); pjEtapaValor(iv,ch,inp?inp.value.trim():''); });
   d.querySelectorAll('[data-eaval]').forEach(b=>b.onclick=()=>{ const it=pjPipeItem(b.dataset.eaval); pjAvaliarModal(iv.kind,iv.gid,b.dataset.eaval,(it&&it.nome)||'',b.dataset.ok==='1',()=>pjPipeRefresh(iv)); });
@@ -3793,6 +3810,27 @@ async function pjEtapaAnexar(iv,chave,file,folha){ if(!iv||!file) return;
     const old=data&&data.old_path; if(old){ try{ await sb.storage.from('fotos-campo').remove([old]); }catch(_){} }   // apaga o arquivo anterior
     toast('Documento anexado'); await pjPipeRefresh(iv);
   }catch(e){ try{ await sb.storage.from('fotos-campo').remove([path]); }catch(_){} toast('Erro ao anexar: '+(e.message||e)); }
+}
+// PDFs a mais numa etapa de documento do Encerramento (vários de uma vez); cada um é um novo envio p/ a Qualidade
+async function pjDocExtraAdd(iv,chave,files,folha){ if(!iv||!files||!files.length) return;
+  const pdfs=files.filter(f=>!f.type||f.type==='application/pdf'); if(pdfs.length<files.length) toast('Só PDF — '+(files.length-pdfs.length)+' arquivo(s) ignorado(s)');
+  let ok=0;
+  for(const file of pdfs){
+    if(folha){ const q=await pjFolhaConfere(file,folha); if(q&&!confirm(file.name+': '+q)) continue; }
+    toast('Enviando '+(ok+1)+'/'+pdfs.length+'…');
+    const path='projetos/'+iv.kind+'/'+iv.gid+'/'+chave+'_'+crypto.randomUUID()+'.pdf';
+    try{ const up=await sb.storage.from('fotos-campo').upload(path,file,{contentType:'application/pdf',upsert:true}); if(up.error) throw up.error;
+      const {error}=await sb.rpc('app_proj_doc_extra_add',{p_kind:iv.kind,p_gid:iv.gid,p_chave:chave,p_nome:file.name,p_path:path,p_folha:folha||null}); if(error) throw error;
+      ok++;
+    }catch(e){ try{ await sb.storage.from('fotos-campo').remove([path]); }catch(_){} toast('Erro ao anexar '+file.name+': '+(e.message||e)); break; }
+  }
+  if(ok) toast(ok===1?'PDF anexado':ok+' PDFs anexados'); await pjPipeRefresh(iv);
+}
+async function pjDocExtraRemover(iv,id){ if(!iv||!id||!confirm('Remover este PDF?')) return;
+  try{ const {data:path,error}=await sb.rpc('app_proj_doc_extra_remover',{p_id:id}); if(error) throw error;
+    if(path){ try{ await sb.storage.from('fotos-campo').remove([path]); }catch(_){} }
+    toast('PDF removido'); await pjPipeRefresh(iv);
+  }catch(e){ toast('Erro ao remover: '+(e.message||e)); }
 }
 async function pjEtapaValor(iv,chave,valor){ if(!valor){ toast('Preencha o campo antes de salvar'); return; }
   try{ const {error}=await sb.rpc('app_proj_etapa_enviar',{p_kind:iv.kind,p_gid:iv.gid,p_chave:chave,p_valor:valor}); if(error) throw error;
@@ -4131,7 +4169,7 @@ async function pjRel(id){
   await Promise.all([pjDocsLoad(iv),pjAvancosLoad(iv),pjPipeLoad(iv)]);
   // documentos = etapas de documento do pipeline; no relatório é SÓ ABRIR (anexar fica nas Etapas)
   const docsHtml=pjPipeDocs().map(it=>{ const doc=pjDocsCur[it.chave], ok=!!doc, [sit,cls]=pjEtapaSit(it);
-    const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">📄 <b>${it.nome}</b> <span class="pjest ${cls}">${sit}</span>${doc&&doc.folha?` <span class="pjhint" style="margin:0">· folha ${doc.folha}</span>`:''}</span><span class="pjdocbtns">${ok?`<button class="btn ghost pjmini" data-open="${doc.path}">👁 Abrir</button>`:'<span class="pjhint" style="margin:0">aguarda anexo nas Etapas</span>'}</span></div>`;
+    const row=`<div class="pjdocrow"><span style="flex:1;min-width:0">📄 <b>${it.nome}</b> <span class="pjest ${cls}">${sit}</span>${doc&&doc.folha?` <span class="pjhint" style="margin:0">· folha ${doc.folha}</span>`:''}</span><span class="pjdocbtns">${ok?pjDocsTodos(it.chave).map((x,i,a)=>`<button class="btn ghost pjmini" data-open="${x.path}">👁 Abrir${a.length>1?' '+(i+1):''}</button>`).join(''):'<span class="pjhint" style="margin:0">aguarda anexo nas Etapas</span>'}</span></div>`;
     return (it.chave==='executivo'&&pj3dIsVrp(iv))?row+pj3dRow():row; }).join('');
   // "Gantt" de progresso por atividade. AUDITORIA: o antigo plotava por ts (data de REGISTRO do avanço), não por data de obra; sem cronograma planejado e com lançamento em lote (ex. F02 = 6 avanços em 8 min, 02/10) a linha do tempo colapsava e o eixo repetia a mesma data. Trocado por barra de PROGRESSO (0–100%) + janela de registro como rótulo honesto.
   const _allAv=Object.values(pjAvancosCur).flat();
@@ -4299,7 +4337,7 @@ function pjImprimirPrancha(imgs){ if(!imgs||!imgs.length) return; const w=window
 // renderiza os anexos (PDFs das etapas de documento do pipeline) como páginas de imagem ao FINAL do relatório → sai mesclado num único PDF no "Salvar PDF"
 async function pjRelRenderAnexos(iv){
   const box=document.getElementById('relAnexos'); if(!box) return;
-  const docs=pjPipeDocs().map(it=>({dc:{t:it.chave,n:it.nome},doc:pjDocsCur[it.chave]})).filter(x=>x.doc);
+  const docs=pjPipeDocs().flatMap(it=>{ const t=pjDocsTodos(it.chave); return t.map((doc,i)=>({dc:{t:it.chave,n:it.nome+(t.length>1?' ('+(i+1)+'/'+t.length+')':'')},doc})); });
   if(!docs.length){ box.innerHTML='<p class="relPend">Nenhum documento anexado para incluir ao final. Anexe nas Etapas da intervenção antes da emissão.</p>'; return; }
   box.innerHTML='<p class="relPend" id="relAnexProg">⏳ Renderizando anexos (0/'+docs.length+')… aguarde antes de salvar o PDF.</p>';
   const prog=document.getElementById('relAnexProg'), fbox=document.getElementById('relFolhas');
@@ -4363,7 +4401,7 @@ function pjRelDocHtml(iv){ const t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, p=Math.round(
     }); });
   h+='<div class="relSec"><span class="relNum">4</span> Documentos e anexos</div>';
   pjPipeDocs().forEach(it=>{ const doc=pjDocsCur[it.chave];
-    if(doc) h+='<div style="font-size:12px;margin-top:7px">📄 <b>'+it.nome+'</b> — <span style="color:#0a7d5e;font-weight:700">'+pjEtapaSit(it)[0]+'</span> <span style="color:#777">('+(doc.nome||(doc.path||'').split('/').pop()||'documento')+(doc.folha?' · folha '+doc.folha:'')+')</span></div>';
+    if(doc) h+='<div style="font-size:12px;margin-top:7px">📄 <b>'+it.nome+'</b> — <span style="color:#0a7d5e;font-weight:700">'+pjEtapaSit(it)[0]+'</span> <span style="color:#777">('+pjDocsTodos(it.chave).map(x=>(x.nome||(x.path||'').split('/').pop()||'documento')+(x.folha?' · folha '+x.folha:'')).join('; ')+')</span></div>';
     else h+='<div style="margin-top:7px"><div style="font-size:12px">📄 <b>'+it.nome+'</b></div><div class="relPend">Ainda não anexado — pendente nas Etapas da intervenção. Deve ser anexado antes da emissão final.</div></div>';
   });
   h+='<p class="relPend" style="margin-top:12px">Os anexos (PDF/imagem) são incluídos <b>na íntegra ao final deste documento</b>, cada um começando em nova página.</p>';

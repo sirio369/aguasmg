@@ -2722,6 +2722,18 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     Status `preobra` agora = falta a OS SIGOS.
   - Testado com rollback (11/11/2026, linha 47 / ZA0200): nome "Liberação Transbetim", vistoria "não se aplica" com a aprovação
     inativa, OS SIGOS recusa "não se aplica", lançar a OS abriu a Execução com GASMIG ainda pendente/acionável, desfazer ok.
+- **📎 Vários PDFs por documento do Encerramento (2026-11-18, sw v424, `docs/migracao_proj_doc_extras.sql`).** Relatório de
+  Furo/Solda/Estanqueidade, Rel. de Qualidade da Pavimentação, As built e Certificado de calibração aceitam mais de um PDF.
+  - O **1º PDF** segue em `intervencao_documento` ("Anexar PDF"/"Substituir 1º", sem mudança). Com ele anexado aparece **➕ Mais
+    PDFs** (seleção múltipla) → `app_proj_doc_extra_add(p_kind,p_gid,p_chave,p_nome,p_path,p_folha)` grava em
+    `"13 - projetos_obra".intervencao_documento_extra` (RLS deny-all). **Só etapas `doc` da fase 5**, mesmo ator/escopo/fase aberta
+    do envio normal; As built pede a folha também nos extras.
+  - **Cada PDF a mais é um novo envio** (`proj_etapa_envio`): a etapa volta a "enviado" e a aprovação da Qualidade a "aguardando"
+    (aviso pelo trigger de evento; o evento guarda o arquivo novo). Remover um extra (🗑, `app_proj_doc_extra_remover(p_id)`, devolve o
+    path p/ apagar do Storage) registra evento `removido` e não mexe no status. Depois de aprovado não entra nem sai arquivo.
+  - Leitura: `app_proj_docs_extras_listar` → `pjDocsExtra[chave]`; `pjDocsTodos(chave)` = 1º + extras, usado no relatório da tela
+    (Abrir 1, 2…), na seção 4 do PDF consolidado e nos anexos mesclados no fim (`Nome (1/3)`). `app_proj_docs_listar` não mudou
+    (app em cache segue vendo só o 1º).
 - **🔓 Sem portões de fase (2026-11-18, sw v420, `docs/migracao_proj_sem_portoes.sql`).** Pedido do usuário: tirar as travas que
   impediam o avanço do pipeline do início ao fim.
   - **Toda fase fica aberta desde o início:** `proj_calc` devolve `aberta` = true nas fases 2–5 (e em cada item delas). A Qualidade
