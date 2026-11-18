@@ -3627,12 +3627,14 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 **Gestão — `qsms` (Home › 🧰 Suporte, card 🦺, gate `ME.qsms`):** `ME.qsms` = admin **ou** engrenagem
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
 (`"16 - qsms".qsms_pode`). ⚙️ (admin, no hub) → `qsms_acesso` (`app_qsms_acesso_listar/_set`).
-**Hub `qsms` em categorias (espelha o Almoxarifado, 2026-10-28):** **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
+**Hub `qsms` em categorias (reorganizado em 2026-11-18, sw v428):** **📊 Indicadores** → `sst_bi` (BI QSMS); **🦺 EPI** →
+painel, cesta e EPI por colaborador; **⛑️ SST** → `qsms_form` (**Formulários APR**), Inspeções, ASO, Treinamentos, CIPA, DDS e
+Ocorrências (Inspeções/DDS/Ocorrências = a tela `sst_lanc` travada em um tipo, ver §20). Antes (2026-10-28): **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
 `qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_painel` (Painel de EPI), `qsms_cesta` (Cesta de EPI) e `qsms_epi_col` (EPI
 por colaborador), nessa ordem. Cada
 tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`/`qf`/`qe`; `qsmsPeriodo`/`qsmsFiltros`/
 `qsmsArgs`). Em APR e derivados **a unidade é a atividade** (APR + PT/PET), com **uma verificação por atividade**.
-- **Indicadores** (`qsms_ind`, `qsmsIndInit`/`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida,
+- **Indicadores** (`qsms_ind`) — **removida em 2026-11-18 (sw v428)**: virou a página **APR** do BI QSMS (`sst_bi`, §20). Era: KPIs (atividades, com PT, com PET, com PT/PET impedida,
   leituras de gás fora, com alertas) e verificação (a verificar, conformes, com ressalva, não conformes — **tocar num tile
   abre Formulários já filtrado no mesmo período/consórcio**); atividades por dia, por tipo, por responsável; riscos.
 - **Formulários** (`qsms_form`, `qsmsFormInit`/`qsmsLista`/`qsmsCardHtml`; filtros guardados em `qsmsFF`, sobrevivem ao
@@ -3769,7 +3771,7 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   - Engrenagem ⚙️ `qsms_acesso` ganhou a coluna **Campo** (`app_qsms_campo_set`); quem tem Gestão já lança em campo
     (caixa travada marcada).
 - **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C, sw v329, gate `ME.qsms`):** 6 telas, código `sg*`.
-  - `sst_painel` — `app_sst_painel` (mesmas views do BI): acidentes/ocorrências, inspeções, DDS, produção por responsável e
+  - `sst_painel` — **removida em 2026-11-18 (sw v428)**, o BI QSMS cobre; a RPC `app_sst_painel` segue no banco sem uso. Era: `app_sst_painel` (mesmas views do BI): acidentes/ocorrências, inspeções, DDS, produção por responsável e
     por semana, ASO, treinamentos por tipo, CIPA. Cada número abre a lista certa (NC pendente/vencida, ocorrência a validar
     e ação aberta abrem com 1 ano para trás, porque não dependem do período).
   - `sst_bi` — **BI QSMS dentro do app** (2026-11-18, sw v425, `docs/migracao_sst_bi.sql`; código `sb*`): 7 páginas do
@@ -3794,7 +3796,16 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     (`#sbSegs`) — e **Limpar filtros** (zera tudo, inclusive segmentações; desabilitado sem filtro). Campo com valor fica em negrito;
     sem o contorno azul global de `select` (escopado em `#sst_bi .sbfil`). Cartões `.sbk` (rótulo em cima, valor grande, contexto
     embaixo), tabelas com cabeçalho fixo e linhas zebradas.
-  - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
+    **sw v428:** filtro de período só com as datas (saíram os atalhos); gráficos de meia largura num mosaico de 2 colunas
+    (`sbMosaico` → `.sbmas`, `column-count:2`), sem buraco quando um é mais baixo; cartões no máximo 4 por linha; tabela de
+    Inspeções com **📄 Abrir** (relatório da inspeção na tela Inspeções). **Página APR nova** (os antigos Indicadores da APR):
+    `app_qsms_listar` com o histórico inteiro do consórcio, período e segmentações (tipo de intervenção, responsável, verificação)
+    no aparelho; Área não se aplica (o campo fica desabilitado); KPIs de atividades/PT/PET/impedida/gás/alertas e verificação,
+    atividades por mês pela situação da verificação, por tipo, por responsável, riscos das APRs e a lista de atividades.
+  - `sst_lanc` — **desde sw v428 são 3 botões/telas no hub (Inspeções, DDS, Ocorrências)**: `sgLancAbrir(tipo, id?, volta?)` abre
+    a tela travada num tipo (título/subtítulo de `SG_TELA`, sem abas, carrega só aquele tipo); em Inspeções há o botão
+    **✅ Checklist da inspeção** (`sst_modelo`, que volta para Inspeções). O BI abre direto o relatório de uma inspeção
+    (`sgLancAbrir('inspecao', id, 'sst_bi')`, "Voltar ao BI QSMS"). Antes: abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
     acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com OS + responsável pela
     intervenção e assinatura, e **tratativa de NC** (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
     presença e assinaturas; ocorrência com **validação** (`app_sst_ocorrencia_validar`; acidente exige classificação e
@@ -3807,7 +3818,7 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     (`app_sst_trein_tipo_salvar`) e **sem vínculo** (registro da planilha sem pessoa → vincular ou anular). Editar = novo
     registro (vale o mais recente), não sobrescreve o anterior. XLSX.
   - `sst_cipa` — membros e reuniões (`app_sst_cipa_*`), editar/anular; total de membros sugerido = titulares ativos.
-  - `sst_modelo` — checklist da inspeção (`app_sst_modelo_salvar`): grupo, item, ordem, ativo.
+  - `sst_modelo` — checklist da inspeção (`app_sst_modelo_salvar`): grupo, item, ordem, ativo. Sem botão no hub desde sw v428: abre pelo botão dentro de Inspeções.
 
 **Tabelas (schema `"16 - qsms"`, RLS deny-all, só RPC definer, `qsms_sem_delete` em todas, update → `sst_evento`):**
 `sst_inspecao` (+ `sst_inspecao_item`: C/NC/NA, foto, prazo, `trat_status` pendente/tratada; checklist-modelo em
