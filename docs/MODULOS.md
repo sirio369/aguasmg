@@ -2794,7 +2794,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   VRP/Macromedidor/Registro; sem `situacao_atual`; mostra `erros`/`tipo_mantido`) + **templates .gpkg** lineares/pontuais (`pjImpTemplateGpkg`,
   sql.js, SRID 31983). **⏱️ Prazos das etapas** (`projeto_prazos`; admin/Engenharia editam via `app_proj_prazo_set`, histórico `app_proj_prazo_log`;
   tela mostra prazo_aten+1/prazo_atraso+1). **Resumo**: filtro de ator, 📌 Situação atual (status × tipo + pendências por ator), 🔁 Pipeline no
-  período (`app_proj_eventos`), CSV com coluna Registro. Etapa em correção mostra o motivo da reprovação na linha do documento.
+  período (`app_proj_eventos`; desde 2026-11-18, sw v421, **só os cartões de contagem** — a lista de eventos por dia foi removida a pedido), CSV com coluna Registro. Etapa em correção mostra o motivo da reprovação na linha do documento.
 - **🔁 Pipeline — PR 4: ensaio de reaterro no projeto (2026-11-02, sw v320, `docs/migracao_proj_reaterro.sql`).** Todo **bloco**
   ativo da execução com `Reaterro…` + `Recomposição de pavimento` (Vala N, Câmara da VRP, Caixa do macromedidor, Obra civil,
   Peça N, Obra civil da caixa da interligação; na VCA o bloco é a **raiz**) só libera a Recomposição com o **ensaio de
