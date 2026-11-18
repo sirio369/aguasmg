@@ -6480,17 +6480,37 @@ async function vmAbrir(vrpId, origem){
 function vmExecRender(){
   const S=vmExec; if(!S) return;
   let scr, nav;
-  if(S.step<=5){
-    const flow = S.hdr.origem==='substituicao' ? [vmScr1,vmScrSubAnt,vmScrSubNova,vmScr2,vmScr5] : [vmScr1,vmScr2,vmScr3,vmScr4,vmScr5];
+  if(S.step<=VM_NSTEP){
+    // etapa 5 = Calibração (jusante + ponto crítico) em toda OS; 6 = Finalizar
+    const flow = S.hdr.origem==='substituicao' ? [vmScr1,vmScrSubAnt,vmScrSubNova,vmScr2,vmScrCalib,vmScr5] : [vmScr1,vmScr2,vmScr3,vmScr4,vmScrCalib,vmScr5];
     scr=flow[S.step-1]();
     const back=S.step>1?`<button class="vmbtn sec" id="vmBack">‹ Voltar</button>`:'';
-    nav=`<div class="vmnav">${back}<button class="vmbtn" id="vmNext">${S.step===5?'Concluir OS ›':'Próximo ›'}</button></div>`;
+    nav=`<div class="vmnav">${back}<button class="vmbtn" id="vmNext">${S.step===VM_NSTEP?'Concluir OS ›':'Próximo ›'}</button></div>`;
   }else{
     scr=vmScrResult(); nav=`<div class="vmnav"><button class="vmbtn sec" id="vmBack">‹ Revisar</button><button class="vmbtn" id="vmEnviar">📤 Enviar OS</button></div>`;
   }
   $('#vmExec').innerHTML=vmHeaderHtml()+vmStepbar()+`<div>${scr}</div>`+nav;
   vmWireExec();
+  if(S.step===VM_STEP_CALIB){ const H=S.hdr; vmPcMapa('vmCalibMap', H.lat!=null?{lat:H.lat,lon:H.lon}:null, H.ponto_critico, 'calib'); }
 }
+const VM_NSTEP=6, VM_STEP_CALIB=5;
+// ---- Mapa VRP × ponto crítico (ficha e etapa de Calibração) ----
+const vmPcMaps={};
+function vmPcMapa(elId, vrp, pc, slot){
+  const el=document.getElementById(elId); if(!el||!window.L) return;
+  if(vmPcMaps[slot]){ try{vmPcMaps[slot].remove();}catch(e){} vmPcMaps[slot]=null; }
+  setTimeout(()=>{
+    if(!document.body.contains(el)) return;
+    const m=L.map(el,{zoomControl:true}); vmPcMaps[slot]=m; mapAddCamadaBase(m);
+    const pts=[];
+    if(vrp&&vrp.lat!=null){ L.circleMarker([vrp.lat,vrp.lon],{radius:9,color:'#fff',weight:2,fillColor:'#3a9bde',fillOpacity:.95}).addTo(m).bindTooltip('VRP',{permanent:true,direction:'top',offset:[0,-8]}); pts.push([vrp.lat,vrp.lon]); }
+    if(pc&&pc.lat!=null){ L.circleMarker([pc.lat,pc.lon],{radius:9,color:'#fff',weight:2,fillColor:'#e0533d',fillOpacity:.95}).addTo(m).bindTooltip('Ponto crítico',{permanent:true,direction:'top',offset:[0,-8]}); pts.push([pc.lat,pc.lon]); }
+    if(pts.length===2) L.polyline(pts,{color:'#e0533d',weight:2,dashArray:'6 6',opacity:.8}).addTo(m);
+    if(pts.length>1) m.fitBounds(pts,{padding:[40,40],maxZoom:17}); else if(pts.length) m.setView(pts[0],17); else m.setView([-19.94,-44.1],12);
+    m.invalidateSize();
+  },120);
+}
+function vmPcNav(pc){ return pc&&pc.lat!=null?`<a href="https://www.google.com/maps/dir/?api=1&destination=${pc.lat},${pc.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar até o ponto crítico</a>`:''; }
 function vmHeaderHtml(){
   const H=vmExec.hdr;
   const rows=[
@@ -6499,8 +6519,8 @@ function vmHeaderHtml(){
     ['Diâmetro', H.diametro?('DN '+H.diametro):'—'],
     ['Modelo', H.modelo||'—'],
     ['Pressão projeto', 'mont '+vmN(H.proj_mont)+' / jus '+vmN(H.proj_jus)+' mca'],
-    ['Última ajustada', 'mont '+vmN(H.ult_mont)+' / jus '+vmN(H.ult_jus)+' mca'],
-    ['Ponto crítico', H.ponto_critico_ref||'—']
+    ['Última ajustada', 'mont '+vmN(H.ult_mont)+' / jus '+vmN(H.ult_jus)+' mca'+(H.ult_pc!=null?(' · PC '+vmN(H.ult_pc)):'')],
+    ['Ponto crítico', H.ponto_critico?(('nó '+(H.ponto_critico.no_modelo||'—'))+(H.ponto_critico.dist_m!=null?(' · '+H.ponto_critico.dist_m+' m da VRP'):'')):(H.ponto_critico_ref||'não cadastrado')]
   ];
   return `<div class="vmhd"><div class="os">OS ${H.os_numero}${vmExec.improd?' · improdutivo':' · em execução'}</div>
     <h2>${vEsc(H.num_vrp||'VRP')}</h2>
@@ -6510,7 +6530,7 @@ function vmHeaderHtml(){
     <button class="vmbtn sec" id="vmFichaBtn" style="margin-top:8px;padding:8px">📋 Ficha e histórico da VRP</button></div>`;
 }
 function vmStepbar(){
-  const names = vmExec.hdr.origem==='substituicao' ? ['Chegada','VRP anterior','VRP nova','Pressões','Finalizar'] : ['Chegada','Pressões','Condição','Serviço','Finalizar'];
+  const names = vmExec.hdr.origem==='substituicao' ? ['Chegada','VRP anterior','VRP nova','Pressões','Calibração','Finalizar'] : ['Chegada','Pressões','Condição','Serviço','Calibração','Finalizar'];
   return '<div class="vmstep">'+names.map((n,i)=>{const s=i+1;const c=s===vmExec.step?'on':(s<vmExec.step?'done':'');return `<div class="d ${c}"><div class="b"></div>${n}</div>`;}).join('')+'</div>';
 }
 function vmOptRow(key,opts,cls){
@@ -6617,17 +6637,34 @@ function vmAlvoJus(){ const S=vmExec,H=S.hdr; const v=H.origem==='substituicao'?
 // true quando a jusante final foi informada e ficou diferente do projeto (exige justificativa)
 const VM_JUS_TOL=0.1; // mca — resolução típica do manômetro; abaixo disso não exige justificativa
 function vmJusForaProjeto(){ const a=vmAlvoJus(), f=parseFloat(String(vmExec.ans.fim_jus||'').replace(',','.')); return a!=null && !isNaN(f) && Math.round(Math.abs(f-a)*100)>=Math.round(VM_JUS_TOL*100); }
-function vmScr5(){
-  const S=vmExec,H=S.hdr, alvo=vmAlvoJus();
-  let h=`<h3 style="margin:2px 0">5 · Regulagem / finalização</h3>
-   ${alvo!=null?`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">🎯 Deixe a <b>jusante no setpoint: ${vmN(alvo)} mca</b> (pressão de projeto)${H.origem!=='substituicao'&&H.proj_mont!=null?(' (montante de projeto: '+vmN(H.proj_mont)+' mca)'):''}</div>`
+// 5 · Calibração (toda OS): pressão na jusante da VRP + no ponto crítico (com foto do manômetro).
+// Grava nos mesmos campos de antes: jusante → press_jus_fin, ponto crítico → press_pc_fin, foto → fotos.manometro_pc.
+function vmScrCalib(){
+  const S=vmExec,H=S.hdr, alvo=vmAlvoJus(), pc=H.ponto_critico;
+  let h=`<h3 style="margin:2px 0">5 · Calibração</h3>
+   <p class="sub" style="margin:-2px 0 8px">Registre a pressão na jusante da VRP e a pressão no ponto crítico.</p>
+   ${alvo!=null?`<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok)">🎯 Deixe a <b>jusante no setpoint: ${vmN(alvo)} mca</b> (pressão de projeto)</div>`
      :`<div class="vmpb">Sem pressão de projeto cadastrada para esta VRP — informe a pressão em que ela foi deixada.</div>`}
+   <div class="vmcard"><div class="h">⬇️ Jusante da VRP</div>
+     <div class="vmq" style="margin-bottom:0"><label>Pressão na jusante (mca) <span class="vmreq">*</span></label><input class="vmin" inputmode="decimal" data-in="fim_jus" value="${vEsc(S.ans.fim_jus||'')}"></div>`;
+  if(vmJusForaProjeto()) h+=`<div class="vmq" style="margin-top:8px;margin-bottom:0"><div class="vmpb">⚠️ Jusante (${vmN(S.ans.fim_jus)} mca) diferente do setpoint (${vmN(alvo)} mca).</div><label>Por que não ficou no setpoint de projeto? <span class="vmreq">*</span></label><textarea class="vmin" data-in="fim_jus_motivo" placeholder="Ex.: rede não sustenta, ponto crítico abaixo do mínimo, orientação da gestão…">${vEsc(S.ans.fim_jus_motivo||'')}</textarea></div>`;
+  h+=`</div>
+   <div class="vmcard"><div class="h">📍 Ponto crítico${pc&&pc.no_modelo?(' · nó '+vEsc(pc.no_modelo)):''}</div>
+     ${pc?`<div class="sub" style="margin:-2px 0 6px">${pc.dist_m!=null?(pc.dist_m+' m da VRP · '):''}${vmPcNav(pc)}</div><div id="vmCalibMap" style="height:200px;border-radius:10px;margin-bottom:10px"></div>`
+       :`<div class="vmpb" style="margin-bottom:8px">Ponto crítico ainda não cadastrado para esta VRP — se souber onde fica, registre mesmo assim.</div>`}
+     <div class="vmq"><label>Pressão no ponto crítico (mca) ${pc?'<span class="vmreq">*</span>':''}</label><input class="vmin" inputmode="decimal" data-in="fim_pc" value="${vEsc(S.ans.fim_pc||'')}"></div>
+     <div class="vmq" style="margin-bottom:0"><label>Foto do manômetro no ponto crítico ${pc?'<span class="vmreq">*</span>':''}</label><div class="vmphotos">${vmPhoto('manometro_pc','Manômetro (ponto crítico)')}</div></div>
+   </div>`;
+  return h;
+}
+function vmScr5(){
+  const S=vmExec,H=S.hdr;
+  let h=`<h3 style="margin:2px 0">6 · Finalização</h3>
    <div class="vmref">
      <div class="p"><span>Mont. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_mont" value="${vEsc(S.ans.fim_mont||'')}"></div>
-     <div class="p"><span>Jus. final</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_jus" value="${vEsc(S.ans.fim_jus||'')}"></div>`;
-  if(H.ponto_critico_ref) h+=`<div class="p"><span>Ponto crítico</span><input class="vmin" style="margin-top:4px;text-align:center" inputmode="decimal" data-in="fim_pc" value="${vEsc(S.ans.fim_pc||'')}"></div>`;
-  h+=`</div>`;
-  if(vmJusForaProjeto()) h+=`<div class="vmq" style="margin-top:8px"><div class="vmpb">⚠️ Jusante final (${vmN(S.ans.fim_jus)} mca) diferente do setpoint (${vmN(alvo)} mca).</div><label>Por que não ficou no setpoint de projeto? <span class="vmreq">*</span></label><textarea class="vmin" data-in="fim_jus_motivo" placeholder="Ex.: rede não sustenta, ponto crítico abaixo do mínimo, orientação da gestão…">${vEsc(S.ans.fim_jus_motivo||'')}</textarea></div>`;
+     <div class="p"><span>Jus. (calibração)</span><b style="display:block;margin-top:8px">${vmN(S.ans.fim_jus)}</b></div>
+     <div class="p"><span>Ponto crítico</span><b style="display:block;margin-top:8px">${vmN(S.ans.fim_pc)}</b></div>
+   </div>`;
   h+=`
    <div class="vmq"><label>VRP estabilizada? <span class="vmreq">*</span></label>${vmOptRow('estab',['Sim','Não'])}</div>
    <div class="vmq"><label>Vazamento após o serviço? <span class="vmreq">*</span></label>${vmOptRow('vaz_pos',['Não','Sim'])}</div>
@@ -6670,6 +6707,7 @@ function vmScrResult(){
     <div class="sub">status definido automaticamente pelas respostas do formulário</div>
     <div class="vmsumm"><div class="r"><span>Serviços</span><b style="text-align:right">${S.serv.size?vEsc([...S.serv].join(', ')):'—'}</b></div>
     <div class="r"><span>Mont/jus final</span><b>${vmN(S.ans.fim_mont)} / ${vmN(S.ans.fim_jus)} mca</b></div>
+    <div class="r"><span>Ponto crítico</span><b>${vmN(S.ans.fim_pc)} mca${S.fotos.manometro_pc?' · 📷':''}</b></div>
     <div class="r"><span>Liberada / vaz. após</span><b>${S.ans.liberada||'—'} / ${S.ans.vaz_pos||'—'}</b></div>
     <div style="margin-top:6px"><span style="color:var(--mut)">Pendências geradas:</span>${pend.length?('<ul style="margin:4px 0 0;padding-left:18px">'+pend.map(p=>'<li>'+vEsc(p.descricao)+'</li>').join('')+'</ul>'):' <b>nenhuma</b>'}</div></div>
     ${detHtml}</div>`;
@@ -6687,7 +6725,7 @@ function vmWireExec(){
   const q=id=>el.querySelector(id);
   if(q('#vmNext'))q('#vmNext').onclick=()=>{ if(!vmValid())return; vmExec.step++; window.scrollTo({top:0,behavior:'smooth'}); vmExecRender(); };
   if(q('#vmBack'))q('#vmBack').onclick=()=>{ vmExec.step--; window.scrollTo({top:0,behavior:'smooth'}); vmExecRender(); };
-  if(q('#vmImprod'))q('#vmImprod').onclick=()=>{ if(!vmExec.fotos.ponto_visitado)return toast('Tire a foto do ponto visitado'); vmExec.improd=true; vmExec.step=6; vmExec.status='improdutiva'; window.scrollTo({top:0}); vmExecRender(); };
+  if(q('#vmImprod'))q('#vmImprod').onclick=()=>{ if(!vmExec.fotos.ponto_visitado)return toast('Tire a foto do ponto visitado'); vmExec.improd=true; vmExec.step=VM_NSTEP+1; vmExec.status='improdutiva'; window.scrollTo({top:0}); vmExecRender(); };
   if(q('#vmEnviar'))q('#vmEnviar').onclick=vmEnviar;
   if(q('#vmFichaBtn'))q('#vmFichaBtn').onclick=()=>vmFichaOpen(vmExec.hdr.vrp_id);
 }
@@ -6698,14 +6736,28 @@ function vmValid(){
     if(S.step===2){ if(!Object.keys(S.fotos).some(k=>(k==='vrp_removida'||k.indexOf('vrp_removida_')===0)&&S.fotos[k])){toast('Foto da VRP removida');return false;} return true; }
     if(S.step===3){ if(!String(S.ans.cad_diametro||'').trim()||!String(S.ans.sub_modelo||'').trim()){toast('Informe diâmetro e modelo da nova VRP');return false;} if(!Object.keys(S.fotos).some(k=>(k==='vrp_nova'||k.indexOf('vrp_nova_')===0)&&S.fotos[k])){toast('Foto da VRP nova instalada');return false;} return true; }
     if(S.step===4){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){toast('Informe a pressão encontrada');return false;} } return true; }
-    if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;} return true; }
+    if(S.step===VM_STEP_CALIB) return vmValidCalib();
+    if(S.step===6){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} return true; }
     return true;
   }
   if(S.step===1){ if(!S.ans.localizada||!S.ans.acessivel){toast('Responda localizada e acesso');return false;} if(!S.fotos.geral_antes_ext&&!S.fotos.geral_antes_int){toast('Tire ao menos 1 foto geral');return false;} return true; }
   if(S.step===2){ for(const lado of ['mont','jus']){ if(S.ans['conn_'+lado]==='Sim' && !String(S.ans['val_'+lado]||'').trim()){ toast('Informe a pressão encontrada ('+(lado==='mont'?'montante':'jusante')+')'); return false; } } return true; }
   if(S.step===3){ for(const [k,l] of VM_COND){ if(S.cond[k]==='Intervir' && !String(S.cond['d_'+k]||'').trim()){ toast('Descreva o que intervir em '+l.toLowerCase()); return false; } } return true; }
   if(S.step===4){ if(!S.serv.size){toast('Marque ao menos um serviço executado');return false;} if(S.serv.has('Troca de peça')&&!S.ans.peca){toast('Informe a peça trocada');return false;} if(S.serv.has('Outro')&&!String(S.ans.serv_outro||'').trim()){toast('Descreva o serviço "Outro"');return false;} for(const s of S.serv){ const sl=vmSlug(s); if(!String(S.ans['servd_'+sl]||'').trim()){toast('Descreva o serviço: '+s);return false;} const temFoto=Object.keys(S.fotos).some(k=>(k==='serv_'+sl||k.indexOf('serv_'+sl+'_')===0)&&S.fotos[k]); if(!temFoto){toast('Adicione foto do serviço: '+s);return false;} } return true; }
-  if(S.step===5){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;} if(!S.ans.nec_subst){toast('Responda se necessita substituição');return false;} if(S.ans.nec_subst==='Sim'&&!String(S.ans.subst_desc||'').trim()){toast('Descreva a necessidade de substituição');return false;} return true; }
+  if(S.step===VM_STEP_CALIB) return vmValidCalib();
+  if(S.step===6){ if(!S.ans.estab||!S.ans.vaz_pos||!S.ans.liberada){toast('Complete estabilizada / vazamento / liberada');return false;} if(!S.ans.nec_subst){toast('Responda se necessita substituição');return false;} if(S.ans.nec_subst==='Sim'&&!String(S.ans.subst_desc||'').trim()){toast('Descreva a necessidade de substituição');return false;} return true; }
+  return true;
+}
+// Calibração: jusante sempre obrigatória; ponto crítico (pressão + foto do manômetro) obrigatório quando a VRP tem ponto crítico cadastrado
+// — sem ponto cadastrado é opcional, mas pressão informada exige a foto.
+function vmValidCalib(){
+  const S=vmExec, pc=S.hdr.ponto_critico, num=v=>!isNaN(parseFloat(String(v==null?'':v).replace(',','.')));
+  if(!num(S.ans.fim_jus)){toast('Informe a pressão na jusante da VRP');return false;}
+  if(vmJusForaProjeto()&&!String(S.ans.fim_jus_motivo||'').trim()){toast('Explique por que a jusante não ficou conforme o projeto');return false;}
+  const temPc=String(S.ans.fim_pc||'').trim()!=='';
+  if(pc&&!num(S.ans.fim_pc)){toast('Informe a pressão no ponto crítico');return false;}
+  if(temPc&&!num(S.ans.fim_pc)){toast('Pressão no ponto crítico inválida');return false;}
+  if((pc||temPc)&&!S.fotos.manometro_pc){toast('Tire a foto do manômetro no ponto crítico');return false;}
   return true;
 }
 async function vmUpload(blob,suf){ const path='vrp-os/'+crypto.randomUUID()+'_'+suf; const {error}=await sb.storage.from('fotos-campo').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true}); if(error) throw error; return path; }
@@ -6754,7 +6806,7 @@ async function vmFichaOpen(vrpId){
   catch(e){ f.innerHTML=`<div class="vmfcard"><div class="vmfbody"><div class="banner bad">Erro: ${e.message||e}</div><button class="vmbtn sec" id="vmfX" style="margin-top:10px">Fechar</button></div></div>`; f.querySelector('#vmfX').onclick=()=>f.classList.remove('on'); return; }
   vmFichaData=d;
   const c=d.cadastro||{}, u=d.ultima||{}, prev=d.preventiva||{}, hist=d.historico||[], visitas=d.visitas||[], pend=(d.pendencias||[]);
-  const cad=[['Diâmetro', c.diametro?('DN '+c.diametro):'—'],['Atuação', c.atuacao||'—'],['Proj. montante', vmN(c.pres_max)+' mca'],['Proj. jusante (setpoint)', vmN(c.pres_saida)+' mca'],['Pressão mínima', vmN(c.pres_min)+' mca'],['Cota', c.cota!=null?(c.cota+' m'):'—'],['Modelo', (u&&u.modelo)||'—'],['Controlador', (u&&u.tem_controlador!=null)?(u.tem_controlador?'Sim':'Não'):'—'],['Ponto crítico', (u&&u.ponto_critico_ref)||'—'],['Nó de água', c.cd_no_agua||'—']];
+  const cad=[['Diâmetro', c.diametro?('DN '+c.diametro):'—'],['Atuação', c.atuacao||'—'],['Proj. montante', vmN(c.pres_max)+' mca'],['Proj. jusante (setpoint)', vmN(c.pres_saida)+' mca'],['Pressão mínima', vmN(c.pres_min)+' mca'],['Cota', c.cota!=null?(c.cota+' m'):'—'],['Modelo', (u&&u.modelo)||'—'],['Controlador', (u&&u.tem_controlador!=null)?(u.tem_controlador?'Sim':'Não'):'—'],['Ponto crítico', d.ponto_critico?('nó '+(d.ponto_critico.no_modelo||'—')+(d.ponto_critico.dist_m!=null?(' · '+d.ponto_critico.dist_m+' m da VRP'):'')):((u&&u.ponto_critico_ref)||'não cadastrado')],['Nó de água', c.cd_no_agua||'—']];
   // mescla OS (novo) + visitas primárias (antigo) em ordem cronológica decrescente
   const items=[];
   hist.forEach(o=>items.push({t:'os',d:o.executado_em||o.aberto_em,o}));
@@ -6781,11 +6833,16 @@ async function vmFichaOpen(vrpId){
     <div class="vmfbody">
       ${spHtml}
       <div class="vmfsec">📇 Ficha cadastral</div><div class="vmfgrid">${cad.map(r=>`<div class="vmfkv"><span>${r[0]}</span><b>${vEsc(String(r[1]))}</b></div>`).join('')}</div>
+      <div class="vmfsec">🗺️ VRP × ponto crítico</div>
+      ${d.ponto_critico?'':'<p class="sub" style="margin:0 0 6px">Ponto crítico não cadastrado para esta VRP.</p>'}
+      <div id="vmFichaMap" style="height:240px;border-radius:10px"></div>
+      <div class="sub" style="margin:6px 0 0;display:flex;gap:14px;flex-wrap:wrap"><span><b style="color:#3a9bde">●</b> VRP</span><span><b style="color:#e0533d">●</b> Ponto crítico</span>${d.ponto_critico?`<span style="margin-left:auto">${vmPcNav(d.ponto_critico)}</span>`:''}</div>
       <div class="vmfsec">🚦 Preventiva</div><div class="vmfkv"><span>${prox}</span><b>intervalo ${prev.intervalo||180}d</b></div>
       <div class="vmfsec">🧰 Histórico de serviços <span class="sub" style="margin-left:auto">${items.length} (${hist.length} OS + ${visitas.length} visita)</span></div>${histHtml}
       <div class="vmfsec" style="margin-top:12px">⚠️ Pendências abertas</div>${pendHtml}
     </div></div>`;
   f.querySelector('#vmfX').onclick=()=>f.classList.remove('on');
+  vmPcMapa('vmFichaMap', c.lat!=null?{lat:c.lat,lon:c.lon}:null, d.ponto_critico, 'ficha');
   { const no=f.querySelector('#vmFichaNovaOs'); if(no) no.onclick=()=>{ f.classList.remove('on'); vmProgramar(vrpId, c.num_vrp); }; }
   f.onclick=e=>{ if(e.target===f) f.classList.remove('on'); };
   f.querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmReport(b.dataset.os));
@@ -6833,7 +6890,8 @@ function vmReportHtml(d){
   h+='<div class="relSec"><span class="relNum">4</span>Serviço executado</div><div class="relGrid">'+relWide('Ações',serv.length?serv.join(', '):'—')+(r.peca?relField('Peça trocada',r.peca):'')+'</div>';
   serv.forEach(function(s){ const dd=r['servd_'+vmSlug(s)]; if(dd) h+='<div class="relGrid">'+relWide(s,dd)+'</div>'; });
   if(r.serv_outro&&serv.indexOf('Outro')>=0) h+='<div class="relGrid">'+relWide('Outro (o quê)',r.serv_outro)+'</div>';
-  h+='<div class="relSec"><span class="relNum">5</span>Finalização</div><div class="relGrid">'+relField('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+relField('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+relField('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+relField('Estabilizada',vmBool(d.estabilizada))+relField('Vazamento após',vmBool(d.vazamento_pos))+relField('Liberada',vmBool(d.liberada))+'</div>';
+  h+='<div class="relSec"><span class="relNum">5</span>Calibração</div><div class="relGrid">'+relField('Jusante da VRP',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+relField('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+(r.fim_jus_motivo?relWide('Jusante fora do setpoint — por quê',r.fim_jus_motivo):'')+'</div>';
+  h+='<div class="relSec"><span class="relNum">6</span>Finalização</div><div class="relGrid">'+relField('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+relField('Estabilizada',vmBool(d.estabilizada))+relField('Vazamento após',vmBool(d.vazamento_pos))+relField('Liberada',vmBool(d.liberada))+'</div>';
   const pend=(d.pendencias||[]);
   if(d.origem==='substituicao'){ const a=r.vrp_anterior||{}, nv=r.vrp_nova||{}; const ar=function(v){return v==null||v===''?'—':vEsc(String(v));}; const fld=function(l,va,vb){return relField(l, ar(va)+'  →  '+ar(vb));};
     h+='<div class="relSec">🔁 Substituição — VRP anterior → nova</div>'+(nv.motivo?('<div class="relPend">Motivo: '+vEsc(nv.motivo)+'</div>'):'')+'<div class="relGrid">'
@@ -6850,7 +6908,7 @@ function vmReportHtml(d){
   serv.forEach(function(s){ const sl=vmSlug(s); const ks=Object.keys(fotos).filter(k=>(k==='serv_'+sl||k.indexOf('serv_'+sl+'_')===0)&&fotos[k]); ks.forEach(function(k,i){ servFotos.push([s+(ks.length>1?(' '+(i+1)):''),fotos[k]]); }); });
   const legKeys=Object.keys(fotos).filter(k=>(k==='servico'||k.indexOf('servico_')===0)&&fotos[k]);  // compat. OSs antigas
   legKeys.forEach(function(k,i){ servFotos.push(['Serviço'+(legKeys.length>1?(' '+(i+1)):''),fotos[k]]); });
-  const fArr=[['Geral antes — externo',fotos.geral_antes_ext],['Geral antes — interno',fotos.geral_antes_int]].concat(servFotos).concat([['Geral depois — interno',fotos.geral_depois_int],['Geral depois — externo',fotos.geral_depois_ext],['Ponto visitado',fotos.ponto_visitado]]);
+  const fArr=[['Geral antes — externo',fotos.geral_antes_ext],['Geral antes — interno',fotos.geral_antes_int]].concat(servFotos).concat([['Manômetro — ponto crítico',fotos.manometro_pc],['Geral depois — interno',fotos.geral_depois_int],['Geral depois — externo',fotos.geral_depois_ext],['Ponto visitado',fotos.ponto_visitado]]);
   h+='<div class="relSec">Fotos</div>'+relFotos(fArr);
   h+='</div><div class="relFoot"><span>AcquaHub · relatório gerado do banco</span><span>'+(d.os_numero||'')+(d.os_sigos?(' · SIGOS '+d.os_sigos):'')+'</span></div>';
   return h;
@@ -7040,8 +7098,10 @@ async function vmOsView(osId){
   h+=vmDsec('4','Serviço')+kv('Ações',serv.length?serv.join(', '):'—')+(r.peca?kv('Peça trocada',r.peca):'');
   serv.forEach(s=>{ const dd=r['servd_'+vmSlug(s)]; if(dd) h+=kv(s,dd); });
   if(r.serv_outro&&serv.indexOf('Outro')>=0) h+=kv('Outro (o quê)',r.serv_outro);
-  h+=vmDsec('5','Finalização')+kv('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+kv('Jus. final',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+kv('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—')+kv('Estabilizada',vmBool(d.estabilizada))+kv('Vazamento após',vmBool(d.vazamento_pos))+kv('Liberada',vmBool(d.liberada));
+  h+=vmDsec('5','Calibração')+kv('Jusante da VRP',d.press_jus_fin!=null?(d.press_jus_fin+' mca'):'—')+kv('Ponto crítico',d.press_pc_fin!=null?(d.press_pc_fin+' mca'):'—');
   if(r.fim_jus_motivo) h+=kv('Jusante fora do setpoint — por quê',r.fim_jus_motivo);
+  if((d.fotos||{}).manometro_pc) h+=`<div class="vmdkv"><span>Foto do manômetro (ponto crítico)</span><a href="${fotoURL(d.fotos.manometro_pc)}" target="_blank" style="color:var(--acc);font-weight:600">ver foto ›</a></div>`;
+  h+=vmDsec('6','Finalização')+kv('Mont. final',d.press_mont_fin!=null?(d.press_mont_fin+' mca'):'—')+kv('Estabilizada',vmBool(d.estabilizada))+kv('Vazamento após',vmBool(d.vazamento_pos))+kv('Liberada',vmBool(d.liberada));
   if(d.obs) h+=kv('Observação',d.obs);
   if(d.origem==='substituicao'){ const a=r.vrp_anterior||{}, nv=r.vrp_nova||{}; const ar=v=>v==null||v===''?'—':String(v); const fk=(l,va,vb)=>kv(l, ar(va)+' → '+ar(vb));
     h+=vmDsec('🔁','Substituição (anterior → nova)',true)+(nv.motivo?kv('Motivo',nv.motivo):'')
