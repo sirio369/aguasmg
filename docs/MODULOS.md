@@ -4438,7 +4438,7 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
 
-### 21.7 Logística reversa de HD (`hd_caixas`) · `docs/migracao_hd_caixas.sql` (2026-11-18, sw v415)
+### 21.7 Logística reversa de HD (`hd_caixas` › `hdcx_cad` · `hdcx_mov` · `hdcx_bi`) · `docs/migracao_hd_caixas.sql` (2026-11-18, sw v415; telas separadas + Análise na v416)
 
 Controle das **caixas de hidrômetros** que a COPASA entrega aos consórcios para a substituição de HD. Card **📦 Logística reversa de HD**
 no Auxiliar de Programação › 🧾 Serviços comerciais; gate `aux_acesso`/admin (front `hxInit`, banco `sigos_pode_ver`).
@@ -4449,12 +4449,20 @@ no Auxiliar de Programação › 🧾 Serviços comerciais; gate `aux_acesso`/ad
 - **Fluxo:** `disponivel` (cadastrada = **pendente de retirada**) → `em_execucao` (**vinculada** a um responsável = retirada) →
   `devolvida` (o **gestor desvincula** = registra a devolução, com observação opcional). Não há passo intermediário de "devolução pendente";
   caixa devolvida não volta para o ciclo. Corrigir/excluir só enquanto `disponivel`.
-- **Tela:** cards Pendentes de retirada / Em execução / Devolvidas / Total (com nº de HDs, clicáveis como filtro), filtros consórcio + pessoa + busca
-  (nº da caixa ou nº do HD), abas **Caixas** (tabela com seleção em lote → "Vincular N a um responsável" / "Registrar devolução de N"; ações por linha)
-  e **Por pessoa** (em execução, HDs em execução, devolvidas e caixa mais antiga em execução, por responsável × consórcio; clique filtra as caixas dela),
-  **➕ Cadastrar caixas** (uma a uma ou colando do Excel `Nº · HD inicial · HD final` — tab, `;` ou `,`; cabeçalho e linhas incompletas são ignorados;
-  repetidas na lista e já cadastradas ficam de fora, com aviso) e **⬇️ Exportar** CSV do filtro. Responsável no vínculo: lista de perfis ativos,
-  primeiro os do consórcio da caixa.
+- **Telas (reorganizadas em 2026-11-18, sw v416, a pedido do usuário):**
+  - **`hd_caixas` = tela inicial do módulo:** quadro da situação atual por consórcio (pendentes / em execução / devolvidas / total, com nº de HDs) e 3 botões.
+  - **`hdcx_cad` Cadastro de caixas:** consórcio + uma a uma ou colando do Excel `Nº · HD inicial · HD final` (tab, `;` ou `,`; cabeçalho e linhas
+    incompletas ignorados; repetidas na lista e já cadastradas ficam de fora, com aviso) + lista das 20 últimas cadastradas.
+  - **`hdcx_mov` Vinculação e devolução:** filtros de situação, consórcio, pessoa e busca (nº da caixa ou nº do HD); cards clicáveis; abas **Caixas**
+    (seleção em lote → "Vincular N a um responsável" / "Registrar devolução de N"; ações por linha; ✏️ corrigir/excluir só pendente) e **Por pessoa**
+    (em execução, HDs, devolvidas, caixa mais antiga; clique filtra as caixas dela); export CSV. Responsável: perfis ativos, primeiro os do consórcio da caixa.
+  - **`hdcx_bi` Análise:** filtros de período (30/90 dias, 12 meses, todo, datas), consórcio e agrupamento (dia/semana/mês; automático pelo tamanho do período).
+    Indicadores (recebidas, vinculadas e devolvidas no período com HDs; tempo médio com a caixa; em execução hoje e há > 30 dias; pendentes hoje),
+    **histórico no tempo** (colunas recebidas × vinculadas × devolvidas), **caixas em execução** no fim de cada período (linha), **quem mais recebeu**,
+    **quem mais devolveu**, **tempo médio por pessoa**, **em execução por tempo** (0–7 / 8–15 / 16–30 / > 30 dias), tabela por pessoa e lista de
+    movimentações (vinculações + devoluções) com export CSV. Tudo calculado no app sobre `app_hdcx_listar` (datas `cad_em`/`vinc_em`/`dev_em`, cada caixa
+    é vinculada e devolvida uma vez só) — sem RPC nova. Gráficos em SVG próprio com tooltip (`[data-tip]`); cores por entidade em `--hxc1/2/3`
+    (azul = recebida/pendente, laranja = vinculada/em execução, verde-água = devolvida), com variante escura.
 - **Banco** (schema `12 - retaguarda`, app-only, RLS sem policy): `hd_caixa` (status, `responsavel`, `vinculado_em/_por`, `devolvido_em/_por`,
   `devolucao_obs`, `criado_em/_por`; `unique(consorcio,numero)`) + `hd_caixa_evento` (log cadastro/vinculo/devolucao/edicao).
   RPCs: `app_hdcx_listar()`, `app_hdcx_pessoas()`, `app_hdcx_cadastrar(p_consorcio, p_itens jsonb [{num,ini,fim,obs}])` → `{ins, dup[]}` (até 5.000),
