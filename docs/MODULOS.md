@@ -3293,8 +3293,9 @@ Gestão (admin **ou** `perfil.vrp_gestao_acesso`, via `vrp_pode_gestao`) — `ap
 → o usuário atribuído; retorno/pendência → a gestão). `app_me` expõe `vrp_gestao`.
 
 **Frontend Campo (`index.html`, funções `vm*`):** hub `vmHub`; `vmCampoInit` (Minhas OS via
-`app_vrp_os_minhas` + "Nova OS corretiva" → `vmNovaPicker` reusa `app_vrp_listar`); wizard de 5 telas
-(`vmExecRender`/`vmScr1..5`: Chegada→Pressões→Condição→Serviço→Finalização) sobre o cabeçalho autofill,
+`app_vrp_os_minhas` + "Nova OS corretiva" → `vmNovaPicker` reusa `app_vrp_listar`); wizard de 6 telas
+(`vmExecRender`: Chegada→Pressões→Condição→Serviço→**Calibração**→Finalização; substituição: Chegada→VRP anterior→VRP
+nova→Pressões→**Calibração**→Finalização; `VM_NSTEP=6`, `VM_STEP_CALIB=5`) sobre o cabeçalho autofill,
 com botões OK/Intervir/Não verificado, campos condicionais, pendências automáticas e sugestão de status;
 fotos via `comprimir`+`vmUpload` (bucket `fotos-campo` prefixo `vrp-os/`), GPS global `gps`; conclusão
 `vmEnviar`→`app_vrp_os_concluir`. **Ficha da VRP** (`vmFichaOpen`, overlay `#vmFicha`) e **relatório PDF**
@@ -3307,6 +3308,21 @@ nova) + o montante de projeto como referência. Na tela Pressões o card de jusa
 obrigatória `fim_jus_motivo` (vai no `respostas` jsonb, sem mudança de banco; é descartada no envio se a jusante
 voltou p/ dentro da tolerância) e ela aparece no resumo. O `onchange` de `fim_jus` só re-renderiza quando o aviso
 aparece/some (não perde o foco ao tocar no próximo campo). O setpoint é a **pressão de projeto** (decisão confirmada em 2026-10-23); `pres_saida_campo` ("Jusante em campo") não é usada aqui.
+**Ponto crítico × VRP + etapa de Calibração (2026-11-18, sw v418, `docs/migracao_vrp_ponto_critico.sql` — aplicada):**
+tabela `"2 - infra_agua".vrp_ponto_critico` (1:1 com `vrps`: `vrp_id` PK/FK, `no_modelo` = nó J-xxxx do modelo,
+`geom` Point 31983, `fonte`; RLS sem policy, só via RPC). Carga inicial: **101 VRPs de Betim** do modelo hidráulico
+(`MH_ZA0200_Resumo_Atualizado.gpkg`, camada `pontos_criticos`, só localização + vínculo — pressões/setpoints do modelo
+**não** foram carregados); VRPs em par (ex.: VRP1456982/83) têm o mesmo ponto. Sem ponto: VRP1684349, VRP1686884,
+VRP1620847, VRP1620852, VRP1447579/80 (não opera/reserva) e todas as de Contagem. Helper `vrp_pc_json(vrp_id)` (sem grant)
+→ `{no_modelo,lat,lon,dist_m}`, devolvido como `ponto_critico` por `app_vrp_ficha` e `app_vrp_os_header` (este também
+passou a devolver `ult_pc`). **Ficha:** seção 🗺️ VRP × ponto crítico com mapa (`vmPcMapa`, VRP azul, PC vermelho, linha
+tracejada) + 🧭 navegar; a linha "Ponto crítico" da grade mostra o nó e a distância. **OS — tela 5 · Calibração
+(`vmScrCalib`, toda OS):** pressão na jusante (obrigatória → `press_jus_fin`/`fim_jus`, com a justificativa de setpoint que
+antes ficava na Finalização) + pressão no ponto crítico (`press_pc_fin`/`fim_pc`) + **foto do manômetro no ponto crítico**
+(`fotos.manometro_pc`), com mini-mapa e navegação. PC + foto são obrigatórios quando a VRP tem ponto cadastrado; sem ponto
+é opcional, mas pressão informada exige a foto (`vmValidCalib`). A Finalização ficou com montante final + estabilizada/
+vazamento/liberada/substituição. Relatório PDF e tela da OS ganharam a seção "5 · Calibração" (foto do manômetro no PDF).
+Sem mudança no `app_vrp_os_concluir` (mesmos campos/jsonb).
 **Pressão de projeto de Betim (2026-10-29):** carregada da planilha do projeto hidráulico (`VRP_SANDER_ENVIADO.xlsx`,
 81 VRPs da ZA0200, casadas por `cd_no_agua`): Pressão de Entrada → `pres_max` (montante de projeto), Pressão de Saída →
 `pres_saida` (jusante = setpoint) e Diâmetro da válvula → `diametro`. 67 valores substituídos + 13 preenchidos (1 já igual);
