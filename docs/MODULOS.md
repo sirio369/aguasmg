@@ -4807,3 +4807,18 @@ texto `$a$`/`$b$` fazem o MCP do Supabase falhar sem mensagem; use `$xa$`/`$xb$`
 helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
 `app_rh_analise` (definer, só `authenticated`; recriada com o parâmetro de área em `docs/migracao_rh_analise_area.sql`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
 inconsistência (sem intervalo 136, HE > 2h 94, falta 55, atraso 55, batida ímpar 18, descanso < 11h 13, falta após desligamento 2).
+
+## 23. BI de Suprimentos + carga direta dos relatórios do SIENGE — `docs/migracao_sup_bi.sql` (2026-11-19, **PR-A: só banco**)
+
+Decisão da usuária (19/11/2026): o Power BI deixa de existir; todo BI vira tela do AcquaHub e os relatórios externos são carregados direto no app.
+Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabelas/views novas, nada do app atual muda); a tela de carga (PR-B) e as páginas do BI (PR-C) vêm depois.
+
+- **Regra de substituição (decidida pela usuária):** o relatório novo **substitui** o anterior. Painel de Compras e Vinculados substituem tudo; Mapa de Cotações (1 arquivo por obra) substitui só a obra que veio no arquivo. Nada é apagado até o arquivo novo chegar inteiro (`app_sup_carga_finalizar` troca numa transação). Arquivo sem linha das obras 430/440 é recusado e o banco fica como estava. Mesmo arquivo (sha256) só gera aviso.
+- **Escopo:** só obras **430** (ZA1004 · Águas Integradas) e **440** (ZA0200 · Eficiência Hídrica).
+- **Fluxo (o app lê o .xlsx no aparelho, o banco recebe linhas normalizadas em lotes):** `app_sup_carga_iniciar(tipo, nome, sha256)` → `app_sup_carga_lote(carga, linhas jsonb)` (N vezes) → `app_sup_carga_finalizar(carga, lidas, fora)`; erro → `app_sup_carga_falha`. Histórico em `app_sup_cargas_listar` (log `sup_carga`, nunca é apagado por falha de leitura).
+- **Tabelas (app-only, RLS sem policy), schema `"9 - suprimentos"`:** `sup_carga`, `sup_painel_linha` (41 colunas do Painel, só as usadas), `sup_mapa_linha` (cotação × item × fornecedor, já "desdobrado" em 6 propostas), `sup_cotped_linha` (data da cotação de cada pedido).
+- **Views (mesmas colunas e regras do modelo do Power BI):** `sup_bi_solicitacoes` (estágio do funil, backlog, aging/urgência, leads, fila do comprador, valor estimado), `sup_bi_cotacoes_itens`, `sup_bi_preco_ref`. Regras portadas: exclui SC Cancelada, item Reprovado e Pedido Cancelado; "Tem cotação" = obra + insumo normalizado (`sup_norm` = `fnNorm`); preço de referência = menor proposta ÷ qtd da cotação mais recente; valor estimado só até R$ 10 mi; valor evitado só com 2+ fornecedores e menor proposta ≤ R$ 10 mi. "Hoje" = BRT (`sup_bi_hoje()`; `set app.sup_hoje='AAAA-MM-DD'` fixa a data para conferir números antigos).
+- **Tela do BI:** `app_sup_bi()` devolve as linhas das views (mesmo desenho do `app_sst_bi`) para o app calcular as medidas.
+- **Acesso:** colunas novas `perfil.sup_bi_acesso` (vê o BI) e `perfil.sup_carga_acesso` (sobe relatórios); admin tem os dois. Quem tem cada acesso ainda precisa ser definido (gear no app no PR-B).
+- **Validação:** leitores em JS (porta do Power Query) + SQL testados em PostgreSQL (PGlite) com os arquivos de 16/11/2026, `app.sup_hoje='2026-11-16'`: **2.265 linhas (ZA1004 1.004 / ZA0200 1.261) · 518 SCs · 1.352 em aberto · 666 críticos · R$ 2.326.438,24 faturado (228 NFs) · 382 cotações · 1.826 itens cotados** — todos iguais ao Power BI validado naquele dia. Testes de substituição: recarregar a Betim não mexe na Contagem; Painel repetido não duplica; arquivo vazio não altera nada; sem permissão é recusado.
+
