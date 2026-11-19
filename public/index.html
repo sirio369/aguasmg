@@ -14372,18 +14372,40 @@ function segPendencias(){ const t=segD.tipo, a=segD.atividade, r=segD.resp, P=[]
 function segAtualizar(soTela){ if(!segD)return; if(soTela!==true) segDraftSave();
   if(segD.tipo==='PET'){ const q=$('#segQtd'); if(q){ const n=new Set(segD.pes.filter(p=>['autorizado','vigia','supervisor'].includes(p.papel)).map(p=>p.pessoa_uuid||String(p.nome).toLowerCase())).size; q.textContent='Quantidade de trabalhadores: '+n; } }
   const {P,B}=segPendencias(), er=$('#segErros'), bt=$('#segBtns'); if(!er||!bt)return;
-  er.innerHTML=(B.length?`<div class="segerr"><b>⛔ ${segD.tipo==='APR'?'A APR não pode ser emitida':segD.tipo==='PET'?'Entrada impedida':'Trabalho em altura impedido'}:</b><ul style="margin:4px 0 0 18px;padding:0">${B.map(x=>'<li>'+segH(x)+'</li>').join('')}</ul></div>`:'')
+  // Só reescreve o HTML quando o conteúdo muda: o GPS chama esta função a cada leitura (no iPhone, várias por segundo)
+  // e recriar o botão no meio do toque fazia o clique se perder (2026-11-19, "botão azul que não responde").
+  const erH=(B.length?`<div class="segerr"><b>⛔ ${segD.tipo==='APR'?'A APR não pode ser emitida':segD.tipo==='PET'?'Entrada impedida':'Trabalho em altura impedido'}:</b><ul style="margin:4px 0 0 18px;padding:0">${B.map(x=>'<li>'+segH(x)+'</li>').join('')}</ul></div>`:'')
     +(P.length?`<div class="segerr" style="background:var(--warn-bg);color:var(--warn)"><b>Falta preencher (${P.length}):</b><ul style="margin:4px 0 0 18px;padding:0">${P.slice(0,8).map(x=>'<li>'+segH(x)+'</li>').join('')}${P.length>8?'<li>…</li>':''}</ul></div>`:'');
-  const t=segD.tipo;
-  bt.innerHTML=`<button class="btn" id="segEmitir" ${P.length||B.length?'disabled':''}>Emitir ${t}</button>`
+  if(er._h!==erH){ er.innerHTML=erH; er._h=erH; }
+  if(segEnviando) return;   // emissão em andamento: não recria o botão (ficaria habilitado de novo)
+  const t=segD.tipo, motivo=P.length?('Falta: '+P[0]+(P.length>1?' (e mais '+(P.length-1)+')':'')):B.length?('Bloqueado: '+B[0]):'';
+  // o botão nunca fica "disabled": tocar com pendência mostra o motivo e registra a tentativa (segEmitir)
+  const btH=`<button class="btn" id="segEmitir" ${motivo?'aria-disabled="true" style="opacity:.45"':''}>Emitir ${t}</button>`
+    +(motivo?`<div id="segMotivo" class="sub" style="margin:6px 2px 0;color:var(--bad);font-size:13px">⚠️ ${segH(motivo)}</div>`:'')
     +(t!=='APR'&&B.length&&!P.length?`<button class="btn ghost" id="segImpedir" style="color:var(--bad)">Registrar ${t} impedida</button>`:'')
     +'<button class="btn ghost" id="segSair" style="margin-top:8px">Salvar rascunho e sair</button>';
+  if(bt._h===btH) return; bt.innerHTML=btH; bt._h=btH;
   const em=$('#segEmitir'); if(em) em.onclick=()=>segEmitir('emitida');
   const im=$('#segImpedir'); if(im) im.onclick=()=>{ if(im.dataset.ok!=='1'){ im.dataset.ok='1'; im.textContent='Toque de novo p/ registrar como impedida'; return; } segEmitir('impedida'); };
   $('#segSair').onclick=()=>{ segDraftSave(); segD=null; irPara('seg'); }; }
-async function segEmitir(status){ const d=segD; if(!d)return; const {P,B}=segPendencias();
-  if(P.length) return toast('Falta: '+P[0]); if(status!=='impedida'&&B.length) return toast('Bloqueado: '+B[0]);
-  const btn=$('#segEmitir'); if(btn) btn.disabled=true;
+// registro de cada toque em Emitir (diagnóstico): vai direto ao servidor, sem fila; offline ou erro = ignora
+let segEnviando=false;
+function segTentativa(d,status,resultado,P,B,erro){ try{ if(!navigator.onLine||!d) return;
+  sb.rpc('app_seg_tentativa',{p_tipo:d.tipo,p_status:status,p_resultado:resultado,p_falta:(P||[]).slice(0,30),p_bloqueio:(B||[]).slice(0,30),
+    p_precisao:gps?Math.round(gps.acc*10)/10:null,p_erro:erro?String(erro).slice(0,500):null,p_versao:SEG_APP_VER,p_dispositivo:navigator.userAgent.slice(0,200)})
+    .then(()=>{},()=>{}); }catch(e){} }
+const SEG_APP_VER='coleta-v436';
+async function segEmitir(status){ const d=segD; if(!d||segEnviando)return; const {P,B}=segPendencias();
+  const barrou=P.length?'falta':(status!=='impedida'&&B.length)?'bloqueio':'';
+  if(barrou){ segTentativa(d,status,barrou,P,B);
+    const er=$('#segErros'); if(er&&er.firstElementChild){ er.scrollIntoView({behavior:'smooth',block:'center'}); er.firstElementChild.animate&&er.firstElementChild.animate([{transform:'scale(1)'},{transform:'scale(1.03)'},{transform:'scale(1)'}],{duration:450}); }
+    return toast(barrou==='falta'?'Falta: '+P[0]:'Bloqueado: '+B[0]); }
+  segTentativa(d,status,'enviando',P,B);
+  segEnviando=true; const btn=$('#segEmitir'); if(btn){ btn.disabled=true; btn.textContent='Emitindo…'; }
+  try{ await segEmitirEnviar(d,status); }
+  catch(e){ segTentativa(d,status,'erro',P,B,(e&&e.message)||e); toast('Não foi possível emitir: '+((e&&e.message)||e)); }
+  finally{ segEnviando=false; if(segD===d){ const bt=$('#segBtns'); if(bt) bt._h=null; segAtualizar(true); } } }
+async function segEmitirEnviar(d,status){
   const agora=new Date().toISOString(), a=d.atividade, L1=a.local||{};
   const atividade={id:a.id,os_sigos:a.os_sigos||null,tipo_intervencao:a.tipo_intervencao,descricao:a.descricao,
     consorcio:L1.consorcio||a.consorcio||null,lat:a.nova?gps.lat:a.lat,lon:a.nova?gps.lon:a.lon,precisao:a.nova?Math.round(gps.acc*10)/10:a.precisao,iniciada_em:a.nova?agora:a.iniciada_em,dispositivo:navigator.userAgent.slice(0,100)};
@@ -14407,7 +14429,7 @@ async function segEmitir(status){ const d=segD; if(!d)return; const {P,B}=segPen
     pes:pesDoc.map(p=>({papel:p.papel,pessoa_uuid:p.pessoa_uuid||null,nome:String(p.nome).trim(),documento:p.documento||'',funcao:p.funcao||'',sig:p.sig||null,apr:!!p.apr,assinado_em:p.assinado_em||null})),
     med:med.map(m=>Object.assign({fase:'entrada'},m)),fotos:fotosUrl,eventos:[],emitido_em:agora,lat:form.lat,lon:form.lon,salvo_em:agora,usuario_nome:segEu().nome};
   const ok=await segEnviar(item,'✓ '+d.tipo+(status==='impedida'?' registrada como impedida':' emitida'));
-  if(!ok){ if(btn) btn.disabled=false; return; }
+  if(!ok) return;
   try{ await segDocPut(doc); }catch(e){}
   clearTimeout(segDraftT); try{ await segDraftDel(); }catch(e){}
   segD=null; irPara('seg');

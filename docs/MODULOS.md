@@ -3708,6 +3708,18 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
 - Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
   foram testadas com rollback E2E (§4 do CLAUDE.md).
+- **Botão Emitir × GPS** (2026-11-19, sw v436): `segOnGps` chama `segAtualizar(true)` a cada leitura do GPS (no iPhone,
+  várias por segundo). Até a v435 isso recriava o HTML de `#segBtns` toda vez, e o toque que começava num botão
+  terminava em outro: **"Emitir" azul que não responde** (caso kesse.lopes, 19/11 — nenhuma chamada chegou ao
+  servidor; reproduzido com GPS a 150 ms: 10/10 toques perdidos). Agora `segAtualizar` só reescreve `#segErros`/
+  `#segBtns` quando o HTML muda (`el._h`) e não mexe nos botões durante o envio (`segEnviando`). **Não volte a
+  recriar o botão a cada chamada.** O botão também não usa mais `disabled` com pendência: fica apagado
+  (`aria-disabled`), mostra "⚠️ Falta: …" logo abaixo e, ao tocar, rola até a caixa de pendências. Erro durante a
+  montagem do envio vira toast e libera o botão (antes ficava travado).
+- **Registro de tentativas** (`app_seg_tentativa` → `"16 - qsms".qsms_tentativa`, `docs/migracao_seg_tentativa.sql`):
+  cada toque em Emitir grava resultado `falta`/`bloqueio`/`enviando`/`erro` + pendências + precisão do GPS + versão do
+  app + aparelho. A chamada vai direto, sem fila; offline ou erro, ela é ignorada. Serve para responder "fulano tentou e não conseguiu".
+  Consulta pronta no fim do arquivo SQL. A tabela não tem a trava de "nada pode ser apagado" (é diagnóstico).
 
 ## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (🚧 Em desenvolvimento, admin-only) — `docs/migracao_avisos.sql` + `docs/migracao_avisos_dinamicos.sql`
 
