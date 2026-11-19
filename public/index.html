@@ -4586,7 +4586,7 @@ async function pjRelPdf(iv){ if(!iv)return;
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
   pjFolhaCss(); pjRelPranchas=[];
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pjRelDocHtml(iv)+'</div><div id="relFolhas"></div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(pjRelDocHtml(iv),iv.cons)+'</div><div id="relFolhas"></div>';
   ov.style.display='block';
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   const pb=document.getElementById('relPrint'); if(pb) pb.onclick=()=>window.print();
@@ -5018,6 +5018,10 @@ function resumo(p){
 const REL_CONS={ZA1004:'Consórcio Águas Integradas · Contagem/MG', ZA0200:'Consórcio Eficiência Hídrica · Betim/MG'};
 const CONSORCIO_NOME={ZA1004:'Águas Integradas', ZA0200:'Eficiência Hídrica'}; // grupo econômico (nome curto do consórcio)
 const REL_ST={pendente:'Pendente — aguardando instalação',instalado:'Instalado',remocao_autorizada:'Instalado — remoção autorizada',removido:'Removido — dados pendentes',concluido:'Concluído'};
+// logo do consórcio no cabeçalho dos relatórios impressos: Águas Integradas (CAI/ZA1004) e/ou Eficiência Hídrica (CEH/ZA0200); sem consórcio reconhecido, não põe nada
+function relLogoKey(s){ const t=String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase(), r=[]; if(/AGUAS|\bCAI\b|ZA1004/.test(t)) r.push('ai'); if(/EFICI|\bCEH\b|ZA0200/.test(t)) r.push('eh'); return r; }
+function relLogoHtml(...cons){ const ks=[...new Set(cons.flat().flatMap(relLogoKey))]; return ks.length?'<span class="relLogos">'+ks.map(k=>k==='ai'?'<img src="./logo-aguas-integradas.png" alt="Consórcio Águas Integradas"/>':'<img src="./logo-eficiencia-hidrica.png" alt="Consórcio Eficiência Hídrica"/>').join('')+'</span>':''; }
+function relComLogo(html,...cons){ const l=relLogoHtml(...cons); return l?String(html).replace('<div class="relBadge"',()=>l+'<div class="relBadge"'):html; }
 const REL_CSS=`
 #relatorio{position:fixed;inset:0;background:#e5e7eb;overflow:auto;z-index:9999;display:none}
 #relToolbar{position:sticky;top:0;display:flex;gap:8px;padding:10px;background:#111;z-index:2}
@@ -5027,6 +5031,7 @@ const REL_CSS=`
 .relTop h1{font-size:18px;margin:0;line-height:1.2}
 .relTop .sub{color:#cdeee2;font-size:12px;margin-top:3px}
 .relBadge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap;background:#fff;color:#0a7d5e}
+.relLogos{margin-left:auto;display:flex;gap:8px;align-items:center;background:#fff;border-radius:6px;padding:5px 10px}.relLogos img{height:30px;width:auto;display:block}
 .relBody{padding:16px 30px 0}
 .relSec{margin-top:18px;padding-bottom:5px;border-bottom:2px solid #0a7d5e;font-weight:700;color:#0a7d5e;font-size:12px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center}
 .relNum{display:inline-flex;width:19px;height:19px;border-radius:50%;background:#0a7d5e;color:#fff;font-size:11px;align-items:center;justify-content:center;margin-right:8px;flex:0 0 auto}
@@ -5062,7 +5067,7 @@ const REL_CSS=`
   #relatorio{position:absolute;left:0;top:0;width:100%;background:#fff;overflow:visible}
   #relToolbar{display:none!important}
   #relDoc{box-shadow:none!important;margin:0!important;max-width:none!important}
-  .relTop,.relBadge,.relNum,.relCard,.relCardV{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .relTop,.relBadge,.relLogos,.relNum,.relCard,.relCardV{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .relSec,.relPhotos figure,.relMapWrap,.relCards,.relVaz,svg{break-inside:avoid}
 }`;
 function relFmtData(s){ if(!s) return '—'; try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } }
@@ -5127,7 +5132,7 @@ function emitirRelatorio(p){
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio');
   if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relDocHtml(p)+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(relDocHtml(p),p.consorcio)+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
@@ -6616,7 +6621,7 @@ if($('#vrpXls')) $('#vrpXls').addEventListener('click',vrpExportarXlsx);
 function vrpRelatorio(p,u){
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+vrpRelHtml(p,u)+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(vrpRelHtml(p,u),p.consorcio)+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
@@ -7180,7 +7185,7 @@ function vmVisitaReport(u, c){
   h+= pairs.length?('<div class="relGrid">'+pairs.map(p=>relField(p[0],p[1])).join('')+'</div>'):'<div class="relPend">Sem respostas registradas.</div>';
   h+='<div class="relSec"><span class="relNum">2</span>Fotos</div>'+relFotos(fotos);
   h+='</div><div class="relFoot"><span>AcquaHub · visita primária (levantamento)</span><span>'+relFmtData(u.visitado_em)+'</span></div>';
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+h+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(h,c.consorcio)+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
@@ -7191,7 +7196,7 @@ async function vmReport(osId){
   let d; try{ const r=await sb.rpc('app_vrp_os_ver',{p_os_id:osId}); if(r.error)throw r.error; d=r.data; }catch(e){ return toast('⚠ '+(e.message||e)); }
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+vmReportHtml(d)+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(vmReportHtml(d),d.consorcio)+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
@@ -11441,7 +11446,7 @@ async function pdGerar(bl, btn){
   if(!d) return;
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+pdDocHtml(d)+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff" disabled>🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(pdDocHtml(d),d.consorcios||[])+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   const pb=document.getElementById('relPrint'); pb.onclick=()=>window.print();
@@ -15854,7 +15859,7 @@ function segVerifHtml(a,verifs){ const vr=QSMS_VERIF[a.verif_status];
 function segCapaHtml(docs){ const a=docs[0].atividade||{}, apr=docs.find(d=>d.tipo==='APR')||docs[0];
   const cons=REL_CONS[a.consorcio]||REL_CONS[(a.local||{}).consorcio]||a.consorcio||'Consórcios Águas Integradas & Eficiência Hídrica';
   const vr=QSMS_VERIF[a.verif_status], resp=(apr.pes||[]).find(p=>p.papel==='responsavel');
-  let h=`<div class="relTop"><div><h1>Atividade — ${docs.map(d=>d.tipo).join(' + ')}</h1><div class="sub">${segH(cons)} · ${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</div></div><div class="relBadge" style="color:${vr?vr[1]:'#64748b'}">${vr?('QSMS: '+vr[0].toUpperCase()):'A VERIFICAR'}</div></div><div class="relBody">`;
+  let h=`<div class="relTop"><div><h1>Atividade — ${docs.map(d=>d.tipo).join(' + ')}</h1><div class="sub">${segH(cons)} · ${segH(SEG_TIPO_LBL(a.tipo_intervencao))}</div></div>${relLogoHtml(cons)}<div class="relBadge" style="color:${vr?vr[1]:'#64748b'}">${vr?('QSMS: '+vr[0].toUpperCase()):'A VERIFICAR'}</div></div><div class="relBody">`;
   h+='<div class="relGrid">'+relWide('Serviço',segH(a.descricao||'—'))+relField('Nº da OS',segH(a.os_sigos||'—'))+relField('Data / hora',segFmt(a.iniciada_em||apr.emitido_em))
     +relWide('Local',segH(segLocalTxt(a)||(a.local?segLocalTxt(a.local):'')||'—'))+relField('Responsável pelos serviços',segH((resp||{}).nome||apr.usuario_nome||'—'))+relField('Consórcio',segH(CONSORCIO_NOME[a.consorcio]||a.consorcio||'—'))+'</div>';
   h+='<div class="relSec"><span class="relNum">≡</span>Formulários desta atividade</div><table class="segT"><tr><th>Formulário</th><th>Modelo</th><th>Emitido em</th><th>Situação</th><th>Alertas</th></tr>'
@@ -15873,7 +15878,7 @@ function segDocHtml(d,sozinho){ const a=d.atividade||{}, r=d.resp||{}, pes=(d.pe
   const cons=REL_CONS[a.consorcio]||REL_CONS[(a.local||{}).consorcio]||a.consorcio||'Consórcios Águas Integradas & Eficiência Hídrica', cor=SEG_ST_COR[d.status]||'#555';
   const X=v=>v?'X':''; let n=0; const sec=t=>'<div class="relSec"><span class="relNum">'+(++n)+'</span>'+t+'</div>';
   const local=segLocalTxt(a)||(a.local?segLocalTxt(a.local):'')||'(pela coordenada, ao sincronizar)';
-  let h=`<div class="relTop"><div><h1>${SEG_TITULO[d.tipo]}</h1><div class="sub">${segH(cons)} · Modelo ${segH(d.modelo||SEG_MODELO[d.tipo])}</div></div><div class="relBadge" style="color:${cor}">${(SEG_ST_LBL[d.status]||d.status||'').toUpperCase()}</div></div><div class="relBody">`;
+  let h=`<div class="relTop"><div><h1>${SEG_TITULO[d.tipo]}</h1><div class="sub">${segH(cons)} · Modelo ${segH(d.modelo||SEG_MODELO[d.tipo])}</div></div>${relLogoHtml(cons)}<div class="relBadge" style="color:${cor}">${(SEG_ST_LBL[d.status]||d.status||'').toUpperCase()}</div></div><div class="relBody">`;
   const la=d.lat!=null?d.lat:a.lat, lo=d.lat!=null?d.lon:a.lon;
   const coord=la!=null?((+la).toFixed(6)+', '+(+lo).toFixed(6)+(a.gps_precisao?(' (±'+a.gps_precisao+' m)'):'')):'—';
   const quem=d.usuario_nome||a.usuario_nome||'—';
@@ -18866,7 +18871,7 @@ async function frotasRelatorioVeiculo(veiculoId){
   if(!r) return toast('Veículo não encontrado');
   if(!document.getElementById('relStyle')){ const s=document.createElement('style'); s.id='relStyle'; s.textContent=REL_CSS; document.head.appendChild(s); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+frotasRelatorioHtml(r)+'</div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+relComLogo(frotasRelatorioHtml(r),r.consorcio)+'</div>';
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   document.getElementById('relPrint').onclick=()=>window.print();
