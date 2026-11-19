@@ -2532,23 +2532,16 @@ async function prEstCarregar(){
   if(data) prEstCache[dmc]=data;
   prEstGj=data; prEstDmc=dmc; prEstDesenhar();
 }
-function prEstIcone(lado,n,med){
-  const cor=lado==='D'?'#2e7d32':'#6a1b9a';
-  const txt=lado+n+(med?(' · '+prpFmt(med.pressao)):'');
-  const est=med?('background:'+cor+';color:#fff;border:2px solid #fff'):('background:#fff;color:'+cor+';border:2px solid '+cor);
-  return L.divIcon({className:'',iconSize:null,iconAnchor:[0,0],
-    html:`<div style="transform:translate(-50%,-50%);white-space:nowrap;font:700 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.35);${est}">${txt}</div>`});
-}
 function prEstLadoHtml(lbl,pt,med){
   if(!pt) return '<br><b>'+lbl+'</b>: <span style="color:var(--mut)">sem ligação nem rede cadastrada a ≥10 m do limite</span>';
   return '<br><b>'+lbl+'</b>: '+(pt.tipo==='rede'?'ponto na rede (hidrante/registro)':('matrícula '+pt.matricula+(pt.endereco?(' · '+pt.endereco):'')))
     +' · '+pt.dist_limite+' m do limite'+(med?(' · <b>'+prpFmt(med.pressao)+' mca</b> '+(med.data||'')):' · <span style="color:var(--warn)">pendente</span>');
 }
 function prEstPopup(p,lado){
-  const md=prEstMedida(p.dentro), mf=prEstMedida(p.fora), pt=lado==='D'?p.dentro:p.fora;
+  const md=prEstMedida(p.dentro), mf=prEstMedida(p.fora), pt=lado==='D'?p.dentro:lado==='F'?p.fora:{lat:p.cruz[1],lon:p.cruz[0]};
   const v=p.valvula;
   const delta=(md&&mf)?('<br>Δ dentro − fora: <b>'+prpFmt(md.pressao-mf.pressao)+' mca</b>'):'';
-  return '<div style="min-width:190px"><b>Par '+p.n+' — '+(lado==='D'?'dentro':'fora')+' do '+(prEstDmc||'').replace(/^ZA\d+-/,'')+'</b>'
+  return '<div style="min-width:190px"><b>Par '+p.n+' — '+(lado?((lado==='D'?'dentro':'fora')+' do '):'fronteira do ')+(prEstDmc||'').replace(/^ZA\d+-/,'')+'</b>'
     +'<br><span style="color:var(--mut)">Trecho que cruza o limite: '+(p.trechos||[]).join(', ')+(p.dn?(' · DN '+Math.round(p.dn)):'')+(p.material?(' '+p.material):'')+'</span>'
     +(v?('<br><span style="color:var(--mut)">Válvula '+(v.tipo||'')+' '+(v.cd||'')+(v.estado?(' ('+v.estado+')'):'')+' a '+v.dist+' m</span>'):'')
     +(pt&&pt.tipo==='ligacao'&&!pt.no_trecho?'<br><span style="color:var(--mut)">Ligação de outro trecho, a '+pt.dist+' m do cruzamento</span>':'')
@@ -2565,16 +2558,12 @@ function prEstDesenhar(){
   if(prMap&&window.L){
     prEstLayer=L.layerGroup().addTo(prMap);
     pares.forEach(p=>{
-      const cz=[p.cruz[1],p.cruz[0]], ll=[];
-      if(p.dentro) ll.push([p.dentro.lat,p.dentro.lon]); ll.push(cz); if(p.fora) ll.push([p.fora.lat,p.fora.lon]);
-      L.polyline(ll,{pane:'prEst',color:'#37474f',weight:1.5,dashArray:'4 4',opacity:.8,interactive:false}).addTo(prEstLayer);
-      L.circleMarker(cz,{pane:'prEst',radius:4,color:'#37474f',weight:1.5,fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(prEstLayer);
-      [['D',p.dentro],['F',p.fora]].forEach(([lado,pt])=>{ if(!pt) return;
-        const m=L.marker([pt.lat,pt.lon],{pane:'prEst',icon:prEstIcone(lado,p.n,prEstMedida(pt))}).addTo(prEstLayer);
-        m.bindPopup(()=>prEstPopup(p,lado),{minWidth:200});
-        m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const a=el&&el.querySelector('.prEstReg'); if(a) a.onclick=()=>{ prMap.closePopup(); irPara('pressao_reg'); }; });
-        p['_mk'+lado]=m;
-      });
+      // só a bolinha no cruzamento da rede com o limite (2026-11-19: sem os chips D/F nem as linhas tracejadas)
+      const cz=[p.cruz[1],p.cruz[0]];
+      const m=L.circleMarker(cz,{pane:'prEst',radius:9,color:'#fff',weight:3,fillColor:'#e65100',fillOpacity:1}).addTo(prEstLayer);
+      m.bindPopup(()=>prEstPopup(p,null),{minWidth:200});
+      m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const a=el&&el.querySelector('.prEstReg'); if(a) a.onclick=()=>{ prMap.closePopup(); irPara('pressao_reg'); }; });
+      p._mk=m;
     });
   }
   if(!box) return;
@@ -2589,13 +2578,12 @@ function prEstDesenhar(){
   }).join('');
   box.classList.remove('hidden');
   box.innerHTML=`<div class="sec" style="margin:0 0 4px">Teste de estanqueidade — ${prFDmc.replace(/^(ZA\d+)-(.*)$/,'$2 ($1)')}</div>
-    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#2e7d32">D</b> = dentro · <b style="color:#6a1b9a">F</b> = fora.</p>${linhas}`;
+    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#e65100">●</b> = fronteira (trecho que cruza o limite); toque na bolinha para ver os pontos dentro/fora.</p>${linhas}`;
   box.querySelectorAll('[data-prp]').forEach(el=>el.addEventListener('click',()=>{
     const p=pares.find(x=>String(x.n)===el.dataset.prp); if(!p||!prMap) return;
-    const pts=[[p.cruz[1],p.cruz[0]]]; if(p.dentro) pts.push([p.dentro.lat,p.dentro.lon]); if(p.fora) pts.push([p.fora.lat,p.fora.lon]);
-    prMap.fitBounds(pts,{padding:[50,50],maxZoom:18});
+    prMap.setView([p.cruz[1],p.cruz[0]],Math.max(prMap.getZoom(),17));
     $('#prMapa').scrollIntoView({behavior:'smooth',block:'center'});
-    setTimeout(()=>{ const m=p._mkD||p._mkF; if(m) m.openPopup(); },400);
+    setTimeout(()=>{ if(p._mk) p._mk.openPopup(); },400);
   }));
 }
 // após salvar: volta ao mapa e recarrega (offline: a leitura entra quando a fila sincronizar)
