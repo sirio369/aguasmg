@@ -4764,6 +4764,12 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
 `app_rh_analise(ini, fim, consórcio, área, funcionário)` (máx. 1 ano) sobre `ponto_dia` + inconsistências. **Desde 2026-11-17 (sw v410,
 `docs/migracao_rh_val_todo_periodo.sql`) quem tem a tela `analise` vê todos os colaboradores de todas as áreas** (antes: aprovador só a
 equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
+**Duas telas em abas (2026-11-19, sw v434, padrão das abas do BI QSMS — `#rhanNav`, `rhanAba`, só front):** **⏱️ Horas** (padrão) = visão
+consolidada das horas — cartões Horas trabalhadas (× previstas) / Absenteísmo / % HE / Pontualidade, mini-indicadores (dias de falta, HE>2h,
+descanso<11h, sem intervalo, adicional noturno), Por área com colunas de horas (ordenada por H.trab), HE por dia + horas de falta por dia,
+por consórcio, interjornada e ranking por H.trab/HE/absenteísmo/faltas/atraso; **🛠️ Tratamento das inconsistências** = % não tratadas (sem a
+barra/legenda dentro do cartão, retiradas a pedido), conformidade, em aberto, funil do pipeline, Por área (inconsistências), por tipo × por
+gestor, inconsistências por dia e ranking A tratar/Inconsist.; o atalho "Abrir a Validação gestor" só aparece nesta aba. Mesma RPC e filtros.
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.

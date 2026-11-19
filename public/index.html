@@ -1900,6 +1900,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="rh_analise" class="hidden">
     <div class="bar"><button class="bk" data-go="rh">‹ RH</button></div>
     <h1>Análise do ponto</h1>
+    <nav id="rhanNav" class="rhan-nav" aria-label="Telas da análise"></nav>
     <div class="rh-fl"><span class="rh-dt"><input id="rhanIni" type="date"/><span>a</span><input id="rhanFim" type="date"/></span>
       <div id="rhanCons" class="rhv-chips"></div><select id="rhanArea" class="rh-sel"><option value="">Todas as áreas</option></select><select id="rhanFunc" class="rh-sel"><option value="">Todos os colaboradores</option></select></div>
     <div id="rhanView"><p class="sub">Carregando…</p></div>
@@ -18258,7 +18259,8 @@ async function rhvSalvar(it,b){
 // usa as batidas do gestor e os números de calc_marcacoes (tot.dias_ajuste_val) enquanto o Kairos não refletir o ajuste; refletiu,
 // vale o Kairos. Inconsistência tratada que o Kairos corrigiu fica como rastro ('corrigidas'), já conforme. Quem tem a tela vê todas
 // as áreas (2026-11-17); o filtro de colaborador (p_funcionario) mostra os indicadores de uma pessoa só.
-let rhanCons='', rhanArea='', rhanFunc='', rhanDados=null, rhanOrd='pend', rhanTodos=false;
+let rhanCons='', rhanArea='', rhanFunc='', rhanDados=null, rhanOrd='htrab', rhanTodos=false, rhanAba='horas';
+const RHAN_ABAS=[['horas','⏱️ Horas'],['trat','🛠️ Tratamento das inconsistências']];
 function rhanInit(){
   if(!rhTela('analise')){ toast('Acesso restrito'); irPara('home'); return; }
   rhvCss(); rhanCss(); rhPeriodo('#rhanIni','#rhanFim',30);
@@ -18266,6 +18268,7 @@ function rhanInit(){
   if(!v.dataset.ready){ v.dataset.ready='1'; ['#rhanIni','#rhanFim'].forEach(s=>$(s).addEventListener('change',rhanCarregar));
     $('#rhanArea').addEventListener('change',()=>{ rhanArea=$('#rhanArea').value; rhanCarregar(); });
     $('#rhanFunc').addEventListener('change',()=>{ rhanFunc=$('#rhanFunc').value; rhanCarregar(); });
+    $('#rhanNav').addEventListener('click',e=>{ const b=e.target.closest('[data-rhaba]'); if(!b||b.dataset.rhaba===rhanAba) return; rhanAba=b.dataset.rhaba; rhanTodos=false; rhanRender(); });
     v.addEventListener('click',e=>{ const b=e.target.closest('[data-o]'); if(b){ rhanOrd=b.dataset.o; rhanRender(); return; }
       if(e.target.closest('[data-limpafunc]')){ rhanFunc=''; rhanCarregar(); return; }
       if(e.target.closest('[data-todos]')){ rhanTodos=!rhanTodos; rhanRender(); return; }
@@ -18277,7 +18280,12 @@ function rhanInit(){
 function rhanCss(){
   if(document.getElementById('rhanCss')) return;
   const st=document.createElement('style'); st.id='rhanCss';
-  st.textContent=`.rhan-hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:2px 0 8px}
+  st.textContent=`.rhan-nav{position:sticky;top:0;z-index:6;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;background:var(--bg);border-bottom:1px solid var(--line);margin:0 0 12px}
+.rhan-nav::-webkit-scrollbar{display:none}
+.rhan-nav button{flex:0 0 auto;font:inherit;font-size:14px;padding:11px 14px 10px;border:0;border-bottom:3px solid transparent;background:none;color:var(--mut);white-space:nowrap;cursor:pointer;margin-bottom:-1px}
+.rhan-nav button:hover{color:var(--ink)}
+.rhan-nav button.sel{color:var(--acc);border-bottom-color:var(--acc);font-weight:700}
+.rhan-hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:2px 0 8px}
 .rhan-g{display:grid;gap:10px}
 .rhan-g.k5{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .rhan-g.c2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));margin-top:10px}
@@ -18363,6 +18371,8 @@ function rhanRender(){
   const fns=D.funcs||[]; if(rhanFunc&&!fns.some(x=>String(x.id)===String(rhanFunc))){ rhanFunc=''; return rhanCarregar(); }
   $('#rhanFunc').innerHTML='<option value="">Todos os colaboradores ('+fns.length+')</option>'
     +fns.map(x=>`<option value="${x.id}"${String(x.id)===String(rhanFunc)?' selected':''}>${vEsc(x.nome)}${x.sigla?' · '+vEsc(x.sigla):''}</option>`).join('');
+  $('#rhanNav').innerHTML=RHAN_ABAS.map(([k,l])=>`<button type="button" data-rhaba="${k}" class="${rhanAba===k?'sel':''}"${rhanAba===k?' aria-current="page"':''}>${l}</button>`).join('');
+  { const n=$('#rhanNav'), hd=document.querySelector('#app>header'); n.style.top=(hd&&getComputedStyle(hd).position==='sticky'?hd.offsetHeight:0)+'px'; }
   if(!T.funcionarios){ $('#rhanView').innerHTML='<p class="sub">Nenhum ponto carregado nesse período.</p>'; return; }
   const P=D.periodo||{}, I=D.inc||{}, IS=D.inc_st||{}, TR=D.tratativas||{};
   // pipeline: identificadas = a tratar + aguardando RH + validadas (aguardam Kairos) + corrigidas no Kairos (rastro, já conformes)
@@ -18375,82 +18385,94 @@ function rhanRender(){
   const stTag=f=>f?`<span class="st ${f}">${({ok:'✓ ok',warn:'! atenção',bad:'▲ crítico'})[f]}</span>`:'';
   const kp=(lb,v,d,f)=>`<div class="rhan-c rhan-kp"><span class="lb">${lb}</span>${stTag(f)}<b class="v">${v}</b><span class="d">${d}</span></div>`;
   const fSel=rhanFunc?fns.find(x=>String(x.id)===String(rhanFunc)):null;
-  let h=`<div class="rhan-hd"><span>${fSel?'<b style="color:var(--ink)">'+vEsc(fSel.nome)+'</b> <button class="rhv-lk" style="margin:0" data-limpafunc>✕ limpar</button> · ':''}${rhanArea?'<b style="color:var(--ink)">'+vEsc(rhanArea)+'</b> · ':''}${rhcN(T.funcionarios)} colaboradores · dados de ${fmtData(P.data_min)} a ${fmtData(P.data_max)}${P.parciais?' · '+P.parciais+' dia(s) ainda parciais':''}${T.dias_ajuste_val?` · <span style="color:var(--ok)" title="Nesses dias valem as batidas ajustadas pelo gestor e validadas pela RH, não as do Kairos">✓ ${rhcN(T.dias_ajuste_val)} dia(s) com ajuste validado</span>`:''}</span>`
-    +`<button class="rhv-lk" style="margin:0" data-irval>Abrir a Validação gestor ›</button></div>`;
-  // ---- KPIs estratégicos
-  h+='<div class="rhan-g k5">'
-    +`<div class="rhan-c rhan-kp hero"><span class="lb">Inconsistências ainda não tratadas</span><b class="v">${nInc?rhPc(TR.pendentes,nInc,0):'—'}</b>`
-    +`<span class="d"><b>${rhcN(TR.pendentes||0)}</b> de ${rhcN(nInc)} dias com inconsistência</span>${sb(TR.pendentes||0,TR.tratadas||0,TR.validadas||0,TR.corrigidas||0)}${lg}</div>`
-    +kp('Conformidade do ponto',conf==null?'—':rhPc(T.dias_aval-nAb,T.dias_aval),`dias sem inconsistência em aberto · ${rhcN(T.dias_aval)} avaliados`,conf==null?'':(conf>=.9?'ok':conf>=.75?'warn':'bad'))
-    +kp('Absenteísmo',rhPc(T.falta_aval,T.prev),`${rhHM(T.falta_aval)} de falta sobre ${rhHM(T.prev)} previstas`,rhFx(abs,.03,.06))
-    +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
-    +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
-    +'</div>';
-  // Funil do pipeline (2026-11-17, sw v414): cada etapa = quantas inconsistências chegaram até ela (largura ∝ identificadas);
-  // a parte colorida é o que parou nessa etapa, a cinza é o que já seguiu adiante. A corrigida no Kairos é rastro, já conforme.
-  { const P=TR.pendentes||0, Tt=TR.tratadas||0, V=TR.validadas||0, C=TR.corrigidas||0;
-    const et=[['Identificadas','inconsistências do período',nInc,P,'xp','a tratar pelo gestor'],
-      ['Tratadas pelo gestor','justificadas ou ajustadas',Tt+V+C,Tt,'xt','aguardando a RH'],
-      ['Validadas pela RH','conferidas e lançadas no Kairos',V+C,V,'xv','aguardando a carga do Kairos'],
-      ['Corrigidas no Kairos','o Kairos não acusa mais · conforme',C,C,'xc','corrigidas']];
-    h+='<div class="rhan-c rhan-fn"><h3>Pipeline das inconsistências <span class="sub">· quantas chegaram a cada etapa; a cor é o que parou nela</span></h3>'
-      +et.map(([l,d,n,par,cx,lp],i)=>{ const w=nInc?n/nInc*100:0, seg=n?par/n*100:0;
-        const tt=`${l}: ${rhcN(n)} (${rhPc(n,nInc,0)} das identificadas)`+(i<3?` · ${rhcN(par)} ${lp} · ${rhcN(n-par)} seguiram`:'');
-        return `<div class="rhan-fr" title="${vEsc(tt)}"><div class="l">${l}<small>${i<3?`${rhcN(par)} ${lp}`:d}</small></div>`
-          +`<div class="b">${n?`<div style="width:${w}%">${par?`<i class="${cx}" style="width:${seg}%"></i>`:''}${n-par?`<i class="fs" style="width:${100-seg}%"></i>`:''}</div>`:''}</div>`
-          +`<div class="n"><b>${rhcN(n)}</b><span>${i?rhPc(n,nInc,0)+' das identif.':'100%'}</span></div></div>`; }).join('')
-      +'<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Aguardando Kairos</span><span class="xc">Corrigidas</span><span class="fs">Seguiram para a próxima etapa</span></div></div>'; }
   const mi=(v,l)=>`<div><b>${v}</b><span>${l}</span></div>`;
-  h+='<div class="rhan-mini">'+mi(rhHM(T.htrab),'horas trabalhadas')+mi(rhcN(T.dias_falta),'dias de falta')
-    +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')
-    +mi(rhcN(ic('interjornada').casos),'descansos < 11h · '+ic('interjornada').pessoas+' pessoa(s)')
-    +mi(rhcN(ic('sem_intervalo').casos),'dias sem intervalo')+mi(rhHM(T.adn),'adicional noturno')+'</div>';
-  // ---- Por área
-  const pa=D.por_area||[];
-  const ln=x=>{ const ni=x.dias_inc||0, pp=ni?x.pend/ni:0;
-    return `<td class="n">${x.funcionarios}</td><td class="n">${ni}</td>`
-      +`<td class="n"><span class="pb"><span class="${pp>=.5?'bad':''}">${ni?rhPc(x.pend,ni,0):'—'}</span><i><b style="width:${pp*100}%"></b></i></span></td>`
-      +`<td class="n">${x.corr||''}</td><td class="n">${x.dias_aval?rhPc(x.dias_aval-ni+(x.corr||0),x.dias_aval,0):'—'}</td>`
-      +`<td class="n ${x.prev&&x.falta/x.prev>.06?'bad':''}">${rhPc(x.falta,x.prev)}</td><td class="n ${x.htrab&&x.he/x.htrab>.10?'warn':''}">${rhPc(x.he,x.htrab)}</td>`
-      +`<td class="n">${x.dias_prev_trab?rhPc(x.dias_prev_trab-x.n_atrasos,x.dias_prev_trab,0):'—'}</td><td class="n">${x.dias_he2||''}</td><td class="n">${x.interj||''}</td>`; };
-  const hdA='<th class="n">Pessoas</th><th class="n">Dias c/ inconsist.</th><th class="n">Não tratadas</th><th class="n">Corrigidas</th><th class="n">Conformidade</th><th class="n">Absenteísmo</th><th class="n">% HE</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>';
-  if(pa.length) h+=`<div class="rhan-c" style="margin-top:10px"><h3>Por área ${pa.length>1?'<span class="sub">· clique numa área para filtrar</span>':''}</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Área</th>${hdA}</tr>`
-    +pa.map(x=>`<tr${pa.length>1?` data-area="${vEsc(x.nome)}"`:''}><td class="nm">${vEsc(x.nome)}</td>${ln(x)}</tr>`).join('')+'</table></div></div>';
-  // ---- Inconsistências por tipo  ×  Tratativa por gestor
-  const its=Object.keys(RH_TIPOS).filter(t=>I[t]).sort((a,b)=>I[b].casos-I[a].casos); const mx=Math.max(1,...its.map(t=>I[t].casos));
-  const blTipo='<div class="rhan-c"><h3>Inconsistências por tipo <span class="sub">· dias, por situação da tratativa</span></h3>'+(its.length?its.map(t=>{ const s=IS[t]||{pend:I[t].casos,trat:0,val:0,corr:0};
-      return `<div class="rhan-r" title="${vEsc(RH_TIPOS[t][1])} — ${I[t].pessoas} pessoa(s): ${s.pend} a tratar, ${s.trat} aguardando RH, ${s.val} validadas, ${s.corr||0} corrigidas no Kairos"><span class="l">${RH_TIPOS[t][0]}</span>`
-        +`<span><span style="display:block;width:${Math.max(6,I[t].casos/mx*100)}%">${sb(s.pend,s.trat,s.val,s.corr||0)}</span></span><span class="n"><b>${I[t].casos}</b> · ${rhPc(s.pend,I[t].casos,0)}</span></div>`; }).join('')+lg:'<p class="sub" style="margin:0">Nenhuma.</p>')+'</div>';
-  const pg=(D.por_gestor||[]).filter(g=>g.dias_inc);
-  const blGest='<div class="rhan-c"><h3>Tratativa por gestor <span class="sub">· % ainda não tratada</span></h3>'+(pg.length?pg.map(g=>`<div class="rhan-r" title="${vEsc(g.nome)}: ${g.pend} a tratar, ${g.trat} aguardando RH, ${g.val} validadas, ${g.corr||0} corrigidas no Kairos · ${g.funcionarios} colaborador(es)"><span class="l">${vEsc(g.nome)} <span class="sub" style="margin:0">· ${g.funcionarios} pess.</span></span>${sb(g.pend,g.trat,g.val,g.corr||0)}<span class="n"><b>${rhPc(g.pend,g.dias_inc,0)}</b> de ${g.dias_inc}</span></div>`).join('')+lg:'<p class="sub" style="margin:0">Nenhuma inconsistência.</p>')+'</div>';
-  h+='<div class="rhan-g c2">'+blTipo+blGest+'</div>';
-  // ---- Por dia: inconsistências  ×  HE (dois gráficos, um eixo cada)
-  const pd=(D.por_dia||[]).filter(d=>d.presentes||d.inc||d.he);
-  if(pd.length){
-    const mi2=Math.max(1,...pd.map(d=>d.inc||0)), mh=Math.max(1,...pd.map(d=>d.he));
-    const dl=d=>`<span class="x">${d.data.slice(8,10)}</span>`;
-    h+='<div class="rhan-g c2">'
-      +'<div class="rhan-c"><h3>Inconsistências por dia <span class="sub">· vermelho = ainda não tratadas</span></h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: ${d.inc||0} inconsistência(s), ${d.pend||0} a tratar · ${d.presentes} presentes"><span>${d.inc||''}</span><span class="bar g" style="height:${(d.inc||0)/mi2*85}%"><i style="height:${d.inc?d.pend/d.inc*100:0}%"></i></span>${dl(d)}</div>`).join('')+'</div></div>'
-      +'<div class="rhan-c"><h3>Horas extras por dia</h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: HE ${rhHM(d.he)} · ${d.presentes} presentes · falta ${rhHM(d.falta_min)}"><span>${d.he?Math.round(d.he/60)+'h':''}</span><span class="bar" style="height:${d.he/mh*85}%"></span>${dl(d)}</div>`).join('')+'</div></div>'
+  // Duas telas (2026-11-19, sw v434, como as abas do BI QSMS): ⏱️ Horas = visão consolidada das horas (trabalhadas, falta,
+  // HE, atraso, por área/dia/consórcio/colaborador); 🛠️ Tratamento = andamento das inconsistências (funil, por tipo/gestor/dia).
+  const trat=rhanAba==='trat';
+  let h=`<div class="rhan-hd"><span>${fSel?'<b style="color:var(--ink)">'+vEsc(fSel.nome)+'</b> <button class="rhv-lk" style="margin:0" data-limpafunc>✕ limpar</button> · ':''}${rhanArea?'<b style="color:var(--ink)">'+vEsc(rhanArea)+'</b> · ':''}${rhcN(T.funcionarios)} colaboradores · dados de ${fmtData(P.data_min)} a ${fmtData(P.data_max)}${P.parciais?' · '+P.parciais+' dia(s) ainda parciais':''}${T.dias_ajuste_val?` · <span style="color:var(--ok)" title="Nesses dias valem as batidas ajustadas pelo gestor e validadas pela RH, não as do Kairos">✓ ${rhcN(T.dias_ajuste_val)} dia(s) com ajuste validado</span>`:''}</span>`
+    +(trat?`<button class="rhv-lk" style="margin:0" data-irval>Abrir a Validação gestor ›</button>`:'')+'</div>';
+  const pa=trat?(D.por_area||[]):[...(D.por_area||[])].sort((a,b)=>(b.htrab||0)-(a.htrab||0)), pd=(D.por_dia||[]).filter(d=>d.presentes||d.inc||d.he||d.falta_min);
+  const dl=d=>`<span class="x">${d.data.slice(8,10)}</span>`;
+  const tabArea=(hd,ln)=>pa.length?`<div class="rhan-c" style="margin-top:10px"><h3>Por área ${pa.length>1?'<span class="sub">· clique numa área para filtrar</span>':''}</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Área</th>${hd}</tr>`
+    +pa.map(x=>`<tr${pa.length>1?` data-area="${vEsc(x.nome)}"`:''}><td class="nm">${vEsc(x.nome)}</td>${ln(x)}</tr>`).join('')+'</table></div></div>':'';
+  const ranking=cols=>{ if(!cols.some(([c])=>c===rhanOrd)) rhanOrd=cols[0][0];
+    const fs=[...(D.func||[])].map(f=>({...f,abs:f.prev?f.falta/f.prev:0})).sort((a,b)=>(b[rhanOrd]||0)-(a[rhanOrd]||0)||String(a.nome).localeCompare(b.nome));
+    const vis=rhanTodos?fs:fs.slice(0,20);
+    const fmt=(c,v,f)=>c==='abs'?(f.prev?rhPc(f.falta,f.prev,0):'—'):(c==='he'||c==='atraso'||c==='htrab')?rhHM(v):(v||'')+(v&&(c==='dias_falta'||c==='dias_he2')?' d':'');
+    return '<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar ou num nome para filtrar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
+      +cols.map(([c,l])=>`<th class="n${c===rhanOrd?' on':''}" data-o="${c}">${vEsc(l)}</th>`).join('')+'</tr>'
+      +vis.map(f=>`<tr${f.fid&&!rhanFunc?` data-fid="${f.fid}" style="cursor:pointer" title="Ver os indicadores só desta pessoa"`:''}><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
+        +cols.map(([c])=>`<td class="n${c==='pend'&&f.pend?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
+      +'</table></div>'+(fs.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fs.length+')'}</button>`:'')+'</div>'; };
+  if(!trat){
+    // ================= ⏱️ HORAS (consolidado) =================
+    h+='<div class="rhan-g k5">'
+      +kp('Horas trabalhadas',rhHM(T.htrab),`${rhHM(T.prev)} previstas · ${rhPc(T.htrab,T.prev,0)} do previsto`,'')
+      +kp('Absenteísmo',rhPc(T.falta_aval,T.prev),`${rhHM(T.falta_aval)} de falta sobre ${rhHM(T.prev)} previstas`,rhFx(abs,.03,.06))
+      +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
+      +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
       +'</div>';
+    h+='<div class="rhan-mini">'+mi(rhcN(T.dias_falta),'dias de falta')
+      +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')
+      +mi(rhcN(ic('interjornada').casos),'descansos < 11h · '+ic('interjornada').pessoas+' pessoa(s)')
+      +mi(rhcN(ic('sem_intervalo').casos),'dias sem intervalo')+mi(rhHM(T.adn),'adicional noturno')+'</div>';
+    h+=tabArea('<th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">Falta</th><th class="n">Absenteísmo</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>',
+      x=>`<td class="n">${x.funcionarios}</td><td class="n">${rhHM(x.htrab)}</td><td class="n">${rhHM(x.he)}</td><td class="n ${x.htrab&&x.he/x.htrab>.10?'warn':''}">${rhPc(x.he,x.htrab)}</td>`
+        +`<td class="n">${rhHM(x.falta)}</td><td class="n ${x.prev&&x.falta/x.prev>.06?'bad':''}">${rhPc(x.falta,x.prev)}</td>`
+        +`<td class="n">${x.dias_prev_trab?rhPc(x.dias_prev_trab-x.n_atrasos,x.dias_prev_trab,0):'—'}</td><td class="n">${x.dias_he2||''}</td><td class="n">${x.interj||''}</td>`);
+    if(pd.length){
+      const mh=Math.max(1,...pd.map(d=>d.he||0)), mf=Math.max(1,...pd.map(d=>d.falta_min||0));
+      h+='<div class="rhan-g c2">'
+        +'<div class="rhan-c"><h3>Horas extras por dia</h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: HE ${rhHM(d.he)} · ${d.presentes} presentes"><span>${d.he?Math.round(d.he/60)+'h':''}</span><span class="bar" style="height:${(d.he||0)/mh*85}%"></span>${dl(d)}</div>`).join('')+'</div></div>'
+        +'<div class="rhan-c"><h3>Horas de falta por dia</h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: falta ${rhHM(d.falta_min)} · ${d.presentes} presentes"><span>${d.falta_min?Math.round(d.falta_min/60)+'h':''}</span><span class="bar" style="height:${(d.falta_min||0)/mf*85}%;background:var(--bad)"></span>${dl(d)}</div>`).join('')+'</div></div>'
+        +'</div>';
+    }
+    const pe=D.por_empresa||[], ij=D.interjornada||[];
+    const blCons=pe.length>1?'<div class="rhan-c"><h3>Por consórcio</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Consórcio</th><th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">Faltas</th><th class="n">Atraso</th></tr>'
+      +pe.map(e=>`<tr><td>${vEsc(e.sigla)} · ${vEsc(RH_ZA[e.consorcio]||e.consorcio||'')}</td><td class="n">${e.funcionarios}</td><td class="n">${rhHM(e.htrab)}</td><td class="n">${rhHM(e.he)}</td><td class="n">${rhPc(e.he,e.htrab)}</td><td class="n">${e.dias_falta} d</td><td class="n">${rhHM(e.atraso_min)}</td></tr>`).join('')+'</table></div></div>':'';
+    const blIj='<div class="rhan-c"><h3>Descanso menor que 11h entre jornadas</h3>'+(ij.length?'<div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Dia</th><th class="n">Descanso</th><th class="n">Falta p/ 11h</th></tr>'
+      +ij.map(x=>`<tr><td class="nm">${vEsc(x.nome)} <span class="sub" style="margin:0">${vEsc(x.sigla||'')}</span></td><td>${fmtData(x.data)}</td><td class="n">${rhHM(x.descanso)}</td><td class="n bad">${rhHM(660-x.descanso)}</td></tr>`).join('')+'</table></div>':'<p class="sub" style="margin:0">Nenhum caso.</p>')+'</div>';
+    h+='<div class="rhan-g c2">'+blCons+blIj+'</div>';
+    h+=ranking([['htrab','H.trab'],['he','HE'],['abs','Absent.'],['dias_falta','Faltas'],['atraso','Atraso'],['dias_he2','HE>2h'],['interj','Desc.<11h']]);
+  } else {
+    // ================= 🛠️ TRATAMENTO das inconsistências =================
+    h+='<div class="rhan-g k5">'
+      +`<div class="rhan-c rhan-kp hero"><span class="lb">Inconsistências ainda não tratadas</span><b class="v">${nInc?rhPc(TR.pendentes,nInc,0):'—'}</b>`
+      +`<span class="d"><b>${rhcN(TR.pendentes||0)}</b> de ${rhcN(nInc)} dias com inconsistência</span></div>`
+      +kp('Conformidade do ponto',conf==null?'—':rhPc(T.dias_aval-nAb,T.dias_aval),`dias sem inconsistência em aberto · ${rhcN(T.dias_aval)} avaliados`,conf==null?'':(conf>=.9?'ok':conf>=.75?'warn':'bad'))
+      +kp('Inconsistências em aberto',rhcN(nAb),`${rhcN(TR.tratadas||0)} aguardando RH · ${rhcN(TR.validadas||0)} aguardando Kairos`,'')
+      +'</div>';
+    // Funil do pipeline (2026-11-17, sw v414): cada etapa = quantas inconsistências chegaram até ela (largura ∝ identificadas);
+    // a parte colorida é o que parou nessa etapa, a cinza é o que já seguiu adiante. A corrigida no Kairos é rastro, já conforme.
+    { const P=TR.pendentes||0, Tt=TR.tratadas||0, V=TR.validadas||0, C=TR.corrigidas||0;
+      const et=[['Identificadas','inconsistências do período',nInc,P,'xp','a tratar pelo gestor'],
+        ['Tratadas pelo gestor','justificadas ou ajustadas',Tt+V+C,Tt,'xt','aguardando a RH'],
+        ['Validadas pela RH','conferidas e lançadas no Kairos',V+C,V,'xv','aguardando a carga do Kairos'],
+        ['Corrigidas no Kairos','o Kairos não acusa mais · conforme',C,C,'xc','corrigidas']];
+      h+='<div class="rhan-c rhan-fn"><h3>Pipeline das inconsistências <span class="sub">· quantas chegaram a cada etapa; a cor é o que parou nela</span></h3>'
+        +et.map(([l,d,n,par,cx,lp],i)=>{ const w=nInc?n/nInc*100:0, seg=n?par/n*100:0;
+          const tt=`${l}: ${rhcN(n)} (${rhPc(n,nInc,0)} das identificadas)`+(i<3?` · ${rhcN(par)} ${lp} · ${rhcN(n-par)} seguiram`:'');
+          return `<div class="rhan-fr" title="${vEsc(tt)}"><div class="l">${l}<small>${i<3?`${rhcN(par)} ${lp}`:d}</small></div>`
+            +`<div class="b">${n?`<div style="width:${w}%">${par?`<i class="${cx}" style="width:${seg}%"></i>`:''}${n-par?`<i class="fs" style="width:${100-seg}%"></i>`:''}</div>`:''}</div>`
+            +`<div class="n"><b>${rhcN(n)}</b><span>${i?rhPc(n,nInc,0)+' das identif.':'100%'}</span></div></div>`; }).join('')
+        +'<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Aguardando Kairos</span><span class="xc">Corrigidas</span><span class="fs">Seguiram para a próxima etapa</span></div></div>'; }
+    h+=tabArea('<th class="n">Pessoas</th><th class="n">Dias c/ inconsist.</th><th class="n">Não tratadas</th><th class="n">Corrigidas</th><th class="n">Conformidade</th>',
+      x=>{ const ni=x.dias_inc||0, pp=ni?x.pend/ni:0;
+        return `<td class="n">${x.funcionarios}</td><td class="n">${ni}</td>`
+          +`<td class="n"><span class="pb"><span class="${pp>=.5?'bad':''}">${ni?rhPc(x.pend,ni,0):'—'}</span><i><b style="width:${pp*100}%"></b></i></span></td>`
+          +`<td class="n">${x.corr||''}</td><td class="n">${x.dias_aval?rhPc(x.dias_aval-ni+(x.corr||0),x.dias_aval,0):'—'}</td>`; });
+    // ---- Inconsistências por tipo  ×  Tratativa por gestor
+    const its=Object.keys(RH_TIPOS).filter(t=>I[t]).sort((a,b)=>I[b].casos-I[a].casos); const mx=Math.max(1,...its.map(t=>I[t].casos));
+    const blTipo='<div class="rhan-c"><h3>Inconsistências por tipo <span class="sub">· dias, por situação da tratativa</span></h3>'+(its.length?its.map(t=>{ const s=IS[t]||{pend:I[t].casos,trat:0,val:0,corr:0};
+        return `<div class="rhan-r" title="${vEsc(RH_TIPOS[t][1])} — ${I[t].pessoas} pessoa(s): ${s.pend} a tratar, ${s.trat} aguardando RH, ${s.val} validadas, ${s.corr||0} corrigidas no Kairos"><span class="l">${RH_TIPOS[t][0]}</span>`
+          +`<span><span style="display:block;width:${Math.max(6,I[t].casos/mx*100)}%">${sb(s.pend,s.trat,s.val,s.corr||0)}</span></span><span class="n"><b>${I[t].casos}</b> · ${rhPc(s.pend,I[t].casos,0)}</span></div>`; }).join('')+lg:'<p class="sub" style="margin:0">Nenhuma.</p>')+'</div>';
+    const pg=(D.por_gestor||[]).filter(g=>g.dias_inc);
+    const blGest='<div class="rhan-c"><h3>Tratativa por gestor <span class="sub">· % ainda não tratada</span></h3>'+(pg.length?pg.map(g=>`<div class="rhan-r" title="${vEsc(g.nome)}: ${g.pend} a tratar, ${g.trat} aguardando RH, ${g.val} validadas, ${g.corr||0} corrigidas no Kairos · ${g.funcionarios} colaborador(es)"><span class="l">${vEsc(g.nome)} <span class="sub" style="margin:0">· ${g.funcionarios} pess.</span></span>${sb(g.pend,g.trat,g.val,g.corr||0)}<span class="n"><b>${rhPc(g.pend,g.dias_inc,0)}</b> de ${g.dias_inc}</span></div>`).join('')+lg:'<p class="sub" style="margin:0">Nenhuma inconsistência.</p>')+'</div>';
+    h+='<div class="rhan-g c2">'+blTipo+blGest+'</div>';
+    if(pd.length){ const mi2=Math.max(1,...pd.map(d=>d.inc||0));
+      h+='<div class="rhan-c" style="margin-top:10px"><h3>Inconsistências por dia <span class="sub">· vermelho = ainda não tratadas</span></h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: ${d.inc||0} inconsistência(s), ${d.pend||0} a tratar · ${d.presentes} presentes"><span>${d.inc||''}</span><span class="bar g" style="height:${(d.inc||0)/mi2*85}%"><i style="height:${d.inc?d.pend/d.inc*100:0}%"></i></span>${dl(d)}</div>`).join('')+'</div></div>'; }
+    h+=ranking([['pend','A tratar'],['dias_inc','Inconsist.']]);
   }
-  // ---- Por consórcio  ×  interjornada
-  const pe=D.por_empresa||[], ij=D.interjornada||[];
-  const blCons=pe.length>1?'<div class="rhan-c"><h3>Por consórcio</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Consórcio</th><th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">Faltas</th><th class="n">Atraso</th></tr>'
-    +pe.map(e=>`<tr><td>${vEsc(e.sigla)} · ${vEsc(RH_ZA[e.consorcio]||e.consorcio||'')}</td><td class="n">${e.funcionarios}</td><td class="n">${rhHM(e.htrab)}</td><td class="n">${rhHM(e.he)}</td><td class="n">${rhPc(e.he,e.htrab)}</td><td class="n">${e.dias_falta} d</td><td class="n">${rhHM(e.atraso_min)}</td></tr>`).join('')+'</table></div></div>':'';
-  const blIj='<div class="rhan-c"><h3>Descanso menor que 11h entre jornadas</h3>'+(ij.length?'<div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Dia</th><th class="n">Descanso</th><th class="n">Falta p/ 11h</th></tr>'
-    +ij.map(x=>`<tr><td class="nm">${vEsc(x.nome)} <span class="sub" style="margin:0">${vEsc(x.sigla||'')}</span></td><td>${fmtData(x.data)}</td><td class="n">${rhHM(x.descanso)}</td><td class="n bad">${rhHM(660-x.descanso)}</td></tr>`).join('')+'</table></div>':'<p class="sub" style="margin:0">Nenhum caso.</p>')+'</div>';
-  h+='<div class="rhan-g c2">'+blCons+blIj+'</div>';
-  // ---- Ranking por colaborador
-  const cols=[['pend','A tratar'],['dias_inc','Inconsist.'],['abs','Absent.'],['he','HE'],['dias_he2','HE>2h'],['interj','Desc.<11h'],['dias_falta','Faltas'],['atraso','Atraso'],['htrab','H.trab']];
-  const fs=[...(D.func||[])].map(f=>({...f,abs:f.prev?f.falta/f.prev:0})).sort((a,b)=>(b[rhanOrd]||0)-(a[rhanOrd]||0)||String(a.nome).localeCompare(b.nome));
-  const vis=rhanTodos?fs:fs.slice(0,20);
-  const fmt=(c,v,f)=>c==='abs'?(f.prev?rhPc(f.falta,f.prev,0):'—'):(c==='he'||c==='atraso'||c==='htrab')?rhHM(v):(v||'')+(v&&(c==='dias_falta'||c==='dias_he2')?' d':'');
-  h+='<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar ou num nome para filtrar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
-    +cols.map(([c,l])=>`<th class="n${c===rhanOrd?' on':''}" data-o="${c}">${vEsc(l)}</th>`).join('')+'</tr>'
-    +vis.map(f=>`<tr${f.fid&&!rhanFunc?` data-fid="${f.fid}" style="cursor:pointer" title="Ver os indicadores só desta pessoa"`:''}><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
-      +cols.map(([c])=>`<td class="n${c==='pend'&&f.pend?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
-    +'</table></div>'+(fs.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fs.length+')'}</button>`:'')+'</div>';
   $('#rhanView').innerHTML=h;
 }
 
