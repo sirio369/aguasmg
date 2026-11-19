@@ -2560,7 +2560,9 @@ function prEstDesenhar(){
     pares.forEach(p=>{
       // só a bolinha no cruzamento da rede com o limite (2026-11-19: sem os chips D/F nem as linhas tracejadas)
       const cz=[p.cruz[1],p.cruz[0]];
-      const m=L.circleMarker(cz,{pane:'prEst',radius:9,color:'#fff',weight:3,fillColor:'#e65100',fillOpacity:1}).addTo(prEstLayer);
+      // losango preto (≠ bolinhas coloridas das pressões aferidas) — 2026-11-19
+      const m=L.marker(cz,{pane:'prEst',icon:L.divIcon({className:'',iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10],
+        html:'<div style="width:14px;height:14px;margin:3px;background:#000;border:2px solid #fff;transform:rotate(45deg);box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>'})}).addTo(prEstLayer);
       m.bindPopup(()=>prEstPopup(p,null),{minWidth:200});
       m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const a=el&&el.querySelector('.prEstReg'); if(a) a.onclick=()=>{ prMap.closePopup(); irPara('pressao_reg'); }; });
       p._mk=m;
@@ -2578,7 +2580,7 @@ function prEstDesenhar(){
   }).join('');
   box.classList.remove('hidden');
   box.innerHTML=`<div class="sec" style="margin:0 0 4px">Teste de estanqueidade — ${prFDmc.replace(/^(ZA\d+)-(.*)$/,'$2 ($1)')}</div>
-    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#e65100">●</b> = fronteira (trecho que cruza o limite); toque na bolinha para ver os pontos dentro/fora.</p>${linhas}`;
+    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#000">◆</b> = fronteira (trecho que cruza o limite); toque no losango para ver os pontos dentro/fora.</p>${linhas}`;
   box.querySelectorAll('[data-prp]').forEach(el=>el.addEventListener('click',()=>{
     const p=pares.find(x=>String(x.n)===el.dataset.prp); if(!p||!prMap) return;
     prMap.setView([p.cruz[1],p.cruz[0]],Math.max(prMap.getZoom(),17));

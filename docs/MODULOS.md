@@ -207,9 +207,9 @@
   sempre ≥5 m do limite; sem ligação → **ponto na rede** a ≥10 m do limite e ≤120 m do cruzamento (medir em hidrante/registro). Traz
   também a válvula de manobra mais próxima do cruzamento (≤40 m), DN/material, matrícula e endereço. Lado vazio = sem ligação nem rede
   cadastrada (borda da ZA). **Medido** = pressão das últimas 36 h (qualquer usuário) a ≤30 m do ponto (cliente, `prEstMedida`) → o
-  popup mostra o valor e a lista o **Δ dentro − fora**. **No mapa só aparece a bolinha laranja da fronteira** (cruzamento da rede
-  com o limite, `circleMarker` raio 9, borda branca) — os chips D/F e as linhas tracejadas saíram em 2026-11-19 (sw v432); tocar a
-  bolinha abre o popup do par (dentro/fora, navegar até o cruzamento, registrar pressão). Pane `prEst` (z 440) abaixo das pressões. Cache por DMC em memória +
+  popup mostra o valor e a lista o **Δ dentro − fora**. **No mapa só aparece o losango preto da fronteira** (cruzamento da rede
+  com o limite, `divIcon` 14 px girado 45°, borda branca — símbolo diferente das bolinhas de pressão aferida, sw v433) — os chips D/F
+  e as linhas tracejadas saíram em 2026-11-19 (sw v432); tocar o losango abre o popup do par (dentro/fora, navegar até o cruzamento, registrar pressão). Pane `prEst` (z 440) abaixo das pressões. Cache por DMC em memória +
   `localStorage.pr_est_<cod_za>`; leva até ~2 s nos DMCs grandes de Betim (05/06, ~85 pares). Substitui a antiga tabela fixa
   `ponto_estanqueidade` (calculada sobre outra camada de DMC).
 - **Formulário** (`pressao_reg`, "‹ Mapa" volta): o mesmo de antes; ao salvar volta ao mapa (`prAposSalvar`).
