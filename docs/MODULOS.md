@@ -609,6 +609,10 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
   (tela `gi`) com todos os BIs do app (Gestão de Suprimentos, Frotas, Pessoas; Financeira "Em breve"). **Quem acessa o
   Auxiliar vê todos os BIs** (`sup_bi_pode`/`frota_bi_pode`/`pes_bi_pode` aceitam `aux_acesso`); os acessos próprios de cada
   BI continuam valendo para **carregar** arquivos. A distribuição definitiva (o que fica onde) ainda vai ser revista.
+  **Carga separada (2026-11-19, sw v439):** como a Carga SIGOS, as cargas saíram de dentro dos BIs e ganharam o card
+  **📥 Carga dos BIs** (tela `bi_carga`, `bcInit`) no mesmo Planejamento → Suprimentos (SIENGE) `sup_carga` · Frotas
+  `frota_carga` · Pessoas `pessoas_carga` (voltar → `bi_carga`). O card e cada sub-card só aparecem para quem tem o
+  `*_carga_acesso` daquele BI (`biCargaAcessos()`); as telas de BI ficam só de leitura (sem botão de carga).
 
 ### 4.1 Criação de matrículas — `// CRIAÇÃO DE MATRÍCULAS` (~L1504) · tela `matriculas`
 - Fila de captações aguardando matrícula. RPCs `app_captacao_fila(p_filtro)` (pendente/criada/todas)
@@ -4888,3 +4892,4 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Acesso:** quem tem `aux_acesso` (ou admin) vê os 3 BIs; `*_carga_acesso` continua necessário para subir arquivos.
 - **Correção:** `app_sup_carga_falha`, `app_frota_carga_falha` e `app_pes_carga_falha` só apagam linhas de carga ainda `pendente` (antes, chamar com o id de uma carga concluída zerava o BI).
 - **SQL aplicado em produção em 19/11/2026** (migrações `sup_bi`, `sup_bi_acesso`, `sup_estoque`, `frota_bi`, `pessoas_bi`). Ordem: `migracao_sup_bi.sql` → `migracao_sup_bi_acesso.sql` → `migracao_sup_estoque.sql` → `migracao_frota_bi.sql` → `migracao_pessoas_bi.sql`.
+- **Carga separada (2026-11-19, sw v439):** botões "Cargas do SIENGE"/"Carregar arquivos" saíram das telas de BI; as cargas ficam em Auxiliar › Planejamento › **📥 Carga dos BIs** (`bi_carga`), visível só com `*_carga_acesso`.
