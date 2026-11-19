@@ -184,7 +184,35 @@
 
 ## 2. Coleta de campo (schema `"8 - coleta_campo"`)
 
-### 2.1 Mapeamento de pressão — `// UI módulo pressão` (~L592) · tela `pressao`
+### 2.1 Mapeamento de pressão — `// MAPEAMENTO DE PRESSÃO — tela inicial em mapa` · telas `pressao` (mapa) + `pressao_reg` (formulário)
+- **Tela inicial = mapa (2026-11-17, sw v407):** `pressao` abre o mapa da região (`prMap`, `prMapInit`) com **limites das ZAs**
+  (`app_limites_zas`, chip liga/desliga), os **DMCs oficiais** (`"7 - setorizacao".dmc` vigentes, RPC **`app_pressao_dmcs()`**, chip
+  liga/desliga) e a **rede de água** (chip "Rede", ligado por padrão, a partir do zoom 14, azul com opacidade 0,45 e sem clique — pane
+  `prRede` entre DMCs e pontos; reaproveita `cadReq`/`cadData` do Cadastro técnico = mesma RPC e cache por área no IndexedDB, sw v408).
+  **Filtros ZA + DMC** (2026-11-17, sw v408; dois `select` `#prFZa`/`#prFDmc`, substituíram o painel de chips por DMC): ZA = Todas/ZA1004/
+  ZA0200; DMC = Todos ou **um só** DMC (lista da ZA escolhida). Recortam limites, DMCs e pontos, ajustam a frase de contagem e
+  enquadram o mapa na seleção; guardados no aparelho em `localStorage.pr_filtro`. Ponto entra no filtro de DMC pelo `dmc`+`consorcio`
+  que a RPC devolve,
+  ponto **"Você"** (GPS + círculo de precisão, pane próprio por cima; `prMapOnGps` é chamado pelo `iniciarGPS`; botão 📍 centraliza)
+  e as **pressões aferidas nas últimas 36 h por qualquer usuário** (RPC **`app_pressao_recentes(p_horas default 36)`**, máx. 168 h,
+  devolve pressão/cota/consórcio/DMC pelo ponto/HD/foto/coletor (nome do `perfil`)/data). Cor = escala fixa 10–50 mca (`prPCor`),
+  rótulo com o valor e popup com o detalhe + foto. Recarrega ao abrir a tela, no ⟳, a cada 2 min com a tela aberta e quando a fila
+  offline sincroniza. Caches no aparelho: `pr_limites_za`, `pr_dmcs`, `pr_recentes`. Botões: **➕ Registrar pressão** (→ `pressao_reg`)
+  e **📊 Produtividade** (→ `pr_prod`). Migração: `docs/migracao_pressao_mapa.sql`.
+- **Pontos sugeridos p/ teste de estanqueidade do DMC (2026-11-17, sw v409):** com um DMC escolhido no filtro aparece o chip
+  **Estanqueidade** (ligado por padrão) + lista de pares abaixo do botão de registrar. RPC **`app_pressao_estanq_pontos(p_dmc cod_za)`**
+  (`docs/migracao_pressao_estanq_pontos.sql`): cada trecho de `"2 - infra_agua".rede` com uma ponta dentro e outra fora do DMC é um
+  cruzamento; cruzamentos a ≤30 m viram 1 **par** (numerado no sentido do azimute a partir do centro). Cada par = ponto **D** (dentro) +
+  **F** (fora): ligação ativa (`situacao='R'`) do próprio trecho que cruza (`ligacoes.nu_trecho`, ≤250 m) ou de outro trecho a ≤60 m,
+  sempre ≥5 m do limite; sem ligação → **ponto na rede** a ≥10 m do limite e ≤120 m do cruzamento (medir em hidrante/registro). Traz
+  também a válvula de manobra mais próxima do cruzamento (≤40 m), DN/material, matrícula e endereço. Lado vazio = sem ligação nem rede
+  cadastrada (borda da ZA). **Medido** = pressão das últimas 36 h (qualquer usuário) a ≤30 m do ponto (cliente, `prEstMedida`) → o
+  popup mostra o valor e a lista o **Δ dentro − fora**. **No mapa só aparece o losango preto da fronteira** (cruzamento da rede
+  com o limite, `divIcon` 14 px girado 45°, borda branca — símbolo diferente das bolinhas de pressão aferida, sw v433) — os chips D/F
+  e as linhas tracejadas saíram em 2026-11-19 (sw v432); tocar o losango abre o popup do par (dentro/fora, navegar até o cruzamento, registrar pressão). Pane `prEst` (z 440) abaixo das pressões. Cache por DMC em memória +
+  `localStorage.pr_est_<cod_za>`; leva até ~2 s nos DMCs grandes de Betim (05/06, ~85 pares). Substitui a antiga tabela fixa
+  `ponto_estanqueidade` (calculada sobre outra camada de DMC).
+- **Formulário** (`pressao_reg`, "‹ Mapa" volta): o mesmo de antes; ao salvar volta ao mapa (`prAposSalvar`).
 - Leitura de manômetro + foto + GPS. Salva via `app_registrar_pressao` (fila).
 - **Duas fotos (2026-09):** **Foto do manômetro** (obrigatória, `fotoBlob`→`p_foto`) e **Foto do número HD**
   (opcional, `fotoHdBlob`→`p_foto_hd`, inputs `.fFotoHd`/preview `#fotoHdPrev`). Ambas vão no `item.fotos`
@@ -192,10 +220,11 @@
   + param `p_foto_hd` na RPC (recriada com `drop`+`create` p/ não gerar overload — regra §0.6; grant só `authenticated`).
 - **Unidade de medida (2026-09):** ao lado do valor há `#pressao_un` (**MCA/BAR/KPA**, default MCA). O valor é
   **convertido p/ mca no cliente** antes de enviar (`vmca`: kpa÷9,80665; bar×10,1971621; mca as-is) — a coluna
-  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend. `prAposSalvar(vmca)`.
-- Alvo opcional vindo do Teste de estanqueidade (`prAlvo`). Botões: `#prEst` (estanqueidade), `#prProd`.
-- Subtelas: **Estanqueidade** (`estanqueidade`, `// TESTE DE ESTANQUEIDADE` ~L649, RPC
-  `app_estanqueidade_listar`, filtro por consórcio) e **Produtividade de pressão** (`pr_prod`,
+  do banco (`p_pressao_mca`) continua sempre em **mca**, sem mudança de backend.
+- **Teste de estanqueidade — REMOVIDO (2026-11-17):** a tela `estanqueidade` (pontos sugeridos, alvo `prAlvo`) saiu do app.
+  Ficam só os resultados: as leituras feitas nela seguem em `mapeamento_pressao` (coluna `ponto_estanqueidade_id`); a tabela
+  `ponto_estanqueidade` e as RPCs `app_estanqueidade_listar`/`app_estanq_poligonos` seguem no banco sem uso (app em cache ≤ v406).
+- Subtela **Produtividade de pressão** (`pr_prod`,
   `// PRODUTIVIDADE DE PRESSÃO` ~L4093, RPCs `app_pressao_filtros`/`app_pressao_produtividade`).
   No mapa da produtividade, o **popup de cada ponto** traz pressão/**cota**/**cota+pressão**/HD/data/coletor +
   **link "📷 Ver foto do manômetro"** (`SBASE+pr.foto`, aba nova) quando há foto. **Chips de métrica**
@@ -203,15 +232,6 @@
   cor fixa 10–50), **Cota** e **Cota + Pressão** (m, escala de cor **automática** por min/máx dos pontos) —
   muda a cor + o rótulo do marcador e recalcula os cards (média/mín/máx) no cliente a partir de `prpData`.
   `app_pressao_produtividade` devolve `foto` **e `cota`** (=`cota_m`) nas `properties` dos pontos.
-- **Camadas COPASA no mapa da estanqueidade (2026-09):** no modo Mapa há chips toggle (`#estCamadas`,
-  `EST_CAM`/`estCamRender`/`estCamToggle`) para **Zonas de pressão** (`"5 - info_copasa".zonas_pressao_copasa`,
-  137, azul) e **DMCs** (`"5 - info_copasa".dmcs_existentes_copasa`, 23, laranja) — polígonos com **fill 30% +
-  borda weight 2** (mesmo padrão de ativar/desativar do Cadastro técnico). GeoJSON (4326, `ST_SimplifyPreserveTopology 1m`)
-  via RPC **`app_estanq_poligonos(p_layer)`** (`zonas_pressao`|`dmcs`, definer, só `authenticated`); cache em
-  localStorage (`est_cam_zp`/`est_cam_dmc`). Camadas ficam **abaixo** dos pontos (`bringToBack`); começam desligadas.
-- **Popup no ponto do mapa (2026-09):** clicar num marcador abre popup (`bindPopup`+`popupopen`) com **🧭 Navegar
-  até o local** (link Google Maps, `target=_blank`) e **📝 Preencher informações** (`.estPopFill` → `estSelecionar`
-  → tela de pressão). Antes o clique ia direto p/ a tela de pressão; o tooltip de hover foi mantido.
 
 ### 2.2 Loggers — `// MÓDULO LOGGERS` (~L782) · telas `loggers_hub` / `loggers` / `logger_det`
 - **Card "Loggers"** (home, antes "Loggers temporários") → **hub `loggers_hub`** com 2 botões:
@@ -585,6 +605,8 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 - **Onde:** Home › 🧰 Suporte. **Gate:** só `pode_aprovar`/admin — botão `#homeAuxProg` nasce
   `hidden`, revelado por `homeGate()` (em `irPara('home')` **e** quando `app_me` resolve).
 - Hub com dois botões (retaguarda):
+- **📅 Planejamento** (2026-11-18, sw v431): última categoria do hub, **vazia por enquanto** (só o texto
+  "Nenhum módulo ainda." `#apPlanVazio`); os módulos de planejamento entram aqui. Mesmo gate do Auxiliar.
 
 ### 4.1 Criação de matrículas — `// CRIAÇÃO DE MATRÍCULAS` (~L1504) · tela `matriculas`
 - Fila de captações aguardando matrícula. RPCs `app_captacao_fila(p_filtro)` (pendente/criada/todas)
@@ -2130,7 +2152,7 @@ na UI desde 2026-10-14).
 ## 10. Catálogo rápido de RPCs (as efetivamente usadas pelo app)
 
 **Núcleo:** `app_me`, `app_limites_zas`.
-**Pressão:** `app_pressao_filtros`, `app_pressao_produtividade`, `app_estanqueidade_listar`, `app_estanq_poligonos` (camadas ZP/DMC COPASA).
+**Pressão:** `app_pressao_dmcs`, `app_pressao_recentes` (mapa inicial, 36 h), `app_pressao_estanq_pontos` (pares D/F do DMC), `app_pressao_filtros`, `app_pressao_produtividade`. (`app_estanqueidade_listar`/`app_estanq_poligonos` sem uso desde 2026-11-17.)
 **Loggers:** `app_loggers_listar`, `app_logger_criar/instalar/remover/finalizar/editar`,
 `logger_pressao_importar/stats`.
 **Pesquisa/Ocorrência:** `app_pesquisa_filtros`, `app_pesquisa_produtividade`,
@@ -2704,6 +2726,34 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     Status `preobra` agora = falta a OS SIGOS.
   - Testado com rollback (11/11/2026, linha 47 / ZA0200): nome "Liberação Transbetim", vistoria "não se aplica" com a aprovação
     inativa, OS SIGOS recusa "não se aplica", lançar a OS abriu a Execução com GASMIG ainda pendente/acionável, desfazer ok.
+- **📎 Vários PDFs por documento do Encerramento (2026-11-18, sw v424, `docs/migracao_proj_doc_extras.sql`).** Relatório de
+  Furo/Solda/Estanqueidade, Rel. de Qualidade da Pavimentação, As built e Certificado de calibração aceitam mais de um PDF.
+  - O **1º PDF** segue em `intervencao_documento` ("Anexar PDF"/"Substituir 1º", sem mudança). Com ele anexado aparece **➕ Mais
+    PDFs** (seleção múltipla) → `app_proj_doc_extra_add(p_kind,p_gid,p_chave,p_nome,p_path,p_folha)` grava em
+    `"13 - projetos_obra".intervencao_documento_extra` (RLS deny-all). **Só etapas `doc` da fase 5**, mesmo ator/escopo/fase aberta
+    do envio normal; As built pede a folha também nos extras.
+  - **Cada PDF a mais é um novo envio** (`proj_etapa_envio`): a etapa volta a "enviado" e a aprovação da Qualidade a "aguardando"
+    (aviso pelo trigger de evento; o evento guarda o arquivo novo). Remover um extra (🗑, `app_proj_doc_extra_remover(p_id)`, devolve o
+    path p/ apagar do Storage) registra evento `removido` e não mexe no status. Depois de aprovado não entra nem sai arquivo.
+  - Leitura: `app_proj_docs_extras_listar` → `pjDocsExtra[chave]`; `pjDocsTodos(chave)` = 1º + extras, usado no relatório da tela
+    (Abrir 1, 2…), na seção 4 do PDF consolidado e nos anexos mesclados no fim (`Nome (1/3)`). `app_proj_docs_listar` não mudou
+    (app em cache segue vendo só o 1º).
+- **🔓 Sem portões de fase (2026-11-18, sw v420, `docs/migracao_proj_sem_portoes.sql`).** Pedido do usuário: tirar as travas que
+  impediam o avanço do pipeline do início ao fim.
+  - **Toda fase fica aberta desde o início:** `proj_calc` devolve `aberta` = true nas fases 2–5 (e em cada item delas). A Qualidade
+    aprova sem esperar o Liberar, Obras anexa a pré-obra/Encerramento e **lança avanço sem OS SIGOS** nem aprovação da Qualidade
+    (`app_proj_avanco_registrar`, `app_proj_etapa_enviar`, `app_proj_etapa_nao_aplica`, `app_proj_reaterro_*` conferem essas flags).
+    A fase 1 continua como era (Engenharia edita até o Liberar; depois só item em correção).
+  - **Continuam:** os papéis (Engenharia/Qualidade/3 cargos de Obras), o **Liberar exigindo os anexos da fase 1** (ele só manda o
+    pacote para a Qualidade), a **trava do ensaio de reaterro → recomposição** e "Concluída" só com tudo feito.
+  - **Fase alcançada ≠ fase aberta:** status, `fase`, "com quem está", `exec_pendente` e os carimbos/avisos de "fase aberta"
+    (`proj_fase_sync`) seguem a ordem do pipeline, agora em **`c->'chegou'`** (= o antigo `aberta`). Item de fase ainda não
+    alcançada só entra na fila (`acionavel`) se estiver **aguardando aprovação ou em correção**; as pendências comuns só entram
+    quando o pipeline chega na fase (as filas não lotam).
+  - Front: o aviso da Execução no `projeto_det` virou "Execução aberta" e, se o pipeline ainda não chegou lá, diz em que fase está.
+  - Testado com rollback (18/11/2026, 86 intervenções): status/fase/concluída/progresso iguais, `chegou` = `aberta` antigo em todas,
+    Execução aberta 42 → 86, 7 documentos já enviados (executivo de 2 em configuração, relatório de furo de 5 HDD em execução)
+    entram na fila da Qualidade; OS SIGOS lançada antes do Liberar aceita sem gerar evento de fase.
 - **🔁 Pipeline — FRONT (2026-11-02, sw v317).** Depende de `docs/migracao_proj_pipeline.sql` aplicado (sem ele
   `app_proj_pipeline_resumo` falha e toda intervenção aparece como "Em configuração").
   - **Hub em 3 atores:** 🏗️ **Obras** (Intervenções · Resumo · Indicadores) · 📐 **Engenharia** (ex-"Suporte":
@@ -2760,7 +2810,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   VRP/Macromedidor/Registro; sem `situacao_atual`; mostra `erros`/`tipo_mantido`) + **templates .gpkg** lineares/pontuais (`pjImpTemplateGpkg`,
   sql.js, SRID 31983). **⏱️ Prazos das etapas** (`projeto_prazos`; admin/Engenharia editam via `app_proj_prazo_set`, histórico `app_proj_prazo_log`;
   tela mostra prazo_aten+1/prazo_atraso+1). **Resumo**: filtro de ator, 📌 Situação atual (status × tipo + pendências por ator), 🔁 Pipeline no
-  período (`app_proj_eventos`), CSV com coluna Registro. Etapa em correção mostra o motivo da reprovação na linha do documento.
+  período (`app_proj_eventos`; desde 2026-11-18, sw v423, **só os cartões de contagem** — a lista de eventos por dia foi removida a pedido), CSV com coluna Registro. Etapa em correção mostra o motivo da reprovação na linha do documento.
 - **🔁 Pipeline — PR 4: ensaio de reaterro no projeto (2026-11-02, sw v320, `docs/migracao_proj_reaterro.sql`).** Todo **bloco**
   ativo da execução com `Reaterro…` + `Recomposição de pavimento` (Vala N, Câmara da VRP, Caixa do macromedidor, Obra civil,
   Peça N, Obra civil da caixa da interligação; na VCA o bloco é a **raiz**) só libera a Recomposição com o **ensaio de
@@ -2849,6 +2899,9 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **Data de execução livre (2026-11-18, sw v422, `docs/migracao_proj_avanco_data_livre.sql`):** a pergunta virou **"Esse avanço foi
+  realizado em outra data?"** — Sim abre um campo de **data e hora** (`datetime-local`, `max` = agora) e aceita **qualquer data**
+  que não esteja no futuro (front e `app_proj_avanco_registrar`, tolerância de 5 min). O texto abaixo (só ontem) é o histórico.
 - **"Esse avanço foi realizado ontem?" (2026-11-13, sw v374, `docs/migracao_proj_hdd_valas_ontem.sql`):** todo
   "Lançar avanço" do `projeto_det` exige responder Sim/Não (`.pjontem`). **Não** = rito normal (`ts = now()`); **Sim** =
   pede o **horário de execução** e grava a data de **ontem** nessa hora (`p_executado_em`, parâmetro novo opcional — drop +
@@ -3275,8 +3328,9 @@ Gestão (admin **ou** `perfil.vrp_gestao_acesso`, via `vrp_pode_gestao`) — `ap
 → o usuário atribuído; retorno/pendência → a gestão). `app_me` expõe `vrp_gestao`.
 
 **Frontend Campo (`index.html`, funções `vm*`):** hub `vmHub`; `vmCampoInit` (Minhas OS via
-`app_vrp_os_minhas` + "Nova OS corretiva" → `vmNovaPicker` reusa `app_vrp_listar`); wizard de 5 telas
-(`vmExecRender`/`vmScr1..5`: Chegada→Pressões→Condição→Serviço→Finalização) sobre o cabeçalho autofill,
+`app_vrp_os_minhas` + "Nova OS corretiva" → `vmNovaPicker` reusa `app_vrp_listar`); wizard de 6 telas
+(`vmExecRender`: Chegada→Pressões→Condição→Serviço→**Calibração**→Finalização; substituição: Chegada→VRP anterior→VRP
+nova→Pressões→**Calibração**→Finalização; `VM_NSTEP=6`, `VM_STEP_CALIB=5`) sobre o cabeçalho autofill,
 com botões OK/Intervir/Não verificado, campos condicionais, pendências automáticas e sugestão de status;
 fotos via `comprimir`+`vmUpload` (bucket `fotos-campo` prefixo `vrp-os/`), GPS global `gps`; conclusão
 `vmEnviar`→`app_vrp_os_concluir`. **Ficha da VRP** (`vmFichaOpen`, overlay `#vmFicha`) e **relatório PDF**
@@ -3289,6 +3343,21 @@ nova) + o montante de projeto como referência. Na tela Pressões o card de jusa
 obrigatória `fim_jus_motivo` (vai no `respostas` jsonb, sem mudança de banco; é descartada no envio se a jusante
 voltou p/ dentro da tolerância) e ela aparece no resumo. O `onchange` de `fim_jus` só re-renderiza quando o aviso
 aparece/some (não perde o foco ao tocar no próximo campo). O setpoint é a **pressão de projeto** (decisão confirmada em 2026-10-23); `pres_saida_campo` ("Jusante em campo") não é usada aqui.
+**Ponto crítico × VRP + etapa de Calibração (2026-11-18, sw v418, `docs/migracao_vrp_ponto_critico.sql` — aplicada):**
+tabela `"2 - infra_agua".vrp_ponto_critico` (1:1 com `vrps`: `vrp_id` PK/FK, `no_modelo` = nó J-xxxx do modelo,
+`geom` Point 31983, `fonte`; RLS sem policy, só via RPC). Carga inicial: **101 VRPs de Betim** do modelo hidráulico
+(`MH_ZA0200_Resumo_Atualizado.gpkg`, camada `pontos_criticos`, só localização + vínculo — pressões/setpoints do modelo
+**não** foram carregados); VRPs em par (ex.: VRP1456982/83) têm o mesmo ponto. Sem ponto: VRP1684349, VRP1686884,
+VRP1620847, VRP1620852, VRP1447579/80 (não opera/reserva) e todas as de Contagem. Helper `vrp_pc_json(vrp_id)` (sem grant)
+→ `{no_modelo,lat,lon,dist_m}`, devolvido como `ponto_critico` por `app_vrp_ficha` e `app_vrp_os_header` (este também
+passou a devolver `ult_pc`). **Ficha:** seção 🗺️ VRP × ponto crítico com mapa (`vmPcMapa`, VRP azul, PC vermelho, linha
+tracejada) + 🧭 navegar; a linha "Ponto crítico" da grade mostra o nó e a distância. **OS — tela 5 · Calibração
+(`vmScrCalib`, toda OS):** pressão na jusante (obrigatória → `press_jus_fin`/`fim_jus`, com a justificativa de setpoint que
+antes ficava na Finalização) + pressão no ponto crítico (`press_pc_fin`/`fim_pc`) + **foto do manômetro no ponto crítico**
+(`fotos.manometro_pc`), com mini-mapa e navegação. PC + foto são obrigatórios quando a VRP tem ponto cadastrado; sem ponto
+é opcional, mas pressão informada exige a foto (`vmValidCalib`). A Finalização ficou com montante final + estabilizada/
+vazamento/liberada/substituição. Relatório PDF e tela da OS ganharam a seção "5 · Calibração" (foto do manômetro no PDF).
+Sem mudança no `app_vrp_os_concluir` (mesmos campos/jsonb).
 **Pressão de projeto de Betim (2026-10-29):** carregada da planilha do projeto hidráulico (`VRP_SANDER_ENVIADO.xlsx`,
 81 VRPs da ZA0200, casadas por `cd_no_agua`): Pressão de Entrada → `pres_max` (montante de projeto), Pressão de Saída →
 `pres_saida` (jusante = setpoint) e Diâmetro da válvula → `diametro`. 67 valores substituídos + 13 preenchidos (1 já igual);
@@ -3562,12 +3631,15 @@ pronto — **nada fica "aberto"** (sem acompanhamento, encerramento, interrupç�
 **Gestão — `qsms` (Home › 🧰 Suporte, card 🦺, gate `ME.qsms`):** `ME.qsms` = admin **ou** engrenagem
 `perfil.qsms_acesso` **ou** cargo Téc. Segurança do Trabalho / Téc. Qualidade / Coord. QSMSS
 (`"16 - qsms".qsms_pode`). ⚙️ (admin, no hub) → `qsms_acesso` (`app_qsms_acesso_listar/_set`).
-**Hub `qsms` em categorias (espelha o Almoxarifado, 2026-10-28):** **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
+**Hub `qsms` em categorias (reorganizado em 2026-11-18, sw v428):** **📊 Indicadores** → `sst_bi` (BI QSMS); **🦺 EPI** →
+painel, cesta e EPI por colaborador; **⛑️ SST** → `qsms_form` (**Formulários APR**), Inspeções, ASO, Treinamentos, CIPA, DDS,
+Ocorrências (Inspeções/DDS/Ocorrências = a tela `sst_lanc` travada em um tipo, ver §20) e **Checklists de reaterro e pavimento**
+(`sst_ck`, POP-022, sw v430 — §20.1). Antes (2026-10-28): **⛑️ APR e derivados** → `qsms_ind` (Indicadores) e
 `qsms_form` (Formulários); **🦺 EPI** → `qsms_epi_painel` (Painel de EPI), `qsms_cesta` (Cesta de EPI) e `qsms_epi_col` (EPI
 por colaborador), nessa ordem. Cada
 tela tem cabeçalho e filtros próprios (período + consórcio com prefixos `qi`/`qf`/`qe`; `qsmsPeriodo`/`qsmsFiltros`/
 `qsmsArgs`). Em APR e derivados **a unidade é a atividade** (APR + PT/PET), com **uma verificação por atividade**.
-- **Indicadores** (`qsms_ind`, `qsmsIndInit`/`qsmsPainel`): KPIs (atividades, com PT, com PET, com PT/PET impedida,
+- **Indicadores** (`qsms_ind`) — **removida em 2026-11-18 (sw v428)**: virou a página **APR** do BI QSMS (`sst_bi`, §20). Era: KPIs (atividades, com PT, com PET, com PT/PET impedida,
   leituras de gás fora, com alertas) e verificação (a verificar, conformes, com ressalva, não conformes — **tocar num tile
   abre Formulários já filtrado no mesmo período/consórcio**); atividades por dia, por tipo, por responsável; riscos.
 - **Formulários** (`qsms_form`, `qsmsFormInit`/`qsmsLista`/`qsmsCardHtml`; filtros guardados em `qsmsFF`, sobrevivem ao
@@ -3636,6 +3708,18 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
 - Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
   foram testadas com rollback E2E (§4 do CLAUDE.md).
+- **Botão Emitir × GPS** (2026-11-19, sw v436): `segOnGps` chama `segAtualizar(true)` a cada leitura do GPS (no iPhone,
+  várias por segundo). Até a v435 isso recriava o HTML de `#segBtns` toda vez, e o toque que começava num botão
+  terminava em outro: **"Emitir" azul que não responde** (caso kesse.lopes, 19/11 — nenhuma chamada chegou ao
+  servidor; reproduzido com GPS a 150 ms: 10/10 toques perdidos). Agora `segAtualizar` só reescreve `#segErros`/
+  `#segBtns` quando o HTML muda (`el._h`) e não mexe nos botões durante o envio (`segEnviando`). **Não volte a
+  recriar o botão a cada chamada.** O botão também não usa mais `disabled` com pendência: fica apagado
+  (`aria-disabled`), mostra "⚠️ Falta: …" logo abaixo e, ao tocar, rola até a caixa de pendências. Erro durante a
+  montagem do envio vira toast e libera o botão (antes ficava travado).
+- **Registro de tentativas** (`app_seg_tentativa` → `"16 - qsms".qsms_tentativa`, `docs/migracao_seg_tentativa.sql`):
+  cada toque em Emitir grava resultado `falta`/`bloqueio`/`enviando`/`erro` + pendências + precisão do GPS + versão do
+  app + aparelho. A chamada vai direto, sem fila; offline ou erro, ela é ignorada. Serve para responder "fulano tentou e não conseguiu".
+  Consulta pronta no fim do arquivo SQL. A tabela não tem a trava de "nada pode ser apagado" (é diagnóstico).
 
 ## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (🚧 Em desenvolvimento, admin-only) — `docs/migracao_avisos.sql` + `docs/migracao_avisos_dinamicos.sql`
 
@@ -3704,10 +3788,45 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   - Engrenagem ⚙️ `qsms_acesso` ganhou a coluna **Campo** (`app_qsms_campo_set`); quem tem Gestão já lança em campo
     (caixa travada marcada).
 - **Gestão — categoria "📊 Indicadores SST" no hub `qsms` (PR-C, sw v329, gate `ME.qsms`):** 6 telas, código `sg*`.
-  - `sst_painel` — `app_sst_painel` (mesmas views do BI): acidentes/ocorrências, inspeções, DDS, produção por responsável e
+  - `sst_painel` — **removida em 2026-11-18 (sw v428)**, o BI QSMS cobre; a RPC `app_sst_painel` segue no banco sem uso. Era: `app_sst_painel` (mesmas views do BI): acidentes/ocorrências, inspeções, DDS, produção por responsável e
     por semana, ASO, treinamentos por tipo, CIPA. Cada número abre a lista certa (NC pendente/vencida, ocorrência a validar
     e ação aberta abrem com 1 ano para trás, porque não dependem do período).
-  - `sst_lanc` — abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
+  - `sst_bi` — **BI QSMS dentro do app** (2026-11-18, sw v425, `docs/migracao_sst_bi.sql`; código `sb*`): 7 páginas do
+    Power BI QSMS (Acidentes, Próprios × terceiros, Inspeções, Saúde ocupacional, DDS, Treinamentos, CIPA) em abas,
+    com os mesmos cartões (incl. a frase de contexto e "Sem dados" quando a tabela inteira está vazia), gráficos por mês
+    (colunas + linha de %, SVG próprio) e por categoria (barras) e tabelas de detalhe. `app_sst_bi(de, ate,
+    consorcio)` (gate `sst_gestao_check`) devolve as **linhas** das views `bi_sst_*` + `vazias` + `hoje`; o app chama sem
+    período (só consórcio) e calcula as medidas no aparelho com a regra do `_Medidas` do BI (conferido número a número
+    com o modelo pelo MCP do Power BI em 18/11/2026, sem filtro, com período e com Área). Filtros = os do BI: período
+    (= relação com o Calendário: Data; Treinamentos pela Data de Realização; sem datas = todo o histórico), consórcio, Área
+    (não filtra a CIPA, que no BI não tem relação com Área) e as segmentações de cada página (Gravidade/Tipo, Vínculo/Empresa,
+    Cargo/Responsável, Cargo/Exame/Situação ASO, Tema/Responsável, Treinamento/Cargo/Situação, Tipo/Representação/Situação do
+    Mandato). Saúde, membros da CIPA, situação dos treinamentos e "Dias sem acidente" não dependem do período (no BI:
+    sem data ou `REMOVEFILTERS('Calendário')`). Só leitura. A segmentação "Mês de Realização" dos Treinamentos não foi
+    reproduzida (o período cobre).
+    **Desktop (sw v426):** a tela usa a largura toda (como RH/OS Pendentes); gráficos em 2 colunas a partir de 1040 px,
+    tabelas e cartões na linha inteira, SVG do gráfico mensal na largura da coluna (re-render no resize), barras com largura máxima.
+    **Visão geral removida** (2026-11-18, a pedido do usuário): a tela abre em Acidentes; a matriz por Área saiu junto.
+    **Layout novo (sw v427):** páginas em abas no topo (`#sbNav`, sublinhado, fixas ao rolar logo abaixo do cabeçalho do app; no
+    celular rolam na horizontal e a aba ativa fica visível); filtros num cartão `.sbfil` com rótulo em cada campo — Período (de/até +
+    atalhos Tudo / Mês atual / Últimos 3 meses / Ano atual, pelo `hoje` do banco), Consórcio, Área e as segmentações da página
+    (`#sbSegs`) — e **Limpar filtros** (zera tudo, inclusive segmentações; desabilitado sem filtro). Campo com valor fica em negrito;
+    sem o contorno azul global de `select` (escopado em `#sst_bi .sbfil`). Cartões `.sbk` (rótulo em cima, valor grande, contexto
+    embaixo), tabelas com cabeçalho fixo e linhas zebradas.
+    **sw v428:** filtro de período só com as datas (saíram os atalhos); gráficos de meia largura num mosaico de 2 colunas
+    (`sbMosaico` → `.sbmas`, `column-count:2`), sem buraco quando um é mais baixo; cartões no máximo 4 por linha; tabela de
+    Inspeções com **📄 Abrir** (relatório da inspeção na tela Inspeções). **Página APR nova** (os antigos Indicadores da APR):
+    `app_qsms_listar` com o histórico inteiro do consórcio, período e segmentações (tipo de intervenção, responsável, verificação)
+    no aparelho; Área não se aplica (o campo fica desabilitado); KPIs de atividades/PT/PET/impedida/gás/alertas e verificação,
+    atividades por mês pela situação da verificação, por tipo, por responsável, riscos das APRs e a lista de atividades.
+    **sw v429:** o mosaico virou 2 colunas de verdade (`sbMosaico` mede cada caixa e põe na coluna mais baixa; a última de cada
+    coluna estica, então as duas terminam na mesma linha). Gráficos de tempo com **eixo Mês | Dia** no título (`sbTempoCtl`,
+    estado por página em `sbi.tg`) e **drill-down**: clicar num mês abre os dias daquele mês (dias seguidos, fim de semana
+    sombreado; "‹ mês" volta). No modo Dia sem mês aberto, vai do 1º ao último dia com dado no filtro.
+  - `sst_lanc` — **desde sw v428 são 3 botões/telas no hub (Inspeções, DDS, Ocorrências)**: `sgLancAbrir(tipo, id?, volta?)` abre
+    a tela travada num tipo (título/subtítulo de `SG_TELA`, sem abas, carrega só aquele tipo); em Inspeções há o botão
+    **✅ Checklist da inspeção** (`sst_modelo`, que volta para Inspeções). O BI abre direto o relatório de uma inspeção
+    (`sgLancAbrir('inspecao', id, 'sst_bi')`, "Voltar ao BI QSMS"). Antes: abas Inspeções / DDS / Ocorrências (`app_sst_listar`), filtros (NC, NC pendente/vencida, a validar,
     acidentes, ação aberta, alerta), busca, XLSX. Detalhe por `app_sst_ver`: inspeção com OS + responsável pela
     intervenção e assinatura, e **tratativa de NC** (`app_sst_nc_tratar`, obs obrigatória + foto opcional em `fotos-campo/sst/trat_<item>_<ts>.jpg`, e reabrir); DDS com
     presença e assinaturas; ocorrência com **validação** (`app_sst_ocorrencia_validar`; acidente exige classificação e
@@ -3720,7 +3839,7 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
     (`app_sst_trein_tipo_salvar`) e **sem vínculo** (registro da planilha sem pessoa → vincular ou anular). Editar = novo
     registro (vale o mais recente), não sobrescreve o anterior. XLSX.
   - `sst_cipa` — membros e reuniões (`app_sst_cipa_*`), editar/anular; total de membros sugerido = titulares ativos.
-  - `sst_modelo` — checklist da inspeção (`app_sst_modelo_salvar`): grupo, item, ordem, ativo.
+  - `sst_modelo` — checklist da inspeção (`app_sst_modelo_salvar`): grupo, item, ordem, ativo. Sem botão no hub desde sw v428: abre pelo botão dentro de Inspeções.
 
 **Tabelas (schema `"16 - qsms"`, RLS deny-all, só RPC definer, `qsms_sem_delete` em todas, update → `sst_evento`):**
 `sst_inspecao` (+ `sst_inspecao_item`: C/NC/NA, foto, prazo, `trat_status` pendente/tratada; checklist-modelo em
@@ -3771,6 +3890,43 @@ outra chave com o schema/prefixo dele. O login `bi_leitura` continua valendo par
 - Os nomes das colunas das views são o contrato com o BI: renomear uma coluna quebra o relatório.
 - O `Área` mistura áreas do cadastro (`perfil.area`, em ASO/treinamentos) e as escolhidas no campo (inspeção/DDS/ocorrência) —
   o app de campo deve oferecer a lista de `perfil.area` + "Geral" para não espalhar grafias.
+
+### 20.1 Checklists do POP-022 — reaterro e recomposição de pavimento (2026-11-18, sw v430) — `docs/migracao_sst_checklist_pop022.sql`
+
+Os dois checklists do **POP-022 Rev. 03** (fonte: `checklists_reaterro_recomposicao_POP022.pdf`) saíram do papel:
+**01 · Reaterro** (4 grupos, 23 itens) e **02 · Recomposição de pavimento** (3 grupos, 25 itens). Preenchidos pela equipe de
+segurança no QSMS campo, vistos na gestão do QSMS e acompanhados numa página nova do BI QSMS.
+- **Campo (`sst`/`sst_form`, gate `ME.qsms_campo`):** 2 botões novos no hub — 🧱 **Checklist de reaterro** (`SST_TIPO.rea`) e
+  🛣️ **Checklist de recomposição** (`SST_TIPO.rec`), mesmo formulário `sst_form` (rascunho, fila offline, pasta `sst/`).
+  Itens na constante `SST_CK` (código `1.1`…, grupo, texto; `pav` = item que só vale para um tipo de pavimento).
+  Blocos: **Identificação** (data, **Nº da OS***, **tipo de intervenção*** Implantação/Manutenção/Reparo/Ligação/HDD/Outra,
+  **equipe/contratada***, endereço/local opcional, **tipo de pavimento*** na recomposição; fiscal = quem preenche) ·
+  **Checklist** (C / NC / N/A em todos; **NC exige observação/evidência**, foto opcional `nc_<i>`; escolher o tipo de
+  pavimento põe **N/A automático** nos itens dos outros tipos — `sstCkPav`, `it.auto`) · **Resultado** (Conforme / Não conforme /
+  Pendente; com item NC não pode ser "Conforme"; resultado ≠ conforme exige observação/ação corretiva) · **Fotos** antes/depois
+  (opcionais, `foto_antes`/`foto_depois`) · **Assinaturas** do **encarregado** (nome da lista ou digitado, p/ terceiro) e da
+  **fiscalização** (quem preenche). **GPS travado** obrigatório. "Meus lançamentos" mostra os checklists (`app_sst_minhas.checklists`).
+- **Gestão (`sst_ck`, hub QSMS › ⛑️ SST › Checklists de reaterro e pavimento, gate `ME.qsms`):** período + consórcio, KPIs
+  (total, por checklist, % itens conformes, itens NC, resultado não conforme, pendentes), filtro por checklist/resultado
+  (incl. "com item NC" e "com alerta"), busca, **XLSX**; detalhe (`app_sst_ck_ver`) com cabeçalho, itens por grupo (NC com
+  observação e foto), fotos, as 2 assinaturas e **anular** (`app_sst_anular` tipo `checklist`). `ckAbrir(id, volta)` abre direto
+  um checklist (usado pelo BI, com "Voltar ao BI QSMS").
+- **BI QSMS (`sst_bi`, página "Reaterro e pavimento", `SB_PAG.ck`):** KPIs (checklists, **% conformidade dos itens** =
+  C ÷ (C + NC), N/A fora; itens NC; resultado não conforme/pendentes), checklists por mês/dia empilhados por resultado + linha
+  de % (drill-down igual às outras páginas), itens com mais NC, por equipe, resultado por tipo de intervenção, NCs por etapa,
+  recomposição por tipo de pavimento e tabela com **📄 Abrir**. Segmentações: Checklist, Equipe, Fiscal. **Área desabilitada**
+  (checklist não tem área). Os itens seguem os checklists filtrados (pelo `Checklist ID`).
+
+**Banco:** `"16 - qsms".sst_checklist` (cabeçalho: `tipo` reaterro|recomposicao, OS, tipo de intervenção, equipe, local,
+tipo de pavimento, `resultado` conforme|nao_conforme|pendente, observações, encarregado + assinatura, assinatura do fiscal,
+GPS/geom 31983 + endereço/bairro/município/consórcio por `qsms_local`, fotos, alertas, anulado_*) e `sst_checklist_item`
+(ordem, código, grupo, **texto do item gravado junto** — mudar `SST_CK` não altera o que já foi respondido —, C/NC/NA, obs,
+foto). RLS deny-all, `qsms_sem_delete` nas duas, `sst_trg_audit` no cabeçalho. RPCs: `app_sst_ck_registrar` (campo,
+idempotente pelo id; inválido vira **alerta**: sem OS/GPS/resultado/assinatura, NC sem observação, "conforme" com NC),
+`app_sst_ck_listar` (gestão), `app_sst_ck_ver` (gestão ou autor); `app_sst_anular`, `app_sst_minhas` e `app_sst_bi`
+redefinidas (+ `checklists`, `checklist_itens`, `vazias.checklists`). Views **`bi_sst_checklist`** e
+**`bi_sst_checklist_item`** (grant `bi_qsms_leitura`) — o Power BI QSMS ainda não tem essas tabelas; dá pra incluir depois
+pela mesma API. **Aplicado em 18/11/2026** (migração `sst_checklist_pop022`, E2E com rollback ok).
 
 ---
 
@@ -4341,6 +4497,13 @@ dias validados ficam clicáveis), tabela por ZA (Atividade · No dia · Acumulad
 fiscalização), detalhe da atividade com **"OS do dia" primeiro** (`fscOsDia`: OS SIGOS, ou a do AcquaHub sem SIGOS, sem
 repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros sem OS) e depois cada execução (OS, situação
 SIGOS, local, equipe, hora, fotos que abrem em nova aba), mapa Leaflet por linha,
+**EXECUTADA(E) = sincronização entre relatórios (2026-11-18, sw v417, só front):** `EXECUTADA(E)` é o status da **carteira**
+(Relação de Serviços) para OS executada em campo e ainda **não encerrada** no SIGOS; `EXECUTADA` vem das **Encerradas**. A
+`vw_os_situacao` dá prioridade às Encerradas, então na próxima carga de Encerradas a OS só troca de chip (`(E)` → `EXECUTADA`) e
+o total do dia não muda (só muda se a data de execução das Encerradas for outra ou se a OS for encerrada sem execução). Na tela:
+chip `⟳ EXECUTADA(E)` **contornado/tracejado** com tooltip (`fscPill`, `fscStSync`), grupos do detalhe e do "OS do dia" com o
+sufixo "— aguardando encerramento no SIGOS" (`fscStRot`) e **legenda única** abaixo da tabela de atividades quando o dia tem
+alguma OS `(E)` (`fscLegendaE`).
 **status SIGOS em destaque (2026-11-13, sw v377, só front):** a linha da atividade mostra chips com a contagem por status
 (`EXECUTADA · 645`, `NÃO EXEC. C/ VISITA · 126`; `fscResumoLinha`) e, no detalhe, as execuções ficam **agrupadas por status
 SIGOS** dentro da atividade (`fscGruposSt`/`fscExecsAgrupadas`: EXECUTADA primeiro; lançamentos do app num grupo "Lançado no
@@ -4419,6 +4582,44 @@ baixar — `excelJsLib()`; o SheetJS do app não formata célula).
   remoção) + Logger fixo (instalação; hoje só Betim, desde 20/10); **VRP** = duas atividades no relatório (`frlAtv`/`FRL_VRP`):
   **Vistoria primária de VRP** (visita do app) e **Manutenção de VRP** (OS) — no Consolidador segue uma linha "VRP" com as
   unidades rotuladas.
+
+### 21.7 Logística reversa de HD (`hd_caixas` › `hdcx_cad` · `hdcx_mov` · `hdcx_bi`) · `docs/migracao_hd_caixas.sql` (2026-11-18, sw v415; telas separadas + Análise na v416)
+
+Controle das **caixas de hidrômetros** que a COPASA entrega aos consórcios para a substituição de HD. Card **📦 Logística reversa de HD**
+no Auxiliar de Programação › 🧾 Serviços comerciais; gate `aux_acesso`/admin (front `hxInit`, banco `sigos_pode_ver`).
+**Qualquer pessoa com acesso ao Auxiliar faz todos os passos** (decisão do usuário, 18/11/2026).
+
+- **Caixa** = consórcio (ZA1004/ZA0200) + **nº da caixa** (único por consórcio) + **HD inicial** + **HD final** (+ observação). A quantidade
+  de HDs e a busca "em qual caixa está o HD X" são calculadas no app quando os dois HDs têm o mesmo prefixo e final numérico (`hxParte`/`hxQtd`/`hxTemHd`).
+- **Fluxo:** `disponivel` (cadastrada = **pendente de retirada**) → `em_execucao` (**vinculada** a um responsável = retirada) →
+  `devolvida` (o **gestor desvincula** = registra a devolução, com observação opcional). Não há passo intermediário de "devolução pendente";
+  caixa devolvida não volta para o ciclo. Corrigir/excluir só enquanto `disponivel`.
+- **Telas (reorganizadas em 2026-11-18, sw v416, a pedido do usuário):**
+  - **`hd_caixas` = tela inicial do módulo:** quadro da situação atual por consórcio (pendentes / em execução / devolvidas / total, com nº de HDs) e 3 botões.
+  - **`hdcx_cad` Cadastro de caixas:** consórcio + uma a uma ou colando do Excel `Nº · HD inicial · HD final` (tab, `;` ou `,`; cabeçalho e linhas
+    incompletas ignorados; repetidas na lista e já cadastradas ficam de fora, com aviso) + lista das 20 últimas cadastradas.
+  - **`hdcx_mov` Vinculação e devolução:** filtros de situação, consórcio, pessoa e busca (nº da caixa ou nº do HD); cards clicáveis; abas **Caixas**
+    (seleção em lote → "Vincular N a um responsável" / "Registrar devolução de N"; ações por linha; ✏️ corrigir/excluir só pendente) e **Por pessoa**
+    (em execução, HDs, devolvidas, caixa mais antiga; clique filtra as caixas dela); export CSV. Responsável: perfis ativos, primeiro os do consórcio da caixa.
+  - **`hdcx_bi` Análise:** filtros de período (30/90 dias, 12 meses, todo, datas), consórcio e agrupamento (dia/semana/mês; automático pelo tamanho do período).
+    Indicadores (recebidas, vinculadas e devolvidas no período com HDs; tempo médio com a caixa; em execução hoje e há > 30 dias; pendentes hoje),
+    **histórico no tempo** (colunas recebidas × vinculadas × devolvidas), **caixas em execução** no fim de cada período (linha), **quem mais recebeu**,
+    **quem mais devolveu**, **tempo médio por pessoa**, **em execução por tempo** (0–7 / 8–15 / 16–30 / > 30 dias), tabela por pessoa e lista de
+    movimentações (vinculações + devoluções) com export CSV. Tudo calculado no app sobre `app_hdcx_listar` (datas `cad_em`/`vinc_em`/`dev_em`, cada caixa
+    é vinculada e devolvida uma vez só) — sem RPC nova. Gráficos em SVG próprio com tooltip (`[data-tip]`); cores por entidade em `--hxc1/2/3`
+    (azul = recebida/pendente, laranja = vinculada/em execução, verde-água = devolvida), com variante escura.
+- **Banco** (schema `12 - retaguarda`, app-only, RLS sem policy): `hd_caixa` (status, `responsavel`, `vinculado_em/_por`, `devolvido_em/_por`,
+  `devolucao_obs`, `criado_em/_por`; `unique(consorcio,numero)`) + `hd_caixa_evento` (log cadastro/vinculo/devolucao/edicao).
+  RPCs: `app_hdcx_listar()`, `app_hdcx_pessoas()`, `app_hdcx_cadastrar(p_consorcio, p_itens jsonb [{num,ini,fim,obs}])` → `{ins, dup[]}` (até 5.000),
+  `app_hdcx_vincular(p_ids bigint[], p_responsavel uuid)` (recusa se alguma não estiver disponível), `app_hdcx_devolver(p_ids bigint[], p_obs)`
+  (recusa se alguma não estiver em execução), `app_hdcx_editar(...)`, `app_hdcx_excluir(p_id)`.
+- **Carga da COPASA (2026-11-18):** planilha "BANCO - HD" (aba Export, 1 linha por HD com `ID_CAIXA` e `DESTINO_LOC`) → 100 caixas (50 por consórcio,
+  1.000 HDs) carregadas direto no banco depois de apagar as 4 caixas de teste. Colunas novas `qtd_hd` e `hds text[]` (`docs/migracao_hd_caixas_lista_hds.sql`):
+  **19 caixas de Betim (A25HX…) têm HDs fora de sequência** (obs "HDs não sequenciais na caixa"), então o app usa `qtd`/`hds` quando existem
+  (quantidade, busca por HD, lista no hover da faixa e coluna "HDs da caixa" no CSV, sw v419) e só calcula pela faixa no cadastro manual.
+  Corrigir a faixa na tela zera `qtd_hd`/`hds`.
+- **Cuidados:** os HDs são guardados em maiúsculas; a caixa não registra quais HDs foram instalados (só a faixa recebida). Testado com rollback no banco
+  e num harness local com as RPCs simuladas — falta QA logado.
 
 ## 22. RH — hub `rh` (Meus colaboradores · Carga RH · Validação gestor · Análise) — schema `"18 - rh"` · `docs/migracao_rh_ponto_carga.sql` + `docs/migracao_rh_ponto_validacao.sql` (2026-11-13, sw v397; migrações aplicadas em 13/11/2026)
 
@@ -4531,12 +4732,81 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
   devolução/validação da RH e conferência com o Kairos aparecem logo abaixo). O formulário abre numa
   linha logo abaixo. **Só aparecem os dias com inconsistência** — dias corretos, folgas/DSR e dias parciais ficam fora (na 1ª carga
   real, 01–13/11: 257 dias com inconsistência de 520; 61 dias trabalhados sem nada, 157 de folga/DSR/feriado, 40 parciais). Prefixo `rhv*`/`RH_TIPOS`/`RH_ACOES`/`RH_MOTIVOS`.
+- **📅 Todo o período** (sw v410, `docs/migracao_rh_val_todo_periodo.sql`): 5º chip, depois de A tratar / Aguardando RH / Validados /
+  **Todas inconsistências** (ex-"Todos"). Mostra **todos os dias de ponto** dos colaboradores que o gestor vê, com ou sem inconsistência,
+  para ver o histórico inteiro de uma pessoa (use a busca). Dia sem inconsistência aparece com o selo cinza "Sem inconsistência" e
+  **sem botão Tratar**; dia parcial sem inconsistência mostra "dia parcial". A tela chama `app_rh_val_lista(ini, fim, p_todos => true)`
+  (cada item traz `inc` = tem inconsistência, e `parcial`) e filtra no navegador: as 4 primeiras abas e as contagens de gestor/consórcio
+  só olham `inc`. Sem `p_todos` a RPC devolve só os dias com inconsistência, como antes (compatível com a v409).
+- **Ajuste com almoço + números validados** (sw v411, `docs/migracao_rh_val_ajuste_calculo.sql`):
+  - Ao abrir **Ajustar** num dia com menos batidas que o horário previsto (ex.: só entrada/saída, comum na EH), o formulário já vem
+    com os pares completos: cada batida vai para um limite previsto (mantendo a ordem, menor distância) e o que falta — em geral o
+    **almoço 12:00–13:00** — vem do texto de horário (`rhvSugMarc`), com o aviso "Completado pelo horário previsto … confira".
+    Dia sem batida continua abrindo vazio.
+  - **Almoço automático** (sw v413, `docs/migracao_rh_ajuste_almoco_auto.sql`, pedido do usuário 17/11/2026): o gestor informa **só
+    entrada e saída** (pré-preenchidas pela sugestão acima); o almoço do horário previsto entra sozinho quando cabe inteiro entre as
+    duas (`rhvAlmoco` no front, `"18 - rh".rh_ajuste_almoco` no servidor — a `app_rh_val_tratar` normaliza sempre, mesmo vindo de
+    app em cache com 4 batidas). Os 3 ajustes já gravados sem almoço foram corrigidos (evento `almoco_auto` em `tratativa_evento`).
+    Antes, o ajuste 06:46–17:00 contava o dia corrido (10:14 em vez de 9:14).
+  - Depois que a RH **valida** um ajuste, a linha mostra as **batidas ajustadas** com o selo verde "✓ validado" (as do Kairos ficam
+    riscadas embaixo) e **H.trab / HE / Falta / Atraso recalculados** com elas, em verde (o valor do Kairos fica no tooltip). Quando
+    uma carga nova do Kairos substitui o dia **sem** trazer as batidas validadas, os números validados continuam valendo. Quando a carga
+    **traz as mesmas batidas** (`kairos_bate`), valem os do Kairos, que é a informação oficial (decisão do usuário, 17/11/2026).
+  - Cálculo: `"18 - rh".calc_marcacoes(horário, marcações)` → `{htrab, he, atraso, falta, prev}`, devolvido em `trat.calc` só para
+    `acao='ajustar'`. Regra (calibrada contra o Kairos: bate 100% do H.trab e da falta, ~93% da HE e ~97% do atraso nos dias de 4
+    batidas): HE = trabalhado fora do previsto, atraso = previsto não trabalhado; tolerância CLT de 5 min por marcação / 10 min no dia,
+    separada para HE e atraso (passou, conta tudo); sem batida = falta do previsto inteiro; dia sem horário = tudo HE. É uma
+    estimativa do app; desde a sw v412 a **Análise do ponto também usa esses números** (§22.3).
+- **Rastro da inconsistência corrigida** (sw v412, `docs/migracao_rh_pipeline_inconsistencias.sql`): dia que teve inconsistência e
+  tratativa e que o Kairos já corrigiu (não acusa mais nada) continua na lista (`inc` = true, `corrigido` = true, tipos guardados em
+  `tratativa.tipos`), com o selo "✓ corrigida no Kairos" — fica nas abas Validados / Todas inconsistências.
+- **Desligamento vale para os dias seguintes** (sw v412, `docs/migracao_rh_desligamento_propaga.sql`): o 1º dia que o gestor justifica
+  com o motivo **"Desligado da empresa"** vira a origem, e todo dia com inconsistência **depois** dele, do mesmo colaborador, recebe a
+  mesma tratativa automaticamente (`tratativa.auto_de` = data da origem, obs "Desligado desde dd/mm/aaaa (automático)").
+  - Os automáticos **seguem a situação da origem**: aguardando RH, validado (mesma RH/data) ou devolvido. A RH valida ou devolve **só a
+    origem**: `app_rh_val_rh` recusa um dia automático, e a tela esconde Validar/Devolver nele e mostra "↳ segue o dia dd/mm".
+  - Dias que chegarem em cargas futuras entram sozinhos: gatilho `trg_arquivo_deslig` quando `"18 - rh".arquivo.status` vira `ok`. O
+    gatilho fica no arquivo, não em `ponto_dia`, porque o processamento grava dia a dia num loop.
+  - Dia tratado à mão não é tocado. Refazer um dia automático o torna manual. Se o gestor informar um dia anterior, a origem passa para
+    ele. Se a origem deixar de ser desligamento, os automáticos dela são apagados.
+  - Tudo em `"18 - rh".rh_deslig_sync(funcionário)` (sem grant; chamada por `app_rh_val_tratar`, que devolve `auto` = nº de dias
+    preenchidos para o aviso, por `app_rh_val_rh` e pelo gatilho).
 
 ### 22.3 Análise do ponto — tela `rh_analise` · `// ---------- RH · ANÁLISE DO PONTO`
-`app_rh_analise(ini, fim, consórcio, área)` (máx. 1 ano; aprovador vê só a equipe, RH/admin todos) sobre `ponto_dia` + inconsistências.
+`app_rh_analise(ini, fim, consórcio, área, funcionário)` (máx. 1 ano) sobre `ponto_dia` + inconsistências. **Desde 2026-11-17 (sw v410,
+`docs/migracao_rh_val_todo_periodo.sql`) quem tem a tela `analise` vê todos os colaboradores de todas as áreas** (antes: aprovador só a
+equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
+**Duas telas em abas (2026-11-19, sw v434, padrão das abas do BI QSMS — `#rhanNav`, `rhanAba`, só front):** **⏱️ Horas** (padrão) = visão
+consolidada das horas — cartões Horas trabalhadas (× previstas) / Absenteísmo / % HE / Pontualidade, mini-indicadores (dias de falta, HE>2h,
+descanso<11h, sem intervalo, adicional noturno), Por área com colunas de horas (ordenada por H.trab), HE por dia + horas de falta por dia,
+por consórcio, interjornada e ranking por H.trab/HE/absenteísmo/faltas/atraso; **🛠️ Tratamento das inconsistências** = % não tratadas (sem a
+barra/legenda dentro do cartão, retiradas a pedido), conformidade, em aberto, funil do pipeline, Por área (inconsistências), por tipo × por
+gestor, inconsistências por dia e ranking A tratar/Inconsist.; o atalho "Abrir a Validação gestor" só aparece nesta aba. Mesma RPC e filtros.
+**Gráficos e blocos (2026-11-19, sw v435, só front):** HE, falta e inconsistências no tempo viraram SVG no padrão do BI QSMS (`rhanColChart`):
+grade com eixo em horas/quantidade, eixo de datas dd/mm com dias seguidos (fim de semana sombreado), Mês|Dia e drill-down ao clicar no mês
+(`rhanTG`, `rhanChaves`); nas inconsistências, a parte vermelha da coluna é o que ainda está a tratar. A tabela **Por consórcio saiu** (a divisão
+AI × EH já está no filtro) e deu lugar a **Quem concentra as horas extras / as faltas** (Pareto sobre `func`: quantas pessoas somam metade do total,
+% dos 10 primeiros, top 10 clicável para filtrar a pessoa). O **Descanso < 11h** ficou na linha inteira, agrupado por pessoa (reincidência primeiro,
+menor descanso, dias em chips; < 10h em vermelho; 10 primeiros + Mostrar todas).
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
+  · **Números validados** (sw v412, `docs/migracao_rh_analise_validados.sql` + `docs/migracao_rh_pipeline_inconsistencias.sql`): dia com
+  ajuste de batidas validado pela RH usa as marcações do gestor e H.trab/HE/Atraso/Falta de `calc_marcacoes` **enquanto o Kairos não
+  refletir o ajuste** (`tv.marcacoes is distinct from pd.marcacoes`); refletiu, valem os números do Kairos (oficial). CTE `d0`→`d`;
+  `tot.dias_ajuste_val` aparece no cabeçalho como "✓ N dia(s) com ajuste validado".
+  · **Pipeline das inconsistências** (sw v412): o universo das inconsistências = as que o Kairos acusa hoje + as **corrigidas no Kairos**
+  (tratativa com `tipos` num dia que o Kairos não acusa mais; situação `corr`, CTE `inc0`). Cada dia está numa etapa: **a tratar** →
+  **aguardando RH** → **validada (aguarda o Kairos)** → **corrigida no Kairos**. Abaixo dos KPIs, o **funil "Pipeline das inconsistências"** (sw v414,
+  substituiu os 5 cartões da v412) tem uma barra horizontal centralizada por etapa — Identificadas → Tratadas pelo gestor → Validadas
+  pela RH → Corrigidas no Kairos — com largura = quantas **chegaram** à etapa (∝ identificadas, nº e % à direita); a parte colorida é o
+  que **parou** nela (a tratar / aguardando RH / aguardando Kairos / corrigidas) e a cinza o que seguiu adiante. Só front, sem RPC nova.
+  As barras (destaque, por tipo, por gestor) têm as 4 cores. `tratativas.corrigidas`, `corr` em `por_area`/`por_gestor`/`por_dia`/
+  `inc_st`/`func`. **Conformidade** = dias avaliados sem inconsistência **em aberto** (a corrigida conta como conforme); "Dias c/
+  inconsist." e os tipos contam as identificadas (com as corrigidas); a tabela Por área ganhou a coluna Corrigidas. Inconsistência que
+  some sem nunca ter sido tratada não tem tratativa e não entra no rastro.
+  · **colaborador** (sw v410): `p_funcionario` recalcula todos os indicadores para uma pessoa só; a lista (`funcs`) traz quem tem ponto no
+  período, já com consórcio + área aplicados. Clicar num nome do ranking "Por colaborador" também filtra; "✕ limpar" no cabeçalho volta.
 - **KPIs estratégicos** (com selo ok / atenção / crítico — só visual):
   - **Inconsistências ainda não tratadas** (destaque): % dos dias com inconsistência sem tratativa do gestor (devolvido conta como
     não tratado) + barra empilhada a tratar / aguardando RH / validadas.
@@ -4555,6 +4825,11 @@ Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
   atraso, H.trab — ordena no título da coluna; padrão = a tratar; 20 primeiros + "mostrar todos"). Prefixo `rhan*`.
 - Na v400 as telas de Validação e Análise perderam o texto de descrição; datas + consórcio (+ situação, na Validação) ficam numa linha.
 - **Largura (sw v401):** no computador (≥ 860 px) as duas telas usam a largura toda da janela, sem a coluna de 1040 px das outras telas (mesmo padrão de `sigos_abertas`), para a tabela da Validação caber inteira.
+
+**Cuidado (17/11/2026):** `"18 - rh".calc_marcacoes(horário, NULL)` devolve um dia **sem batida** (falta = previsto), não NULL. Ao usar
+num LEFT JOIN, chame só quando a linha existe (`case when tv.funcionario_id is not null then calc_marcacoes(...) end`). Esse erro deixou
+a Análise com H.trab 0 em todos os dias por cerca de uma hora antes da correção. Nas migrações com `do $$ … replace(…) $$`, as marcas de
+texto `$a$`/`$b$` fazem o MCP do Supabase falhar sem mensagem; use `$xa$`/`$xb$`.
 
 **Banco da validação** (`docs/migracao_rh_ponto_validacao.sql`, roda **depois** da migração da carga): `tratativa`, `tratativa_evento`,
 helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lista`, `app_rh_val_tratar`, `app_rh_val_rh`,
