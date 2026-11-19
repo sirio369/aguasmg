@@ -338,7 +338,7 @@ pwa/
     só validar (sem ocultar) por linha e depois o dia (snapshot `"12 - retaguarda".fisc_dia`; valida o admin e quem for marcado na ⚙️ do próprio Consolidador, `perfil.fisc_validar`, sw v388) e Excel; detalhe da
     atividade abre com as OS do dia separadas por vírgula; status SIGOS em destaque com as execuções agrupadas por status e
     recomposição de pavimento com o **serviço de origem** (OS + do que se trata; sw v377, `docs/migracao_fisc_pav_origem.sql`) — ver `docs/MODULOS.md §21.6`.
-  - **📅 Planejamento** (2026-11-18, sw v431): última categoria do hub, vazia por enquanto (placeholder "Nenhum módulo ainda.").
+  - **📅 Planejamento** (2026-11-18, sw v431; 19/11 sw v438): última categoria do hub; botão **📊 BI** (tela `gi`) com os BIs de Suprimentos, Frotas e Pessoas — todo usuário do Auxiliar vê. Distribuição definitiva ainda a rever.
   - **Abertura de serviços segmentada:** a mesma tela `programacao_servicos` serve as duas frentes; `pgModo`
     (comercial/pesquisa) esconde a seção que não é do contexto, sem duplicar código.
 - **Gestão de Pavimento** (2026-10-21) — registra pavimentos a recompor após serviços. **Duas telas:**
