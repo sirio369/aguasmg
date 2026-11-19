@@ -18,7 +18,7 @@ alter table public.perfil add column if not exists sup_carga_acesso boolean not 
 create or replace function "9 - suprimentos".sup_bi_pode(p_uid uuid) returns boolean
 language sql stable security definer set search_path to 'public' as $$
   select exists (select 1 from public.perfil p where p.id = p_uid and p.ativo
-    and (p.funcao = 'admin' or p.sup_bi_acesso or p.sup_carga_acesso))
+    and (p.funcao = 'admin' or coalesce(p.aux_acesso, false) or p.sup_bi_acesso or p.sup_carga_acesso))
 $$;
 create or replace function "9 - suprimentos".sup_carga_pode(p_uid uuid) returns boolean
 language sql stable security definer set search_path to 'public' as $$
@@ -171,6 +171,7 @@ returns void language plpgsql security definer set search_path to 'public' as $$
 begin
   if not "9 - suprimentos".sup_carga_pode(auth.uid()) then raise exception 'sem permissão'; end if;
   update "9 - suprimentos".sup_carga set status = 'erro', erro = left(p_erro, 500), concluido_em = now() where id = p_carga and status = 'pendente';
+  if not found then return; end if;  -- carga já concluída/sem pendência: não apaga linhas ativas
   delete from "9 - suprimentos".sup_painel_linha where carga_id = p_carga;
   delete from "9 - suprimentos".sup_mapa_linha where carga_id = p_carga;
   delete from "9 - suprimentos".sup_cotped_linha where carga_id = p_carga;

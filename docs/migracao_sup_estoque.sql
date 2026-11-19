@@ -156,6 +156,7 @@ returns void language plpgsql security definer set search_path to 'public' as $$
 begin
   if not "9 - suprimentos".sup_carga_pode(auth.uid()) then raise exception 'sem permissão'; end if;
   update "9 - suprimentos".sup_carga set status = 'erro', erro = left(p_erro, 500), concluido_em = now() where id = p_carga and status = 'pendente';
+  if not found then return; end if;  -- carga já concluída/sem pendência: não apaga linhas ativas
   delete from "9 - suprimentos".sup_painel_linha where carga_id = p_carga;
   delete from "9 - suprimentos".sup_mapa_linha where carga_id = p_carga;
   delete from "9 - suprimentos".sup_cotped_linha where carga_id = p_carga;

@@ -447,7 +447,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="homeRh" data-go="rh"><div class="ic">👥</div><div class="nm">RH</div></button>
       <button class="mod hidden" id="homeMeusColab" data-go="meus_colab"><div class="ic">📇</div><div class="nm">Meus colaboradores</div></button>
       <button class="mod hidden" id="homeQsms" data-go="qsms"><div class="ic">🦺</div><div class="nm">QSMS</div></button>
-      <button class="mod hidden" id="homeGI" data-go="gi"><div class="ic">📊</div><div class="nm">Gestão Integrada</div></button>
       <button class="mod" data-go="frota"><div class="ic">🚗</div><div class="nm">Frota</div></button>
     </div>
     <div class="sec" style="margin-top:20px;display:flex;align-items:center;gap:8px">🚧 Em desenvolvimento<button id="homeDevAcesso" class="hidden" title="Quem acessa os módulos em desenvolvimento" style="all:unset;cursor:pointer;font-size:16px;margin-left:auto;padding:2px 6px;border-radius:8px">⚙️</button></div>
@@ -1104,6 +1103,11 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="sigos_carga"><div class="ic">📥</div><div class="nm">Carga SIGOS</div></button>
       <button class="mod" data-go="sigos_vinculo"><div class="ic">🔗</div><div class="nm">Vínculo das OS</div></button>
     </div>
+
+    <div class="sec" style="margin-top:20px">📅 Planejamento</div>
+    <div class="grid" style="margin-top:10px">
+      <button class="mod" data-go="gi"><div class="ic">📊</div><div class="nm">BI</div></button>
+    </div>
   </main>
 
   <main id="aux_acesso" class="hidden">
@@ -1434,8 +1438,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
 
   <main id="gi" class="hidden spbmain">
-    <div class="bar"><button class="bk" data-go="home">‹ Início</button></div>
-    <h1>Gestão Integrada</h1>
+    <div class="bar"><button class="bk" data-go="auxiliar_programacao">‹ Auxiliar de Programação</button></div>
+    <h1>BI</h1>
     <p class="sub">Os indicadores de cada área num só lugar, com os relatórios carregados direto no app (o Power BI foi desligado).</p>
     <div class="grid" style="margin-top:10px">
       <button class="mod hidden" id="giSup" data-go="sup_bi"><div class="ic">📦</div><div class="nm">Gestão de Suprimentos</div></button>
@@ -1446,7 +1450,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="sup_bi" class="hidden spbmain">
-    <div class="bar"><button class="bk" data-go="gi">‹ Gestão Integrada</button></div>
+    <div class="bar"><button class="bk" data-go="gi">‹ BI</button></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <h1>Gestão de Suprimentos</h1>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1462,7 +1466,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="frota_bi" class="hidden spbmain">
-    <div class="bar"><button class="bk" data-go="gi">‹ Gestão Integrada</button></div>
+    <div class="bar"><button class="bk" data-go="gi">‹ BI</button></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <h1>Gestão de Frotas</h1>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1495,7 +1499,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   </main>
 
   <main id="pessoas_bi" class="hidden spbmain">
-    <div class="bar"><button class="bk" data-go="gi">‹ Gestão Integrada</button></div>
+    <div class="bar"><button class="bk" data-go="gi">‹ BI</button></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <h1>Gestão de Pessoas</h1>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2011,6 +2015,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="rh_analise" class="hidden">
     <div class="bar"><button class="bk" data-go="rh">‹ RH</button></div>
     <h1>Análise do ponto</h1>
+    <nav id="rhanNav" class="rhan-nav" aria-label="Telas da análise"></nav>
     <div class="rh-fl"><span class="rh-dt"><input id="rhanIni" type="date"/><span>a</span><input id="rhanFim" type="date"/></span>
       <div id="rhanCons" class="rhv-chips"></div><select id="rhanArea" class="rh-sel"><option value="">Todas as áreas</option></select><select id="rhanFunc" class="rh-sel"><option value="">Todos os colaboradores</option></select></div>
     <div id="rhanView"><p class="sub">Carregando…</p></div>
@@ -2643,23 +2648,16 @@ async function prEstCarregar(){
   if(data) prEstCache[dmc]=data;
   prEstGj=data; prEstDmc=dmc; prEstDesenhar();
 }
-function prEstIcone(lado,n,med){
-  const cor=lado==='D'?'#2e7d32':'#6a1b9a';
-  const txt=lado+n+(med?(' · '+prpFmt(med.pressao)):'');
-  const est=med?('background:'+cor+';color:#fff;border:2px solid #fff'):('background:#fff;color:'+cor+';border:2px solid '+cor);
-  return L.divIcon({className:'',iconSize:null,iconAnchor:[0,0],
-    html:`<div style="transform:translate(-50%,-50%);white-space:nowrap;font:700 11px/1 system-ui,sans-serif;padding:4px 6px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.35);${est}">${txt}</div>`});
-}
 function prEstLadoHtml(lbl,pt,med){
   if(!pt) return '<br><b>'+lbl+'</b>: <span style="color:var(--mut)">sem ligação nem rede cadastrada a ≥10 m do limite</span>';
   return '<br><b>'+lbl+'</b>: '+(pt.tipo==='rede'?'ponto na rede (hidrante/registro)':('matrícula '+pt.matricula+(pt.endereco?(' · '+pt.endereco):'')))
     +' · '+pt.dist_limite+' m do limite'+(med?(' · <b>'+prpFmt(med.pressao)+' mca</b> '+(med.data||'')):' · <span style="color:var(--warn)">pendente</span>');
 }
 function prEstPopup(p,lado){
-  const md=prEstMedida(p.dentro), mf=prEstMedida(p.fora), pt=lado==='D'?p.dentro:p.fora;
+  const md=prEstMedida(p.dentro), mf=prEstMedida(p.fora), pt=lado==='D'?p.dentro:lado==='F'?p.fora:{lat:p.cruz[1],lon:p.cruz[0]};
   const v=p.valvula;
   const delta=(md&&mf)?('<br>Δ dentro − fora: <b>'+prpFmt(md.pressao-mf.pressao)+' mca</b>'):'';
-  return '<div style="min-width:190px"><b>Par '+p.n+' — '+(lado==='D'?'dentro':'fora')+' do '+(prEstDmc||'').replace(/^ZA\d+-/,'')+'</b>'
+  return '<div style="min-width:190px"><b>Par '+p.n+' — '+(lado?((lado==='D'?'dentro':'fora')+' do '):'fronteira do ')+(prEstDmc||'').replace(/^ZA\d+-/,'')+'</b>'
     +'<br><span style="color:var(--mut)">Trecho que cruza o limite: '+(p.trechos||[]).join(', ')+(p.dn?(' · DN '+Math.round(p.dn)):'')+(p.material?(' '+p.material):'')+'</span>'
     +(v?('<br><span style="color:var(--mut)">Válvula '+(v.tipo||'')+' '+(v.cd||'')+(v.estado?(' ('+v.estado+')'):'')+' a '+v.dist+' m</span>'):'')
     +(pt&&pt.tipo==='ligacao'&&!pt.no_trecho?'<br><span style="color:var(--mut)">Ligação de outro trecho, a '+pt.dist+' m do cruzamento</span>':'')
@@ -2676,16 +2674,14 @@ function prEstDesenhar(){
   if(prMap&&window.L){
     prEstLayer=L.layerGroup().addTo(prMap);
     pares.forEach(p=>{
-      const cz=[p.cruz[1],p.cruz[0]], ll=[];
-      if(p.dentro) ll.push([p.dentro.lat,p.dentro.lon]); ll.push(cz); if(p.fora) ll.push([p.fora.lat,p.fora.lon]);
-      L.polyline(ll,{pane:'prEst',color:'#37474f',weight:1.5,dashArray:'4 4',opacity:.8,interactive:false}).addTo(prEstLayer);
-      L.circleMarker(cz,{pane:'prEst',radius:4,color:'#37474f',weight:1.5,fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(prEstLayer);
-      [['D',p.dentro],['F',p.fora]].forEach(([lado,pt])=>{ if(!pt) return;
-        const m=L.marker([pt.lat,pt.lon],{pane:'prEst',icon:prEstIcone(lado,p.n,prEstMedida(pt))}).addTo(prEstLayer);
-        m.bindPopup(()=>prEstPopup(p,lado),{minWidth:200});
-        m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const a=el&&el.querySelector('.prEstReg'); if(a) a.onclick=()=>{ prMap.closePopup(); irPara('pressao_reg'); }; });
-        p['_mk'+lado]=m;
-      });
+      // só a bolinha no cruzamento da rede com o limite (2026-11-19: sem os chips D/F nem as linhas tracejadas)
+      const cz=[p.cruz[1],p.cruz[0]];
+      // losango preto (≠ bolinhas coloridas das pressões aferidas) — 2026-11-19
+      const m=L.marker(cz,{pane:'prEst',icon:L.divIcon({className:'',iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10],
+        html:'<div style="width:14px;height:14px;margin:3px;background:#000;border:2px solid #fff;transform:rotate(45deg);box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>'})}).addTo(prEstLayer);
+      m.bindPopup(()=>prEstPopup(p,null),{minWidth:200});
+      m.on('popupopen',ev=>{ const el=ev.popup.getElement(); const a=el&&el.querySelector('.prEstReg'); if(a) a.onclick=()=>{ prMap.closePopup(); irPara('pressao_reg'); }; });
+      p._mk=m;
     });
   }
   if(!box) return;
@@ -2700,13 +2696,12 @@ function prEstDesenhar(){
   }).join('');
   box.classList.remove('hidden');
   box.innerHTML=`<div class="sec" style="margin:0 0 4px">Teste de estanqueidade — ${prFDmc.replace(/^(ZA\d+)-(.*)$/,'$2 ($1)')}</div>
-    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#2e7d32">D</b> = dentro · <b style="color:#6a1b9a">F</b> = fora.</p>${linhas}`;
+    <p class="sub" style="margin:0 0 6px">${pares.length} pares nos cruzamentos da rede com o limite · ${nMed}/${nTot} pontos medidos nas últimas ${PR_HORAS} h. <b style="color:#000">◆</b> = fronteira (trecho que cruza o limite); toque no losango para ver os pontos dentro/fora.</p>${linhas}`;
   box.querySelectorAll('[data-prp]').forEach(el=>el.addEventListener('click',()=>{
     const p=pares.find(x=>String(x.n)===el.dataset.prp); if(!p||!prMap) return;
-    const pts=[[p.cruz[1],p.cruz[0]]]; if(p.dentro) pts.push([p.dentro.lat,p.dentro.lon]); if(p.fora) pts.push([p.fora.lat,p.fora.lon]);
-    prMap.fitBounds(pts,{padding:[50,50],maxZoom:18});
+    prMap.setView([p.cruz[1],p.cruz[0]],Math.max(prMap.getZoom(),17));
     $('#prMapa').scrollIntoView({behavior:'smooth',block:'center'});
-    setTimeout(()=>{ const m=p._mkD||p._mkF; if(m) m.openPopup(); },400);
+    setTimeout(()=>{ if(p._mk) p._mk.openPopup(); },400);
   }));
 }
 // após salvar: volta ao mapa e recarrega (offline: a leitura entra quando a fila sincronizar)
@@ -2829,7 +2824,7 @@ function irPara(id){
   if(id==='home'||id==='suprimentos') ntfBadge();
 }
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
-function homeGate(){ spbGate(); const hf=document.getElementById('homeFisc'); if(hf) hf.classList.toggle('hidden', !(ME&&ME.fisc_acesso)); const hfa=document.getElementById('homeFiscAcesso'); if(hfa) hfa.classList.toggle('hidden', !(ME&&ME.is_admin)); fiscalOnly(!!(ME&&ME.is_fiscal)); const hav=document.getElementById('homeAvisos'); if(hav) hav.classList.toggle('hidden', !(ME&&ME.is_admin)); const hq=document.getElementById('homeQsms'); if(hq) hq.classList.toggle('hidden', !(ME&&ME.qsms)); const hsc=document.getElementById('homeSstCampo'); if(hsc) hsc.classList.toggle('hidden', !(ME&&ME.qsms_campo)); const hpq=document.getElementById('homePavQual'); if(hpq) hpq.classList.toggle('hidden', !(ME&&ME.qualidade)); const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const hr=document.getElementById('homeRh'); if(hr) hr.classList.toggle('hidden', !rhTela('modulo')); const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar&&!rhTela('colab'))); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
+function homeGate(){ const hf=document.getElementById('homeFisc'); if(hf) hf.classList.toggle('hidden', !(ME&&ME.fisc_acesso)); const hfa=document.getElementById('homeFiscAcesso'); if(hfa) hfa.classList.toggle('hidden', !(ME&&ME.is_admin)); fiscalOnly(!!(ME&&ME.is_fiscal)); const hav=document.getElementById('homeAvisos'); if(hav) hav.classList.toggle('hidden', !(ME&&ME.is_admin)); const hq=document.getElementById('homeQsms'); if(hq) hq.classList.toggle('hidden', !(ME&&ME.qsms)); const hsc=document.getElementById('homeSstCampo'); if(hsc) hsc.classList.toggle('hidden', !(ME&&ME.qsms_campo)); const hpq=document.getElementById('homePavQual'); if(hpq) hpq.classList.toggle('hidden', !(ME&&ME.qualidade)); const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const hr=document.getElementById('homeRh'); if(hr) hr.classList.toggle('hidden', !rhTela('modulo')); const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar&&!rhTela('colab'))); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
@@ -8474,7 +8469,6 @@ async function spbAcesso(force){
   try{ const {data,error}=await sb.rpc('app_sup_bi_acesso'); if(error) throw error; SPB_AC=data||{}; SPB_AC_T=Date.now(); }catch(e){ SPB_AC=SPB_AC||{}; }
   return SPB_AC;
 }
-async function spbGate(){ const b=document.getElementById('homeGI'); if(!b||!ME) return; const [a,f,pe]=await Promise.all([spbAcesso(),frtAcesso(),hcAcesso()]); b.classList.toggle('hidden',!((a&&a.ver)||(f&&f.ver)||(pe&&pe.ver))); }
 function spbCss(){
   if(document.getElementById('spbCss')) return;
   const st=document.createElement('style'); st.id='spbCss';
@@ -8500,7 +8494,7 @@ function spbCss(){
 const spbDH=ts=>{ if(!ts) return '—'; try{ return new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(ts); } };
 const spbN=n=>(n==null?'—':Number(n).toLocaleString('pt-BR'));
 const spbObras=a=>(a&&a.length)?a.map(o=>SPB_OBRA[o]||('Obra '+o)).join(' + '):'—';
-// ----- Gestão Integrada (hub) -----
+// ----- BI (hub em Auxiliar de Programação › Planejamento) -----
 async function giInit(){
   spbCss();
   const [a,fa,pa]=await Promise.all([spbAcesso(true),frtAcesso(true),hcAcesso(true)]);
@@ -8508,7 +8502,7 @@ async function giInit(){
   const fr=$('#giFrota'); if(fr) fr.classList.toggle('hidden',!(fa&&fa.ver));
   const pp=$('#giPessoas'); if(pp) pp.classList.toggle('hidden',!(pa&&pa.ver));
   document.querySelectorAll('#gi [data-soon]').forEach(x=>{ x.onclick=()=>toast('Em breve'); });
-  if(!((a&&a.ver)||(fa&&fa.ver)||(pa&&pa.ver))){ toast('Acesso restrito'); irPara('home'); }
+  if(!((a&&a.ver)||(fa&&fa.ver)||(pa&&pa.ver))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); }
 }
 // ----- Gestão de Suprimentos (BI) — 6 páginas do Power BI, calculadas no aparelho a partir das views do banco -----
 // Mesmas medidas do modelo do Power BI (DAX portado). Dados: app_sup_bi() = linhas de sup_bi_solicitacoes e sup_bi_cotacoes_itens.
@@ -15588,18 +15582,40 @@ function segPendencias(){ const t=segD.tipo, a=segD.atividade, r=segD.resp, P=[]
 function segAtualizar(soTela){ if(!segD)return; if(soTela!==true) segDraftSave();
   if(segD.tipo==='PET'){ const q=$('#segQtd'); if(q){ const n=new Set(segD.pes.filter(p=>['autorizado','vigia','supervisor'].includes(p.papel)).map(p=>p.pessoa_uuid||String(p.nome).toLowerCase())).size; q.textContent='Quantidade de trabalhadores: '+n; } }
   const {P,B}=segPendencias(), er=$('#segErros'), bt=$('#segBtns'); if(!er||!bt)return;
-  er.innerHTML=(B.length?`<div class="segerr"><b>⛔ ${segD.tipo==='APR'?'A APR não pode ser emitida':segD.tipo==='PET'?'Entrada impedida':'Trabalho em altura impedido'}:</b><ul style="margin:4px 0 0 18px;padding:0">${B.map(x=>'<li>'+segH(x)+'</li>').join('')}</ul></div>`:'')
+  // Só reescreve o HTML quando o conteúdo muda: o GPS chama esta função a cada leitura (no iPhone, várias por segundo)
+  // e recriar o botão no meio do toque fazia o clique se perder (2026-11-19, "botão azul que não responde").
+  const erH=(B.length?`<div class="segerr"><b>⛔ ${segD.tipo==='APR'?'A APR não pode ser emitida':segD.tipo==='PET'?'Entrada impedida':'Trabalho em altura impedido'}:</b><ul style="margin:4px 0 0 18px;padding:0">${B.map(x=>'<li>'+segH(x)+'</li>').join('')}</ul></div>`:'')
     +(P.length?`<div class="segerr" style="background:var(--warn-bg);color:var(--warn)"><b>Falta preencher (${P.length}):</b><ul style="margin:4px 0 0 18px;padding:0">${P.slice(0,8).map(x=>'<li>'+segH(x)+'</li>').join('')}${P.length>8?'<li>…</li>':''}</ul></div>`:'');
-  const t=segD.tipo;
-  bt.innerHTML=`<button class="btn" id="segEmitir" ${P.length||B.length?'disabled':''}>Emitir ${t}</button>`
+  if(er._h!==erH){ er.innerHTML=erH; er._h=erH; }
+  if(segEnviando) return;   // emissão em andamento: não recria o botão (ficaria habilitado de novo)
+  const t=segD.tipo, motivo=P.length?('Falta: '+P[0]+(P.length>1?' (e mais '+(P.length-1)+')':'')):B.length?('Bloqueado: '+B[0]):'';
+  // o botão nunca fica "disabled": tocar com pendência mostra o motivo e registra a tentativa (segEmitir)
+  const btH=`<button class="btn" id="segEmitir" ${motivo?'aria-disabled="true" style="opacity:.45"':''}>Emitir ${t}</button>`
+    +(motivo?`<div id="segMotivo" class="sub" style="margin:6px 2px 0;color:var(--bad);font-size:13px">⚠️ ${segH(motivo)}</div>`:'')
     +(t!=='APR'&&B.length&&!P.length?`<button class="btn ghost" id="segImpedir" style="color:var(--bad)">Registrar ${t} impedida</button>`:'')
     +'<button class="btn ghost" id="segSair" style="margin-top:8px">Salvar rascunho e sair</button>';
+  if(bt._h===btH) return; bt.innerHTML=btH; bt._h=btH;
   const em=$('#segEmitir'); if(em) em.onclick=()=>segEmitir('emitida');
   const im=$('#segImpedir'); if(im) im.onclick=()=>{ if(im.dataset.ok!=='1'){ im.dataset.ok='1'; im.textContent='Toque de novo p/ registrar como impedida'; return; } segEmitir('impedida'); };
   $('#segSair').onclick=()=>{ segDraftSave(); segD=null; irPara('seg'); }; }
-async function segEmitir(status){ const d=segD; if(!d)return; const {P,B}=segPendencias();
-  if(P.length) return toast('Falta: '+P[0]); if(status!=='impedida'&&B.length) return toast('Bloqueado: '+B[0]);
-  const btn=$('#segEmitir'); if(btn) btn.disabled=true;
+// registro de cada toque em Emitir (diagnóstico): vai direto ao servidor, sem fila; offline ou erro = ignora
+let segEnviando=false;
+function segTentativa(d,status,resultado,P,B,erro){ try{ if(!navigator.onLine||!d) return;
+  sb.rpc('app_seg_tentativa',{p_tipo:d.tipo,p_status:status,p_resultado:resultado,p_falta:(P||[]).slice(0,30),p_bloqueio:(B||[]).slice(0,30),
+    p_precisao:gps?Math.round(gps.acc*10)/10:null,p_erro:erro?String(erro).slice(0,500):null,p_versao:SEG_APP_VER,p_dispositivo:navigator.userAgent.slice(0,200)})
+    .then(()=>{},()=>{}); }catch(e){} }
+const SEG_APP_VER='coleta-v436';
+async function segEmitir(status){ const d=segD; if(!d||segEnviando)return; const {P,B}=segPendencias();
+  const barrou=P.length?'falta':(status!=='impedida'&&B.length)?'bloqueio':'';
+  if(barrou){ segTentativa(d,status,barrou,P,B);
+    const er=$('#segErros'); if(er&&er.firstElementChild){ er.scrollIntoView({behavior:'smooth',block:'center'}); er.firstElementChild.animate&&er.firstElementChild.animate([{transform:'scale(1)'},{transform:'scale(1.03)'},{transform:'scale(1)'}],{duration:450}); }
+    return toast(barrou==='falta'?'Falta: '+P[0]:'Bloqueado: '+B[0]); }
+  segTentativa(d,status,'enviando',P,B);
+  segEnviando=true; const btn=$('#segEmitir'); if(btn){ btn.disabled=true; btn.textContent='Emitindo…'; }
+  try{ await segEmitirEnviar(d,status); }
+  catch(e){ segTentativa(d,status,'erro',P,B,(e&&e.message)||e); toast('Não foi possível emitir: '+((e&&e.message)||e)); }
+  finally{ segEnviando=false; if(segD===d){ const bt=$('#segBtns'); if(bt) bt._h=null; segAtualizar(true); } } }
+async function segEmitirEnviar(d,status){
   const agora=new Date().toISOString(), a=d.atividade, L1=a.local||{};
   const atividade={id:a.id,os_sigos:a.os_sigos||null,tipo_intervencao:a.tipo_intervencao,descricao:a.descricao,
     consorcio:L1.consorcio||a.consorcio||null,lat:a.nova?gps.lat:a.lat,lon:a.nova?gps.lon:a.lon,precisao:a.nova?Math.round(gps.acc*10)/10:a.precisao,iniciada_em:a.nova?agora:a.iniciada_em,dispositivo:navigator.userAgent.slice(0,100)};
@@ -15623,7 +15639,7 @@ async function segEmitir(status){ const d=segD; if(!d)return; const {P,B}=segPen
     pes:pesDoc.map(p=>({papel:p.papel,pessoa_uuid:p.pessoa_uuid||null,nome:String(p.nome).trim(),documento:p.documento||'',funcao:p.funcao||'',sig:p.sig||null,apr:!!p.apr,assinado_em:p.assinado_em||null})),
     med:med.map(m=>Object.assign({fase:'entrada'},m)),fotos:fotosUrl,eventos:[],emitido_em:agora,lat:form.lat,lon:form.lon,salvo_em:agora,usuario_nome:segEu().nome};
   const ok=await segEnviar(item,'✓ '+d.tipo+(status==='impedida'?' registrada como impedida':' emitida'));
-  if(!ok){ if(btn) btn.disabled=false; return; }
+  if(!ok) return;
   try{ await segDocPut(doc); }catch(e){}
   clearTimeout(segDraftT); try{ await segDraftDel(); }catch(e){}
   segD=null; irPara('seg');
@@ -19313,7 +19329,7 @@ function rhvRender(){
   const tudo=rhvF.st==='tudo', all=D.itens||[], its=tudo?all:all.filter(it=>it.inc!==false);
   const q=rhNorm(rhvF.q.trim());
   const consOk=it=>!rhvF.cons||it.consorcio===rhvF.cons;
-  const gOk=it=>!rhvF.gestor||(rhvF.gestor==='__sem'?(!it.gestor&&!it.gestor2):(it.gestor===rhvF.gestor||it.gestor2===rhvF.gestor));
+  const gOk=it=>!rhvF.gestor||(rhvF.gestor==='__sem'?!it.gestor:it.gestor===rhvF.gestor);
   const fOk=it=>consOk(it)&&gOk(it)&&(!rhvF.tipo||(it.tipos||[]).includes(rhvF.tipo))&&(!q||rhNorm(it.nome+' '+(it.matricula||'')).includes(q));
   const baseAll=all.filter(fOk), base=baseAll.filter(it=>it.inc!==false);
   const cnt={pend:0,trat:0,val:0}; base.forEach(it=>{ const s=rhStatus(it); cnt[s==='dev'?'pend':s]++; });
@@ -19324,7 +19340,7 @@ function rhvRender(){
   $('#rhvCons').innerHTML=cs.length<2?'':[['','Ambos'],['ZA1004','Contagem · AI'],['ZA0200','Betim · EH']]
     .map(([v,l])=>`<button data-c="${v}" class="${v===rhvF.cons?'on':''}">${l} ${its.filter(it=>!v||it.consorcio===v).length}</button>`).join('');
   $('#rhvCons').querySelectorAll('button').forEach(b=>b.onclick=()=>{ rhvF.cons=b.dataset.c; rhvRender(); });
-  const gc={}; let gsem=0; its.filter(consOk).forEach(it=>{ const gs=[...new Set([it.gestor,it.gestor2].filter(Boolean))]; if(!gs.length) gsem++; gs.forEach(g=>gc[g]=(gc[g]||0)+1); });
+  const gc={}; let gsem=0; its.filter(consOk).forEach(it=>{ const gs=it.gestor?[it.gestor]:[]; if(!gs.length) gsem++; gs.forEach(g=>gc[g]=(gc[g]||0)+1); });
   if(rhvF.gestor&&rhvF.gestor!=='__sem'&&!gc[rhvF.gestor]) rhvF.gestor='';
   $('#rhvGestor').innerHTML='<option value="">Todos os gestores</option>'+Object.keys(gc).sort((x,y)=>x.localeCompare(y))
     .map(g=>`<option value="${vEsc(g)}"${g===rhvF.gestor?' selected':''}>${vEsc(g)} (${gc[g]})</option>`).join('')
@@ -19342,7 +19358,7 @@ function rhvRender(){
 }
 // Faixa do colaborador (nome, empresa, matrícula, gestores) acima dos dias dele
 function rhvFaixa(it,n){
-  const gest=[it.gestor,it.gestor2].filter(Boolean).join(' / ');
+  const gest=it.gestor||'';
   return `<tr class="gp"><td colspan="9"><b>${vEsc(it.nome)}</b><span class="sub">${vEsc(it.sigla||'')}${it.matricula?' · mat. '+vEsc(it.matricula):''}${gest?' · gestor: '+vEsc(gest):''}${it.sem_usuario?' · <span style="color:var(--warn)">sem usuário no app</span>':''} · ${n} dia${n===1?'':'s'}</span></td></tr>`;
 }
 // Uma linha por dia (o colaborador vem na faixa acima); formulário abre numa linha logo abaixo
@@ -19475,7 +19491,8 @@ async function rhvSalvar(it,b){
 // usa as batidas do gestor e os números de calc_marcacoes (tot.dias_ajuste_val) enquanto o Kairos não refletir o ajuste; refletiu,
 // vale o Kairos. Inconsistência tratada que o Kairos corrigiu fica como rastro ('corrigidas'), já conforme. Quem tem a tela vê todas
 // as áreas (2026-11-17); o filtro de colaborador (p_funcionario) mostra os indicadores de uma pessoa só.
-let rhanCons='', rhanArea='', rhanFunc='', rhanDados=null, rhanOrd='pend', rhanTodos=false;
+let rhanCons='', rhanArea='', rhanFunc='', rhanDados=null, rhanOrd='htrab', rhanTodos=false, rhanAba='horas', rhanTG={g:'dia',m:null}, rhanIjTodos=false;
+const RHAN_ABAS=[['horas','⏱️ Horas'],['trat','🛠️ Tratamento das inconsistências']];
 function rhanInit(){
   if(!rhTela('analise')){ toast('Acesso restrito'); irPara('home'); return; }
   rhvCss(); rhanCss(); rhPeriodo('#rhanIni','#rhanFim',30);
@@ -19483,7 +19500,11 @@ function rhanInit(){
   if(!v.dataset.ready){ v.dataset.ready='1'; ['#rhanIni','#rhanFim'].forEach(s=>$(s).addEventListener('change',rhanCarregar));
     $('#rhanArea').addEventListener('change',()=>{ rhanArea=$('#rhanArea').value; rhanCarregar(); });
     $('#rhanFunc').addEventListener('change',()=>{ rhanFunc=$('#rhanFunc').value; rhanCarregar(); });
-    v.addEventListener('click',e=>{ const b=e.target.closest('[data-o]'); if(b){ rhanOrd=b.dataset.o; rhanRender(); return; }
+    $('#rhanNav').addEventListener('click',e=>{ const b=e.target.closest('[data-rhaba]'); if(!b||b.dataset.rhaba===rhanAba) return; rhanAba=b.dataset.rhaba; rhanTodos=false; rhanRender(); });
+    v.addEventListener('click',e=>{ const g=e.target.closest('[data-rhg]'); if(g){ rhanTG={g:g.dataset.rhg,m:null}; rhanRender(); return; }
+      const dr=e.target.closest('[data-rhdrill]'); if(dr){ rhanTG={g:'dia',m:dr.dataset.rhdrill}; rhanRender(); return; }
+      if(e.target.closest('[data-ijtodos]')){ rhanIjTodos=!rhanIjTodos; rhanRender(); return; }
+      const b=e.target.closest('[data-o]'); if(b){ rhanOrd=b.dataset.o; rhanRender(); return; }
       if(e.target.closest('[data-limpafunc]')){ rhanFunc=''; rhanCarregar(); return; }
       if(e.target.closest('[data-todos]')){ rhanTodos=!rhanTodos; rhanRender(); return; }
       const fu=e.target.closest('[data-fid]'); if(fu){ rhanFunc=fu.dataset.fid; rhanCarregar(); window.scrollTo(0,0); return; }
@@ -19494,7 +19515,28 @@ function rhanInit(){
 function rhanCss(){
   if(document.getElementById('rhanCss')) return;
   const st=document.createElement('style'); st.id='rhanCss';
-  st.textContent=`.rhan-hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:2px 0 8px}
+  st.textContent=`.rhan-nav{position:sticky;top:0;z-index:6;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;background:var(--bg);border-bottom:1px solid var(--line);margin:0 0 12px}
+.rhan-nav::-webkit-scrollbar{display:none}
+.rhan-nav button{flex:0 0 auto;font:inherit;font-size:14px;padding:11px 14px 10px;border:0;border-bottom:3px solid transparent;background:none;color:var(--mut);white-space:nowrap;cursor:pointer;margin-bottom:-1px}
+.rhan-nav button:hover{color:var(--ink)}
+.rhan-nav button.sel{color:var(--acc);border-bottom-color:var(--acc);font-weight:700}
+.rhan-t2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 8px}.rhan-t2 h3{margin:0}
+.rhan-ctl{margin-left:auto;display:flex;align-items:center;gap:6px}
+.rhan-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.rhan-seg button{font:inherit;font-size:12px;padding:4px 12px;border:0;background:var(--card);color:var(--mut);cursor:pointer}
+.rhan-seg button+button{border-left:1px solid var(--line)} .rhan-seg button.sel{background:var(--ink);color:var(--card);font-weight:600}
+.rhan-up{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--acc);cursor:pointer;white-space:nowrap}
+.rhan-ch{overflow-x:auto} .rhan-ch .ax{font-size:11px;fill:var(--mut)} .rhan-ch .vl{font-size:11px;fill:var(--ink);font-weight:600}
+.rhan-ch .hit{cursor:pointer} .rhan-ch .hit:hover{fill:var(--acc);fill-opacity:.06}
+.rhan-dica{font-size:11px;color:var(--mut);margin:4px 0 0}
+.rhan-pz{font-size:12.5px;color:var(--mut);margin:-2px 0 8px} .rhan-pz b{color:var(--ink)}
+.rhan-pr{display:grid;grid-template-columns:minmax(0,1fr) minmax(70px,38%) 112px;align-items:center;gap:10px;margin-top:6px;font-size:12.5px;cursor:pointer}
+.rhan-pr:hover .l{color:var(--acc)} .rhan-pr .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rhan-pr .t{height:10px;background:var(--line);border-radius:5px;overflow:hidden} .rhan-pr .t i{display:block;height:100%;border-radius:5px}
+.rhan-pr .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap} .rhan-pr .n span{color:var(--mut);font-size:11.5px}
+.rhan-dts{display:flex;flex-wrap:wrap;gap:4px} .rhan-dts span{font-size:11px;padding:1px 6px;border-radius:6px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.rhan-dts span.bad{border-color:var(--bad);color:var(--bad)}
+.rhan-hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:2px 0 8px}
 .rhan-g{display:grid;gap:10px}
 .rhan-g.k5{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .rhan-g.c2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));margin-top:10px}
@@ -19546,13 +19588,7 @@ function rhanCss(){
 .rhan-t .pb i{display:block;width:60px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;flex:none}
 .rhan-t .pb i b{display:block;height:100%;background:var(--bad)}
 .rhan-t .bad{color:var(--bad);font-weight:600} .rhan-t .warn{color:var(--warn);font-weight:600}
-.rhan-dias{display:flex;align-items:flex-end;gap:2px;height:130px;margin-top:4px;overflow-x:auto}
-.rhan-dias .c{flex:1;min-width:16px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:10px;color:var(--mut)}
-.rhan-dias .c .bar{width:100%;max-width:26px;border-radius:4px 4px 0 0;min-height:1px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--acc)}
-.rhan-dias .c .bar.g{background:var(--line)}
-.rhan-dias .c .bar i{display:block;width:100%;flex:none;background:var(--bad)}
-.rhan-dias .c:hover .bar{opacity:.75}
-.rhan-dias .c .x{margin-top:3px}`;
+`;
   document.head.appendChild(st);
 }
 function rhanConsRender(){
@@ -19567,6 +19603,34 @@ async function rhanCarregar(){
   catch(e){ rhanDados=null; $('#rhanView').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc(e.message||e)+'</div>'; return; }
   rhanRender();
 }
+// Eixo de tempo dos gráficos da aba Horas (2026-11-19, sw v435) — mesmo padrão do BI QSMS (sbColChart): dias seguidos do 1º ao último
+// dia com dado (fim de semana sombreado) ou meses; clicar num mês abre os dias dele. Valores em minutos, mostrados em horas.
+const RH_MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const rhMesL=k=>RH_MES[+k.slice(5,7)-1]+'/'+k.slice(2,4);
+const rhIsoU=d=>d.toISOString().slice(0,10);
+function rhanChaves(pd){ const t=rhanTG, ds=pd.map(d=>String(d.data).slice(0,10)).sort(); if(!ds.length) return [];
+  if(t.g==='mes') return [...new Set(ds.map(d=>d.slice(0,7)))];
+  const dd=t.m?ds.filter(d=>d.slice(0,7)===t.m):ds; if(!dd.length) return [];
+  const out=[]; for(let d=new Date(dd[0]+'T00:00:00Z'); rhIsoU(d)<=dd[dd.length-1] && out.length<400; d.setUTCDate(d.getUTCDate()+1)) out.push(rhIsoU(d)); return out; }
+function rhanTempoCtl(){ const t=rhanTG;
+  return `<span class="rhan-ctl">${t.m?`<button type="button" class="rhan-up" data-rhg="mes" title="Voltar à visão por mês">‹ ${rhMesL(t.m)}</button>`:''}`
+    +`<span class="rhan-seg" role="group" aria-label="Eixo do gráfico"><button type="button" data-rhg="mes" class="${t.g==='mes'?'sel':''}">Mês</button><button type="button" data-rhg="dia" class="${t.g==='dia'?'sel':''}">Dia</button></span></span>`; }
+function rhanColChart(ks,vals,cor,tip,{un='h',parte=null,cor2='var(--bad)',full=false}={}){ if(!ks.length) return '<p class="sub" style="margin:0">Sem dados no período.</p>';
+  const dia=ks[0].length===10, vw=($('#rhanView')||{}).clientWidth||360, cw=Math.round((vw>=1000&&!full?(vw-10)/2:vw)-32);
+  const W=Math.max(320,ks.length*(dia?20:58)+60,cw), H=230, pl=40, pr=10, pt=18, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
+  const dv=un==='h'?60:1, fv=v=>un==='h'?Math.round(v)+'h':Math.round(v), hv=vals.map(v=>(v||0)/dv), pv=parte?parte.map(v=>(v||0)/dv):null, r=Math.max(1,Math.max(1,...hv)/4), p10=Math.pow(10,Math.floor(Math.log10(r))), f=r/p10;
+  const mx=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p10*4, lbEvery=Math.max(1,Math.ceil(38/bw)), valOk=bw>=22; let g='';
+  for(let j=0;j<=4;j++){ const y=pt+ih-ih*j/4; g+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-5}" y="${y+3}" text-anchor="end" class="ax">${fv(mx*j/4)}</text>`; }
+  ks.forEach((k,i)=>{ const x0=pl+i*bw, L=dia?k.slice(8,10)+'/'+k.slice(5,7):rhMesL(k), v=hv[i], h=ih*v/mx, w=Math.min(bw*(dia?.75:.6),56);
+    if(dia&&[0,6].includes(new Date(k+'T12:00:00Z').getUTCDay())) g+=`<rect x="${x0}" y="${pt}" width="${bw}" height="${ih}" fill="var(--bg)" opacity=".8"/>`;
+    if(i%lbEvery===0) g+=`<text x="${x0+bw/2}" y="${H-pb+15}" text-anchor="middle" class="ax">${L}</text>`;
+    if(v){ const ph=pv?ih*Math.min(pv[i],v)/mx:0, tt=vEsc(tip(k,i,L));
+      g+=`<rect x="${x0+(bw-w)/2}" y="${pt+ih-h}" width="${w}" height="${h}" fill="${cor}" rx="2"><title>${tt}</title></rect>`
+        +(ph?`<rect x="${x0+(bw-w)/2}" y="${pt+ih-ph}" width="${w}" height="${ph}" fill="${cor2}" rx="2"><title>${tt}</title></rect>`:'')
+        +(valOk?`<text x="${x0+bw/2}" y="${pt+ih-h-4}" text-anchor="middle" class="vl">${fv(v)}</text>`:''); }
+    if(!dia) g+=`<rect class="hit" data-rhdrill="${k}" x="${x0}" y="${pt}" width="${bw}" height="${ih+pb}" fill="transparent"><title>${L} · clique para ver os dias</title></rect>`; });
+  return `<div class="rhan-ch"><svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block">${g}</svg></div>`
+    +(dia?'':'<p class="rhan-dica">Clique num mês para abrir os dias.</p>'); }
 const rhPc=(a,b,d=1)=>b?(a/b*100).toFixed(d).replace('.',',')+'%':'—';
 // Faixa visual dos indicadores (≤ ok = verde, ≤ al = atenção, acima = crítico)
 const rhFx=(v,ok,al)=>v==null?'':(v<=ok?'ok':(v<=al?'warn':'bad'));
@@ -19580,6 +19644,8 @@ function rhanRender(){
   const fns=D.funcs||[]; if(rhanFunc&&!fns.some(x=>String(x.id)===String(rhanFunc))){ rhanFunc=''; return rhanCarregar(); }
   $('#rhanFunc').innerHTML='<option value="">Todos os colaboradores ('+fns.length+')</option>'
     +fns.map(x=>`<option value="${x.id}"${String(x.id)===String(rhanFunc)?' selected':''}>${vEsc(x.nome)}${x.sigla?' · '+vEsc(x.sigla):''}</option>`).join('');
+  $('#rhanNav').innerHTML=RHAN_ABAS.map(([k,l])=>`<button type="button" data-rhaba="${k}" class="${rhanAba===k?'sel':''}"${rhanAba===k?' aria-current="page"':''}>${l}</button>`).join('');
+  { const n=$('#rhanNav'), hd=document.querySelector('#app>header'); n.style.top=(hd&&getComputedStyle(hd).position==='sticky'?hd.offsetHeight:0)+'px'; }
   if(!T.funcionarios){ $('#rhanView').innerHTML='<p class="sub">Nenhum ponto carregado nesse período.</p>'; return; }
   const P=D.periodo||{}, I=D.inc||{}, IS=D.inc_st||{}, TR=D.tratativas||{};
   // pipeline: identificadas = a tratar + aguardando RH + validadas (aguardam Kairos) + corrigidas no Kairos (rastro, já conformes)
@@ -19592,82 +19658,111 @@ function rhanRender(){
   const stTag=f=>f?`<span class="st ${f}">${({ok:'✓ ok',warn:'! atenção',bad:'▲ crítico'})[f]}</span>`:'';
   const kp=(lb,v,d,f)=>`<div class="rhan-c rhan-kp"><span class="lb">${lb}</span>${stTag(f)}<b class="v">${v}</b><span class="d">${d}</span></div>`;
   const fSel=rhanFunc?fns.find(x=>String(x.id)===String(rhanFunc)):null;
-  let h=`<div class="rhan-hd"><span>${fSel?'<b style="color:var(--ink)">'+vEsc(fSel.nome)+'</b> <button class="rhv-lk" style="margin:0" data-limpafunc>✕ limpar</button> · ':''}${rhanArea?'<b style="color:var(--ink)">'+vEsc(rhanArea)+'</b> · ':''}${rhcN(T.funcionarios)} colaboradores · dados de ${fmtData(P.data_min)} a ${fmtData(P.data_max)}${P.parciais?' · '+P.parciais+' dia(s) ainda parciais':''}${T.dias_ajuste_val?` · <span style="color:var(--ok)" title="Nesses dias valem as batidas ajustadas pelo gestor e validadas pela RH, não as do Kairos">✓ ${rhcN(T.dias_ajuste_val)} dia(s) com ajuste validado</span>`:''}</span>`
-    +`<button class="rhv-lk" style="margin:0" data-irval>Abrir a Validação gestor ›</button></div>`;
-  // ---- KPIs estratégicos
-  h+='<div class="rhan-g k5">'
-    +`<div class="rhan-c rhan-kp hero"><span class="lb">Inconsistências ainda não tratadas</span><b class="v">${nInc?rhPc(TR.pendentes,nInc,0):'—'}</b>`
-    +`<span class="d"><b>${rhcN(TR.pendentes||0)}</b> de ${rhcN(nInc)} dias com inconsistência</span>${sb(TR.pendentes||0,TR.tratadas||0,TR.validadas||0,TR.corrigidas||0)}${lg}</div>`
-    +kp('Conformidade do ponto',conf==null?'—':rhPc(T.dias_aval-nAb,T.dias_aval),`dias sem inconsistência em aberto · ${rhcN(T.dias_aval)} avaliados`,conf==null?'':(conf>=.9?'ok':conf>=.75?'warn':'bad'))
-    +kp('Absenteísmo',rhPc(T.falta_aval,T.prev),`${rhHM(T.falta_aval)} de falta sobre ${rhHM(T.prev)} previstas`,rhFx(abs,.03,.06))
-    +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
-    +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
-    +'</div>';
-  // Funil do pipeline (2026-11-17, sw v414): cada etapa = quantas inconsistências chegaram até ela (largura ∝ identificadas);
-  // a parte colorida é o que parou nessa etapa, a cinza é o que já seguiu adiante. A corrigida no Kairos é rastro, já conforme.
-  { const P=TR.pendentes||0, Tt=TR.tratadas||0, V=TR.validadas||0, C=TR.corrigidas||0;
-    const et=[['Identificadas','inconsistências do período',nInc,P,'xp','a tratar pelo gestor'],
-      ['Tratadas pelo gestor','justificadas ou ajustadas',Tt+V+C,Tt,'xt','aguardando a RH'],
-      ['Validadas pela RH','conferidas e lançadas no Kairos',V+C,V,'xv','aguardando a carga do Kairos'],
-      ['Corrigidas no Kairos','o Kairos não acusa mais · conforme',C,C,'xc','corrigidas']];
-    h+='<div class="rhan-c rhan-fn"><h3>Pipeline das inconsistências <span class="sub">· quantas chegaram a cada etapa; a cor é o que parou nela</span></h3>'
-      +et.map(([l,d,n,par,cx,lp],i)=>{ const w=nInc?n/nInc*100:0, seg=n?par/n*100:0;
-        const tt=`${l}: ${rhcN(n)} (${rhPc(n,nInc,0)} das identificadas)`+(i<3?` · ${rhcN(par)} ${lp} · ${rhcN(n-par)} seguiram`:'');
-        return `<div class="rhan-fr" title="${vEsc(tt)}"><div class="l">${l}<small>${i<3?`${rhcN(par)} ${lp}`:d}</small></div>`
-          +`<div class="b">${n?`<div style="width:${w}%">${par?`<i class="${cx}" style="width:${seg}%"></i>`:''}${n-par?`<i class="fs" style="width:${100-seg}%"></i>`:''}</div>`:''}</div>`
-          +`<div class="n"><b>${rhcN(n)}</b><span>${i?rhPc(n,nInc,0)+' das identif.':'100%'}</span></div></div>`; }).join('')
-      +'<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Aguardando Kairos</span><span class="xc">Corrigidas</span><span class="fs">Seguiram para a próxima etapa</span></div></div>'; }
   const mi=(v,l)=>`<div><b>${v}</b><span>${l}</span></div>`;
-  h+='<div class="rhan-mini">'+mi(rhHM(T.htrab),'horas trabalhadas')+mi(rhcN(T.dias_falta),'dias de falta')
-    +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')
-    +mi(rhcN(ic('interjornada').casos),'descansos < 11h · '+ic('interjornada').pessoas+' pessoa(s)')
-    +mi(rhcN(ic('sem_intervalo').casos),'dias sem intervalo')+mi(rhHM(T.adn),'adicional noturno')+'</div>';
-  // ---- Por área
-  const pa=D.por_area||[];
-  const ln=x=>{ const ni=x.dias_inc||0, pp=ni?x.pend/ni:0;
-    return `<td class="n">${x.funcionarios}</td><td class="n">${ni}</td>`
-      +`<td class="n"><span class="pb"><span class="${pp>=.5?'bad':''}">${ni?rhPc(x.pend,ni,0):'—'}</span><i><b style="width:${pp*100}%"></b></i></span></td>`
-      +`<td class="n">${x.corr||''}</td><td class="n">${x.dias_aval?rhPc(x.dias_aval-ni+(x.corr||0),x.dias_aval,0):'—'}</td>`
-      +`<td class="n ${x.prev&&x.falta/x.prev>.06?'bad':''}">${rhPc(x.falta,x.prev)}</td><td class="n ${x.htrab&&x.he/x.htrab>.10?'warn':''}">${rhPc(x.he,x.htrab)}</td>`
-      +`<td class="n">${x.dias_prev_trab?rhPc(x.dias_prev_trab-x.n_atrasos,x.dias_prev_trab,0):'—'}</td><td class="n">${x.dias_he2||''}</td><td class="n">${x.interj||''}</td>`; };
-  const hdA='<th class="n">Pessoas</th><th class="n">Dias c/ inconsist.</th><th class="n">Não tratadas</th><th class="n">Corrigidas</th><th class="n">Conformidade</th><th class="n">Absenteísmo</th><th class="n">% HE</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>';
-  if(pa.length) h+=`<div class="rhan-c" style="margin-top:10px"><h3>Por área ${pa.length>1?'<span class="sub">· clique numa área para filtrar</span>':''}</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Área</th>${hdA}</tr>`
-    +pa.map(x=>`<tr${pa.length>1?` data-area="${vEsc(x.nome)}"`:''}><td class="nm">${vEsc(x.nome)}</td>${ln(x)}</tr>`).join('')+'</table></div></div>';
-  // ---- Inconsistências por tipo  ×  Tratativa por gestor
-  const its=Object.keys(RH_TIPOS).filter(t=>I[t]).sort((a,b)=>I[b].casos-I[a].casos); const mx=Math.max(1,...its.map(t=>I[t].casos));
-  const blTipo='<div class="rhan-c"><h3>Inconsistências por tipo <span class="sub">· dias, por situação da tratativa</span></h3>'+(its.length?its.map(t=>{ const s=IS[t]||{pend:I[t].casos,trat:0,val:0,corr:0};
-      return `<div class="rhan-r" title="${vEsc(RH_TIPOS[t][1])} — ${I[t].pessoas} pessoa(s): ${s.pend} a tratar, ${s.trat} aguardando RH, ${s.val} validadas, ${s.corr||0} corrigidas no Kairos"><span class="l">${RH_TIPOS[t][0]}</span>`
-        +`<span><span style="display:block;width:${Math.max(6,I[t].casos/mx*100)}%">${sb(s.pend,s.trat,s.val,s.corr||0)}</span></span><span class="n"><b>${I[t].casos}</b> · ${rhPc(s.pend,I[t].casos,0)}</span></div>`; }).join('')+lg:'<p class="sub" style="margin:0">Nenhuma.</p>')+'</div>';
-  const pg=(D.por_gestor||[]).filter(g=>g.dias_inc);
-  const blGest='<div class="rhan-c"><h3>Tratativa por gestor <span class="sub">· % ainda não tratada</span></h3>'+(pg.length?pg.map(g=>`<div class="rhan-r" title="${vEsc(g.nome)}: ${g.pend} a tratar, ${g.trat} aguardando RH, ${g.val} validadas, ${g.corr||0} corrigidas no Kairos · ${g.funcionarios} colaborador(es)"><span class="l">${vEsc(g.nome)} <span class="sub" style="margin:0">· ${g.funcionarios} pess.</span></span>${sb(g.pend,g.trat,g.val,g.corr||0)}<span class="n"><b>${rhPc(g.pend,g.dias_inc,0)}</b> de ${g.dias_inc}</span></div>`).join('')+lg:'<p class="sub" style="margin:0">Nenhuma inconsistência.</p>')+'</div>';
-  h+='<div class="rhan-g c2">'+blTipo+blGest+'</div>';
-  // ---- Por dia: inconsistências  ×  HE (dois gráficos, um eixo cada)
-  const pd=(D.por_dia||[]).filter(d=>d.presentes||d.inc||d.he);
-  if(pd.length){
-    const mi2=Math.max(1,...pd.map(d=>d.inc||0)), mh=Math.max(1,...pd.map(d=>d.he));
-    const dl=d=>`<span class="x">${d.data.slice(8,10)}</span>`;
-    h+='<div class="rhan-g c2">'
-      +'<div class="rhan-c"><h3>Inconsistências por dia <span class="sub">· vermelho = ainda não tratadas</span></h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: ${d.inc||0} inconsistência(s), ${d.pend||0} a tratar · ${d.presentes} presentes"><span>${d.inc||''}</span><span class="bar g" style="height:${(d.inc||0)/mi2*85}%"><i style="height:${d.inc?d.pend/d.inc*100:0}%"></i></span>${dl(d)}</div>`).join('')+'</div></div>'
-      +'<div class="rhan-c"><h3>Horas extras por dia</h3><div class="rhan-dias">'+pd.map(d=>`<div class="c" title="${fmtData(d.data)}: HE ${rhHM(d.he)} · ${d.presentes} presentes · falta ${rhHM(d.falta_min)}"><span>${d.he?Math.round(d.he/60)+'h':''}</span><span class="bar" style="height:${d.he/mh*85}%"></span>${dl(d)}</div>`).join('')+'</div></div>'
+  // Duas telas (2026-11-19, sw v434, como as abas do BI QSMS): ⏱️ Horas = visão consolidada das horas (trabalhadas, falta,
+  // HE, atraso, por área/dia/consórcio/colaborador); 🛠️ Tratamento = andamento das inconsistências (funil, por tipo/gestor/dia).
+  const trat=rhanAba==='trat';
+  let h=`<div class="rhan-hd"><span>${fSel?'<b style="color:var(--ink)">'+vEsc(fSel.nome)+'</b> <button class="rhv-lk" style="margin:0" data-limpafunc>✕ limpar</button> · ':''}${rhanArea?'<b style="color:var(--ink)">'+vEsc(rhanArea)+'</b> · ':''}${rhcN(T.funcionarios)} colaboradores · dados de ${fmtData(P.data_min)} a ${fmtData(P.data_max)}${P.parciais?' · '+P.parciais+' dia(s) ainda parciais':''}${T.dias_ajuste_val?` · <span style="color:var(--ok)" title="Nesses dias valem as batidas ajustadas pelo gestor e validadas pela RH, não as do Kairos">✓ ${rhcN(T.dias_ajuste_val)} dia(s) com ajuste validado</span>`:''}</span>`
+    +(trat?`<button class="rhv-lk" style="margin:0" data-irval>Abrir a Validação gestor ›</button>`:'')+'</div>';
+  const pa=trat?(D.por_area||[]):[...(D.por_area||[])].sort((a,b)=>(b.htrab||0)-(a.htrab||0)), pd=(D.por_dia||[]).filter(d=>d.presentes||d.inc||d.he||d.falta_min);
+  const tabArea=(hd,ln)=>pa.length?`<div class="rhan-c" style="margin-top:10px"><h3>Por área ${pa.length>1?'<span class="sub">· clique numa área para filtrar</span>':''}</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Área</th>${hd}</tr>`
+    +pa.map(x=>`<tr${pa.length>1?` data-area="${vEsc(x.nome)}"`:''}><td class="nm">${vEsc(x.nome)}</td>${ln(x)}</tr>`).join('')+'</table></div></div>':'';
+  const ranking=cols=>{ if(!cols.some(([c])=>c===rhanOrd)) rhanOrd=cols[0][0];
+    const fs=[...(D.func||[])].map(f=>({...f,abs:f.prev?f.falta/f.prev:0})).sort((a,b)=>(b[rhanOrd]||0)-(a[rhanOrd]||0)||String(a.nome).localeCompare(b.nome));
+    const vis=rhanTodos?fs:fs.slice(0,20);
+    const fmt=(c,v,f)=>c==='abs'?(f.prev?rhPc(f.falta,f.prev,0):'—'):(c==='he'||c==='atraso'||c==='htrab')?rhHM(v):(v||'')+(v&&(c==='dias_falta'||c==='dias_he2')?' d':'');
+    return '<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar ou num nome para filtrar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
+      +cols.map(([c,l])=>`<th class="n${c===rhanOrd?' on':''}" data-o="${c}">${vEsc(l)}</th>`).join('')+'</tr>'
+      +vis.map(f=>`<tr${f.fid&&!rhanFunc?` data-fid="${f.fid}" style="cursor:pointer" title="Ver os indicadores só desta pessoa"`:''}><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
+        +cols.map(([c])=>`<td class="n${c==='pend'&&f.pend?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
+      +'</table></div>'+(fs.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fs.length+')'}</button>`:'')+'</div>'; };
+  if(!trat){
+    // ================= ⏱️ HORAS (consolidado) =================
+    h+='<div class="rhan-g k5">'
+      +kp('Horas trabalhadas',rhHM(T.htrab),`${rhHM(T.prev)} previstas · ${rhPc(T.htrab,T.prev,0)} do previsto`,'')
+      +kp('Absenteísmo',rhPc(T.falta_aval,T.prev),`${rhHM(T.falta_aval)} de falta sobre ${rhHM(T.prev)} previstas`,rhFx(abs,.03,.06))
+      +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
+      +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
       +'</div>';
+    h+='<div class="rhan-mini">'+mi(rhcN(T.dias_falta),'dias de falta')
+      +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')
+      +mi(rhcN(ic('interjornada').casos),'descansos < 11h · '+ic('interjornada').pessoas+' pessoa(s)')
+      +mi(rhcN(ic('sem_intervalo').casos),'dias sem intervalo')+mi(rhHM(T.adn),'adicional noturno')+'</div>';
+    h+=tabArea('<th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">Falta</th><th class="n">Absenteísmo</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>',
+      x=>`<td class="n">${x.funcionarios}</td><td class="n">${rhHM(x.htrab)}</td><td class="n">${rhHM(x.he)}</td><td class="n ${x.htrab&&x.he/x.htrab>.10?'warn':''}">${rhPc(x.he,x.htrab)}</td>`
+        +`<td class="n">${rhHM(x.falta)}</td><td class="n ${x.prev&&x.falta/x.prev>.06?'bad':''}">${rhPc(x.falta,x.prev)}</td>`
+        +`<td class="n">${x.dias_prev_trab?rhPc(x.dias_prev_trab-x.n_atrasos,x.dias_prev_trab,0):'—'}</td><td class="n">${x.dias_he2||''}</td><td class="n">${x.interj||''}</td>`);
+    if(pd.length){
+      // série no eixo escolhido: dia a dia (dias sem lançamento = 0) ou somada por mês
+      const ks=rhanChaves(pd), by=new Map(pd.map(d=>[String(d.data).slice(0,10),d]));
+      const agg=c=>ks.map(k=>k.length===10?((by.get(k)||{})[c]||0):pd.filter(d=>String(d.data).slice(0,7)===k).reduce((s,d)=>s+(d[c]||0),0));
+      const pres=agg('presentes'), he=agg('he'), fa=agg('falta_min'), rot=rhanTG.g==='mes'?'por mês':rhanTG.m?'por dia · '+rhMesL(rhanTG.m):'por dia';
+      h+='<div class="rhan-g c2">'
+        +`<div class="rhan-c"><div class="rhan-t2"><h3>Horas extras ${rot}</h3>${rhanTempoCtl()}</div>${rhanColChart(ks,he,'var(--acc)',(k,i,L)=>`${L}: HE ${rhHM(he[i])}`+(ks[0].length===10?` · ${pres[i]} presentes`:''))}</div>`
+        +`<div class="rhan-c"><div class="rhan-t2"><h3>Horas de falta ${rot}</h3>${rhanTempoCtl()}</div>${rhanColChart(ks,fa,'var(--bad)',(k,i,L)=>`${L}: falta ${rhHM(fa[i])}`+(ks[0].length===10?` · ${pres[i]} presentes`:''))}</div>`
+        +'</div>';
+    }
+    // Concentração (Pareto) — quem responde pela maior parte da HE e da falta; clicar filtra a pessoa. Substitui a tabela
+    // Por consórcio (2026-11-19, sw v435): a divisão AI × EH já está no filtro de consórcio.
+    const pareto=(tit,c,tot,cor,lbl)=>{ const fs=(D.func||[]).filter(f=>(f[c]||0)>0).sort((a,b)=>b[c]-a[c]); if(!fs.length||!tot) return `<div class="rhan-c"><h3>${tit}</h3><p class="sub" style="margin:0">Nenhum caso.</p></div>`;
+      let ac=0, n50=0; for(const f of fs){ ac+=f[c]; n50++; if(ac>=tot/2) break; }
+      const top=fs.slice(0,10), mx=top[0][c], s10=top.reduce((s,f)=>s+f[c],0);
+      return `<div class="rhan-c"><h3>${tit}</h3><p class="rhan-pz"><b>${n50}</b> de ${fs.length} pessoa(s) com ${lbl} somam metade do total · os 10 primeiros, <b>${rhPc(s10,tot,0)}</b></p>`
+        +top.map(f=>`<div class="rhan-pr"${f.fid&&!rhanFunc?` data-fid="${f.fid}"`:''} title="${vEsc(f.nome+' · '+(f.area||'')+' · '+rhHM(f[c])+' ('+rhPc(f[c],tot)+' do total)')}"><span class="l">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></span>`
+          +`<span class="t"><i style="width:${f[c]/mx*100}%;background:${cor}"></i></span><span class="n"><b>${rhHM(f[c])}</b> <span>· ${rhPc(f[c],tot,0)}</span></span></div>`).join('')+'</div>'; };
+    h+='<div class="rhan-g c2">'+pareto('Quem concentra as horas extras','he',T.he,'var(--acc)','HE')+pareto('Quem concentra as faltas','falta',(D.func||[]).reduce((s,f)=>s+(f.falta||0),0),'var(--bad)','falta')+'</div>';
+    // Descanso < 11h agrupado por pessoa (reincidência primeiro), com os dias em chips; linha inteira, sem espaço morto
+    const ij=D.interjornada||[];
+    if(ij.length){ const gp=new Map(); ij.forEach(x=>{ const k=x.nome+'|'+(x.sigla||''); if(!gp.has(k)) gp.set(k,{nome:x.nome,sigla:x.sigla,l:[]}); gp.get(k).l.push(x); });
+      const gs=[...gp.values()].map(g=>({...g,min:Math.min(...g.l.map(x=>x.descanso))})).sort((a,b)=>b.l.length-a.l.length||a.min-b.min);
+      const vis=rhanIjTodos?gs:gs.slice(0,10);
+      h+=`<div class="rhan-c" style="margin-top:10px"><h3>Descanso menor que 11h entre jornadas <span class="sub">· ${ij.length} ocorrência(s) em ${gs.length} pessoa(s); em vermelho, menos de 10h</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th class="n">Ocorrências</th><th class="n">Menor descanso</th><th>Dias (descanso)</th></tr>`
+        +vis.map(g=>`<tr><td class="nm">${vEsc(g.nome)} <span class="sub" style="margin:0">${vEsc(g.sigla||'')}</span></td><td class="n">${g.l.length}</td><td class="n ${g.min<600?'bad':''}">${rhHM(g.min)}</td>`
+          +`<td style="white-space:normal"><div class="rhan-dts">${g.l.sort((a,b)=>String(a.data).localeCompare(b.data)).map(x=>`<span class="${x.descanso<600?'bad':''}" title="Faltou ${rhHM(660-x.descanso)} para 11h">${fmtData(x.data).slice(0,5)} · ${rhHM(x.descanso)}</span>`).join('')}</div></td></tr>`).join('')
+        +'</table></div>'+(gs.length>10?`<button class="rhv-lk" data-ijtodos>${rhanIjTodos?'Mostrar só as 10 primeiras':'Mostrar todas ('+gs.length+')'}</button>`:'')+'</div>'; }
+    h+=ranking([['htrab','H.trab'],['he','HE'],['abs','Absent.'],['dias_falta','Faltas'],['atraso','Atraso'],['dias_he2','HE>2h'],['interj','Desc.<11h']]);
+  } else {
+    // ================= 🛠️ TRATAMENTO das inconsistências =================
+    h+='<div class="rhan-g k5">'
+      +`<div class="rhan-c rhan-kp hero"><span class="lb">Inconsistências ainda não tratadas</span><b class="v">${nInc?rhPc(TR.pendentes,nInc,0):'—'}</b>`
+      +`<span class="d"><b>${rhcN(TR.pendentes||0)}</b> de ${rhcN(nInc)} dias com inconsistência</span></div>`
+      +kp('Conformidade do ponto',conf==null?'—':rhPc(T.dias_aval-nAb,T.dias_aval),`dias sem inconsistência em aberto · ${rhcN(T.dias_aval)} avaliados`,conf==null?'':(conf>=.9?'ok':conf>=.75?'warn':'bad'))
+      +kp('Inconsistências em aberto',rhcN(nAb),`${rhcN(TR.tratadas||0)} aguardando RH · ${rhcN(TR.validadas||0)} aguardando Kairos`,'')
+      +'</div>';
+    // Funil do pipeline (2026-11-17, sw v414): cada etapa = quantas inconsistências chegaram até ela (largura ∝ identificadas);
+    // a parte colorida é o que parou nessa etapa, a cinza é o que já seguiu adiante. A corrigida no Kairos é rastro, já conforme.
+    { const P=TR.pendentes||0, Tt=TR.tratadas||0, V=TR.validadas||0, C=TR.corrigidas||0;
+      const et=[['Identificadas','inconsistências do período',nInc,P,'xp','a tratar pelo gestor'],
+        ['Tratadas pelo gestor','justificadas ou ajustadas',Tt+V+C,Tt,'xt','aguardando a RH'],
+        ['Validadas pela RH','conferidas e lançadas no Kairos',V+C,V,'xv','aguardando a carga do Kairos'],
+        ['Corrigidas no Kairos','o Kairos não acusa mais · conforme',C,C,'xc','corrigidas']];
+      h+='<div class="rhan-c rhan-fn"><h3>Pipeline das inconsistências <span class="sub">· quantas chegaram a cada etapa; a cor é o que parou nela</span></h3>'
+        +et.map(([l,d,n,par,cx,lp],i)=>{ const w=nInc?n/nInc*100:0, seg=n?par/n*100:0;
+          const tt=`${l}: ${rhcN(n)} (${rhPc(n,nInc,0)} das identificadas)`+(i<3?` · ${rhcN(par)} ${lp} · ${rhcN(n-par)} seguiram`:'');
+          return `<div class="rhan-fr" title="${vEsc(tt)}"><div class="l">${l}<small>${i<3?`${rhcN(par)} ${lp}`:d}</small></div>`
+            +`<div class="b">${n?`<div style="width:${w}%">${par?`<i class="${cx}" style="width:${seg}%"></i>`:''}${n-par?`<i class="fs" style="width:${100-seg}%"></i>`:''}</div>`:''}</div>`
+            +`<div class="n"><b>${rhcN(n)}</b><span>${i?rhPc(n,nInc,0)+' das identif.':'100%'}</span></div></div>`; }).join('')
+        +'<div class="rhan-lg"><span class="xp">A tratar</span><span class="xt">Aguardando RH</span><span class="xv">Aguardando Kairos</span><span class="xc">Corrigidas</span><span class="fs">Seguiram para a próxima etapa</span></div></div>'; }
+    h+=tabArea('<th class="n">Pessoas</th><th class="n">Dias c/ inconsist.</th><th class="n">Não tratadas</th><th class="n">Corrigidas</th><th class="n">Conformidade</th>',
+      x=>{ const ni=x.dias_inc||0, pp=ni?x.pend/ni:0;
+        return `<td class="n">${x.funcionarios}</td><td class="n">${ni}</td>`
+          +`<td class="n"><span class="pb"><span class="${pp>=.5?'bad':''}">${ni?rhPc(x.pend,ni,0):'—'}</span><i><b style="width:${pp*100}%"></b></i></span></td>`
+          +`<td class="n">${x.corr||''}</td><td class="n">${x.dias_aval?rhPc(x.dias_aval-ni+(x.corr||0),x.dias_aval,0):'—'}</td>`; });
+    // ---- Inconsistências por tipo  ×  Tratativa por gestor
+    const its=Object.keys(RH_TIPOS).filter(t=>I[t]).sort((a,b)=>I[b].casos-I[a].casos); const mx=Math.max(1,...its.map(t=>I[t].casos));
+    const blTipo='<div class="rhan-c"><h3>Inconsistências por tipo <span class="sub">· dias, por situação da tratativa</span></h3>'+(its.length?its.map(t=>{ const s=IS[t]||{pend:I[t].casos,trat:0,val:0,corr:0};
+        return `<div class="rhan-r" title="${vEsc(RH_TIPOS[t][1])} — ${I[t].pessoas} pessoa(s): ${s.pend} a tratar, ${s.trat} aguardando RH, ${s.val} validadas, ${s.corr||0} corrigidas no Kairos"><span class="l">${RH_TIPOS[t][0]}</span>`
+          +`<span><span style="display:block;width:${Math.max(6,I[t].casos/mx*100)}%">${sb(s.pend,s.trat,s.val,s.corr||0)}</span></span><span class="n"><b>${I[t].casos}</b> · ${rhPc(s.pend,I[t].casos,0)}</span></div>`; }).join('')+lg:'<p class="sub" style="margin:0">Nenhuma.</p>')+'</div>';
+    const pg=(D.por_gestor||[]).filter(g=>g.dias_inc);
+    const blGest='<div class="rhan-c"><h3>Tratativa por gestor <span class="sub">· % ainda não tratada</span></h3>'+(pg.length?pg.map(g=>`<div class="rhan-r" title="${vEsc(g.nome)}: ${g.pend} a tratar, ${g.trat} aguardando RH, ${g.val} validadas, ${g.corr||0} corrigidas no Kairos · ${g.funcionarios} colaborador(es)"><span class="l">${vEsc(g.nome)} <span class="sub" style="margin:0">· ${g.funcionarios} pess.</span></span>${sb(g.pend,g.trat,g.val,g.corr||0)}<span class="n"><b>${rhPc(g.pend,g.dias_inc,0)}</b> de ${g.dias_inc}</span></div>`).join('')+lg:'<p class="sub" style="margin:0">Nenhuma inconsistência.</p>')+'</div>';
+    h+='<div class="rhan-g c2">'+blTipo+blGest+'</div>';
+    if(pd.length){ const ks=rhanChaves(pd), by=new Map(pd.map(d=>[String(d.data).slice(0,10),d]));
+      const agg=c=>ks.map(k=>k.length===10?((by.get(k)||{})[c]||0):pd.filter(d=>String(d.data).slice(0,7)===k).reduce((s,d)=>s+(d[c]||0),0));
+      const inc=agg('inc'), pen=agg('pend'), rot=rhanTG.g==='mes'?'por mês':rhanTG.m?'por dia · '+rhMesL(rhanTG.m):'por dia';
+      h+=`<div class="rhan-c" style="margin-top:10px"><div class="rhan-t2"><h3>Inconsistências ${rot} <span class="sub">· vermelho = ainda não tratadas</span></h3>${rhanTempoCtl()}</div>`
+        +rhanColChart(ks,inc,'var(--line)',(k,i,L)=>`${L}: ${inc[i]} inconsistência(s), ${pen[i]} a tratar`,{un:'n',parte:pen,full:true})+'</div>'; }
+    h+=ranking([['pend','A tratar'],['dias_inc','Inconsist.']]);
   }
-  // ---- Por consórcio  ×  interjornada
-  const pe=D.por_empresa||[], ij=D.interjornada||[];
-  const blCons=pe.length>1?'<div class="rhan-c"><h3>Por consórcio</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Consórcio</th><th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">Faltas</th><th class="n">Atraso</th></tr>'
-    +pe.map(e=>`<tr><td>${vEsc(e.sigla)} · ${vEsc(RH_ZA[e.consorcio]||e.consorcio||'')}</td><td class="n">${e.funcionarios}</td><td class="n">${rhHM(e.htrab)}</td><td class="n">${rhHM(e.he)}</td><td class="n">${rhPc(e.he,e.htrab)}</td><td class="n">${e.dias_falta} d</td><td class="n">${rhHM(e.atraso_min)}</td></tr>`).join('')+'</table></div></div>':'';
-  const blIj='<div class="rhan-c"><h3>Descanso menor que 11h entre jornadas</h3>'+(ij.length?'<div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Dia</th><th class="n">Descanso</th><th class="n">Falta p/ 11h</th></tr>'
-    +ij.map(x=>`<tr><td class="nm">${vEsc(x.nome)} <span class="sub" style="margin:0">${vEsc(x.sigla||'')}</span></td><td>${fmtData(x.data)}</td><td class="n">${rhHM(x.descanso)}</td><td class="n bad">${rhHM(660-x.descanso)}</td></tr>`).join('')+'</table></div>':'<p class="sub" style="margin:0">Nenhum caso.</p>')+'</div>';
-  h+='<div class="rhan-g c2">'+blCons+blIj+'</div>';
-  // ---- Ranking por colaborador
-  const cols=[['pend','A tratar'],['dias_inc','Inconsist.'],['abs','Absent.'],['he','HE'],['dias_he2','HE>2h'],['interj','Desc.<11h'],['dias_falta','Faltas'],['atraso','Atraso'],['htrab','H.trab']];
-  const fs=[...(D.func||[])].map(f=>({...f,abs:f.prev?f.falta/f.prev:0})).sort((a,b)=>(b[rhanOrd]||0)-(a[rhanOrd]||0)||String(a.nome).localeCompare(b.nome));
-  const vis=rhanTodos?fs:fs.slice(0,20);
-  const fmt=(c,v,f)=>c==='abs'?(f.prev?rhPc(f.falta,f.prev,0):'—'):(c==='he'||c==='atraso'||c==='htrab')?rhHM(v):(v||'')+(v&&(c==='dias_falta'||c==='dias_he2')?' d':'');
-  h+='<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar ou num nome para filtrar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
-    +cols.map(([c,l])=>`<th class="n${c===rhanOrd?' on':''}" data-o="${c}">${vEsc(l)}</th>`).join('')+'</tr>'
-    +vis.map(f=>`<tr${f.fid&&!rhanFunc?` data-fid="${f.fid}" style="cursor:pointer" title="Ver os indicadores só desta pessoa"`:''}><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
-      +cols.map(([c])=>`<td class="n${c==='pend'&&f.pend?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
-    +'</table></div>'+(fs.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fs.length+')'}</button>`:'')+'</div>';
   $('#rhanView').innerHTML=h;
 }
 

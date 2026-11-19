@@ -207,7 +207,9 @@
   sempre ≥5 m do limite; sem ligação → **ponto na rede** a ≥10 m do limite e ≤120 m do cruzamento (medir em hidrante/registro). Traz
   também a válvula de manobra mais próxima do cruzamento (≤40 m), DN/material, matrícula e endereço. Lado vazio = sem ligação nem rede
   cadastrada (borda da ZA). **Medido** = pressão das últimas 36 h (qualquer usuário) a ≤30 m do ponto (cliente, `prEstMedida`) → o
-  marcador mostra o valor e a lista o **Δ dentro − fora**. Pane `prEst` (z 440) abaixo das pressões. Cache por DMC em memória +
+  popup mostra o valor e a lista o **Δ dentro − fora**. **No mapa só aparece o losango preto da fronteira** (cruzamento da rede
+  com o limite, `divIcon` 14 px girado 45°, borda branca — símbolo diferente das bolinhas de pressão aferida, sw v433) — os chips D/F
+  e as linhas tracejadas saíram em 2026-11-19 (sw v432); tocar o losango abre o popup do par (dentro/fora, navegar até o cruzamento, registrar pressão). Pane `prEst` (z 440) abaixo das pressões. Cache por DMC em memória +
   `localStorage.pr_est_<cod_za>`; leva até ~2 s nos DMCs grandes de Betim (05/06, ~85 pares). Substitui a antiga tabela fixa
   `ponto_estanqueidade` (calculada sobre outra camada de DMC).
 - **Formulário** (`pressao_reg`, "‹ Mapa" volta): o mesmo de antes; ao salvar volta ao mapa (`prAposSalvar`).
@@ -603,6 +605,10 @@ Reúne funções de campo + a subdivisão **🛟 Suporte**. (A antiga "Retaguard
 - **Onde:** Home › 🧰 Suporte. **Gate:** só `pode_aprovar`/admin — botão `#homeAuxProg` nasce
   `hidden`, revelado por `homeGate()` (em `irPara('home')` **e** quando `app_me` resolve).
 - Hub com dois botões (retaguarda):
+- **📅 Planejamento** (2026-11-18, sw v431; 2026-11-19, sw v438): última categoria do hub. Tem um botão **📊 BI**
+  (tela `gi`) com todos os BIs do app (Gestão de Suprimentos, Frotas, Pessoas; Financeira "Em breve"). **Quem acessa o
+  Auxiliar vê todos os BIs** (`sup_bi_pode`/`frota_bi_pode`/`pes_bi_pode` aceitam `aux_acesso`); os acessos próprios de cada
+  BI continuam valendo para **carregar** arquivos. A distribuição definitiva (o que fica onde) ainda vai ser revista.
 
 ### 4.1 Criação de matrículas — `// CRIAÇÃO DE MATRÍCULAS` (~L1504) · tela `matriculas`
 - Fila de captações aguardando matrícula. RPCs `app_captacao_fila(p_filtro)` (pendente/criada/todas)
@@ -3704,6 +3710,18 @@ conteúdo inválido vira alerta, não erro, porque a fila descartaria em silênc
   reaproveita o id da tela de treinamento removida em 2026-09 (§6.3) — são coisas diferentes.
 - Teste de UI sem login: servir uma cópia de `public/` com um script que simula GPS e responde às RPCs; as RPCs
   foram testadas com rollback E2E (§4 do CLAUDE.md).
+- **Botão Emitir × GPS** (2026-11-19, sw v436): `segOnGps` chama `segAtualizar(true)` a cada leitura do GPS (no iPhone,
+  várias por segundo). Até a v435 isso recriava o HTML de `#segBtns` toda vez, e o toque que começava num botão
+  terminava em outro: **"Emitir" azul que não responde** (caso kesse.lopes, 19/11 — nenhuma chamada chegou ao
+  servidor; reproduzido com GPS a 150 ms: 10/10 toques perdidos). Agora `segAtualizar` só reescreve `#segErros`/
+  `#segBtns` quando o HTML muda (`el._h`) e não mexe nos botões durante o envio (`segEnviando`). **Não volte a
+  recriar o botão a cada chamada.** O botão também não usa mais `disabled` com pendência: fica apagado
+  (`aria-disabled`), mostra "⚠️ Falta: …" logo abaixo e, ao tocar, rola até a caixa de pendências. Erro durante a
+  montagem do envio vira toast e libera o botão (antes ficava travado).
+- **Registro de tentativas** (`app_seg_tentativa` → `"16 - qsms".qsms_tentativa`, `docs/migracao_seg_tentativa.sql`):
+  cada toque em Emitir grava resultado `falta`/`bloqueio`/`enviando`/`erro` + pendências + precisão do GPS + versão do
+  app + aparelho. A chamada vai direto, sem fila; offline ou erro, ela é ignorada. Serve para responder "fulano tentou e não conseguiu".
+  Consulta pronta no fim do arquivo SQL. A tabela não tem a trava de "nada pode ser apagado" (é diagnóstico).
 
 ## 19. Avisos (pop-ups) — `// AVISOS (pop-ups)` · tela `avisos` (🚧 Em desenvolvimento, admin-only) — `docs/migracao_avisos.sql` + `docs/migracao_avisos_dinamicos.sql`
 
@@ -4760,6 +4778,18 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
 `app_rh_analise(ini, fim, consórcio, área, funcionário)` (máx. 1 ano) sobre `ponto_dia` + inconsistências. **Desde 2026-11-17 (sw v410,
 `docs/migracao_rh_val_todo_periodo.sql`) quem tem a tela `analise` vê todos os colaboradores de todas as áreas** (antes: aprovador só a
 equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
+**Duas telas em abas (2026-11-19, sw v434, padrão das abas do BI QSMS — `#rhanNav`, `rhanAba`, só front):** **⏱️ Horas** (padrão) = visão
+consolidada das horas — cartões Horas trabalhadas (× previstas) / Absenteísmo / % HE / Pontualidade, mini-indicadores (dias de falta, HE>2h,
+descanso<11h, sem intervalo, adicional noturno), Por área com colunas de horas (ordenada por H.trab), HE por dia + horas de falta por dia,
+por consórcio, interjornada e ranking por H.trab/HE/absenteísmo/faltas/atraso; **🛠️ Tratamento das inconsistências** = % não tratadas (sem a
+barra/legenda dentro do cartão, retiradas a pedido), conformidade, em aberto, funil do pipeline, Por área (inconsistências), por tipo × por
+gestor, inconsistências por dia e ranking A tratar/Inconsist.; o atalho "Abrir a Validação gestor" só aparece nesta aba. Mesma RPC e filtros.
+**Gráficos e blocos (2026-11-19, sw v435, só front):** HE, falta e inconsistências no tempo viraram SVG no padrão do BI QSMS (`rhanColChart`):
+grade com eixo em horas/quantidade, eixo de datas dd/mm com dias seguidos (fim de semana sombreado), Mês|Dia e drill-down ao clicar no mês
+(`rhanTG`, `rhanChaves`); nas inconsistências, a parte vermelha da coluna é o que ainda está a tratar. A tabela **Por consórcio saiu** (a divisão
+AI × EH já está no filtro) e deu lugar a **Quem concentra as horas extras / as faltas** (Pareto sobre `func`: quantas pessoas somam metade do total,
+% dos 10 primeiros, top 10 clicável para filtrar a pessoa). O **Descanso < 11h** ficou na linha inteira, agrupado por pessoa (reincidência primeiro,
+menor descanso, dias em chips; < 10h em vermelho; 10 primeiros + Mostrar todas).
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
@@ -4828,6 +4858,7 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Leitores `SPB_P` (`lerPainel/lerMapa/lerVinculados`):** porta do Power Query (`stgPainel`, `MapaBase/MapaLinhas`, `CotPedMap`); iguais ao leitor testado contra os arquivos de 16/11/2026 (2.673 linhas do Painel nas obras 430/440 · 3.168 + 2.753 propostas do Mapa · 1.417 itens dos Vinculados).
 - **Acesso `sup_acesso` (admin):** duas caixas por pessoa — **Ver** e **Subir relatórios** (`app_sup_acesso_listar/_set`; subir inclui ver; admin tem os dois sempre).
 **PR-C (2026-11-19, sw v432) — módulo "Gestão Integrada" + BI de Suprimentos (6 páginas)** (telas `gi` / `sup_bi`; código `spb*`, reaproveita os componentes do BI QSMS `sb*`):
+- **Atualizado em 19/11/2026 (sw v438, decisão do Sander):** o card da Home saiu; o hub `gi` virou o botão **📊 BI** em Auxiliar de Programação › Planejamento (voltar → Auxiliar). Texto original a seguir.
 - **Decisão da usuária:** todos os BIs ficam num módulo novo, **Gestão Integrada** (card 📊 na Home, `homeGI`): **Gestão de Suprimentos** (pronto), Gestão de Frotas, Gestão de Pessoas, Gestão Financeira (cards "Em breve"; há mais áreas previstas). O hub de PR-B (`sup_bi`) virou a tela do BI; **Cargas do SIENGE** e **Acesso** passaram a ser botões no cabeçalho da Gestão de Suprimentos.
 - **Gestão de Suprimentos (`sup_bi`):** abas = páginas do Power BI — Visão Gerencial, Mesa do Comprador, Cotações, SLA & Lead Time, Estimativa (Sem Pedido), Itens (detalhe). Uma chamada `app_sup_bi()` traz as linhas das views; as **medidas são calculadas no aparelho** (DAX portado: Em Aberto, Backlog Crítico, Valor Faturado por NF distinta, funil de 8 etapas, filas, medianas, concorrência/fonte única/valor evitado, estimativa por referência). Filtros por página como as segmentações do BI (Nº da SC com busca por prefixo e vários números, período da solicitação, obra, comprador, grupo, solicitante, estágio, nº da cotação, faixa de concorrência). Tabelas com **⬇ Excel** (exporta todas as linhas, não só as 300 mostradas). Resumo por obra → comprador é expansível. Faixa "Painel de Compras de dd/mm hh:mm · referência dd/mm/aaaa" mostra a idade dos dados.
 - **Diferenças para o Power BI (de propósito):** o gráfico de linha mensal do SLA é de colunas agrupadas; as barras de valor estimado mostram R$; as 2 etapas de lead time sem fonte no SIENGE seguem só como nota.
@@ -4851,3 +4882,9 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Banco (schema `"18 - rh"`):** log `pes_bi_carga`; tabelas `pes_bi_contratado/_orcamento/_depara`; RPCs `app_pes_carga_iniciar/_lote/_finalizar/_falha`, `app_pes_cargas_listar`, `app_pes_bi`, acesso `app_pes_bi_acesso/_acesso_listar/_acesso_set` (`perfil.pes_bi_acesso` ver, `perfil.pes_carga_acesso` subir). As regras do Power Query rodam na consulta (`app_pes_bi`): de-para de cargo por área+função, mapa folha → Orçamento Aprovado (função `pes_cargo_final`, inclui motoristas: Recadastramento → MOTORISTA I, demais campo → AJUDANTE DE SANEAMENTO), MENOR APRENDIZ fora, Analista de RH "Ambos" → Contagem, Contagem → Águas Integradas, Betim → Eficiência Hídrica, Ambos = posição comum. `app.pes_hoje` fixa a data.
 - **Tela `pessoas_bi`:** Visão Geral (orçado, realizado, gap, aderência, pico e gap até o pico; orçado × realizado por mês; gap por área e por cargo; tabelas), Pessoas (ativos por empresa/categoria/área/cargo, % feminino, liderança, lista), Rotatividade (admissões, desligamentos, headcount médio, turnover do mês e acumulado, mediana de tempo de casa, ≤30 dias, lista de desligados) e Qualidade dos Dados. Filtros: empresa, categoria, área, cargo, liderança e mês de referência. Medidas portadas do DAX no aparelho, inclusive o **Orçado Comum** (posição "Ambos": 1 na empresa de quem está contratado, 0,5/0,5 enquanto vaga) e o "admissão em branco conta em todos os meses" do modelo.
 - **Validação contra o Power BI (cópia do Headcount v4 atualizada com os arquivos de 18/11/2026, consultas DAX; `app.pes_hoje='2026-11-18'`):** **0 divergências** em orçado e realizado de jul/26 a dez/27 (nov/26 = 180 × 109, pico 180 em nov/26–jan/27), por empresa (AI 99×65, EH 81×44), por categoria, liderança, 17 áreas e 15 cargos; admissões, desligamentos, headcount início/fim e turnover mês a mês (set/26 4,5%, out/26 17,3%, nov/26 5,9%), turnover acumulado 44,2% (25 desligamentos), mediana 43 dias, 9 com ≤30 dias, ativos 109 (21,1% feminino, 15 liderança). Contratados sem área ficam fora de Direto/Indireto (como no modelo).
+
+**Consolidação (2026-11-19, sw v438):** os PRs #401, #403, #404, #405, #406 e #407 entraram juntos num PR só, sincronizado com o main.
+- **Onde fica:** Auxiliar de Programação › 📅 Planejamento › **📊 BI** (tela `gi`). Saiu da Home.
+- **Acesso:** quem tem `aux_acesso` (ou admin) vê os 3 BIs; `*_carga_acesso` continua necessário para subir arquivos.
+- **Correção:** `app_sup_carga_falha`, `app_frota_carga_falha` e `app_pes_carga_falha` só apagam linhas de carga ainda `pendente` (antes, chamar com o id de uma carga concluída zerava o BI).
+- **Ordem do SQL (aplicar antes do deploy):** `migracao_sup_bi.sql` → `migracao_sup_bi_acesso.sql` → `migracao_sup_estoque.sql` → `migracao_frota_bi.sql` → `migracao_pessoas_bi.sql`.

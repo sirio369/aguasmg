@@ -13,7 +13,7 @@ alter table public.perfil add column if not exists frota_carga_acesso boolean no
 
 create or replace function "10 - Frotas".frota_bi_pode(p_uid uuid) returns boolean
 language sql stable security definer set search_path to 'public' as $$
-  select exists (select 1 from public.perfil p where p.id = p_uid and p.ativo and (p.funcao = 'admin' or p.frota_bi_acesso or p.frota_carga_acesso))
+  select exists (select 1 from public.perfil p where p.id = p_uid and p.ativo and (p.funcao = 'admin' or coalesce(p.aux_acesso, false) or p.frota_bi_acesso or p.frota_carga_acesso))
 $$;
 create or replace function "10 - Frotas".frota_carga_pode(p_uid uuid) returns boolean
 language sql stable security definer set search_path to 'public' as $$
@@ -154,6 +154,7 @@ returns void language plpgsql security definer set search_path to 'public' as $$
 begin
   if not "10 - Frotas".frota_carga_pode(auth.uid()) then raise exception 'sem permissão'; end if;
   update "10 - Frotas".frota_bi_carga set status = 'erro', erro = left(p_erro, 500), concluido_em = now() where id = p_carga and status = 'pendente';
+  if not found then return; end if;  -- carga já concluída/sem pendência: não apaga linhas ativas
   delete from "10 - Frotas".frota_bi_orcamento where carga_id = p_carga; delete from "10 - Frotas".frota_bi_area where carga_id = p_carga;
   delete from "10 - Frotas".frota_bi_depara where carga_id = p_carga; delete from "10 - Frotas".frota_bi_item_orc where carga_id = p_carga;
   delete from "10 - Frotas".frota_bi_leve where carga_id = p_carga; delete from "10 - Frotas".frota_bi_abast where carga_id = p_carga;
