@@ -4887,4 +4887,4 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Onde fica:** Auxiliar de Programação › 📅 Planejamento › **📊 BI** (tela `gi`). Saiu da Home.
 - **Acesso:** quem tem `aux_acesso` (ou admin) vê os 3 BIs; `*_carga_acesso` continua necessário para subir arquivos.
 - **Correção:** `app_sup_carga_falha`, `app_frota_carga_falha` e `app_pes_carga_falha` só apagam linhas de carga ainda `pendente` (antes, chamar com o id de uma carga concluída zerava o BI).
-- **Ordem do SQL (aplicar antes do deploy):** `migracao_sup_bi.sql` → `migracao_sup_bi_acesso.sql` → `migracao_sup_estoque.sql` → `migracao_frota_bi.sql` → `migracao_pessoas_bi.sql`.
+- **SQL aplicado em produção em 19/11/2026** (migrações `sup_bi`, `sup_bi_acesso`, `sup_estoque`, `frota_bi`, `pessoas_bi`). Ordem: `migracao_sup_bi.sql` → `migracao_sup_bi_acesso.sql` → `migracao_sup_estoque.sql` → `migracao_frota_bi.sql` → `migracao_pessoas_bi.sql`.
