@@ -4770,6 +4770,12 @@ descanso<11h, sem intervalo, adicional noturno), Por área com colunas de horas 
 por consórcio, interjornada e ranking por H.trab/HE/absenteísmo/faltas/atraso; **🛠️ Tratamento das inconsistências** = % não tratadas (sem a
 barra/legenda dentro do cartão, retiradas a pedido), conformidade, em aberto, funil do pipeline, Por área (inconsistências), por tipo × por
 gestor, inconsistências por dia e ranking A tratar/Inconsist.; o atalho "Abrir a Validação gestor" só aparece nesta aba. Mesma RPC e filtros.
+**Gráficos e blocos (2026-11-19, sw v435, só front):** HE, falta e inconsistências no tempo viraram SVG no padrão do BI QSMS (`rhanColChart`):
+grade com eixo em horas/quantidade, eixo de datas dd/mm com dias seguidos (fim de semana sombreado), Mês|Dia e drill-down ao clicar no mês
+(`rhanTG`, `rhanChaves`); nas inconsistências, a parte vermelha da coluna é o que ainda está a tratar. A tabela **Por consórcio saiu** (a divisão
+AI × EH já está no filtro) e deu lugar a **Quem concentra as horas extras / as faltas** (Pareto sobre `func`: quantas pessoas somam metade do total,
+% dos 10 primeiros, top 10 clicável para filtrar a pessoa). O **Descanso < 11h** ficou na linha inteira, agrupado por pessoa (reincidência primeiro,
+menor descanso, dias em chips; < 10h em vermelho; 10 primeiros + Mostrar todas).
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.
