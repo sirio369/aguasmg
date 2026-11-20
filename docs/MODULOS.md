@@ -4797,7 +4797,7 @@ Lista os **dias estranhos** do ponto para o gestor dizer o que aconteceu; a RH f
 equipe, via `func_visiveis`); a Validação gestor continua só com a equipe.
 **Duas telas em abas (2026-11-19, sw v434, padrão das abas do BI QSMS — `#rhanNav`, `rhanAba`, só front):** **⏱️ Horas** (padrão) = visão
 consolidada das horas — cartões Horas trabalhadas (× previstas) / Absenteísmo / % HE / Pontualidade, mini-indicadores (dias de falta, HE>2h,
-descanso<11h, sem intervalo, adicional noturno), Por área com colunas de horas (ordenada por H.trab), HE por dia + horas de falta por dia,
+descanso<11h, sem intervalo, adicional noturno — refeita na sw v441, ver abaixo), Por área com colunas de horas (ordenada por H.trab), HE por dia + horas de falta por dia,
 por consórcio, interjornada e ranking por H.trab/HE/absenteísmo/faltas/atraso; **🛠️ Tratamento das inconsistências** = % não tratadas (sem a
 barra/legenda dentro do cartão, retiradas a pedido), conformidade, em aberto, funil do pipeline, Por área (inconsistências), por tipo × por
 gestor, inconsistências por dia e ranking A tratar/Inconsist.; o atalho "Abrir a Validação gestor" só aparece nesta aba. Mesma RPC e filtros.
@@ -4807,6 +4807,34 @@ grade com eixo em horas/quantidade, eixo de datas dd/mm com dias seguidos (fim d
 AI × EH já está no filtro) e deu lugar a **Quem concentra as horas extras / as faltas** (Pareto sobre `func`: quantas pessoas somam metade do total,
 % dos 10 primeiros, top 10 clicável para filtrar a pessoa). O **Descanso < 11h** ficou na linha inteira, agrupado por pessoa (reincidência primeiro,
 menor descanso, dias em chips; < 10h em vermelho; 10 primeiros + Mostrar todas).
+**⏱️ Horas recalculada no navegador + HE por tipo + DSR + conformidade CLT (2026-11-20, sw v441, `docs/migracao_rh_analise_clt.sql` — só
+acrescenta `"18 - rh".marc_info(text[])` e `public.app_rh_ponto_dias(ini, fim, consórcio)`; nenhuma RPC existente mudou; APLICADA 20/11):**
+- **Base dia a dia:** `app_rh_ponto_dias` devolve `cols` + `dias` (1 array por colaborador × dia, com o ajuste validado pela RH valendo enquanto o
+  Kairos não refletir — mesma regra da `app_rh_analise`), `funcs` (área/gestor) e `kairos_he` (como o Kairos classificou a HE no resumo de cada
+  relatório). Busca só quando muda período/consórcio (`rhanDiasKey`); a aba Horas inteira (`rhanHoras`) é calculada no front.
+- **Filtros cruzados (`rhanX`, `rhanRows(excl)`, `RHAN_DIM`):** clicar em barra (dia no gráfico em modo Dia, dia da semana, faixa de HE, tipo de dia),
+  cartão (tipo de HE, regras do DSR), linha da tabela CLT, área ou pessoa vira filtro; chips no topo (`.rhan-fx`) tiram um a um ou tudo. Cada quadro
+  ignora o próprio filtro e destaca o escolhido (o resto esmaece). Área/colaborador seguem nos selects (agora na mesma linha do período,
+  `#rhanArea,#rhanFunc{flex:1 1 200px;max-width:340px}`) e refazem a aba Horas na hora; a `app_rh_analise` recarrega por baixo só p/ a aba Tratamento.
+- **Tipo de HE = regra do Kairos** (conferida com o resumo 01–17/11, bate 100%): **100%** no "Descanso Semanal" (sábado de folga e domingo) e
+  "Feriado"; **60%** no dia útil e no "Compensado". **Noturna** = parte da HE entre 22h e 5h, pelas batidas (`marc_info.not`), já contida nas outras.
+  Tipo do dia `td`: U útil · C compensado · S sábado de folga (descanso sem `dsr_min`) · D DSR (domingo ou `dsr_min` > 0) · F feriado.
+  Indicadores: HE 60%/100%/noturna (clicáveis), custo em horas normais (60% ×1,6 + 100% ×2 + noturna ×0,2), HE habitual (% dos dias trabalhados
+  com HE), média por pessoa e por dia, maior HE num dia, horas noturnas e horas noturnas a pagar (hora de 52min30s); HE por dia (vermelho = 100%),
+  por dia da semana, por faixa diária e por tipo de dia; Pareto de HE e de HE 100%; ranking com HE 60%/100%/noturna e "Irreg. CLT".
+- **DSR** (semanas seg–dom completas, sem dia parcial): houve DSR (≥ 1 dia inteiro sem trabalho e sem falta), DSR respeitado (folga + sem 7 dias
+  seguidos + descanso ≥ 35h), semanas sem folga, folga com descanso < 35h, folga no domingo, domingos/feriados trabalhados, semanas com falta sem
+  justificativa (DSR descontável) e a lista das semanas com problema. `seq` = dias trabalhados seguidos (olha 13 dias antes do início); `ds` =
+  descanso desde a última saída quando houve ≥ 1 dia inteiro sem trabalho.
+- **Conformidade CLT (`RHAN_CLT`)**, dia a dia: graves (entram no cartão "Conformidade CLT" = dias trabalhados sem nenhuma) — HE > 2h (art. 59),
+  jornada > 10h, intervalo < 1h em jornada > 6h (art. 71 §4º), sem pausa de 15 min em 4–6h (§1º), interjornada < 11h (art. 66/OJ 355), 7º dia
+  seguido (art. 67/OJ 410), folga < 35h (Súmula 110), batida ímpar (art. 74 §2º/Súmula 338); informativas — HE habitual em semana compensada
+  (Súmula 85 IV: quem tem sábado de folga e HE em ≥ metade dos dias úteis), trabalho em DSR/feriado (Súmula 146), trabalho noturno (art. 73),
+  falta sem justificativa (Lei 605/49 art. 6º). Abaixo, **Achados na configuração do ponto** a partir do `kairos_he` e das batidas: mesmo período
+  com HE a 50% num relatório e 60% em outro; "Folga Trabalhada" fora dos percentuais; adicional noturno vazio no relatório diário; dias > 6h
+  com só 2 batidas (o Kairos conta o almoço como trabalhado → intervalo não concedido ou HE inflada em até 1h/dia).
+- Cuidados: `adn_min` do `ponto_dia` vem sempre vazio do Kairos — não usar; o noturno sai das batidas. A conformidade e os números da aba Horas
+  usam o H.trab/HE do Kairos (ou do ajuste validado), não recalculam a jornada.
 Refeita em estilo BI na sw v400 (`docs/migracao_rh_analise_area.sql`):
 - **Filtros numa linha:** período (campos estreitos) · consórcio · **área** (`perfil.area` do colaborador via `funcionario.perfil_id`;
   sem perfil/área = "Sem área"). A lista de áreas vem do banco (`areas`) sem o próprio filtro; clicar numa linha da tabela "Por área" filtra.

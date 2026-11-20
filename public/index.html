@@ -19651,17 +19651,22 @@ function rhanInit(){
   rhvCss(); rhanCss(); rhPeriodo('#rhanIni','#rhanFim',30);
   const v=$('#rhanView');
   if(!v.dataset.ready){ v.dataset.ready='1'; ['#rhanIni','#rhanFim'].forEach(s=>$(s).addEventListener('change',rhanCarregar));
-    $('#rhanArea').addEventListener('change',()=>{ rhanArea=$('#rhanArea').value; rhanCarregar(); });
-    $('#rhanFunc').addEventListener('change',()=>{ rhanFunc=$('#rhanFunc').value; rhanCarregar(); });
+    $('#rhanArea').addEventListener('change',()=>{ rhanArea=$('#rhanArea').value; if(rhanAba==='horas') rhanRender(); rhanCarregar(); });
+    $('#rhanFunc').addEventListener('change',()=>{ rhanFunc=$('#rhanFunc').value; if(rhanAba==='horas') rhanRender(); rhanCarregar(); });
     $('#rhanNav').addEventListener('click',e=>{ const b=e.target.closest('[data-rhaba]'); if(!b||b.dataset.rhaba===rhanAba) return; rhanAba=b.dataset.rhaba; rhanTodos=false; rhanRender(); });
     v.addEventListener('click',e=>{ const g=e.target.closest('[data-rhg]'); if(g){ rhanTG={g:g.dataset.rhg,m:null}; rhanRender(); return; }
       const dr=e.target.closest('[data-rhdrill]'); if(dr){ rhanTG={g:'dia',m:dr.dataset.rhdrill}; rhanRender(); return; }
       if(e.target.closest('[data-ijtodos]')){ rhanIjTodos=!rhanIjTodos; rhanRender(); return; }
+      const x=e.target.closest('[data-rhx]'); if(x){ const [k,...r]=x.dataset.rhx.split('|'), val=r.join('|'); rhanX[k]=String(rhanX[k])===val?null:val; rhanRender(); return; }
+      const xc=e.target.closest('[data-rhxclr]'); if(xc){ const k=xc.dataset.rhxclr; const srv=k==='*'?!!(rhanArea||rhanFunc):(k==='area'||k==='func');
+        if(k==='*'){ rhanX={}; rhanArea=''; rhanFunc=''; } else if(k==='area') rhanArea=''; else if(k==='func') rhanFunc=''; else rhanX[k]=null;
+        rhanRender(); if(srv) rhanCarregar(); return; }
+      if(e.target.closest('[data-clttodos]')){ rhanCltTodos=!rhanCltTodos; rhanRender(); return; }
       const b=e.target.closest('[data-o]'); if(b){ rhanOrd=b.dataset.o; rhanRender(); return; }
       if(e.target.closest('[data-limpafunc]')){ rhanFunc=''; rhanCarregar(); return; }
       if(e.target.closest('[data-todos]')){ rhanTodos=!rhanTodos; rhanRender(); return; }
-      const fu=e.target.closest('[data-fid]'); if(fu){ rhanFunc=fu.dataset.fid; rhanCarregar(); window.scrollTo(0,0); return; }
-      const ar=e.target.closest('[data-area]'); if(ar){ rhanArea=ar.dataset.area; rhanCarregar(); window.scrollTo(0,0); return; }
+      const fu=e.target.closest('[data-fid]'); if(fu){ rhanFunc=String(rhanFunc)===fu.dataset.fid?'':fu.dataset.fid; if(rhanAba==='horas') rhanRender(); rhanCarregar(); return; }
+      const ar=e.target.closest('[data-area]'); if(ar){ rhanArea=rhanArea===ar.dataset.area?'':ar.dataset.area; if(rhanAba==='horas') rhanRender(); rhanCarregar(); return; }
       if(e.target.closest('[data-irval]')) irPara('rh_val'); }); }
   rhanConsRender(); rhanCarregar();
 }
@@ -19741,6 +19746,18 @@ function rhanCss(){
 .rhan-t .pb i{display:block;width:60px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;flex:none}
 .rhan-t .pb i b{display:block;height:100%;background:var(--bad)}
 .rhan-t .bad{color:var(--bad);font-weight:600} .rhan-t .warn{color:var(--warn);font-weight:600}
+.rhan-g.c3{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));margin-top:10px}
+.rhan-sec{font-size:15px;margin:22px 0 8px;font-weight:650} .rhan-sec .sub{font-weight:400;font-size:12px}
+.rhan-fx{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px;min-height:28px;font-size:12px;color:var(--mut)}
+.rhan-fx button{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--acc);background:var(--card);color:var(--acc);cursor:pointer}
+.rhan-fx button b{font-weight:650} .rhan-fx button.lk{border-color:transparent;text-decoration:underline}
+.rhan-tl{cursor:pointer;transition:opacity .15s} .rhan-tl:hover{border-color:var(--acc)} .rhan-tl.sel{border-color:var(--ink);outline:1.5px solid var(--ink)}
+.rhan-off{opacity:.4} .rhan-pr.sel .l{color:var(--acc);font-weight:650}
+.rhan-t tr.sel td{background:var(--bg);font-weight:600} .rhan-t tr[data-rhx]:hover td,.rhan-t tr[data-fid]:hover td{background:var(--bg)}
+.rhan-clt .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.rhan-clt .dot.bad{background:var(--bad)} .rhan-clt .dot.ok{background:var(--ok)} .rhan-clt .dot.info{background:var(--acc)}
+.rhan-ach ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.5} .rhan-ach li+li{margin-top:6px}
+#rhanArea,#rhanFunc{flex:1 1 200px;max-width:340px;min-width:160px}
 `;
   document.head.appendChild(st);
 }
@@ -19749,12 +19766,18 @@ function rhanConsRender(){
     .map(([v,l])=>`<button data-c="${v}" class="${v===rhanCons?'on':''}">${l}</button>`).join('');
   $('#rhanCons').querySelectorAll('button').forEach(b=>b.onclick=()=>{ rhanCons=b.dataset.c; rhanConsRender(); rhanCarregar(); });
 }
+// Base dia a dia (app_rh_ponto_dias) só é buscada quando muda período/consórcio; área/colaborador refazem a aba Horas na hora
+// e só a app_rh_analise (aba Tratamento) vai ao banco, sem apagar a tela.
 async function rhanCarregar(){
   const ini=$('#rhanIni').value, fim=$('#rhanFim').value; if(!ini||!fim) return;
-  $('#rhanView').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_rh_analise',{p_ini:ini,p_fim:fim,p_consorcio:rhanCons||null,p_area:rhanArea||null,p_funcionario:rhanFunc?+rhanFunc:null}); if(error) throw error; rhanDados=data; }
-  catch(e){ rhanDados=null; $('#rhanView').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc(e.message||e)+'</div>'; return; }
-  rhanRender();
+  const key=ini+'|'+fim+'|'+rhanCons, novo=key!==rhanDiasKey;
+  if(novo||!rhanDados) $('#rhanView').innerHTML='<p class="sub">Carregando…</p>';
+  else if(rhanAba!=='horas') $('#rhanView').style.opacity='.6';
+  try{ const [a,b]=await Promise.all([sb.rpc('app_rh_analise',{p_ini:ini,p_fim:fim,p_consorcio:rhanCons||null,p_area:rhanArea||null,p_funcionario:rhanFunc?+rhanFunc:null}),
+      novo?sb.rpc('app_rh_ponto_dias',{p_ini:ini,p_fim:fim,p_consorcio:rhanCons||null}):Promise.resolve({data:null})]);
+    if(a.error) throw a.error; if(b.error) throw b.error; rhanDados=a.data; if(novo){ rhanDias=rhanDiasPrep(b.data||{}); rhanDiasKey=key; rhanX={}; } }
+  catch(e){ rhanDados=null; rhanDiasKey=''; $('#rhanView').style.opacity=''; $('#rhanView').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc(e.message||e)+'</div>'; return; }
+  $('#rhanView').style.opacity=''; rhanRender();
 }
 // Eixo de tempo dos gráficos da aba Horas (2026-11-19, sw v435) — mesmo padrão do BI QSMS (sbColChart): dias seguidos do 1º ao último
 // dia com dado (fim de semana sombreado) ou meses; clicar num mês abre os dias dele. Valores em minutos, mostrados em horas.
@@ -19768,7 +19791,7 @@ function rhanChaves(pd){ const t=rhanTG, ds=pd.map(d=>String(d.data).slice(0,10)
 function rhanTempoCtl(){ const t=rhanTG;
   return `<span class="rhan-ctl">${t.m?`<button type="button" class="rhan-up" data-rhg="mes" title="Voltar à visão por mês">‹ ${rhMesL(t.m)}</button>`:''}`
     +`<span class="rhan-seg" role="group" aria-label="Eixo do gráfico"><button type="button" data-rhg="mes" class="${t.g==='mes'?'sel':''}">Mês</button><button type="button" data-rhg="dia" class="${t.g==='dia'?'sel':''}">Dia</button></span></span>`; }
-function rhanColChart(ks,vals,cor,tip,{un='h',parte=null,cor2='var(--bad)',full=false}={}){ if(!ks.length) return '<p class="sub" style="margin:0">Sem dados no período.</p>';
+function rhanColChart(ks,vals,cor,tip,{un='h',parte=null,cor2='var(--bad)',full=false,pick=false}={}){ if(!ks.length) return '<p class="sub" style="margin:0">Sem dados no período.</p>';
   const dia=ks[0].length===10, vw=($('#rhanView')||{}).clientWidth||360, cw=Math.round((vw>=1000&&!full?(vw-10)/2:vw)-32);
   const W=Math.max(320,ks.length*(dia?20:58)+60,cw), H=230, pl=40, pr=10, pt=18, pb=30, iw=W-pl-pr, ih=H-pt-pb, bw=iw/ks.length;
   const dv=un==='h'?60:1, fv=v=>un==='h'?Math.round(v)+'h':Math.round(v), hv=vals.map(v=>(v||0)/dv), pv=parte?parte.map(v=>(v||0)/dv):null, r=Math.max(1,Math.max(1,...hv)/4), p10=Math.pow(10,Math.floor(Math.log10(r))), f=r/p10;
@@ -19781,12 +19804,223 @@ function rhanColChart(ks,vals,cor,tip,{un='h',parte=null,cor2='var(--bad)',full=
       g+=`<rect x="${x0+(bw-w)/2}" y="${pt+ih-h}" width="${w}" height="${h}" fill="${cor}" rx="2"><title>${tt}</title></rect>`
         +(ph?`<rect x="${x0+(bw-w)/2}" y="${pt+ih-ph}" width="${w}" height="${ph}" fill="${cor2}" rx="2"><title>${tt}</title></rect>`:'')
         +(valOk?`<text x="${x0+bw/2}" y="${pt+ih-h-4}" text-anchor="middle" class="vl">${fv(v)}</text>`:''); }
-    if(!dia) g+=`<rect class="hit" data-rhdrill="${k}" x="${x0}" y="${pt}" width="${bw}" height="${ih+pb}" fill="transparent"><title>${L} · clique para ver os dias</title></rect>`; });
+    if(pick&&rhanX.tempo===k) g+=`<rect x="${x0+1}" y="${pt}" width="${bw-2}" height="${ih}" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="3 2" rx="3"/>`;
+    if(!dia) g+=`<rect class="hit" data-rhdrill="${k}" x="${x0}" y="${pt}" width="${bw}" height="${ih+pb}" fill="transparent"><title>${L} · clique para ver os dias</title></rect>`;
+    else if(pick) g+=`<rect class="hit" data-rhx="tempo|${k}" x="${x0}" y="${pt}" width="${bw}" height="${ih+pb}" fill="transparent"><title>${vEsc(tip(k,i,L))} · clique para filtrar este dia</title></rect>`; });
   return `<div class="rhan-ch"><svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;height:auto;display:block">${g}</svg></div>`
-    +(dia?'':'<p class="rhan-dica">Clique num mês para abrir os dias.</p>'); }
+    +(dia?(pick?'<p class="rhan-dica">Clique num dia para filtrar a página.</p>':''):'<p class="rhan-dica">Clique num mês para abrir os dias.</p>'); }
 const rhPc=(a,b,d=1)=>b?(a/b*100).toFixed(d).replace('.',',')+'%':'—';
 // Faixa visual dos indicadores (≤ ok = verde, ≤ al = atenção, acima = crítico)
 const rhFx=(v,ok,al)=>v==null?'':(v<=ok?'ok':(v<=al?'warn':'bad'));
+// ---- ⏱️ HORAS: base dia a dia + filtros cruzados + HE por tipo + DSR + conformidade CLT (2026-11-20, sw v441) ----
+// app_rh_ponto_dias devolve 1 linha por colaborador × dia (com o ajuste validado pela RH valendo enquanto o Kairos não
+// refletir) e a aba inteira é recalculada aqui: clicar em qualquer barra, linha ou cartão vira um filtro (chips no topo)
+// e todos os outros quadros se refazem na hora, sem ir ao banco. Cada quadro ignora o próprio filtro (mostra todas as
+// categorias com a escolhida destacada), como o filtro cruzado do Power BI. Área e colaborador seguem nos selects do topo.
+// Tipo de HE = regra do Kairos (conferida com o resumo dos relatórios 01–17/11): 100% no sábado de folga, domingo e feriado;
+// 60% no dia útil e no "Compensado". Noturna = parte da HE entre 22h e 5h (art. 73), calculada pelas batidas.
+let rhanDias=null, rhanDiasKey='', rhanX={}, rhanCltTodos=false;
+const RHAN_TD={U:'Dia útil',C:'Compensado',S:'Sábado de folga',D:'Domingo (DSR)',F:'Feriado'};
+const RH_DOW=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const RHAN_FX=[['f1','até 30 min',0,30],['f2','30 min a 1h',30,60],['f3','1h a 2h',60,120],['f4','2h a 4h',120,240],['f5','mais de 4h',240,1e9]];
+const RHAN_HET=[['60','HE 60%','dia útil e compensado','var(--acc)'],['100','HE 100%','sábado de folga, domingo e feriado','var(--bad)'],['not','HE noturna','parte entre 22h e 5h · +20%','var(--warn)']];
+// Regras da CLT conferidas dia a dia. g = grave (entra na conformidade); i = informativo (custo/atenção, não é irregular por si).
+const RHAN_CLT=[
+  {k:'he2',g:1,nm:'Hora extra acima de 2h no dia',art:'CLT art. 59, caput',f:r=>r.he>120,
+    cons:'O limite legal é de 2h extras por dia. O excesso gera multa administrativa (art. 75) e é prova de HE habitual.'},
+  {k:'j10',g:1,nm:'Jornada acima de 10h no dia',art:'CLT art. 59 (8h + 2h)',f:r=>r.ht>600,
+    cons:'Passa do teto diário de 10h de trabalho efetivo.'},
+  {k:'intra',g:1,nm:'Intervalo de refeição menor que 1h (jornada acima de 6h)',art:'CLT art. 71, caput e §4º',f:r=>r.ht>360&&(r.itv||0)<60,
+    cons:'O tempo suprimido é pago como indenização com +50% (§4º, Lei 13.467/2017). Batida sem o almoço também conta aqui.'},
+  {k:'intra15',g:1,nm:'Sem pausa de 15 min (jornada de 4h a 6h)',art:'CLT art. 71, §1º',f:r=>r.ht>240&&r.ht<=360&&(r.itv||0)<15,
+    cons:'Pausa obrigatória de 15 min; suprimida, é indenizada com +50%.'},
+  {k:'ij',g:1,nm:'Descanso entre jornadas menor que 11h',art:'CLT art. 66; OJ 355 SDI-1 TST',f:r=>r.ij!=null&&r.ij<660,
+    cons:'As horas que faltaram para as 11h são pagas como hora extra (com adicional).'},
+  {k:'seq7',g:1,nm:'7º dia seguido de trabalho, sem folga',art:'CLT art. 67; Lei 605/49; OJ 410 SDI-1 TST',f:r=>r.seq>=7,
+    cons:'DSR concedido depois do 7º dia é como não concedido: pagamento em dobro.'},
+  {k:'ds35',g:1,nm:'Folga semanal com descanso total menor que 35h',art:'CLT arts. 66 e 67; Súmula 110 TST',f:r=>r.ds!=null&&r.ds<2100,
+    cons:'DSR (24h) + interjornada (11h) = 35h seguidas. O que faltar é pago como hora extra.'},
+  {k:'impar',g:1,nm:'Marcação incompleta (batida ímpar)',art:'CLT art. 74, §2º; Portaria MTP 671/2021',f:r=>!!r.mi,
+    cons:'Registro de ponto incompleto. Em ação trabalhista, vale a jornada que o empregado alegar (Súmula 338 TST).'},
+  {k:'hab',g:0,nm:'HE habitual em semana com compensação de sábado',art:'Súmula 85, IV, TST',f:(r,c)=>r.he>0&&c.hab.has(r.f),
+    cons:'Com HE habitual o acordo de compensação perde a validade: as horas além da 8ª diária destinadas a compensar o sábado passam a ser pagas com o adicional.'},
+  {k:'dsrtrab',g:0,nm:'Trabalho em domingo (DSR) ou feriado',art:'Lei 605/49 art. 9º; CLT art. 70; Súmula 146 TST',f:r=>r.tb&&(r.td==='D'||r.td==='F'),
+    cons:'Exige folga compensatória na semana ou pagamento em dobro (o Kairos paga 100%).'},
+  {k:'not',g:0,nm:'Trabalho noturno (22h às 5h)',art:'CLT art. 73',f:r=>r.nt>0,
+    cons:'Adicional de 20% e hora noturna reduzida de 52min30s. O relatório do Kairos não traz o adicional noturno por dia.'},
+  {k:'faltasj',g:0,nm:'Falta sem justificativa',art:'Lei 605/49 art. 6º',f:r=>r.fa>0&&!r.js&&!r.pc,
+    cons:'Falta injustificada na semana permite descontar o DSR daquela semana.'}];
+const rhanIso=d=>d.toISOString().slice(0,10);
+const rhanSeg=k=>{ const d=new Date(k+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7)); return rhanIso(d); };
+function rhanDiasPrep(raw){
+  const cols=raw.cols||[], ix=Object.fromEntries(cols.map((c,i)=>[c,i])), fm=new Map((raw.funcs||[]).map(f=>[f.id,f]));
+  const rows=(raw.dias||[]).map(a=>{ const g=c=>a[ix[c]], fu=fm.get(g('f'))||{}, d=String(g('d')).slice(0,10), he=g('he')||0, td=g('td'), nt=g('nt')||0;
+    const h100=(td==='D'||td==='S'||td==='F')?he:0;
+    return {f:g('f'),d,mes:d.slice(0,7),dow:new Date(d+'T12:00:00Z').getUTCDay(),td,pv:g('pv')||0,ht:g('ht')||0,he,fa:g('fa')||0,at:g('at')||0,
+      pc:!!g('pc'),vl:!!g('vl'),tb:!!g('tb'),mi:!!g('mi'),nt,itv:g('itv'),ij:g('ij'),seq:g('seq')||0,ds:g('ds'),js:!!g('js'),
+      h100,h60:he-h100,hen:Math.min(nt,he),nome:fu.nome||'?',sigla:fu.sigla||'',area:fu.area||'Sem área',gestor:fu.gestor||'Sem gestor no app'}; });
+  return {rows,funcs:raw.funcs||[],kairos:raw.kairos_he||[]};
+}
+// HE habitual (Súmula 85, IV): quem tem sábado de folga (semana compensada) e fez HE em metade ou mais dos dias úteis trabalhados
+function rhanHabitual(rows){ const m=new Map();
+  rows.forEach(r=>{ let x=m.get(r.f); if(!x) m.set(r.f,x={comp:false,d:0,dh:0}); if(r.td==='S') x.comp=true; if(r.tb&&r.td==='U'&&r.pv>0){ x.d++; if(r.he>0) x.dh++; } });
+  return new Set([...m].filter(([,x])=>x.comp&&x.d>=4&&x.dh/x.d>=.5).map(([f])=>f)); }
+const RHAN_DIM={
+  area:(r,v)=>r.area===v, func:(r,v)=>String(r.f)===String(v), gestor:(r,v)=>r.gestor===v,
+  tempo:(r,v)=>v.length===10?r.d===v:r.mes===v, dow:(r,v)=>r.dow===+v, td:(r,v)=>r.td===v,
+  het:(r,v)=>v==='100'?r.h100>0:v==='60'?r.h60>0:r.hen>0,
+  faixa:(r,v)=>{ const x=RHAN_FX.find(q=>q[0]===v)||RHAN_FX[0]; return r.he>x[2]&&r.he<=x[3]; },
+  regra:(r,v,c)=>{ const q=RHAN_CLT.find(q=>q.k===v); return q?q.f(r,c):true; }};
+const RHAN_DIM_NM={gestor:'Gestor',tempo:'Período',dow:'Dia da semana',td:'Tipo de dia',het:'Tipo de HE',faixa:'HE no dia',regra:'Regra CLT'};
+function rhanXLabel(k,v){ if(k==='tempo') return v.length===10?fmtData(v):rhMesL(v); if(k==='dow') return RH_DOW[+v]; if(k==='td') return RHAN_TD[v]||v;
+  if(k==='het') return (RHAN_HET.find(x=>x[0]===v)||[])[1]||v; if(k==='faixa') return (RHAN_FX.find(x=>x[0]===v)||[])[1]||v;
+  if(k==='regra') return (RHAN_CLT.find(x=>x.k===v)||{}).nm||v; return v; }
+// linhas com todos os filtros, menos o da dimensão `excl` (o quadro daquela dimensão mostra todas as categorias)
+function rhanRows(excl){ const P=rhanDias; if(!P) return []; const c=P.ctx, X={...rhanX}; if(rhanArea) X.area=rhanArea; if(rhanFunc) X.func=rhanFunc; delete X[excl];
+  const fs=Object.entries(X).filter(([,v])=>v!=null&&v!=='');
+  return fs.length?P.rows.filter(r=>fs.every(([k,v])=>RHAN_DIM[k](r,v,c))):P.rows; }
+function rhanAgg(rs){ const a={pes:new Set(),pesHe:new Set(),ht:0,he:0,h60:0,h100:0,hen:0,nt:0,fa:0,falta:0,prev:0,at:0,natr:0,dpt:0,dtrab:0,dhe:0,dfalta:0,dhe2:0,heMax:0};
+  for(const r of rs){ a.pes.add(r.f); a.ht+=r.ht; a.he+=r.he; a.h60+=r.h60; a.h100+=r.h100; a.hen+=r.hen; a.nt+=r.nt; a.at+=r.at; a.falta+=r.fa;
+    if(r.he>0){ a.pesHe.add(r.f); a.heMax=Math.max(a.heMax,r.he); } if(r.he>120) a.dhe2++; if(r.at>0) a.natr++; if(r.fa>0) a.dfalta++;
+    if(!r.pc){ a.prev+=r.pv; a.fa+=r.fa; } if((r.tb||r.mi)&&r.pv>0) a.dpt++; if(r.tb){ a.dtrab++; if(r.he>0) a.dhe++; } }
+  return a; }
+// botão-filtro: data-rhx="dim|valor"; `sel` destaca o escolhido e esmaece o resto
+const rhanSelA=(k,v)=>rhanX[k]!=null&&String(rhanX[k])===String(v);
+const rhanDim=(k,v)=>rhanX[k]!=null&&String(rhanX[k])!==String(v)?' rhan-off':'';
+function rhanBars(lista,{cor='var(--acc)',cor2=null,fmt=rhHM,dim}){ // lista: [valor-filtro, rótulo, total, parte(cor2), sub]
+  const mx=Math.max(1,...lista.map(x=>x[2]||0));
+  return lista.map(([v,l,t,p,sub])=>`<div class="rhan-pr${rhanSelA(dim,v)?' sel':''}${rhanDim(dim,v)}" data-rhx="${dim}|${vEsc(String(v))}" title="${vEsc(l+': '+fmt(t)+(sub?' · '+sub:''))} · clique para filtrar">`
+    +`<span class="l">${vEsc(l)}</span><span class="t"><i style="width:${(t||0)/mx*100}%;background:${cor};display:flex;justify-content:flex-end">${cor2&&p?`<b style="display:block;height:100%;width:${p/(t||1)*100}%;background:${cor2}"></b>`:''}</i></span>`
+    +`<span class="n"><b>${fmt(t)}</b>${sub?` <span>· ${vEsc(sub)}</span>`:''}</span></div>`).join(''); }
+function rhanHoras(){
+  const P=rhanDias; if(!P) return '<p class="sub">Carregando…</p>';
+  P.ctx={hab:rhanHabitual(P.rows)};
+  const R=rhanRows(null), A=rhanAgg(R), fns=rhanDados&&rhanDados.funcs||[];
+  const fSel=rhanFunc?fns.find(x=>String(x.id)===String(rhanFunc)):null;
+  const ds=R.map(r=>r.d).sort(), np=R.filter(r=>r.pc).length, nv=R.filter(r=>r.vl).length;
+  let h=`<div class="rhan-hd"><span>${rhcN(A.pes.size)} colaboradores · ${ds.length?`dados de ${fmtData(ds[0])} a ${fmtData(ds[ds.length-1])}`:'sem dados'}${np?' · '+rhcN(np)+' dia(s) ainda parciais':''}${nv?` · <span style="color:var(--ok)" title="Nesses dias valem as batidas ajustadas pelo gestor e validadas pela RH, não as do Kairos">✓ ${rhcN(nv)} dia(s) com ajuste validado</span>`:''}</span></div>`;
+  // chips dos filtros ativos (área/colaborador também aparecem aqui p/ limpar com 1 clique)
+  const ch=[]; if(rhanArea) ch.push(['area','Área',rhanArea]); if(fSel) ch.push(['func','Colaborador',fSel.nome]);
+  Object.entries(rhanX).forEach(([k,v])=>{ if(v!=null&&v!=='') ch.push([k,RHAN_DIM_NM[k]||k,rhanXLabel(k,v)]); });
+  h+=`<div class="rhan-fx">${ch.length?ch.map(([k,n,v])=>`<button type="button" data-rhxclr="${k}" title="Tirar este filtro">${n}: <b>${vEsc(v)}</b> ✕</button>`).join('')+(ch.length>1?'<button type="button" class="lk" data-rhxclr="*">Limpar tudo</button>':'')
+    :'<span>💡 Clique em qualquer barra, linha ou cartão para filtrar a página inteira.</span>'}</div>`;
+  if(!R.length) return h+'<p class="sub">Nada nesse recorte. Tire um dos filtros acima.</p>';
+  const abs=A.prev?A.fa/A.prev:null, phe=A.ht?A.he/A.ht:null, pont=A.dpt?1-A.natr/A.dpt:null;
+  const stTag=f=>f?`<span class="st ${f}">${({ok:'✓ ok',warn:'! atenção',bad:'▲ crítico'})[f]}</span>`:'';
+  const kp=(lb,v,d,f,x='')=>`<div class="rhan-c rhan-kp${x}"><span class="lb">${lb}</span>${stTag(f)}<b class="v">${v}</b><span class="d">${d}</span></div>`;
+  // conformidade CLT: dias trabalhados sem nenhuma regra grave
+  const graves=RHAN_CLT.filter(q=>q.g), Rt=R.filter(r=>r.tb), nOk=Rt.filter(r=>!graves.some(q=>q.f(r,P.ctx))).length, conf=Rt.length?nOk/Rt.length:null;
+  h+='<div class="rhan-g k5">'
+    +kp('Horas trabalhadas',rhHM(A.ht),`${rhHM(A.prev)} previstas · ${rhPc(A.ht,A.prev,0)} do previsto`,'')
+    +kp('Absenteísmo',rhPc(A.fa,A.prev),`${rhHM(A.fa)} de falta sobre ${rhHM(A.prev)} previstas`,rhFx(abs,.03,.06))
+    +kp('Horas extras',rhPc(A.he,A.ht),`${rhHM(A.he)} sobre ${rhHM(A.ht)} trabalhadas`,rhFx(phe,.05,.10))
+    +kp('Pontualidade',pont==null?'—':rhPc(A.dpt-A.natr,A.dpt),`${rhcN(A.natr)} dia(s) com atraso · ${rhHM(A.at)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
+    +kp('Conformidade CLT',conf==null?'—':rhPc(nOk,Rt.length),`dias trabalhados sem irregularidade · ${rhcN(Rt.length-nOk)} com problema`,conf==null?'':(conf>=.95?'ok':conf>=.8?'warn':'bad'),' hero')
+    +'</div>';
+  // ================= HORAS EXTRAS — detalhamento =================
+  { const Rh=rhanRows('het'), Ah=rhanAgg(Rh), eq=Ah.h60*1.6+Ah.h100*2+Ah.hen*.2, pHab=[...Ah.pesHe].filter(f=>P.ctx.hab.has(f)).length;
+    const tile=([k,l,d,cor])=>{ const v=k==='60'?Ah.h60:k==='100'?Ah.h100:Ah.hen, ps=new Set(Rh.filter(r=>RHAN_DIM.het(r,k)).map(r=>r.f)).size;
+      return `<div class="rhan-c rhan-kp rhan-tl${rhanSelA('het',k)?' sel':''}${rhanDim('het',k)}" data-rhx="het|${k}" style="box-shadow:inset 3px 0 0 ${cor}" title="Clique para ver só os dias com ${l}"><span class="lb">${l} <span class="sub" style="margin:0">· ${d}</span></span>`
+        +`<b class="v">${rhHM(v)}</b><span class="d">${rhPc(v,Ah.he,0)} da HE · ${ps} pessoa(s)${k==='not'?' · já incluída nas outras':''}</span></div>`; };
+    h+='<h2 class="rhan-sec">⏰ Horas extras por tipo</h2><div class="rhan-g k5">'+RHAN_HET.map(tile).join('')
+      +kp('Custo em horas normais',rhHM(eq),`HE × adicional: 60% ×1,6 · 100% ×2 · noturna +20%`,'')
+      +kp('HE habitual',rhPc(Ah.dhe,Ah.dtrab,0),`dos dias trabalhados tiveram HE · ${pHab} pessoa(s) em semana compensada com HE em ≥ metade dos dias`,rhFx(Ah.dtrab?Ah.dhe/Ah.dtrab:null,.2,.4))
+      +'</div>';
+    h+='<div class="rhan-mini">'+[[rhHM(Ah.pesHe.size?Ah.he/Ah.pesHe.size:0),'HE média por pessoa com HE'],[rhHM(Ah.dhe?Ah.he/Ah.dhe:0),'HE média por dia com HE'],[rhHM(Ah.heMax),'maior HE num dia'],
+      [rhcN(Ah.dhe2),'dias com HE > 2h'],[rhHM(Ah.nt),'horas noturnas trabalhadas'],[rhHM(Ah.nt*60/52.5),'horas noturnas a pagar (hora de 52min30s)']].map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')+'</div>';
+    // tempo (60% + 100% sobreposto), dia da semana, faixa de HE no dia, tipo de dia
+    const Rt2=rhanRows('tempo'), ks=rhanChaves(Rt2.map(r=>({data:r.d}))), byK=new Map(), byF=new Map();
+    Rt2.forEach(r=>{ const k=ks.length&&ks[0].length===10?r.d:r.mes; let x=byK.get(k); if(!x) byK.set(k,x={he:0,h100:0,fa:0,pres:0}); x.he+=r.he; x.h100+=r.h100; x.fa+=r.fa; if(r.tb) x.pres++; });
+    const he=ks.map(k=>(byK.get(k)||{}).he||0), h1=ks.map(k=>(byK.get(k)||{}).h100||0), fa=ks.map(k=>(byK.get(k)||{}).fa||0), pres=ks.map(k=>(byK.get(k)||{}).pres||0);
+    const rot=rhanTG.g==='mes'?'por mês':rhanTG.m?'por dia · '+rhMesL(rhanTG.m):'por dia';
+    const Rw=rhanRows('dow'), w=[1,2,3,4,5,6,0].map(i=>{ const x=Rw.filter(r=>r.dow===i); return [i,RH_DOW[i],x.reduce((s,r)=>s+r.he,0),x.reduce((s,r)=>s+r.h100,0),new Set(x.filter(r=>r.he>0).map(r=>r.f)).size+' pess.']; });
+    const Rf=rhanRows('faixa'), fx=RHAN_FX.map(([k,l,a,b])=>{ const x=Rf.filter(r=>r.he>a&&r.he<=b); return [k,l,x.length,0,rhHM(x.reduce((s,r)=>s+r.he,0))]; });
+    const Rd=rhanRows('td'), tds=['U','C','S','D','F'].map(k=>{ const x=Rd.filter(r=>r.td===k&&r.tb); return [k,RHAN_TD[k],x.reduce((s,r)=>s+r.he,0),0,x.length+' dia(s) trab.']; }).filter(x=>x[2]||x[4][0]!=='0');
+    h+='<div class="rhan-g c2">'
+      +`<div class="rhan-c"><div class="rhan-t2"><h3>Horas extras ${rot} <span class="sub">· vermelho = 100%</span></h3>${rhanTempoCtl()}</div>${rhanColChart(ks,he,'var(--acc)',(k,i,L)=>`${L}: HE ${rhHM(he[i])} (100%: ${rhHM(h1[i])})`+(ks[0]&&ks[0].length===10?` · ${pres[i]} presentes`:''),{parte:h1,pick:true})}</div>`
+      +`<div class="rhan-c"><div class="rhan-t2"><h3>Horas de falta ${rot}</h3>${rhanTempoCtl()}</div>${rhanColChart(ks,fa,'var(--bad)',(k,i,L)=>`${L}: falta ${rhHM(fa[i])}`+(ks[0]&&ks[0].length===10?` · ${pres[i]} presentes`:''),{pick:true})}</div>`
+      +'</div><div class="rhan-g c3">'
+      +`<div class="rhan-c"><h3>HE por dia da semana <span class="sub">· vermelho = 100%</span></h3>${rhanBars(w,{cor:'var(--acc)',cor2:'var(--bad)',dim:'dow'})}</div>`
+      +`<div class="rhan-c"><h3>Quanto de HE por dia <span class="sub">· nº de dias em cada faixa</span></h3>${rhanBars(fx,{cor:'var(--acc)',fmt:rhcN,dim:'faixa'})}<p class="rhan-dica">Acima de 2h fere o limite do art. 59 da CLT.</p></div>`
+      +`<div class="rhan-c"><h3>HE por tipo de dia</h3>${rhanBars(tds,{cor:'var(--acc)',dim:'td'})}</div>`
+      +'</div>'; }
+  // ================= DSR =================
+  { const Rs=rhanRows('regra'), wk=new Map();
+    Rs.forEach(r=>{ const k=r.f+'|'+rhanSeg(r.d); let x=wk.get(k); if(!x) wk.set(k,x={f:r.f,nome:r.nome,sigla:r.sigla,seg:rhanSeg(r.d),dias:0,pc:false,folga:0,domFolga:false,seq7:false,ds35:false,trabDsr:0,faltaSj:false}); x.dias++;
+      if(r.pc) x.pc=true; if(!r.tb&&!(r.fa>0)) x.folga++; if(r.dow===0&&!r.tb) x.domFolga=true; if(r.seq>=7) x.seq7=true; if(r.ds!=null&&r.ds<2100) x.ds35=true;
+      if(r.tb&&(r.td==='D'||r.td==='F')) x.trabDsr++; if(r.fa>0&&!r.js&&!r.pc) x.faltaSj=true; });
+    const sem=[...wk.values()].filter(x=>x.dias===7&&!x.pc), nS=sem.length, comF=sem.filter(x=>x.folga>0), resp=comF.filter(x=>!x.seq7&&!x.ds35), semF=sem.filter(x=>!x.folga);
+    const dom=sem.filter(x=>x.domFolga).length, prob=sem.filter(x=>!x.folga||x.seq7||x.ds35);
+    const tl=(v,l,d,f,fx)=>`<div class="rhan-c rhan-kp${fx?` rhan-tl${rhanSelA('regra',fx)?' sel':''}`:''}"${fx?` data-rhx="regra|${fx}" title="Clique para ver só esses dias"`:''}><span class="lb">${l}</span>${stTag(f)}<b class="v">${v}</b><span class="d">${d}</span></div>`;
+    h+='<h2 class="rhan-sec">🛌 DSR — descanso semanal remunerado <span class="sub">· semanas de segunda a domingo completas no período (CLT art. 67; Lei 605/49)</span></h2>';
+    h+=nS?'<div class="rhan-g k5">'
+      +tl(rhPc(comF.length,nS,0),'Houve DSR',`${rhcN(comF.length)} de ${rhcN(nS)} semanas com ao menos 1 dia inteiro de folga`,comF.length===nS?'ok':'bad')
+      +tl(rhPc(resp.length,nS,0),'DSR respeitado',`folga, sem 7 dias seguidos e com 35h de descanso · ${rhcN(nS-resp.length)} semana(s) com problema`,resp.length/nS>=.98?'ok':resp.length/nS>=.9?'warn':'bad')
+      +tl(rhcN(semF.length),'Semanas sem nenhuma folga',`trabalhou os 7 dias · DSR em dobro`,semF.length?'bad':'ok','seq7')
+      +tl(rhcN(sem.filter(x=>x.ds35).length),'Folga com descanso < 35h',`descanso semanal + interjornada (Súmula 110)`,sem.some(x=>x.ds35)?'warn':'ok','ds35')
+      +tl(rhPc(dom,nS,0),'Folga no domingo',`${rhcN(dom)} semana(s) · o DSR deve cair preferencialmente no domingo`,'')
+      +tl(rhcN(Rs.filter(r=>r.tb&&(r.td==='D'||r.td==='F')).length),'Domingos e feriados trabalhados',`pago a 100% ou folga compensatória (Súmula 146)`,'','dsrtrab')
+      +tl(rhcN(sem.filter(x=>x.faltaSj).length),'Semanas com falta sem justificativa',`o DSR dessas semanas pode ser descontado (Lei 605/49 art. 6º)`,'','faltasj')
+      +'</div>'+(prob.length?`<div class="rhan-c" style="margin-top:10px"><h3>Semanas com DSR não respeitado <span class="sub">· clique no nome para filtrar a pessoa</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Semana</th><th class="n">Dias de folga</th><th>Problema</th></tr>`
+        +prob.sort((a,b)=>a.seg.localeCompare(b.seg)||a.nome.localeCompare(b.nome)).slice(0,60).map(x=>`<tr data-fid="${x.f}" style="cursor:pointer"><td class="nm">${vEsc(x.nome)} <span class="sub" style="margin:0">${vEsc(x.sigla)}</span></td><td>${fmtData(x.seg).slice(0,5)} a ${fmtData(rhAddDias(x.seg,6)).slice(0,5)}</td><td class="n${x.folga?'':' bad'}">${x.folga}</td>`
+          +`<td style="white-space:normal">${[!x.folga&&'<span class="bad">sem folga na semana</span>',x.seq7&&'<span class="bad">7+ dias seguidos</span>',x.ds35&&'<span class="warn">descanso < 35h</span>'].filter(Boolean).join(' · ')}</td></tr>`).join('')
+        +'</table></div>'+(prob.length>60?`<p class="rhan-dica">Mostrando 60 de ${prob.length}.</p>`:'')+'</div>':'')
+      :'<p class="sub">Nenhuma semana completa (segunda a domingo, sem dia parcial) nesse recorte.</p>'; }
+  // ================= CONFORMIDADE CLT =================
+  { const Rc=rhanRows('regra'), Rct=Rc.filter(r=>r.tb);
+    const lin=RHAN_CLT.map(q=>{ const x=Rc.filter(r=>q.f(r,P.ctx)); return {q,n:x.length,p:new Set(x.map(r=>r.f)).size,top:x}; });
+    const vis=lin.filter(l=>l.n||rhanCltTodos);
+    h+='<h2 class="rhan-sec">⚖️ Conformidade com a CLT <span class="sub">· dia a dia, pelas batidas; clique numa regra para filtrar a página</span></h2>';
+    h+='<div class="rhan-c"><div class="rhan-tw"><table class="rhan-t rhan-clt"><tr><th>Regra</th><th>Base legal</th><th class="n">Dias</th><th class="n">Pessoas</th><th class="n">% dias trab.</th><th>Consequência</th></tr>'
+      +vis.map(({q,n,p})=>`<tr class="${rhanSelA('regra',q.k)?'sel':''}${rhanDim('regra',q.k)}" data-rhx="regra|${q.k}" style="cursor:pointer"><td class="nm"><span class="dot ${!n?'ok':q.g?'bad':'info'}"></span>${vEsc(q.nm)}</td><td class="ar">${vEsc(q.art)}</td>`
+        +`<td class="n${n&&q.g?' bad':''}">${rhcN(n)}</td><td class="n">${p||''}</td><td class="n">${Rct.length&&n?rhPc(n,Rct.length):''}</td><td class="ar" style="max-width:420px">${vEsc(q.cons)}</td></tr>`).join('')
+      +'</table></div>'+(lin.some(l=>!l.n)?`<button class="rhv-lk" data-clttodos>${rhanCltTodos?'Esconder as regras sem ocorrência':'Mostrar também as regras sem ocorrência ('+lin.filter(l=>!l.n).length+')'}</button>`:'')
+      +'<p class="rhan-dica">● vermelho = irregular (entra na conformidade) · ● azul = ponto de atenção/custo. Os dias com ajuste validado pela RH usam as batidas ajustadas.</p></div>';
+    // achados da configuração do Kairos (resumo dos relatórios)
+    const ach=[], kz=P.kairos||[];
+    [...new Set(kz.map(x=>x.sigla))].forEach(s=>{ const t=kz.filter(x=>x.sigla===s), p50=t.filter(x=>/50%/.test(x.tipo)), p60=t.filter(x=>/60%/.test(x.tipo));
+      if(p50.length&&p60.length) ach.push(`<b>${vEsc(s)}</b>: o mesmo período saiu com HE a <b>50%</b> num relatório (${[...new Set(p50.map(x=>fmtData(x.ini).slice(0,5)+'–'+fmtData(x.fim).slice(0,5)))].join(', ')}) e a <b>60%</b> em outro (${[...new Set(p60.map(x=>fmtData(x.ini).slice(0,5)+'–'+fmtData(x.fim).slice(0,5)))].join(', ')}). Conferir o percentual da convenção coletiva no Kairos antes de fechar a folha.`);
+      const ft=t.filter(x=>/folga trabalhada/i.test(x.tipo)); if(ft.length) ach.push(`<b>${vEsc(s)}</b>: o Kairos lançou ${rhHM(ft.reduce((a,x)=>a+x.min,0))} como "Folga Trabalhada" (fora dos percentuais de HE) no relatório ${[...new Set(ft.map(x=>fmtData(x.ini).slice(0,5)+'–'+fmtData(x.fim).slice(0,5)))].join(', ')}. Folga trabalhada sem compensação é paga em dobro (Súmula 146).`); });
+    if(A.nt>0) ach.push(`O relatório diário do Kairos <b>não traz adicional noturno</b> (coluna vazia em todos os dias), mas as batidas somam <b>${rhHM(A.nt)}</b> entre 22h e 5h neste recorte. Calculado aqui pelas batidas; conferir se a folha está pagando os 20% e a hora reduzida.`);
+    // 2 batidas em jornada > 6h: o Kairos soma o almoço como trabalhado (H.trab = saída − entrada) → a HE sai inflada em até 1h/dia
+    const s2=Rct.filter(r=>r.ht>360&&!(r.itv>0)), s2he=s2.reduce((a,r)=>a+Math.min(60,r.he),0);
+    if(s2.length) ach.push(`<b>${rhcN(s2.length)}</b> dia(s) com mais de 6h de trabalho têm só 2 batidas (entrada e saída) e o Kairos contou o dia inteiro como trabalhado, almoço incluído. Ou o intervalo não foi concedido (art. 71: indenização de 1h com +50% por dia), ou foi concedido e não foi registrado — nesse caso a HE está inflada em até <b>${rhHM(s2he)}</b> neste recorte. O intervalo pode ser pré-assinalado (art. 74, §2º), mas tem de ser descontado no espelho.`);
+    if(ach.length) h+=`<div class="rhan-c rhan-ach" style="margin-top:10px"><h3>🔎 Achados na configuração do ponto</h3><ul>${ach.map(a=>'<li>'+a+'</li>').join('')}</ul></div>`; }
+  // ================= POR ÁREA / CONCENTRAÇÃO / INTERJORNADA / COLABORADOR =================
+  { const Ra=rhanRows('area'), ga=new Map(); Ra.forEach(r=>{ let x=ga.get(r.area); if(!x) ga.set(r.area,x=[]); x.push(r); });
+    const pa=[...ga].map(([n,rs])=>{ const a=rhanAgg(rs); a.nome=n; a.clt=rs.filter(r=>r.tb&&RHAN_CLT.some(q=>q.g&&q.f(r,P.ctx))).length; return a; }).sort((a,b)=>b.ht-a.ht);
+    if(pa.length) h+=`<div class="rhan-c" style="margin-top:10px"><h3>Por área ${pa.length>1?'<span class="sub">· clique numa área para filtrar</span>':''}</h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Área</th><th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">HE 60%</th><th class="n">HE 100%</th><th class="n">Noturna</th><th class="n">Absenteísmo</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Dias c/ irreg. CLT</th></tr>`
+      +pa.map(x=>`<tr data-area="${vEsc(x.nome)}" class="${rhanArea===x.nome?'sel':''}${rhanArea&&rhanArea!==x.nome?' rhan-off':''}"><td class="nm">${vEsc(x.nome)}</td><td class="n">${x.pes.size}</td><td class="n">${rhHM(x.ht)}</td><td class="n">${rhHM(x.he)}</td><td class="n ${x.ht&&x.he/x.ht>.10?'warn':''}">${rhPc(x.he,x.ht)}</td>`
+        +`<td class="n">${rhHM(x.h60)}</td><td class="n">${x.h100?rhHM(x.h100):''}</td><td class="n">${x.hen?rhHM(x.hen):''}</td><td class="n ${x.prev&&x.fa/x.prev>.06?'bad':''}">${rhPc(x.fa,x.prev)}</td>`
+        +`<td class="n">${x.dpt?rhPc(x.dpt-x.natr,x.dpt,0):'—'}</td><td class="n">${x.dhe2||''}</td><td class="n ${x.clt?'bad':''}">${x.clt||''}</td></tr>`).join('')+'</table></div></div>'; }
+  const Rp=rhanRows('func'), gp=new Map(); Rp.forEach(r=>{ let x=gp.get(r.f); if(!x) gp.set(r.f,x=[]); x.push(r); });
+  const fs=[...gp].map(([f,rs])=>{ const a=rhanAgg(rs); return {fid:f,nome:rs[0].nome,sigla:rs[0].sigla,area:rs[0].area,htrab:a.ht,he:a.he,h60:a.h60,h100:a.h100,hen:a.hen,falta:a.fa,prev:a.prev,dias_falta:a.dfalta,atraso:a.at,dias_he2:a.dhe2,
+    interj:rs.filter(r=>r.ij!=null&&r.ij<660).length,clt:rs.filter(r=>r.tb&&RHAN_CLT.some(q=>q.g&&q.f(r,P.ctx))).length}; });
+  const pareto=(tit,c,cor,lbl)=>{ const xs=fs.filter(f=>(f[c]||0)>0).sort((a,b)=>b[c]-a[c]), tot=xs.reduce((s,f)=>s+f[c],0); if(!xs.length) return `<div class="rhan-c"><h3>${tit}</h3><p class="sub" style="margin:0">Nenhum caso.</p></div>`;
+    let ac=0, n50=0; for(const f of xs){ ac+=f[c]; n50++; if(ac>=tot/2) break; }
+    const top=xs.slice(0,10), mx=top[0][c], s10=top.reduce((s,f)=>s+f[c],0);
+    return `<div class="rhan-c"><h3>${tit}</h3><p class="rhan-pz"><b>${n50}</b> de ${xs.length} pessoa(s) com ${lbl} somam metade do total · os 10 primeiros, <b>${rhPc(s10,tot,0)}</b></p>`
+      +top.map(f=>`<div class="rhan-pr${String(rhanFunc)===String(f.fid)?' sel':''}" data-fid="${f.fid}" title="${vEsc(f.nome+' · '+(f.area||'')+' · '+rhHM(f[c])+' ('+rhPc(f[c],tot)+' do total)')} · clique para filtrar"><span class="l">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></span>`
+        +`<span class="t"><i style="width:${f[c]/mx*100}%;background:${cor}"></i></span><span class="n"><b>${rhHM(f[c])}</b> <span>· ${rhPc(f[c],tot,0)}</span></span></div>`).join('')+'</div>'; };
+  h+='<div class="rhan-g c2">'+pareto('Quem concentra as horas extras','he','var(--acc)','HE')+pareto('Quem concentra a HE 100%','h100','var(--bad)','HE 100%')+'</div>';
+  { const ij=R.filter(r=>r.ij!=null&&r.ij<660);
+    if(ij.length){ const g=new Map(); ij.forEach(x=>{ if(!g.has(x.f)) g.set(x.f,{f:x.f,nome:x.nome,sigla:x.sigla,l:[]}); g.get(x.f).l.push(x); });
+      const gs=[...g.values()].map(q=>({...q,min:Math.min(...q.l.map(x=>x.ij))})).sort((a,b)=>b.l.length-a.l.length||a.min-b.min), vis=rhanIjTodos?gs:gs.slice(0,10);
+      h+=`<div class="rhan-c" style="margin-top:10px"><h3>Descanso menor que 11h entre jornadas <span class="sub">· ${ij.length} ocorrência(s) em ${gs.length} pessoa(s); em vermelho, menos de 10h (CLT art. 66)</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th class="n">Ocorrências</th><th class="n">Menor descanso</th><th>Dias (descanso)</th></tr>`
+        +vis.map(q=>`<tr data-fid="${q.f}" style="cursor:pointer"><td class="nm">${vEsc(q.nome)} <span class="sub" style="margin:0">${vEsc(q.sigla||'')}</span></td><td class="n">${q.l.length}</td><td class="n ${q.min<600?'bad':''}">${rhHM(q.min)}</td>`
+          +`<td style="white-space:normal"><div class="rhan-dts">${q.l.sort((a,b)=>a.d.localeCompare(b.d)).map(x=>`<span class="${x.ij<600?'bad':''}" title="Faltou ${rhHM(660-x.ij)} para 11h">${fmtData(x.d).slice(0,5)} · ${rhHM(x.ij)}</span>`).join('')}</div></td></tr>`).join('')
+        +'</table></div>'+(gs.length>10?`<button class="rhv-lk" data-ijtodos>${rhanIjTodos?'Mostrar só as 10 primeiras':'Mostrar todas ('+gs.length+')'}</button>`:'')+'</div>'; } }
+  const cols=[['htrab','H.trab'],['he','HE'],['h60','HE 60%'],['h100','HE 100%'],['hen','Noturna'],['abs','Absent.'],['dias_falta','Faltas'],['atraso','Atraso'],['dias_he2','HE>2h'],['interj','Desc.<11h'],['clt','Irreg. CLT']];
+  if(!cols.some(([c])=>c===rhanOrd)) rhanOrd='he';
+  const fo=fs.map(f=>({...f,abs:f.prev?f.falta/f.prev:0})).sort((a,b)=>(b[rhanOrd]||0)-(a[rhanOrd]||0)||String(a.nome).localeCompare(b.nome)), fv=rhanTodos?fo:fo.slice(0,20);
+  const fmt=(c,v,f)=>c==='abs'?(f.prev?rhPc(f.falta,f.prev,0):'—'):['he','h60','h100','hen','atraso','htrab'].includes(c)?(v?rhHM(v):''):(v||'')+(v&&(c==='dias_falta'||c==='dias_he2'||c==='clt')?' d':'');
+  h+='<div class="rhan-c" style="margin-top:10px"><h3>Por colaborador <span class="sub">· clique no título da coluna para ordenar ou num nome para filtrar</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th>Área</th>'
+    +cols.map(([c,l])=>`<th class="n${c===rhanOrd?' on':''}" data-o="${c}">${vEsc(l)}</th>`).join('')+'</tr>'
+    +fv.map(f=>`<tr data-fid="${f.fid}" style="cursor:pointer" class="${String(rhanFunc)===String(f.fid)?'sel':''}"><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
+      +cols.map(([c])=>`<td class="n${c==='clt'&&f.clt?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
+    +'</table></div>'+(fo.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fo.length+')'}</button>`:'')+'</div>';
+  return h;
+}
 function rhanRender(){
   const D=rhanDados; if(!D) return; const T=D.tot||{};
   // filtro de área (a lista vem do banco, sem o próprio filtro aplicado)
@@ -19829,51 +20063,7 @@ function rhanRender(){
       +vis.map(f=>`<tr${f.fid&&!rhanFunc?` data-fid="${f.fid}" style="cursor:pointer" title="Ver os indicadores só desta pessoa"`:''}><td class="nm">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></td><td class="ar">${vEsc(f.area||'')}</td>`
         +cols.map(([c])=>`<td class="n${c==='pend'&&f.pend?' bad':''}">${fmt(c,f[c],f)}</td>`).join('')+'</tr>').join('')
       +'</table></div>'+(fs.length>20?`<button class="rhv-lk" data-todos>${rhanTodos?'Mostrar só os 20 primeiros':'Mostrar todos ('+fs.length+')'}</button>`:'')+'</div>'; };
-  if(!trat){
-    // ================= ⏱️ HORAS (consolidado) =================
-    h+='<div class="rhan-g k5">'
-      +kp('Horas trabalhadas',rhHM(T.htrab),`${rhHM(T.prev)} previstas · ${rhPc(T.htrab,T.prev,0)} do previsto`,'')
-      +kp('Absenteísmo',rhPc(T.falta_aval,T.prev),`${rhHM(T.falta_aval)} de falta sobre ${rhHM(T.prev)} previstas`,rhFx(abs,.03,.06))
-      +kp('Horas extras',rhPc(T.he,T.htrab),`${rhHM(T.he)} sobre ${rhHM(T.htrab)} trabalhadas`,rhFx(phe,.05,.10))
-      +kp('Pontualidade',pont==null?'—':rhPc(T.dias_prev_trab-T.n_atrasos,T.dias_prev_trab),`${rhcN(T.n_atrasos)} dia(s) com atraso · ${rhHM(T.atraso_min)}`,pont==null?'':(pont>=.95?'ok':pont>=.85?'warn':'bad'))
-      +'</div>';
-    h+='<div class="rhan-mini">'+mi(rhcN(T.dias_falta),'dias de falta')
-      +mi(rhcN(ic('he_excesso').casos),'dias com HE > 2h · '+ic('he_excesso').pessoas+' pessoa(s)')
-      +mi(rhcN(ic('interjornada').casos),'descansos < 11h · '+ic('interjornada').pessoas+' pessoa(s)')
-      +mi(rhcN(ic('sem_intervalo').casos),'dias sem intervalo')+mi(rhHM(T.adn),'adicional noturno')+'</div>';
-    h+=tabArea('<th class="n">Pessoas</th><th class="n">H.trab</th><th class="n">HE</th><th class="n">% HE</th><th class="n">Falta</th><th class="n">Absenteísmo</th><th class="n">Pontualidade</th><th class="n">HE&gt;2h</th><th class="n">Desc.&lt;11h</th>',
-      x=>`<td class="n">${x.funcionarios}</td><td class="n">${rhHM(x.htrab)}</td><td class="n">${rhHM(x.he)}</td><td class="n ${x.htrab&&x.he/x.htrab>.10?'warn':''}">${rhPc(x.he,x.htrab)}</td>`
-        +`<td class="n">${rhHM(x.falta)}</td><td class="n ${x.prev&&x.falta/x.prev>.06?'bad':''}">${rhPc(x.falta,x.prev)}</td>`
-        +`<td class="n">${x.dias_prev_trab?rhPc(x.dias_prev_trab-x.n_atrasos,x.dias_prev_trab,0):'—'}</td><td class="n">${x.dias_he2||''}</td><td class="n">${x.interj||''}</td>`);
-    if(pd.length){
-      // série no eixo escolhido: dia a dia (dias sem lançamento = 0) ou somada por mês
-      const ks=rhanChaves(pd), by=new Map(pd.map(d=>[String(d.data).slice(0,10),d]));
-      const agg=c=>ks.map(k=>k.length===10?((by.get(k)||{})[c]||0):pd.filter(d=>String(d.data).slice(0,7)===k).reduce((s,d)=>s+(d[c]||0),0));
-      const pres=agg('presentes'), he=agg('he'), fa=agg('falta_min'), rot=rhanTG.g==='mes'?'por mês':rhanTG.m?'por dia · '+rhMesL(rhanTG.m):'por dia';
-      h+='<div class="rhan-g c2">'
-        +`<div class="rhan-c"><div class="rhan-t2"><h3>Horas extras ${rot}</h3>${rhanTempoCtl()}</div>${rhanColChart(ks,he,'var(--acc)',(k,i,L)=>`${L}: HE ${rhHM(he[i])}`+(ks[0].length===10?` · ${pres[i]} presentes`:''))}</div>`
-        +`<div class="rhan-c"><div class="rhan-t2"><h3>Horas de falta ${rot}</h3>${rhanTempoCtl()}</div>${rhanColChart(ks,fa,'var(--bad)',(k,i,L)=>`${L}: falta ${rhHM(fa[i])}`+(ks[0].length===10?` · ${pres[i]} presentes`:''))}</div>`
-        +'</div>';
-    }
-    // Concentração (Pareto) — quem responde pela maior parte da HE e da falta; clicar filtra a pessoa. Substitui a tabela
-    // Por consórcio (2026-11-19, sw v435): a divisão AI × EH já está no filtro de consórcio.
-    const pareto=(tit,c,tot,cor,lbl)=>{ const fs=(D.func||[]).filter(f=>(f[c]||0)>0).sort((a,b)=>b[c]-a[c]); if(!fs.length||!tot) return `<div class="rhan-c"><h3>${tit}</h3><p class="sub" style="margin:0">Nenhum caso.</p></div>`;
-      let ac=0, n50=0; for(const f of fs){ ac+=f[c]; n50++; if(ac>=tot/2) break; }
-      const top=fs.slice(0,10), mx=top[0][c], s10=top.reduce((s,f)=>s+f[c],0);
-      return `<div class="rhan-c"><h3>${tit}</h3><p class="rhan-pz"><b>${n50}</b> de ${fs.length} pessoa(s) com ${lbl} somam metade do total · os 10 primeiros, <b>${rhPc(s10,tot,0)}</b></p>`
-        +top.map(f=>`<div class="rhan-pr"${f.fid&&!rhanFunc?` data-fid="${f.fid}"`:''} title="${vEsc(f.nome+' · '+(f.area||'')+' · '+rhHM(f[c])+' ('+rhPc(f[c],tot)+' do total)')}"><span class="l">${vEsc(f.nome)} <span class="sub" style="margin:0">${vEsc(f.sigla||'')}</span></span>`
-          +`<span class="t"><i style="width:${f[c]/mx*100}%;background:${cor}"></i></span><span class="n"><b>${rhHM(f[c])}</b> <span>· ${rhPc(f[c],tot,0)}</span></span></div>`).join('')+'</div>'; };
-    h+='<div class="rhan-g c2">'+pareto('Quem concentra as horas extras','he',T.he,'var(--acc)','HE')+pareto('Quem concentra as faltas','falta',(D.func||[]).reduce((s,f)=>s+(f.falta||0),0),'var(--bad)','falta')+'</div>';
-    // Descanso < 11h agrupado por pessoa (reincidência primeiro), com os dias em chips; linha inteira, sem espaço morto
-    const ij=D.interjornada||[];
-    if(ij.length){ const gp=new Map(); ij.forEach(x=>{ const k=x.nome+'|'+(x.sigla||''); if(!gp.has(k)) gp.set(k,{nome:x.nome,sigla:x.sigla,l:[]}); gp.get(k).l.push(x); });
-      const gs=[...gp.values()].map(g=>({...g,min:Math.min(...g.l.map(x=>x.descanso))})).sort((a,b)=>b.l.length-a.l.length||a.min-b.min);
-      const vis=rhanIjTodos?gs:gs.slice(0,10);
-      h+=`<div class="rhan-c" style="margin-top:10px"><h3>Descanso menor que 11h entre jornadas <span class="sub">· ${ij.length} ocorrência(s) em ${gs.length} pessoa(s); em vermelho, menos de 10h</span></h3><div class="rhan-tw"><table class="rhan-t"><tr><th>Colaborador</th><th class="n">Ocorrências</th><th class="n">Menor descanso</th><th>Dias (descanso)</th></tr>`
-        +vis.map(g=>`<tr><td class="nm">${vEsc(g.nome)} <span class="sub" style="margin:0">${vEsc(g.sigla||'')}</span></td><td class="n">${g.l.length}</td><td class="n ${g.min<600?'bad':''}">${rhHM(g.min)}</td>`
-          +`<td style="white-space:normal"><div class="rhan-dts">${g.l.sort((a,b)=>String(a.data).localeCompare(b.data)).map(x=>`<span class="${x.descanso<600?'bad':''}" title="Faltou ${rhHM(660-x.descanso)} para 11h">${fmtData(x.data).slice(0,5)} · ${rhHM(x.descanso)}</span>`).join('')}</div></td></tr>`).join('')
-        +'</table></div>'+(gs.length>10?`<button class="rhv-lk" data-ijtodos>${rhanIjTodos?'Mostrar só as 10 primeiras':'Mostrar todas ('+gs.length+')'}</button>`:'')+'</div>'; }
-    h+=ranking([['htrab','H.trab'],['he','HE'],['abs','Absent.'],['dias_falta','Faltas'],['atraso','Atraso'],['dias_he2','HE>2h'],['interj','Desc.<11h']]);
+  if(!trat){ h=rhanHoras(); // ⏱️ HORAS: calculada no navegador a partir de app_rh_ponto_dias (filtros cruzados)
   } else {
     // ================= 🛠️ TRATAMENTO das inconsistências =================
     h+='<div class="rhan-g k5">'
