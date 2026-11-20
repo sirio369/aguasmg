@@ -2655,13 +2655,26 @@ Leaflet). Por isso **não entra no `SCREENS`** nem no `irPara`. Acesso pelo card
 
 ---
 
-## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel` / `projeto_import` / `projeto_qual`
+## 8. Projetos · Intervenções — `// MÓDULO PROJETOS / INTERVENÇÕES` · telas `projetos`(hub) / `projeto_campo` / `projeto_det` / `projeto_sup` / `projeto_cfg` / `projeto_acesso` / `projeto_resumo` / `projeto_rel` / `projeto_import` / `projeto_qual` / `projeto_pend`
 
 - **Indicadores (2026-10-27):** card **📊 Indicadores** no bloco 🏗️ Campo do hub (`pjHub`, `#pjIndicadores`) abre o painel
   externo `https://indicadores-aguas-mg-v2.vercel.app/#resumo` em **nova aba** (`window.open`, `noopener`). Visível a quem
   acessa Projetos (sem gate próprio).
 
 Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes VCA/HDD, **válvulas**).
+
+- **🧭 Pendências (2026-11-20, sw v440, `docs/migracao_proj_pendencias.sql`):** card no bloco 🏗️ Obras do hub → tela
+  **`projeto_pend`** (`pjPendInit`/`pjPendRender`, sem gate — todos consultam). Por intervenção, cada etapa das 5 fases com
+  situação **✅ ok · ⏳ em andamento · ⭕ pendente · ➖ fora do escopo** (`pjPdSit`): fases 1/2/3/5 = itens do `proj_calc`
+  (doc enviado aguardando aprovação e aprovação aguardando = em andamento; em correção, reprovado e "aguarda o documento" =
+  pendente; `nao_aplica` = ok); fase 4 = etapas de topo da árvore (`pjPct`: 100% ok, >0 em andamento, 0 pendente).
+  Card: faixa das 5 fases (ok/total, Execução em %), lista do que está em aberto por fase (ator, dias e faixa do prazo,
+  motivo da reprovação), "Ver todas as etapas" e "Abrir intervenção ›" (`pjOpen(id,'projeto_pend')`, volta "‹ Pendências").
+  Filtros: consórcio, tipo, status, **pendência com** (ator), **pendência em** (fase), ordenação, busca, contar legado
+  (`pend_legado`). KPIs de etapas e painel **📉 Onde estão os gaps** (etapa × fase com ok/andamento/pendente; tocar filtra).
+  Banco: **`app_proj_pendencias()`** (só leitura, `authenticated`) = `proj_calc` de todas as intervenções numa chamada, com os
+  campos enxutos (~0,5 s, 69 iv / 1.289 itens em 20/11/2026). **Plano B no front:** se a RPC falhar, chama `app_proj_pipeline`
+  uma a uma (6 por vez) — ordem SQL/merge tanto faz. Ensaio de reaterro (natureza `ensaio`) não entra na lista.
 
 - **🔁 Pipeline Engenharia → Qualidade → Obras — BANCO (2026-11-02, `docs/migracao_proj_pipeline.sql`, APLICADA em produção
   em 02/11/2026 — migrações `proj_pipeline` + `proj_pipeline_search_path`; o front vem nos PRs seguintes).** Cada intervenção passa por 5 fases, e cada uma só abre quando a anterior fecha:
