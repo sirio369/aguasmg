@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orçamento por organograma — AcquaHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!--
+  Orçamento por organograma ("fazedor de orçamento") — 🚧 Em desenvolvimento (gate dev_acesso).
+  Quadro livre portado do kit de organograma: caixas, ligações, organizar/alinhar, texto e caneta.
+  Cada caixa = 1 pessoa = 1 linha de Mão de Obra; itens (Locação/Despesas) ligados à pessoa ou a uma equipe.
+  Banco: schema "19 - orcamento" (RPCs app_orc_*). Valores (salários, encargos, preços) vêm SÓ do banco:
+  nunca escrever números do orçamento neste arquivo (o repositório é público).
+-->
+<style>
+:root{
+  --bg:#eaf1f3; --board:#f3f6f7; --dot:#c6d3d8; --surface:#ffffff; --surface-2:#f4f8f9;
+  --ink:#0f2129; --ink-2:#2c414b; --muted:#5c717b; --line:#d6e3e7;
+  --accent:#0e7c86; --accent-2:#0a5a62; --on-accent:#ffffff; --sel:#e0832a; --link:#8199a2;
+  --good:#2f8b6c; --warn:#b9821a; --warn-bg:#f6ecd6; --crit:#bd4438;
+  --shadow:0 1px 2px rgba(16,33,41,.06),0 6px 18px rgba(16,33,41,.07);
+  --font:"IBM Plex Sans",system-ui,sans-serif; --display:"IBM Plex Sans Condensed","Arial Narrow",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1418; --board:#0e1b20; --dot:#22373e; --surface:#12242b; --surface-2:#0f1e24;
+  --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41;
+  --accent:#37b1bc; --accent-2:#5cc7d0; --on-accent:#062028; --link:#5f7a83;
+  --warn-bg:#33280f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0b1418; --board:#0e1b20; --dot:#22373e; --surface:#12242b; --surface-2:#0f1e24;
+  --ink:#e7eff2; --ink-2:#bcccd2; --muted:#8ba0a8; --line:#233a41;
+  --accent:#37b1bc; --accent-2:#5cc7d0; --on-accent:#062028; --link:#5f7a83;
+  --warn-bg:#33280f; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.35); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;overflow:hidden}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;color:var(--ink);background:transparent;border:0;border-radius:6px;padding:6px 9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover{background:var(--surface-2)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+button:disabled{opacity:.4;cursor:default;background:transparent}
+button.primary{background:var(--accent);color:var(--on-accent);font-weight:600}
+button.primary:hover{background:var(--accent-2)}
+button.danger{color:var(--crit)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+.k{font-size:11px;opacity:.55}
+#app{height:100%;display:flex;flex-direction:column}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;z-index:5}
+.grp{display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.sep{flex:1}
+.doc-title{font-family:var(--display);font-size:19px;font-weight:600;min-width:120px;padding:2px 6px;border-radius:4px;outline:none}
+.doc-title:hover,.doc-title:focus{background:var(--surface-2)}
+.boards select{border:0;background:var(--surface-2);font-weight:600;max-width:220px}
+.al{padding:5px 6px}
+.al svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4}
+.al svg rect{fill:currentColor;fill-opacity:.18}
+.sw{width:20px;height:20px;border-radius:50%;padding:0;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);background:var(--c)}
+.sw:hover{background:var(--c)}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink);background:var(--c)}
+.status{font-size:12px;color:var(--muted);min-width:90px;text-align:right}
+.status.err{color:var(--crit)}
+.main{flex:1;display:flex;min-height:0}
+#board{flex:1;position:relative;overflow:hidden;touch-action:none;background-color:var(--board);background-image:radial-gradient(var(--dot) 1.2px,transparent 1.3px)}
+#board.t-pen,#board.t-eraser{cursor:crosshair}
+#board.t-text{cursor:text}
+#board.t-link{cursor:alias}
+#board.panning{cursor:grabbing}
+#world{position:absolute;left:0;top:0;transform-origin:0 0}
+#links,#ink{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible}
+#links path{fill:none;stroke:var(--link);stroke-width:2}
+#links path.preview{stroke:var(--sel);stroke-dasharray:6 5}
+#ink{pointer-events:none}
+#ink .hit{fill:none;stroke:transparent}
+.t-select #ink .hit{pointer-events:stroke;cursor:move}
+#ink .vis{fill:none;stroke-linecap:round;stroke-linejoin:round}
+#ink .box{fill:none;stroke:var(--sel);stroke-width:1.5;stroke-dasharray:5 4}
+.card{position:absolute;width:220px;background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--c);border-radius:7px;padding:8px 11px 9px;box-shadow:var(--shadow);user-select:none;cursor:grab;text-align:center}
+.card .name{font-weight:600;font-size:14.5px;line-height:1.25;overflow-wrap:anywhere}
+.card .role{font-size:11.5px;color:var(--muted);line-height:1.3;margin-top:2px;overflow-wrap:anywhere;text-transform:uppercase;letter-spacing:.04em}
+.card .meta{font-size:11.5px;color:var(--ink-2);margin-top:5px}
+.card .cost{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500;margin-top:2px;color:var(--accent)}
+.card .falta{font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:1px 6px;margin-top:5px;display:inline-block}
+.card .tags{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:5px}
+.card .tags span{font-size:10.5px;border-radius:999px;padding:1px 7px;color:#fff;background:var(--t)}
+.card.sel,.note.sel{box-shadow:0 0 0 2px var(--sel),var(--shadow)}
+.card.linkfrom{box-shadow:0 0 0 3px var(--sel);border-style:dashed}
+.t-pen .card,.t-eraser .card,.t-text .card{cursor:inherit}
+.note{position:absolute;min-width:24px;padding:2px 4px;font-size:var(--fs);color:var(--c);font-weight:500;line-height:1.3;white-space:pre-wrap;user-select:none;cursor:move;border-radius:3px;outline:none}
+.note.editing{cursor:text;user-select:text;background:var(--surface);box-shadow:0 0 0 1px var(--accent)}
+.overlay{position:absolute;z-index:4;display:flex;gap:6px;align-items:center}
+.zoom{right:14px;bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px}
+.zoom span{font-size:12px;min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
+.hint{left:14px;bottom:14px;max-width:min(560px,calc(100% - 230px));font-size:12px;color:var(--muted);background:var(--surface);opacity:.92;border:1px solid var(--line);border-radius:8px;padding:6px 10px;line-height:1.45}
+#marquee{position:absolute;z-index:3;border:1.5px dashed var(--sel);background:rgba(224,131,42,.08);pointer-events:none}
+#toast{position:fixed;left:50%;top:62px;transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:7px 14px;border-radius:6px;font-size:13px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+#toast.on{opacity:1}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none}
+.empty div{pointer-events:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 24px;text-align:center;max-width:380px;line-height:1.5}
+.empty h2{margin:0 0 6px;font-family:var(--display);font-size:20px}
+.empty p{margin:0 0 14px;color:var(--muted)}
+/* painel lateral */
+#side{width:320px;flex:none;background:var(--surface);border-left:1px solid var(--line);overflow:auto;padding:12px 14px 30px;display:flex;flex-direction:column;gap:16px}
+#side h3{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+#side h3 button{margin-left:auto;font-size:12px;text-transform:none;letter-spacing:0;padding:3px 7px;border:1px solid var(--line)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:13px}
+.kv .v{font-family:"IBM Plex Mono",monospace;text-align:right}
+.kv .tot{font-weight:600;border-top:1px solid var(--line);padding-top:4px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.eq{border:1px solid var(--line);border-left:4px solid var(--t);border-radius:7px;padding:7px 9px;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.eq:hover{background:var(--surface-2)}
+.eq b{font-size:13.5px}
+.list{display:flex;flex-direction:column;gap:6px}
+.za-tot{display:grid;grid-template-columns:auto 1fr 1fr;gap:2px 10px;font-size:12.5px}
+.za-tot .h{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.za-tot .v{font-family:"IBM Plex Mono",monospace;text-align:right}
+/* diálogos */
+.dlg{position:fixed;inset:0;z-index:20;background:rgba(10,20,25,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg-card{background:var(--surface);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);width:min(720px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.dlg-card.wide{width:min(1180px,100%)}
+.dlg-head{padding:14px 18px 8px;border-bottom:1px solid var(--line)}
+.dlg-head h2{margin:0;font-family:var(--display);font-size:20px}
+.steps{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.steps button{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.steps button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.steps button.ok::before{content:"✓";font-size:11px}
+.dlg-body{padding:14px 18px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.dlg-foot{padding:10px 18px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dlg-foot .prev{font-size:12.5px;color:var(--ink-2);margin-right:auto}
+.dlg-foot button{border:1px solid var(--line)}
+.q{display:flex;flex-direction:column;gap:5px}
+.q > label,.q > .lab{font-weight:600;font-size:13.5px}
+.q .help{font-size:12px;color:var(--muted);line-height:1.4}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row > .q{flex:1;min-width:180px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.chips button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.badge{font-size:12px;border-radius:6px;padding:5px 9px;background:var(--surface-2);border:1px solid var(--line);line-height:1.4}
+.badge.warn{background:var(--warn-bg);border-color:transparent}
+.items{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.it{display:grid;grid-template-columns:22px 1fr 70px 110px;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);font-size:13px}
+.it:first-child{border-top:0}
+.it .d small{display:block;color:var(--muted);font-size:11.5px}
+.it input[type=number]{padding:4px 6px;width:100%}
+.it.off input[type=number]{opacity:.4}
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:55vh}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface-2);font-weight:600;font-size:11.5px;color:var(--ink-2);z-index:1}
+td.n,th.n{text-align:right;font-family:"IBM Plex Mono",monospace}
+tr.tot td{font-weight:600;background:var(--surface-2)}
+#gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+#gate div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 26px;max-width:420px;text-align:center;line-height:1.5}
+@media (max-width:900px){
+  .main{flex-direction:column}
+  #side{width:auto;max-height:38vh;border-left:0;border-top:1px solid var(--line)}
+  .hint{display:none}.k{display:none}
+  .it{grid-template-columns:22px 1fr 60px 90px}
+}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="gate"><div><b>Orçamento</b><p id="gm" class="muted">Verificando acesso…</p><button onclick="location.href='index.html'">← Voltar ao AcquaHub</button></div></div>
+<div id="app">
+  <header class="bar">
+    <button onclick="location.href='index.html'" title="Voltar ao AcquaHub">← AcquaHub</button>
+    <div class="grp boards" role="group" aria-label="Organogramas">
+      <label for="boardSel" class="k" style="position:absolute;width:1px;height:1px;overflow:hidden">Organograma aberto</label>
+      <select id="boardSel" title="Troca o organograma aberto"></select>
+      <button id="boardNew" title="Cria um organograma novo">+ Novo</button>
+      <button id="boardDel" class="danger" title="Exclui o organograma aberto">Excluir</button>
+    </div>
+    <div id="docTitle" class="doc-title" contenteditable="true" spellcheck="false" aria-label="Nome do organograma" title="Clique para renomear"></div>
+    <div class="grp" role="group" aria-label="Ferramentas">
+      <button data-tool="select" title="Selecionar e mover; arraste no fundo para selecionar várias (V)">Selecionar <span class="k">V</span></button>
+      <button data-tool="link" title="Ligar: clique no subordinado e depois no superior (L)">Ligar <span class="k">L</span></button>
+      <button data-tool="text" title="Texto livre (T)">Texto <span class="k">T</span></button>
+      <button data-tool="pen" title="Caneta (P)">Caneta <span class="k">P</span></button>
+      <button data-tool="eraser" title="Borracha: apaga riscos e textos (E)">Borracha <span class="k">E</span></button>
+    </div>
+    <div class="grp" role="group" aria-label="Cor" id="swatches"></div>
+    <div class="grp" role="group" aria-label="Pessoas">
+      <button id="addBox" title="Nova pessoa solta no centro da tela">+ Pessoa</button>
+      <button id="addSub" title="Nova pessoa abaixo da selecionada (Tab)">+ Subordinado <span class="k">Tab</span></button>
+      <button id="ficha" title="Abre a ficha da pessoa selecionada (Enter ou duplo clique)">Ficha</button>
+      <button id="mkTeam" title="Cria uma equipe com as pessoas selecionadas">+ Equipe</button>
+      <button id="unlink" title="Tira a pessoa selecionada do seu superior">Desligar</button>
+      <button id="tidy" title="Reorganiza as caixas em árvore">Organizar</button>
+    </div>
+    <div class="grp align" role="group" aria-label="Alinhar">
+      <button class="al" data-align="left" title="Alinhar à esquerda" aria-label="Alinhar à esquerda"><svg viewBox="0 0 16 16"><path d="M2 1v14"/><rect x="4" y="3" width="10" height="4"/><rect x="4" y="9" width="6" height="4"/></svg></button>
+      <button class="al" data-align="hcenter" title="Centralizar (mesmo eixo)" aria-label="Centralizar"><svg viewBox="0 0 16 16"><path d="M8 1v14"/><rect x="2" y="3" width="12" height="4"/><rect x="4" y="9" width="8" height="4"/></svg></button>
+      <button class="al" data-align="top" title="Alinhar pelo topo (mesma linha)" aria-label="Alinhar pelo topo"><svg viewBox="0 0 16 16"><path d="M1 2h14"/><rect x="3" y="4" width="4" height="10"/><rect x="9" y="4" width="4" height="6"/></svg></button>
+      <button class="al" data-align="disth" title="Mesmo espaço na horizontal (3 ou mais)" aria-label="Distribuir na horizontal"><svg viewBox="0 0 16 16"><path d="M1 1v14M15 1v14"/><rect x="5.5" y="4" width="5" height="8"/></svg></button>
+      <button class="al" data-align="distv" title="Mesmo espaço na vertical (3 ou mais)" aria-label="Distribuir na vertical"><svg viewBox="0 0 16 16"><path d="M1 1h14M1 15h14"/><rect x="4" y="5.5" width="8" height="5"/></svg></button>
+      <button id="snap" title="Grade magnética (Alt ao arrastar solta livre)">Grade</button>
+    </div>
+    <div class="grp" role="group" aria-label="Edição">
+      <button id="del" class="danger" title="Excluir o selecionado (Delete)">Excluir</button>
+    </div>
+    <div class="sep"></div>
+    <div class="grp" role="group" aria-label="Orçamento">
+      <button id="resumo" class="primary" title="Resumo do orçamento por ZA, pessoa e mês">Resumo</button>
+      <button id="xlsx" title="Baixa o orçamento (.xlsx) nas abas Mão de Obra, Locação e Despesas">Excel</button>
+      <button id="png" title="Baixa uma imagem do quadro">PNG</button>
+    </div>
+    <span id="status" class="status" aria-live="polite"></span>
+  </header>
+  <div class="main">
+    <main id="board" aria-label="Quadro">
+      <div id="world">
+        <svg id="links" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="items"></div>
+        <svg id="ink" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="overlay hint">Duplo clique na caixa abre a ficha (perguntas da pessoa) · arraste no fundo para selecionar várias · Ctrl+clique soma à seleção · Shift ao arrastar leva os subordinados · navegar: botão direito ou Espaço + arrastar · roda dá zoom · tudo é salvo na hora</div>
+      <div class="overlay zoom"><button id="zout" aria-label="Diminuir zoom">−</button><span id="zval">100%</span><button id="zin" aria-label="Aumentar zoom">+</button><button id="fit">Ajustar</button></div>
+      <div id="empty" class="empty" hidden><div><h2>Nenhum organograma ainda</h2><p>Crie um organograma e lance as pessoas: cada caixa vira uma linha de Mão de Obra, com veículos, equipamentos e despesas ligados.</p><button id="emptyNew" class="primary">Criar organograma</button></div></div>
+      <div id="marquee" hidden></div>
+    </main>
+    <aside id="side" aria-label="Painel do orçamento">
+      <section><h3>Totais do organograma</h3><div id="sideTot"></div></section>
+      <section><h3>Selecionado</h3><div id="sideSel" class="small muted">Clique numa caixa para ver o custo da pessoa.</div></section>
+      <section><h3>Equipes <button id="mkTeam2" title="Cria uma equipe com as pessoas selecionadas">+ Equipe</button></h3><div id="sideEq" class="list"></div></section>
+    </aside>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<!-- ficha da pessoa (perguntas) -->
+<div id="dlgP" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgPTit">
+  <div class="dlg-card">
+    <div class="dlg-head"><h2 id="dlgPTit">Novo colaborador</h2><div class="steps" id="pSteps"></div></div>
+    <div class="dlg-body" id="pBody"></div>
+    <div class="dlg-foot"><span class="prev" id="pPrev"></span><button id="pCancel" type="button">Cancelar</button><button id="pBack" type="button">← Voltar</button><button id="pNext" type="button" class="primary">Próximo →</button><button id="pSave" type="button" class="primary">Salvar</button></div>
+  </div>
+</div>
+<!-- equipe -->
+<div id="dlgE" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgETit">
+  <div class="dlg-card">
+    <div class="dlg-head"><h2 id="dlgETit">Equipe</h2></div>
+    <div class="dlg-body" id="eBody"></div>
+    <div class="dlg-foot"><span class="prev" id="ePrev"></span><button id="eDel" type="button" class="danger">Excluir equipe</button><button id="eCancel" type="button">Cancelar</button><button id="eSave" type="button" class="primary">Salvar</button></div>
+  </div>
+</div>
+<!-- resumo -->
+<div id="dlgR" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgRTit">
+  <div class="dlg-card wide">
+    <div class="dlg-head"><h2 id="dlgRTit">Resumo do orçamento</h2><div class="steps" id="rTabs"></div></div>
+    <div class="dlg-body" id="rBody"></div>
+    <div class="dlg-foot"><span class="prev" id="rPrev"></span><button id="rXlsx" type="button">Baixar Excel</button><button id="rClose" type="button" class="primary">Fechar</button></div>
+  </div>
+</div>
+<datalist id="dlCargos"></datalist>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const sb = createClient('https://lwttadkctfznidzvmury.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3dHRhZGtjdGZ6bmlkenZtdXJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MzQ4NjksImV4cCI6MjEwMTUxMDg2OX0._M5FOmACjrYeRgQ6hXrvmxFp3Et8Jrt-fElYohiiVZc');
+
+/* ================= estado ================= */
+const $ = id => document.getElementById(id);
+const CARD_W = 220, GRID = 20;
+const COLORS = ['#0e7c86','#1f5f8b','#2a7a5c','#7a4fa0','#e0832a','#c0392b','#5c717b'];
+const SETOR_COR = {'OBRAS':'#2a7a5c','ENGENHARIA':'#1f5f8b','ADMINISTRAÇÃO':'#7a4fa0'};
+const MODS = [['CLT','CLT'],['PJ','PJ'],['ESTAGIO','Estágio'],['APRENDIZ','Aprendiz'],['TEMPORARIO','Temporário']];
+const SETORES = ['OBRAS','ENGENHARIA','ADMINISTRAÇÃO'];
+const ADICIONAIS = [['nenhum','Nenhum'],['insalubridade_1','Insalubridade grau mínimo','insal_1'],['insalubridade_2','Insalubridade grau médio','insal_2'],['insalubridade_3','Insalubridade grau máximo','insal_3'],['periculosidade','Periculosidade','periculosidade']];
+
+let P = {}, PREM = [], ZAS = [], CARGOS = [], CARGO = {}, ITENS = [], ITEM = {}, APROP = [], APR = {}, IS_ADMIN = false;
+let QUADROS = [], Q = null, PES = [], EQ = [], VIN = [], NOTES = [], STROKES = [];
+let view = {tx:0, ty:0, s:1}, tool = 'select', color = COLORS[0];
+let sel = null, group = [], editing = null, linkFrom = null, drag = null, spaceDown = false, lastDown = {t:0, id:null};
+let heights = {}, snapOn = true, pending = 0, lastErr = '', touched = false;
+try { snapOn = localStorage.getItem('orc-grade') !== '0'; } catch (e) {}
+const board = $('board'), world = $('world'), items = $('items'), linksSvg = $('links'), ink = $('ink');
+
+/* ================= util ================= */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => (v === null || v === undefined || v === '' || isNaN(+v)) ? null : +v;
+const brl = v => v == null ? '—' : v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
+const brl2 = v => v == null ? '—' : v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', minimumFractionDigits:2, maximumFractionDigits:2});
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+const sid = () => Math.random().toString(36).slice(2, 10);
+const byId = (arr, id) => arr.find(x => x.id === id) || null;
+let toastT;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+function setStatus(){
+  const st = $('status');
+  if (lastErr) { st.textContent = 'Erro ao salvar'; st.title = lastErr; st.className = 'status err'; }
+  else if (pending) { st.textContent = 'Salvando…'; st.title = ''; st.className = 'status'; }
+  else { st.textContent = 'Salvo'; st.title = ''; st.className = 'status'; }
+}
+async function rpc(fn, args){
+  pending++; setStatus();
+  try { const { data, error } = await sb.rpc(fn, args || {}); if (error) throw error; lastErr = ''; return data; }
+  catch (e) { lastErr = (e && e.message) || String(e); toast('Não consegui salvar: ' + lastErr); throw e; }
+  finally { pending--; setStatus(); }
+}
+
+/* ================= meses do contrato ================= */
+function mes0(){ const v = String(P.mes_inicio || ''); return /^\d{6}$/.test(v) ? {y:+v.slice(0,4), m:+v.slice(4,6)} : {y:new Date().getFullYear(), m:1}; }
+const NM = () => Math.max(1, Math.round(+P.meses_contrato || 60));
+function idxMes(d){ if (!d) return null; const s = mes0(); return (+d.slice(0,4) - s.y) * 12 + (+d.slice(5,7) - s.m) + 1; }
+function ymDe(i){ const s = mes0(), t = s.m - 1 + i - 1; return {y: s.y + Math.floor(t / 12), m: (t % 12 + 12) % 12 + 1}; }
+function rotMes(i){ const r = ymDe(i); return String(r.m).padStart(2,'0') + '/' + r.y; }
+function isoMes(i){ const r = ymDe(i); return r.y + '-' + String(r.m).padStart(2,'0'); }
+function janela(ini, fim, padrao){
+  const d = padrao || [1, NM()];
+  let a = ini ? idxMes(ini) : d[0], b = fim ? idxMes(fim) : d[1];
+  a = Math.max(1, a); b = Math.min(NM(), b);
+  return [a, b];
+}
+
+/* ================= cálculo do custo (fórmulas da aba Mão de Obra) ================= */
+function setorDe(p){ return p.setor || (CARGO[p.cargo_id] && CARGO[p.cargo_id].setor_padrao) || 'OBRAS'; }
+function custoMO(p){
+  const mod = p.modalidade || 'CLT';
+  if (mod === 'PJ') { const v = num(p.valor_pj) || 0; return {total:v, partes:[['Valor mensal da NF', v]]}; }
+  if (mod === 'ESTAGIO') { const v = num(p.valor_pj) || 0; return {total:v, partes:[['Bolsa mensal', v]]}; }
+  const sal = num(p.salario) || 0, sm = num(P.salario_minimo) || 0;
+  let adic = 0;
+  if (num(p.adicional_valor) != null) adic = num(p.adicional_valor);
+  else if (/^insalubridade_\d$/.test(p.adicional || '')) adic = sm * (num(P['insal_' + p.adicional.slice(-1)]) || 0);
+  else if (p.adicional === 'periculosidade') adic = sal * (num(P.periculosidade) || 0);
+  const he = p.hora_extra ? sal / 220 * ((num(P.he60_horas) || 0) * (1 + (num(P.he60_pct) || 0)) + (num(P.he100_horas) || 0) * (1 + (num(P.he100_pct) || 0))) : 0;
+  const R = sal + adic + he;
+  const taxa = p.regime === 'HORISTA' ? num(P.enc_horista) : num(P.enc_mensalista);   // aprendiz/temporário seguem a planilha (mensalista/horista)
+  const enc = (taxa || 0) * R;
+  const dec = (num(P.decimo) || 0) * sal, fer = (num(P.ferias) || 0) * sal;
+  const ben = ['seguro_vida','plano_saude','plano_odonto','transporte','alimentacao'].reduce((s, k) => s + (num(P[k]) || 0), 0);
+  const exa = num(P.exames) || 0, plr = (num(P.plr_fator) || 0) * sal;
+  const epi = setorDe(p) === 'OBRAS' ? (num(P.epi_operacional) || 0) : (num(P.epi_adm) || 0);
+  const partes = [['Salário', sal], ['Adicional', adic], ['Hora extra', he], ['Encargos', enc], ['13º', dec], ['Férias', fer], ['Benefícios', ben], ['Exames', exa], ['PLR', plr], ['Uniformes e EPI', epi]];
+  return {total: partes.reduce((s, x) => s + x[1], 0), partes, sal, adic, he, enc, dec, fer, ben: ben + exa, plr, epi};
+}
+function unitVinc(v){ if (num(v.valor) != null) return num(v.valor); const it = ITEM[v.item_id]; return it && num(it.valor) != null ? num(it.valor) : null; }
+function tipoItem(it){ return it && (it.origem === 'Locação' || (it.origem === 'manual' && (it.categoria === 'veiculo' || it.categoria === 'equipamento'))) ? 'Locação' : 'Despesas'; }
+function zasEquipe(e){ if (e.zas && e.zas.length) return e.zas; const s = new Set(); (e.membros || []).forEach(id => { const p = byId(PES, id); (p && p.zas || []).forEach(z => s.add(z)); }); return [...s]; }
+function faltas(p){
+  const f = [];
+  if (!(p.zas && p.zas.length)) f.push('ZA');
+  if (['PJ','ESTAGIO'].includes(p.modalidade)) { if (!num(p.valor_pj)) f.push('valor'); }
+  else if (!num(p.salario)) f.push('salário');
+  if (!p.aprop_cod) f.push('apropriação');
+  return f;
+}
+/* Linhas do orçamento: 1 por pessoa × ZA (MO) e 1 por item ligado × ZA; meses[1..N]. */
+function linhas(){
+  const N = NM(), out = [];
+  const nova = (o, zas, fn) => { const zz = zas && zas.length ? zas : ['(sem ZA)']; const k = 1 / zz.length; zz.forEach(z => { const m = new Float64Array(N + 1); fn(m, k); out.push(Object.assign({za: z, rateio: k, meses: m}, o)); }); };
+  PES.forEach(p => {
+    const c = custoMO(p), [a, b] = janela(p.mes_ini, p.mes_fim);
+    nova({tipo:'Mão de Obra', pessoa:p, custo:c, aprop:p.aprop_cod, ini:a, fim:b}, p.zas, (m, k) => { for (let i = a; i <= b; i++) m[i] = c.total * k; });
+  });
+  VIN.forEach(v => {
+    const it = ITEM[v.item_id]; if (!it) return;
+    const u = unitVinc(v), qtd = num(v.qtd) || 1;
+    let dono, zas, jan, aprop;
+    if (v.pessoa_id) { dono = byId(PES, v.pessoa_id); if (!dono) return; zas = dono.zas; jan = janela(dono.mes_ini, dono.mes_fim); aprop = dono.aprop_cod; }
+    else { dono = byId(EQ, v.equipe_id); if (!dono) return; zas = zasEquipe(dono); jan = janela(dono.mes_ini, dono.mes_fim); aprop = dono.aprop_cod; }
+    const [a, b] = janela(v.mes_ini, v.mes_fim, jan);
+    nova({tipo:tipoItem(it), item:it, vinc:v, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, ini:a, fim:b, semPreco: u == null}, zas, (m, k) => {
+      const val = (u || 0) * qtd * k;
+      if (it.cobranca === 'pontual') { if (a <= b) m[a] = val; } else for (let i = a; i <= b; i++) m[i] = val;
+    });
+  });
+  return out;
+}
+const somaMeses = m => { let s = 0; for (let i = 1; i < m.length; i++) s += m[i]; return s; };
+function mensalPessoa(p){
+  let t = custoMO(p).total;
+  VIN.forEach(v => { if (v.pessoa_id === p.id && ITEM[v.item_id] && ITEM[v.item_id].cobranca !== 'pontual') t += (unitVinc(v) || 0) * (num(v.qtd) || 1); });
+  return t;
+}
+
+/* ================= vista ================= */
+function applyView(){
+  world.style.transform = `translate(${view.tx}px,${view.ty}px) scale(${view.s})`;
+  const g = 20 * view.s; board.style.backgroundSize = g + 'px ' + g + 'px'; board.style.backgroundPosition = view.tx + 'px ' + view.ty + 'px';
+  $('zval').textContent = Math.round(view.s * 100) + '%';
+}
+function toWorld(e){ const r = board.getBoundingClientRect(); return {x:(e.clientX - r.left - view.tx) / view.s, y:(e.clientY - r.top - view.ty) / view.s}; }
+function zoomAt(f, cx, cy){ const ns = Math.min(3, Math.max(0.15, view.s * f)); f = ns / view.s; view.tx = cx - (cx - view.tx) * f; view.ty = cy - (cy - view.ty) * f; view.s = ns; applyView(); }
+const nodeH = n => heights[n.id] || 110;
+function bounds(){
+  const b = {x1:Infinity, y1:Infinity, x2:-Infinity, y2:-Infinity};
+  const add = (x, y) => { b.x1 = Math.min(b.x1, x); b.y1 = Math.min(b.y1, y); b.x2 = Math.max(b.x2, x); b.y2 = Math.max(b.y2, y); };
+  PES.forEach(n => { add(n.x, n.y); add(n.x + CARD_W, n.y + nodeH(n)); });
+  NOTES.forEach(n => { add(n.x, n.y); add(n.x + 120, n.y + 30); });
+  STROKES.forEach(s => s.points.forEach(p => { add(p[0] - s.width, p[1] - s.width); add(p[0] + s.width, p[1] + s.width); }));
+  return b.x1 === Infinity ? {x1:-200, y1:-100, x2:200, y2:100} : b;
+}
+function fit(){
+  const b = bounds(), r = board.getBoundingClientRect(), pad = 60;
+  view.s = Math.min(1.2, Math.max(0.15, Math.min((r.width - pad * 2) / (b.x2 - b.x1), (r.height - pad * 2) / (b.y2 - b.y1))));
+  view.tx = r.width / 2 - (b.x1 + b.x2) / 2 * view.s; view.ty = r.height / 2 - (b.y1 + b.y2) / 2 * view.s; applyView();
+}
+const centerWorld = () => { const r = board.getBoundingClientRect(); return {x:(r.width / 2 - view.tx) / view.s, y:(r.height / 2 - view.ty) / view.s}; };
+
+/* ================= seleção ================= */
+const selItems = () => group.length ? group : (sel ? [sel] : []);
+const isSel = (kind, id) => selItems().some(x => x.kind === kind && x.id === id);
+const clearSel = () => { sel = null; group = []; };
+function setSel(list){ if (list.length === 1) { sel = list[0]; group = []; } else { sel = null; group = list.slice(); } }
+function toggleSel(kind, id){ const l = selItems().slice(), i = l.findIndex(x => x.kind === kind && x.id === id); if (i >= 0) l.splice(i, 1); else l.push({kind, id}); setSel(l); }
+const selPessoas = () => selItems().filter(x => x.kind === 'node').map(x => byId(PES, x.id)).filter(Boolean);
+function getObj(it){ return byId(it.kind === 'node' ? PES : it.kind === 'note' ? NOTES : STROKES, it.id); }
+
+/* ================= renderização ================= */
+const corDe = n => n.cor || SETOR_COR[setorDe(n)] || COLORS[0];
+const modRot = m => (MODS.find(x => x[0] === m) || [m, m])[1];
+const zasRot = z => z && z.length ? z.join(' + ') : 'sem ZA';
+function render(){
+  let html = '';
+  PES.forEach(n => {
+    const cls = 'card' + (isSel('node', n.id) ? ' sel' : '') + (linkFrom === n.id ? ' linkfrom' : '');
+    const eqs = EQ.filter(e => (e.membros || []).includes(n.id)), f = faltas(n);
+    html += `<div class="${cls}" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px;--c:${esc(corDe(n))}">` +
+      `<div class="name">${esc(n.nome || 'A definir')}</div><div class="role">${esc(n.funcao || 'Cargo a definir')}</div>` +
+      `<div class="meta">${esc(modRot(n.modalidade))} · ${esc(zasRot(n.zas))}</div>` +
+      `<div class="cost">${brl(mensalPessoa(n))}/mês</div>` +
+      (f.length ? `<div class="falta">falta: ${esc(f.join(', '))}</div>` : '') +
+      (eqs.length ? `<div class="tags">${eqs.map(e => `<span style="--t:${esc(e.cor || '#7a4fa0')}">${esc(e.nome)}</span>`).join('')}</div>` : '') + `</div>`;
+  });
+  NOTES.forEach(n => {
+    const cls = 'note' + (isSel('note', n.id) ? ' sel' : '') + (editing === n.id ? ' editing' : '');
+    html += `<div class="${cls}" data-note="${n.id}" style="left:${n.x}px;top:${n.y}px;--c:${esc(n.color)};--fs:${+n.size || 18}px"${editing === n.id ? ' contenteditable="true"' : ''}>${esc(n.text)}</div>`;
+  });
+  items.innerHTML = html;
+  heights = {};
+  PES.forEach(n => { const el = items.querySelector(`[data-node="${n.id}"]`); if (el) heights[n.id] = el.offsetHeight; });
+  drawLinks(); drawInk(); paintBar(); renderSide();
+  const qa = Q && byId(QUADROS, Q.id); if (qa && qa.pessoas !== PES.length) fillBoardSel();
+  if ($('docTitle') !== document.activeElement) $('docTitle').textContent = Q ? Q.titulo : '';
+}
+function linkPts(p, c){
+  const x1 = p.x + CARD_W / 2, y1 = p.y + nodeH(p), x2 = c.x + CARD_W / 2, y2 = c.y;
+  if (y2 > y1 + 10) { const my = y1 + Math.max(16, (y2 - y1) / 2); return [[x1, y1], [x1, my], [x2, my], [x2, y2]]; }
+  return [[x1, p.y + nodeH(p) / 2], [x2, c.y + nodeH(c) / 2]];
+}
+const linkPath = (p, c) => linkPts(p, c).map((q, i) => (i ? 'L' : 'M') + q[0] + ' ' + q[1]).join('');
+function drawLinks(extra){
+  let out = '';
+  PES.forEach(c => { if (!c.parent_id) return; const p = byId(PES, c.parent_id); if (p) out += `<path d="${linkPath(p, c)}"/>`; });
+  linksSvg.innerHTML = out + (extra || '');
+}
+function strokeD(pts){
+  if (pts.length === 1) return 'M' + pts[0][0] + ' ' + pts[0][1] + 'l0.01 0';
+  let d = 'M' + pts[0][0] + ' ' + pts[0][1];
+  for (let i = 1; i < pts.length - 1; i++) d += 'Q' + pts[i][0] + ' ' + pts[i][1] + ' ' + ((pts[i][0] + pts[i + 1][0]) / 2).toFixed(1) + ' ' + ((pts[i][1] + pts[i + 1][1]) / 2).toFixed(1);
+  const l = pts[pts.length - 1]; return d + 'L' + l[0] + ' ' + l[1];
+}
+function sBox(s){ const b = {x1:Infinity, y1:Infinity, x2:-Infinity, y2:-Infinity}; s.points.forEach(p => { b.x1 = Math.min(b.x1, p[0]); b.y1 = Math.min(b.y1, p[1]); b.x2 = Math.max(b.x2, p[0]); b.y2 = Math.max(b.y2, p[1]); }); return b; }
+function drawInk(){
+  let out = '';
+  STROKES.forEach(s => { const d = strokeD(s.points); out += `<g data-stroke="${s.id}"><path class="vis" d="${d}" stroke="${esc(s.color)}" stroke-width="${+s.width}"/><path class="hit" d="${d}" stroke-width="${+s.width + 14}"/></g>`; });
+  selItems().forEach(it => { if (it.kind !== 'stroke') return; const s = byId(STROKES, it.id); if (s) { const b = sBox(s); out += `<rect class="box" x="${b.x1 - 6}" y="${b.y1 - 6}" width="${b.x2 - b.x1 + 12}" height="${b.y2 - b.y1 + 12}"/>`; } });
+  ink.innerHTML = out;
+}
+function paintBar(){
+  document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === tool ? 'true' : 'false'));
+  document.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', b.dataset.color === color ? 'true' : 'false'));
+  $('snap').setAttribute('aria-pressed', snapOn ? 'true' : 'false');
+  const one = sel && sel.kind === 'node', ns = selItems().length, np = selPessoas().length;
+  $('addSub').disabled = !one; $('ficha').disabled = !one;
+  $('unlink').disabled = !(one && byId(PES, sel.id) && byId(PES, sel.id).parent_id);
+  $('del').disabled = !ns; $('mkTeam').disabled = !np;
+  document.querySelectorAll('.al').forEach(b => { const m = b.dataset.align; b.disabled = (m === 'disth' || m === 'distv') ? ns < 3 : ns < 2; });
+  ['addBox','addSub','ficha','mkTeam','mkTeam2','unlink','tidy','del','resumo','xlsx','png','boardDel'].forEach(id => { if (!Q) $(id).disabled = true; });
+  if (Q) { $('addBox').disabled = false; $('tidy').disabled = !PES.length; $('resumo').disabled = $('xlsx').disabled = $('png').disabled = $('boardDel').disabled = false; $('mkTeam2').disabled = false; }
+}
+
+/* ================= painel lateral ================= */
+function renderSide(){
+  if (!Q) { $('sideTot').innerHTML = ''; $('sideSel').innerHTML = ''; $('sideEq').innerHTML = ''; return; }
+  const L = linhas(), zs = {}, N = NM();
+  L.forEach(l => { const z = zs[l.za] = zs[l.za] || {mo:0, loc:0, des:0}; const t = somaMeses(l.meses); if (l.tipo === 'Mão de Obra') z.mo += t; else if (l.tipo === 'Locação') z.loc += t; else z.des += t; });
+  const semPreco = L.filter(l => l.semPreco).length;
+  let h = `<div class="small muted" style="margin-bottom:6px">${PES.length} pessoa(s) · ${EQ.length} equipe(s) · contrato ${rotMes(1)} a ${rotMes(N)}</div><div class="za-tot"><span class="h">ZA</span><span class="h" style="text-align:right">Total</span><span class="h" style="text-align:right">Média/mês</span>`;
+  let tot = 0;
+  Object.keys(zs).sort().forEach(z => { const t = zs[z].mo + zs[z].loc + zs[z].des; tot += t; h += `<span>${esc(z)}</span><span class="v">${brl(t)}</span><span class="v">${brl(t / N)}</span>`; });
+  h += `<span><b>Total</b></span><span class="v"><b>${brl(tot)}</b></span><span class="v"><b>${brl(tot / N)}</b></span></div>`;
+  if (semPreco) h += `<div class="badge warn" style="margin-top:8px">${semPreco} item(ns) sem preço (a definir) — entram como zero.</div>`;
+  $('sideTot').innerHTML = PES.length ? h : '<span class="small muted">Lance a primeira pessoa com “+ Pessoa”.</span>';
+  // selecionado
+  const sp = selPessoas();
+  if (sp.length === 1) {
+    const p = sp[0], c = custoMO(p), vs = VIN.filter(v => v.pessoa_id === p.id), [a, b] = janela(p.mes_ini, p.mes_fim);
+    let s = `<div style="font-weight:600;font-size:14px">${esc(p.nome)}</div><div class="small muted">${esc(p.funcao || 'Cargo a definir')} · ${esc(modRot(p.modalidade))} · ${esc(zasRot(p.zas))}</div>`;
+    s += `<div class="small muted" style="margin:2px 0 8px">${rotMes(a)} a ${rotMes(b)} (${Math.max(0, b - a + 1)} meses)${p.aprop_cod ? ' · ' + esc(p.aprop_cod) : ''}</div><div class="kv">`;
+    c.partes.forEach(([k, v]) => { if (v) s += `<span>${esc(k)}</span><span class="v">${brl2(v)}</span>`; });
+    s += `<span class="tot">Mão de obra/mês</span><span class="v tot">${brl2(c.total)}</span>`;
+    vs.forEach(v => { const it = ITEM[v.item_id]; if (!it) return; const u = unitVinc(v); s += `<span>${esc(it.descricao)}${(num(v.qtd) || 1) > 1 ? ' ×' + num(v.qtd) : ''}${it.cobranca === 'pontual' ? ' <span class="muted">(1×)</span>' : ''}</span><span class="v">${u == null ? 'a definir' : brl2(u * (num(v.qtd) || 1))}</span>`; });
+    s += `<span class="tot">Total/mês</span><span class="v tot">${brl2(mensalPessoa(p))}</span></div>`;
+    if ((p.zas || []).length > 1) s += `<div class="small muted" style="margin-top:6px">Dividido igual entre ${p.zas.length} ZAs.</div>`;
+    s += `<div style="margin-top:8px"><button class="primary" id="sideFicha">Abrir ficha</button></div>`;
+    $('sideSel').innerHTML = s; $('sideSel').className = '';
+    $('sideFicha').onclick = () => abrirFicha(p.id);
+  } else if (sp.length > 1) {
+    const t = sp.reduce((s, p) => s + mensalPessoa(p), 0);
+    $('sideSel').innerHTML = `<div class="kv"><span>${sp.length} pessoas</span><span class="v">${brl2(t)}/mês</span></div><div style="margin-top:8px"><button class="primary" id="sideTeam">Criar equipe com elas</button></div>`;
+    $('sideSel').className = ''; $('sideTeam').onclick = () => abrirEquipe(null);
+  } else { $('sideSel').innerHTML = 'Clique numa caixa para ver o custo da pessoa.'; $('sideSel').className = 'small muted'; }
+  // equipes
+  $('sideEq').innerHTML = EQ.length ? EQ.map(e => {
+    const vs = VIN.filter(v => v.equipe_id === e.id), t = vs.reduce((s, v) => s + (ITEM[v.item_id] && ITEM[v.item_id].cobranca !== 'pontual' ? (unitVinc(v) || 0) * (num(v.qtd) || 1) : 0), 0);
+    return `<div class="eq" data-eq="${e.id}" style="--t:${esc(e.cor || '#7a4fa0')}"><b>${esc(e.nome)}</b><span class="small muted">${(e.membros || []).length} pessoa(s) · ${vs.length} item(ns) · ${esc(zasRot(zasEquipe(e)))}</span><span class="small mono">${brl(t)}/mês em itens</span></div>`;
+  }).join('') : '<span class="small muted">Selecione várias caixas e clique em “+ Equipe” para dar ferramentas e equipamentos a um grupo.</span>';
+  $('sideEq').querySelectorAll('[data-eq]').forEach(el => el.onclick = () => abrirEquipe(el.dataset.eq));
+}
+
+/* ================= gravação ================= */
+let posTimer = null, posIds = new Set(), desTimer = null;
+function savePos(ids){ ids.forEach(id => posIds.add(id)); clearTimeout(posTimer); posTimer = setTimeout(flushPos, 350); }
+function flushPos(){
+  const list = [...posIds].map(id => byId(PES, id)).filter(Boolean).map(n => ({id:n.id, x:n.x, y:n.y, parent_id:n.parent_id || ''}));
+  posIds.clear(); if (list.length) rpc('app_orc_pessoas_pos', {p:list}).catch(() => {});
+}
+function saveDesenho(){ clearTimeout(desTimer); desTimer = setTimeout(() => { if (Q) rpc('app_orc_quadro_salvar', {p:{id:Q.id, desenho:{notes:NOTES, strokes:STROKES}}}).catch(() => {}); }, 600); }
+async function savePessoa(id, patch){ const r = await rpc('app_orc_pessoa_salvar', {p:Object.assign({id}, patch)}); const i = PES.findIndex(x => x.id === id); if (i >= 0) PES[i] = r; else PES.push(r); return r; }
+
+/* ================= barra ================= */
+COLORS.forEach(c => {
+  const b = document.createElement('button'); b.className = 'sw'; b.style.setProperty('--c', c); b.dataset.color = c; b.setAttribute('aria-label', 'Cor ' + c);
+  b.onclick = () => {
+    color = c; paintBar();
+    const list = selItems(); if (!list.length) return;
+    list.forEach(it => { const o = getObj(it); if (!o) return; if (it.kind === 'node') { o.cor = c; savePessoa(o.id, {cor:c}).catch(() => {}); } else o.color = c; });
+    if (list.some(it => it.kind !== 'node')) saveDesenho(); render();
+  };
+  $('swatches').appendChild(b);
+});
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+function setTool(t){ finishEdit(); tool = t; linkFrom = null; board.className = 't-' + t; render(); if (t === 'link') toast('Clique no subordinado e depois no superior'); }
+document.querySelectorAll('.al').forEach(b => b.onclick = () => { finishEdit(); alignSel(b.dataset.align); });
+$('snap').onclick = () => { snapOn = !snapOn; paintBar(); try { localStorage.setItem('orc-grade', snapOn ? '1' : '0'); } catch (e) {} toast(snapOn ? 'Grade magnética ligada' : 'Grade magnética desligada'); };
+$('addBox').onclick = () => { const c = centerWorld(); novaPessoa({x:Math.round(c.x - CARD_W / 2), y:Math.round(c.y - 50), parent_id:null}); };
+$('addSub').onclick = addSub;
+$('ficha').onclick = () => { if (sel && sel.kind === 'node') abrirFicha(sel.id); };
+$('mkTeam').onclick = $('mkTeam2').onclick = () => abrirEquipe(null);
+$('unlink').onclick = () => { if (!(sel && sel.kind === 'node')) return; const n = byId(PES, sel.id); n.parent_id = null; render(); savePessoa(n.id, {parent_id:''}).catch(() => {}); };
+$('tidy').onclick = () => { tidy(); render(); savePos(PES.map(n => n.id)); toast('Caixas reorganizadas'); };
+$('del').onclick = delSel;
+$('zin').onclick = () => { const r = board.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); };
+$('zout').onclick = () => { const r = board.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); };
+$('fit').onclick = fit;
+$('png').onclick = exportPng;
+$('xlsx').onclick = exportXlsx;
+$('resumo').onclick = () => abrirResumo('za');
+$('docTitle').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+$('docTitle').addEventListener('blur', async e => {
+  if (!Q) return; const t = e.target.textContent.trim() || 'Organograma'; e.target.textContent = t;
+  if (t === Q.titulo) return; Q.titulo = t; const b = byId(QUADROS, Q.id); if (b) b.titulo = t; fillBoardSel();
+  rpc('app_orc_quadro_salvar', {p:{id:Q.id, titulo:t}}).catch(() => {});
+});
+
+function addSub(){
+  if (!(sel && sel.kind === 'node')) return;
+  const p = byId(PES, sel.id), kids = PES.filter(n => n.parent_id === p.id);
+  const x = kids.length ? Math.max(...kids.map(k => k.x)) + CARD_W + 40 : p.x, y = kids.length ? kids[0].y : p.y + nodeH(p) + 90;
+  novaPessoa({x, y, parent_id:p.id, zas:(p.zas || []).slice(), aprop_cod:p.aprop_cod, mes_ini:p.mes_ini, mes_fim:p.mes_fim});
+}
+async function delSel(){
+  const list = selItems().slice(); if (!list.length) return;
+  const pes = list.filter(x => x.kind === 'node').map(x => byId(PES, x.id)).filter(Boolean);
+  if (pes.length && !confirm(pes.length === 1 ? `Excluir ${pes[0].nome} do orçamento? Os itens ligados a essa pessoa também saem.` : `Excluir ${pes.length} pessoas do orçamento? Os itens ligados a elas também saem.`)) return;
+  clearSel();
+  let des = false;
+  list.forEach(s => {
+    if (s.kind === 'note') { NOTES = NOTES.filter(x => x.id !== s.id); des = true; }
+    if (s.kind === 'stroke') { STROKES = STROKES.filter(x => x.id !== s.id); des = true; }
+  });
+  if (des) saveDesenho();
+  for (const n of pes) {
+    try {
+      await rpc('app_orc_pessoa_excluir', {p_id:n.id});
+      PES.forEach(c => { if (c.parent_id === n.id) c.parent_id = n.parent_id; });
+      PES = PES.filter(x => x.id !== n.id); VIN = VIN.filter(v => v.pessoa_id !== n.id);
+      EQ.forEach(e => { e.membros = (e.membros || []).filter(id => id !== n.id); });
+    } catch (e) {}
+  }
+  render();
+}
+function tidy(){
+  const GX = 40, LH = Math.max(110, ...PES.map(nodeH)) + 90, kids = {}, ids = {};
+  PES.forEach(n => ids[n.id] = 1);
+  PES.forEach(n => { const p = n.parent_id && ids[n.parent_id] ? n.parent_id : '_'; (kids[p] = kids[p] || []).push(n); });
+  Object.keys(kids).forEach(k => kids[k].sort((a, b) => a.x - b.x));
+  const w = {};
+  const width = (n, seen = {}) => { if (seen[n.id]) return CARD_W; seen[n.id] = 1; const k = kids[n.id] || []; if (!k.length) return w[n.id] = CARD_W; let t = 0; k.forEach((c, i) => t += width(c, seen) + (i ? GX : 0)); return w[n.id] = Math.max(CARD_W, t); };
+  const place = (n, left, y) => { const ww = w[n.id]; n.x = Math.round(left + ww / 2 - CARD_W / 2); n.y = y; const k = kids[n.id] || []; let tot = 0; k.forEach((c, i) => tot += w[c.id] + (i ? GX : 0)); let cl = left + (ww - tot) / 2; k.forEach(c => { place(c, cl, y + LH); cl += w[c.id] + GX; }); };
+  const roots = kids._ || []; if (!roots.length) return;
+  const ax = roots[0].x + CARD_W / 2, ay = roots[0].y; let left = 0;
+  roots.forEach(r => width(r)); roots.forEach(r => { place(r, left, 0); left += w[r.id] + GX * 2; });
+  const dx = ax - (roots[0].x + CARD_W / 2); PES.forEach(n => { n.x = Math.round(n.x + dx); n.y = Math.round(n.y + ay); });
+}
+function isAncestor(a, b){ const seen = {}; let cur = byId(PES, b); while (cur && cur.parent_id && !seen[cur.id]) { seen[cur.id] = 1; if (cur.parent_id === a) return true; cur = byId(PES, cur.parent_id); } return false; }
+function subtree(id){ const out = [id]; for (let i = 0; i < out.length; i++) PES.forEach(n => { if (n.parent_id === out[i] && !out.includes(n.id)) out.push(n.id); }); return out; }
+function itemBox(it){
+  const o = getObj(it); if (!o) return null;
+  if (it.kind === 'stroke') return sBox(o);
+  if (it.kind === 'node') return {x1:o.x, y1:o.y, x2:o.x + CARD_W, y2:o.y + nodeH(o)};
+  const el = items.querySelector(`[data-note="${o.id}"]`); return {x1:o.x, y1:o.y, x2:o.x + (el ? el.offsetWidth : 60), y2:o.y + (el ? el.offsetHeight : 24)};
+}
+function shiftItem(it, dx, dy){ const o = getObj(it); if (!o || (!dx && !dy)) return; if (it.kind === 'stroke') o.points = o.points.map(q => [Math.round((q[0] + dx) * 10) / 10, Math.round((q[1] + dy) * 10) / 10]); else { o.x = Math.round(o.x + dx); o.y = Math.round(o.y + dy); } }
+function afterMove(list){ const ids = list.filter(x => x.kind === 'node').map(x => x.id); if (ids.length) savePos(ids); if (list.some(x => x.kind !== 'node')) saveDesenho(); }
+function alignSel(mode){
+  const list = selItems().map(it => ({it, b:itemBox(it)})).filter(x => x.b); if (list.length < 2) return;
+  const u = {x1:Infinity, y1:Infinity, x2:-Infinity, y2:-Infinity};
+  list.forEach(x => { u.x1 = Math.min(u.x1, x.b.x1); u.y1 = Math.min(u.y1, x.b.y1); u.x2 = Math.max(u.x2, x.b.x2); u.y2 = Math.max(u.y2, x.b.y2); });
+  if (mode === 'left') list.forEach(x => shiftItem(x.it, u.x1 - x.b.x1, 0));
+  if (mode === 'hcenter') { const cx = (u.x1 + u.x2) / 2; list.forEach(x => shiftItem(x.it, cx - (x.b.x1 + x.b.x2) / 2, 0)); }
+  if (mode === 'top') list.forEach(x => shiftItem(x.it, 0, u.y1 - x.b.y1));
+  if (mode === 'disth' || mode === 'distv') {
+    const h = mode === 'disth', a = h ? 'x1' : 'y1', z = h ? 'x2' : 'y2';
+    list.sort((p, q) => (p.b[a] + p.b[z]) - (q.b[a] + q.b[z]));
+    const sizes = list.reduce((s, x) => s + x.b[z] - x.b[a], 0), gap = (list[list.length - 1].b[z] - list[0].b[a] - sizes) / (list.length - 1); let pos = list[0].b[a];
+    list.forEach(x => { const d = pos - x.b[a]; shiftItem(x.it, h ? d : 0, h ? 0 : d); pos += x.b[z] - x.b[a] + gap; });
+  }
+  render(); afterMove(list.map(x => x.it));
+}
+function moveList(list, orig, dx, dy){
+  let inkc = false, nodes = false;
+  list.forEach(it => {
+    const o = getObj(it), og = orig[it.kind + ':' + it.id]; if (!o || !og) return;
+    if (it.kind === 'stroke') { o.points = og.map(q => [Math.round((q[0] + dx) * 10) / 10, Math.round((q[1] + dy) * 10) / 10]); inkc = true; }
+    else { o.x = Math.round(og.x + dx); o.y = Math.round(og.y + dy); const el = items.querySelector(`[data-${it.kind}="${it.id}"]`); if (el) { el.style.left = o.x + 'px'; el.style.top = o.y + 'px'; } if (it.kind === 'node') nodes = true; }
+  });
+  if (nodes) drawLinks(); if (inkc || selItems().some(x => x.kind === 'stroke')) drawInk();
+}
+function inRect(a, b){
+  const x1 = Math.min(a.x, b.x), y1 = Math.min(a.y, b.y), x2 = Math.max(a.x, b.x), y2 = Math.max(a.y, b.y), out = [];
+  const hit = (bx1, by1, bx2, by2) => bx1 < x2 && bx2 > x1 && by1 < y2 && by2 > y1;
+  PES.forEach(n => { if (hit(n.x, n.y, n.x + CARD_W, n.y + nodeH(n))) out.push({kind:'node', id:n.id}); });
+  NOTES.forEach(n => { const el = items.querySelector(`[data-note="${n.id}"]`); if (hit(n.x, n.y, n.x + (el ? el.offsetWidth : 60), n.y + (el ? el.offsetHeight : 24))) out.push({kind:'note', id:n.id}); });
+  STROKES.forEach(s => { const bb = sBox(s); if (hit(bb.x1, bb.y1, bb.x2, bb.y2)) out.push({kind:'stroke', id:s.id}); });
+  return out;
+}
+
+/* ================= texto livre ================= */
+function startNoteEdit(id){
+  finishEdit(); editing = id; render();
+  const el = items.querySelector(`[data-note="${id}"]`);
+  if (el) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+}
+function finishEdit(){
+  if (!editing) return; const id = editing; editing = null;
+  const el = items.querySelector(`[data-note="${id}"]`);
+  if (el) { const t = el.innerText.replace(/\n+$/, ''); if (t.trim()) byId(NOTES, id).text = t; else NOTES = NOTES.filter(x => x.id !== id); saveDesenho(); }
+  render();
+}
+items.addEventListener('keydown', e => { if (editing && e.key === 'Escape') { e.preventDefault(); finishEdit(); } });
+items.addEventListener('focusout', () => { if (editing) setTimeout(() => { if (editing && !(document.activeElement && document.activeElement.closest && document.activeElement.closest(`[data-note="${editing}"]`))) finishEdit(); }, 0); });
+
+/* ================= ponteiro ================= */
+function segDist(p, a, b){ const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy, t = l ? Math.max(0, Math.min(1, ((p.x - a[0]) * dx + (p.y - a[1]) * dy) / l)) : 0; const x = a[0] + t * dx - p.x, y = a[1] + t * dy - p.y; return Math.sqrt(x * x + y * y); }
+function hitStroke(p, r){ for (let i = STROKES.length - 1; i >= 0; i--) { const s = STROKES[i], rr = r + s.width / 2; for (let j = 0; j < s.points.length; j++) { const a = s.points[j], b = s.points[j + 1] || a; if (segDist(p, a, b) < rr) return s; } } return null; }
+function eraseAt(p){
+  const h = hitStroke(p, 8 / view.s); if (h) { STROKES = STROKES.filter(s => s !== h); drawInk(); drag.changed = true; }
+  NOTES.forEach(n => { const el = items.querySelector(`[data-note="${n.id}"]`); if (el && p.x >= n.x && p.x <= n.x + el.offsetWidth && p.y >= n.y && p.y <= n.y + el.offsetHeight) { NOTES = NOTES.filter(x => x !== n); drag.changed = true; render(); } });
+}
+function connect(child, parent){
+  linkFrom = null;
+  if (child === parent) { render(); return; }
+  if (isAncestor(child, parent)) { toast('Essa ligação faria um círculo: o superior escolhido já está abaixo dessa pessoa'); render(); return; }
+  const n = byId(PES, child); n.parent_id = parent; render(); savePessoa(child, {parent_id:parent}).catch(() => {}); toast('Ligado');
+}
+board.addEventListener('pointerdown', e => {
+  if (!Q || e.target.closest('.overlay')) return;
+  if (editing && e.target.closest('[contenteditable="true"]')) return;
+  const p = toWorld(e), card = e.target.closest('.card'), note = e.target.closest('.note'), sg = e.target.closest('[data-stroke]');
+  if (editing) finishEdit();
+  if (e.button === 1 || e.button === 2 || spaceDown) { drag = {kind:'pan', sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty}; board.classList.add('panning'); touched = true; }
+  else if (e.button !== 0) return;
+  else if (tool === 'select' && !card && !note && !sg) {
+    const add = e.ctrlKey || e.metaKey || e.shiftKey; if (!add) clearSel();
+    const br = board.getBoundingClientRect(); drag = {kind:'marquee', base:selItems().slice(), start:p, sx:e.clientX - br.left, sy:e.clientY - br.top}; render();
+  } else if (tool === 'pen') {
+    const s = {id:sid(), color, width:3, points:[[Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]]}; STROKES.push(s); drag = {kind:'pen', stroke:s}; drawInk();
+  } else if (tool === 'eraser') { drag = {kind:'erase'}; eraseAt(p); }
+  else if (tool === 'text') {
+    if (note) { startNoteEdit(note.dataset.note); return; }
+    const n = {id:sid(), x:Math.round(p.x), y:Math.round(p.y - 12), text:'Texto', color, size:18}; NOTES.push(n); startNoteEdit(n.id); e.preventDefault(); return;
+  } else if (tool === 'link') {
+    if (!card) { linkFrom = null; render(); return; }
+    const id = card.dataset.node; if (!linkFrom) { linkFrom = id; render(); drag = {kind:'linkline', from:id}; } else connect(linkFrom, id);
+  } else if (tool === 'select') {
+    const kind = card ? 'node' : note ? 'note' : 'stroke', id = card ? card.dataset.node : note ? note.dataset.note : sg.dataset.stroke, now = Date.now();
+    if (lastDown.id === id && now - lastDown.t < 380) { lastDown = {t:0, id:null}; clearSel(); sel = {kind, id}; if (kind === 'node') abrirFicha(id); else if (kind === 'note') startNoteEdit(id); e.preventDefault(); return; }
+    lastDown = {t:now, id};
+    if (e.ctrlKey || e.metaKey) { toggleSel(kind, id); render(); e.preventDefault(); return; }
+    if (!isSel(kind, id)) { clearSel(); sel = {kind, id}; }
+    const list = selItems().slice();
+    if (e.shiftKey) list.filter(it => it.kind === 'node').forEach(it => subtree(it.id).forEach(i => { if (!list.some(x => x.kind === 'node' && x.id === i)) list.push({kind:'node', id:i}); }));
+    const orig = {}; list.forEach(it => { const o = getObj(it); if (o) orig[it.kind + ':' + it.id] = it.kind === 'stroke' ? o.points.map(q => q.slice()) : {x:o.x, y:o.y}; });
+    drag = {kind:'move', list, orig, start:p, moved:false, anchor:kind + ':' + id}; render();
+  }
+  board.setPointerCapture(e.pointerId); e.preventDefault();
+});
+board.addEventListener('pointermove', e => {
+  if (!drag) return; const p = toWorld(e);
+  if (drag.kind === 'pan') { view.tx = drag.tx + e.clientX - drag.sx; view.ty = drag.ty + e.clientY - drag.sy; applyView(); }
+  else if (drag.kind === 'pen') { const pts = drag.stroke.points, l = pts[pts.length - 1]; if (Math.abs(p.x - l[0]) + Math.abs(p.y - l[1]) > 1.5 / view.s) { pts.push([Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]); drawInk(); } }
+  else if (drag.kind === 'erase') eraseAt(p);
+  else if (drag.kind === 'linkline') { const a = byId(PES, drag.from); if (a) drawLinks(`<path class="preview" d="M${a.x + CARD_W / 2} ${a.y + nodeH(a) / 2}L${p.x} ${p.y}"/>`); }
+  else if (drag.kind === 'move') {
+    let dx = p.x - drag.start.x, dy = p.y - drag.start.y; if (Math.abs(dx) + Math.abs(dy) > 2 / view.s) drag.moved = true;
+    const an = drag.orig[drag.anchor];
+    if (snapOn && !e.altKey && an && an.x !== undefined) { dx = Math.round((an.x + dx) / GRID) * GRID - an.x; dy = Math.round((an.y + dy) / GRID) * GRID - an.y; }
+    moveList(drag.list, drag.orig, dx, dy);
+  } else if (drag.kind === 'marquee') {
+    const br = board.getBoundingClientRect(), cx = e.clientX - br.left, cy = e.clientY - br.top, m = $('marquee'); m.hidden = false;
+    m.style.left = Math.min(cx, drag.sx) + 'px'; m.style.top = Math.min(cy, drag.sy) + 'px'; m.style.width = Math.abs(cx - drag.sx) + 'px'; m.style.height = Math.abs(cy - drag.sy) + 'px';
+    const list = drag.base.slice(); inRect(drag.start, p).forEach(f => { if (!list.some(x => x.kind === f.kind && x.id === f.id)) list.push(f); }); setSel(list); render();
+  }
+});
+function endDrag(e){
+  if (!drag) return; const d = drag; drag = null; board.classList.remove('panning');
+  if (d.kind === 'pen') saveDesenho();
+  if (d.kind === 'erase' && d.changed) saveDesenho();
+  if (d.kind === 'move' && d.moved) afterMove(d.list);
+  if (d.kind === 'marquee') { $('marquee').hidden = true; const n = selItems().length; if (n > 1) toast(n + ' itens selecionados · arraste qualquer um para mover todos'); }
+  if (d.kind === 'linkline') { const t = document.elementFromPoint(e.clientX, e.clientY), c = t && t.closest && t.closest('.card'); if (c && c.dataset.node !== d.from) connect(d.from, c.dataset.node); else drawLinks(); }
+}
+board.addEventListener('pointerup', endDrag);
+board.addEventListener('pointercancel', endDrag);
+board.addEventListener('contextmenu', e => e.preventDefault());
+board.addEventListener('wheel', e => {
+  e.preventDefault(); touched = true; const r = board.getBoundingClientRect();
+  if (e.ctrlKey || (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && !e.shiftKey)) zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
+  else { view.tx -= e.deltaX || e.deltaY; applyView(); }
+}, {passive:false});
+const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden;
+document.addEventListener('keydown', e => {
+  if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
+  if (e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (!Q) return;
+  if (e.key === ' ') { spaceDown = true; e.preventDefault(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSel(); return; }
+  if (e.key === 'Tab') { e.preventDefault(); addSub(); return; }
+  if (e.key === 'Enter' && sel) { e.preventDefault(); if (sel.kind === 'node') abrirFicha(sel.id); else if (sel.kind === 'note') startNoteEdit(sel.id); return; }
+  if (e.key === 'Escape') { clearSel(); linkFrom = null; render(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); if (tool !== 'select') setTool('select'); setSel(PES.map(n => ({kind:'node', id:n.id})).concat(NOTES.map(n => ({kind:'note', id:n.id})), STROKES.map(s => ({kind:'stroke', id:s.id})))); render(); return; }
+  const ar = {ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1]}[e.key];
+  if (ar && selItems().length) { e.preventDefault(); const st = e.shiftKey ? 50 : 10, list = selItems(), orig = {}; list.forEach(it => { const o = getObj(it); if (o) orig[it.kind + ':' + it.id] = it.kind === 'stroke' ? o.points.map(q => q.slice()) : {x:o.x, y:o.y}; }); moveList(list, orig, ar[0] * st, ar[1] * st); afterMove(list); return; }
+  const k = {v:'select', l:'link', t:'text', p:'pen', e:'eraser'}[e.key.toLowerCase()]; if (k && !e.ctrlKey && !e.metaKey && !e.altKey) setTool(k);
+});
+document.addEventListener('keyup', e => { if (e.key === ' ') spaceDown = false; });
+
+/* ================= ficha da pessoa (perguntas) ================= */
+const PASSOS = ['Quem é', 'Contratação', 'Onde trabalha', 'Período', 'Veículos e despesas'];
+let W = null;
+function novaPessoa(base){
+  const d = Object.assign({id:uid(), quadro_id:Q.id, nome:'', funcao:'', cargo_id:null, modalidade:'CLT', regime:'MENSALISTA', salario:null, adicional:'nenhum', adicional_valor:null, hora_extra:false, valor_pj:null, zas:[], setor:null, aprop_cod:null, mes_ini:null, mes_fim:null, cor:null}, base);
+  W = {novo:true, passo:0, d, itens:new Map(), usaVeic:null, salvarCargo:true, visto:new Set([0])};
+  renderFicha();
+}
+function abrirFicha(id){
+  const p = byId(PES, id); if (!p) return;
+  const itens = new Map(); VIN.filter(v => v.pessoa_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor)}));
+  W = {novo:false, passo:0, d:JSON.parse(JSON.stringify(p)), itens, usaVeic:[...itens.keys()].some(k => ITEM[k] && tipoItem(ITEM[k]) === 'Locação') ? true : null, salvarCargo:true, visto:new Set(PASSOS.map((_, i) => i))};
+  renderFicha();
+}
+function fecharDlgs(){ $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = true; W = null; E = null; render(); }
+$('pCancel').onclick = fecharDlgs;
+$('pBack').onclick = () => { if (W.passo > 0) { W.passo--; renderFicha(); } };
+$('pNext').onclick = () => { if (W.passo < PASSOS.length - 1) { W.passo++; W.visto.add(W.passo); renderFicha(); } };
+$('pSave').onclick = salvarFicha;
+const optMes = v => v ? v.slice(0, 7) : '';
+function cargoPorNome(f){ const u = String(f || '').trim().toUpperCase(); return CARGOS.find(c => c.funcao.toUpperCase() === u) || null; }
+function aplicarCargo(c){ const d = W.d; d.cargo_id = c.id; d.funcao = c.funcao; d.salario = num(c.salario); d.regime = c.regime; d.adicional = c.adicional; d.hora_extra = !!c.hora_extra; d.adicional_valor = null; if (c.setor_padrao) d.setor = c.setor_padrao; }
+function chipsZa(sel, onToggle){
+  return `<div class="chips" data-zas>${ZAS.map(z => `<button type="button" data-za="${esc(z.za)}" aria-pressed="${sel.includes(z.za)}" title="${esc(z.consorcio || 'consórcio a definir')}">${esc(z.rotulo || z.za)}</button>`).join('')}</div>`;
+}
+function bindZas(root, arr, cb){ root.querySelectorAll('[data-za]').forEach(b => b.onclick = () => { const z = b.dataset.za, i = arr.indexOf(z); if (i >= 0) arr.splice(i, 1); else arr.push(z); b.setAttribute('aria-pressed', arr.includes(z)); cb && cb(); }); }
+function selectAprop(val, cat){
+  const grupos = {}; APROP.filter(a => !cat || a.categoria === cat).forEach(a => (grupos[a.nivel1] = grupos[a.nivel1] || []).push(a));
+  return `<select data-aprop><option value="">(sem apropriação)</option>${Object.keys(grupos).map(g => `<optgroup label="${esc(g)}">${grupos[g].map(a => `<option value="${esc(a.cod)}"${a.cod === val ? ' selected' : ''}>${esc(a.cod)} · ${esc(String(a.nivel3 || '').replace(/^[\d.]+ - /, ''))} › ${esc(String(a.nivel4 || '').replace(/^[\d.]+ - /, ''))}</option>`).join('')}</optgroup>`).join('')}</select>`;
+}
+function listaItens(map, filtro){
+  const its = ITENS.filter(filtro);
+  if (!its.length) return '<div class="small muted">Nenhum item cadastrado.</div>';
+  return `<div class="items">${its.map(it => {
+    const on = map.has(it.id), v = map.get(it.id) || {};
+    const preco = num(it.valor) == null ? '<small>preço a definir — digite ao lado</small>' : `<small>${brl2(num(it.valor))}${it.cobranca === 'pontual' ? ' · 1× no mês de entrada' : '/mês'}</small>`;
+    return `<label class="it${on ? '' : ' off'}"><input type="checkbox" data-it="${it.id}"${on ? ' checked' : ''}><span class="d">${esc(it.descricao)}${preco}</span>` +
+      `<input type="number" min="1" step="1" data-qtd="${it.id}" value="${v.qtd || 1}" title="Quantidade" aria-label="Quantidade de ${esc(it.descricao)}">` +
+      `<input type="number" min="0" step="0.01" data-val="${it.id}" value="${v.valor ?? ''}" placeholder="${num(it.valor) == null ? 'preço' : 'outro preço'}" title="Preço unitário (deixe vazio para usar o do catálogo)" aria-label="Preço de ${esc(it.descricao)}"></label>`;
+  }).join('')}</div>`;
+}
+function bindItens(root, map, cb){
+  root.querySelectorAll('[data-it]').forEach(ch => ch.onchange = () => { const id = +ch.dataset.it; if (ch.checked) map.set(id, Object.assign({qtd:1, valor:null}, map.get(id) || {}, {on:true})); else map.delete(id); ch.closest('.it').classList.toggle('off', !ch.checked); cb && cb(); });
+  root.querySelectorAll('[data-qtd]').forEach(i => i.oninput = () => { const id = +i.dataset.qtd; if (!map.has(id)) { map.set(id, {qtd:1, valor:null}); root.querySelector(`[data-it="${id}"]`).checked = true; i.closest('.it').classList.remove('off'); } map.get(id).qtd = Math.max(1, num(i.value) || 1); cb && cb(); });
+  root.querySelectorAll('[data-val]').forEach(i => i.oninput = () => { const id = +i.dataset.val; if (!map.has(id)) { map.set(id, {qtd:1, valor:null}); root.querySelector(`[data-it="${id}"]`).checked = true; i.closest('.it').classList.remove('off'); } map.get(id).valor = num(i.value); cb && cb(); });
+}
+function previewFicha(){
+  const d = W.d, c = custoMO(d); let it = 0, pont = 0, sp = 0;
+  W.itens.forEach((v, id) => { const i = ITEM[id]; if (!i) return; const u = num(v.valor) != null ? num(v.valor) : num(i.valor); if (u == null) sp++; if (i.cobranca === 'pontual') pont += (u || 0) * v.qtd; else it += (u || 0) * v.qtd; });
+  $('pPrev').innerHTML = `Mão de obra <b class="mono">${brl2(c.total)}</b>/mês · itens <b class="mono">${brl2(it)}</b>/mês` + (pont ? ` · pontuais <b class="mono">${brl2(pont)}</b>` : '') + (sp ? ` · <span style="color:var(--warn)">${sp} sem preço</span>` : '') + ((d.zas || []).length > 1 ? ` · ÷${d.zas.length} ZAs` : '');
+}
+function renderFicha(){
+  const d = W.d, s = W.passo;
+  $('dlgPTit').textContent = W.novo ? 'Novo colaborador' : 'Ficha: ' + (d.nome || 'A definir');
+  $('pSteps').innerHTML = PASSOS.map((t, i) => `<button type="button" data-st="${i}" class="${i === s ? 'on' : ''}${W.visto.has(i) && i !== s ? ' ok' : ''}">${i + 1}. ${esc(t)}</button>`).join('');
+  $('pSteps').querySelectorAll('[data-st]').forEach(b => b.onclick = () => { W.passo = +b.dataset.st; W.visto.add(W.passo); renderFicha(); });
+  const B = $('pBody'); let h = '';
+  if (s === 0) {
+    h += `<div class="q"><label for="fNome">Nome do colaborador</label><input id="fNome" value="${esc(d.nome === 'A definir' ? '' : d.nome)}" placeholder="Deixe vazio se for vaga (fica “A definir”)"></div>`;
+    h += `<div class="q"><label for="fFunc">Cargo / função</label><input id="fFunc" list="dlCargos" value="${esc(d.funcao || '')}" placeholder="Comece a digitar: encanador, motorista, engenheiro…" autocomplete="off"><div id="fCargoInfo"></div></div>`;
+    B.innerHTML = h;
+    const info = () => {
+      const c2 = cargoPorNome($('fFunc').value), el = $('fCargoInfo');
+      if (!String($('fFunc').value).trim()) { el.innerHTML = '<div class="help">Escolha um cargo da base do orçamento ou digite um novo.</div>'; return; }
+      if (c2) el.innerHTML = `<div class="badge">Cargo da base · ${esc(c2.regime.toLowerCase())} · salário ${brl2(num(c2.salario))}${c2.hora_extra ? ' · faz hora extra' : ''}${c2.adicional !== 'nenhum' ? ' · ' + esc((ADICIONAIS.find(a => a[0] === c2.adicional) || [0, c2.adicional])[1].toLowerCase()) : ''}. Dá para ajustar no próximo passo.</div>`;
+      else el.innerHTML = `<div class="badge warn">Esse cargo não existe na base do orçamento: informe salário e regras no próximo passo.</div><label class="small" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="fSalvarCargo"${W.salvarCargo ? ' checked' : ''}> Guardar este cargo na base para os próximos lançamentos</label>`;
+      const sc = $('fSalvarCargo'); if (sc) sc.onchange = () => W.salvarCargo = sc.checked;
+    };
+    $('fNome').oninput = e => d.nome = e.target.value;
+    $('fFunc').oninput = e => { d.funcao = e.target.value; const c2 = cargoPorNome(d.funcao); if (c2) aplicarCargo(c2); else d.cargo_id = null; info(); previewFicha(); };
+    info(); setTimeout(() => $('fNome').focus(), 0);
+  } else if (s === 1) {
+    h += `<div class="q"><span class="lab">Modalidade de contratação</span><div class="chips" id="fMod">${MODS.map(m => `<button type="button" data-mod="${m[0]}" aria-pressed="${d.modalidade === m[0]}">${m[1]}</button>`).join('')}</div></div>`;
+    if (d.modalidade === 'PJ' || d.modalidade === 'ESTAGIO') {
+      h += `<div class="q"><label for="fPj">${d.modalidade === 'PJ' ? 'Valor mensal da nota fiscal (R$)' : 'Bolsa mensal (R$)'}</label><input id="fPj" type="number" min="0" step="0.01" value="${d.valor_pj ?? ''}"><div class="help">${d.modalidade === 'PJ' ? 'PJ entra só com o valor da NF: sem encargos nem benefícios.' : 'Estágio entra só com a bolsa.'}</div></div>`;
+    } else {
+      h += `<div class="row"><div class="q"><label for="fSal">Salário mensal (R$)</label><input id="fSal" type="number" min="0" step="0.01" value="${d.salario ?? ''}"></div>`;
+      h += `<div class="q"><label for="fReg">Regime</label><select id="fReg"><option value="MENSALISTA"${d.regime === 'MENSALISTA' ? ' selected' : ''}>Mensalista</option><option value="HORISTA"${d.regime === 'HORISTA' ? ' selected' : ''}>Horista</option></select></div></div>`;
+      h += `<div class="row"><div class="q"><label for="fAd">Adicional</label><select id="fAd">${ADICIONAIS.map(a => `<option value="${a[0]}"${d.adicional === a[0] ? ' selected' : ''}>${esc(a[1])}${a[2] && num(P[a[2]]) != null ? ' (' + Math.round(num(P[a[2]]) * 100) + '%' + (a[0] === 'periculosidade' ? ' do salário' : ' do salário mínimo') + ')' : ''}</option>`).join('')}</select></div>`;
+      h += `<div class="q"><label for="fAdV">Valor do adicional (opcional)</label><input id="fAdV" type="number" min="0" step="0.01" value="${d.adicional_valor ?? ''}" placeholder="pela fórmula"><div class="help">Preencha só para sobrepor a fórmula.</div></div></div>`;
+      h += `<label class="q" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="fHe"${d.hora_extra ? ' checked' : ''}> <span><b>Faz hora extra</b> <span class="help">(${num(P.he60_horas) ?? '?'}h a ${Math.round((num(P.he60_pct) || 0) * 100)}% + ${num(P.he100_horas) ?? '?'}h a ${Math.round((num(P.he100_pct) || 0) * 100)}% por mês)</span></span></label>`;
+    }
+    B.innerHTML = h;
+    B.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => { d.modalidade = b.dataset.mod; renderFicha(); });
+    const bind = (id, k, f) => { const el = $(id); if (el) el[el.type === 'checkbox' ? 'onchange' : 'oninput'] = () => { d[k] = f(el); previewFicha(); }; };
+    bind('fPj', 'valor_pj', el => num(el.value)); bind('fSal', 'salario', el => num(el.value)); bind('fReg', 'regime', el => el.value);
+    bind('fAd', 'adicional', el => el.value); bind('fAdV', 'adicional_valor', el => num(el.value)); bind('fHe', 'hora_extra', el => el.checked);
+  } else if (s === 2) {
+    h += `<div class="q"><span class="lab">A qual ZA pertence?</span>${chipsZa(d.zas || [])}<div class="help">Pode marcar mais de uma: o custo é dividido igual entre as ZAs marcadas.</div></div>`;
+    h += `<div class="q"><label for="fSet">Setor</label><select id="fSet">${SETORES.map(x => `<option value="${x}"${setorDe(d) === x ? ' selected' : ''}>${x.charAt(0) + x.slice(1).toLowerCase()}</option>`).join('')}</select><div class="help">Define o kit de uniforme/EPI (Obras = operacional; demais = administrativo).</div></div>`;
+    h += `<div class="q"><label>Apropriação de obra (aba Auxiliar)</label>${selectAprop(d.aprop_cod, 'Mão de Obra')}<div class="help">Mostra só as linhas de Mão de Obra do plano de contas.</div></div>`;
+    B.innerHTML = h;
+    d.zas = d.zas || []; bindZas(B, d.zas, previewFicha);
+    $('fSet').onchange = e => { d.setor = e.target.value; previewFicha(); };
+    B.querySelector('[data-aprop]').onchange = e => d.aprop_cod = e.target.value || null;
+  } else if (s === 3) {
+    h += `<div class="row"><div class="q"><label for="fIni">Mês de entrada</label><input id="fIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini) || isoMes(1)}"><div class="help">Contrato começa em ${rotMes(1)}.</div></div>`;
+    h += `<div class="q"><label for="fFim">Mês de saída</label><input id="fFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até o fim do contrato (${rotMes(NM())}).</div></div></div>`;
+    h += `<div class="help">Veículos e despesas ligados à pessoa seguem esse mesmo período.</div>`;
+    B.innerHTML = h;
+    if (!d.mes_ini) d.mes_ini = isoMes(1) + '-01';
+    $('fIni').onchange = e => d.mes_ini = e.target.value ? e.target.value + '-01' : null;
+    $('fFim').onchange = e => d.mes_fim = e.target.value ? e.target.value + '-01' : null;
+  } else if (s === 4) {
+    const usa = W.usaVeic;
+    h += `<div class="q"><span class="lab">Vai usar veículo ou equipamento?</span><div class="chips"><button type="button" data-uv="1" aria-pressed="${usa === true}">Sim</button><button type="button" data-uv="0" aria-pressed="${usa === false}">Não</button></div></div>`;
+    if (usa) h += `<div class="q"><span class="lab">Veículos e equipamentos (aba Locação)</span>${listaItens(W.itens, it => tipoItem(it) === 'Locação')}<div class="help">Equipamento de uso coletivo? Dê para a equipe (selecione as caixas → “+ Equipe”).</div></div>`;
+    h += `<div class="q"><span class="lab">Despesas do colaborador</span>${listaItens(W.itens, it => tipoItem(it) === 'Despesas')}</div>`;
+    B.innerHTML = h;
+    B.querySelectorAll('[data-uv]').forEach(b => b.onclick = () => { W.usaVeic = b.dataset.uv === '1'; if (!W.usaVeic) [...W.itens.keys()].forEach(k => { if (ITEM[k] && tipoItem(ITEM[k]) === 'Locação') W.itens.delete(k); }); renderFicha(); });
+    bindItens(B, W.itens, previewFicha);
+  }
+  $('pBack').disabled = s === 0;
+  $('pNext').hidden = s === PASSOS.length - 1;
+  $('pSave').hidden = W.novo && s < PASSOS.length - 1;
+  $('pSave').textContent = W.novo ? 'Concluir' : 'Salvar';
+  $('pNext').className = W.novo ? 'primary' : '';
+  $('dlgP').hidden = false; previewFicha();
+}
+async function salvarFicha(){
+  const d = W.d, novo = W.novo;
+  $('pSave').disabled = true;
+  try {
+    if (!d.cargo_id && String(d.funcao || '').trim()) {
+      const c = cargoPorNome(d.funcao);
+      if (c) d.cargo_id = c.id;
+      else if (W.salvarCargo) {
+        const nc = await rpc('app_orc_cargo_salvar', {p:{funcao:d.funcao, salario:d.salario ?? '', regime:d.regime, adicional:d.adicional, hora_extra:!!d.hora_extra, setor_padrao:d.setor || ''}});
+        CARGOS.push(nc); CARGO[nc.id] = nc; d.cargo_id = nc.id; d.funcao = nc.funcao; fillCargos();
+      }
+    }
+    const campos = ['quadro_id','parent_id','x','y','cor','nome','cargo_id','funcao','setor','modalidade','regime','salario','adicional','adicional_valor','hora_extra','valor_pj','zas','aprop_cod','mes_ini','mes_fim','obs'];
+    const p = {id:d.id}; campos.forEach(k => { if (k in d) p[k] = d[k] ?? ''; });
+    p.zas = d.zas || []; p.hora_extra = !!d.hora_extra; p.setor = d.setor || setorDe(d);
+    await savePessoa(d.id, p);
+    // itens ligados à pessoa
+    const atuais = VIN.filter(v => v.pessoa_id === d.id);
+    for (const v of atuais) if (!W.itens.has(v.item_id)) { await rpc('app_orc_vinculo_excluir', {p_id:v.id}); VIN = VIN.filter(x => x.id !== v.id); }
+    for (const [item_id, v] of W.itens) {
+      const ex = atuais.find(a => a.item_id === item_id);
+      if (ex && num(ex.qtd) === v.qtd && num(ex.valor) === num(v.valor)) continue;
+      const r = await rpc('app_orc_vinculo_salvar', {p:{id:ex ? ex.id : '', pessoa_id:d.id, item_id, qtd:v.qtd, valor:v.valor ?? ''}});
+      VIN = VIN.filter(x => x.id !== r.id); VIN.push(r);
+    }
+    $('dlgP').hidden = true; W = null;
+    clearSel(); sel = {kind:'node', id:d.id}; render();
+    if (novo) toast('Colaborador lançado'); else toast('Ficha salva');
+  } catch (e) {} finally { $('pSave').disabled = false; }
+}
+
+/* ================= equipes ================= */
+let E = null;
+function abrirEquipe(id){
+  if (!Q) return;
+  if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor)})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; }
+  else {
+    const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
+    E = {novo:true, d:{id:uid(), quadro_id:Q.id, nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:sp[0] ? sp[0].aprop_cod : null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+  }
+  renderEquipe();
+}
+function renderEquipe(){
+  const d = E.d, B = $('eBody');
+  $('dlgETit').textContent = E.novo ? 'Nova equipe' : 'Equipe: ' + d.nome;
+  let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
+  h += `<div class="q"><span class="lab">Quem faz parte</span><div class="chips" id="eMem">${PES.map(p => `<button type="button" data-mem="${p.id}" aria-pressed="${(d.membros || []).includes(p.id)}">${esc(p.nome)}${p.funcao ? ' · ' + esc(p.funcao.toLowerCase()) : ''}</button>`).join('') || '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}</div></div>`;
+  h += `<div class="q"><span class="lab">ZA da equipe</span>${chipsZa(d.zas || [])}<div class="help">Vazio = as ZAs das pessoas da equipe. Os itens da equipe são divididos igual entre as ZAs.</div></div>`;
+  h += `<div class="row"><div class="q"><label>Apropriação dos itens</label>${selectAprop(d.aprop_cod, null)}</div></div>`;
+  h += `<div class="row"><div class="q"><label for="eIni">Mês de início</label><input id="eIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini)}"><div class="help">Vazio = desde ${rotMes(1)}.</div></div><div class="q"><label for="eFim">Mês de fim</label><input id="eFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até ${rotMes(NM())}.</div></div></div>`;
+  h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${listaItens(E.itens, () => true)}</div>`;
+  B.innerHTML = h;
+  $('eNome').oninput = e => d.nome = e.target.value;
+  B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  B.querySelectorAll('[data-mem]').forEach(b => b.onclick = () => { const id = b.dataset.mem, m = d.membros = d.membros || [], i = m.indexOf(id); if (i >= 0) m.splice(i, 1); else m.push(id); b.setAttribute('aria-pressed', m.includes(id)); });
+  d.zas = d.zas || []; bindZas(B, d.zas, prevEquipe);
+  B.querySelector('[data-aprop]').onchange = e => d.aprop_cod = e.target.value || null;
+  $('eIni').onchange = e => d.mes_ini = e.target.value ? e.target.value + '-01' : null;
+  $('eFim').onchange = e => d.mes_fim = e.target.value ? e.target.value + '-01' : null;
+  bindItens(B, E.itens, prevEquipe);
+  $('eDel').hidden = E.novo; $('dlgE').hidden = false; prevEquipe();
+}
+function prevEquipe(){
+  let m = 0, pt = 0; E.itens.forEach((v, id) => { const i = ITEM[id]; if (!i) return; const u = num(v.valor) != null ? num(v.valor) : num(i.valor); if (i.cobranca === 'pontual') pt += (u || 0) * v.qtd; else m += (u || 0) * v.qtd; });
+  $('ePrev').innerHTML = `Itens <b class="mono">${brl2(m)}</b>/mês` + (pt ? ` · pontuais <b class="mono">${brl2(pt)}</b>` : '');
+}
+$('eCancel').onclick = fecharDlgs;
+$('eSave').onclick = async () => {
+  const d = E.d; $('eSave').disabled = true;
+  try {
+    await rpc('app_orc_equipe_salvar', {p:{id:d.id, quadro_id:Q.id, nome:d.nome, cor:d.cor, zas:d.zas || [], aprop_cod:d.aprop_cod || '', mes_ini:d.mes_ini || '', mes_fim:d.mes_fim || '', membros:d.membros || []}});
+    const row = Object.assign({}, d); EQ = EQ.filter(x => x.id !== d.id); EQ.push(row); EQ.sort((a, b) => a.nome.localeCompare(b.nome));
+    const atuais = VIN.filter(v => v.equipe_id === d.id);
+    for (const v of atuais) if (!E.itens.has(v.item_id)) { await rpc('app_orc_vinculo_excluir', {p_id:v.id}); VIN = VIN.filter(x => x.id !== v.id); }
+    for (const [item_id, v] of E.itens) {
+      const ex = atuais.find(a => a.item_id === item_id);
+      if (ex && num(ex.qtd) === v.qtd && num(ex.valor) === num(v.valor)) continue;
+      const r = await rpc('app_orc_vinculo_salvar', {p:{id:ex ? ex.id : '', equipe_id:d.id, item_id, qtd:v.qtd, valor:v.valor ?? ''}});
+      VIN = VIN.filter(x => x.id !== r.id); VIN.push(r);
+    }
+    $('dlgE').hidden = true; E = null; render(); toast('Equipe salva');
+  } catch (e) {} finally { $('eSave').disabled = false; }
+};
+$('eDel').onclick = async () => {
+  const d = E.d; if (!confirm(`Excluir a equipe ${d.nome}? As pessoas continuam; os itens da equipe saem do orçamento.`)) return;
+  try { await rpc('app_orc_equipe_excluir', {p_id:d.id}); EQ = EQ.filter(x => x.id !== d.id); VIN = VIN.filter(v => v.equipe_id !== d.id); $('dlgE').hidden = true; E = null; render(); toast('Equipe excluída'); } catch (e) {}
+};
+
+/* ================= resumo ================= */
+let rTab = 'za', rZa = '';
+function abrirResumo(t){ rTab = t || rTab; renderResumo(); $('dlgR').hidden = false; }
+$('rClose').onclick = fecharDlgs;
+$('rXlsx').onclick = exportXlsx;
+function renderResumo(){
+  const L = linhas(), N = NM(), tabs = [['za','Por ZA'],['pes','Por pessoa'],['itens','Itens'],['mes','Por mês']];
+  $('rTabs').innerHTML = tabs.map(t => `<button type="button" data-rt="${t[0]}" class="${rTab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('');
+  $('rTabs').querySelectorAll('[data-rt]').forEach(b => b.onclick = () => { rTab = b.dataset.rt; renderResumo(); });
+  const zas = [...new Set(L.map(l => l.za))].sort();
+  const filtro = `<div class="chips"><button type="button" data-rz="" aria-pressed="${!rZa}">Todas as ZAs</button>${zas.map(z => `<button type="button" data-rz="${esc(z)}" aria-pressed="${rZa === z}">${esc(z)}</button>`).join('')}</div>`;
+  const LL = rZa ? L.filter(l => l.za === rZa) : L;
+  let h = '';
+  if (rTab === 'za') {
+    const tipos = ['Mão de Obra','Locação','Despesas'], g = {};
+    L.forEach(l => { const r = g[l.za] = g[l.za] || {'Mão de Obra':0,'Locação':0,'Despesas':0}; r[l.tipo] += somaMeses(l.meses); });
+    const tot = {'Mão de Obra':0,'Locação':0,'Despesas':0};
+    h += `<div class="tbl-wrap"><table><thead><tr><th>ZA</th><th>Consórcio</th>${tipos.map(t => `<th class="n">${t}</th>`).join('')}<th class="n">Total (${N} meses)</th><th class="n">Média/mês</th></tr></thead><tbody>`;
+    Object.keys(g).sort().forEach(z => { const r = g[z], t = tipos.reduce((s, k) => s + r[k], 0); tipos.forEach(k => tot[k] += r[k]); const zz = ZAS.find(x => x.za === z); h += `<tr><td>${esc(z)}</td><td>${esc(zz && zz.consorcio || '—')}</td>${tipos.map(k => `<td class="n">${brl(r[k])}</td>`).join('')}<td class="n">${brl(t)}</td><td class="n">${brl(t / N)}</td></tr>`; });
+    const T = tipos.reduce((s, k) => s + tot[k], 0);
+    h += `<tr class="tot"><td colspan="2">Total</td>${tipos.map(k => `<td class="n">${brl(tot[k])}</td>`).join('')}<td class="n">${brl(T)}</td><td class="n">${brl(T / N)}</td></tr></tbody></table></div>`;
+    const sp = L.filter(l => l.semPreco).length;
+    if (sp) h += `<div class="badge warn">${sp} linha(s) com item sem preço (a definir) entram como zero. Preencha o preço na ficha ou na equipe.</div>`;
+  } else if (rTab === 'pes') {
+    h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Modalidade</th><th>ZA</th><th>Apropriação</th><th>Período</th><th class="n">MO/mês</th><th class="n">Itens/mês</th><th class="n">Total no período</th></tr></thead><tbody>`;
+    let T = 0;
+    LL.filter(l => l.tipo === 'Mão de Obra').forEach(l => {
+      const p = l.pessoa, its = LL.filter(x => x.donoTipo === 'pessoa' && x.dono === p && x.za === l.za);
+      const im = its.reduce((s, x) => s + (x.item.cobranca === 'pontual' ? 0 : (x.unit || 0) * x.qtd * x.rateio), 0);
+      const t = somaMeses(l.meses) + its.reduce((s, x) => s + somaMeses(x.meses), 0); T += t;
+      h += `<tr><td>${esc(p.nome)}</td><td>${esc(p.funcao || '—')}</td><td>${esc(modRot(p.modalidade))}</td><td>${esc(l.za)}${l.rateio < 1 ? ' <span class="muted">(' + Math.round(l.rateio * 100) + '%)</span>' : ''}</td><td>${esc(p.aprop_cod || '—')}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl2(l.custo.total * l.rateio)}</td><td class="n">${brl2(im)}</td><td class="n">${brl(t)}</td></tr>`;
+    });
+    h += `<tr class="tot"><td colspan="8">Total (sem itens das equipes)</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
+  } else if (rTab === 'itens') {
+    h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Aba</th><th>Ligado a</th><th>ZA</th><th class="n">Qtd</th><th class="n">Unitário</th><th>Cobrança</th><th>Período</th><th class="n">Total no período</th></tr></thead><tbody>`;
+    let T = 0;
+    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => { const t = somaMeses(l.meses); T += t; h += `<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td>${l.donoTipo === 'equipe' ? '👥 ' : ''}${esc(l.dono.nome)}</td><td>${esc(l.za)}${l.rateio < 1 ? ' <span class="muted">(' + Math.round(l.rateio * 100) + '%)</span>' : ''}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.item.cobranca === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`; });
+    h += `<tr class="tot"><td colspan="8">Total</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
+  } else {
+    h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Mês</th><th class="n">Mão de Obra</th><th class="n">Locação</th><th class="n">Despesas</th><th class="n">Total</th><th class="n">Pessoas</th></tr></thead><tbody>`;
+    for (let i = 1; i <= N; i++) {
+      const r = {'Mão de Obra':0,'Locação':0,'Despesas':0}; LL.forEach(l => r[l.tipo] += l.meses[i]);
+      const np = new Set(LL.filter(l => l.tipo === 'Mão de Obra' && l.meses[i] > 0).map(l => l.pessoa.id)).size, t = r['Mão de Obra'] + r['Locação'] + r['Despesas'];
+      h += `<tr><td>M${i} · ${rotMes(i)}</td><td class="n">${brl(r['Mão de Obra'])}</td><td class="n">${brl(r['Locação'])}</td><td class="n">${brl(r['Despesas'])}</td><td class="n">${brl(t)}</td><td class="n">${np}</td></tr>`;
+    }
+    h += '</tbody></table></div>';
+  }
+  $('rBody').innerHTML = h;
+  $('rBody').querySelectorAll('[data-rz]').forEach(b => b.onclick = () => { rZa = b.dataset.rz; renderResumo(); });
+  $('rPrev').textContent = `${PES.length} pessoa(s) · ${EQ.length} equipe(s) · ${rotMes(1)} a ${rotMes(N)}`;
+}
+
+/* ================= exportação ================= */
+const safeName = s => String(s || 'Organograma').replace(/[\\/:*?"<>|]/g, '-').trim() || 'Organograma';
+function exportXlsx(){
+  if (!window.XLSX) { toast('Biblioteca do Excel não carregou'); return; }
+  const L = linhas(), N = NM(), meses = Array.from({length:N}, (_, i) => 'M' + (i + 1) + ' ' + rotMes(i + 1));
+  const ap = c => c ? c + ' ' + String((APR[c] || {}).nivel4 || '') : '';
+  const mo = L.filter(l => l.tipo === 'Mão de Obra').map(l => {
+    const p = l.pessoa, c = l.custo, k = l.rateio;
+    const base = {'Nome':p.nome, 'Função':p.funcao || '', 'Modalidade':modRot(p.modalidade), 'Regime':p.regime, 'Setor':setorDe(p), 'ZA':l.za, 'Rateio':k, 'Apropriação':ap(p.aprop_cod), 'Mês entrada':rotMes(l.ini), 'Mês saída':rotMes(l.fim)};
+    if (['PJ','ESTAGIO'].includes(p.modalidade)) Object.assign(base, {'Valor NF/bolsa':(num(p.valor_pj) || 0) * k});
+    else Object.assign(base, {'Salário':c.sal * k, 'Adicional':c.adic * k, 'Hora extra':c.he * k, 'Encargos':c.enc * k, '13º':c.dec * k, 'Férias':c.fer * k, 'Benefícios + exames':c.ben * k, 'PLR':c.plr * k, 'Uniformes e EPI':c.epi * k});
+    base['Custo mensal'] = c.total * k; base['Total no período'] = somaMeses(l.meses);
+    meses.forEach((m, i) => base[m] = l.meses[i + 1]); return base;
+  });
+  const itens = tipo => L.filter(l => l.tipo === tipo).map(l => {
+    const r = {'Item':l.item.descricao, 'Categoria':l.item.categoria, 'Ligado a':(l.donoTipo === 'equipe' ? 'Equipe ' : '') + l.dono.nome, 'ZA':l.za, 'Rateio':l.rateio, 'Qtd':l.qtd, 'Unitário':l.unit == null ? 'a definir' : l.unit, 'Cobrança':l.item.cobranca, 'Apropriação contábil':l.item.aprop_contabil || '', 'Apropriação de obra':ap(l.aprop), 'Mês início':rotMes(l.ini), 'Mês fim':rotMes(l.fim)};
+    if (tipo === 'Locação') Object.entries(l.item.componentes || {}).forEach(([k, v]) => r['Comp. ' + k] = v);
+    r['Total no período'] = somaMeses(l.meses); meses.forEach((m, i) => r[m] = l.meses[i + 1]); return r;
+  });
+  const g = {}; L.forEach(l => { const r = g[l.za] = g[l.za] || {'ZA':l.za, 'Mão de Obra':0, 'Locação':0, 'Despesas':0}; r[l.tipo] += somaMeses(l.meses); });
+  const resumo = Object.values(g).map(r => Object.assign(r, {'Total':r['Mão de Obra'] + r['Locação'] + r['Despesas']}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo.length ? resumo : [{'ZA':'(vazio)'}]), 'Resumo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mo.length ? mo : [{'Nome':'(vazio)'}]), 'Mão de Obra');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itens('Locação').length ? itens('Locação') : [{'Item':'(vazio)'}]), 'Locação');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itens('Despesas').length ? itens('Despesas') : [{'Item':'(vazio)'}]), 'Despesas');
+  XLSX.writeFile(wb, 'Orçamento - ' + safeName(Q && Q.titulo) + '.xlsx');
+}
+function wrapTxt(ctx, text, maxW){ const words = String(text).split(/\s+/), lines = []; let cur = ''; words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }); if (cur) lines.push(cur); return lines.length ? lines : ['']; }
+function exportPng(){
+  finishEdit();
+  const b = bounds(), pad = 40, k = 2, Wd = Math.ceil(b.x2 - b.x1 + pad * 2), H = Math.ceil(b.y2 - b.y1 + pad * 2);
+  const cv = document.createElement('canvas'); cv.width = Wd * k; cv.height = H * k; const ctx = cv.getContext('2d');
+  ctx.scale(k, k); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, Wd, H); ctx.translate(pad - b.x1, pad - b.y1);
+  ctx.strokeStyle = '#8199a2'; ctx.lineWidth = 2;
+  PES.forEach(c => { if (!c.parent_id) return; const p = byId(PES, c.parent_id); if (p) ctx.stroke(new Path2D(linkPath(p, c))); });
+  PES.forEach(n => {
+    const h = nodeH(n); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#d6e3e7'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(n.x, n.y, CARD_W, h, 7) : ctx.rect(n.x, n.y, CARD_W, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = corDe(n); ctx.fillRect(n.x + 1, n.y, CARD_W - 2, 5);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#0f2129'; ctx.font = "600 14.5px 'IBM Plex Sans', sans-serif";
+    let y = n.y + 14; wrapTxt(ctx, n.nome || 'A definir', CARD_W - 22).forEach(l => { ctx.fillText(l, n.x + CARD_W / 2, y); y += 18; });
+    ctx.fillStyle = '#5c717b'; ctx.font = "11.5px 'IBM Plex Sans', sans-serif"; y += 2;
+    wrapTxt(ctx, String(n.funcao || 'Cargo a definir').toUpperCase(), CARD_W - 22).forEach(l => { ctx.fillText(l, n.x + CARD_W / 2, y); y += 15; });
+    ctx.fillStyle = '#2c414b'; y += 4; ctx.fillText(modRot(n.modalidade) + ' · ' + zasRot(n.zas), n.x + CARD_W / 2, y);
+  });
+  NOTES.forEach(n => { ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = n.color; ctx.font = '500 ' + n.size + "px 'IBM Plex Sans', sans-serif"; String(n.text).split('\n').forEach((l, i) => ctx.fillText(l, n.x + 4, n.y + 2 + i * n.size * 1.3)); });
+  STROKES.forEach(s => { ctx.save(); ctx.strokeStyle = s.color; ctx.lineWidth = s.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(new Path2D(strokeD(s.points))); ctx.restore(); });
+  cv.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = safeName(Q && Q.titulo) + '.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }, 'image/png');
+}
+
+/* ================= quadros ================= */
+function fillBoardSel(){ $('boardSel').innerHTML = QUADROS.map(q => { const atual = Q && q.id === Q.id; if (atual) q.pessoas = PES.length; return `<option value="${q.id}"${atual ? ' selected' : ''}>${esc(q.titulo)} (${q.pessoas || 0})</option>`; }).join(''); }
+function fillCargos(){ $('dlCargos').innerHTML = CARGOS.map(c => `<option value="${esc(c.funcao)}"></option>`).join(''); }
+$('boardSel').onchange = e => abrirQuadro(e.target.value);
+$('boardNew').onclick = $('emptyNew').onclick = async () => {
+  const t = prompt('Nome do organograma', 'Organograma ' + (QUADROS.length + 1)); if (t === null) return;
+  try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0}); await abrirQuadro(id); } catch (e) {}
+};
+$('boardDel').onclick = async () => {
+  if (!Q) return;
+  if (!confirm(`Excluir o organograma “${Q.titulo}” com todas as pessoas, equipes e itens? Não dá para desfazer.`)) return;
+  try { await rpc('app_orc_quadro_excluir', {p_id:Q.id}); QUADROS = QUADROS.filter(q => q.id !== Q.id); Q = null; if (QUADROS.length) await abrirQuadro(QUADROS[0].id); else mostrarVazio(); toast('Organograma excluído'); } catch (e) {}
+};
+function mostrarVazio(){ Q = null; PES = []; EQ = []; VIN = []; NOTES = []; STROKES = []; $('empty').hidden = false; fillBoardSel(); render(); }
+async function abrirQuadro(id){
+  const r = await rpc('app_orc_quadro', {p_id:id});
+  Q = r.quadro; PES = r.pessoas || []; EQ = r.equipes || []; VIN = r.vinculos || [];
+  const ds = Q.desenho || {}; NOTES = ds.notes || []; STROKES = ds.strokes || [];
+  clearSel(); $('empty').hidden = true; fillBoardSel(); render(); fit();
+  try { localStorage.setItem('orc-quadro', id); } catch (e) {}
+}
+
+/* ================= início ================= */
+async function iniciar(){
+  const c = await rpc('app_orc_catalogos');
+  PREM = c.premissas || []; P = {}; PREM.forEach(p => P[p.chave] = p.valor);
+  ZAS = c.zas || []; CARGOS = c.cargos || []; CARGO = {}; CARGOS.forEach(x => CARGO[x.id] = x);
+  ITENS = c.itens || []; ITEM = {}; ITENS.forEach(x => ITEM[x.id] = x);
+  APROP = c.aprop || []; APR = {}; APROP.forEach(a => APR[a.cod] = a); IS_ADMIN = !!c.admin;
+  fillCargos();
+  QUADROS = await rpc('app_orc_quadros') || [];
+  setStatus();
+  let ult = null; try { ult = localStorage.getItem('orc-quadro'); } catch (e) {}
+  if (QUADROS.length) await abrirQuadro(byId(QUADROS, ult) ? ult : QUADROS[QUADROS.length - 1].id);
+  else mostrarVazio();
+  setTool('select');
+}
+window.addEventListener('resize', () => { if (!touched && Q) fit(); });
+try {
+  const { data } = await sb.auth.getSession();
+  if (!(data.session && data.session.user)) $('gm').textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.';
+  else {
+    const { data: me } = await sb.rpc('app_me');
+    if (me && (me.dev_acesso || me.is_admin)) { $('gate').remove(); await iniciar(); }
+    else $('gm').textContent = 'Acesso restrito — ' + (data.session.user.email || '') + ' não tem acesso ao Orçamento (módulo em desenvolvimento).';
+  }
+} catch (e) { const g = $('gm'); if (g) g.textContent = 'Não foi possível abrir o Orçamento: ' + ((e && e.message) || e); }
+</script>
+</body>
+</html>

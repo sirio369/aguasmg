@@ -1,5 +1,5 @@
-const CACHE = 'coleta-v441';
-const ASSETS = ['./', './index.html', './perdas.html', './manifest.webmanifest', './icon.png', './logo.png', './logo-aguas-integradas.png', './logo-eficiencia-hidrica.png'];
+const CACHE = 'coleta-v442';
+const ASSETS = ['./', './index.html', './perdas.html', './orcamento.html', './manifest.webmanifest', './icon.png', './logo.png', './logo-aguas-integradas.png', './logo-eficiencia-hidrica.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -15,10 +15,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;              // Supabase / CDN vão direto à rede
-  const isHtml = e.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/perdas.html');
+  const isHtml = e.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/perdas.html') || url.pathname.endsWith('/orcamento.html');
   if (isHtml) {
     // network-first: online sempre pega a versão nova; offline usa o cache (por página)
-    const key = url.pathname.endsWith('perdas.html') ? './perdas.html' : './index.html';
+    const key = url.pathname.endsWith('perdas.html') ? './perdas.html' : url.pathname.endsWith('orcamento.html') ? './orcamento.html' : './index.html';
     e.respondWith(
       fetch(e.request).then(r => {
         const clone = r.clone();

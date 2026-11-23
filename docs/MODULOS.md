@@ -4935,12 +4935,12 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **SQL aplicado em produção em 19/11/2026** (migrações `sup_bi`, `sup_bi_acesso`, `sup_estoque`, `frota_bi`, `pessoas_bi`). Ordem: `migracao_sup_bi.sql` → `migracao_sup_bi_acesso.sql` → `migracao_sup_estoque.sql` → `migracao_frota_bi.sql` → `migracao_pessoas_bi.sql`.
 - **Carga separada (2026-11-19, sw v439):** botões "Cargas do SIENGE"/"Carregar arquivos" saíram das telas de BI; as cargas ficam em Auxiliar › Planejamento › **📥 Carga dos BIs** (`bi_carga`), visível só com `*_carga_acesso`.
 
-## 24. Orçamento por organograma ("fazedor de orçamento") — schema `"19 - orcamento"` · `docs/migracao_orcamento.sql` (2026-11-23, **PR-A: só banco**)
+## 24. Orçamento por organograma ("fazedor de orçamento") — schema `"19 - orcamento"` · `docs/migracao_orcamento.sql` (2026-11-23; PR-A banco #418, PR-B tela `public/orcamento.html`, sw v442)
 
 Base parcial do **Orçamento Budget.xlsx** (abas Mão de Obra, Locação e parte de Despesas) montada a partir de um
 organograma em quadro livre (formato do kit de organograma: caixas, ligações, organizar/alinhar). Cada caixa é uma
 pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular etc. se ligam à pessoa ou a uma **equipe**
-(grupo de pessoas). A tela (`orcamento.html`, card no bloco 🚧 Em desenvolvimento) vem no PR seguinte.
+(grupo de pessoas). Tela `public/orcamento.html`, card `#cardOrcamento` no bloco 🚧 Em desenvolvimento (§24.1).
 
 - **⚠️ Confidencial:** salários, encargos, benefícios e preços **não ficam no repositório** (público). A carga inicial
   saiu da planilha e foi aplicada direto no banco; o script fica fora do repo. Não citar valores neste documento.
@@ -4965,3 +4965,31 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
 - **O cálculo do custo fica no front** (PR da tela), com as fórmulas da aba Mão de Obra; o banco só guarda as escolhas.
 - **SQL aplicado em produção em 23/11/2026** (migrações `orc_19_schema_orcamento` + `orc_19_seed`); teste E2E com
   rollback ok (gate nega usuário sem `dev_acesso`; contagens dos catálogos batem com a planilha; exclusão em cascata).
+
+### 24.1 Tela `public/orcamento.html` (PR-B, sw v442)
+
+- **Página separada** (como `perdas.html`): login pela sessão do AcquaHub (`sb.auth.getSession` + `app_me`), entra quem tem
+  `dev_acesso` ou é admin. Card `#cardOrcamento` no bloco 🚧 Em desenvolvimento, ligado em `homeGate()` como o Perdas.
+- **Quadro** portado do kit de organograma: selecionar (laço, Ctrl+clique, Shift leva subordinados, setas), ligar
+  (subordinado → superior, sem círculo), texto livre, caneta/borracha, cores, organizar em árvore, alinhar/distribuir, grade
+  magnética, zoom/pan, PNG. **Sem desfazer** (cada ação grava na hora). Vários organogramas (`orc_quadro`); textos e riscos
+  ficam em `orc_quadro.desenho`; posição/ligação em lote por `app_orc_pessoas_pos`.
+- **Ficha da pessoa** (abre ao criar, no duplo clique ou Enter), 5 passos: 1) nome + cargo (datalist da base; cargo novo →
+  aviso + "guardar na base", `app_orc_cargo_salvar`); 2) modalidade CLT/PJ/Estágio/Aprendiz/Temporário — PJ = valor da NF,
+  Estágio = bolsa (sem encargos/benefícios); demais: salário, regime, adicional (fórmula ou valor que sobrepõe), hora extra;
+  3) ZAs (várias → divide igual), setor (define o EPI), apropriação (só linhas "Mão de Obra" da aba Auxiliar); 4) mês de
+  entrada/saída (vazio = contrato todo); 5) "vai usar veículo/equipamento?" → itens da Locação + despesas (celular, dados,
+  notebook, kits) com qtd e preço que sobrepõe o catálogo (item sem preço = "a definir", entra como zero com aviso).
+  Subordinado novo herda ZAs, apropriação e período do superior; o setor vem do cargo.
+- **Equipes**: selecione caixas → "+ Equipe" (nome, cor, membros, ZAs — vazio = as das pessoas —, apropriação, período e
+  itens). Chip da equipe aparece nas caixas; lista no painel lateral.
+- **Cálculo (no front, premissas do banco):** CLT/Aprendiz/Temporário = salário + adicional (insalubridade × salário mínimo,
+  periculosidade × salário) + HE (salário/220 × horas × (1+%)) → encargos (mensalista/horista) sobre esse total; 13º e férias
+  sobre o salário; benefícios fixos + exames; PLR; EPI por setor — confere com a coluna **Custo Mensal TOTAL** da aba Mão de
+  Obra (testado em 23/11 com 2 linhas da planilha). Itens mensais × qtd no período; pontuais 1× no mês de início. Tudo
+  dividido igual entre as ZAs.
+- **Resumo** (por ZA, por pessoa, itens, por mês) e **Excel** (abas Resumo, Mão de Obra, Locação, Despesas; colunas mês a mês
+  M1…M60 a partir de `mes_inicio`).
+- QA (23/11/2026): fluxo completo testado com banco simulado (premissas fictícias) — criar organograma, pessoa da base,
+  subordinado PJ com cargo novo, equipe com item, resumo, Excel, excluir (subordinado sobe), recarregar. Falta QA logado
+  em produção.
