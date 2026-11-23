@@ -130,6 +130,8 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .dlg{position:fixed;inset:0;z-index:20;background:rgba(10,20,25,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .dlg-card{background:var(--surface);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);width:min(720px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 .dlg-card.wide{width:min(1180px,100%)}
+#dlgP .dlg-card,#dlgE .dlg-card{width:min(1080px,100%)}
+#dlgP td:first-child,#dlgE td:first-child{white-space:normal;min-width:240px}
 .dlg-head{padding:14px 18px 8px;border-bottom:1px solid var(--line)}
 .dlg-head h2{margin:0;font-family:var(--display);font-size:20px}
 .steps{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
@@ -151,7 +153,12 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .badge{font-size:12px;border-radius:6px;padding:5px 9px;background:var(--surface-2);border:1px solid var(--line);line-height:1.4}
 .badge.warn{background:var(--warn-bg);border-color:transparent}
 .items{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.it{display:grid;grid-template-columns:22px 1fr 70px 110px;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);font-size:13px}
+.it{display:grid;grid-template-columns:22px minmax(0,1fr) 150px 64px 104px;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);font-size:13px}
+.items.sub .it{grid-template-columns:22px minmax(0,1fr) 150px 170px 64px 104px}
+.it.hd{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;background:var(--surface-2)}
+.it select{padding:4px 6px;width:100%;font-size:12.5px}
+.it.off select{opacity:.4}
+.it .d small.per{color:var(--ink-2)}
 .it:first-child{border-top:0}
 .it .d small{display:block;color:var(--muted);font-size:11.5px}
 .it input[type=number]{padding:4px 6px;width:100%}
@@ -159,6 +166,18 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .it.bloq{background:var(--surface-2)}
 .it.bloq .d{color:var(--muted)}
 .it .d small.dup{color:var(--crit);font-weight:600}
+.gtbl input,.gtbl select{padding:4px 6px;font-size:12.5px;width:100%}
+.gtbl td{vertical-align:middle}
+.gtbl tr.dirty td{background:var(--warn-bg)}
+.gitem{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.gitem.dirty{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}
+.gitem .g{display:grid;grid-template-columns:minmax(0,2.4fr) 1fr 1fr 1fr auto;gap:8px;align-items:end}
+.gitem .g label{font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.gitem .comp{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.gitem .comp label{font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.gitem .kit{display:grid;grid-template-columns:minmax(0,1fr) 70px 110px 100px 28px;gap:6px;align-items:center;font-size:12.5px}
+.gitem input,.gitem select{padding:4px 6px;font-size:12.5px;width:100%}
+@media (max-width:900px){.gitem .g{grid-template-columns:1fr 1fr}}
 .tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:55vh}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
 th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
@@ -171,7 +190,10 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
   .main{flex-direction:column}
   #side{width:auto;max-height:38vh;border-left:0;border-top:1px solid var(--line)}
   .hint{display:none}.k{display:none}
-  .it{grid-template-columns:22px 1fr 60px 90px}
+  .it,.items.sub .it{grid-template-columns:22px 1fr 1fr}
+  .it .d{grid-column:2/4}
+  .it > :nth-child(3){grid-column-start:2}
+  .it.hd{display:none}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
@@ -221,6 +243,7 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
       <button id="resumo" class="primary" title="Resumo do orçamento por ZA, pessoa e mês">Resumo</button>
       <button id="xlsx" title="Baixa o orçamento (.xlsx) nas abas Mão de Obra, Locação e Despesas">Excel</button>
       <button id="png" title="Baixa uma imagem do quadro">PNG</button>
+      <button id="cfg" title="Parâmetros de cálculo: premissas, contrato das ZAs, cargos e itens — valem para todos os lançamentos">⚙️ Parâmetros</button>
     </div>
     <span id="status" class="status" aria-live="polite"></span>
   </header>
@@ -267,6 +290,14 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
     <div class="dlg-head"><h2 id="dlgRTit">Resumo do orçamento</h2><div class="steps" id="rTabs"></div></div>
     <div class="dlg-body" id="rBody"></div>
     <div class="dlg-foot"><span class="prev" id="rPrev"></span><button id="rXlsx" type="button">Baixar Excel</button><button id="rClose" type="button" class="primary">Fechar</button></div>
+  </div>
+</div>
+<!-- parâmetros de cálculo -->
+<div id="dlgG" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgGTit">
+  <div class="dlg-card wide">
+    <div class="dlg-head"><h2 id="dlgGTit">⚙️ Parâmetros de cálculo</h2><div class="steps" id="gTabs"></div></div>
+    <div class="dlg-body" id="gBody"></div>
+    <div class="dlg-foot"><span class="prev" id="gPrev"></span><button id="gClose" type="button">Fechar</button><button id="gSave" type="button" class="primary">Salvar alterações</button></div>
   </div>
 </div>
 <datalist id="dlCargos"></datalist>
@@ -382,6 +413,23 @@ function custoMO(p){
   const partes = [['Salário', sal], ['Adicional', adic], ['Hora extra', he], ['Encargos', enc], ['13º', dec], ['Férias', fer], ['Benefícios', ben], ['Exames', exa], ['PLR', plr], ['Uniformes e EPI', epi]];
   return {total: partes.reduce((s, x) => s + x[1], 0), partes, sal, adic, he, enc, dec, fer, ben: ben + exa, plr, epi};
 }
+/* cobrança: o vínculo pode trocar mensal/pontual; vazio = a do catálogo */
+const cobCat = it => it && it.cobranca === 'pontual' ? 'pontual' : 'mensal';
+const cobV = v => v && v.cobranca ? v.cobranca : cobCat(ITEM[v.item_id]);
+const cobM = (v, it) => v && v.cob ? v.cob : cobCat(it);
+/* centro de custo da equipe: 1º nível = nivel3 da aba Auxiliar (VCA, HDD…); sub-CC = nivel4 (Equipamentos, Material…) */
+const semCod = t => String(t || '').replace(/^[\d.]+ - /, '');
+function gruposCC(){ const m = new Map(); APROP.forEach(a => { if (/^(EQUIPAMENTOS|MATERIAL)$/.test(semCod(a.nivel4)) && !m.has(a.nivel3)) m.set(a.nivel3, a.nivel1); }); return m; }
+const subsDe = g => APROP.filter(a => a.nivel3 === g);
+function subPadrao(it, g){
+  const ss = subsDe(g), alvo = it && (tipoItem(it) === 'Locação' || it.categoria === 'equipamento') ? 'EQUIPAMENTOS' : 'MATERIAL';
+  const a = ss.find(x => semCod(x.nivel4) === alvo) || ss[0]; return a ? a.cod : null;
+}
+function selectGrupo(val){
+  const g = {}; gruposCC().forEach((n1, n3) => (g[n1] = g[n1] || []).push(n3));
+  return `<select data-grupo><option value="">(escolha o centro de custo)</option>${Object.keys(g).map(n1 => `<optgroup label="${esc(n1)}">${g[n1].map(n3 => `<option value="${esc(n3)}"${n3 === val ? ' selected' : ''}>${esc(semCod(n3))}</option>`).join('')}</optgroup>`).join('')}</select>`;
+}
+const grupoDe = d => d.aprop_grupo || (d.aprop_cod && APR[d.aprop_cod] ? APR[d.aprop_cod].nivel3 : null);
 function unitVinc(v){ if (num(v.valor) != null) return num(v.valor); const it = ITEM[v.item_id]; return it && num(it.valor) != null ? num(it.valor) : null; }
 function tipoItem(it){ return it && (it.origem === 'Locação' || (it.origem === 'manual' && (it.categoria === 'veiculo' || it.categoria === 'equipamento'))) ? 'Locação' : 'Despesas'; }
 function zasEquipe(e){ if (e.zas && e.zas.length) return e.zas; const s = new Set(); (e.membros || []).forEach(id => { const p = byId(PES, id); (p && p.zas || []).forEach(z => s.add(z)); }); return [...s]; }
@@ -412,9 +460,10 @@ function linhas(){
     const it = ITEM[v.item_id]; if (!it) return;
     const u = unitVinc(v), qtd = num(v.qtd) || 1;
     let dono, zas, aprop;
-    if (v.pessoa_id) { dono = byId(PES, v.pessoa_id); if (!dono) return; zas = dono.zas; aprop = dono.aprop_cod; }
-    else { dono = byId(EQ, v.equipe_id); if (!dono) return; zas = zasEquipe(dono); aprop = dono.aprop_cod; }
-    nova({tipo:tipoItem(it), item:it, vinc:v, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, semPreco: u == null}, pesos(janelasZA(dono, zas, v)), (u || 0) * qtd, it.cobranca === 'pontual');
+    if (v.pessoa_id) { dono = byId(PES, v.pessoa_id); if (!dono) return; zas = dono.zas; aprop = v.aprop_cod || dono.aprop_cod; }
+    else { dono = byId(EQ, v.equipe_id); if (!dono) return; zas = zasEquipe(dono); aprop = v.aprop_cod || dono.aprop_cod; }
+    const cob = cobV(v);
+    nova({tipo:tipoItem(it), item:it, vinc:v, cob, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, semPreco: u == null}, pesos(janelasZA(dono, zas, v)), (u || 0) * qtd, cob === 'pontual');
   });
   return out;
 }
@@ -423,7 +472,7 @@ const zaMeses = z => { const j = zaJan(z); return Math.max(1, j.b - j.a + 1); };
 const somaMeses = m => { let s = 0; for (let i = 1; i < m.length; i++) s += m[i]; return s; };
 function mensalPessoa(p){
   let t = custoMO(p).total;
-  VIN.forEach(v => { if (v.pessoa_id === p.id && ITEM[v.item_id] && ITEM[v.item_id].cobranca !== 'pontual') t += (unitVinc(v) || 0) * (num(v.qtd) || 1); });
+  VIN.forEach(v => { if (v.pessoa_id === p.id && ITEM[v.item_id] && cobV(v) !== 'pontual') t += (unitVinc(v) || 0) * (num(v.qtd) || 1); });
   return t;
 }
 
@@ -549,7 +598,7 @@ function renderSide(){
     s += `<div class="small muted" style="margin:2px 0 8px">${esc(perTxt(p, p.zas))}${p.aprop_cod ? ' · ' + esc(p.aprop_cod) : ''}</div><div class="kv">`;
     c.partes.forEach(([k, v]) => { if (v) s += `<span>${esc(k)}</span><span class="v">${brl2(v)}</span>`; });
     s += `<span class="tot">Mão de obra/mês</span><span class="v tot">${brl2(c.total)}</span>`;
-    vs.forEach(v => { const it = ITEM[v.item_id]; if (!it) return; const u = unitVinc(v); s += `<span>${esc(it.descricao)}${(num(v.qtd) || 1) > 1 ? ' ×' + num(v.qtd) : ''}${it.cobranca === 'pontual' ? ' <span class="muted">(1×)</span>' : ''}</span><span class="v">${u == null ? 'a definir' : brl2(u * (num(v.qtd) || 1))}</span>`; });
+    vs.forEach(v => { const it = ITEM[v.item_id]; if (!it) return; const u = unitVinc(v); s += `<span>${esc(it.descricao)}${(num(v.qtd) || 1) > 1 ? ' ×' + num(v.qtd) : ''}${cobV(v) === 'pontual' ? ' <span class="muted">(1×)</span>' : ''}</span><span class="v">${u == null ? 'a definir' : brl2(u * (num(v.qtd) || 1))}</span>`; });
     s += `<span class="tot">Total/mês</span><span class="v tot">${brl2(mensalPessoa(p))}</span></div>`;
     if ((p.zas || []).length > 1) s += `<div class="small muted" style="margin-top:6px">Dividido igual entre ${p.zas.length} ZAs.</div>`;
     s += `<div style="margin-top:8px;display:flex;gap:6px"><button class="primary" id="sideFicha">Abrir ficha</button><button id="sideDup" style="border:1px solid var(--line)">Duplicar…</button></div>`;
@@ -563,7 +612,7 @@ function renderSide(){
   } else { $('sideSel').innerHTML = 'Clique numa caixa para ver o custo da pessoa.'; $('sideSel').className = 'small muted'; }
   // equipes
   $('sideEq').innerHTML = EQ.length ? EQ.map(e => {
-    const vs = VIN.filter(v => v.equipe_id === e.id), t = vs.reduce((s, v) => s + (ITEM[v.item_id] && ITEM[v.item_id].cobranca !== 'pontual' ? (unitVinc(v) || 0) * (num(v.qtd) || 1) : 0), 0);
+    const vs = VIN.filter(v => v.equipe_id === e.id), t = vs.reduce((s, v) => s + (ITEM[v.item_id] && cobV(v) !== 'pontual' ? (unitVinc(v) || 0) * (num(v.qtd) || 1) : 0), 0);
     return `<div class="eq" data-eq="${e.id}" style="--t:${esc(e.cor || '#7a4fa0')}"><b>${esc(e.nome)}</b><span class="small muted">${(e.membros || []).length} pessoa(s) · ${vs.length} item(ns) · ${esc(zasRot(zasEquipe(e)))}</span><span class="small mono">${brl(t)}/mês em itens</span></div>`;
   }).join('') : '<span class="small muted">Selecione várias caixas e clique em “+ Equipe” para dar ferramentas e equipamentos a um grupo.</span>';
   $('sideEq').querySelectorAll('[data-eq]').forEach(el => el.onclick = () => abrirEquipe(el.dataset.eq));
@@ -614,6 +663,7 @@ $('fit').onclick = fit;
 $('png').onclick = exportPng;
 $('xlsx').onclick = exportXlsx;
 $('resumo').onclick = () => abrirResumo('za');
+$('cfg').onclick = () => abrirParam();
 $('docTitle').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
 $('docTitle').addEventListener('blur', async e => {
   if (!Q) return; const t = e.target.textContent.trim() || 'Organograma'; e.target.textContent = t;
@@ -655,7 +705,7 @@ async function duplicar(ids, vezes){
         campos.forEach(c => p[c] = o[c] ?? '');
         await savePessoa(id, p); novos.push(id);
         const vs = VIN.filter(v => v.pessoa_id === o.id);
-        const rs = await Promise.all(vs.map(v => { const a = {id:'', pessoa_id:id, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:v.valor ?? ''}; if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim; return rpc('app_orc_vinculo_salvar', {p:a}); }));
+        const rs = await Promise.all(vs.map(v => { const a = {id:'', pessoa_id:id, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:v.valor ?? '', cobranca:v.cobranca || ''}; if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim; return rpc('app_orc_vinculo_salvar', {p:a}); }));
         rs.forEach(r => VIN.push(r));
         for (const e of EQ.filter(e => (e.membros || []).includes(o.id))) { const membros = (e.membros || []).concat(id); await rpc('app_orc_equipe_salvar', {p:{id:e.id, membros}}); e.membros = membros; }
       }
@@ -847,7 +897,7 @@ board.addEventListener('wheel', e => {
   if (e.ctrlKey || (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && !e.shiftKey)) zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
   else { view.tx -= e.deltaX || e.deltaY; applyView(); }
 }, {passive:false});
-const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden;
+const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden;
 document.addEventListener('keydown', e => {
   if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
   if (e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -880,12 +930,12 @@ function novaPessoa(base){
 }
 function abrirFicha(id){
   const p = byId(PES, id); if (!p) return;
-  const itens = new Map(); VIN.filter(v => v.pessoa_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor)}));
+  const itens = new Map(); VIN.filter(v => v.pessoa_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null}));
   W = {novo:false, passo:0, d:JSON.parse(JSON.stringify(p)), itens, usaVeic:[...itens.keys()].some(k => ITEM[k] && tipoItem(ITEM[k]) === 'Locação') ? true : null, salvarCargo:true, visto:new Set(PASSOS.map((_, i) => i))};
   W.equipes = new Set(EQ.filter(e => (e.membros || []).includes(id)).map(e => e.id)); W.emEquipe = W.equipes.size ? true : null;
   renderFicha();
 }
-function fecharDlgs(){ $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = true; W = null; E = null; render(); }
+function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = true; W = null; E = null; render(); }
 $('pCancel').onclick = fecharDlgs;
 $('pBack').onclick = () => { if (W.passo > 0) { W.passo--; renderFicha(); } };
 $('pNext').onclick = () => { if (W.passo < PASSOS.length - 1) { W.passo++; W.visto.add(W.passo); renderFicha(); } };
@@ -905,27 +955,53 @@ function selectAprop(val, cat){
 function itensDasEquipes(ids){ const m = new Map(); ids.forEach(eid => { const e = byId(EQ, eid); if (!e) return; VIN.filter(v => v.equipe_id === eid).forEach(v => m.set(v.item_id, (m.get(v.item_id) || []).concat(e.nome))); }); return m; }
 /* duplicidades: item ligado à pessoa que também está numa equipe dela */
 function duplicidades(){ const out = []; PES.forEach(p => { const eqs = EQ.filter(e => (e.membros || []).includes(p.id)).map(e => e.id); if (!eqs.length) return; const m = itensDasEquipes(eqs); VIN.forEach(v => { if (v.pessoa_id === p.id && m.has(v.item_id) && ITEM[v.item_id]) out.push({p, it:ITEM[v.item_id], eqs:m.get(v.item_id)}); }); }); return out; }
-function listaItens(map, filtro, avisos){
-  const its = ITENS.filter(filtro); avisos = avisos || new Map();
+const mesesFicha = () => W ? ativos(pesos(janelasZA(W.d, W.d.zas || []))).length : 0;
+const mesesEquipe = () => E ? ativos(pesos(janelasZA(E.d, zasEquipe(E.d)))).length : 0;
+/* texto "R$ x/mês × n meses = total" de cada item marcado */
+function atualizaPer(root, map, n){
+  if (!root) return;
+  root.querySelectorAll('[data-per]').forEach(el => {
+    const id = +el.dataset.per, it = ITEM[id], v = map.get(id);
+    if (!it || !v) { el.textContent = ''; return; }
+    const u = num(v.valor) != null ? num(v.valor) : num(it.valor), val = (u || 0) * (v.qtd || 1);
+    el.textContent = cobM(v, it) === 'pontual' ? `pontual: ${brl2(val)} uma vez, no 1º mês do período` : `${brl2(val)}/mês × ${n} ${n === 1 ? 'mês' : 'meses'} do período = ${brl2(val * n)}`;
+  });
+}
+/* opt.grupo (equipe): mostra o sub-CC por item dentro do centro de custo da equipe */
+function listaItens(map, filtro, avisos, opt){
+  const its = ITENS.filter(filtro); avisos = avisos || new Map(); opt = opt || {};
   if (!its.length) return '<div class="small muted">Nenhum item cadastrado.</div>';
-  return `<div class="items">${its.map(it => {
+  const sub = 'grupo' in opt, ss = sub ? subsDe(opt.grupo) : [];
+  const hd = `<div class="it hd"><span></span><span>Item</span><span>Cobrança</span>${sub ? '<span>Sub-CC</span>' : ''}<span>Qtd</span><span>Preço unit.</span></div>`;
+  return `<div class="items${sub ? ' sub' : ''}">${hd}${its.map(it => {
     const on = map.has(it.id), v = map.get(it.id) || {}, av = avisos.get(it.id);
-    const preco = num(it.valor) == null ? '<small>preço a definir — digite ao lado</small>' : `<small>${brl2(num(it.valor))}${it.cobranca === 'pontual' ? ' · 1× no mês de entrada' : '/mês'}</small>`;
+    const preco = num(it.valor) == null ? '<small>preço a definir — digite ao lado</small>' : `<small>${brl2(num(it.valor))} · catálogo: ${cobCat(it) === 'pontual' ? 'pontual (1×)' : 'mensal'}</small>`;
+    const cob = cobM(v, it), sc = v.sub || subPadrao(it, opt.grupo);
     const bloq = av && av.bloqueia && !on;
     const nota = av ? `<small class="${on ? 'dup' : ''}">${on && av.bloqueia ? '⚠ duplicado: ' : ''}${esc(av.txt)}${on && av.bloqueia ? ' — desmarque aqui' : ''}</small>` : '';
-    return `<label class="it${on ? '' : ' off'}${bloq ? ' bloq' : ''}"><input type="checkbox" data-it="${it.id}"${on ? ' checked' : ''}${bloq ? ' disabled' : ''}><span class="d">${esc(it.descricao)}${preco}${nota}</span>` +
+    return `<label class="it${on ? '' : ' off'}${bloq ? ' bloq' : ''}"><input type="checkbox" data-it="${it.id}"${on ? ' checked' : ''}${bloq ? ' disabled' : ''}><span class="d">${esc(it.descricao)}${preco}<small class="per" data-per="${it.id}"></small>${nota}</span>` +
+      `<select data-cob="${it.id}"${bloq ? ' disabled' : ''} aria-label="Cobrança de ${esc(it.descricao)}"><option value="mensal"${cob === 'mensal' ? ' selected' : ''}>Mensal recorrente</option><option value="pontual"${cob === 'pontual' ? ' selected' : ''}>Pontual (1×)</option></select>` +
+      (sub ? (ss.length ? `<select data-sub="${it.id}"${bloq ? ' disabled' : ''} aria-label="Sub-CC de ${esc(it.descricao)}">${ss.map(a => `<option value="${esc(a.cod)}"${a.cod === sc ? ' selected' : ''}>${esc(semCod(a.nivel4))}</option>`).join('')}</select>` : '<small class="muted">escolha o CC acima</small>') : '') +
       `<input type="number" min="1" step="1" data-qtd="${it.id}" value="${v.qtd || 1}" title="Quantidade" aria-label="Quantidade de ${esc(it.descricao)}"${bloq ? ' disabled' : ''}>` +
       `<input type="number" min="0" step="0.01" data-val="${it.id}" value="${v.valor ?? ''}"${bloq ? ' disabled' : ''} placeholder="${num(it.valor) == null ? 'preço' : 'outro preço'}" title="Preço unitário (deixe vazio para usar o do catálogo)" aria-label="Preço de ${esc(it.descricao)}"></label>`;
   }).join('')}</div>`;
 }
 function bindItens(root, map, cb){
-  root.querySelectorAll('[data-it]').forEach(ch => ch.onchange = () => { const id = +ch.dataset.it; if (ch.checked) map.set(id, Object.assign({qtd:1, valor:null}, map.get(id) || {}, {on:true})); else map.delete(id); ch.closest('.it').classList.toggle('off', !ch.checked); cb && cb(); });
+  const liga = id => { if (!map.has(id)) { map.set(id, {qtd:1, valor:null}); const ch = root.querySelector(`[data-it="${id}"]`); ch.checked = true; ch.closest('.it').classList.remove('off'); } return map.get(id); };
+  root.querySelectorAll('[data-it]').forEach(ch => ch.onchange = () => {
+    const id = +ch.dataset.it, row = ch.closest('.it');
+    if (ch.checked) { const e = Object.assign({qtd:1, valor:null}, map.get(id) || {}, {on:true}); const c = row.querySelector('[data-cob]'), sb2 = row.querySelector('[data-sub]'); if (c && c.value !== cobCat(ITEM[id])) e.cob = c.value; if (sb2) e.sub = sb2.value; map.set(id, e); }
+    else map.delete(id);
+    row.classList.toggle('off', !ch.checked); cb && cb(); });
+  root.querySelectorAll('[data-cob]').forEach(sl => sl.onchange = () => { const id = +sl.dataset.cob, e = liga(id); e.cob = sl.value === cobCat(ITEM[id]) ? null : sl.value; cb && cb(); });
+  root.querySelectorAll('[data-sub]').forEach(sl => sl.onchange = () => { liga(+sl.dataset.sub).sub = sl.value; cb && cb(); });
   root.querySelectorAll('[data-qtd]').forEach(i => i.oninput = () => { const id = +i.dataset.qtd; if (!map.has(id)) { map.set(id, {qtd:1, valor:null}); root.querySelector(`[data-it="${id}"]`).checked = true; i.closest('.it').classList.remove('off'); } map.get(id).qtd = Math.max(1, num(i.value) || 1); cb && cb(); });
   root.querySelectorAll('[data-val]').forEach(i => i.oninput = () => { const id = +i.dataset.val; if (!map.has(id)) { map.set(id, {qtd:1, valor:null}); root.querySelector(`[data-it="${id}"]`).checked = true; i.closest('.it').classList.remove('off'); } map.get(id).valor = num(i.value); cb && cb(); });
 }
 function previewFicha(){
   const d = W.d, c = custoMO(d); let it = 0, pont = 0, sp = 0;
-  W.itens.forEach((v, id) => { const i = ITEM[id]; if (!i) return; const u = num(v.valor) != null ? num(v.valor) : num(i.valor); if (u == null) sp++; if (i.cobranca === 'pontual') pont += (u || 0) * v.qtd; else it += (u || 0) * v.qtd; });
+  W.itens.forEach((v, id) => { const i = ITEM[id]; if (!i) return; const u = num(v.valor) != null ? num(v.valor) : num(i.valor); if (u == null) sp++; if (cobM(v, i) === 'pontual') pont += (u || 0) * v.qtd; else it += (u || 0) * v.qtd; });
+  if (W.passo === 5) atualizaPer($('pBody'), W.itens, mesesFicha());
   const fc = $('fComp'); if (fc) fc.innerHTML = compHtml(d);
   $('pPrev').innerHTML = `Mão de obra <b class="mono">${brl2(c.total)}</b>/mês · itens <b class="mono">${brl2(it)}</b>/mês` + (pont ? ` · pontuais <b class="mono">${brl2(pont)}</b>` : '') + (sp ? ` · <span style="color:var(--warn)">${sp} sem preço</span>` : '') + ((d.zas || []).length > 1 ? ` · ÷${d.zas.length} ZAs` : '');
 }
@@ -950,7 +1026,7 @@ function resumoFichaHtml(d){
   h += `<tr class="tot"><td>Mão de obra</td><td class="n">${brl2(c.total)}</td><td class="n">${n}</td><td class="n">${brl2(c.total * n)}</td></tr>`;
   const its = [...W.itens.entries()].map(([id, v]) => ({it:ITEM[id], v})).filter(x => x.it);
   its.forEach(({it, v}) => {
-    const u = num(v.valor) != null ? num(v.valor) : num(it.valor), q = num(v.qtd) || 1, val = (u || 0) * q, pt = it.cobranca === 'pontual';
+    const u = num(v.valor) != null ? num(v.valor) : num(it.valor), q = num(v.qtd) || 1, val = (u || 0) * q, pt = cobM(v, it) === 'pontual';
     if (u == null) sp++;
     if (pt) { pont += val; tot += n ? val : 0; } else { men += val; tot += val * n; }
     h += `<tr><td>${esc(it.descricao)}${q > 1 ? ' ×' + q : ''} <span class="muted">${pt ? '(1× na entrada)' : ''}${u == null ? ' · sem preço' : ''}</span></td><td class="n">${pt ? '—' : brl2(val)}</td><td class="n">${pt ? 1 : n}</td><td class="n">${brl2(pt ? (n ? val : 0) : val * n)}</td></tr>`;
@@ -1046,8 +1122,8 @@ function renderFicha(){
     const usa = W.usaVeic;
     const av = new Map(); itensDasEquipes(W.equipes).forEach((nomes, id) => av.set(id, {txt:'já vem da equipe ' + nomes.join(', '), bloqueia:true}));
     h += `<div class="q"><span class="lab">Vai usar veículo ou equipamento?</span><div class="chips"><button type="button" data-uv="1" aria-pressed="${usa === true}">Sim</button><button type="button" data-uv="0" aria-pressed="${usa === false}">Não</button></div></div>`;
-    if (usa) h += `<div class="q"><span class="lab">Veículos e equipamentos (aba Locação)</span>${listaItens(W.itens, it => tipoItem(it) === 'Locação', av)}<div class="help">Equipamento de uso coletivo? Dê para a equipe (selecione as caixas → “+ Equipe”).</div></div>`;
-    h += `<div class="q"><span class="lab">Despesas do colaborador</span>${listaItens(W.itens, it => tipoItem(it) === 'Despesas', av)}</div>`;
+    if (usa) h += `<div class="q"><span class="lab">Veículos e equipamentos (aba Locação)</span>${listaItens(W.itens, it => tipoItem(it) === 'Locação' && (!it.so_equipe || W.itens.has(it.id)), av)}<div class="help">Equipamento de uso coletivo? Dê para a equipe (selecione as caixas → “+ Equipe”).</div></div>`;
+    h += `<div class="q"><span class="lab">Despesas do colaborador</span>${listaItens(W.itens, it => tipoItem(it) === 'Despesas' && (!it.so_equipe || W.itens.has(it.id)), av)}<div class="help">Mensal recorrente entra todo mês do período da pessoa; pontual entra uma vez, no 1º mês. Kits de ferramentas e de pesquisa só entram pela equipe.</div></div>`;
     B.innerHTML = h;
     B.querySelectorAll('[data-uv]').forEach(b => b.onclick = () => { W.usaVeic = b.dataset.uv === '1'; if (!W.usaVeic) [...W.itens.keys()].forEach(k => { if (ITEM[k] && tipoItem(ITEM[k]) === 'Locação') W.itens.delete(k); }); renderFicha(); });
     bindItens(B, W.itens, previewFicha);
@@ -1082,8 +1158,8 @@ async function salvarFicha(){
     for (const v of atuais) if (!W.itens.has(v.item_id)) { await rpc('app_orc_vinculo_excluir', {p_id:v.id}); VIN = VIN.filter(x => x.id !== v.id); }
     for (const [item_id, v] of W.itens) {
       const ex = atuais.find(a => a.item_id === item_id);
-      if (ex && num(ex.qtd) === v.qtd && num(ex.valor) === num(v.valor)) continue;
-      const r = await rpc('app_orc_vinculo_salvar', {p:{id:ex ? ex.id : '', pessoa_id:d.id, item_id, qtd:v.qtd, valor:v.valor ?? ''}});
+      if (ex && num(ex.qtd) === v.qtd && num(ex.valor) === num(v.valor) && (ex.cobranca || null) === (v.cob || null)) continue;
+      const r = await rpc('app_orc_vinculo_salvar', {p:{id:ex ? ex.id : '', pessoa_id:d.id, item_id, qtd:v.qtd, valor:v.valor ?? '', cobranca:v.cob || ''}});
       VIN = VIN.filter(x => x.id !== r.id); VIN.push(r);
     }
     // equipes de execução
@@ -1103,10 +1179,10 @@ async function salvarFicha(){
 let E = null;
 function abrirEquipe(id){
   if (!Q) return;
-  if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor)})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; }
+  if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; E.d.aprop_grupo = grupoDe(E.d); }
   else {
     const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
-    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:sp[0] ? sp[0].aprop_cod : null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:(sp[0] && sp[0].aprop_cod && APR[sp[0].aprop_cod]) ? APR[sp[0].aprop_cod].nivel3 : null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
   }
   renderEquipe();
 }
@@ -1116,39 +1192,47 @@ function renderEquipe(){
   let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
   h += `<div class="q"><span class="lab">Quem faz parte</span><div class="chips" id="eMem">${PES.map(p => `<button type="button" data-mem="${p.id}" aria-pressed="${(d.membros || []).includes(p.id)}">${esc(p.nome)}${p.funcao ? ' · ' + esc(p.funcao.toLowerCase()) : ''}</button>`).join('') || '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}</div></div>`;
   h += `<div class="q"><span class="lab">ZA da equipe</span>${chipsZa(d.zas || [])}<div class="help">Vazio = as ZAs das pessoas da equipe. Os itens da equipe são divididos igual entre as ZAs.</div></div>`;
-  h += `<div class="row"><div class="q"><label>Apropriação dos itens</label>${selectAprop(d.aprop_cod, null)}</div></div>`;
+  h += `<div class="q"><label>Centro de custo da equipe (1º nível)</label>${selectGrupo(d.aprop_grupo)}<div class="help">Ex.: VCA, HDD, Implantação de DMC. O sub-CC (Equipamentos, Material, Serviços terceiro…) é escolhido em cada item abaixo.</div></div>`;
   h += perguntaFase(d, 'Em qual fase a equipe atua?');
   h += `<div class="row"><div class="q"><label for="eIni">Começa depois do início da fase? (opcional)</label><input id="eIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini)}"><div class="help">Vazio = junto com a fase.</div></div><div class="q"><label for="eFim">Termina antes do fim da fase? (opcional)</label><input id="eFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até o fim da fase.</div></div></div>`;
-  h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${listaItens(E.itens, () => true, avisosEquipe(d))}</div>`;
+  h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}</div>`;
   B.innerHTML = h;
   $('eNome').oninput = e => d.nome = e.target.value;
   B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   B.querySelectorAll('[data-mem]').forEach(b => b.onclick = () => { const id = b.dataset.mem, m = d.membros = d.membros || [], i = m.indexOf(id); if (i >= 0) m.splice(i, 1); else m.push(id); renderEquipe(); });
   d.zas = d.zas || []; bindZas(B, d.zas, prevEquipe);
-  B.querySelector('[data-aprop]').onchange = e => d.aprop_cod = e.target.value || null;
+  B.querySelector('[data-grupo]').onchange = e => {
+    const ng = e.target.value || null;
+    // mantém o mesmo sub-CC (por nome) no centro de custo novo
+    E.itens.forEach((v, id) => { const old = v.sub && APR[v.sub] ? semCod(APR[v.sub].nivel4) : null, a = old && subsDe(ng).find(x => semCod(x.nivel4) === old); v.sub = a ? a.cod : null; });
+    d.aprop_grupo = ng; renderEquipe();
+  };
   bindFase(B, d, prevEquipe);
-  $('eIni').onchange = e => d.mes_ini = e.target.value ? e.target.value + '-01' : null;
-  $('eFim').onchange = e => d.mes_fim = e.target.value ? e.target.value + '-01' : null;
+  $('eIni').onchange = e => { d.mes_ini = e.target.value ? e.target.value + '-01' : null; prevEquipe(); };
+  $('eFim').onchange = e => { d.mes_fim = e.target.value ? e.target.value + '-01' : null; prevEquipe(); };
   bindItens(B, E.itens, prevEquipe);
   $('eDel').hidden = E.novo; $('dlgE').hidden = false; prevEquipe();
 }
 function avisosEquipe(d){ const av = new Map(); VIN.forEach(v => { if (!v.pessoa_id || !(d.membros || []).includes(v.pessoa_id) || !ITEM[v.item_id]) return; const p = byId(PES, v.pessoa_id), a = av.get(v.item_id) || {txt:'', nomes:[]}; a.nomes.push(p ? p.nome : '?'); a.txt = '⚠ já lançado individual para ' + a.nomes.join(', ') + ' — tire da pessoa ou não marque aqui'; av.set(v.item_id, a); }); return av; }
 function prevEquipe(){
-  let m = 0, pt = 0; E.itens.forEach((v, id) => { const i = ITEM[id]; if (!i) return; const u = num(v.valor) != null ? num(v.valor) : num(i.valor); if (i.cobranca === 'pontual') pt += (u || 0) * v.qtd; else m += (u || 0) * v.qtd; });
+  let m = 0, pt = 0; E.itens.forEach((v, id) => { const i = ITEM[id]; if (!i) return; const u = num(v.valor) != null ? num(v.valor) : num(i.valor); if (cobM(v, i) === 'pontual') pt += (u || 0) * v.qtd; else m += (u || 0) * v.qtd; });
+  atualizaPer($('eBody'), E.itens, mesesEquipe());
   $('ePrev').innerHTML = `Itens <b class="mono">${brl2(m)}</b>/mês` + (pt ? ` · pontuais <b class="mono">${brl2(pt)}</b>` : '');
 }
 $('eCancel').onclick = fecharDlgs;
 $('eSave').onclick = async () => {
   const d = E.d; $('eSave').disabled = true;
   try {
-    await rpc('app_orc_equipe_salvar', {p:{id:d.id, quadro_id:Q.id, nome:d.nome, cor:d.cor, zas:d.zas || [], aprop_cod:d.aprop_cod || '', fase:d.fase || 'todo', mes_ini:d.mes_ini || '', mes_fim:d.mes_fim || '', membros:d.membros || []}});
+    const g = d.aprop_grupo || ''; d.aprop_cod = g ? (subPadrao({categoria:'equipamento'}, g) || '') : (d.aprop_cod || '');
+    await rpc('app_orc_equipe_salvar', {p:{id:d.id, quadro_id:Q.id, nome:d.nome, cor:d.cor, zas:d.zas || [], aprop_grupo:g, aprop_cod:d.aprop_cod, fase:d.fase || 'todo', mes_ini:d.mes_ini || '', mes_fim:d.mes_fim || '', membros:d.membros || []}});
     const row = Object.assign({}, d); EQ = EQ.filter(x => x.id !== d.id); EQ.push(row); EQ.sort((a, b) => a.nome.localeCompare(b.nome));
     const atuais = VIN.filter(v => v.equipe_id === d.id);
     for (const v of atuais) if (!E.itens.has(v.item_id)) { await rpc('app_orc_vinculo_excluir', {p_id:v.id}); VIN = VIN.filter(x => x.id !== v.id); }
     for (const [item_id, v] of E.itens) {
       const ex = atuais.find(a => a.item_id === item_id);
-      if (ex && num(ex.qtd) === v.qtd && num(ex.valor) === num(v.valor)) continue;
-      const r = await rpc('app_orc_vinculo_salvar', {p:{id:ex ? ex.id : '', equipe_id:d.id, item_id, qtd:v.qtd, valor:v.valor ?? ''}});
+      const sc = g ? (v.sub || subPadrao(ITEM[item_id], g)) : null;
+      if (ex && num(ex.qtd) === v.qtd && num(ex.valor) === num(v.valor) && (ex.cobranca || null) === (v.cob || null) && (ex.aprop_cod || null) === (sc || null)) continue;
+      const r = await rpc('app_orc_vinculo_salvar', {p:{id:ex ? ex.id : '', equipe_id:d.id, item_id, qtd:v.qtd, valor:v.valor ?? '', cobranca:v.cob || '', aprop_cod:sc || ''}});
       VIN = VIN.filter(x => x.id !== r.id); VIN.push(r);
     }
     $('dlgE').hidden = true; E = null; render(); toast('Equipe salva');
@@ -1158,6 +1242,143 @@ $('eDel').onclick = async () => {
   const d = E.d; if (!confirm(`Excluir a equipe ${d.nome}? As pessoas continuam; os itens da equipe saem do orçamento.`)) return;
   try { await rpc('app_orc_equipe_excluir', {p_id:d.id}); EQ = EQ.filter(x => x.id !== d.id); VIN = VIN.filter(v => v.equipe_id !== d.id); $('dlgE').hidden = true; E = null; render(); toast('Equipe excluída'); } catch (e) {}
 };
+
+/* ================= ⚙️ parâmetros de cálculo =================
+   Premissas e contrato das ZAs: só admin (RPC confere). Cargos: a mudança vai para todas as pessoas ligadas ao
+   cargo que ainda usam o valor da base (app_orc_cargo_aplicar). Itens: preço/cobrança do catálogo valem para todo
+   vínculo sem preço próprio. Valor de item com componentes ou composição (kit) = soma. */
+const PCT = new Set(['enc_horista','enc_mensalista','enc_aprendiz','insal_1','insal_2','insal_3','periculosidade','ferias','decimo','he60_pct','he100_pct','plr_fator']);
+const HRS = new Set(['he60_horas','he100_horas']);
+const PREM_OCULTA = new Set(['mes_inicio','meses_contrato']);   // substituídas pelo contrato de cada ZA
+const COMP_ROT = {locacao:'Locação', motorista:'Motorista', plotagem:'Plotagem', lavagem:'Lavagem', rastreador:'Rastreador', manutencao:'Manutenção', combustivel:'Combustível', avarias:'Avarias'};
+const CATS = [['veiculo','Veículo'],['equipamento','Equipamento'],['ferramenta','Ferramenta / kit'],['ti','TI'],['outro','Outro']];
+let G = null;
+const gSujo = () => G ? Object.keys(G.prem).length + Object.keys(G.za).length + Object.keys(G.cargo).length + Object.keys(G.item).length : 0;
+function abrirParam(){ G = {tab:G ? G.tab : 'prem', prem:{}, za:{}, cargo:{}, item:{}, busca:'', novos:0}; renderParam(); $('dlgG').hidden = false; }
+function fecharParam(){ if (gSujo() && !confirm('Há alterações não salvas nos parâmetros. Descartar?')) return; $('dlgG').hidden = true; G = null; }
+$('gClose').onclick = fecharParam;
+$('gSave').onclick = salvarParam;
+const somaComp = c => Object.values(c || {}).reduce((s, v) => s + (num(v) || 0), 0);
+const somaKit = k => (k || []).reduce((s, x) => s + (num(x.qtd) || 0) * (num(x.valor) || 0), 0);
+function itemG(id){ return G.item[id] || ITEM[id]; }
+function sujaItem(id){ if (!G.item[id]) G.item[id] = JSON.parse(JSON.stringify(ITEM[id])); return G.item[id]; }
+function renderParam(){
+  const tabs = [['prem','Premissas de mão de obra'],['za','Contrato das ZAs'],['cargo','Cargos e salários'],['item','Itens, veículos e kits']];
+  $('gTabs').innerHTML = tabs.map(t => `<button type="button" data-gt="${t[0]}" class="${G.tab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('');
+  $('gTabs').querySelectorAll('[data-gt]').forEach(b => b.onclick = () => { G.tab = b.dataset.gt; renderParam(); });
+  const B = $('gBody'); let h = '';
+  const soAdm = IS_ADMIN ? '' : '<div class="badge warn">Só o administrador altera esta parte. Você pode consultar.</div>';
+  if (G.tab === 'prem') {
+    h += soAdm + `<div class="help">Valem para todas as pessoas lançadas, em todos os organogramas: o custo é recalculado na hora.</div>`;
+    const grupos = {}; PREM.filter(p => !PREM_OCULTA.has(p.chave)).forEach(p => (grupos[p.grupo || 'Outros'] = grupos[p.grupo || 'Outros'] || []).push(p));
+    Object.keys(grupos).forEach(g => {
+      h += `<div class="q"><span class="lab">${esc(g)}</span><div class="tbl-wrap" style="max-height:none"><table class="gtbl"><tbody>`;
+      grupos[g].forEach(p => {
+        const v = p.chave in G.prem ? G.prem[p.chave] : num(p.valor), pct = PCT.has(p.chave), un = pct ? '%' : HRS.has(p.chave) ? 'h/mês' : 'R$/mês';
+        const mostra = v == null ? '' : pct ? +(v * 100).toFixed(4) : v;
+        h += `<tr class="${p.chave in G.prem ? 'dirty' : ''}"><td>${esc(p.rotulo)}</td><td style="width:160px"><input type="number" step="any" data-pr="${esc(p.chave)}" value="${mostra}"${IS_ADMIN ? '' : ' disabled'}></td><td style="width:70px" class="muted">${un}</td></tr>`;
+      });
+      h += `</tbody></table></div></div>`;
+    });
+    B.innerHTML = h;
+    B.querySelectorAll('[data-pr]').forEach(i => i.oninput = () => { const k = i.dataset.pr, x = num(i.value); G.prem[k] = x == null ? null : PCT.has(k) ? x / 100 : x; i.closest('tr').classList.add('dirty'); prevParam(); });
+  } else if (G.tab === 'za') {
+    h += soAdm + `<div class="help">Início e duração do contrato de cada ZA. Execução = primeiros meses; Manutenção = o restante. Pessoas e equipes por fase seguem estas datas.</div>`;
+    h += `<div class="tbl-wrap" style="max-height:none"><table class="gtbl"><thead><tr><th>ZA</th><th>Rótulo</th><th>Consórcio</th><th>Início</th><th class="n">Meses</th><th class="n">Execução</th><th>Manutenção</th><th>Fim</th></tr></thead><tbody>`;
+    ZAS.forEach(z => {
+      const e = Object.assign({}, z, G.za[z.za] || {}), ini = e.inicio ? String(e.inicio).slice(0, 7) : '', mm = num(e.meses) || 0, ex = num(e.meses_execucao) || 0;
+      let fim = '—'; if (ini) { const [y, m] = ini.split('-').map(Number), t = y * 12 + (m - 1) + mm - 1; fim = String(t % 12 + 1).padStart(2, '0') + '/' + Math.floor(t / 12); }
+      const dis = IS_ADMIN ? '' : ' disabled';
+      h += `<tr class="${G.za[z.za] ? 'dirty' : ''}"><td><b>${esc(z.za)}</b></td><td><input data-zf="rotulo" data-z="${esc(z.za)}" value="${esc(e.rotulo || '')}"${dis}></td><td><input data-zf="consorcio" data-z="${esc(z.za)}" value="${esc(e.consorcio || '')}" placeholder="a definir"${dis}></td><td style="width:150px"><input type="month" data-zf="inicio" data-z="${esc(z.za)}" value="${ini}"${dis}></td><td style="width:80px"><input type="number" min="1" step="1" data-zf="meses" data-z="${esc(z.za)}" value="${mm}"${dis}></td><td style="width:80px"><input type="number" min="0" step="1" data-zf="meses_execucao" data-z="${esc(z.za)}" value="${ex}"${dis}></td><td>${Math.max(0, mm - ex)} meses</td><td>${fim}</td></tr>`;
+    });
+    h += `</tbody></table></div>`;
+    B.innerHTML = h;
+    B.querySelectorAll('[data-zf]').forEach(i => i.onchange = () => { const z = i.dataset.z, k = i.dataset.zf, o = G.za[z] = G.za[z] || {}; o[k] = k === 'inicio' ? (i.value ? i.value + '-01' : null) : (k === 'meses' || k === 'meses_execucao') ? Math.round(num(i.value) || 0) : i.value; renderParam(); });
+  } else if (G.tab === 'cargo') {
+    h += `<div class="row" style="align-items:end"><div class="q"><label for="gBusca">Buscar cargo</label><input id="gBusca" value="${esc(G.busca)}" placeholder="encanador, engenheiro…"></div></div>`;
+    h += `<div class="help">Ao salvar, a mudança vai para todas as pessoas ligadas ao cargo (em todos os organogramas) que ainda usam o valor da base. Quem teve salário ajustado à mão na ficha fica como está.</div>`;
+    const b = G.busca.trim().toUpperCase(), lista = CARGOS.filter(c => !b || c.funcao.toUpperCase().includes(b));
+    const nQ = id => PES.filter(p => p.cargo_id === id).length;
+    h += `<div class="tbl-wrap"><table class="gtbl"><thead><tr><th>Cargo</th><th style="width:130px">Salário (R$)</th><th style="width:130px">Regime</th><th style="width:190px">Adicional</th><th style="width:70px">HE</th><th style="width:150px">Setor padrão</th><th class="n" style="width:90px">Neste quadro</th></tr></thead><tbody>`;
+    lista.forEach(c0 => {
+      const c = Object.assign({}, c0, G.cargo[c0.id] || {});
+      h += `<tr class="${G.cargo[c0.id] ? 'dirty' : ''}"><td>${esc(c.funcao)}${c.origem === 'manual' ? ' <span class="muted small">(manual)</span>' : ''}</td>` +
+        `<td><input type="number" min="0" step="0.01" data-cg="salario" data-id="${c.id}" value="${c.salario ?? ''}"></td>` +
+        `<td><select data-cg="regime" data-id="${c.id}"><option value="MENSALISTA"${c.regime === 'MENSALISTA' ? ' selected' : ''}>Mensalista</option><option value="HORISTA"${c.regime === 'HORISTA' ? ' selected' : ''}>Horista</option></select></td>` +
+        `<td><select data-cg="adicional" data-id="${c.id}">${ADICIONAIS.map(a => `<option value="${a[0]}"${c.adicional === a[0] ? ' selected' : ''}>${esc(a[1])}</option>`).join('')}</select></td>` +
+        `<td style="text-align:center"><input type="checkbox" data-cg="hora_extra" data-id="${c.id}"${c.hora_extra ? ' checked' : ''} style="width:auto"></td>` +
+        `<td><select data-cg="setor_padrao" data-id="${c.id}"><option value="">—</option>${SETORES.map(x => `<option value="${x}"${c.setor_padrao === x ? ' selected' : ''}>${x.charAt(0) + x.slice(1).toLowerCase()}</option>`).join('')}</select></td>` +
+        `<td class="n">${nQ(c.id) || ''}</td></tr>`;
+    });
+    h += `</tbody></table></div><div class="small muted">${lista.length} de ${CARGOS.length} cargos.</div>`;
+    B.innerHTML = h;
+    $('gBusca').oninput = e => { G.busca = e.target.value; const pos = e.target.selectionStart; renderParam(); const n = $('gBusca'); n.focus(); n.setSelectionRange(pos, pos); };
+    B.querySelectorAll('[data-cg]').forEach(i => i[i.type === 'checkbox' || i.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => {
+      const id = +i.dataset.id, k = i.dataset.cg, o = G.cargo[id] = G.cargo[id] || {};
+      o[k] = i.type === 'checkbox' ? i.checked : k === 'salario' ? num(i.value) : i.value; i.closest('tr').classList.add('dirty'); prevParam();
+    });
+  } else {
+    h += `<div class="help">Preço e cobrança do catálogo valem para todo item ligado que não tem preço próprio (digitado na ficha/equipe). Veículos e equipamentos: o preço é a soma dos componentes. Kits: abra os itens; o preço do kit é a soma (qtd × unitário).</div>`;
+    h += `<div><button type="button" id="gNovo">+ Novo item</button></div>`;
+    const ids = ITENS.map(x => x.id).concat(Object.keys(G.item).filter(k => k.startsWith('n')));
+    ids.forEach(id => {
+      const it = itemG(id), dirty = !!G.item[id], comp = it.componentes || {}, temComp = Object.keys(comp).length > 0, kit = it.composicao || [];
+      const ehKit = kit.length > 0 || it.so_equipe || it.categoria === 'ferramenta';
+      const valor = temComp ? somaComp(comp) : kit.length ? somaKit(kit) : num(it.valor);
+      const usos = VIN.filter(v => v.item_id === it.id).length;
+      h += `<div class="gitem${dirty ? ' dirty' : ''}" data-gi="${id}"><div class="g">` +
+        `<label>Descrição<input data-if="descricao" value="${esc(it.descricao || '')}"></label>` +
+        `<label>Categoria<select data-if="categoria">${CATS.map(c => `<option value="${c[0]}"${it.categoria === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></label>` +
+        `<label>Cobrança<select data-if="cobranca"><option value="mensal"${it.cobranca !== 'pontual' ? ' selected' : ''}>Mensal recorrente</option><option value="pontual"${it.cobranca === 'pontual' ? ' selected' : ''}>Pontual (1×)</option></select></label>` +
+        `<label>Preço unitário (R$)<input type="number" min="0" step="0.01" data-if="valor" value="${valor ?? ''}"${temComp || kit.length ? ' disabled title="Soma dos componentes / do kit"' : ''} placeholder="a definir"></label>` +
+        `<label style="flex-direction:row;align-items:center;gap:6px;white-space:nowrap"><input type="checkbox" data-if="so_equipe"${it.so_equipe ? ' checked' : ''} style="width:auto"> Só equipe</label></div>`;
+      if (temComp) h += `<div class="comp">${Object.keys(comp).map(k => `<label>${esc(COMP_ROT[k] || k)}<input type="number" min="0" step="0.01" data-ic="${esc(k)}" value="${comp[k] ?? ''}"></label>`).join('')}</div>`;
+      if (ehKit) {
+        h += `<div class="small muted">${kit.length ? 'Composição do kit' : 'Kit sem composição: preço digitado acima. Abra os itens para o preço virar a soma.'}</div>`;
+        if (kit.length) h += `<div class="kit muted small"><span>Item</span><span>Qtd</span><span>Unitário (R$)</span><span style="text-align:right">Subtotal</span><span></span></div>`;
+        kit.forEach((x, i) => h += `<div class="kit"><input data-kf="descricao" data-ki="${i}" value="${esc(x.descricao || '')}" placeholder="ex.: chave grifo 12&quot;"><input type="number" min="0" step="1" data-kf="qtd" data-ki="${i}" value="${x.qtd ?? 1}"><input type="number" min="0" step="0.01" data-kf="valor" data-ki="${i}" value="${x.valor ?? ''}" placeholder="preço"><span class="mono" style="text-align:right">${brl2((num(x.qtd) || 0) * (num(x.valor) || 0))}</span><button type="button" data-kdel="${i}" aria-label="Tirar do kit">×</button></div>`);
+        h += `<div><button type="button" data-kadd>+ Item no kit</button></div>`;
+      }
+      h += `<div class="small muted">${usos ? usos + ' lançamento(s) neste organograma' : 'Sem lançamento neste organograma'}${it.origem && it.origem !== 'manual' ? ' · base: ' + esc(it.origem) : ''}</div></div>`;
+    });
+    B.innerHTML = h;
+    $('gNovo').onclick = () => { const k = 'n' + (++G.novos); G.item[k] = {id:k, descricao:'', categoria:'ferramenta', cobranca:'mensal', valor:null, componentes:{}, composicao:[], so_equipe:false, novo:true}; renderParam(); };
+    B.querySelectorAll('[data-gi]').forEach(box => {
+      const id = box.dataset.gi, key = isNaN(+id) ? id : +id, pega = () => key in G.item ? G.item[key] : sujaItem(key);
+      const marca = () => { box.classList.add('dirty'); prevParam(); };
+      box.querySelectorAll('[data-if]').forEach(i => i[i.type === 'checkbox' || i.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { const it = pega(), k = i.dataset.if; it[k] = i.type === 'checkbox' ? i.checked : k === 'valor' ? num(i.value) : i.value; marca(); if (k === 'categoria' || k === 'so_equipe') renderParam(); });
+      box.querySelectorAll('[data-ic]').forEach(i => i.oninput = () => { const it = pega(); it.componentes = Object.assign({}, it.componentes, {[i.dataset.ic]: num(i.value)}); box.querySelector('[data-if="valor"]').value = somaComp(it.componentes); marca(); });
+      box.querySelectorAll('[data-kf]').forEach(i => i.onchange = () => { const it = pega(), x = it.composicao[+i.dataset.ki], k = i.dataset.kf; x[k] = k === 'descricao' ? i.value : num(i.value); renderParam(); });
+      box.querySelectorAll('[data-kdel]').forEach(b => b.onclick = () => { const it = pega(); it.composicao.splice(+b.dataset.kdel, 1); renderParam(); });
+      const ka = box.querySelector('[data-kadd]'); if (ka) ka.onclick = () => { const it = pega(); it.composicao = (it.composicao || []).concat({descricao:'', qtd:1, valor:null}); renderParam(); };
+    });
+  }
+  prevParam();
+}
+function prevParam(){ const n = gSujo(); $('gPrev').textContent = n ? n + ' alteração(ões) por salvar' : 'Nada alterado'; $('gSave').disabled = !n; }
+async function salvarParam(){
+  $('gSave').disabled = true; let pes = 0, ok = true;
+  try {
+    for (const [k, v] of Object.entries(G.prem)) await rpc('app_orc_premissa_set', {p_chave:k, p_valor:v});
+    for (const [z, o] of Object.entries(G.za)) {
+      const e = Object.assign({}, ZAS.find(x => x.za === z), o);
+      if ('rotulo' in o || 'consorcio' in o) await rpc('app_orc_za_set', {p_za:z, p_consorcio:e.consorcio || '', p_rotulo:e.rotulo || ''});
+      if ('inicio' in o || 'meses' in o || 'meses_execucao' in o) await rpc('app_orc_za_contrato_set', {p_za:z, p_inicio:e.inicio, p_meses:num(e.meses), p_execucao:num(e.meses_execucao)});
+    }
+    for (const [id, o] of Object.entries(G.cargo)) { const r = await rpc('app_orc_cargo_aplicar', {p:Object.assign({id:+id}, o)}); pes += (r && r.pessoas) || 0; }
+    for (const [id, it] of Object.entries(G.item)) {
+      if (it.novo && !String(it.descricao || '').trim()) continue;
+      const kit = (it.composicao || []).filter(x => String(x.descricao || '').trim()), temComp = Object.keys(it.componentes || {}).length > 0;
+      const valor = temComp ? somaComp(it.componentes) : kit.length ? somaKit(kit) : it.valor;
+      await rpc('app_orc_item_salvar', {p:{id:it.novo ? '' : it.id, descricao:it.descricao, categoria:it.categoria, cobranca:it.cobranca, valor:valor ?? '', componentes:it.componentes || {}, composicao:kit, so_equipe:!!it.so_equipe}});
+    }
+  } catch (e) { ok = false; }
+  await carregarCatalogos();
+  if (Q && Object.keys(G.cargo).length) { const r = await rpc('app_orc_quadro', {p_id:Q.id}); PES = r.pessoas || []; }
+  if (ok) { G = null; $('dlgG').hidden = true; toast('Parâmetros salvos — custos recalculados' + (pes ? ` (${pes} pessoa(s) com cargo atualizado)` : '')); }
+  else { G.prem = {}; G.za = {}; G.cargo = {}; G.item = {}; renderParam(); toast('Parte não foi salva: confira e tente de novo'); }
+  render();
+}
 
 /* ================= resumo ================= */
 let rTab = 'za', rZa = '';
@@ -1187,7 +1408,7 @@ function renderResumo(){
     let T = 0;
     LL.filter(l => l.tipo === 'Mão de Obra').forEach(l => {
       const p = l.pessoa, its = LL.filter(x => x.donoTipo === 'pessoa' && x.dono === p && x.za === l.za);
-      const im = its.reduce((s, x) => s + (x.item.cobranca === 'pontual' ? 0 : somaMeses(x.meses) / x.nm), 0);
+      const im = its.reduce((s, x) => s + (x.cob === 'pontual' ? 0 : somaMeses(x.meses) / x.nm), 0);
       const t = somaMeses(l.meses) + its.reduce((s, x) => s + somaMeses(x.meses), 0); T += t;
       h += `<tr><td>${esc(p.nome)}</td><td>${esc(p.funcao || '—')}</td><td>${esc(modRot(p.modalidade))}</td><td>${esc(l.za)}${ratRot(l)}</td><td>${esc(p.aprop_cod || '—')}</td><td>${esc(FASE_ROT[p.fase || 'todo'])} · ${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl2(somaMeses(l.meses) / l.nm)}</td><td class="n">${brl2(im)}</td><td class="n">${brl(t)}</td></tr>`;
     });
@@ -1195,7 +1416,7 @@ function renderResumo(){
   } else if (rTab === 'itens') {
     h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Aba</th><th>Ligado a</th><th>ZA</th><th class="n">Qtd</th><th class="n">Unitário</th><th>Cobrança</th><th>Período</th><th class="n">Total no período</th></tr></thead><tbody>`;
     let T = 0;
-    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => { const t = somaMeses(l.meses); T += t; h += `<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td>${l.donoTipo === 'equipe' ? '👥 ' : ''}${esc(l.dono.nome)}</td><td>${esc(l.za)}${ratRot(l)}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.item.cobranca === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`; });
+    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => { const t = somaMeses(l.meses); T += t; h += `<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td>${l.donoTipo === 'equipe' ? '👥 ' : ''}${esc(l.dono.nome)}</td><td>${esc(l.za)}${ratRot(l)}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.cob === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`; });
     h += `<tr class="tot"><td colspan="8">Total</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
   } else {
     h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Mês</th><th class="n">Mão de Obra</th><th class="n">Locação</th><th class="n">Despesas</th><th class="n">Total</th><th class="n">Pessoas</th></tr></thead><tbody>`;
@@ -1226,7 +1447,7 @@ function exportXlsx(){
     meses.forEach((m, i) => base[m] = l.meses[i + 1]); return base;
   });
   const itens = tipo => L.filter(l => l.tipo === tipo).map(l => {
-    const r = {'Item':l.item.descricao, 'Categoria':l.item.categoria, 'Ligado a':(l.donoTipo === 'equipe' ? 'Equipe ' : '') + l.dono.nome, 'ZA':l.za, 'Rateio':l.rateio == null ? 'varia' : l.rateio, 'Qtd':l.qtd, 'Unitário':l.unit == null ? 'a definir' : l.unit, 'Cobrança':l.item.cobranca, 'Apropriação contábil':l.item.aprop_contabil || '', 'Apropriação de obra':ap(l.aprop), 'Mês início':rotMes(l.ini), 'Mês fim':rotMes(l.fim)};
+    const r = {'Item':l.item.descricao, 'Categoria':l.item.categoria, 'Ligado a':(l.donoTipo === 'equipe' ? 'Equipe ' : '') + l.dono.nome, 'ZA':l.za, 'Rateio':l.rateio == null ? 'varia' : l.rateio, 'Qtd':l.qtd, 'Unitário':l.unit == null ? 'a definir' : l.unit, 'Cobrança':l.cob, 'Apropriação contábil':l.item.aprop_contabil || '', 'Apropriação de obra':ap(l.aprop), 'Mês início':rotMes(l.ini), 'Mês fim':rotMes(l.fim)};
     if (tipo === 'Locação') Object.entries(l.item.componentes || {}).forEach(([k, v]) => r['Comp. ' + k] = v);
     r['Total no período'] = somaMeses(l.meses); meses.forEach((m, i) => r[m] = l.meses[i + 1]); return r;
   });
@@ -1286,13 +1507,16 @@ async function abrirQuadro(id){
 }
 
 /* ================= início ================= */
-async function iniciar(){
+async function carregarCatalogos(){
   const c = await rpc('app_orc_catalogos');
   PREM = c.premissas || []; P = {}; PREM.forEach(p => P[p.chave] = p.valor);
   ZAS = c.zas || []; CARGOS = c.cargos || []; CARGO = {}; CARGOS.forEach(x => CARGO[x.id] = x);
   ITENS = c.itens || []; ITEM = {}; ITENS.forEach(x => ITEM[x.id] = x);
   APROP = c.aprop || []; APR = {}; APROP.forEach(a => APR[a.cod] = a); IS_ADMIN = !!c.admin;
   fillCargos();
+}
+async function iniciar(){
+  await carregarCatalogos();
   QUADROS = await rpc('app_orc_quadros') || [];
   setStatus();
   let ult = null; try { ult = localStorage.getItem('orc-quadro'); } catch (e) {}

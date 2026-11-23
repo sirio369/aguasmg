@@ -5030,3 +5030,35 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
 - QA (23/11): harness com banco simulado — composição CLT/PJ com e sem EPI, resumo com pontual e 2 ZAs (bate com o painel),
   período no card, duplicar 4×, Ctrl+C/V, clicar na linha + Delete (só desliga, não exclui), Desligar com o chefe
   selecionado (aviso). Falta QA logado em produção.
+
+### 24.3 Parâmetros ⚙️, mensal/pontual por item, CC da equipe, kits (23/11/2026, sw v445)
+
+Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_parametros` + `orc_22b_cargo_aplicar`).
+- **Mensal × pontual por item ligado:** `orc_vinculo.cobranca` (null = a do catálogo). Na ficha e na equipe cada item tem o
+  seletor "Mensal recorrente / Pontual (1×)" e a linha mostra a conta com o período: "R$ x/mês × n meses do período = total"
+  (mensal) ou "uma vez, no 1º mês do período" (pontual). Grava só quando difere do catálogo, para mudar junto com ele.
+  Todo cálculo (cards, painel, resumo, Excel) usa `cobV(v)` = cobrança do vínculo ou do catálogo.
+- **Ficha mais larga** (`#dlgP`/`#dlgE` 1080 px; 1ª coluna das tabelas quebra linha): Resumo sem barra horizontal.
+- **Kits só de equipe:** `orc_item.so_equipe` (Kit de ferramentas e Kit pesquisa marcados) — somem da lista da pessoa
+  (a não ser que já estejam ligados nela) e entram pela equipe. `orc_item.composicao` = itens do kit
+  `[{descricao, qtd, valor}]`; com composição o preço do kit é a soma (qtd × unitário).
+- **Centro de custo da equipe:** `orc_equipe.aprop_grupo` = 1º nível (nivel3 da aba Auxiliar: VCA, HDD, Implantação de DMC…;
+  lista só os grupos que têm sub-CC Equipamentos/Material). Cada item da equipe escolhe o **sub-CC** (nivel4: Mão de obra,
+  Equipamentos, Material, Serviços terceiro) em `orc_vinculo.aprop_cod` — padrão Equipamentos para veículo/equipamento e
+  Material para o resto; trocar o CC da equipe mantém o mesmo sub-CC pelo nome. `orc_equipe.aprop_cod` fica com o
+  Equipamentos do grupo (fallback). Linhas usam `v.aprop_cod || dono.aprop_cod`.
+- **Datas:** item da pessoa segue a fase/datas da pessoa; item da equipe segue a fase/datas da equipe. Uma não sobrepõe a
+  outra (a pessoa da equipe tem o período dela só para a MO e os itens individuais).
+- **⚙️ Parâmetros** (botão na barra, diálogo `#dlgG`, 4 abas): *Premissas de mão de obra* (encargos/adicionais/HE em %,
+  benefícios em R$; `app_orc_premissa_set`, só admin; `mes_inicio`/`meses_contrato` ocultas — substituídas pelo contrato
+  das ZAs), *Contrato das ZAs* (rótulo, consórcio, início, meses, meses de execução → `app_orc_za_set` /
+  `app_orc_za_contrato_set`, só admin), *Cargos e salários* (busca; salário/regime/adicional/HE/setor →
+  **`app_orc_cargo_aplicar`**, que leva a mudança às pessoas de **todos** os organogramas ligadas ao cargo que ainda usam o
+  valor da base — quem foi ajustado à mão fica), *Itens, veículos e kits* (descrição, categoria, cobrança, preço, só equipe,
+  componentes da Locação → preço = soma, composição do kit → preço = soma; `app_orc_item_salvar`; "+ Novo item").
+  Salvar recarrega os catálogos e recalcula tudo; item ligado com preço próprio (digitado na ficha) não muda.
+- Notebook e periféricos ganhou preço (só no banco). Proposta do kit de ferramentas montada a partir das retiradas do
+  Almoxarifado (planilha fora do repo, para aprovação); Kit pesquisa sem base no almox (aguarda lista/preços).
+- QA (23/11): harness — mensal/pontual por item e total no período, kit fora da lista da pessoa, CC + sub-CC por item
+  (troca de CC remapeia), ⚙️ com premissa, cargo (pessoa acompanhou), componentes, composição do kit e meses de execução:
+  total recalculado bate com a conta manual. Falta QA logado em produção.
