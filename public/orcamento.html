@@ -316,19 +316,45 @@ async function rpc(fn, args){
 }
 
 /* ================= meses do contrato ================= */
-function mes0(){ const v = String(P.mes_inicio || ''); return /^\d{6}$/.test(v) ? {y:+v.slice(0,4), m:+v.slice(4,6)} : {y:new Date().getFullYear(), m:1}; }
-const NM = () => Math.max(1, Math.round(+P.meses_contrato || 60));
+/* Cada ZA tem o seu contrato (orc_za.inicio/meses/meses_execucao). O eixo M1…MN começa no menor início e vai até o
+   último fim. Sem dado na ZA, vale a premissa mes_inicio/meses_contrato. */
+function mes0(){
+  const ds = ZAS.filter(z => z.inicio).map(z => String(z.inicio)).sort();
+  if (ds.length) return {y:+ds[0].slice(0,4), m:+ds[0].slice(5,7)};
+  const v = String(P.mes_inicio || ''); return /^\d{6}$/.test(v) ? {y:+v.slice(0,4), m:+v.slice(4,6)} : {y:new Date().getFullYear(), m:1};
+}
+function NM(){ let fim = 0; ZAS.forEach(z => { if (z.inicio) fim = Math.max(fim, idxMes(String(z.inicio)) + (+z.meses || 60) - 1); }); return Math.max(1, fim || Math.round(+P.meses_contrato || 60)); }
 function idxMes(d){ if (!d) return null; const s = mes0(); return (+d.slice(0,4) - s.y) * 12 + (+d.slice(5,7) - s.m) + 1; }
 function ymDe(i){ const s = mes0(), t = s.m - 1 + i - 1; return {y: s.y + Math.floor(t / 12), m: (t % 12 + 12) % 12 + 1}; }
 const MCURTO = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 function rotCurto(i){ const r = ymDe(i); return MCURTO[r.m - 1] + '/' + String(r.y).slice(2); }
 function rotMes(i){ const r = ymDe(i); return String(r.m).padStart(2,'0') + '/' + r.y; }
 function isoMes(i){ const r = ymDe(i); return r.y + '-' + String(r.m).padStart(2,'0'); }
-function janela(ini, fim, padrao){
-  const d = padrao || [1, NM()];
-  let a = ini ? idxMes(ini) : d[0], b = fim ? idxMes(fim) : d[1];
-  a = Math.max(1, a); b = Math.min(NM(), b);
-  return [a, b];
+const FASE_ROT = {execucao:'Execução', manutencao:'Manutenção', todo:'Contrato todo'};
+function zaJan(z){
+  const r = ZAS.find(x => x.za === z);
+  if (r && r.inicio) { const a = idxMes(String(r.inicio)); return {a, b:a + (+r.meses || 60) - 1, ex:+r.meses_execucao || 18}; }
+  return {a:1, b:Math.round(+P.meses_contrato || 60), ex:18};
+}
+function faseJan(z, fase){ const j = zaJan(z); if (fase === 'execucao') return [j.a, Math.min(j.b, j.a + j.ex - 1)]; if (fase === 'manutencao') return [j.a + j.ex, j.b]; return [j.a, j.b]; }
+/* janela de cada ZA = fase da ZA ∩ entrada/saída da pessoa (∩ período próprio do item, se houver) */
+function janelasZA(o, zas, extra){
+  const zz = zas && zas.length ? zas : ['(sem ZA)'], N = NM();
+  const lo = Math.max(1, o.mes_ini ? idxMes(o.mes_ini) : 1, extra && extra.mes_ini ? idxMes(extra.mes_ini) : 1);
+  const hi = Math.min(N, o.mes_fim ? idxMes(o.mes_fim) : N, extra && extra.mes_fim ? idxMes(extra.mes_fim) : N);
+  const out = {}; zz.forEach(z => { const [a, b] = faseJan(z, o.fase); out[z] = [Math.max(a, lo), Math.min(b, hi)]; }); return out;
+}
+/* peso de cada ZA em cada mês: divide igual só entre as ZAs ativas naquele mês */
+function pesos(jz){
+  const N = NM(), w = {}, ks = Object.keys(jz); ks.forEach(z => w[z] = new Float64Array(N + 1));
+  for (let i = 1; i <= N; i++) { const at = ks.filter(z => jz[z][0] <= i && i <= jz[z][1]); at.forEach(z => w[z][i] = 1 / at.length); }
+  return w;
+}
+function ativos(w){ const N = NM(), out = []; for (let i = 1; i <= N; i++) if (Object.values(w).some(a => a[i] > 0)) out.push(i); return out; }
+function perTxt(o, zas){
+  const jz = janelasZA(o, zas), ks = Object.keys(jz), txt = ([a, b]) => a <= b ? `${rotMes(a)} a ${rotMes(b)} (${b - a + 1} meses)` : 'fora do período';
+  const iguais = ks.every(z => jz[z][0] === jz[ks[0]][0] && jz[z][1] === jz[ks[0]][1]);
+  return FASE_ROT[o.fase || 'todo'] + ' · ' + (iguais ? txt(jz[ks[0]]) : ks.map(z => z + ' ' + txt(jz[z])).join(' · '));
 }
 
 /* ================= cálculo do custo (fórmulas da aba Mão de Obra) ================= */
@@ -370,25 +396,30 @@ function faltas(p){
 /* Linhas do orçamento: 1 por pessoa × ZA (MO) e 1 por item ligado × ZA; meses[1..N]. */
 function linhas(){
   const N = NM(), out = [];
-  const nova = (o, zas, fn) => { const zz = zas && zas.length ? zas : ['(sem ZA)']; const k = 1 / zz.length; zz.forEach(z => { const m = new Float64Array(N + 1); fn(m, k); out.push(Object.assign({za: z, rateio: k, meses: m}, o)); }); };
-  PES.forEach(p => {
-    const c = custoMO(p), [a, b] = janela(p.mes_ini, p.mes_fim);
-    nova({tipo:'Mão de Obra', pessoa:p, custo:c, aprop:p.aprop_cod, ini:a, fim:b}, p.zas, (m, k) => { for (let i = a; i <= b; i++) m[i] = c.total * k; });
-  });
+  /* uma linha por ZA com mês ativo; rateio = fração fixa ou null quando varia (ZA que entra depois) */
+  const nova = (o, w, val, pontual) => {
+    const at = ativos(w), f0 = at[0] || 0;
+    Object.keys(w).forEach(z => {
+      const ws = w[z], m = new Float64Array(N + 1); let ini = 0, fim = 0, nm = 0; const ks = new Set();
+      for (let i = 1; i <= N; i++) if (ws[i] > 0) { if (!ini) ini = i; fim = i; nm++; ks.add(Math.round(ws[i] * 1e6)); }
+      if (!nm) return;
+      if (pontual) { if (f0 && ws[f0] > 0) m[f0] = val * ws[f0]; else return; } else for (let i = 1; i <= N; i++) m[i] = val * ws[i];
+      out.push(Object.assign({za:z, meses:m, ini, fim, nm, rateio: ks.size === 1 ? [...ks][0] / 1e6 : null}, o));
+    });
+  };
+  PES.forEach(p => { const c = custoMO(p); nova({tipo:'Mão de Obra', pessoa:p, custo:c, aprop:p.aprop_cod}, pesos(janelasZA(p, p.zas)), c.total, false); });
   VIN.forEach(v => {
     const it = ITEM[v.item_id]; if (!it) return;
     const u = unitVinc(v), qtd = num(v.qtd) || 1;
-    let dono, zas, jan, aprop;
-    if (v.pessoa_id) { dono = byId(PES, v.pessoa_id); if (!dono) return; zas = dono.zas; jan = janela(dono.mes_ini, dono.mes_fim); aprop = dono.aprop_cod; }
-    else { dono = byId(EQ, v.equipe_id); if (!dono) return; zas = zasEquipe(dono); jan = janela(dono.mes_ini, dono.mes_fim); aprop = dono.aprop_cod; }
-    const [a, b] = janela(v.mes_ini, v.mes_fim, jan);
-    nova({tipo:tipoItem(it), item:it, vinc:v, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, ini:a, fim:b, semPreco: u == null}, zas, (m, k) => {
-      const val = (u || 0) * qtd * k;
-      if (it.cobranca === 'pontual') { if (a <= b) m[a] = val; } else for (let i = a; i <= b; i++) m[i] = val;
-    });
+    let dono, zas, aprop;
+    if (v.pessoa_id) { dono = byId(PES, v.pessoa_id); if (!dono) return; zas = dono.zas; aprop = dono.aprop_cod; }
+    else { dono = byId(EQ, v.equipe_id); if (!dono) return; zas = zasEquipe(dono); aprop = dono.aprop_cod; }
+    nova({tipo:tipoItem(it), item:it, vinc:v, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, semPreco: u == null}, pesos(janelasZA(dono, zas, v)), (u || 0) * qtd, it.cobranca === 'pontual');
   });
   return out;
 }
+const ratRot = l => l.rateio == null ? ' <span class="muted">(varia)</span>' : l.rateio < 1 ? ' <span class="muted">(' + Math.round(l.rateio * 100) + '%)</span>' : '';
+const zaMeses = z => { const j = zaJan(z); return Math.max(1, j.b - j.a + 1); };
 const somaMeses = m => { let s = 0; for (let i = 1; i < m.length; i++) s += m[i]; return s; };
 function mensalPessoa(p){
   let t = custoMO(p).total;
@@ -430,7 +461,7 @@ const selPessoas = () => selItems().filter(x => x.kind === 'node').map(x => byId
 function getObj(it){ return byId(it.kind === 'node' ? PES : it.kind === 'note' ? NOTES : STROKES, it.id); }
 
 /* ================= renderização ================= */
-function perCard(n){ const [a, b] = janela(n.mes_ini, n.mes_fim); return rotCurto(a) + ' → ' + rotCurto(b); }
+function perCard(n){ const at = ativos(pesos(janelasZA(n, n.zas))); return (n.fase && n.fase !== 'todo' ? FASE_ROT[n.fase] + ' · ' : '') + (at.length ? rotCurto(at[0]) + ' → ' + rotCurto(at[at.length - 1]) : 'fora do período'); }
 const corDe = n => n.cor || SETOR_COR[setorDe(n)] || COLORS[0];
 const modRot = m => (MODS.find(x => x[0] === m) || [m, m])[1];
 const zasRot = z => z && z.length ? z.join(' + ') : 'sem ZA';
@@ -504,7 +535,7 @@ function renderSide(){
   const semPreco = L.filter(l => l.semPreco).length;
   let h = `<div class="small muted" style="margin-bottom:6px">${PES.length} pessoa(s) · ${EQ.length} equipe(s) · contrato ${rotMes(1)} a ${rotMes(N)}</div><div class="za-tot"><span class="h">ZA</span><span class="h" style="text-align:right">Total</span><span class="h" style="text-align:right">Média/mês</span>`;
   let tot = 0;
-  Object.keys(zs).sort().forEach(z => { const t = zs[z].mo + zs[z].loc + zs[z].des; tot += t; h += `<span>${esc(z)}</span><span class="v">${brl(t)}</span><span class="v">${brl(t / N)}</span>`; });
+  Object.keys(zs).sort().forEach(z => { const t = zs[z].mo + zs[z].loc + zs[z].des; tot += t; h += `<span>${esc(z)}</span><span class="v">${brl(t)}</span><span class="v">${brl(t / zaMeses(z))}</span>`; });
   h += `<span><b>Total</b></span><span class="v"><b>${brl(tot)}</b></span><span class="v"><b>${brl(tot / N)}</b></span></div>`;
   if (semPreco) h += `<div class="badge warn" style="margin-top:8px">${semPreco} item(ns) sem preço (a definir) — entram como zero.</div>`;
   const dups = duplicidades();
@@ -513,9 +544,9 @@ function renderSide(){
   // selecionado
   const sp = selPessoas();
   if (sp.length === 1) {
-    const p = sp[0], c = custoMO(p), vs = VIN.filter(v => v.pessoa_id === p.id), [a, b] = janela(p.mes_ini, p.mes_fim);
+    const p = sp[0], c = custoMO(p), vs = VIN.filter(v => v.pessoa_id === p.id);
     let s = `<div style="font-weight:600;font-size:14px">${esc(p.nome)}</div><div class="small muted">${esc(p.funcao || 'Cargo a definir')} · ${esc(modRot(p.modalidade))} · ${esc(zasRot(p.zas))}</div>`;
-    s += `<div class="small muted" style="margin:2px 0 8px">${rotMes(a)} a ${rotMes(b)} (${Math.max(0, b - a + 1)} meses)${p.aprop_cod ? ' · ' + esc(p.aprop_cod) : ''}</div><div class="kv">`;
+    s += `<div class="small muted" style="margin:2px 0 8px">${esc(perTxt(p, p.zas))}${p.aprop_cod ? ' · ' + esc(p.aprop_cod) : ''}</div><div class="kv">`;
     c.partes.forEach(([k, v]) => { if (v) s += `<span>${esc(k)}</span><span class="v">${brl2(v)}</span>`; });
     s += `<span class="tot">Mão de obra/mês</span><span class="v tot">${brl2(c.total)}</span>`;
     vs.forEach(v => { const it = ITEM[v.item_id]; if (!it) return; const u = unitVinc(v); s += `<span>${esc(it.descricao)}${(num(v.qtd) || 1) > 1 ? ' ×' + num(v.qtd) : ''}${it.cobranca === 'pontual' ? ' <span class="muted">(1×)</span>' : ''}</span><span class="v">${u == null ? 'a definir' : brl2(u * (num(v.qtd) || 1))}</span>`; });
@@ -612,7 +643,7 @@ async function duplicar(ids, vezes){
   const larg = x2 - x1 + 40;
   const faixa = PES.filter(n => n.y < y2 && n.y + nodeH(n) > y1 && n.x >= x1);   // cards na mesma altura, à direita
   const ini = Math.max(x2, ...faixa.map(n => n.x + CARD_W)) + 40;
-  const campos = ['cor','cargo_id','funcao','setor','modalidade','regime','salario','adicional','adicional_valor','valor_pj','aprop_cod','mes_ini','mes_fim','obs'];
+  const campos = ['cor','cargo_id','funcao','setor','fase','modalidade','regime','salario','adicional','adicional_valor','valor_pj','aprop_cod','mes_ini','mes_fim','obs'];
   const novos = [];
   duplicando = true;
   try {
@@ -642,7 +673,7 @@ function addSub(){
   if (!(sel && sel.kind === 'node')) return;
   const p = byId(PES, sel.id), kids = PES.filter(n => n.parent_id === p.id);
   const x = kids.length ? Math.max(...kids.map(k => k.x)) + CARD_W + 40 : p.x, y = kids.length ? kids[0].y : p.y + nodeH(p) + 90;
-  novaPessoa({x, y, parent_id:p.id, zas:(p.zas || []).slice(), aprop_cod:p.aprop_cod, mes_ini:p.mes_ini, mes_fim:p.mes_fim});
+  novaPessoa({x, y, parent_id:p.id, zas:(p.zas || []).slice(), aprop_cod:p.aprop_cod, fase:p.fase || 'todo', mes_ini:p.mes_ini, mes_fim:p.mes_fim});
 }
 async function delSel(){
   const list = selItems().slice(); if (!list.length) return;
@@ -843,7 +874,7 @@ document.addEventListener('keyup', e => { if (e.key === ' ') spaceDown = false; 
 const PASSOS = ['Quem é', 'Contratação', 'Onde trabalha', 'Período', 'Equipe', 'Veículos e despesas', 'Resumo'];
 let W = null;
 function novaPessoa(base){
-  const d = Object.assign({id:uid(), quadro_id:Q.id, nome:'', funcao:'', cargo_id:null, modalidade:'CLT', regime:'MENSALISTA', salario:null, adicional:'nenhum', adicional_valor:null, hora_extra:false, valor_pj:null, recebe_epi:true, zas:[], setor:null, aprop_cod:null, mes_ini:null, mes_fim:null, cor:null}, base);
+  const d = Object.assign({id:uid(), quadro_id:Q.id, nome:'', funcao:'', cargo_id:null, modalidade:'CLT', regime:'MENSALISTA', salario:null, adicional:'nenhum', adicional_valor:null, hora_extra:false, valor_pj:null, recebe_epi:true, fase:'todo', zas:[], setor:null, aprop_cod:null, mes_ini:null, mes_fim:null, cor:null}, base);
   W = {novo:true, passo:0, d, itens:new Map(), usaVeic:null, salvarCargo:true, visto:new Set([0]), equipes:new Set(), emEquipe:null};
   renderFicha();
 }
@@ -898,16 +929,22 @@ function previewFicha(){
   const fc = $('fComp'); if (fc) fc.innerHTML = compHtml(d);
   $('pPrev').innerHTML = `Mão de obra <b class="mono">${brl2(c.total)}</b>/mês · itens <b class="mono">${brl2(it)}</b>/mês` + (pont ? ` · pontuais <b class="mono">${brl2(pont)}</b>` : '') + (sp ? ` · <span style="color:var(--warn)">${sp} sem preço</span>` : '') + ((d.zas || []).length > 1 ? ` · ÷${d.zas.length} ZAs` : '');
 }
+function perguntaFase(d, titulo){
+  const j = zaJan((d.zas && d.zas[0]) || (ZAS[0] && ZAS[0].za)), tot = j.b - j.a + 1, f = d.fase || 'todo';
+  const op = [['execucao', 'Execução', `${j.ex} primeiros meses`], ['manutencao', 'Manutenção', `${tot - j.ex} meses restantes`], ['todo', 'Contrato todo', `${tot} meses`]];
+  return `<div class="q"><span class="lab">${esc(titulo)}</span><div class="chips">${op.map(([k, l, sub]) => `<button type="button" data-fase="${k}" aria-pressed="${f === k}">${l} <small style="opacity:.75">· ${sub}</small></button>`).join('')}</div><div class="help">Contado a partir do início de cada ZA (ZA1004 e ZA0200 em ${rotMes(zaJan('ZA1004').a)}; ZA1500 e ZA1600 em ${rotMes(zaJan('ZA1500').a)}).</div></div>`;
+}
+function bindFase(root, d, cb){ root.querySelectorAll('[data-fase]').forEach(b => b.onclick = () => { d.fase = b.dataset.fase; root.querySelectorAll('[data-fase]').forEach(x => x.setAttribute('aria-pressed', x === b)); cb && cb(); }); }
 function compHtml(d){
   const c = custoMO(d); let h = '<div class="kv comp">';
   c.partes.forEach(([k, v]) => { if (v) h += `<span>${esc(k)}</span><span class="v">${brl2(v)}</span>`; });
   return h + `<span class="tot">Total mensal</span><span class="v tot">${brl2(c.total)}</span></div>`;
 }
 function resumoFichaHtml(d){
-  const c = custoMO(d), [a, b] = janela(d.mes_ini, d.mes_fim), n = Math.max(0, b - a + 1), zz = d.zas || [];
+  const c = custoMO(d), zz = d.zas || [], w = pesos(janelasZA(d, zz)), at = ativos(w), n = at.length, a = at[0] || 1;
   let men = c.total, tot = c.total * n, pont = 0, sp = 0, h = '';
   h += `<div><div style="font-weight:600;font-size:15px">${esc(d.nome || 'A definir')}</div><div class="small muted">${esc(d.funcao || 'Cargo a definir')} · ${esc(modRot(d.modalidade))} · ${esc(setorDe(d).charAt(0) + setorDe(d).slice(1).toLowerCase())} · ${esc(zasRot(zz))}${d.aprop_cod ? ' · ' + esc(d.aprop_cod) : ''}</div>`;
-  h += `<div class="small muted">Período: ${rotMes(a)} a ${rotMes(b)} · ${n} ${n === 1 ? 'mês' : 'meses'}</div></div>`;
+  h += `<div class="small muted">Período: ${esc(perTxt(d, zz))}${n ? ' · ' + n + (n === 1 ? ' mês' : ' meses') + ' com custo' : ''}</div></div>`;
   h += `<div class="tbl-wrap"><table><thead><tr><th>Custo</th><th class="n">Por mês</th><th class="n">Meses</th><th class="n">Total no período</th></tr></thead><tbody>`;
   c.partes.forEach(([k, v]) => { if (v) h += `<tr><td>${esc(k)}</td><td class="n">${brl2(v)}</td><td class="n">${n}</td><td class="n">${brl2(v * n)}</td></tr>`; });
   h += `<tr class="tot"><td>Mão de obra</td><td class="n">${brl2(c.total)}</td><td class="n">${n}</td><td class="n">${brl2(c.total * n)}</td></tr>`;
@@ -921,9 +958,9 @@ function resumoFichaHtml(d){
   h += `<tr class="tot"><td>Total do colaborador</td><td class="n">${brl2(men)}</td><td class="n">${n}</td><td class="n">${brl2(tot)}</td></tr></tbody></table></div>`;
   if (pont) h += `<div class="small muted">Itens pontuais (${brl2(pont)}) entram uma vez, em ${rotMes(a)}: nesse mês o custo é ${brl2(men + pont)}.</div>`;
   if (zz.length > 1) {
-    h += `<div class="q"><span class="lab">Divisão por ZA (igual entre ${zz.length})</span><div class="tbl-wrap"><table><thead><tr><th>ZA</th><th class="n">Por mês</th><th class="n">Total no período</th></tr></thead><tbody>`;
-    zz.forEach(z => h += `<tr><td>${esc(z)}</td><td class="n">${brl2(men / zz.length)}</td><td class="n">${brl2(tot / zz.length)}</td></tr>`);
-    h += `</tbody></table></div></div>`;
+    h += `<div class="q"><span class="lab">Divisão por ZA</span><div class="tbl-wrap"><table><thead><tr><th>ZA</th><th class="n">Meses</th><th class="n">Média/mês</th><th class="n">Total no período</th></tr></thead><tbody>`;
+    zz.forEach(z => { const ws = w[z] || []; let nm = 0, sw = 0; for (let i = 1; i < ws.length; i++) if (ws[i] > 0) { nm++; sw += ws[i]; } const t = men * sw + pont * ((w[z] || [])[a] || 0); h += `<tr><td>${esc(z)}</td><td class="n">${nm}</td><td class="n">${nm ? brl2(t / nm) : '—'}</td><td class="n">${brl2(t)}</td></tr>`; });
+    h += `</tbody></table></div><div class="help">No mês em que mais de uma ZA está ativa o custo é dividido igual entre elas; fora disso vai inteiro para a ZA ativa.</div></div>`;
   }
   if (W.equipes.size) {
     const m = itensDasEquipes(W.equipes), dup = [...W.itens.keys()].filter(id => m.has(id));
@@ -983,13 +1020,15 @@ function renderFicha(){
     $('fSet').onchange = e => { d.setor = e.target.value; previewFicha(); };
     B.querySelector('[data-aprop]').onchange = e => d.aprop_cod = e.target.value || null;
   } else if (s === 3) {
-    h += `<div class="row"><div class="q"><label for="fIni">Mês de entrada</label><input id="fIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini) || isoMes(1)}"><div class="help">Contrato começa em ${rotMes(1)}.</div></div>`;
-    h += `<div class="q"><label for="fFim">Mês de saída</label><input id="fFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até o fim do contrato (${rotMes(NM())}).</div></div></div>`;
-    h += `<div class="help">Veículos e despesas ligados à pessoa seguem esse mesmo período.</div>`;
+    h += perguntaFase(d, 'Em qual fase do contrato a pessoa vai trabalhar?');
+    h += `<div class="row"><div class="q"><label for="fIni">Entra depois do início da fase? (opcional)</label><input id="fIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini)}"><div class="help">Vazio = começa junto com a fase.</div></div>`;
+    h += `<div class="q"><label for="fFim">Sai antes do fim da fase? (opcional)</label><input id="fFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = fica até o fim da fase.</div></div></div>`;
+    h += `<div class="badge" id="fJan"></div><div class="help">Veículos e despesas ligados à pessoa seguem esse mesmo período.</div>`;
     B.innerHTML = h;
-    if (!d.mes_ini) d.mes_ini = isoMes(1) + '-01';
-    $('fIni').onchange = e => d.mes_ini = e.target.value ? e.target.value + '-01' : null;
-    $('fFim').onchange = e => d.mes_fim = e.target.value ? e.target.value + '-01' : null;
+    const jan = () => { $('fJan').textContent = 'Período: ' + perTxt(d, d.zas); previewFicha(); };
+    bindFase(B, d, jan); jan();
+    $('fIni').onchange = e => { d.mes_ini = e.target.value ? e.target.value + '-01' : null; jan(); };
+    $('fFim').onchange = e => { d.mes_fim = e.target.value ? e.target.value + '-01' : null; jan(); };
   } else if (s === 4) {
     const em = W.emEquipe;
     h += `<div class="q"><span class="lab">Vai fazer parte de alguma equipe de execução?</span><div class="chips"><button type="button" data-em="1" aria-pressed="${em === true}">Sim</button><button type="button" data-em="0" aria-pressed="${em === false}">Não</button></div><div class="help">Os veículos, equipamentos e ferramentas da equipe ficam na equipe. No próximo passo eles não aparecem para a pessoa, para não lançar duas vezes.</div></div>`;
@@ -1034,7 +1073,7 @@ async function salvarFicha(){
         CARGOS.push(nc); CARGO[nc.id] = nc; d.cargo_id = nc.id; d.funcao = nc.funcao; fillCargos();
       }
     }
-    const campos = ['quadro_id','parent_id','x','y','cor','nome','cargo_id','funcao','setor','modalidade','regime','salario','adicional','adicional_valor','hora_extra','valor_pj','recebe_epi','zas','aprop_cod','mes_ini','mes_fim','obs'];
+    const campos = ['quadro_id','parent_id','x','y','cor','nome','cargo_id','funcao','setor','modalidade','regime','salario','adicional','adicional_valor','hora_extra','valor_pj','recebe_epi','fase','zas','aprop_cod','mes_ini','mes_fim','obs'];
     const p = {id:d.id}; campos.forEach(k => { if (k in d) p[k] = d[k] ?? ''; });
     p.zas = d.zas || []; p.hora_extra = !!d.hora_extra; p.recebe_epi = d.recebe_epi !== false; p.setor = d.setor || setorDe(d);
     await savePessoa(d.id, p);
@@ -1067,7 +1106,7 @@ function abrirEquipe(id){
   if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor)})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; }
   else {
     const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
-    E = {novo:true, d:{id:uid(), quadro_id:Q.id, nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:sp[0] ? sp[0].aprop_cod : null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:sp[0] ? sp[0].aprop_cod : null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
   }
   renderEquipe();
 }
@@ -1078,7 +1117,8 @@ function renderEquipe(){
   h += `<div class="q"><span class="lab">Quem faz parte</span><div class="chips" id="eMem">${PES.map(p => `<button type="button" data-mem="${p.id}" aria-pressed="${(d.membros || []).includes(p.id)}">${esc(p.nome)}${p.funcao ? ' · ' + esc(p.funcao.toLowerCase()) : ''}</button>`).join('') || '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}</div></div>`;
   h += `<div class="q"><span class="lab">ZA da equipe</span>${chipsZa(d.zas || [])}<div class="help">Vazio = as ZAs das pessoas da equipe. Os itens da equipe são divididos igual entre as ZAs.</div></div>`;
   h += `<div class="row"><div class="q"><label>Apropriação dos itens</label>${selectAprop(d.aprop_cod, null)}</div></div>`;
-  h += `<div class="row"><div class="q"><label for="eIni">Mês de início</label><input id="eIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini)}"><div class="help">Vazio = desde ${rotMes(1)}.</div></div><div class="q"><label for="eFim">Mês de fim</label><input id="eFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até ${rotMes(NM())}.</div></div></div>`;
+  h += perguntaFase(d, 'Em qual fase a equipe atua?');
+  h += `<div class="row"><div class="q"><label for="eIni">Começa depois do início da fase? (opcional)</label><input id="eIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini)}"><div class="help">Vazio = junto com a fase.</div></div><div class="q"><label for="eFim">Termina antes do fim da fase? (opcional)</label><input id="eFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até o fim da fase.</div></div></div>`;
   h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${listaItens(E.itens, () => true, avisosEquipe(d))}</div>`;
   B.innerHTML = h;
   $('eNome').oninput = e => d.nome = e.target.value;
@@ -1086,6 +1126,7 @@ function renderEquipe(){
   B.querySelectorAll('[data-mem]').forEach(b => b.onclick = () => { const id = b.dataset.mem, m = d.membros = d.membros || [], i = m.indexOf(id); if (i >= 0) m.splice(i, 1); else m.push(id); renderEquipe(); });
   d.zas = d.zas || []; bindZas(B, d.zas, prevEquipe);
   B.querySelector('[data-aprop]').onchange = e => d.aprop_cod = e.target.value || null;
+  bindFase(B, d, prevEquipe);
   $('eIni').onchange = e => d.mes_ini = e.target.value ? e.target.value + '-01' : null;
   $('eFim').onchange = e => d.mes_fim = e.target.value ? e.target.value + '-01' : null;
   bindItens(B, E.itens, prevEquipe);
@@ -1100,7 +1141,7 @@ $('eCancel').onclick = fecharDlgs;
 $('eSave').onclick = async () => {
   const d = E.d; $('eSave').disabled = true;
   try {
-    await rpc('app_orc_equipe_salvar', {p:{id:d.id, quadro_id:Q.id, nome:d.nome, cor:d.cor, zas:d.zas || [], aprop_cod:d.aprop_cod || '', mes_ini:d.mes_ini || '', mes_fim:d.mes_fim || '', membros:d.membros || []}});
+    await rpc('app_orc_equipe_salvar', {p:{id:d.id, quadro_id:Q.id, nome:d.nome, cor:d.cor, zas:d.zas || [], aprop_cod:d.aprop_cod || '', fase:d.fase || 'todo', mes_ini:d.mes_ini || '', mes_fim:d.mes_fim || '', membros:d.membros || []}});
     const row = Object.assign({}, d); EQ = EQ.filter(x => x.id !== d.id); EQ.push(row); EQ.sort((a, b) => a.nome.localeCompare(b.nome));
     const atuais = VIN.filter(v => v.equipe_id === d.id);
     for (const v of atuais) if (!E.itens.has(v.item_id)) { await rpc('app_orc_vinculo_excluir', {p_id:v.id}); VIN = VIN.filter(x => x.id !== v.id); }
@@ -1135,8 +1176,8 @@ function renderResumo(){
     const tipos = ['Mão de Obra','Locação','Despesas'], g = {};
     L.forEach(l => { const r = g[l.za] = g[l.za] || {'Mão de Obra':0,'Locação':0,'Despesas':0}; r[l.tipo] += somaMeses(l.meses); });
     const tot = {'Mão de Obra':0,'Locação':0,'Despesas':0};
-    h += `<div class="tbl-wrap"><table><thead><tr><th>ZA</th><th>Consórcio</th>${tipos.map(t => `<th class="n">${t}</th>`).join('')}<th class="n">Total (${N} meses)</th><th class="n">Média/mês</th></tr></thead><tbody>`;
-    Object.keys(g).sort().forEach(z => { const r = g[z], t = tipos.reduce((s, k) => s + r[k], 0); tipos.forEach(k => tot[k] += r[k]); const zz = ZAS.find(x => x.za === z); h += `<tr><td>${esc(z)}</td><td>${esc(zz && zz.consorcio || '—')}</td>${tipos.map(k => `<td class="n">${brl(r[k])}</td>`).join('')}<td class="n">${brl(t)}</td><td class="n">${brl(t / N)}</td></tr>`; });
+    h += `<div class="tbl-wrap"><table><thead><tr><th>ZA</th><th>Consórcio</th>${tipos.map(t => `<th class="n">${t}</th>`).join('')}<th class="n">Total</th><th class="n">Média/mês</th></tr></thead><tbody>`;
+    Object.keys(g).sort().forEach(z => { const r = g[z], t = tipos.reduce((s, k) => s + r[k], 0); tipos.forEach(k => tot[k] += r[k]); const zz = ZAS.find(x => x.za === z); h += `<tr><td>${esc(z)}</td><td>${esc(zz && zz.consorcio || '—')}</td>${tipos.map(k => `<td class="n">${brl(r[k])}</td>`).join('')}<td class="n">${brl(t)}</td><td class="n">${brl(t / zaMeses(z))}</td></tr>`; });
     const T = tipos.reduce((s, k) => s + tot[k], 0);
     h += `<tr class="tot"><td colspan="2">Total</td>${tipos.map(k => `<td class="n">${brl(tot[k])}</td>`).join('')}<td class="n">${brl(T)}</td><td class="n">${brl(T / N)}</td></tr></tbody></table></div>`;
     const sp = L.filter(l => l.semPreco).length;
@@ -1146,22 +1187,22 @@ function renderResumo(){
     let T = 0;
     LL.filter(l => l.tipo === 'Mão de Obra').forEach(l => {
       const p = l.pessoa, its = LL.filter(x => x.donoTipo === 'pessoa' && x.dono === p && x.za === l.za);
-      const im = its.reduce((s, x) => s + (x.item.cobranca === 'pontual' ? 0 : (x.unit || 0) * x.qtd * x.rateio), 0);
+      const im = its.reduce((s, x) => s + (x.item.cobranca === 'pontual' ? 0 : somaMeses(x.meses) / x.nm), 0);
       const t = somaMeses(l.meses) + its.reduce((s, x) => s + somaMeses(x.meses), 0); T += t;
-      h += `<tr><td>${esc(p.nome)}</td><td>${esc(p.funcao || '—')}</td><td>${esc(modRot(p.modalidade))}</td><td>${esc(l.za)}${l.rateio < 1 ? ' <span class="muted">(' + Math.round(l.rateio * 100) + '%)</span>' : ''}</td><td>${esc(p.aprop_cod || '—')}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl2(l.custo.total * l.rateio)}</td><td class="n">${brl2(im)}</td><td class="n">${brl(t)}</td></tr>`;
+      h += `<tr><td>${esc(p.nome)}</td><td>${esc(p.funcao || '—')}</td><td>${esc(modRot(p.modalidade))}</td><td>${esc(l.za)}${ratRot(l)}</td><td>${esc(p.aprop_cod || '—')}</td><td>${esc(FASE_ROT[p.fase || 'todo'])} · ${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl2(somaMeses(l.meses) / l.nm)}</td><td class="n">${brl2(im)}</td><td class="n">${brl(t)}</td></tr>`;
     });
     h += `<tr class="tot"><td colspan="8">Total (sem itens das equipes)</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
   } else if (rTab === 'itens') {
     h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Aba</th><th>Ligado a</th><th>ZA</th><th class="n">Qtd</th><th class="n">Unitário</th><th>Cobrança</th><th>Período</th><th class="n">Total no período</th></tr></thead><tbody>`;
     let T = 0;
-    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => { const t = somaMeses(l.meses); T += t; h += `<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td>${l.donoTipo === 'equipe' ? '👥 ' : ''}${esc(l.dono.nome)}</td><td>${esc(l.za)}${l.rateio < 1 ? ' <span class="muted">(' + Math.round(l.rateio * 100) + '%)</span>' : ''}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.item.cobranca === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`; });
+    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => { const t = somaMeses(l.meses); T += t; h += `<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td>${l.donoTipo === 'equipe' ? '👥 ' : ''}${esc(l.dono.nome)}</td><td>${esc(l.za)}${ratRot(l)}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.item.cobranca === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`; });
     h += `<tr class="tot"><td colspan="8">Total</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
   } else {
     h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Mês</th><th class="n">Mão de Obra</th><th class="n">Locação</th><th class="n">Despesas</th><th class="n">Total</th><th class="n">Pessoas</th></tr></thead><tbody>`;
     for (let i = 1; i <= N; i++) {
       const r = {'Mão de Obra':0,'Locação':0,'Despesas':0}; LL.forEach(l => r[l.tipo] += l.meses[i]);
       const np = new Set(LL.filter(l => l.tipo === 'Mão de Obra' && l.meses[i] > 0).map(l => l.pessoa.id)).size, t = r['Mão de Obra'] + r['Locação'] + r['Despesas'];
-      h += `<tr><td>M${i} · ${rotMes(i)}</td><td class="n">${brl(r['Mão de Obra'])}</td><td class="n">${brl(r['Locação'])}</td><td class="n">${brl(r['Despesas'])}</td><td class="n">${brl(t)}</td><td class="n">${np}</td></tr>`;
+      h += `<tr><td>${rotMes(i)}</td><td class="n">${brl(r['Mão de Obra'])}</td><td class="n">${brl(r['Locação'])}</td><td class="n">${brl(r['Despesas'])}</td><td class="n">${brl(t)}</td><td class="n">${np}</td></tr>`;
     }
     h += '</tbody></table></div>';
   }
@@ -1174,18 +1215,18 @@ function renderResumo(){
 const safeName = s => String(s || 'Organograma').replace(/[\\/:*?"<>|]/g, '-').trim() || 'Organograma';
 function exportXlsx(){
   if (!window.XLSX) { toast('Biblioteca do Excel não carregou'); return; }
-  const L = linhas(), N = NM(), meses = Array.from({length:N}, (_, i) => 'M' + (i + 1) + ' ' + rotMes(i + 1));
+  const L = linhas(), N = NM(), meses = Array.from({length:N}, (_, i) => rotMes(i + 1));
   const ap = c => c ? c + ' ' + String((APR[c] || {}).nivel4 || '') : '';
   const mo = L.filter(l => l.tipo === 'Mão de Obra').map(l => {
-    const p = l.pessoa, c = l.custo, k = l.rateio;
-    const base = {'Nome':p.nome, 'Função':p.funcao || '', 'Modalidade':modRot(p.modalidade), 'Regime':p.regime, 'Setor':setorDe(p), 'ZA':l.za, 'Rateio':k, 'Apropriação':ap(p.aprop_cod), 'Mês entrada':rotMes(l.ini), 'Mês saída':rotMes(l.fim)};
+    const p = l.pessoa, c = l.custo, k = l.rateio == null ? somaMeses(l.meses) / l.nm / (c.total || 1) : l.rateio;
+    const base = {'Nome':p.nome, 'Função':p.funcao || '', 'Modalidade':modRot(p.modalidade), 'Regime':p.regime, 'Setor':setorDe(p), 'Fase':FASE_ROT[p.fase || 'todo'], 'ZA':l.za, 'Rateio':l.rateio == null ? 'varia' : l.rateio, 'Apropriação':ap(p.aprop_cod), 'Mês entrada':rotMes(l.ini), 'Mês saída':rotMes(l.fim)};
     if (['PJ','ESTAGIO'].includes(p.modalidade)) Object.assign(base, {'Valor NF/bolsa':(num(p.valor_pj) || 0) * k, 'Uniformes e EPI':c.epi * k});
     else Object.assign(base, {'Salário':c.sal * k, 'Adicional':c.adic * k, 'Hora extra':c.he * k, 'Encargos':c.enc * k, '13º':c.dec * k, 'Férias':c.fer * k, 'Benefícios + exames':c.ben * k, 'PLR':c.plr * k, 'Uniformes e EPI':c.epi * k});
-    base['Custo mensal'] = c.total * k; base['Total no período'] = somaMeses(l.meses);
+    base['Custo mensal (média)'] = c.total * k; base['Total no período'] = somaMeses(l.meses);
     meses.forEach((m, i) => base[m] = l.meses[i + 1]); return base;
   });
   const itens = tipo => L.filter(l => l.tipo === tipo).map(l => {
-    const r = {'Item':l.item.descricao, 'Categoria':l.item.categoria, 'Ligado a':(l.donoTipo === 'equipe' ? 'Equipe ' : '') + l.dono.nome, 'ZA':l.za, 'Rateio':l.rateio, 'Qtd':l.qtd, 'Unitário':l.unit == null ? 'a definir' : l.unit, 'Cobrança':l.item.cobranca, 'Apropriação contábil':l.item.aprop_contabil || '', 'Apropriação de obra':ap(l.aprop), 'Mês início':rotMes(l.ini), 'Mês fim':rotMes(l.fim)};
+    const r = {'Item':l.item.descricao, 'Categoria':l.item.categoria, 'Ligado a':(l.donoTipo === 'equipe' ? 'Equipe ' : '') + l.dono.nome, 'ZA':l.za, 'Rateio':l.rateio == null ? 'varia' : l.rateio, 'Qtd':l.qtd, 'Unitário':l.unit == null ? 'a definir' : l.unit, 'Cobrança':l.item.cobranca, 'Apropriação contábil':l.item.aprop_contabil || '', 'Apropriação de obra':ap(l.aprop), 'Mês início':rotMes(l.ini), 'Mês fim':rotMes(l.fim)};
     if (tipo === 'Locação') Object.entries(l.item.componentes || {}).forEach(([k, v]) => r['Comp. ' + k] = v);
     r['Total no período'] = somaMeses(l.meses); meses.forEach((m, i) => r[m] = l.meses[i + 1]); return r;
   });

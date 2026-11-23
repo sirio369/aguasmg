@@ -4994,7 +4994,7 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
   subordinado PJ com cargo novo, equipe com item, resumo, Excel, excluir (subordinado sobe), recarregar. Falta QA logado
   em produção.
 
-### 24.2 Ajustes da revisão (23/11/2026, sw v443)
+### 24.2 Ajustes da revisão (23/11/2026, sw v443; fases por ZA sw v444)
 
 - **PJ e Estágio com uniforme/EPI:** pergunta "Recebe uniforme e EPI do consórcio?" (padrão **Sim**) no passo Contratação;
   Sim soma o kit do setor à NF/bolsa. Coluna nova `orc_pessoa.recebe_epi boolean default true` (CLT sempre recebe), gravada
@@ -5018,6 +5018,15 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
   ligados à pessoa aparecem em vermelho "duplicado — desmarque aqui". O Resumo da ficha avisa duplicidade; a tela da
   equipe avisa quando um membro já tem o item individual; o painel lateral mostra "⚠ N item(ns) na pessoa e na equipe —
   custo em dobro".
+- **Contrato por ZA + fases Execução/Manutenção** (`docs/migracao_orcamento_fases.sql`, aplicado 23/11 como
+  `orc_21_fases_za`): `orc_za.inicio/meses/meses_execucao` — ZA1004/ZA0200 jul/2026→jun/2031, ZA1500/ZA1600
+  jan/2027→dez/2031 (60 meses; Execução = 18 primeiros, Manutenção = 42 restantes, contados do início de cada ZA).
+  `orc_pessoa.fase` / `orc_equipe.fase` ∈ execucao|manutencao|todo (padrão todo). No passo Período a pergunta da fase vem
+  **antes** das datas; entrada/saída viram opcionais e só recortam dentro da fase. Eixo do orçamento = do menor início ao
+  último fim (jul/2026→dez/2031, 66 meses; Excel com colunas por mês/ano). **Rateio mês a mês:** em cada mês o custo se
+  divide igual só entre as ZAs ativas (pessoa em ZA1004+ZA1500: jul–dez/26 100% ZA1004, jan/27–jun/31 50/50,
+  jul–dez/31 100% ZA1500); pontual cai no 1º mês ativo. Linhas com rateio variável aparecem como "(varia)". Card mostra
+  a fase + início → fim; média/mês por ZA usa os meses da própria ZA.
 - QA (23/11): harness com banco simulado — composição CLT/PJ com e sem EPI, resumo com pontual e 2 ZAs (bate com o painel),
   período no card, duplicar 4×, Ctrl+C/V, clicar na linha + Delete (só desliga, não exclui), Desligar com o chefe
   selecionado (aviso). Falta QA logado em produção.
