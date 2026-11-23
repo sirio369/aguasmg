@@ -4993,3 +4993,31 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
 - QA (23/11/2026): fluxo completo testado com banco simulado (premissas fictícias) — criar organograma, pessoa da base,
   subordinado PJ com cargo novo, equipe com item, resumo, Excel, excluir (subordinado sobe), recarregar. Falta QA logado
   em produção.
+
+### 24.2 Ajustes da revisão (23/11/2026, sw v443)
+
+- **PJ e Estágio com uniforme/EPI:** pergunta "Recebe uniforme e EPI do consórcio?" (padrão **Sim**) no passo Contratação;
+  Sim soma o kit do setor à NF/bolsa. Coluna nova `orc_pessoa.recebe_epi boolean default true` (CLT sempre recebe), gravada
+  por `app_orc_pessoa_salvar`; Excel ganha a coluna Uniformes e EPI também para PJ/Estágio. SQL aplicado em 23/11
+  (migração `orc_20_recebe_epi`).
+- **Custo aberto no passo Contratação:** composição mensal linha a linha (salário, adicional, HE, encargos, 13º, férias,
+  benefícios, exames, PLR, uniforme/EPI → total), atualizada ao digitar.
+- **Passo 6 "Resumo" na ficha:** cada custo com por mês × meses = total no período (MO aberta + itens; pontual 1× na entrada),
+  total do colaborador, divisão por ZA quando há mais de uma e avisos (faltas, item sem preço). O Concluir fica nesse passo.
+- **Período no card** (e no PNG): "jul/26 → jun/31"; sem data = início/fim do contrato.
+- **Duplicar** (botão, Ctrl+D ou "Duplicar…" no painel): pergunta quantas cópias (1–50) da(s) pessoa(s) selecionada(s). A
+  cópia leva cargo, contratação, ZAs, setor, apropriação, período, superior, itens ligados e as **mesmas equipes** (item de
+  equipe é da equipe, não por membro — não dobra custo); nome vira "A definir". Ctrl+C / Ctrl+V cola uma cópia por vez. Várias selecionadas com chefe e subordinado → a cópia
+  mantém a hierarquia interna. Cópias ficam lado a lado, à direita, na mesma altura.
+- **Quebrar vínculo:** clicar na linha entre os cards a seleciona (destaque laranja) → Delete ou "Desligar". O botão
+  Desligar fica sempre ativo quando há ligações (antes ficava apagado até selecionar o subordinado e parecia sumido); sem
+  seleção válida ele explica o que fazer.
+- **Passo "Equipe" na ficha** (antes de Veículos e despesas, ficha agora tem 7 passos): "Vai fazer parte de alguma equipe
+  de execução?" Sim → escolhe a(s) equipe(s) (grava a participação via `app_orc_equipe_salvar.membros`) e mostra o que já
+  vem da equipe. No passo seguinte esses itens ficam **bloqueados** para a pessoa ("já vem da equipe X"); se já estavam
+  ligados à pessoa aparecem em vermelho "duplicado — desmarque aqui". O Resumo da ficha avisa duplicidade; a tela da
+  equipe avisa quando um membro já tem o item individual; o painel lateral mostra "⚠ N item(ns) na pessoa e na equipe —
+  custo em dobro".
+- QA (23/11): harness com banco simulado — composição CLT/PJ com e sem EPI, resumo com pontual e 2 ZAs (bate com o painel),
+  período no card, duplicar 4×, Ctrl+C/V, clicar na linha + Delete (só desliga, não exclui), Desligar com o chefe
+  selecionado (aviso). Falta QA logado em produção.

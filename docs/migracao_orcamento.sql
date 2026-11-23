@@ -87,6 +87,7 @@ create table if not exists orc_pessoa(
   adicional_valor numeric,          -- sobrepõe o valor calculado do adicional (null = fórmula das premissas)
   hora_extra boolean not null default false,
   valor_pj numeric,                 -- PJ: valor mensal da NF (sem encargos/benefícios)
+  recebe_epi boolean not null default true,  -- PJ/Estágio: soma o kit de uniforme/EPI do setor (CLT sempre recebe)
   zas text[] not null default '{}' check (zas <@ array['ZA1004','ZA0200','ZA1500','ZA1600']),
   aprop_cod text references orc_aprop(cod) on delete set null,
   mes_ini date, mes_fim date,       -- 1º dia do mês; null em mes_fim = até o fim do contrato
@@ -95,6 +96,7 @@ create table if not exists orc_pessoa(
   check (mes_fim is null or mes_ini is null or mes_fim >= mes_ini)
 );
 create index if not exists orc_pessoa_quadro on orc_pessoa(quadro_id);
+alter table orc_pessoa add column if not exists recebe_epi boolean not null default true;  -- ajuste 23/11 (bases já criadas)
 
 create table if not exists orc_equipe(
   id uuid primary key default gen_random_uuid(),
@@ -255,6 +257,7 @@ begin
     adicional_valor = case when p ? 'adicional_valor' then nullif(p->>'adicional_valor','')::numeric else adicional_valor end,
     hora_extra = case when p ? 'hora_extra' then coalesce((p->>'hora_extra')::boolean,false) else hora_extra end,
     valor_pj = case when p ? 'valor_pj' then nullif(p->>'valor_pj','')::numeric else valor_pj end,
+    recebe_epi = case when p ? 'recebe_epi' then coalesce((p->>'recebe_epi')::boolean,true) else recebe_epi end,
     zas = case when p ? 'zas' then coalesce((select array_agg(distinct z) from jsonb_array_elements_text(p->'zas') z),'{}') else zas end,
     aprop_cod = case when p ? 'aprop_cod' then nullif(p->>'aprop_cod','') else aprop_cod end,
     mes_ini = case when p ? 'mes_ini' then "19 - orcamento".orc_mes(p->>'mes_ini') else mes_ini end,
