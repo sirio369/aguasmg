@@ -4934,3 +4934,34 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Correção:** `app_sup_carga_falha`, `app_frota_carga_falha` e `app_pes_carga_falha` só apagam linhas de carga ainda `pendente` (antes, chamar com o id de uma carga concluída zerava o BI).
 - **SQL aplicado em produção em 19/11/2026** (migrações `sup_bi`, `sup_bi_acesso`, `sup_estoque`, `frota_bi`, `pessoas_bi`). Ordem: `migracao_sup_bi.sql` → `migracao_sup_bi_acesso.sql` → `migracao_sup_estoque.sql` → `migracao_frota_bi.sql` → `migracao_pessoas_bi.sql`.
 - **Carga separada (2026-11-19, sw v439):** botões "Cargas do SIENGE"/"Carregar arquivos" saíram das telas de BI; as cargas ficam em Auxiliar › Planejamento › **📥 Carga dos BIs** (`bi_carga`), visível só com `*_carga_acesso`.
+
+## 24. Orçamento por organograma ("fazedor de orçamento") — schema `"19 - orcamento"` · `docs/migracao_orcamento.sql` (2026-11-23, **PR-A: só banco**)
+
+Base parcial do **Orçamento Budget.xlsx** (abas Mão de Obra, Locação e parte de Despesas) montada a partir de um
+organograma em quadro livre (formato do kit de organograma: caixas, ligações, organizar/alinhar). Cada caixa é uma
+pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular etc. se ligam à pessoa ou a uma **equipe**
+(grupo de pessoas). A tela (`orcamento.html`, card no bloco 🚧 Em desenvolvimento) vem no PR seguinte.
+
+- **⚠️ Confidencial:** salários, encargos, benefícios e preços **não ficam no repositório** (público). A carga inicial
+  saiu da planilha e foi aplicada direto no banco; o script fica fora do repo. Não citar valores neste documento.
+- **Acesso:** admin ou `perfil.dev_acesso` (helper `"19 - orcamento".orc_exige()`); premissas e ZAs só admin.
+  Schema app-only: RLS ligada sem policy, sem USAGE para `authenticated`/`gis_*`; tudo por RPC `security definer`.
+- **Catálogos:** `orc_premissa` (encargos mensalista/horista, 13º, férias, adicionais, HE, PLR, benefícios fixos, EPI
+  por setor, mês 1 e duração do contrato), `orc_za`, `orc_cargo` (dedup por função), `orc_aprop` (aba Auxiliar, nível
+  1–4 + cód. SIENGE), `orc_item` (Locação com os componentes locação/motorista/plotagem/lavagem/rastreador/manutenção/
+  combustível/avarias + celular, pacote de dados, notebook, kits; `valor` null = preço a definir).
+- **Regras combinadas (23/11/2026):** várias ZAs → custo **dividido igual**; período = **mês de entrada e de saída**
+  (`mes_ini`/`mes_fim`, 1º dia do mês; itens ligados herdam se vazios); **PJ = só o valor mensal da NF** (`valor_pj`,
+  sem encargos/benefícios); cargo que não existe na base → digitar salário etc. (`app_orc_cargo_salvar` cria
+  `origem='manual'`). Insalubridade segue a fórmula (salário mínimo × %); `orc_pessoa.adicional_valor` sobrepõe quando
+  precisar bater um valor digitado na planilha.
+- **RPCs:** leitura `app_orc_catalogos()`, `app_orc_quadros()`, `app_orc_quadro(id)` (quadro + pessoas + equipes com
+  membros + vínculos); quadro `app_orc_quadro_salvar(jsonb)` / `_excluir(id)`; pessoa `app_orc_pessoa_salvar(jsonb)`
+  (upsert parcial: só as chaves enviadas), `app_orc_pessoas_pos(jsonb[])` (arrastar/organizar em lote),
+  `app_orc_pessoa_excluir(id)` (subordinados sobem para o superior); equipe `app_orc_equipe_salvar(jsonb, com membros)`
+  / `_excluir`; item ligado `app_orc_vinculo_salvar(jsonb)` (pessoa **ou** equipe, qtd, valor que sobrepõe o catálogo,
+  meses) / `_excluir`; catálogos `app_orc_cargo_salvar`, `app_orc_item_salvar`; admin `app_orc_premissa_set`,
+  `app_orc_za_set`.
+- **O cálculo do custo fica no front** (PR da tela), com as fórmulas da aba Mão de Obra; o banco só guarda as escolhas.
+- **SQL aplicado em produção em 23/11/2026** (migrações `orc_19_schema_orcamento` + `orc_19_seed`); teste E2E com
+  rollback ok (gate nega usuário sem `dev_acesso`; contagens dos catálogos batem com a planilha; exclusão em cascata).
