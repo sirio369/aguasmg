@@ -4994,7 +4994,7 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
   subordinado PJ com cargo novo, equipe com item, resumo, Excel, excluir (subordinado sobe), recarregar. Falta QA logado
   em produção.
 
-### 24.2 Ajustes da revisão (23/11/2026, sw v443)
+### 24.2 Ajustes da revisão (23/11/2026, sw v443; fases por ZA sw v444)
 
 - **PJ e Estágio com uniforme/EPI:** pergunta "Recebe uniforme e EPI do consórcio?" (padrão **Sim**) no passo Contratação;
   Sim soma o kit do setor à NF/bolsa. Coluna nova `orc_pessoa.recebe_epi boolean default true` (CLT sempre recebe), gravada
