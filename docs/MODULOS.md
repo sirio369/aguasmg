@@ -5116,3 +5116,7 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - Nome obrigatório, gravado em maiúsculas e sem espaço duplo; **nome igual a um cargo da base** (ou repetido entre os novos)
   marca a linha e bloqueia salvar — o banco juntaria os dois. Para mudar um cargo que já existe, edite a linha dele.
 - Salário em branco = a definir (grava 0). Sem SQL novo.
+- **Correção do colar entre organogramas** (24/11): ao trocar de organograma pela lista suspensa o foco ficava nela e o
+  Ctrl+V (e C/Z) era ignorado — nada era colado. Agora a lista perde o foco ao trocar e os atalhos Ctrl valem mesmo com
+  o foco numa lista. Colado de outro organograma **mantém o nome** (no mesmo organograma segue "A definir") e cai no canto
+  de cima/esquerda da área visível; erro ao colar aparece em mensagem.

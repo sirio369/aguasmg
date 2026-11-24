@@ -793,8 +793,11 @@ async function duplicar(ids, vezes, fonte){
   const x1 = Math.min(...orig.map(p => p.x)), x2 = Math.max(...orig.map(p => p.x)) + CARD_W;
   const y1 = Math.min(...orig.map(p => p.y)), y2 = Math.max(...orig.map(p => p.y + nodeH(p)));
   const larg = x2 - x1 + 40;
-  const faixa = PES.filter(n => n.y < y2 && n.y + nodeH(n) > y1 && n.x >= x1);   // cards na mesma altura, à direita
-  const ini = Math.max(x2, ...faixa.map(n => n.x + CARD_W)) + 40;
+  // outro organograma: o grupo entra no canto de cima/esquerda da área visível; mesmo organograma: à direita do original
+  const vx = (40 - view.tx) / view.s, vy = (60 - view.ty) / view.s;
+  const dy = mesmo ? 0 : Math.round(vy - y1);
+  const faixa = mesmo ? PES.filter(n => n.y < y2 && n.y + nodeH(n) > y1 && n.x >= x1) : [];   // cards na mesma altura, à direita
+  const ini = mesmo ? Math.max(x2, ...faixa.map(n => n.x + CARD_W)) + 40 : Math.round(vx);
   const campos = ['cor','cargo_id','funcao','setor','fase','modalidade','regime','salario','adicional','adicional_valor','valor_pj','aprop_cod','mes_ini','mes_fim','obs'];
   const novos = [];
   duplicando = true;
@@ -803,7 +806,7 @@ async function duplicar(ids, vezes, fonte){
       const mapa = {}, dx = ini + k * larg - x1;
       for (const o of orig) {
         const id = uid(); mapa[o.id] = id;
-        const p = {id, quadro_id:Q.id, nome:'A definir', x:Math.round(o.x + dx), y:o.y, parent_id:mapa[o.parent_id] || (mesmo ? o.parent_id : '') || '', zas:(o.zas || []).slice(), hora_extra:!!o.hora_extra, recebe_epi:o.recebe_epi !== false};
+        const p = {id, quadro_id:Q.id, nome:mesmo ? 'A definir' : (o.nome || 'A definir'), x:Math.round(o.x + dx), y:o.y + dy, parent_id:mapa[o.parent_id] || (mesmo ? o.parent_id : '') || '', zas:(o.zas || []).slice(), hora_extra:!!o.hora_extra, recebe_epi:o.recebe_epi !== false};
         campos.forEach(c => p[c] = o[c] ?? '');
         await savePessoa(id, p); novos.push(id);
         const vs = VS.filter(v => v.pessoa_id === o.id);
@@ -812,9 +815,9 @@ async function duplicar(ids, vezes, fonte){
         if (mesmo) for (const e of EQ.filter(e => (e.membros || []).includes(o.id))) { const membros = (e.membros || []).concat(id); await rpc('app_orc_equipe_salvar', {p:{id:e.id, membros}}); e.membros = membros; }
       }
     }
-    toast(novos.length === 1 ? 'Cópia criada (nome “A definir”)' : novos.length + ' cópias criadas (nome “A definir”)');
+    if (mesmo) toast(novos.length === 1 ? 'Cópia criada (nome “A definir”)' : novos.length + ' cópias criadas (nome “A definir”)');
   } catch (e) {
-    if (novos.length) toast('Parei no meio: ' + novos.length + ' cópia(s) criada(s)');
+    toast(novos.length ? 'Parei no meio: ' + novos.length + ' cópia(s) criada(s)' : 'Não deu para colar: ' + ((e && e.message) || 'erro'));
   } finally {
     duplicando = false;
     if (tool !== 'select') setTool('select');
@@ -1003,7 +1006,8 @@ board.addEventListener('wheel', e => {
 const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden;
 document.addEventListener('keydown', e => {
   if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
-  if (e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.target.isContentEditable || /INPUT|TEXTAREA/.test(e.target.tagName) || (e.target.tagName === 'SELECT' && !(e.ctrlKey || e.metaKey))) return;
+  if (e.target.tagName === 'SELECT') e.target.blur();
   if (!Q) return;
   if (e.key === ' ') { spaceDown = true; e.preventDefault(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSel(); return; }
@@ -1016,7 +1020,7 @@ document.addEventListener('keydown', e => {
     if (kk === 'v' && CLIP && CLIP.pes && CLIP.pes.length && Q) {
       e.preventDefault();
       if (CLIP.quadro === Q.id) { const ok = CLIP.pes.map(p => p.id).filter(id => byId(PES, id)); if (ok.length) duplicar(ok, 1); else duplicar(null, 1, Object.assign({}, CLIP, {quadro:null})); }
-      else { duplicar(null, 1, CLIP).then(() => toast(`Colado de “${CLIP.titulo}” (equipes não vêm junto)`)); }
+      else { const n0 = PES.length; duplicar(null, 1, CLIP).then(() => { if (PES.length > n0) toast(`Colado de “${CLIP.titulo}”: ${PES.length - n0} pessoa(s) com nome e itens (equipes não vêm junto)`); }); }
       return;
     }
     if (kk === 'd') { e.preventDefault(); pedirCopias(); return; }
@@ -1685,7 +1689,7 @@ function exportPng(){
 /* ================= quadros ================= */
 function fillBoardSel(){ $('boardSel').innerHTML = QUADROS.map(q => { const atual = Q && q.id === Q.id; if (atual) q.pessoas = PES.length; return `<option value="${q.id}"${atual ? ' selected' : ''}>${q.restrito ? '🔐 ' : ''}${esc(q.titulo)} (${q.pessoas || 0})</option>`; }).join(''); const a = $('boardAcc'); a.disabled = !Q; a.title = Q && Q.restrito ? 'Organograma restrito: veja quem pode entrar' : 'Quem pode entrar neste organograma (hoje: todos com acesso ao Orçamento)'; }
 function fillCargos(){ $('dlCargos').innerHTML = CARGOS.map(c => `<option value="${esc(c.funcao)}"></option>`).join(''); }
-$('boardSel').onchange = e => abrirQuadro(e.target.value);
+$('boardSel').onchange = e => { e.target.blur(); abrirQuadro(e.target.value); };
 $('boardNew').onclick = $('emptyNew').onclick = async () => {
   const t = prompt('Nome do organograma', 'Organograma ' + (QUADROS.length + 1)); if (t === null) return;
   try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0, restrito:false, pode_config:true}); await abrirQuadro(id); } catch (e) {}
