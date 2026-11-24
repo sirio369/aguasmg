@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!--
-  Orçamento por organograma ("fazedor de orçamento") — 🚧 Em desenvolvimento (gate dev_acesso).
+  Orçamento por organograma ("fazedor de orçamento") — acesso próprio do módulo (⚙️ Acesso, só o dono; RPC orc_pode).
   Quadro livre portado do kit de organograma: caixas, ligações, organizar/alinhar, texto e caneta.
   Cada caixa = 1 pessoa = 1 linha de Mão de Obra; itens (Locação/Despesas) ligados à pessoa ou a uma equipe.
   Banco: schema "19 - orcamento" (RPCs app_orc_*). Valores (salários, encargos, preços) vêm SÓ do banco:
@@ -137,6 +137,7 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .steps{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
 .steps button{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
 .steps button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.seg{display:flex;gap:4px}.seg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .steps button.ok::before{content:"✓";font-size:11px}
 .dlg-body{padding:14px 18px;overflow:auto;display:flex;flex-direction:column;gap:14px}
 .dlg-foot{padding:10px 18px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -256,6 +257,7 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
       <button id="resumo" class="primary" title="Resumo do orçamento por ZA, pessoa e mês">Resumo</button>
       <button id="xlsx" title="Baixa o orçamento (.xlsx) nas abas Mão de Obra, Locação e Despesas">Excel</button>
       <button id="png" title="Baixa uma imagem do quadro">PNG</button>
+      <button id="usrAcc" hidden title="Quem entra no módulo Orçamento (só o dono do módulo)">👥 Acesso</button>
       <button id="cfg" title="Parâmetros de cálculo: premissas, contrato das ZAs, cargos e itens — valem para todos os lançamentos">⚙️ Parâmetros</button>
     </div>
     <span id="status" class="status" aria-live="polite"></span>
@@ -319,6 +321,14 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
     <div class="dlg-head"><h2 id="dlgATit">🔐 Quem pode entrar neste organograma</h2></div>
     <div class="dlg-body" id="aBody"></div>
     <div class="dlg-foot"><span class="prev" id="aPrev"></span><button id="aClose" type="button">Cancelar</button><button id="aSave" type="button" class="primary">Salvar</button></div>
+  </div>
+</div>
+<!-- acesso ao módulo -->
+<div id="dlgU" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgUTit">
+  <div class="dlg-card">
+    <div class="dlg-head"><h2 id="dlgUTit">👥 Quem entra no Orçamento</h2></div>
+    <div class="dlg-body" id="uBody"></div>
+    <div class="dlg-foot"><span class="prev" id="uPrev"></span><button id="uClose" type="button" class="primary">Fechar</button></div>
   </div>
 </div>
 <datalist id="dlCargos"></datalist>
@@ -470,9 +480,12 @@ function errosEquipe(e){
   const ps = membrosDe(e), out = [];
   if (new Set(ps.map(p => perKey(periodoPessoa(p)))).size > 1) out.push('datas');
   if (new Set(ps.map(nivel3De).filter(Boolean)).size > 1) out.push('cc');
+  if (new Set(ps.map(zaKey)).size > 1) out.push('za');
   return out;
 }
-function zasEquipe(e){ if (e.zas && e.zas.length) return e.zas; const s = new Set(); (e.membros || []).forEach(id => { const p = byId(PES, id); (p && p.zas || []).forEach(z => s.add(z)); }); return [...s]; }
+/* ZA da equipe = a dos membros (todos iguais, senão não salva); sem membros fica a gravada (legado) */
+const zaKey = p => (p.zas || []).slice().sort().join(',');
+function zasEquipe(e){ const ps = membrosDe(e); return ps.length ? (ps[0].zas || []).slice() : (e.zas || []); }
 function faltas(p){
   const f = [];
   if (!(p.zas && p.zas.length)) f.push('ZA');
@@ -1003,7 +1016,7 @@ board.addEventListener('wheel', e => {
   if (e.ctrlKey || (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && !e.shiftKey)) zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
   else { view.tx -= e.deltaX || e.deltaY; applyView(); }
 }, {passive:false});
-const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden;
+const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden || !$('dlgU').hidden;
 document.addEventListener('keydown', e => {
   if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
   if (e.target.isContentEditable || /INPUT|TEXTAREA/.test(e.target.tagName) || (e.target.tagName === 'SELECT' && !(e.ctrlKey || e.metaKey))) return;
@@ -1058,7 +1071,7 @@ function abrirFicha(id){
   if (W.equipes.size) setEmEquipe(true);
   renderFicha();
 }
-function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = $('dlgA').hidden = true; AC = null; W = null; E = null; render(); }
+function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = $('dlgA').hidden = $('dlgU').hidden = true; AC = null; UA = null; W = null; E = null; render(); }
 $('pCancel').onclick = fecharDlgs;
 $('pBack').onclick = () => { let i = W.passo - 1; while (i > 0 && !passoOk(i)) i--; if (i >= 0) { W.passo = i; renderFicha(); } };
 $('pNext').onclick = () => { let i = W.passo + 1; while (i < PASSOS.length - 1 && !passoOk(i)) i++; if (i <= PASSOS.length - 1) { W.passo = i; W.visto.add(i); renderFicha(); } };
@@ -1317,18 +1330,20 @@ function membrosHtml(d){
   const ps = membrosDe(d);
   if (!ps.length) return '<div class="small muted">Ninguém selecionado.</div>';
   const per = ps.map(p => ({p, r:periodoPessoa(p)})), cont = {}, contG = {};
-  per.forEach(x => { const k = perKey(x.r); cont[k] = (cont[k] || 0) + 1; const g = nivel3De(x.p); if (g) contG[g] = (contG[g] || 0) + 1; });
-  const maior = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0], gMaior = Object.keys(contG).sort((a, b) => contG[b] - contG[a])[0];
+  const contZ = {};
+  per.forEach(x => { const k = perKey(x.r); cont[k] = (cont[k] || 0) + 1; const g = nivel3De(x.p); if (g) contG[g] = (contG[g] || 0) + 1; const z = zaKey(x.p); contZ[z] = (contZ[z] || 0) + 1; });
+  const maior = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0], gMaior = Object.keys(contG).sort((a, b) => contG[b] - contG[a])[0], zMaior = Object.keys(contZ).sort((a, b) => contZ[b] - contZ[a])[0];
   const er = errosEquipe(d);
   let h = `<div class="tbl-wrap" style="max-height:40vh"><table><thead><tr><th>Nome</th><th>Função</th><th>Apropriação</th><th>ZA</th><th>Início</th><th>Fim</th><th></th></tr></thead><tbody>`;
   per.forEach(({p, r}) => {
-    const dif = (er.includes('datas') && perKey(r) !== maior) || (er.includes('cc') && nivel3De(p) && nivel3De(p) !== gMaior);
+    const dif = (er.includes('datas') && perKey(r) !== maior) || (er.includes('cc') && nivel3De(p) && nivel3De(p) !== gMaior) || (er.includes('za') && zaKey(p) !== zMaior);
     h += `<tr${dif ? ' class="dif"' : ''}><td>${esc(p.nome || 'A definir')}</td><td>${esc((p.funcao || '').toLowerCase())}</td><td>${esc(aprRot(p.aprop_cod))}</td><td>${esc(zasRot(p.zas))}</td><td class="n">${r ? rotMes(r.a) : '—'}</td><td class="n">${r ? rotMes(r.b) : '—'}</td><td><button type="button" data-rmem="${p.id}" aria-label="Tirar ${esc(p.nome || 'A definir')} da equipe">✕</button></td></tr>`;
   });
   h += `</tbody></table></div>`;
   if (er.includes('datas')) h += `<div class="badge warn">⚠ Os membros têm datas de entrada/saída diferentes (linhas destacadas). Todos da equipe precisam do mesmo início e fim: ajuste o período na ficha da pessoa ou tire-a da equipe. Não dá para salvar assim.</div>`;
   if (er.includes('cc')) h += `<div class="badge warn">⚠ Os membros estão em centros de custo diferentes (1º nível: ${[...new Set(ps.map(nivel3De).filter(Boolean))].map(g => esc(semCod(g))).join(', ')}). A equipe usa um só: ajuste a apropriação na ficha ou tire a pessoa. Não dá para salvar assim.</div>`;
-  if (!er.length) { const r = per[0].r; h += `<div class="badge">Período da equipe (vem dos membros): ${r ? rotMes(r.a) + ' a ' + rotMes(r.b) + ' · ' + (r.b - r.a + 1) + ' meses' : 'fora do período'}${d.aprop_grupo ? ' · centro de custo: ' + esc(semCod(d.aprop_grupo)) : ''}</div>`; }
+  if (er.includes('za')) h += `<div class="badge warn">⚠ Os membros estão em ZAs diferentes (${[...new Set(ps.map(p => zasRot(p.zas) || 'sem ZA'))].map(esc).join(' · ')}). A equipe usa as ZAs dos membros, que precisam ser as mesmas: ajuste a ZA na ficha ou tire a pessoa. Não dá para salvar assim.</div>`;
+  if (!er.length) { const r = per[0].r; h += `<div class="badge">Período da equipe (vem dos membros): ${r ? rotMes(r.a) + ' a ' + rotMes(r.b) + ' · ' + (r.b - r.a + 1) + ' meses' : 'fora do período'} · ZA: ${esc(zasRot(ps[0].zas) || 'sem ZA')}${d.aprop_grupo ? ' · centro de custo: ' + esc(semCod(d.aprop_grupo)) : ''}</div>`; }
   return h;
 }
 function mselHtml(d){
@@ -1366,14 +1381,12 @@ function renderEquipe(){
   const d = E.d, B = $('eBody');
   $('dlgETit').textContent = E.novo ? 'Nova equipe' : 'Equipe: ' + d.nome;
   let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
-  h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim e 1º nível de apropriação.</div></div>`;
-  h += `<div class="q"><span class="lab">ZA da equipe</span>${chipsZa(d.zas || [])}<div class="help">Vazio = as ZAs das pessoas da equipe. Os itens da equipe são divididos igual entre as ZAs.</div></div>`;
+  h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período, a ZA e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim, ZA(s) e 1º nível de apropriação. Com mais de uma ZA, os itens da equipe são divididos igual entre elas.</div></div>`;
   h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${d.aprop_grupo ? '' : '<div class="badge warn">Os membros ainda não têm apropriação de obra: defina na ficha para escolher o sub-CC (Equipamentos, Material, Serviços terceiro) de cada item.</div>'}${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}<div class="help">O 1º nível do centro de custo é o dos membros${d.aprop_grupo ? ' (' + esc(semCod(d.aprop_grupo)) + ')' : ''}; o sub-CC é escolhido em cada item.</div></div>`;
   B.innerHTML = h;
   $('eNome').oninput = e => d.nome = e.target.value;
   B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   if (PES.length) bindMembros(B, d);
-  d.zas = d.zas || []; bindZas(B, d.zas, prevEquipe);
   bindItens(B, E.itens, prevEquipe);
   $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = errosEquipe(d).length > 0; prevEquipe();
 }
@@ -1387,8 +1400,8 @@ $('eCancel').onclick = fecharDlgs;
 $('eSave').onclick = async () => {
   const d = E.d;
   const er = errosEquipe(d);
-  if (er.length) { toast(er.includes('datas') ? 'Membros com datas de entrada/saída diferentes: ajuste antes de salvar' : 'Membros em centros de custo diferentes: ajuste antes de salvar'); return; }
-  d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null;
+  if (er.length) { toast({datas:'Membros com datas de entrada/saída diferentes', cc:'Membros em centros de custo diferentes', za:'Membros em ZAs diferentes'}[er[0]] + ': ajuste antes de salvar'); return; }
+  d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null; d.zas = zasEquipe(d);
   $('eSave').disabled = true;
   try {
     const g = d.aprop_grupo || ''; d.aprop_cod = g ? (subPadrao({categoria:'equipamento'}, g) || '') : (d.aprop_cod || '');
@@ -1694,6 +1707,33 @@ $('boardNew').onclick = $('emptyNew').onclick = async () => {
   const t = prompt('Nome do organograma', 'Organograma ' + (QUADROS.length + 1)); if (t === null) return;
   try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0, restrito:false, pode_config:true}); await abrirQuadro(id); } catch (e) {}
 };
+/* ================= 👥 acesso ao módulo =================
+   Separado do "Em desenvolvimento": entra o dono do módulo e quem estiver marcado aqui (tabela orc_usuario).
+   Só o dono vê o botão e muda (as RPCs conferem). Cada marcação grava na hora. */
+let UA = null;
+$('usrAcc').onclick = async () => {
+  try { const l = await rpc('app_orc_acesso_listar'); UA = {l, busca:'', so:true}; renderUA(); $('dlgU').hidden = false; } catch (e) {}
+};
+function renderUA(){
+  const q = UA.busca.toLowerCase(), n = UA.l.filter(u => u.acesso || u.dono).length;
+  const lista = UA.l.filter(u => (!UA.so || u.acesso || u.dono) && (!q || ((u.nome || '') + ' ' + (u.email || '') + ' ' + (u.cargo || '')).toLowerCase().includes(q)));
+  let h = `<div class="badge">Entram no Orçamento <b>${n}</b> pessoa(s). Vale para a página, o card da home e as funções do banco — o acesso "Em desenvolvimento" não abre mais o Orçamento.</div>`;
+  h += `<div class="row" style="align-items:end"><div class="q"><input id="uBusca" placeholder="Buscar nome, e-mail ou cargo" value="${esc(UA.busca)}" autocomplete="off"></div>` +
+       `<div class="seg"><button type="button" data-uso="1" class="${UA.so ? 'on' : ''}">Com acesso</button><button type="button" data-uso="0" class="${UA.so ? '' : 'on'}">Todos</button></div></div>`;
+  h += `<div class="msel-list" style="max-height:55vh">` + (lista.map(u => `<label><input type="checkbox" data-ua="${u.id}"${u.acesso || u.dono ? ' checked' : ''}${u.dono ? ' disabled' : ''}> <span>${esc(u.nome || '?')} <small>· ${esc(u.cargo || u.funcao || '')} · ${esc(u.email || '')}${u.dono ? ' · dono do módulo (sempre entra)' : ''}</small></span></label>`).join('') || '<span class="small muted">Ninguém com esse filtro.</span>') + `</div>`;
+  h += `<div class="help">Tirar alguém daqui fecha o módulo inteiro para essa pessoa (organogramas, parâmetros, cargos e salários). Os 🔐 de cada organograma continuam valendo para quem entra.</div>`;
+  $('uBody').innerHTML = h; $('uPrev').textContent = n + ' com acesso';
+  $('uBusca').oninput = e => { UA.busca = e.target.value; renderUA(); const i = $('uBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+  $('uBody').querySelectorAll('[data-uso]').forEach(b => b.onclick = () => { UA.so = b.dataset.uso === '1'; renderUA(); });
+  $('uBody').querySelectorAll('[data-ua]').forEach(c => c.onchange = async () => {
+    const u = UA.l.find(x => x.id === c.dataset.ua); c.disabled = true;
+    try { await rpc('app_orc_acesso_set', {p_id:u.id, p_on:c.checked}); u.acesso = c.checked; toast((c.checked ? 'Liberado: ' : 'Retirado: ') + (u.nome || '')); }
+    catch (e) { c.checked = !c.checked; }
+    renderUA();
+  });
+}
+$('uClose').onclick = () => { $('dlgU').hidden = true; UA = null; };
+
 /* ================= 🔐 acesso por organograma =================
    Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e o dono do módulo
    (tabela orc_dono; os demais administradores entram só se marcados). Só o dono ou quem criou muda (a RPC confere). */
@@ -1761,8 +1801,8 @@ try {
   if (!(data.session && data.session.user)) $('gm').textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.';
   else {
     const { data: me } = await sb.rpc('app_me');
-    if (me && (me.dev_acesso || me.is_admin)) { $('gate').remove(); await iniciar(); }
-    else $('gm').textContent = 'Acesso restrito — ' + (data.session.user.email || '') + ' não tem acesso ao Orçamento (módulo em desenvolvimento).';
+    if (me && me.orc_acesso) { $('gate').remove(); $('usrAcc').hidden = !me.orc_dono; await iniciar(); }
+    else $('gm').textContent = 'Acesso restrito — ' + (data.session.user.email || '') + ' não tem acesso ao Orçamento. Peça ao responsável pelo módulo.';
   }
 } catch (e) { const g = $('gm'); if (g) g.textContent = 'Não foi possível abrir o Orçamento: ' + ((e && e.message) || e); }
 </script>
