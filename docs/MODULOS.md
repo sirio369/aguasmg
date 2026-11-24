@@ -5074,3 +5074,18 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   área de vivência (novo) — e banheiro químico como item mensal; kit de escritório ganhou preço. Valores fora do repo.
 - QA (24/11): harness — Sim esconde o passo e pula na navegação, Não volta com a lista e a coluna Cobrança; item marcado
   some com Sim, volta com Não; salvar com Sim apaga o vínculo da pessoa.
+
+### 24.5 Equipe: membros por lista com filtro, período e CC vindos dos membros (24/11/2026, sw v447)
+
+- **Quem faz parte** virou lista suspensa de seleção múltipla (`<details class="msel">`): filtro por apropriação
+  (1º nível da apropriação de obra da pessoa, "Sem apropriação" incluso), busca por nome/função, "Marcar/Desmarcar os
+  listados". Abaixo, **tabela** só com os selecionados: nome, função, apropriação, ZA, início, fim (1º e último mês com
+  custo da ficha) e ✕ para tirar.
+- **A equipe não tem data própria**: saíram a pergunta de fase e os campos de início/fim. O período dos itens da equipe é o
+  período comum dos membros (`perEquipe()` → usado nas linhas e em "× n meses"). Gravação: `fase='todo'`, datas vazias.
+- **O 1º nível do centro de custo (VCA, HDD…) também vem dos membros** (`grupoMembros()`); saiu o seletor de CC da equipe.
+  O sub-CC (Equipamentos, Material, Serviços terceiro) continua em cada item. Trocar membros remapeia o sub-CC pelo nome.
+- **Impeditivo**: membros com início/fim diferentes ou com 1º nível de apropriação diferente → linhas destacadas, aviso e
+  **Salvar desabilitado** (e o clique é barrado com mensagem). Sem membros, o item da equipe vale o contrato todo.
+- QA (24/11): harness — filtro por apropriação, marcar listados, datas diferentes e CC diferente bloqueiam, ao tirar os
+  divergentes libera; período da equipe 07/2026–12/2027 (18 meses) vindo dos membros no Resumo › Itens.

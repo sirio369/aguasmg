@@ -152,6 +152,17 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .chips button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .badge{font-size:12px;border-radius:6px;padding:5px 9px;background:var(--surface-2);border:1px solid var(--line);line-height:1.4}
 .badge.warn{background:var(--warn-bg);border-color:transparent}
+.msel>summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:7px 10px;display:flex;justify-content:space-between;gap:8px;background:var(--surface)}
+.msel>summary::-webkit-details-marker{display:none}
+.msel>summary::after{content:"\25BE";color:var(--muted)}
+.msel[open]>summary::after{content:"\25B4"}
+.msel-pop{border:1px solid var(--line);border-radius:8px;margin-top:4px;padding:8px;display:grid;gap:6px;background:var(--surface)}
+.msel-pop .row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+.msel-list{max-height:260px;overflow:auto;display:grid;border-top:1px solid var(--line);padding-top:4px}
+.msel-list label{display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:6px;font-size:13px;cursor:pointer}
+.msel-list label:hover{background:var(--surface-2)}
+.msel-list small{color:var(--muted)}
+tr.dif td{background:var(--warn-bg)}
 .items{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .it{display:grid;grid-template-columns:22px minmax(0,1fr) 150px 64px 104px;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid var(--line);font-size:13px}
 .items.sub .it{grid-template-columns:22px minmax(0,1fr) 150px 170px 64px 104px}
@@ -432,6 +443,25 @@ function selectGrupo(val){
 const grupoDe = d => d.aprop_grupo || (d.aprop_cod && APR[d.aprop_cod] ? APR[d.aprop_cod].nivel3 : null);
 function unitVinc(v){ if (num(v.valor) != null) return num(v.valor); const it = ITEM[v.item_id]; return it && num(it.valor) != null ? num(it.valor) : null; }
 function tipoItem(it){ return it && (it.origem === 'Locação' || (it.origem === 'manual' && (it.categoria === 'veiculo' || it.categoria === 'equipamento'))) ? 'Locação' : 'Despesas'; }
+/* período de cada pessoa = 1º e último mês com custo; a equipe não tem data própria: usa o período comum dos membros */
+function periodoPessoa(p){ const at = ativos(pesos(janelasZA(p, p.zas || []))); return at.length ? {a:at[0], b:at[at.length - 1]} : null; }
+const perKey = r => r ? r.a + '-' + r.b : 'fora';
+const membrosDe = e => (e.membros || []).map(id => byId(PES, id)).filter(Boolean);
+function perEquipe(e){
+  const ps = membrosDe(e), r = ps.length ? periodoPessoa(ps[0]) : null;
+  if (!ps.length) return {fase:'todo', mes_ini:null, mes_fim:null};
+  if (!r) return {fase:'todo', mes_ini:isoMes(NM()) + '-01', mes_fim:isoMes(1) + '-01'};   // fora do período: nenhum mês
+  return {fase:'todo', mes_ini:isoMes(r.a) + '-01', mes_fim:isoMes(r.b) + '-01'};
+}
+/* 1º nível do CC (VCA, HDD…) = o da apropriação dos membros; o sub-CC é de cada item */
+const nivel3De = p => p && p.aprop_cod && APR[p.aprop_cod] ? APR[p.aprop_cod].nivel3 : null;
+function grupoMembros(e){ const g = new Set(membrosDe(e).map(nivel3De).filter(Boolean)); return g.size === 1 ? [...g][0] : null; }
+function errosEquipe(e){
+  const ps = membrosDe(e), out = [];
+  if (new Set(ps.map(p => perKey(periodoPessoa(p)))).size > 1) out.push('datas');
+  if (new Set(ps.map(nivel3De).filter(Boolean)).size > 1) out.push('cc');
+  return out;
+}
 function zasEquipe(e){ if (e.zas && e.zas.length) return e.zas; const s = new Set(); (e.membros || []).forEach(id => { const p = byId(PES, id); (p && p.zas || []).forEach(z => s.add(z)); }); return [...s]; }
 function faltas(p){
   const f = [];
@@ -463,7 +493,7 @@ function linhas(){
     if (v.pessoa_id) { dono = byId(PES, v.pessoa_id); if (!dono) return; zas = dono.zas; aprop = v.aprop_cod || dono.aprop_cod; }
     else { dono = byId(EQ, v.equipe_id); if (!dono) return; zas = zasEquipe(dono); aprop = v.aprop_cod || dono.aprop_cod; }
     const cob = cobV(v);
-    nova({tipo:tipoItem(it), item:it, vinc:v, cob, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, semPreco: u == null}, pesos(janelasZA(dono, zas, v)), (u || 0) * qtd, cob === 'pontual');
+    nova({tipo:tipoItem(it), item:it, vinc:v, cob, dono, donoTipo: v.pessoa_id ? 'pessoa' : 'equipe', unit:u, qtd, aprop, semPreco: u == null}, pesos(janelasZA(v.pessoa_id ? dono : perEquipe(dono), zas, v)), (u || 0) * qtd, cob === 'pontual');
   });
   return out;
 }
@@ -966,7 +996,7 @@ function itensDasEquipes(ids){ const m = new Map(); ids.forEach(eid => { const e
 /* duplicidades: item ligado à pessoa que também está numa equipe dela */
 function duplicidades(){ const out = []; PES.forEach(p => { const eqs = EQ.filter(e => (e.membros || []).includes(p.id)).map(e => e.id); if (!eqs.length) return; const m = itensDasEquipes(eqs); VIN.forEach(v => { if (v.pessoa_id === p.id && m.has(v.item_id) && ITEM[v.item_id]) out.push({p, it:ITEM[v.item_id], eqs:m.get(v.item_id)}); }); }); return out; }
 const mesesFicha = () => W ? ativos(pesos(janelasZA(W.d, W.d.zas || []))).length : 0;
-const mesesEquipe = () => E ? ativos(pesos(janelasZA(E.d, zasEquipe(E.d)))).length : 0;
+const mesesEquipe = () => E ? ativos(pesos(janelasZA(perEquipe(E.d), zasEquipe(E.d)))).length : 0;
 /* texto "R$ x/mês × n meses = total" de cada item marcado */
 function atualizaPer(root, map, n){
   if (!root) return;
@@ -1191,39 +1221,78 @@ async function salvarFicha(){
 let E = null;
 function abrirEquipe(id){
   if (!Q) return;
-  if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; E.d.aprop_grupo = grupoDe(E.d); }
+  if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; E.d.aprop_grupo = grupoMembros(E.d) || grupoDe(E.d); }
   else {
     const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
-    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:(sp[0] && sp[0].aprop_cod && APR[sp[0].aprop_cod]) ? APR[sp[0].aprop_cod].nivel3 : null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+    E.d.aprop_grupo = grupoMembros(E.d);
   }
   renderEquipe();
+}
+const aprRot = cod => cod && APR[cod] ? semCod(APR[cod].nivel3) : 'Sem apropriação';
+function membrosHtml(d){
+  const ps = membrosDe(d);
+  if (!ps.length) return '<div class="small muted">Ninguém selecionado.</div>';
+  const per = ps.map(p => ({p, r:periodoPessoa(p)})), cont = {}, contG = {};
+  per.forEach(x => { const k = perKey(x.r); cont[k] = (cont[k] || 0) + 1; const g = nivel3De(x.p); if (g) contG[g] = (contG[g] || 0) + 1; });
+  const maior = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0], gMaior = Object.keys(contG).sort((a, b) => contG[b] - contG[a])[0];
+  const er = errosEquipe(d);
+  let h = `<div class="tbl-wrap" style="max-height:40vh"><table><thead><tr><th>Nome</th><th>Função</th><th>Apropriação</th><th>ZA</th><th>Início</th><th>Fim</th><th></th></tr></thead><tbody>`;
+  per.forEach(({p, r}) => {
+    const dif = (er.includes('datas') && perKey(r) !== maior) || (er.includes('cc') && nivel3De(p) && nivel3De(p) !== gMaior);
+    h += `<tr${dif ? ' class="dif"' : ''}><td>${esc(p.nome || 'A definir')}</td><td>${esc((p.funcao || '').toLowerCase())}</td><td>${esc(aprRot(p.aprop_cod))}</td><td>${esc(zasRot(p.zas))}</td><td class="n">${r ? rotMes(r.a) : '—'}</td><td class="n">${r ? rotMes(r.b) : '—'}</td><td><button type="button" data-rmem="${p.id}" aria-label="Tirar ${esc(p.nome || 'A definir')} da equipe">✕</button></td></tr>`;
+  });
+  h += `</tbody></table></div>`;
+  if (er.includes('datas')) h += `<div class="badge warn">⚠ Os membros têm datas de entrada/saída diferentes (linhas destacadas). Todos da equipe precisam do mesmo início e fim: ajuste o período na ficha da pessoa ou tire-a da equipe. Não dá para salvar assim.</div>`;
+  if (er.includes('cc')) h += `<div class="badge warn">⚠ Os membros estão em centros de custo diferentes (1º nível: ${[...new Set(ps.map(nivel3De).filter(Boolean))].map(g => esc(semCod(g))).join(', ')}). A equipe usa um só: ajuste a apropriação na ficha ou tire a pessoa. Não dá para salvar assim.</div>`;
+  if (!er.length) { const r = per[0].r; h += `<div class="badge">Período da equipe (vem dos membros): ${r ? rotMes(r.a) + ' a ' + rotMes(r.b) + ' · ' + (r.b - r.a + 1) + ' meses' : 'fora do período'}${d.aprop_grupo ? ' · centro de custo: ' + esc(semCod(d.aprop_grupo)) : ''}</div>`; }
+  return h;
+}
+function mselHtml(d){
+  const f = E.filtroApr || '', q = (E.busca || '').toLowerCase(), m = new Set(d.membros || []);
+  const aprs = [...new Set(PES.map(p => aprRot(p.aprop_cod)))].sort((a, b) => a.localeCompare(b));
+  const lista = PES.filter(p => (!f || aprRot(p.aprop_cod) === f) && (!q || ((p.nome || '') + ' ' + (p.funcao || '')).toLowerCase().includes(q)))
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  const n = m.size;
+  return `<details class="msel" id="eMsel"${E.mselAberto ? ' open' : ''}><summary>${n ? n + (n === 1 ? ' pessoa selecionada' : ' pessoas selecionadas') : 'Selecionar pessoas…'}</summary>` +
+    `<div class="msel-pop"><div class="row2"><select id="eFApr" aria-label="Filtrar por apropriação"><option value="">Todas as apropriações</option>${aprs.map(a => `<option value="${esc(a)}"${f === a ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select><input id="eBusca" placeholder="Buscar nome ou função" value="${esc(E.busca || '')}" autocomplete="off"></div>` +
+    `<div class="small"><button type="button" id="eTodos">Marcar os ${lista.length} listados</button> <button type="button" id="eNenhum">Desmarcar os listados</button></div>` +
+    `<div class="msel-list">${lista.map(p => { const r = periodoPessoa(p); return `<label><input type="checkbox" data-mem="${p.id}"${m.has(p.id) ? ' checked' : ''}> <span>${esc(p.nome || 'A definir')} <small>· ${esc((p.funcao || '').toLowerCase())} · ${esc(aprRot(p.aprop_cod))} · ${r ? rotMes(r.a) + ' a ' + rotMes(r.b) : 'fora do período'}</small></span></label>`; }).join('') || '<span class="small muted">Nenhuma pessoa com esse filtro.</span>'}</div></div></details>`;
+}
+/* troca de membros: recalcula o CC (1º nível) pelos membros e mantém o sub-CC de cada item pelo nome */
+function mudouMembros(d){
+  const ng = grupoMembros(d);
+  if (ng && ng !== d.aprop_grupo) { E.itens.forEach(v => { const old = v.sub && APR[v.sub] ? semCod(APR[v.sub].nivel4) : null, a = old && subsDe(ng).find(x => semCod(x.nivel4) === old); v.sub = a ? a.cod : null; }); d.aprop_grupo = ng; }
+  renderEquipe();
+}
+function bindMembros(B, d){
+  const lista = () => {
+    $('eMsel').ontoggle = e => E.mselAberto = e.target.open;
+    $('eFApr').onchange = e => { E.filtroApr = e.target.value; redesenha(); };
+    $('eBusca').oninput = e => { E.busca = e.target.value; redesenha(true); };
+    const marca = on => { const m = new Set(d.membros || []); B.querySelectorAll('.msel-list [data-mem]').forEach(c => { if (on) m.add(c.dataset.mem); else m.delete(c.dataset.mem); }); d.membros = [...m]; mudouMembros(d); };
+    $('eTodos').onclick = () => marca(true); $('eNenhum').onclick = () => marca(false);
+    B.querySelectorAll('.msel-list [data-mem]').forEach(c => c.onchange = () => { const m = new Set(d.membros || []); if (c.checked) m.add(c.dataset.mem); else m.delete(c.dataset.mem); d.membros = [...m]; mudouMembros(d); });
+  };
+  const redesenha = foco => { $('eMemSel').innerHTML = mselHtml(d); lista(); if (foco) { const i = $('eBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
+  lista();
+  B.querySelectorAll('[data-rmem]').forEach(b => b.onclick = () => { d.membros = (d.membros || []).filter(x => x !== b.dataset.rmem); mudouMembros(d); });
+  $('eSave').disabled = errosEquipe(d).length > 0;
 }
 function renderEquipe(){
   const d = E.d, B = $('eBody');
   $('dlgETit').textContent = E.novo ? 'Nova equipe' : 'Equipe: ' + d.nome;
   let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
-  h += `<div class="q"><span class="lab">Quem faz parte</span><div class="chips" id="eMem">${PES.map(p => `<button type="button" data-mem="${p.id}" aria-pressed="${(d.membros || []).includes(p.id)}">${esc(p.nome)}${p.funcao ? ' · ' + esc(p.funcao.toLowerCase()) : ''}</button>`).join('') || '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}</div></div>`;
+  h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim e 1º nível de apropriação.</div></div>`;
   h += `<div class="q"><span class="lab">ZA da equipe</span>${chipsZa(d.zas || [])}<div class="help">Vazio = as ZAs das pessoas da equipe. Os itens da equipe são divididos igual entre as ZAs.</div></div>`;
-  h += `<div class="q"><label>Centro de custo da equipe (1º nível)</label>${selectGrupo(d.aprop_grupo)}<div class="help">Ex.: VCA, HDD, Implantação de DMC. O sub-CC (Equipamentos, Material, Serviços terceiro…) é escolhido em cada item abaixo.</div></div>`;
-  h += perguntaFase(d, 'Em qual fase a equipe atua?');
-  h += `<div class="row"><div class="q"><label for="eIni">Começa depois do início da fase? (opcional)</label><input id="eIni" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_ini)}"><div class="help">Vazio = junto com a fase.</div></div><div class="q"><label for="eFim">Termina antes do fim da fase? (opcional)</label><input id="eFim" type="month" min="${isoMes(1)}" max="${isoMes(NM())}" value="${optMes(d.mes_fim)}"><div class="help">Vazio = até o fim da fase.</div></div></div>`;
-  h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}</div>`;
+  h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${d.aprop_grupo ? '' : '<div class="badge warn">Os membros ainda não têm apropriação de obra: defina na ficha para escolher o sub-CC (Equipamentos, Material, Serviços terceiro) de cada item.</div>'}${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}<div class="help">O 1º nível do centro de custo é o dos membros${d.aprop_grupo ? ' (' + esc(semCod(d.aprop_grupo)) + ')' : ''}; o sub-CC é escolhido em cada item.</div></div>`;
   B.innerHTML = h;
   $('eNome').oninput = e => d.nome = e.target.value;
   B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
-  B.querySelectorAll('[data-mem]').forEach(b => b.onclick = () => { const id = b.dataset.mem, m = d.membros = d.membros || [], i = m.indexOf(id); if (i >= 0) m.splice(i, 1); else m.push(id); renderEquipe(); });
+  if (PES.length) bindMembros(B, d);
   d.zas = d.zas || []; bindZas(B, d.zas, prevEquipe);
-  B.querySelector('[data-grupo]').onchange = e => {
-    const ng = e.target.value || null;
-    // mantém o mesmo sub-CC (por nome) no centro de custo novo
-    E.itens.forEach((v, id) => { const old = v.sub && APR[v.sub] ? semCod(APR[v.sub].nivel4) : null, a = old && subsDe(ng).find(x => semCod(x.nivel4) === old); v.sub = a ? a.cod : null; });
-    d.aprop_grupo = ng; renderEquipe();
-  };
-  bindFase(B, d, prevEquipe);
-  $('eIni').onchange = e => { d.mes_ini = e.target.value ? e.target.value + '-01' : null; prevEquipe(); };
-  $('eFim').onchange = e => { d.mes_fim = e.target.value ? e.target.value + '-01' : null; prevEquipe(); };
   bindItens(B, E.itens, prevEquipe);
-  $('eDel').hidden = E.novo; $('dlgE').hidden = false; prevEquipe();
+  $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = errosEquipe(d).length > 0; prevEquipe();
 }
 function avisosEquipe(d){ const av = new Map(); VIN.forEach(v => { if (!v.pessoa_id || !(d.membros || []).includes(v.pessoa_id) || !ITEM[v.item_id]) return; const p = byId(PES, v.pessoa_id), a = av.get(v.item_id) || {txt:'', nomes:[]}; a.nomes.push(p ? p.nome : '?'); a.txt = '⚠ já lançado individual para ' + a.nomes.join(', ') + ' — tire da pessoa ou não marque aqui'; av.set(v.item_id, a); }); return av; }
 function prevEquipe(){
@@ -1233,7 +1302,11 @@ function prevEquipe(){
 }
 $('eCancel').onclick = fecharDlgs;
 $('eSave').onclick = async () => {
-  const d = E.d; $('eSave').disabled = true;
+  const d = E.d;
+  const er = errosEquipe(d);
+  if (er.length) { toast(er.includes('datas') ? 'Membros com datas de entrada/saída diferentes: ajuste antes de salvar' : 'Membros em centros de custo diferentes: ajuste antes de salvar'); return; }
+  d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null;
+  $('eSave').disabled = true;
   try {
     const g = d.aprop_grupo || ''; d.aprop_cod = g ? (subPadrao({categoria:'equipamento'}, g) || '') : (d.aprop_cod || '');
     await rpc('app_orc_equipe_salvar', {p:{id:d.id, quadro_id:Q.id, nome:d.nome, cor:d.cor, zas:d.zas || [], aprop_grupo:g, aprop_cod:d.aprop_cod, fase:d.fase || 'todo', mes_ini:d.mes_ini || '', mes_fim:d.mes_fim || '', membros:d.membros || []}});
