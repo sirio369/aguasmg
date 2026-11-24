@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!--
-  Orçamento por organograma ("fazedor de orçamento") — 🚧 Em desenvolvimento (gate dev_acesso).
+  Orçamento por organograma ("fazedor de orçamento") — acesso próprio do módulo (⚙️ Acesso, só o dono; RPC orc_pode).
   Quadro livre portado do kit de organograma: caixas, ligações, organizar/alinhar, texto e caneta.
   Cada caixa = 1 pessoa = 1 linha de Mão de Obra; itens (Locação/Despesas) ligados à pessoa ou a uma equipe.
   Banco: schema "19 - orcamento" (RPCs app_orc_*). Valores (salários, encargos, preços) vêm SÓ do banco:
@@ -137,6 +137,7 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .steps{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
 .steps button{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
 .steps button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.seg{display:flex;gap:4px}.seg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .steps button.ok::before{content:"✓";font-size:11px}
 .dlg-body{padding:14px 18px;overflow:auto;display:flex;flex-direction:column;gap:14px}
 .dlg-foot{padding:10px 18px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -256,6 +257,7 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
       <button id="resumo" class="primary" title="Resumo do orçamento por ZA, pessoa e mês">Resumo</button>
       <button id="xlsx" title="Baixa o orçamento (.xlsx) nas abas Mão de Obra, Locação e Despesas">Excel</button>
       <button id="png" title="Baixa uma imagem do quadro">PNG</button>
+      <button id="usrAcc" hidden title="Quem entra no módulo Orçamento (só o dono do módulo)">👥 Acesso</button>
       <button id="cfg" title="Parâmetros de cálculo: premissas, contrato das ZAs, cargos e itens — valem para todos os lançamentos">⚙️ Parâmetros</button>
     </div>
     <span id="status" class="status" aria-live="polite"></span>
@@ -319,6 +321,14 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
     <div class="dlg-head"><h2 id="dlgATit">🔐 Quem pode entrar neste organograma</h2></div>
     <div class="dlg-body" id="aBody"></div>
     <div class="dlg-foot"><span class="prev" id="aPrev"></span><button id="aClose" type="button">Cancelar</button><button id="aSave" type="button" class="primary">Salvar</button></div>
+  </div>
+</div>
+<!-- acesso ao módulo -->
+<div id="dlgU" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgUTit">
+  <div class="dlg-card">
+    <div class="dlg-head"><h2 id="dlgUTit">👥 Quem entra no Orçamento</h2></div>
+    <div class="dlg-body" id="uBody"></div>
+    <div class="dlg-foot"><span class="prev" id="uPrev"></span><button id="uClose" type="button" class="primary">Fechar</button></div>
   </div>
 </div>
 <datalist id="dlCargos"></datalist>
@@ -1003,7 +1013,7 @@ board.addEventListener('wheel', e => {
   if (e.ctrlKey || (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && !e.shiftKey)) zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
   else { view.tx -= e.deltaX || e.deltaY; applyView(); }
 }, {passive:false});
-const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden;
+const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden || !$('dlgU').hidden;
 document.addEventListener('keydown', e => {
   if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
   if (e.target.isContentEditable || /INPUT|TEXTAREA/.test(e.target.tagName) || (e.target.tagName === 'SELECT' && !(e.ctrlKey || e.metaKey))) return;
@@ -1058,7 +1068,7 @@ function abrirFicha(id){
   if (W.equipes.size) setEmEquipe(true);
   renderFicha();
 }
-function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = $('dlgA').hidden = true; AC = null; W = null; E = null; render(); }
+function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = $('dlgA').hidden = $('dlgU').hidden = true; AC = null; UA = null; W = null; E = null; render(); }
 $('pCancel').onclick = fecharDlgs;
 $('pBack').onclick = () => { let i = W.passo - 1; while (i > 0 && !passoOk(i)) i--; if (i >= 0) { W.passo = i; renderFicha(); } };
 $('pNext').onclick = () => { let i = W.passo + 1; while (i < PASSOS.length - 1 && !passoOk(i)) i++; if (i <= PASSOS.length - 1) { W.passo = i; W.visto.add(i); renderFicha(); } };
@@ -1694,6 +1704,33 @@ $('boardNew').onclick = $('emptyNew').onclick = async () => {
   const t = prompt('Nome do organograma', 'Organograma ' + (QUADROS.length + 1)); if (t === null) return;
   try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0, restrito:false, pode_config:true}); await abrirQuadro(id); } catch (e) {}
 };
+/* ================= 👥 acesso ao módulo =================
+   Separado do "Em desenvolvimento": entra o dono do módulo e quem estiver marcado aqui (tabela orc_usuario).
+   Só o dono vê o botão e muda (as RPCs conferem). Cada marcação grava na hora. */
+let UA = null;
+$('usrAcc').onclick = async () => {
+  try { const l = await rpc('app_orc_acesso_listar'); UA = {l, busca:'', so:true}; renderUA(); $('dlgU').hidden = false; } catch (e) {}
+};
+function renderUA(){
+  const q = UA.busca.toLowerCase(), n = UA.l.filter(u => u.acesso || u.dono).length;
+  const lista = UA.l.filter(u => (!UA.so || u.acesso || u.dono) && (!q || ((u.nome || '') + ' ' + (u.email || '') + ' ' + (u.cargo || '')).toLowerCase().includes(q)));
+  let h = `<div class="badge">Entram no Orçamento <b>${n}</b> pessoa(s). Vale para a página, o card da home e as funções do banco — o acesso "Em desenvolvimento" não abre mais o Orçamento.</div>`;
+  h += `<div class="row" style="align-items:end"><div class="q"><input id="uBusca" placeholder="Buscar nome, e-mail ou cargo" value="${esc(UA.busca)}" autocomplete="off"></div>` +
+       `<div class="seg"><button type="button" data-uso="1" class="${UA.so ? 'on' : ''}">Com acesso</button><button type="button" data-uso="0" class="${UA.so ? '' : 'on'}">Todos</button></div></div>`;
+  h += `<div class="msel-list" style="max-height:55vh">` + (lista.map(u => `<label><input type="checkbox" data-ua="${u.id}"${u.acesso || u.dono ? ' checked' : ''}${u.dono ? ' disabled' : ''}> <span>${esc(u.nome || '?')} <small>· ${esc(u.cargo || u.funcao || '')} · ${esc(u.email || '')}${u.dono ? ' · dono do módulo (sempre entra)' : ''}</small></span></label>`).join('') || '<span class="small muted">Ninguém com esse filtro.</span>') + `</div>`;
+  h += `<div class="help">Tirar alguém daqui fecha o módulo inteiro para essa pessoa (organogramas, parâmetros, cargos e salários). Os 🔐 de cada organograma continuam valendo para quem entra.</div>`;
+  $('uBody').innerHTML = h; $('uPrev').textContent = n + ' com acesso';
+  $('uBusca').oninput = e => { UA.busca = e.target.value; renderUA(); const i = $('uBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+  $('uBody').querySelectorAll('[data-uso]').forEach(b => b.onclick = () => { UA.so = b.dataset.uso === '1'; renderUA(); });
+  $('uBody').querySelectorAll('[data-ua]').forEach(c => c.onchange = async () => {
+    const u = UA.l.find(x => x.id === c.dataset.ua); c.disabled = true;
+    try { await rpc('app_orc_acesso_set', {p_id:u.id, p_on:c.checked}); u.acesso = c.checked; toast((c.checked ? 'Liberado: ' : 'Retirado: ') + (u.nome || '')); }
+    catch (e) { c.checked = !c.checked; }
+    renderUA();
+  });
+}
+$('uClose').onclick = () => { $('dlgU').hidden = true; UA = null; };
+
 /* ================= 🔐 acesso por organograma =================
    Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e o dono do módulo
    (tabela orc_dono; os demais administradores entram só se marcados). Só o dono ou quem criou muda (a RPC confere). */
@@ -1761,8 +1798,8 @@ try {
   if (!(data.session && data.session.user)) $('gm').textContent = 'Faça login no AcquaHub (mesmo navegador) para acessar.';
   else {
     const { data: me } = await sb.rpc('app_me');
-    if (me && (me.dev_acesso || me.is_admin)) { $('gate').remove(); await iniciar(); }
-    else $('gm').textContent = 'Acesso restrito — ' + (data.session.user.email || '') + ' não tem acesso ao Orçamento (módulo em desenvolvimento).';
+    if (me && me.orc_acesso) { $('gate').remove(); $('usrAcc').hidden = !me.orc_dono; await iniciar(); }
+    else $('gm').textContent = 'Acesso restrito — ' + (data.session.user.email || '') + ' não tem acesso ao Orçamento. Peça ao responsável pelo módulo.';
   }
 } catch (e) { const g = $('gm'); if (g) g.textContent = 'Não foi possível abrir o Orçamento: ' + ((e && e.message) || e); }
 </script>

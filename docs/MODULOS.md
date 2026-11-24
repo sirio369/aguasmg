@@ -5125,3 +5125,15 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   cadastrado à parte, fora do repositório) e quem criou o organograma; os demais administradores aparecem na lista como
   qualquer pessoa e entram só se marcados. Mudar o acesso: dono ou quem criou (`orc_quadro_config`). Candidatos trazem a flag
   `dono` (a tela trava dono + criador). Lista vazia segue aberta a todos do módulo. Parâmetros seguem só admin.
+
+### 24.8 Acesso próprio do módulo — 👥 Acesso (24/11/2026, sw v450)
+
+- O Orçamento **saiu do acesso "Em desenvolvimento"** (`dev_acesso`): entra o **dono do módulo** (`orc_dono`) e quem estiver
+  em `"19 - orcamento".orc_usuario`. `orc_pode()` (usada por `orc_exige()` em todas as RPCs `app_orc_*`) passou a ler essa
+  tabela; `app_me` ganhou `orc_acesso` e `orc_dono`. Banco: `docs/migracao_orcamento_acesso_modulo.sql` (aplicado,
+  `orc_25_acesso_modulo`); semente = quem entrava (admin ou `dev_acesso`, ativo) no dia da aplicação.
+- Tela: botão **👥 Acesso** ao lado de ⚙️ Parâmetros, **só para o dono** (`#usrAcc` → `#dlgU`): busca, filtro Com acesso/Todos,
+  marcar/desmarcar grava na hora (`app_orc_acesso_listar`/`app_orc_acesso_set`, ambas só dono); o dono fica travado.
+- Home: o card `#cardOrcamento` (ainda na categoria 🚧) usa `ME.orc_acesso` em vez de `dev_acesso`. A página `orcamento.html`
+  também. O 🔐 de cada organograma oferece só quem entra no módulo.
+- Quem é membro do projeto no Supabase continua vendo tudo pelo painel — a trava é de quem está no projeto.
