@@ -1314,12 +1314,20 @@ async function salvarFicha(){
 
 /* ================= equipes ================= */
 let E = null;
-function abrirEquipe(id){
+/* nome de equipe é único em TODOS os organogramas (ignora maiúsculas e espaços) — o banco também trava */
+let EQN = [];
+const normNome = t => String(t || '').trim().replace(/\s+/g, ' ').toLowerCase();
+function conflitoNome(d){ const n = normNome(d.nome); if (!n) return {vazio:true}; return EQN.concat(EQ.map(e => ({id:e.id, nome:e.nome, quadro:Q && Q.titulo}))).find(e => e.id !== d.id && normNome(e.nome) === n) || null; }
+function nomeLivre(){ for (let i = 1; ; i++) { const t = 'Equipe ' + i; if (!conflitoNome({id:null, nome:t})) return t; } }
+const eqBloq = d => errosEquipe(d).length > 0 || !!conflitoNome(d);
+function avisoNome(d){ const c = conflitoNome(d), el = $('eNomeErr'); if (!el) return; el.textContent = !c ? '' : c.vazio ? 'Informe o nome da equipe.' : `Já existe uma equipe chamada "${c.nome}"${c.quadro ? ' (organograma ' + c.quadro + ')' : ' em outro organograma'} — use outro nome.`; el.hidden = !c; $('eSave').disabled = eqBloq(d); }
+async function abrirEquipe(id){
   if (!Q) return;
+  try { EQN = await rpc('app_orc_equipe_nomes') || []; } catch (e) { EQN = []; }
   if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; E.d.aprop_grupo = grupoMembros(E.d) || grupoDe(E.d); }
   else {
     const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
-    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:nomeLivre(), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
     E.d.aprop_grupo = grupoMembros(E.d);
   }
   renderEquipe();
@@ -1374,20 +1382,20 @@ function bindMembros(B, d){
   const redesenha = foco => { $('eMemSel').innerHTML = mselHtml(d); lista(); if (foco) { const i = $('eBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
   lista();
   B.querySelectorAll('[data-rmem]').forEach(b => b.onclick = () => { d.membros = (d.membros || []).filter(x => x !== b.dataset.rmem); mudouMembros(d); });
-  $('eSave').disabled = errosEquipe(d).length > 0;
+  $('eSave').disabled = eqBloq(d);
 }
 function renderEquipe(){
   const d = E.d, B = $('eBody');
   $('dlgETit').textContent = E.novo ? 'Nova equipe' : 'Equipe: ' + d.nome;
-  let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
+  let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}" aria-describedby="eNomeErr"><div id="eNomeErr" class="small" role="alert" style="color:var(--bad)" hidden></div></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
   h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período, a ZA e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim, ZA(s) e 1º nível de apropriação. Com mais de uma ZA, os itens da equipe são divididos igual entre elas.</div></div>`;
   h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${d.aprop_grupo ? '' : '<div class="badge warn">Os membros ainda não têm apropriação de obra: defina na ficha para escolher o sub-CC (Equipamentos, Material, Serviços terceiro) de cada item.</div>'}${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}<div class="help">O 1º nível do centro de custo é o dos membros${d.aprop_grupo ? ' (' + esc(semCod(d.aprop_grupo)) + ')' : ''}; o sub-CC é escolhido em cada item.</div></div>`;
   B.innerHTML = h;
-  $('eNome').oninput = e => d.nome = e.target.value;
+  $('eNome').oninput = e => { d.nome = e.target.value; avisoNome(d); };
   B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   if (PES.length) bindMembros(B, d);
   bindItens(B, E.itens, prevEquipe);
-  $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = errosEquipe(d).length > 0; prevEquipe();
+  $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = eqBloq(d); avisoNome(d); prevEquipe();
 }
 function avisosEquipe(d){ const av = new Map(); VIN.forEach(v => { if (!v.pessoa_id || !(d.membros || []).includes(v.pessoa_id) || !ITEM[v.item_id]) return; const p = byId(PES, v.pessoa_id), a = av.get(v.item_id) || {txt:'', nomes:[]}; a.nomes.push(p ? p.nome : '?'); a.txt = '⚠ já lançado individual para ' + a.nomes.join(', ') + ' — tire da pessoa ou não marque aqui'; av.set(v.item_id, a); }); return av; }
 function prevEquipe(){
@@ -1400,6 +1408,8 @@ $('eSave').onclick = async () => {
   const d = E.d;
   const er = errosEquipe(d);
   if (er.length) { toast({datas:'Membros com datas de entrada/saída diferentes', cc:'Membros em centros de custo diferentes', za:'Membros em ZAs diferentes'}[er[0]] + ': ajuste antes de salvar'); return; }
+  if (conflitoNome(d)) { avisoNome(d); toast('Nome de equipe repetido: use outro nome'); return; }
+  d.nome = d.nome.trim().replace(/\s+/g, ' ');
   d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null; d.zas = zasEquipe(d);
   $('eSave').disabled = true;
   try {
@@ -1744,9 +1754,11 @@ function montarXlsx(ExcelJS){
 
   /* ---------- Mão de Obra ---------- */
   const mo = L.filter(l => l.tipo === 'Mão de Obra');
+  /* equipe(s) da pessoa — a mesma coluna das abas de itens, para filtrar/relacionar */
+  const eqsDe = p => EQ.filter(e => (e.membros || []).includes(p.id)).map(e => e.nome || 'Equipe').join(', ');
   const wsM = WS['Mão de Obra'];
-  titulo(wsM, 'Mão de Obra — 1 linha por pessoa × ZA', SUB + ' · custo mensal = 100% da pessoa; os meses aplicam o rateio da ZA');
-  const MC = [['Nome', 26], ['Função', 26], ['Modalidade', 12], ['Regime', 12], ['Setor', 13], ['Fase', 13], ['ZA', 9], ['Rateio na ZA', 9], ['Apropriação', 26], ['Entrada', 9], ['Saída', 9],
+  titulo(wsM, 'Mão de Obra — 1 linha por pessoa × ZA', SUB + ' · coluna Equipe = mesma das abas Locação/Despesas · custo mensal = 100% da pessoa; os meses aplicam o rateio da ZA');
+  const MC = [['Nome', 26], ['Equipe', 20], ['Função', 26], ['Modalidade', 12], ['Regime', 12], ['Setor', 13], ['Fase', 13], ['ZA', 9], ['Rateio na ZA', 9], ['Apropriação', 26], ['Entrada', 9], ['Saída', 9],
               ['Salário / NF / bolsa', 13], ['Adicional', 12], ['Hora extra', 12], ['Encargos', 12], ['13º', 12], ['Férias', 12], ['Benefícios', 12], ['Exames', 11], ['PLR', 11], ['Uniformes e EPI', 12],
               ['Custo mensal (pessoa)', 14], ['Meses na ZA', 8], ['Total no período', 15], ['Origem do salário', 22]];
   const MM0 = MC.length + 1; for (let i = 1; i <= N; i++) MC.push([rotCurto(i), 11]);
@@ -1754,39 +1766,39 @@ function montarXlsx(ExcelJS){
   r = D0;
   mo.forEach(l => {
     const p = l.pessoa, c = l.custo, row = wsM.getRow(r), R = n => colL(n) + r, pj = ['PJ','ESTAGIO'].includes(p.modalidade);
-    [p.nome, p.funcao || '', modRot(p.modalidade), pj ? '' : p.regime, setorDe(p), FASE_ROT[p.fase || 'todo'], l.za].forEach((v, i) => row.getCell(i + 1).value = v);
-    ratCel(row.getCell(8), l); row.getCell(9).value = ap(p.aprop_cod); row.getCell(10).value = rotMes(l.ini); row.getCell(11).value = rotMes(l.fim);
+    [p.nome, eqsDe(p), p.funcao || '', modRot(p.modalidade), pj ? '' : p.regime, setorDe(p), FASE_ROT[p.fase || 'todo'], l.za].forEach((v, i) => row.getCell(i + 1).value = v);
+    ratCel(row.getCell(9), l); row.getCell(10).value = ap(p.aprop_cod); row.getCell(11).value = rotMes(l.ini); row.getCell(12).value = rotMes(l.fim);
     const cg = p.cargo_id && CARGO[p.cargo_id], salBase = !pj && cg && CREF[cg.id] && num(cg.salario) === num(p.salario);
-    if (pj) { orig(row.getCell(12), num(p.valor_pj) || 0, MOEDA); for (let k = 13; k <= 20; k++) { row.getCell(k).value = 0; row.getCell(k).numFmt = MOEDA; } }
+    if (pj) { orig(row.getCell(13), num(p.valor_pj) || 0, MOEDA); for (let k = 14; k <= 21; k++) { row.getCell(k).value = 0; row.getCell(k).numFmt = MOEDA; } }
     else {
-      if (salBase) fx(row.getCell(12), CREF[cg.id], c.sal, MOEDA); else orig(row.getCell(12), c.sal, MOEDA);
-      const S = R(12);
-      if (num(p.adicional_valor) != null) orig(row.getCell(13), c.adic, MOEDA);
-      else if (/^insalubridade_\d$/.test(p.adicional || '')) fx(row.getCell(13), `${pn('salario_minimo')}*${pn('insal_' + p.adicional.slice(-1))}`, c.adic, MOEDA);
-      else if (p.adicional === 'periculosidade') fx(row.getCell(13), `${S}*${pn('periculosidade')}`, c.adic, MOEDA);
-      else { row.getCell(13).value = 0; row.getCell(13).numFmt = MOEDA; }
-      if (p.hora_extra) fx(row.getCell(14), `${S}/220*(${pn('he60_horas')}*(1+${pn('he60_pct')})+${pn('he100_horas')}*(1+${pn('he100_pct')}))`, c.he, MOEDA);
+      if (salBase) fx(row.getCell(13), CREF[cg.id], c.sal, MOEDA); else orig(row.getCell(13), c.sal, MOEDA);
+      const S = R(13);
+      if (num(p.adicional_valor) != null) orig(row.getCell(14), c.adic, MOEDA);
+      else if (/^insalubridade_\d$/.test(p.adicional || '')) fx(row.getCell(14), `${pn('salario_minimo')}*${pn('insal_' + p.adicional.slice(-1))}`, c.adic, MOEDA);
+      else if (p.adicional === 'periculosidade') fx(row.getCell(14), `${S}*${pn('periculosidade')}`, c.adic, MOEDA);
       else { row.getCell(14).value = 0; row.getCell(14).numFmt = MOEDA; }
-      fx(row.getCell(15), `(${S}+${R(13)}+${R(14)})*${pn(p.regime === 'HORISTA' ? 'enc_horista' : 'enc_mensalista')}`, c.enc, MOEDA);
-      fx(row.getCell(16), `${S}*${pn('decimo')}`, c.dec, MOEDA);
-      fx(row.getCell(17), `${S}*${pn('ferias')}`, c.fer, MOEDA);
-      fx(row.getCell(18), ['seguro_vida','plano_saude','plano_odonto','transporte','alimentacao'].map(pn).join('+'), c.ben - pv('exames'), MOEDA);
-      fx(row.getCell(19), pn('exames'), pv('exames'), MOEDA);
-      fx(row.getCell(20), `${S}*${pn('plr_fator')}`, c.plr, MOEDA);
+      if (p.hora_extra) fx(row.getCell(15), `${S}/220*(${pn('he60_horas')}*(1+${pn('he60_pct')})+${pn('he100_horas')}*(1+${pn('he100_pct')}))`, c.he, MOEDA);
+      else { row.getCell(15).value = 0; row.getCell(15).numFmt = MOEDA; }
+      fx(row.getCell(16), `(${S}+${R(14)}+${R(15)})*${pn(p.regime === 'HORISTA' ? 'enc_horista' : 'enc_mensalista')}`, c.enc, MOEDA);
+      fx(row.getCell(17), `${S}*${pn('decimo')}`, c.dec, MOEDA);
+      fx(row.getCell(18), `${S}*${pn('ferias')}`, c.fer, MOEDA);
+      fx(row.getCell(19), ['seguro_vida','plano_saude','plano_odonto','transporte','alimentacao'].map(pn).join('+'), c.ben - pv('exames'), MOEDA);
+      fx(row.getCell(20), pn('exames'), pv('exames'), MOEDA);
+      fx(row.getCell(21), `${S}*${pn('plr_fator')}`, c.plr, MOEDA);
     }
-    if (pj && p.recebe_epi === false) { row.getCell(21).value = 0; row.getCell(21).numFmt = MOEDA; }
-    else fx(row.getCell(21), pn(setorDe(p) === 'OBRAS' ? 'epi_operacional' : 'epi_adm'), c.epi, MOEDA);
-    fx(row.getCell(22), `SUM(${R(12)}:${R(21)})`, c.total, MOEDA); row.getCell(22).font = {bold:true};
-    fx(row.getCell(23), `COUNT(${colL(MM0)}${r}:${colL(MM0 + N - 1)}${r})`, l.nm, '0');
-    fx(row.getCell(24), `SUM(${colL(MM0)}${r}:${colL(MM0 + N - 1)}${r})`, somaMeses(l.meses), MOEDA); row.getCell(24).font = {bold:true};
-    row.getCell(25).value = pj ? (p.modalidade === 'PJ' ? 'valor da NF digitado' : 'bolsa digitada') : salBase ? 'aba Cargos (base)' : cg ? 'digitado (difere da base)' : 'digitado (cargo novo/manual)';
-    for (let i = 1; i <= N; i++) { const f = mesF('$V' + r, '$H' + r, l, i); if (f) fx(row.getCell(MM0 + i - 1), f, l.meses[i], MOEDA); }
+    if (pj && p.recebe_epi === false) { row.getCell(22).value = 0; row.getCell(22).numFmt = MOEDA; }
+    else fx(row.getCell(22), pn(setorDe(p) === 'OBRAS' ? 'epi_operacional' : 'epi_adm'), c.epi, MOEDA);
+    fx(row.getCell(23), `SUM(${R(13)}:${R(22)})`, c.total, MOEDA); row.getCell(23).font = {bold:true};
+    fx(row.getCell(24), `COUNT(${colL(MM0)}${r}:${colL(MM0 + N - 1)}${r})`, l.nm, '0');
+    fx(row.getCell(25), `SUM(${colL(MM0)}${r}:${colL(MM0 + N - 1)}${r})`, somaMeses(l.meses), MOEDA); row.getCell(25).font = {bold:true};
+    row.getCell(26).value = pj ? (p.modalidade === 'PJ' ? 'valor da NF digitado' : 'bolsa digitada') : salBase ? 'aba Cargos (base)' : cg ? 'digitado (difere da base)' : 'digitado (cargo novo/manual)';
+    for (let i = 1; i <= N; i++) { const f = mesF('$W' + r, '$I' + r, l, i); if (f) fx(row.getCell(MM0 + i - 1), f, l.meses[i], MOEDA); }
     r++;
   });
   const moFim = r - 1;
   if (mo.length) {
     const row = wsM.getRow(r); row.getCell(1).value = 'Total';
-    [24].concat(Array.from({length:N}, (_, i) => MM0 + i)).forEach(cn => fx(row.getCell(cn), `SUM(${colL(cn)}${D0}:${colL(cn)}${moFim})`, cn === 24 ? mo.reduce((s, l) => s + somaMeses(l.meses), 0) : mo.reduce((s, l) => s + l.meses[cn - MM0 + 1], 0), MOEDA));
+    [25].concat(Array.from({length:N}, (_, i) => MM0 + i)).forEach(cn => fx(row.getCell(cn), `SUM(${colL(cn)}${D0}:${colL(cn)}${moFim})`, cn === 25 ? mo.reduce((s, l) => s + somaMeses(l.meses), 0) : mo.reduce((s, l) => s + l.meses[cn - MM0 + 1], 0), MOEDA));
     linTot(wsM, r, MC.length);
   } else wsM.getCell('A' + D0).value = '(sem pessoas)';
   fim(wsM, MC.length, mo.length, 1);
@@ -1796,16 +1808,16 @@ function montarXlsx(ExcelJS){
     const ls = L.filter(l => l.tipo === tipo), ws = WS[tipo];
     titulo(ws, tipo + ' — 1 linha por item ligado × ZA', SUB + ' · valor = qtd × unitário; mensal entra em todos os meses, pontual só no 1º');
     const comps = tipo === 'Locação' ? [...new Set(ls.flatMap(l => Object.keys(l.item.componentes || {}).filter(k => num(l.item.componentes[k]) != null)))] : [];
-    const IC = [['Item', 30], ['Categoria', 12], ['Ligado a', 26], ['ZA', 9], ['Rateio na ZA', 9], ['Cobrança', 10], ['Apropriação contábil', 20], ['Apropriação de obra', 26], ['Início', 9], ['Fim', 9]];
+    const IC = [['Item', 30], ['Categoria', 12], ['Equipe', 20], ['Ligado a', 26], ['ZA', 9], ['Rateio na ZA', 9], ['Cobrança', 10], ['Apropriação contábil', 20], ['Apropriação de obra', 26], ['Início', 9], ['Fim', 9]];
     const cC0 = IC.length + 1; comps.forEach(k => IC.push(['Comp. ' + (COMP_ROT[k] || k), 12]));
     const cQ = IC.length + 1; IC.push(['Qtd', 7], ['Unitário', 13], ['Valor (qtd × unit.)', 14], ['Total no período', 15], ['Origem do preço', 24]);
     const cU = cQ + 1, cV = cQ + 2, cT = cQ + 3, cO = cQ + 4, M0 = IC.length + 1; for (let i = 1; i <= N; i++) IC.push([rotCurto(i), 11]);
     cab(ws, IC); let rr = D0;
     ls.forEach(l => {
       const row = ws.getRow(rr), it = l.item, v = l.vinc;
-      [it.descricao, it.categoria || '', (l.donoTipo === 'equipe' ? 'Equipe: ' : '') + l.dono.nome, l.za].forEach((x, i) => row.getCell(i + 1).value = x);
-      ratCel(row.getCell(5), l); row.getCell(6).value = l.cob === 'pontual' ? 'pontual' : 'mensal';
-      row.getCell(7).value = it.aprop_contabil || ''; row.getCell(8).value = ap(l.aprop); row.getCell(9).value = rotMes(l.ini); row.getCell(10).value = rotMes(l.fim);
+      [it.descricao, it.categoria || '', l.donoTipo === 'equipe' ? (l.dono.nome || 'Equipe') : eqsDe(l.dono), l.donoTipo === 'equipe' ? 'a equipe (todos os membros)' : l.dono.nome, l.za].forEach((x, i) => row.getCell(i + 1).value = x);
+      ratCel(row.getCell(6), l); row.getCell(7).value = l.cob === 'pontual' ? 'pontual' : 'mensal';
+      row.getCell(8).value = it.aprop_contabil || ''; row.getCell(9).value = ap(l.aprop); row.getCell(10).value = rotMes(l.ini); row.getCell(11).value = rotMes(l.fim);
       const cp = it.componentes || {}; comps.forEach((k, i) => { if (num(cp[k]) != null) orig(row.getCell(cC0 + i), num(cp[k]), MOEDA); });
       orig(row.getCell(cQ), l.qtd, '0.##');
       const proprio = num(v.valor) != null, temComp = comps.length && Object.keys(cp).some(k => num(cp[k]) != null) && Math.abs(somaComp(cp) - (l.unit || 0)) < 0.005;
@@ -1818,7 +1830,7 @@ function montarXlsx(ExcelJS){
       fx(row.getCell(cV), `${colL(cQ)}${rr}*${colL(cU)}${rr}`, (l.unit || 0) * l.qtd, MOEDA);
       fx(row.getCell(cT), `SUM(${colL(M0)}${rr}:${colL(M0 + N - 1)}${rr})`, somaMeses(l.meses), MOEDA); row.getCell(cT).font = {bold:true};
       row.getCell(cO).value = origem;
-      const ref = '$' + colL(cV) + rr, rat = '$E' + rr;
+      const ref = '$' + colL(cV) + rr, rat = '$F' + rr;
       for (let i = 1; i <= N; i++) { if (l.cob === 'pontual' && i !== l.f0) continue; const f = mesF(ref, rat, l, i); if (f) fx(row.getCell(M0 + i - 1), f, l.meses[i], MOEDA); }
       rr++;
     });
@@ -1829,10 +1841,10 @@ function montarXlsx(ExcelJS){
       linTot(ws, rr, IC.length);
     } else ws.getCell('A' + D0).value = '(sem itens)';
     fim(ws, IC.length, ls.length, 1);
-    return {ls, fimL, colZA:'D', colT:colL(cT), M0};
+    return {ls, fimL, colZA:'E', colT:colL(cT), M0};
   };
   const LOC = abaItens('Locação', 'EF6C00'), DES = abaItens('Despesas', '6A1B9A');
-  const MOI = {ls:mo, fimL:moFim, colZA:'G', colT:colL(24), M0:MM0};
+  const MOI = {ls:mo, fimL:moFim, colZA:'H', colT:colL(25), M0:MM0};
 
   /* ---------- Resumo (por ZA) e Por mês — só fórmulas sobre as abas de detalhe ---------- */
   const ABAS = [['Mão de Obra', MOI], ['Locação', LOC], ['Despesas', DES]];
