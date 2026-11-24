@@ -1695,8 +1695,8 @@ $('boardNew').onclick = $('emptyNew').onclick = async () => {
   try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0, restrito:false, pode_config:true}); await abrirQuadro(id); } catch (e) {}
 };
 /* ================= 🔐 acesso por organograma =================
-   Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e os administradores.
-   Só administrador ou quem criou muda (a RPC confere). */
+   Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e o dono do módulo
+   (tabela orc_dono; os demais administradores entram só se marcados). Só o dono ou quem criou muda (a RPC confere). */
 let AC = null;
 $('undo').onclick = () => desfazer();
 $('boardAcc').onclick = async () => {
@@ -1706,10 +1706,10 @@ $('boardAcc').onclick = async () => {
 function renderAcesso(){
   const r = AC.r, pode = !!r.pode_config, q = AC.busca.toLowerCase();
   const cand = (r.candidatos || []).filter(c => !q || ((c.nome || '') + ' ' + (c.email || '')).toLowerCase().includes(q));
-  let h = `<div class="badge">${AC.sel.size ? `<b>Restrito:</b> só entram as ${AC.sel.size} pessoa(s) marcada(s), quem criou o organograma e os administradores.` : '<b>Aberto:</b> ninguém marcado = todos com acesso ao Orçamento entram.'}</div>`;
-  if (!pode) h += `<div class="badge warn">Só o administrador ou quem criou este organograma muda o acesso.</div>`;
+  let h = `<div class="badge">${AC.sel.size ? `<b>Restrito:</b> só entram as ${AC.sel.size} pessoa(s) marcada(s), quem criou o organograma e o dono do módulo.` : '<b>Aberto:</b> ninguém marcado = todos com acesso ao Orçamento entram.'}</div>`;
+  if (!pode) h += `<div class="badge warn">Só o dono do módulo ou quem criou este organograma muda o acesso.</div>`;
   h += `<div class="q"><input id="aBusca" placeholder="Buscar nome ou e-mail" value="${esc(AC.busca)}" autocomplete="off"></div><div class="msel-list" style="max-height:50vh">`;
-  h += cand.map(c => { const fixo = c.admin || c.id === r.criado_por; return `<label><input type="checkbox" data-acc="${c.id}"${AC.sel.has(c.id) || fixo ? ' checked' : ''}${fixo || !pode ? ' disabled' : ''}> <span>${esc(c.nome || '?')} <small>· ${esc(c.email || '')}${c.admin ? ' · administrador (sempre entra)' : ''}${c.id === r.criado_por ? ' · criou o organograma (sempre entra)' : ''}</small></span></label>`; }).join('') || '<span class="small muted">Ninguém com esse filtro.</span>';
+  h += cand.map(c => { const fixo = c.dono || c.id === r.criado_por; return `<label><input type="checkbox" data-acc="${c.id}"${AC.sel.has(c.id) || fixo ? ' checked' : ''}${fixo || !pode ? ' disabled' : ''}> <span>${esc(c.nome || '?')} <small>· ${esc(c.email || '')}${c.dono ? ' · dono do módulo (sempre entra)' : c.admin ? ' · administrador' : ''}${c.id === r.criado_por ? ' · criou o organograma (sempre entra)' : ''}</small></span></label>`; }).join('') || '<span class="small muted">Ninguém com esse filtro.</span>';
   h += `</div><div class="help">A lista mostra quem tem acesso ao módulo Orçamento (administradores e acesso de desenvolvimento).</div>`;
   $('aBody').innerHTML = h; $('aSave').disabled = !pode; $('aPrev').textContent = AC.sel.size ? AC.sel.size + ' marcada(s)' : 'aberto a todos';
   $('aBusca').oninput = e => { AC.busca = e.target.value; renderAcesso(); const i = $('aBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };

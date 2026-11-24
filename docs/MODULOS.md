@@ -5120,3 +5120,8 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   Ctrl+V (e C/Z) era ignorado — nada era colado. Agora a lista perde o foco ao trocar e os atalhos Ctrl valem mesmo com
   o foco numa lista. Colado de outro organograma **mantém o nome** (no mesmo organograma segue "A definir") e cai no canto
   de cima/esquerda da área visível; erro ao colar aparece em mensagem.
+- **🔐 tira até os administradores** (24/11, `docs/migracao_orcamento_acesso_dono.sql`, aplicado — migração
+  `orc_24_acesso_dono`): com a lista preenchida, sempre entram só o **dono do módulo** (tabela `"19 - orcamento".orc_dono`,
+  cadastrado à parte, fora do repositório) e quem criou o organograma; os demais administradores aparecem na lista como
+  qualquer pessoa e entram só se marcados. Mudar o acesso: dono ou quem criou (`orc_quadro_config`). Candidatos trazem a flag
+  `dono` (a tela trava dono + criador). Lista vazia segue aberta a todos do módulo. Parâmetros seguem só admin.
