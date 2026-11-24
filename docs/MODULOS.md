@@ -5089,3 +5089,21 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   **Salvar desabilitado** (e o clique é barrado com mensagem). Sem membros, o item da equipe vale o contrato todo.
 - QA (24/11): harness — filtro por apropriação, marcar listados, datas diferentes e CC diferente bloqueiam, ao tirar os
   divergentes libera; período da equipe 07/2026–12/2027 (18 meses) vindo dos membros no Resumo › Itens.
+
+### 24.6 🔐 Acesso por organograma, colar entre organogramas e Ctrl+Z (24/11/2026, sw v448)
+
+- **🔐 ao lado do organograma** (`#boardAcc` → diálogo `#dlgA`): lista quem tem acesso ao módulo (admin + `dev_acesso`);
+  **ninguém marcado = aberto a todos do módulo** (como antes); com gente marcada, só entram os marcados, quem criou e os
+  administradores. Só admin ou quem criou muda. Organograma restrito aparece com 🔐 na lista.
+  Banco: `docs/migracao_orcamento_acesso_quadro.sql` — tabela `orc_quadro_acesso`, `orc_quadro_pode()`/`orc_quadro_config()`,
+  trigger `trg_acesso` (pessoa/equipe/membro/vínculo só gravam em organograma liberado), `app_orc_quadros`/`app_orc_quadro`
+  filtram e devolvem `restrito`/`pode_config`, RPCs novas `app_orc_quadro_acesso`/`_acesso_set`. **Sem o SQL o 🔐 dá erro.**
+- **Copiar e colar entre organogramas**: Ctrl+C guarda uma cópia das pessoas selecionadas (com os itens ligados); Ctrl+V
+  em outro organograma cria as pessoas lá (cargo, contratação, ZAs, apropriação, período, superior se veio junto, itens).
+  **Equipes não vêm junto** (são de cada organograma). No mesmo organograma segue como antes (duplica, com equipes).
+- **Ctrl+Z / ↶ Desfazer** (`marcaUndo()`/`desfazer()`): a cada render (e ao soltar um arrasto/desenho) guarda o estado do
+  organograma (pessoas, equipes, itens ligados, textos, desenhos); desfazer grava a diferença pelas RPCs de sempre e recarrega.
+  Até 30 passos, só na sessão e no organograma aberto (trocar de organograma zera). Pessoa recriada pelo desfazer volta com
+  o mesmo id. Não desfaz Parâmetros nem acesso.
+- QA (24/11): harness — 🔐 marca/desmarca e mostra 🔐 na lista; colar de outro organograma leva os itens da pessoa;
+  desfazer criar, excluir, mover e editar ficha.

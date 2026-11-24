@@ -218,6 +218,7 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
       <label for="boardSel" class="k" style="position:absolute;width:1px;height:1px;overflow:hidden">Organograma aberto</label>
       <select id="boardSel" title="Troca o organograma aberto"></select>
       <button id="boardNew" title="Cria um organograma novo">+ Novo</button>
+      <button id="boardAcc" title="Quem pode entrar neste organograma" aria-label="Acesso ao organograma">🔐</button>
       <button id="boardDel" class="danger" title="Exclui o organograma aberto">Excluir</button>
     </div>
     <div id="docTitle" class="doc-title" contenteditable="true" spellcheck="false" aria-label="Nome do organograma" title="Clique para renomear"></div>
@@ -247,6 +248,7 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
       <button id="snap" title="Grade magnética (Alt ao arrastar solta livre)">Grade</button>
     </div>
     <div class="grp" role="group" aria-label="Edição">
+      <button id="undo" title="Desfazer a última ação (Ctrl+Z)" disabled>↶ Desfazer</button>
       <button id="del" class="danger" title="Excluir o selecionado (Delete)">Excluir</button>
     </div>
     <div class="sep"></div>
@@ -309,6 +311,14 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
     <div class="dlg-head"><h2 id="dlgGTit">⚙️ Parâmetros de cálculo</h2><div class="steps" id="gTabs"></div></div>
     <div class="dlg-body" id="gBody"></div>
     <div class="dlg-foot"><span class="prev" id="gPrev"></span><button id="gClose" type="button">Fechar</button><button id="gSave" type="button" class="primary">Salvar alterações</button></div>
+  </div>
+</div>
+<!-- acesso ao organograma -->
+<div id="dlgA" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgATit">
+  <div class="dlg-card">
+    <div class="dlg-head"><h2 id="dlgATit">🔐 Quem pode entrar neste organograma</h2></div>
+    <div class="dlg-body" id="aBody"></div>
+    <div class="dlg-foot"><span class="prev" id="aPrev"></span><button id="aClose" type="button">Cancelar</button><button id="aSave" type="button" class="primary">Salvar</button></div>
   </div>
 </div>
 <datalist id="dlCargos"></datalist>
@@ -545,6 +555,7 @@ const corDe = n => n.cor || SETOR_COR[setorDe(n)] || COLORS[0];
 const modRot = m => (MODS.find(x => x[0] === m) || [m, m])[1];
 const zasRot = z => z && z.length ? z.join(' + ') : 'sem ZA';
 function render(){
+  marcaUndo();
   let html = '';
   PES.forEach(n => {
     const cls = 'card' + (isSel('node', n.id) ? ' sel' : '') + (linkFrom === n.id ? ' linkfrom' : '');
@@ -648,6 +659,64 @@ function renderSide(){
   $('sideEq').querySelectorAll('[data-eq]').forEach(el => el.onclick = () => abrirEquipe(el.dataset.eq));
 }
 
+/* ================= desfazer (Ctrl+Z) =================
+   A cada render com o organograma "parado" (sem arrastar, sem desfazer em curso) guarda o estado (pessoas, equipes,
+   itens ligados, textos e desenhos). Ctrl+Z volta ao estado anterior gravando a diferença no banco e recarrega.
+   Vale para a sessão e para o organograma aberto (trocar de organograma zera). Guarda até 30 passos. */
+const UNDO = {pilha:[], ult:null, rodando:false};
+const P_CAMPOS = ['parent_id','x','y','cor','nome','cargo_id','funcao','setor','modalidade','regime','salario','adicional','adicional_valor','hora_extra','valor_pj','recebe_epi','fase','zas','aprop_cod','mes_ini','mes_fim','obs'];
+const projP = p => { const o = {id:p.id}; P_CAMPOS.forEach(k => o[k] = p[k] ?? null); return o; };
+const projE = e => ({id:e.id, nome:e.nome, cor:e.cor || null, zas:e.zas || [], aprop_grupo:e.aprop_grupo || null, aprop_cod:e.aprop_cod || null, fase:e.fase || 'todo', mes_ini:e.mes_ini || null, mes_fim:e.mes_fim || null, membros:(e.membros || []).slice().sort()});
+const projV = v => ({id:v.id, pessoa_id:v.pessoa_id || null, equipe_id:v.equipe_id || null, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:num(v.valor), cobranca:v.cobranca || null, aprop_cod:v.aprop_cod || null, mes_ini:v.mes_ini || null, mes_fim:v.mes_fim || null});
+const estado = () => JSON.stringify({p:PES.map(projP), e:EQ.map(projE), v:VIN.map(projV), n:NOTES, s:STROKES});
+function marcaUndo(){
+  if (!Q || drag || UNDO.rodando || duplicando) return;
+  const cur = estado();
+  if (!UNDO.ult || UNDO.ult.q !== Q.id) { UNDO.pilha = []; UNDO.ult = {q:Q.id, s:cur}; }
+  else if (UNDO.ult.s !== cur) { UNDO.pilha.push(UNDO.ult); if (UNDO.pilha.length > 30) UNDO.pilha.shift(); UNDO.ult = {q:Q.id, s:cur}; }
+  const b = $('undo'); if (b) b.disabled = !UNDO.pilha.length;
+}
+async function desfazer(){
+  if (!Q || UNDO.rodando || dlgAberto()) return;
+  const prev = UNDO.pilha.pop(); if (!prev || prev.q !== Q.id) { toast('Nada para desfazer'); return; }
+  UNDO.rodando = true; $('undo').disabled = true;
+  const alvo = JSON.parse(prev.s), cur = JSON.parse(estado()), eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const m = arr => { const o = {}; arr.forEach(x => o[x.id] = x); return o; };
+  const aP = m(alvo.p), cP = m(cur.p), aE = m(alvo.e), cE = m(cur.e), aV = m(alvo.v), cV = m(cur.v);
+  try {
+    clearTimeout(posTimer); posIds.clear(); clearTimeout(desTimer);
+    for (const v of cur.v) if (!aV[v.id]) await rpc('app_orc_vinculo_excluir', {p_id:v.id});
+    for (const e of cur.e) if (!aE[e.id]) await rpc('app_orc_equipe_excluir', {p_id:e.id});
+    for (const p of cur.p) if (!aP[p.id]) await rpc('app_orc_pessoa_excluir', {p_id:p.id});
+    // pessoas: superior antes do subordinado
+    const prof = p => { let d = 0, c = p; while (c && c.parent_id && aP[c.parent_id] && d < 60) { c = aP[c.parent_id]; d++; } return d; };
+    for (const p of alvo.p.slice().sort((a, b) => prof(a) - prof(b))) {
+      if (cP[p.id] && eq(cP[p.id], p)) continue;
+      const pl = Object.assign({quadro_id:Q.id}, p); Object.keys(pl).forEach(k => { if (pl[k] === null) pl[k] = ''; });
+      pl.zas = p.zas || []; pl.hora_extra = !!p.hora_extra; pl.recebe_epi = p.recebe_epi !== false;
+      await rpc('app_orc_pessoa_salvar', {p:pl});
+    }
+    for (const e of alvo.e) {
+      if (cE[e.id] && eq(cE[e.id], e)) continue;
+      await rpc('app_orc_equipe_salvar', {p:{id:e.id, quadro_id:Q.id, nome:e.nome, cor:e.cor || '', zas:e.zas || [], aprop_grupo:e.aprop_grupo || '', aprop_cod:e.aprop_cod || '', fase:e.fase || 'todo', mes_ini:e.mes_ini || '', mes_fim:e.mes_fim || '', membros:e.membros || []}});
+    }
+    for (const v of alvo.v) {
+      if (cV[v.id] && eq(cV[v.id], v)) continue;
+      const a = {id:cV[v.id] ? v.id : '', item_id:v.item_id, qtd:v.qtd, valor:v.valor ?? '', cobranca:v.cobranca || '', aprop_cod:v.aprop_cod || ''};
+      if (v.pessoa_id) a.pessoa_id = v.pessoa_id; else a.equipe_id = v.equipe_id;
+      if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim;
+      await rpc('app_orc_vinculo_salvar', {p:a});
+    }
+    if (!eq(cur.n, alvo.n) || !eq(cur.s, alvo.s)) await rpc('app_orc_quadro_salvar', {p:{id:Q.id, desenho:{notes:alvo.n, strokes:alvo.s}}});
+    toast('Desfeito');
+  } catch (e) { toast('Não deu para desfazer tudo — recarreguei o organograma'); }
+  finally {
+    try { const r = await rpc('app_orc_quadro', {p_id:Q.id}); PES = r.pessoas || []; EQ = r.equipes || []; VIN = r.vinculos || []; const ds = r.quadro.desenho || {}; NOTES = ds.notes || []; STROKES = ds.strokes || []; } catch (e) {}
+    UNDO.ult = {q:Q.id, s:estado()}; UNDO.rodando = false;
+    clearSel(); render();
+  }
+}
+
 /* ================= gravação ================= */
 let posTimer = null, posIds = new Set(), desTimer = null;
 function savePos(ids){ ids.forEach(id => posIds.add(id)); clearTimeout(posTimer); posTimer = setTimeout(flushPos, 350); }
@@ -655,7 +724,7 @@ function flushPos(){
   const list = [...posIds].map(id => byId(PES, id)).filter(Boolean).map(n => ({id:n.id, x:n.x, y:n.y, parent_id:n.parent_id || ''}));
   posIds.clear(); if (list.length) rpc('app_orc_pessoas_pos', {p:list}).catch(() => {});
 }
-function saveDesenho(){ clearTimeout(desTimer); desTimer = setTimeout(() => { if (Q) rpc('app_orc_quadro_salvar', {p:{id:Q.id, desenho:{notes:NOTES, strokes:STROKES}}}).catch(() => {}); }, 600); }
+function saveDesenho(){ marcaUndo(); clearTimeout(desTimer); desTimer = setTimeout(() => { if (Q) rpc('app_orc_quadro_salvar', {p:{id:Q.id, desenho:{notes:NOTES, strokes:STROKES}}}).catch(() => {}); }, 600); }
 async function savePessoa(id, patch){ const r = await rpc('app_orc_pessoa_salvar', {p:Object.assign({id}, patch)}); const i = PES.findIndex(x => x.id === id); if (i >= 0) PES[i] = r; else PES.push(r); return r; }
 
 /* ================= barra ================= */
@@ -702,7 +771,7 @@ $('docTitle').addEventListener('blur', async e => {
 });
 
 /* ================= duplicar / copiar e colar ================= */
-let CLIP = [], duplicando = false;
+let CLIP = null, duplicando = false;
 function pedirCopias(){
   const sp = selPessoas(); if (!sp.length) return;
   const quem = sp.length === 1 ? (sp[0].funcao || sp[0].nome || 'a pessoa') : sp.length + ' pessoas';
@@ -712,11 +781,14 @@ function pedirCopias(){
   if (n < 1 || n > 50) { toast('Informe um número de 1 a 50'); return; }
   duplicar(sp.map(p => p.id), n);
 }
-async function duplicar(ids, vezes){
+/* fonte = cópia guardada no Ctrl+C ({quadro, pes, vin}); colar em outro organograma leva cargo, contratação, ZAs,
+   apropriação, período, superior (se veio junto) e itens da pessoa — equipes ficam (são de cada organograma) */
+async function duplicar(ids, vezes, fonte){
   if (duplicando) return;
-  const orig = ids.map(id => byId(PES, id)).filter(Boolean); if (!orig.length) return;
-  const set = new Set(orig.map(p => p.id));
-  const prof = p => { let d = 0, c = p; while (c && c.parent_id && set.has(c.parent_id) && d < 60) { c = byId(PES, c.parent_id); d++; } return d; };
+  const orig = fonte ? fonte.pes.map(p => Object.assign({}, p)) : ids.map(id => byId(PES, id)).filter(Boolean); if (!orig.length) return;
+  const mesmo = !fonte || fonte.quadro === (Q && Q.id), VS = fonte ? fonte.vin : VIN;
+  const set = new Set(orig.map(p => p.id)), O = {}; orig.forEach(p => O[p.id] = p);
+  const prof = p => { let d = 0, c = p; while (c && c.parent_id && set.has(c.parent_id) && d < 60) { c = O[c.parent_id]; d++; } return d; };
   orig.sort((a, b) => prof(a) - prof(b));   // superior antes do subordinado
   const x1 = Math.min(...orig.map(p => p.x)), x2 = Math.max(...orig.map(p => p.x)) + CARD_W;
   const y1 = Math.min(...orig.map(p => p.y)), y2 = Math.max(...orig.map(p => p.y + nodeH(p)));
@@ -731,13 +803,13 @@ async function duplicar(ids, vezes){
       const mapa = {}, dx = ini + k * larg - x1;
       for (const o of orig) {
         const id = uid(); mapa[o.id] = id;
-        const p = {id, quadro_id:Q.id, nome:'A definir', x:Math.round(o.x + dx), y:o.y, parent_id:mapa[o.parent_id] || o.parent_id || '', zas:(o.zas || []).slice(), hora_extra:!!o.hora_extra, recebe_epi:o.recebe_epi !== false};
+        const p = {id, quadro_id:Q.id, nome:'A definir', x:Math.round(o.x + dx), y:o.y, parent_id:mapa[o.parent_id] || (mesmo ? o.parent_id : '') || '', zas:(o.zas || []).slice(), hora_extra:!!o.hora_extra, recebe_epi:o.recebe_epi !== false};
         campos.forEach(c => p[c] = o[c] ?? '');
         await savePessoa(id, p); novos.push(id);
-        const vs = VIN.filter(v => v.pessoa_id === o.id);
+        const vs = VS.filter(v => v.pessoa_id === o.id);
         const rs = await Promise.all(vs.map(v => { const a = {id:'', pessoa_id:id, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:v.valor ?? '', cobranca:v.cobranca || ''}; if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim; return rpc('app_orc_vinculo_salvar', {p:a}); }));
         rs.forEach(r => VIN.push(r));
-        for (const e of EQ.filter(e => (e.membros || []).includes(o.id))) { const membros = (e.membros || []).concat(id); await rpc('app_orc_equipe_salvar', {p:{id:e.id, membros}}); e.membros = membros; }
+        if (mesmo) for (const e of EQ.filter(e => (e.membros || []).includes(o.id))) { const membros = (e.membros || []).concat(id); await rpc('app_orc_equipe_salvar', {p:{id:e.id, membros}}); e.membros = membros; }
       }
     }
     toast(novos.length === 1 ? 'Cópia criada (nome “A definir”)' : novos.length + ' cópias criadas (nome “A definir”)');
@@ -918,6 +990,7 @@ function endDrag(e){
   if (d.kind === 'move' && d.moved) afterMove(d.list);
   if (d.kind === 'marquee') { $('marquee').hidden = true; const n = selItems().length; if (n > 1) toast(n + ' itens selecionados · arraste qualquer um para mover todos'); }
   if (d.kind === 'linkline') { const t = document.elementFromPoint(e.clientX, e.clientY), c = t && t.closest && t.closest('.card'); if (c && c.dataset.node !== d.from) connect(d.from, c.dataset.node); else drawLinks(); }
+  marcaUndo();  // mover/desenhar sem render também vira passo do Ctrl+Z
 }
 board.addEventListener('pointerup', endDrag);
 board.addEventListener('pointercancel', endDrag);
@@ -927,7 +1000,7 @@ board.addEventListener('wheel', e => {
   if (e.ctrlKey || (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && !e.shiftKey)) zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
   else { view.tx -= e.deltaX || e.deltaY; applyView(); }
 }, {passive:false});
-const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden;
+const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden;
 document.addEventListener('keydown', e => {
   if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
   if (e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -939,9 +1012,15 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { clearSel(); linkFrom = null; render(); return; }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
     const kk = e.key.toLowerCase();
-    if (kk === 'c' && selPessoas().length && !String(getSelection())) { CLIP = selPessoas().map(p => p.id); toast(CLIP.length === 1 ? 'Copiado · Ctrl+V cola uma cópia' : CLIP.length + ' pessoas copiadas · Ctrl+V cola'); return; }
-    if (kk === 'v' && CLIP.length) { e.preventDefault(); const ok = CLIP.filter(id => byId(PES, id)); if (ok.length) duplicar(ok, 1); else toast('O que foi copiado não existe mais'); return; }
+    if (kk === 'c' && selPessoas().length && !String(getSelection())) { const sp = selPessoas(), ids = new Set(sp.map(p => p.id)); CLIP = {quadro:Q.id, titulo:Q.titulo, pes:JSON.parse(JSON.stringify(sp)), vin:JSON.parse(JSON.stringify(VIN.filter(v => ids.has(v.pessoa_id))))}; toast((sp.length === 1 ? 'Copiado' : sp.length + ' pessoas copiadas') + ' · Ctrl+V cola aqui ou em outro organograma'); return; }
+    if (kk === 'v' && CLIP && CLIP.pes && CLIP.pes.length && Q) {
+      e.preventDefault();
+      if (CLIP.quadro === Q.id) { const ok = CLIP.pes.map(p => p.id).filter(id => byId(PES, id)); if (ok.length) duplicar(ok, 1); else duplicar(null, 1, Object.assign({}, CLIP, {quadro:null})); }
+      else { duplicar(null, 1, CLIP).then(() => toast(`Colado de “${CLIP.titulo}” (equipes não vêm junto)`)); }
+      return;
+    }
     if (kk === 'd') { e.preventDefault(); pedirCopias(); return; }
+    if (kk === 'z') { e.preventDefault(); desfazer(); return; }
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); if (tool !== 'select') setTool('select'); setSel(PES.map(n => ({kind:'node', id:n.id})).concat(NOTES.map(n => ({kind:'note', id:n.id})), STROKES.map(s => ({kind:'stroke', id:s.id})))); render(); return; }
   const ar = {ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1]}[e.key];
@@ -975,7 +1054,7 @@ function abrirFicha(id){
   if (W.equipes.size) setEmEquipe(true);
   renderFicha();
 }
-function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = true; W = null; E = null; render(); }
+function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = $('dlgA').hidden = true; AC = null; W = null; E = null; render(); }
 $('pCancel').onclick = fecharDlgs;
 $('pBack').onclick = () => { let i = W.passo - 1; while (i > 0 && !passoOk(i)) i--; if (i >= 0) { W.passo = i; renderFicha(); } };
 $('pNext').onclick = () => { let i = W.passo + 1; while (i < PASSOS.length - 1 && !passoOk(i)) i++; if (i <= PASSOS.length - 1) { W.passo = i; W.visto.add(i); renderFicha(); } };
@@ -1570,12 +1649,41 @@ function exportPng(){
 }
 
 /* ================= quadros ================= */
-function fillBoardSel(){ $('boardSel').innerHTML = QUADROS.map(q => { const atual = Q && q.id === Q.id; if (atual) q.pessoas = PES.length; return `<option value="${q.id}"${atual ? ' selected' : ''}>${esc(q.titulo)} (${q.pessoas || 0})</option>`; }).join(''); }
+function fillBoardSel(){ $('boardSel').innerHTML = QUADROS.map(q => { const atual = Q && q.id === Q.id; if (atual) q.pessoas = PES.length; return `<option value="${q.id}"${atual ? ' selected' : ''}>${q.restrito ? '🔐 ' : ''}${esc(q.titulo)} (${q.pessoas || 0})</option>`; }).join(''); const a = $('boardAcc'); a.disabled = !Q; a.title = Q && Q.restrito ? 'Organograma restrito: veja quem pode entrar' : 'Quem pode entrar neste organograma (hoje: todos com acesso ao Orçamento)'; }
 function fillCargos(){ $('dlCargos').innerHTML = CARGOS.map(c => `<option value="${esc(c.funcao)}"></option>`).join(''); }
 $('boardSel').onchange = e => abrirQuadro(e.target.value);
 $('boardNew').onclick = $('emptyNew').onclick = async () => {
   const t = prompt('Nome do organograma', 'Organograma ' + (QUADROS.length + 1)); if (t === null) return;
-  try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0}); await abrirQuadro(id); } catch (e) {}
+  try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0, restrito:false, pode_config:true}); await abrirQuadro(id); } catch (e) {}
+};
+/* ================= 🔐 acesso por organograma =================
+   Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e os administradores.
+   Só administrador ou quem criou muda (a RPC confere). */
+let AC = null;
+$('undo').onclick = () => desfazer();
+$('boardAcc').onclick = async () => {
+  if (!Q) return;
+  try { const r = await rpc('app_orc_quadro_acesso', {p_quadro:Q.id}); AC = {r, sel:new Set(r.lista || []), busca:''}; renderAcesso(); $('dlgA').hidden = false; } catch (e) {}
+};
+function renderAcesso(){
+  const r = AC.r, pode = !!r.pode_config, q = AC.busca.toLowerCase();
+  const cand = (r.candidatos || []).filter(c => !q || ((c.nome || '') + ' ' + (c.email || '')).toLowerCase().includes(q));
+  let h = `<div class="badge">${AC.sel.size ? `<b>Restrito:</b> só entram as ${AC.sel.size} pessoa(s) marcada(s), quem criou o organograma e os administradores.` : '<b>Aberto:</b> ninguém marcado = todos com acesso ao Orçamento entram.'}</div>`;
+  if (!pode) h += `<div class="badge warn">Só o administrador ou quem criou este organograma muda o acesso.</div>`;
+  h += `<div class="q"><input id="aBusca" placeholder="Buscar nome ou e-mail" value="${esc(AC.busca)}" autocomplete="off"></div><div class="msel-list" style="max-height:50vh">`;
+  h += cand.map(c => { const fixo = c.admin || c.id === r.criado_por; return `<label><input type="checkbox" data-acc="${c.id}"${AC.sel.has(c.id) || fixo ? ' checked' : ''}${fixo || !pode ? ' disabled' : ''}> <span>${esc(c.nome || '?')} <small>· ${esc(c.email || '')}${c.admin ? ' · administrador (sempre entra)' : ''}${c.id === r.criado_por ? ' · criou o organograma (sempre entra)' : ''}</small></span></label>`; }).join('') || '<span class="small muted">Ninguém com esse filtro.</span>';
+  h += `</div><div class="help">A lista mostra quem tem acesso ao módulo Orçamento (administradores e acesso de desenvolvimento).</div>`;
+  $('aBody').innerHTML = h; $('aSave').disabled = !pode; $('aPrev').textContent = AC.sel.size ? AC.sel.size + ' marcada(s)' : 'aberto a todos';
+  $('aBusca').oninput = e => { AC.busca = e.target.value; renderAcesso(); const i = $('aBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+  $('aBody').querySelectorAll('[data-acc]').forEach(c => c.onchange = () => { if (c.checked) AC.sel.add(c.dataset.acc); else AC.sel.delete(c.dataset.acc); renderAcesso(); });
+}
+$('aClose').onclick = fecharDlgs;
+$('aSave').onclick = async () => {
+  try {
+    const lista = await rpc('app_orc_quadro_acesso_set', {p_quadro:Q.id, p_ids:[...AC.sel]});
+    Q.restrito = (lista || []).length > 0; const q = byId(QUADROS, Q.id); if (q) q.restrito = Q.restrito;
+    $('dlgA').hidden = true; AC = null; fillBoardSel(); toast(Q.restrito ? 'Acesso restrito salvo' : 'Organograma aberto a todos do Orçamento');
+  } catch (e) {}
 };
 $('boardDel').onclick = async () => {
   if (!Q) return;
