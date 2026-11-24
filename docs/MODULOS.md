@@ -5030,3 +5030,5 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
 - QA (23/11): harness com banco simulado — composição CLT/PJ com e sem EPI, resumo com pontual e 2 ZAs (bate com o painel),
   período no card, duplicar 4×, Ctrl+C/V, clicar na linha + Delete (só desliga, não exclui), Desligar com o chefe
   selecionado (aviso). Falta QA logado em produção.
+
+**Ponto sem terceiros (2026-11-24, `docs/migracao_rh_sem_terceiros.sql`, aplicado em produção):** quem é terceiro (`perfil.modalidade = 'TERCEIRO'`, casado ao funcionário do Kairos pelo CPF em `funcionario.perfil_id`) fica fora de Análise, Horas, Validação e Gestão de pontos. Função `"18 - rh".rh_terceiro(perfil_id)`; `func_visiveis` e o join de `app_rh_analise`, `app_rh_ponto_dias` e `app_rh_val_lista` passam a filtrar. Os dados seguem gravados em `ponto_dia`. Sem perfil no app não dá para saber: continua aparecendo. Em 24/11/2026 nenhum dos 111 funcionários do ponto era terceiro (104 CLT e 7 admitidos em nov sem conta).
