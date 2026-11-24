@@ -5097,7 +5097,7 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   administradores. Só admin ou quem criou muda. Organograma restrito aparece com 🔐 na lista.
   Banco: `docs/migracao_orcamento_acesso_quadro.sql` — tabela `orc_quadro_acesso`, `orc_quadro_pode()`/`orc_quadro_config()`,
   trigger `trg_acesso` (pessoa/equipe/membro/vínculo só gravam em organograma liberado), `app_orc_quadros`/`app_orc_quadro`
-  filtram e devolvem `restrito`/`pode_config`, RPCs novas `app_orc_quadro_acesso`/`_acesso_set`. **Sem o SQL o 🔐 dá erro.**
+  filtram e devolvem `restrito`/`pode_config`, RPCs novas `app_orc_quadro_acesso`/`_acesso_set`. SQL **aplicado em 24/11** (migração `orc_23_acesso_quadro`, E2E com rollback ok).
 - **Copiar e colar entre organogramas**: Ctrl+C guarda uma cópia das pessoas selecionadas (com os itens ligados); Ctrl+V
   em outro organograma cria as pessoas lá (cargo, contratação, ZAs, apropriação, período, superior se veio junto, itens).
   **Equipes não vêm junto** (são de cada organograma). No mesmo organograma segue como antes (duplica, com equipes).

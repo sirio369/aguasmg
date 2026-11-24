@@ -44,7 +44,8 @@ begin
   elsif TG_OP = 'DELETE' then v_q := old.quadro_id;
   else v_q := new.quadro_id;
   end if;
-  if v_q is not null and not "19 - orcamento".orc_quadro_pode(v_q) then
+  -- organograma já apagado = exclusão em cascata (a RPC de excluir já conferiu o acesso)
+  if v_q is not null and exists (select 1 from orc_quadro where id = v_q) and not "19 - orcamento".orc_quadro_pode(v_q) then
     raise exception 'sem acesso a este organograma';
   end if;
   return case when TG_OP = 'DELETE' then old else new end;
@@ -149,3 +150,7 @@ revoke all on function public.app_orc_quadro_acesso(uuid) from public, anon;
 revoke all on function public.app_orc_quadro_acesso_set(uuid, uuid[]) from public, anon;
 grant execute on function public.app_orc_quadro_acesso(uuid) to authenticated;
 grant execute on function public.app_orc_quadro_acesso_set(uuid, uuid[]) to authenticated;
+revoke all on function "19 - orcamento".orc_quadro_pode(uuid, uuid) from public, anon;
+revoke all on function "19 - orcamento".orc_quadro_config(uuid, uuid) from public, anon;
+revoke all on function "19 - orcamento".orc_eh_admin(uuid) from public, anon;
+-- APLICADO em 24/11/2026 (migração orc_23_acesso_quadro); teste E2E com rollback ok.
