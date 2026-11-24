@@ -922,7 +922,16 @@ document.addEventListener('keyup', e => { if (e.key === ' ') spaceDown = false; 
 
 /* ================= ficha da pessoa (perguntas) ================= */
 const PASSOS = ['Quem é', 'Contratação', 'Onde trabalha', 'Período', 'Equipe', 'Veículos e despesas', 'Resumo'];
+const P_ITENS = 5;
 let W = null;
+/* quem participa de equipe não lança veículo/despesa na própria ficha: tudo vem da equipe (evita duplicar) */
+const pulaItens = () => !!(W && W.emEquipe === true);
+const passoOk = i => !(i === P_ITENS && pulaItens());
+function setEmEquipe(v){
+  W.emEquipe = v;
+  if (v) { if (W.itens.size) { W.itensBak = W.itens; W.itens = new Map(); } W.usaVeic = null; }
+  else { W.equipes.clear(); if (W.itensBak) { W.itens = W.itensBak; W.itensBak = null; } }
+}
 function novaPessoa(base){
   const d = Object.assign({id:uid(), quadro_id:Q.id, nome:'', funcao:'', cargo_id:null, modalidade:'CLT', regime:'MENSALISTA', salario:null, adicional:'nenhum', adicional_valor:null, hora_extra:false, valor_pj:null, recebe_epi:true, fase:'todo', zas:[], setor:null, aprop_cod:null, mes_ini:null, mes_fim:null, cor:null}, base);
   W = {novo:true, passo:0, d, itens:new Map(), usaVeic:null, salvarCargo:true, visto:new Set([0]), equipes:new Set(), emEquipe:null};
@@ -932,13 +941,14 @@ function abrirFicha(id){
   const p = byId(PES, id); if (!p) return;
   const itens = new Map(); VIN.filter(v => v.pessoa_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null}));
   W = {novo:false, passo:0, d:JSON.parse(JSON.stringify(p)), itens, usaVeic:[...itens.keys()].some(k => ITEM[k] && tipoItem(ITEM[k]) === 'Locação') ? true : null, salvarCargo:true, visto:new Set(PASSOS.map((_, i) => i))};
-  W.equipes = new Set(EQ.filter(e => (e.membros || []).includes(id)).map(e => e.id)); W.emEquipe = W.equipes.size ? true : null;
+  W.equipes = new Set(EQ.filter(e => (e.membros || []).includes(id)).map(e => e.id)); W.emEquipe = null;
+  if (W.equipes.size) setEmEquipe(true);
   renderFicha();
 }
 function fecharDlgs(){ if (!$('dlgG').hidden) { fecharParam(); return; } $('dlgP').hidden = $('dlgE').hidden = $('dlgR').hidden = true; W = null; E = null; render(); }
 $('pCancel').onclick = fecharDlgs;
-$('pBack').onclick = () => { if (W.passo > 0) { W.passo--; renderFicha(); } };
-$('pNext').onclick = () => { if (W.passo < PASSOS.length - 1) { W.passo++; W.visto.add(W.passo); renderFicha(); } };
+$('pBack').onclick = () => { let i = W.passo - 1; while (i > 0 && !passoOk(i)) i--; if (i >= 0) { W.passo = i; renderFicha(); } };
+$('pNext').onclick = () => { let i = W.passo + 1; while (i < PASSOS.length - 1 && !passoOk(i)) i++; if (i <= PASSOS.length - 1) { W.passo = i; W.visto.add(i); renderFicha(); } };
 $('pSave').onclick = salvarFicha;
 const optMes = v => v ? v.slice(0, 7) : '';
 function cargoPorNome(f){ const u = String(f || '').trim().toUpperCase(); return CARGOS.find(c => c.funcao.toUpperCase() === u) || null; }
@@ -1049,9 +1059,10 @@ function resumoFichaHtml(d){
   return h;
 }
 function renderFicha(){
+  if (!passoOk(W.passo)) W.passo = PASSOS.length - 1;
   const d = W.d, s = W.passo;
   $('dlgPTit').textContent = W.novo ? 'Novo colaborador' : 'Ficha: ' + (d.nome || 'A definir');
-  $('pSteps').innerHTML = PASSOS.map((t, i) => `<button type="button" data-st="${i}" class="${i === s ? 'on' : ''}${W.visto.has(i) && i !== s ? ' ok' : ''}">${i + 1}. ${esc(t)}</button>`).join('');
+  $('pSteps').innerHTML = PASSOS.map((t, i) => !passoOk(i) ? '' : `<button type="button" data-st="${i}" class="${i === s ? 'on' : ''}${W.visto.has(i) && i !== s ? ' ok' : ''}">${PASSOS.slice(0, i + 1).filter((_, j) => passoOk(j)).length}. ${esc(t)}</button>`).join('');
   $('pSteps').querySelectorAll('[data-st]').forEach(b => b.onclick = () => { W.passo = +b.dataset.st; W.visto.add(W.passo); renderFicha(); });
   const B = $('pBody'); let h = '';
   if (s === 0) {
@@ -1107,16 +1118,17 @@ function renderFicha(){
     $('fFim').onchange = e => { d.mes_fim = e.target.value ? e.target.value + '-01' : null; jan(); };
   } else if (s === 4) {
     const em = W.emEquipe;
-    h += `<div class="q"><span class="lab">Vai fazer parte de alguma equipe de execução?</span><div class="chips"><button type="button" data-em="1" aria-pressed="${em === true}">Sim</button><button type="button" data-em="0" aria-pressed="${em === false}">Não</button></div><div class="help">Os veículos, equipamentos e ferramentas da equipe ficam na equipe. No próximo passo eles não aparecem para a pessoa, para não lançar duas vezes.</div></div>`;
+    h += `<div class="q"><span class="lab">Vai fazer parte de alguma equipe de execução?</span><div class="chips"><button type="button" data-em="1" aria-pressed="${em === true}">Sim</button><button type="button" data-em="0" aria-pressed="${em === false}">Não</button></div><div class="help">Sim: veículos, equipamentos e despesas ficam só na equipe, e o passo “Veículos e despesas” some da ficha (para não lançar duas vezes). Não: a pessoa lança os itens dela no próximo passo.</div></div>`;
+    if (em && W.itensBak && W.itensBak.size) h += `<div class="badge warn">Esta pessoa tinha ${W.itensBak.size} item(ns) lançado(s) na ficha (${[...W.itensBak.keys()].map(id => esc((ITEM[id] || {}).descricao || '?')).join(', ')}). Ao salvar eles saem da pessoa: lance o que faltar na equipe. Marque “Não” para mantê-los.</div>`;
     if (em) {
       if (EQ.length) {
         h += `<div class="q"><span class="lab">Qual equipe?</span><div class="chips">${EQ.map(e => `<button type="button" data-eqm="${e.id}" aria-pressed="${W.equipes.has(e.id)}">${esc(e.nome)}</button>`).join('')}</div></div>`;
         const m = itensDasEquipes(W.equipes);
         if (W.equipes.size) h += m.size ? `<div class="badge">Já vem da equipe: ${[...m.keys()].map(id => esc((ITEM[id] || {}).descricao || '?')).join(', ')}.</div>` : `<div class="badge">A equipe ainda não tem itens. Lance os itens de uso coletivo na equipe (painel lateral → Equipes), não na pessoa.</div>`;
-      } else h += `<div class="badge warn">Ainda não há equipes neste organograma. Conclua a ficha, selecione as caixas e use “+ Equipe”: os itens de uso coletivo vão na equipe. No próximo passo lance só o que é individual.</div>`;
+      } else h += `<div class="badge warn">Ainda não há equipes neste organograma. Conclua a ficha, selecione as caixas e use “+ Equipe”: veículos, equipamentos e despesas dessa pessoa vão na equipe.</div>`;
     }
     B.innerHTML = h;
-    B.querySelectorAll('[data-em]').forEach(b => b.onclick = () => { W.emEquipe = b.dataset.em === '1'; if (!W.emEquipe) W.equipes.clear(); renderFicha(); });
+    B.querySelectorAll('[data-em]').forEach(b => b.onclick = () => { setEmEquipe(b.dataset.em === '1'); renderFicha(); });
     B.querySelectorAll('[data-eqm]').forEach(b => b.onclick = () => { const id = b.dataset.eqm; if (W.equipes.has(id)) W.equipes.delete(id); else W.equipes.add(id); renderFicha(); });
   } else if (s === 5) {
     const usa = W.usaVeic;

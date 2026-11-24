@@ -5062,3 +5062,15 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - QA (23/11): harness — mensal/pontual por item e total no período, kit fora da lista da pessoa, CC + sub-CC por item
   (troca de CC remapeia), ⚙️ com premissa, cargo (pessoa acompanhou), componentes, composição do kit e meses de execução:
   total recalculado bate com a conta manual. Falta QA logado em produção.
+
+### 24.4 Pessoa de equipe sem "Veículos e despesas" (24/11/2026, sw v446)
+
+- Ficha, passo **Equipe**: respondendo **Sim** ("vai fazer parte de alguma equipe de execução?") o passo **Veículos e
+  despesas** some da ficha (abas renumeram; Próximo/Voltar pulam) — veículo, equipamento e despesa dessa pessoa ficam só na
+  equipe, para não lançar duas vezes. **Não** traz o passo de volta.
+- Pessoa que já tinha itens na ficha e passa para Sim: os itens saem da prévia e aparece aviso com a lista ("ao salvar eles
+  saem da pessoa"); voltar para Não restaura. Ao abrir a ficha de quem já está numa equipe vale o mesmo (Sim marcado).
+- Catálogo (só banco, 23–24/11): composição dos kits carregada — ferramentas, EPC (novo), pesquisa (1 conjunto por equipe),
+  área de vivência (novo) — e banheiro químico como item mensal; kit de escritório ganhou preço. Valores fora do repo.
+- QA (24/11): harness — Sim esconde o passo e pula na navegação, Não volta com a lista e a coluna Cobrança; item marcado
+  some com Sim, volta com Não; salvar com Sim apaga o vínculo da pessoa.
