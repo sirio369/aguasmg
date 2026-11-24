@@ -797,8 +797,24 @@ function pedirCopias(){
   if (n < 1 || n > 50) { toast('Informe um número de 1 a 50'); return; }
   duplicar(sp.map(p => p.id), n);
 }
-/* fonte = cópia guardada no Ctrl+C ({quadro, pes, vin}); colar em outro organograma leva cargo, contratação, ZAs,
-   apropriação, período, superior (se veio junto) e itens da pessoa — equipes ficam (são de cada organograma) */
+/* fonte = cópia guardada no Ctrl+C ({quadro, pes, vin, eqs}); colar em outro organograma leva cargo, contratação, ZAs,
+   apropriação, período, superior (se veio junto), itens da pessoa e as equipes (com os itens da equipe e só os membros
+   colados). Equipe que já existe aqui (mesmo id) só ganha os membros; as outras são criadas — nome repetido no
+   organograma ganha (2), (3)… */
+async function colarEquipes(fonte, mapa){
+  for (const e0 of fonte.eqs || []) {
+    const membros = (e0.membros || []).map(id => mapa[id]).filter(Boolean); if (!membros.length) continue;
+    const ja = byId(EQ, e0.id);
+    if (ja) { const m = [...new Set((ja.membros || []).concat(membros))]; await rpc('app_orc_equipe_salvar', {p:{id:ja.id, membros:m}}); ja.membros = m; continue; }
+    const d = {id:uid(), quadro_id:Q.id, nome:nomeLivreDe(e0.nome), cor:e0.cor || '', zas:(e0.zas || []).slice(), aprop_cod:e0.aprop_cod || '', aprop_grupo:e0.aprop_grupo || '',
+               fase:e0.fase || 'todo', mes_ini:e0.mes_ini || '', mes_fim:e0.mes_fim || '', membros};
+    await rpc('app_orc_equipe_salvar', {p:d});
+    EQ.push(Object.assign({}, d, {aprop_cod:d.aprop_cod || null, aprop_grupo:d.aprop_grupo || null, mes_ini:e0.mes_ini || null, mes_fim:e0.mes_fim || null}));
+    const vs = (fonte.vin || []).filter(v => v.equipe_id === e0.id);
+    const rs = await Promise.all(vs.map(v => { const a = {id:'', equipe_id:d.id, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:v.valor ?? '', cobranca:v.cobranca || '', aprop_cod:v.aprop_cod || '', obs:v.obs || ''}; if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim; return rpc('app_orc_vinculo_salvar', {p:a}); }));
+    rs.forEach(r => VIN.push(r));
+  }
+}
 async function duplicar(ids, vezes, fonte){
   if (duplicando) return;
   const orig = fonte ? fonte.pes.map(p => Object.assign({}, p)) : ids.map(id => byId(PES, id)).filter(Boolean); if (!orig.length) return;
@@ -826,10 +842,11 @@ async function duplicar(ids, vezes, fonte){
         campos.forEach(c => p[c] = o[c] ?? '');
         await savePessoa(id, p); novos.push(id);
         const vs = VS.filter(v => v.pessoa_id === o.id);
-        const rs = await Promise.all(vs.map(v => { const a = {id:'', pessoa_id:id, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:v.valor ?? '', cobranca:v.cobranca || ''}; if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim; return rpc('app_orc_vinculo_salvar', {p:a}); }));
+        const rs = await Promise.all(vs.map(v => { const a = {id:'', pessoa_id:id, item_id:v.item_id, qtd:num(v.qtd) || 1, valor:v.valor ?? '', cobranca:v.cobranca || '', aprop_cod:v.aprop_cod || '', obs:v.obs || ''}; if (v.mes_ini) a.mes_ini = v.mes_ini; if (v.mes_fim) a.mes_fim = v.mes_fim; return rpc('app_orc_vinculo_salvar', {p:a}); }));
         rs.forEach(r => VIN.push(r));
         if (mesmo) for (const e of EQ.filter(e => (e.membros || []).includes(o.id))) { const membros = (e.membros || []).concat(id); await rpc('app_orc_equipe_salvar', {p:{id:e.id, membros}}); e.membros = membros; }
       }
+      if (!mesmo) await colarEquipes(fonte, mapa);
     }
     if (mesmo) toast(novos.length === 1 ? 'Cópia criada (nome “A definir”)' : novos.length + ' cópias criadas (nome “A definir”)');
   } catch (e) {
@@ -1032,11 +1049,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { clearSel(); linkFrom = null; render(); return; }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
     const kk = e.key.toLowerCase();
-    if (kk === 'c' && selPessoas().length && !String(getSelection())) { const sp = selPessoas(), ids = new Set(sp.map(p => p.id)); CLIP = {quadro:Q.id, titulo:Q.titulo, pes:JSON.parse(JSON.stringify(sp)), vin:JSON.parse(JSON.stringify(VIN.filter(v => ids.has(v.pessoa_id))))}; toast((sp.length === 1 ? 'Copiado' : sp.length + ' pessoas copiadas') + ' · Ctrl+V cola aqui ou em outro organograma'); return; }
+    if (kk === 'c' && selPessoas().length && !String(getSelection())) { const sp = selPessoas(), ids = new Set(sp.map(p => p.id)); const eqs = EQ.filter(q => (q.membros || []).some(id => ids.has(id))), eids = new Set(eqs.map(q => q.id)); CLIP = {quadro:Q.id, titulo:Q.titulo, pes:JSON.parse(JSON.stringify(sp)), vin:JSON.parse(JSON.stringify(VIN.filter(v => ids.has(v.pessoa_id) || eids.has(v.equipe_id)))), eqs:JSON.parse(JSON.stringify(eqs))}; toast((sp.length === 1 ? 'Copiado' : sp.length + ' pessoas copiadas') + ' · Ctrl+V cola aqui ou em outro organograma'); return; }
     if (kk === 'v' && CLIP && CLIP.pes && CLIP.pes.length && Q) {
       e.preventDefault();
       if (CLIP.quadro === Q.id) { const ok = CLIP.pes.map(p => p.id).filter(id => byId(PES, id)); if (ok.length) duplicar(ok, 1); else duplicar(null, 1, Object.assign({}, CLIP, {quadro:null})); }
-      else { const n0 = PES.length; duplicar(null, 1, CLIP).then(() => { if (PES.length > n0) toast(`Colado de “${CLIP.titulo}”: ${PES.length - n0} pessoa(s) com nome e itens (equipes não vêm junto)`); }); }
+      else { const n0 = PES.length; duplicar(null, 1, CLIP).then(() => { if (PES.length > n0) toast(`Colado de “${CLIP.titulo}”: ${PES.length - n0} pessoa(s) com nome, itens e equipes`); }); }
       return;
     }
     if (kk === 'd') { e.preventDefault(); pedirCopias(); return; }
@@ -1318,16 +1335,16 @@ async function salvarFicha(){
 
 /* ================= equipes ================= */
 let E = null;
-/* nome de equipe é único em TODOS os organogramas (ignora maiúsculas e espaços) — o banco também trava */
-let EQN = [];
+/* nome de equipe é único DENTRO do organograma (ignora maiúsculas e espaços) — o banco também trava.
+   O Excel sai por organograma, então o mesmo nome em organogramas diferentes não mistura no filtro. */
 const normNome = t => String(t || '').trim().replace(/\s+/g, ' ').toLowerCase();
-function conflitoNome(d){ const n = normNome(d.nome); if (!n) return {vazio:true}; return EQN.concat(EQ.map(e => ({id:e.id, nome:e.nome, quadro:Q && Q.titulo}))).find(e => e.id !== d.id && normNome(e.nome) === n) || null; }
+function conflitoNome(d){ const n = normNome(d.nome); if (!n) return {vazio:true}; return EQ.find(e => e.id !== d.id && normNome(e.nome) === n) || null; }
+function nomeLivreDe(base){ base = String(base || 'Equipe').trim().replace(/\s+/g, ' ').replace(/ \(\d+\)$/, ''); if (!conflitoNome({id:null, nome:base})) return base; for (let i = 2; ; i++) { const t = base + ' (' + i + ')'; if (!conflitoNome({id:null, nome:t})) return t; } }
 function nomeLivre(){ for (let i = 1; ; i++) { const t = 'Equipe ' + i; if (!conflitoNome({id:null, nome:t})) return t; } }
 const eqBloq = d => errosEquipe(d).length > 0 || !!conflitoNome(d);
-function avisoNome(d){ const c = conflitoNome(d), el = $('eNomeErr'); if (!el) return; el.textContent = !c ? '' : c.vazio ? 'Informe o nome da equipe.' : `Já existe uma equipe chamada "${c.nome}"${c.quadro ? ' (organograma ' + c.quadro + ')' : ' em outro organograma'} — use outro nome.`; el.hidden = !c; $('eSave').disabled = eqBloq(d); }
+function avisoNome(d){ const c = conflitoNome(d), el = $('eNomeErr'); if (!el) return; el.textContent = !c ? '' : c.vazio ? 'Informe o nome da equipe.' : `Já existe uma equipe chamada "${c.nome}" neste organograma — use outro nome.`; el.hidden = !c; $('eSave').disabled = eqBloq(d); }
 async function abrirEquipe(id){
   if (!Q) return;
-  try { EQN = await rpc('app_orc_equipe_nomes') || []; } catch (e) { EQN = []; }
   if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; E.d.aprop_grupo = grupoMembros(E.d) || grupoDe(E.d); }
   else {
     const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
