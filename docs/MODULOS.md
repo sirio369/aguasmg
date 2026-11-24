@@ -5154,3 +5154,8 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - **Azul = valor de origem** (base/digitado), preto = fórmula. Cada fórmula leva o resultado calculado no app (cache), então
   abre com números mesmo sem recálculo; mudar uma premissa/salário no arquivo recalcula tudo.
 - Os valores vêm do banco na hora — nada no código. QA 24/11 (banco simulado): 1.120 fórmulas recalculadas no Excel = valores do app.
+- **Coluna Equipe** (v452): na Mão de Obra (equipe(s) da pessoa) e em Locação/Despesas (a equipe do item, ou a da pessoa
+  dona do item), logo depois do Nome/Categoria — filtra e relaciona as três abas. "Ligado a" mostra a pessoa ou "a equipe".
+- **Catálogo (24/11, só banco, migração `orc_26_celular_dados_unico`):** "Celular" e "Pacote de dados" viraram um item só,
+  **Celular com pacote de dados** (preço = soma; id 16). Os vínculos do pacote eram pares idênticos do celular e saíram;
+  o item 17 ficou inativo. Backup em `"19 - orcamento"._bkp_orc_celular_dados_20261124`.
