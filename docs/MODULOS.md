@@ -5107,3 +5107,21 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   o mesmo id. Não desfaz Parâmetros nem acesso.
 - QA (24/11): harness — 🔐 marca/desmarca e mostra 🔐 na lista; colar de outro organograma leva os itens da pessoa;
   desfazer criar, excluir, mover e editar ficha.
+
+### 24.7 Cargo novo nos Parâmetros (24/11/2026, sw v449)
+
+- ⚙️ Parâmetros › **Cargos e salários** ganhou **+ Novo cargo**: linhas novas no topo com nome, salário, regime, adicional,
+  hora extra e setor padrão. Ao salvar, cada uma vai para a base por `app_orc_cargo_salvar` (já existia; `origem='manual'`)
+  e passa a aparecer na lista de cargos da ficha.
+- Nome obrigatório, gravado em maiúsculas e sem espaço duplo; **nome igual a um cargo da base** (ou repetido entre os novos)
+  marca a linha e bloqueia salvar — o banco juntaria os dois. Para mudar um cargo que já existe, edite a linha dele.
+- Salário em branco = a definir (grava 0). Sem SQL novo.
+- **Correção do colar entre organogramas** (24/11): ao trocar de organograma pela lista suspensa o foco ficava nela e o
+  Ctrl+V (e C/Z) era ignorado — nada era colado. Agora a lista perde o foco ao trocar e os atalhos Ctrl valem mesmo com
+  o foco numa lista. Colado de outro organograma **mantém o nome** (no mesmo organograma segue "A definir") e cai no canto
+  de cima/esquerda da área visível; erro ao colar aparece em mensagem.
+- **🔐 tira até os administradores** (24/11, `docs/migracao_orcamento_acesso_dono.sql`, aplicado — migração
+  `orc_24_acesso_dono`): com a lista preenchida, sempre entram só o **dono do módulo** (tabela `"19 - orcamento".orc_dono`,
+  cadastrado à parte, fora do repositório) e quem criou o organograma; os demais administradores aparecem na lista como
+  qualquer pessoa e entram só se marcados. Mudar o acesso: dono ou quem criou (`orc_quadro_config`). Candidatos trazem a flag
+  `dono` (a tela trava dono + criador). Lista vazia segue aberta a todos do módulo. Parâmetros seguem só admin.

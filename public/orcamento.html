@@ -793,8 +793,11 @@ async function duplicar(ids, vezes, fonte){
   const x1 = Math.min(...orig.map(p => p.x)), x2 = Math.max(...orig.map(p => p.x)) + CARD_W;
   const y1 = Math.min(...orig.map(p => p.y)), y2 = Math.max(...orig.map(p => p.y + nodeH(p)));
   const larg = x2 - x1 + 40;
-  const faixa = PES.filter(n => n.y < y2 && n.y + nodeH(n) > y1 && n.x >= x1);   // cards na mesma altura, à direita
-  const ini = Math.max(x2, ...faixa.map(n => n.x + CARD_W)) + 40;
+  // outro organograma: o grupo entra no canto de cima/esquerda da área visível; mesmo organograma: à direita do original
+  const vx = (40 - view.tx) / view.s, vy = (60 - view.ty) / view.s;
+  const dy = mesmo ? 0 : Math.round(vy - y1);
+  const faixa = mesmo ? PES.filter(n => n.y < y2 && n.y + nodeH(n) > y1 && n.x >= x1) : [];   // cards na mesma altura, à direita
+  const ini = mesmo ? Math.max(x2, ...faixa.map(n => n.x + CARD_W)) + 40 : Math.round(vx);
   const campos = ['cor','cargo_id','funcao','setor','fase','modalidade','regime','salario','adicional','adicional_valor','valor_pj','aprop_cod','mes_ini','mes_fim','obs'];
   const novos = [];
   duplicando = true;
@@ -803,7 +806,7 @@ async function duplicar(ids, vezes, fonte){
       const mapa = {}, dx = ini + k * larg - x1;
       for (const o of orig) {
         const id = uid(); mapa[o.id] = id;
-        const p = {id, quadro_id:Q.id, nome:'A definir', x:Math.round(o.x + dx), y:o.y, parent_id:mapa[o.parent_id] || (mesmo ? o.parent_id : '') || '', zas:(o.zas || []).slice(), hora_extra:!!o.hora_extra, recebe_epi:o.recebe_epi !== false};
+        const p = {id, quadro_id:Q.id, nome:mesmo ? 'A definir' : (o.nome || 'A definir'), x:Math.round(o.x + dx), y:o.y + dy, parent_id:mapa[o.parent_id] || (mesmo ? o.parent_id : '') || '', zas:(o.zas || []).slice(), hora_extra:!!o.hora_extra, recebe_epi:o.recebe_epi !== false};
         campos.forEach(c => p[c] = o[c] ?? '');
         await savePessoa(id, p); novos.push(id);
         const vs = VS.filter(v => v.pessoa_id === o.id);
@@ -812,9 +815,9 @@ async function duplicar(ids, vezes, fonte){
         if (mesmo) for (const e of EQ.filter(e => (e.membros || []).includes(o.id))) { const membros = (e.membros || []).concat(id); await rpc('app_orc_equipe_salvar', {p:{id:e.id, membros}}); e.membros = membros; }
       }
     }
-    toast(novos.length === 1 ? 'Cópia criada (nome “A definir”)' : novos.length + ' cópias criadas (nome “A definir”)');
+    if (mesmo) toast(novos.length === 1 ? 'Cópia criada (nome “A definir”)' : novos.length + ' cópias criadas (nome “A definir”)');
   } catch (e) {
-    if (novos.length) toast('Parei no meio: ' + novos.length + ' cópia(s) criada(s)');
+    toast(novos.length ? 'Parei no meio: ' + novos.length + ' cópia(s) criada(s)' : 'Não deu para colar: ' + ((e && e.message) || 'erro'));
   } finally {
     duplicando = false;
     if (tool !== 'select') setTool('select');
@@ -1003,7 +1006,8 @@ board.addEventListener('wheel', e => {
 const dlgAberto = () => !$('dlgP').hidden || !$('dlgE').hidden || !$('dlgR').hidden || !$('dlgG').hidden || !$('dlgA').hidden;
 document.addEventListener('keydown', e => {
   if (dlgAberto()) { if (e.key === 'Escape') { e.preventDefault(); fecharDlgs(); } return; }
-  if (e.target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.target.isContentEditable || /INPUT|TEXTAREA/.test(e.target.tagName) || (e.target.tagName === 'SELECT' && !(e.ctrlKey || e.metaKey))) return;
+  if (e.target.tagName === 'SELECT') e.target.blur();
   if (!Q) return;
   if (e.key === ' ') { spaceDown = true; e.preventDefault(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSel(); return; }
@@ -1016,7 +1020,7 @@ document.addEventListener('keydown', e => {
     if (kk === 'v' && CLIP && CLIP.pes && CLIP.pes.length && Q) {
       e.preventDefault();
       if (CLIP.quadro === Q.id) { const ok = CLIP.pes.map(p => p.id).filter(id => byId(PES, id)); if (ok.length) duplicar(ok, 1); else duplicar(null, 1, Object.assign({}, CLIP, {quadro:null})); }
-      else { duplicar(null, 1, CLIP).then(() => toast(`Colado de “${CLIP.titulo}” (equipes não vêm junto)`)); }
+      else { const n0 = PES.length; duplicar(null, 1, CLIP).then(() => { if (PES.length > n0) toast(`Colado de “${CLIP.titulo}”: ${PES.length - n0} pessoa(s) com nome e itens (equipes não vêm junto)`); }); }
       return;
     }
     if (kk === 'd') { e.preventDefault(); pedirCopias(); return; }
@@ -1417,8 +1421,17 @@ const PREM_OCULTA = new Set(['mes_inicio','meses_contrato']);   // substituídas
 const COMP_ROT = {locacao:'Locação', motorista:'Motorista', plotagem:'Plotagem', lavagem:'Lavagem', rastreador:'Rastreador', manutencao:'Manutenção', combustivel:'Combustível', avarias:'Avarias'};
 const CATS = [['veiculo','Veículo'],['equipamento','Equipamento'],['ferramenta','Ferramenta / kit'],['ti','TI'],['outro','Outro']];
 let G = null;
-const gSujo = () => G ? Object.keys(G.prem).length + Object.keys(G.za).length + Object.keys(G.cargo).length + Object.keys(G.item).length : 0;
-function abrirParam(){ G = {tab:G ? G.tab : 'prem', prem:{}, za:{}, cargo:{}, item:{}, busca:'', novos:0}; renderParam(); $('dlgG').hidden = false; }
+const gSujo = () => G ? Object.keys(G.prem).length + Object.keys(G.za).length + Object.keys(G.cargo).length + Object.keys(G.item).length + G.cnovo.length : 0;
+function abrirParam(){ G = {tab:G ? G.tab : 'prem', prem:{}, za:{}, cargo:{}, item:{}, cnovo:[], busca:'', novos:0}; renderParam(); $('dlgG').hidden = false; }
+/* cargo novo: nome obrigatório e sem repetir um da base (o banco juntaria os dois) */
+const normCargo = t => String(t || '').trim().toUpperCase().replace(/\s+/g, ' ');
+function errosCargoNovo(){
+  const base = new Set(CARGOS.map(c => normCargo(c.funcao))), vistos = new Set(), err = [];
+  G.cnovo.forEach((c, i) => { const f = normCargo(c.funcao);
+    if (!f) err.push([i, 'informe o nome']); else if (base.has(f)) err.push([i, 'já existe na base — edite o salário na lista abaixo']);
+    else if (vistos.has(f)) err.push([i, 'nome repetido']); vistos.add(f); });
+  return err;
+}
 function fecharParam(){ if (gSujo() && !confirm('Há alterações não salvas nos parâmetros. Descartar?')) return; $('dlgG').hidden = true; G = null; }
 $('gClose').onclick = fecharParam;
 $('gSave').onclick = salvarParam;
@@ -1459,7 +1472,21 @@ function renderParam(){
     B.innerHTML = h;
     B.querySelectorAll('[data-zf]').forEach(i => i.onchange = () => { const z = i.dataset.z, k = i.dataset.zf, o = G.za[z] = G.za[z] || {}; o[k] = k === 'inicio' ? (i.value ? i.value + '-01' : null) : (k === 'meses' || k === 'meses_execucao') ? Math.round(num(i.value) || 0) : i.value; renderParam(); });
   } else if (G.tab === 'cargo') {
-    h += `<div class="row" style="align-items:end"><div class="q"><label for="gBusca">Buscar cargo</label><input id="gBusca" value="${esc(G.busca)}" placeholder="encanador, engenheiro…"></div></div>`;
+    h += `<div class="row" style="align-items:end"><div class="q"><label for="gBusca">Buscar cargo</label><input id="gBusca" value="${esc(G.busca)}" placeholder="encanador, engenheiro…"></div><div><button type="button" id="gCNovo">+ Novo cargo</button></div></div>`;
+    if (G.cnovo.length) {
+      const err = {}; errosCargoNovo().forEach(([i, m]) => err[i] = m);
+      h += `<div class="q"><span class="lab">Cargos novos (entram na base ao salvar)</span><div class="tbl-wrap" style="max-height:none"><table class="gtbl"><thead><tr><th>Cargo</th><th style="width:130px">Salário (R$)</th><th style="width:130px">Regime</th><th style="width:190px">Adicional</th><th style="width:70px">HE</th><th style="width:150px">Setor padrão</th><th style="width:40px"></th></tr></thead><tbody>`;
+      G.cnovo.forEach((c, i) => {
+        h += `<tr class="dirty"><td><input data-cn="funcao" data-i="${i}" value="${esc(c.funcao)}" placeholder="ex.: TÉCNICO DE GEOPROCESSAMENTO"${err[i] ? ' aria-invalid="true"' : ''}>${err[i] ? `<div class="small" style="color:var(--bad)">${esc(err[i])}</div>` : ''}</td>` +
+          `<td><input type="number" min="0" step="0.01" data-cn="salario" data-i="${i}" value="${c.salario ?? ''}" placeholder="a definir"></td>` +
+          `<td><select data-cn="regime" data-i="${i}"><option value="MENSALISTA"${c.regime === 'MENSALISTA' ? ' selected' : ''}>Mensalista</option><option value="HORISTA"${c.regime === 'HORISTA' ? ' selected' : ''}>Horista</option></select></td>` +
+          `<td><select data-cn="adicional" data-i="${i}">${ADICIONAIS.map(a => `<option value="${a[0]}"${c.adicional === a[0] ? ' selected' : ''}>${esc(a[1])}</option>`).join('')}</select></td>` +
+          `<td style="text-align:center"><input type="checkbox" data-cn="hora_extra" data-i="${i}"${c.hora_extra ? ' checked' : ''} style="width:auto"></td>` +
+          `<td><select data-cn="setor_padrao" data-i="${i}"><option value="">—</option>${SETORES.map(x => `<option value="${x}"${c.setor_padrao === x ? ' selected' : ''}>${x.charAt(0) + x.slice(1).toLowerCase()}</option>`).join('')}</select></td>` +
+          `<td><button type="button" data-cndel="${i}" aria-label="Descartar cargo novo">×</button></td></tr>`;
+      });
+      h += `</tbody></table></div></div>`;
+    }
     h += `<div class="help">Ao salvar, a mudança vai para todas as pessoas ligadas ao cargo (em todos os organogramas) que ainda usam o valor da base. Quem teve salário ajustado à mão na ficha fica como está.</div>`;
     const b = G.busca.trim().toUpperCase(), lista = CARGOS.filter(c => !b || c.funcao.toUpperCase().includes(b));
     const nQ = id => PES.filter(p => p.cargo_id === id).length;
@@ -1477,6 +1504,13 @@ function renderParam(){
     h += `</tbody></table></div><div class="small muted">${lista.length} de ${CARGOS.length} cargos.</div>`;
     B.innerHTML = h;
     $('gBusca').oninput = e => { G.busca = e.target.value; const pos = e.target.selectionStart; renderParam(); const n = $('gBusca'); n.focus(); n.setSelectionRange(pos, pos); };
+    $('gCNovo').onclick = () => { G.cnovo.push({funcao:'', salario:null, regime:'MENSALISTA', adicional:ADICIONAIS[0][0], hora_extra:false, setor_padrao:''}); renderParam(); const l = B.querySelectorAll('[data-cn="funcao"]'); l[l.length - 1].focus(); };
+    B.querySelectorAll('[data-cn]').forEach(i => {
+      const set = () => { const c = G.cnovo[+i.dataset.i], k = i.dataset.cn; c[k] = i.type === 'checkbox' ? i.checked : k === 'salario' ? num(i.value) : i.value; };
+      if (i.dataset.cn === 'funcao') { i.oninput = () => { set(); prevParam(); }; i.onchange = () => renderParam(); }
+      else i[i.type === 'checkbox' || i.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => { set(); prevParam(); };
+    });
+    B.querySelectorAll('[data-cndel]').forEach(b => b.onclick = () => { G.cnovo.splice(+b.dataset.cndel, 1); renderParam(); });
     B.querySelectorAll('[data-cg]').forEach(i => i[i.type === 'checkbox' || i.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => {
       const id = +i.dataset.id, k = i.dataset.cg, o = G.cargo[id] = G.cargo[id] || {};
       o[k] = i.type === 'checkbox' ? i.checked : k === 'salario' ? num(i.value) : i.value; i.closest('tr').classList.add('dirty'); prevParam();
@@ -1519,9 +1553,10 @@ function renderParam(){
   }
   prevParam();
 }
-function prevParam(){ const n = gSujo(); $('gPrev').textContent = n ? n + ' alteração(ões) por salvar' : 'Nada alterado'; $('gSave').disabled = !n; }
+function prevParam(){ const n = gSujo(), e = G && G.cnovo.length ? errosCargoNovo().length : 0; $('gPrev').textContent = e ? 'Confira o nome do cargo novo' : n ? n + ' alteração(ões) por salvar' : 'Nada alterado'; $('gSave').disabled = !n || !!e; }
 async function salvarParam(){
-  $('gSave').disabled = true; let pes = 0, ok = true;
+  if (G.cnovo.length && errosCargoNovo().length) { G.tab = 'cargo'; renderParam(); toast('Confira o nome do cargo novo'); return; }
+  $('gSave').disabled = true; let pes = 0, ok = true, nc = 0;
   try {
     for (const [k, v] of Object.entries(G.prem)) await rpc('app_orc_premissa_set', {p_chave:k, p_valor:v});
     for (const [z, o] of Object.entries(G.za)) {
@@ -1530,6 +1565,9 @@ async function salvarParam(){
       if ('inicio' in o || 'meses' in o || 'meses_execucao' in o) await rpc('app_orc_za_contrato_set', {p_za:z, p_inicio:e.inicio, p_meses:num(e.meses), p_execucao:num(e.meses_execucao)});
     }
     for (const [id, o] of Object.entries(G.cargo)) { const r = await rpc('app_orc_cargo_aplicar', {p:Object.assign({id:+id}, o)}); pes += (r && r.pessoas) || 0; }
+    while (G.cnovo.length) { const c = G.cnovo[0];
+      await rpc('app_orc_cargo_salvar', {p:{funcao:normCargo(c.funcao), salario:c.salario ?? '', regime:c.regime, adicional:c.adicional, hora_extra:!!c.hora_extra, setor_padrao:c.setor_padrao || ''}});
+      G.cnovo.shift(); nc++; }
     for (const [id, it] of Object.entries(G.item)) {
       if (it.novo && !String(it.descricao || '').trim()) continue;
       const kit = (it.composicao || []).filter(x => String(x.descricao || '').trim()), temComp = Object.keys(it.componentes || {}).length > 0;
@@ -1539,7 +1577,7 @@ async function salvarParam(){
   } catch (e) { ok = false; }
   await carregarCatalogos();
   if (Q && Object.keys(G.cargo).length) { const r = await rpc('app_orc_quadro', {p_id:Q.id}); PES = r.pessoas || []; }
-  if (ok) { G = null; $('dlgG').hidden = true; toast('Parâmetros salvos — custos recalculados' + (pes ? ` (${pes} pessoa(s) com cargo atualizado)` : '')); }
+  if (ok) { G = null; $('dlgG').hidden = true; toast('Parâmetros salvos — custos recalculados' + (pes ? ` (${pes} pessoa(s) com cargo atualizado)` : '') + (nc ? ` · ${nc} cargo(s) novo(s) na base` : '')); }
   else { G.prem = {}; G.za = {}; G.cargo = {}; G.item = {}; renderParam(); toast('Parte não foi salva: confira e tente de novo'); }
   render();
 }
@@ -1651,14 +1689,14 @@ function exportPng(){
 /* ================= quadros ================= */
 function fillBoardSel(){ $('boardSel').innerHTML = QUADROS.map(q => { const atual = Q && q.id === Q.id; if (atual) q.pessoas = PES.length; return `<option value="${q.id}"${atual ? ' selected' : ''}>${q.restrito ? '🔐 ' : ''}${esc(q.titulo)} (${q.pessoas || 0})</option>`; }).join(''); const a = $('boardAcc'); a.disabled = !Q; a.title = Q && Q.restrito ? 'Organograma restrito: veja quem pode entrar' : 'Quem pode entrar neste organograma (hoje: todos com acesso ao Orçamento)'; }
 function fillCargos(){ $('dlCargos').innerHTML = CARGOS.map(c => `<option value="${esc(c.funcao)}"></option>`).join(''); }
-$('boardSel').onchange = e => abrirQuadro(e.target.value);
+$('boardSel').onchange = e => { e.target.blur(); abrirQuadro(e.target.value); };
 $('boardNew').onclick = $('emptyNew').onclick = async () => {
   const t = prompt('Nome do organograma', 'Organograma ' + (QUADROS.length + 1)); if (t === null) return;
   try { const id = await rpc('app_orc_quadro_salvar', {p:{titulo:t.trim() || 'Organograma'}}); QUADROS.push({id, titulo:t.trim() || 'Organograma', pessoas:0, restrito:false, pode_config:true}); await abrirQuadro(id); } catch (e) {}
 };
 /* ================= 🔐 acesso por organograma =================
-   Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e os administradores.
-   Só administrador ou quem criou muda (a RPC confere). */
+   Lista vazia = todos com acesso ao Orçamento entram. Com gente marcada = só os marcados, quem criou e o dono do módulo
+   (tabela orc_dono; os demais administradores entram só se marcados). Só o dono ou quem criou muda (a RPC confere). */
 let AC = null;
 $('undo').onclick = () => desfazer();
 $('boardAcc').onclick = async () => {
@@ -1668,10 +1706,10 @@ $('boardAcc').onclick = async () => {
 function renderAcesso(){
   const r = AC.r, pode = !!r.pode_config, q = AC.busca.toLowerCase();
   const cand = (r.candidatos || []).filter(c => !q || ((c.nome || '') + ' ' + (c.email || '')).toLowerCase().includes(q));
-  let h = `<div class="badge">${AC.sel.size ? `<b>Restrito:</b> só entram as ${AC.sel.size} pessoa(s) marcada(s), quem criou o organograma e os administradores.` : '<b>Aberto:</b> ninguém marcado = todos com acesso ao Orçamento entram.'}</div>`;
-  if (!pode) h += `<div class="badge warn">Só o administrador ou quem criou este organograma muda o acesso.</div>`;
+  let h = `<div class="badge">${AC.sel.size ? `<b>Restrito:</b> só entram as ${AC.sel.size} pessoa(s) marcada(s), quem criou o organograma e o dono do módulo.` : '<b>Aberto:</b> ninguém marcado = todos com acesso ao Orçamento entram.'}</div>`;
+  if (!pode) h += `<div class="badge warn">Só o dono do módulo ou quem criou este organograma muda o acesso.</div>`;
   h += `<div class="q"><input id="aBusca" placeholder="Buscar nome ou e-mail" value="${esc(AC.busca)}" autocomplete="off"></div><div class="msel-list" style="max-height:50vh">`;
-  h += cand.map(c => { const fixo = c.admin || c.id === r.criado_por; return `<label><input type="checkbox" data-acc="${c.id}"${AC.sel.has(c.id) || fixo ? ' checked' : ''}${fixo || !pode ? ' disabled' : ''}> <span>${esc(c.nome || '?')} <small>· ${esc(c.email || '')}${c.admin ? ' · administrador (sempre entra)' : ''}${c.id === r.criado_por ? ' · criou o organograma (sempre entra)' : ''}</small></span></label>`; }).join('') || '<span class="small muted">Ninguém com esse filtro.</span>';
+  h += cand.map(c => { const fixo = c.dono || c.id === r.criado_por; return `<label><input type="checkbox" data-acc="${c.id}"${AC.sel.has(c.id) || fixo ? ' checked' : ''}${fixo || !pode ? ' disabled' : ''}> <span>${esc(c.nome || '?')} <small>· ${esc(c.email || '')}${c.dono ? ' · dono do módulo (sempre entra)' : c.admin ? ' · administrador' : ''}${c.id === r.criado_por ? ' · criou o organograma (sempre entra)' : ''}</small></span></label>`; }).join('') || '<span class="small muted">Ninguém com esse filtro.</span>';
   h += `</div><div class="help">A lista mostra quem tem acesso ao módulo Orçamento (administradores e acesso de desenvolvimento).</div>`;
   $('aBody').innerHTML = h; $('aSave').disabled = !pode; $('aPrev').textContent = AC.sel.size ? AC.sel.size + ' marcada(s)' : 'aberto a todos';
   $('aBusca').oninput = e => { AC.busca = e.target.value; renderAcesso(); const i = $('aBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
