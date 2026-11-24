@@ -4988,8 +4988,7 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
   sobre o salário; benefícios fixos + exames; PLR; EPI por setor — confere com a coluna **Custo Mensal TOTAL** da aba Mão de
   Obra (testado em 23/11 com 2 linhas da planilha). Itens mensais × qtd no período; pontuais 1× no mês de início. Tudo
   dividido igual entre as ZAs.
-- **Resumo** (por ZA, por pessoa, itens, por mês) e **Excel** (abas Resumo, Mão de Obra, Locação, Despesas; colunas mês a mês
-  M1…M60 a partir de `mes_inicio`).
+- **Resumo** (por ZA, por pessoa, itens, por mês) e **Excel** (desde v451 formatado e com fórmulas — ver §24.9).
 - QA (23/11/2026): fluxo completo testado com banco simulado (premissas fictícias) — criar organograma, pessoa da base,
   subordinado PJ com cargo novo, equipe com item, resumo, Excel, excluir (subordinado sobe), recarregar. Falta QA logado
   em produção.
@@ -5140,3 +5139,18 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - **Equipe sem ZA própria** (24/11, mesmo PR): saiu o campo "ZA da equipe". A ZA vem dos membros (`zasEquipe()` = ZAs do
   1º membro; sem membros, a gravada — legado) e entra no impeditivo junto com datas e CC: membros com ZAs diferentes
   (`zaKey`, conjunto de ZAs ordenado) → linha destacada, aviso e Salvar bloqueado. Ao salvar grava `zas` = a dos membros.
+
+### 24.9 Excel formatado e com fórmulas (24/11/2026, sw v451)
+
+- O botão **Excel** (barra e diálogo do Resumo) gera o arquivo com **ExcelJS** (cdnjs 4.4.0, carregado sob demanda —
+  mesma biblioteca do Relatório consolidado do `index.html`); o SheetJS saiu da página.
+- **Abas:** Resumo (por ZA) · Por mês · Mão de Obra · Locação · Despesas · **Premissas** (+ contrato das ZAs) · **Cargos**
+  (só os usados no organograma). Cabeçalho escuro, cabeçalho e 1ª coluna congelados, filtro, R$ com 2 casas, linha de Total.
+- **Fórmulas mostram a origem:** cada premissa vira um nome `pr_<chave>` (ex.: `=(L5+M5+N5)*pr_enc_mensalista`); o salário
+  da base aponta para a aba Cargos; adicional, HE, encargos, 13º, férias, benefícios, exames, PLR e EPI são fórmulas; custo
+  mensal = SOMA; cada mês = custo × rateio da ZA (coluna "Rateio na ZA" = `1/k`; quando varia, `/k` no próprio mês); Total =
+  SOMA dos meses; Resumo = SOMASES por ZA; Por mês = SOMA das colunas do mês. Item: unitário = SOMA dos componentes quando
+  o preço vem deles, valor = qtd × unitário, pontual só no 1º mês. Colunas "Origem do salário"/"Origem do preço" explicam o resto.
+- **Azul = valor de origem** (base/digitado), preto = fórmula. Cada fórmula leva o resultado calculado no app (cache), então
+  abre com números mesmo sem recálculo; mudar uma premissa/salário no arquivo recalcula tudo.
+- Os valores vêm do banco na hora — nada no código. QA 24/11 (banco simulado): 1.120 fórmulas recalculadas no Excel = valores do app.

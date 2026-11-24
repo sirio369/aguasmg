@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!--
   Orçamento por organograma ("fazedor de orçamento") — acesso próprio do módulo (⚙️ Acesso, só o dono; RPC orc_pode).
   Quadro livre portado do kit de organograma: caixas, ligações, organizar/alinhar, texto e caneta.
@@ -255,7 +254,7 @@ tr.tot td{font-weight:600;background:var(--surface-2)}
     <div class="sep"></div>
     <div class="grp" role="group" aria-label="Orçamento">
       <button id="resumo" class="primary" title="Resumo do orçamento por ZA, pessoa e mês">Resumo</button>
-      <button id="xlsx" title="Baixa o orçamento (.xlsx) nas abas Mão de Obra, Locação e Despesas">Excel</button>
+      <button id="xlsx" title="Baixa o orçamento (.xlsx) formatado e com fórmulas: Resumo, Por mês, Mão de Obra, Locação, Despesas, Premissas e Cargos">Excel</button>
       <button id="png" title="Baixa uma imagem do quadro">PNG</button>
       <button id="usrAcc" hidden title="Quem entra no módulo Orçamento (só o dono do módulo)">👥 Acesso</button>
       <button id="cfg" title="Parâmetros de cálculo: premissas, contrato das ZAs, cargos e itens — valem para todos os lançamentos">⚙️ Parâmetros</button>
@@ -505,7 +504,7 @@ function linhas(){
       for (let i = 1; i <= N; i++) if (ws[i] > 0) { if (!ini) ini = i; fim = i; nm++; ks.add(Math.round(ws[i] * 1e6)); }
       if (!nm) return;
       if (pontual) { if (f0 && ws[f0] > 0) m[f0] = val * ws[f0]; else return; } else for (let i = 1; i <= N; i++) m[i] = val * ws[i];
-      out.push(Object.assign({za:z, meses:m, ini, fim, nm, rateio: ks.size === 1 ? [...ks][0] / 1e6 : null}, o));
+      out.push(Object.assign({za:z, meses:m, ini, fim, nm, rateio: ks.size === 1 ? [...ks][0] / 1e6 : null, w:ws, f0}, o));
     });
   };
   PES.forEach(p => { const c = custoMO(p); nova({tipo:'Mão de Obra', pessoa:p, custo:c, aprop:p.aprop_cod}, pesos(janelasZA(p, p.zas)), c.total, false); });
@@ -1649,31 +1648,236 @@ function renderResumo(){
 
 /* ================= exportação ================= */
 const safeName = s => String(s || 'Organograma').replace(/[\\/:*?"<>|]/g, '-').trim() || 'Organograma';
-function exportXlsx(){
-  if (!window.XLSX) { toast('Biblioteca do Excel não carregou'); return; }
-  const L = linhas(), N = NM(), meses = Array.from({length:N}, (_, i) => rotMes(i + 1));
+/* ================= exportação Excel =================
+   ExcelJS (cdnjs, carregado sob demanda) — planilha formatada e com FÓRMULAS: o custo de cada linha sai das abas
+   Premissas e Cargos (nomes pr_<chave>), cada mês = custo mensal × rateio da ZA, totais por SOMA/SOMASES.
+   Azul = valor de origem (base/digitado), preto = fórmula. Cada fórmula leva o resultado calculado no app (cache),
+   então o arquivo abre com os números mesmo onde não há recálculo. Valores vêm do banco na hora — nada no código. */
+function excelJsLib(){
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload = () => window.ExcelJS ? res(window.ExcelJS) : rej(new Error('ExcelJS')); s.onerror = () => rej(new Error('sem conexão com a biblioteca do Excel'));
+    document.head.appendChild(s);
+  });
+}
+let xlsxOcupado = false;
+async function exportXlsx(){
+  if (xlsxOcupado) return; xlsxOcupado = true; toast('Gerando o Excel…');
+  try {
+    const ExcelJS = await excelJsLib(), wb = montarXlsx(ExcelJS), buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download = 'Orçamento - ' + safeName(Q && Q.titulo) + '.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { console.error(e); toast('Não deu para gerar o Excel: ' + (e.message || e)); }
+  finally { xlsxOcupado = false; }
+}
+const colL = n => { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
+const COR0 = '1F4E5A';
+function montarXlsx(ExcelJS){
+  const L = linhas(), N = NM(), H0 = 4, D0 = 5;   // linha do cabeçalho e 1ª linha de dados
+  const wb = new ExcelJS.Workbook(); wb.creator = 'AcquaHub'; wb.created = new Date();
+  const TAB = {Resumo:COR0, 'Por mês':COR0, 'Mão de Obra':'2E7D32', 'Locação':'EF6C00', 'Despesas':'6A1B9A', Premissas:'8199A2', Cargos:'8199A2'}, WS = {};
+  Object.keys(TAB).forEach(n => WS[n] = wb.addWorksheet(n, {properties:{tabColor:{argb:'FF' + TAB[n]}}}));
+  const COR = COR0, AZUL = '1F4FB4', MOEDA = '#,##0.00', PCTF = '0.00%';
+  const thin = {style:'thin', color:{argb:'FFD6E3E7'}};
+  const titulo = (ws, t, sub) => {
+    ws.getCell('A1').value = t; ws.getCell('A1').font = {bold:true, size:14, color:{argb:'FF' + COR}};
+    ws.getCell('A2').value = sub; ws.getCell('A2').font = {italic:true, size:9, color:{argb:'FF5C717B'}};
+  };
+  const SUB = `${Q && Q.titulo || 'Organograma'} · gerado em ${new Date().toLocaleString('pt-BR')} · azul = valor de origem, preto = fórmula`;
+  const cab = (ws, cols) => {
+    const r = ws.getRow(H0); cols.forEach((c, i) => { const x = r.getCell(i + 1); x.value = c[0]; ws.getColumn(i + 1).width = c[1]; });
+    r.font = {bold:true, color:{argb:'FFFFFFFF'}}; r.alignment = {vertical:'middle', wrapText:true}; r.height = 30;
+    cols.forEach((c, i) => { r.getCell(i + 1).fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF' + COR}}; r.getCell(i + 1).border = {bottom:thin}; });
+  };
+  const fim = (ws, nCols, nLin, fixas) => {
+    ws.views = [{state:'frozen', xSplit:fixas, ySplit:H0}];
+    if (nLin) ws.autoFilter = {from:{row:H0, column:1}, to:{row:H0 + nLin, column:nCols}};
+  };
+  const linTot = (ws, r, nCols) => { const row = ws.getRow(r); row.font = {bold:true}; for (let c = 1; c <= nCols; c++) { const x = row.getCell(c); x.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFE8F1F3'}}; x.border = {top:{style:'thin', color:{argb:'FF' + COR}}}; } };
+  const orig = (x, v, fmt) => { x.value = v; x.font = {color:{argb:'FF' + AZUL}}; if (fmt) x.numFmt = fmt; };
+  const fx = (x, f, r, fmt) => { x.value = {formula:f, result:r}; if (fmt) x.numFmt = fmt; };
   const ap = c => c ? c + ' ' + String((APR[c] || {}).nivel4 || '') : '';
-  const mo = L.filter(l => l.tipo === 'Mão de Obra').map(l => {
-    const p = l.pessoa, c = l.custo, k = l.rateio == null ? somaMeses(l.meses) / l.nm / (c.total || 1) : l.rateio;
-    const base = {'Nome':p.nome, 'Função':p.funcao || '', 'Modalidade':modRot(p.modalidade), 'Regime':p.regime, 'Setor':setorDe(p), 'Fase':FASE_ROT[p.fase || 'todo'], 'ZA':l.za, 'Rateio':l.rateio == null ? 'varia' : l.rateio, 'Apropriação':ap(p.aprop_cod), 'Mês entrada':rotMes(l.ini), 'Mês saída':rotMes(l.fim)};
-    if (['PJ','ESTAGIO'].includes(p.modalidade)) Object.assign(base, {'Valor NF/bolsa':(num(p.valor_pj) || 0) * k, 'Uniformes e EPI':c.epi * k});
-    else Object.assign(base, {'Salário':c.sal * k, 'Adicional':c.adic * k, 'Hora extra':c.he * k, 'Encargos':c.enc * k, '13º':c.dec * k, 'Férias':c.fer * k, 'Benefícios + exames':c.ben * k, 'PLR':c.plr * k, 'Uniformes e EPI':c.epi * k});
-    base['Custo mensal (média)'] = c.total * k; base['Total no período'] = somaMeses(l.meses);
-    meses.forEach((m, i) => base[m] = l.meses[i + 1]); return base;
+  /* mês: custo × peso da ZA (1/k ativas). Rateio fixo → referencia a coluna Rateio; varia → divide no próprio mês */
+  const mesF = (ref, refRat, l, i) => { const w = l.w[i]; if (!(w > 0)) return null; if (l.rateio != null) return ref + '*' + refRat; const k = Math.round(1 / w); return k === 1 ? ref : ref + '/' + k; };
+  const ratCel = (x, l) => { if (l.rateio == null) { x.value = 'varia'; x.alignment = {horizontal:'right'}; return; } const k = Math.round(1 / l.rateio); fx(x, '1/' + k, l.rateio, '0%'); };
+
+  /* ---------- Premissas (+ contrato das ZAs) ---------- */
+  const wsP = WS['Premissas'];
+  titulo(wsP, 'Premissas de mão de obra', SUB + ' · mude um valor aqui e as abas recalculam');
+  cab(wsP, [['Grupo', 22], ['Premissa', 40], ['Nome na fórmula', 24], ['Valor', 16], ['Unidade', 10]]);
+  const USADAS = ['salario_minimo','insal_1','insal_2','insal_3','periculosidade','he60_horas','he60_pct','he100_horas','he100_pct','enc_horista','enc_mensalista','decimo','ferias','seguro_vida','plano_saude','plano_odonto','transporte','alimentacao','exames','plr_fator','epi_operacional','epi_adm'];
+  const prems = PREM.filter(p => !PREM_OCULTA.has(p.chave)).slice();
+  USADAS.forEach(k => { if (!prems.some(p => p.chave === k)) prems.push({chave:k, rotulo:k + ' (não cadastrada — vale zero)', grupo:'Outros', valor:null}); });
+  const NOME = {}; let r = D0;
+  prems.forEach(p => {
+    const nm = 'pr_' + String(p.chave).replace(/[^A-Za-z0-9_]/g, '_'), pct = PCT.has(p.chave), row = wsP.getRow(r);
+    row.getCell(1).value = p.grupo || 'Outros'; row.getCell(2).value = p.rotulo || p.chave; row.getCell(3).value = nm; row.getCell(3).font = {name:'Consolas', size:9, color:{argb:'FF5C717B'}};
+    orig(row.getCell(4), num(p.valor) == null ? 0 : num(p.valor), pct ? PCTF : HRS.has(p.chave) ? '0.0' : MOEDA);
+    row.getCell(4).name = nm; row.getCell(5).value = pct ? '%' : HRS.has(p.chave) ? 'h/mês' : 'R$/mês';
+    NOME[p.chave] = nm; r++;
   });
-  const itens = tipo => L.filter(l => l.tipo === tipo).map(l => {
-    const r = {'Item':l.item.descricao, 'Categoria':l.item.categoria, 'Ligado a':(l.donoTipo === 'equipe' ? 'Equipe ' : '') + l.dono.nome, 'ZA':l.za, 'Rateio':l.rateio == null ? 'varia' : l.rateio, 'Qtd':l.qtd, 'Unitário':l.unit == null ? 'a definir' : l.unit, 'Cobrança':l.cob, 'Apropriação contábil':l.item.aprop_contabil || '', 'Apropriação de obra':ap(l.aprop), 'Mês início':rotMes(l.ini), 'Mês fim':rotMes(l.fim)};
-    if (tipo === 'Locação') Object.entries(l.item.componentes || {}).forEach(([k, v]) => r['Comp. ' + k] = v);
-    r['Total no período'] = somaMeses(l.meses); meses.forEach((m, i) => r[m] = l.meses[i + 1]); return r;
+  const pv = k => num(P[k]) || 0, pn = k => NOME[k];
+  r += 2; wsP.getCell('A' + r).value = 'Contrato das ZAs'; wsP.getCell('A' + r).font = {bold:true, color:{argb:'FF' + COR}}; r++;
+  const zr = wsP.getRow(r); ['ZA','Consórcio','Início','Meses do contrato','Meses de execução'].forEach((t, i) => { const x = zr.getCell(i + 1); x.value = t; x.font = {bold:true, color:{argb:'FFFFFFFF'}}; x.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF' + COR}}; }); r++;
+  const zasUsadas = [...new Set(L.map(l => l.za))].sort(), ZAREF = {};
+  zasUsadas.forEach(z => {
+    const zz = ZAS.find(x => x.za === z) || {}, j = zaJan(z), row = wsP.getRow(r);
+    row.getCell(1).value = z; row.getCell(2).value = zz.consorcio || '—'; row.getCell(3).value = rotMes(j.a);
+    orig(row.getCell(4), zaMeses(z), '0'); orig(row.getCell(5), j.ex, '0');
+    ZAREF[z] = 'Premissas!$D$' + r; r++;
   });
-  const g = {}; L.forEach(l => { const r = g[l.za] = g[l.za] || {'ZA':l.za, 'Mão de Obra':0, 'Locação':0, 'Despesas':0}; r[l.tipo] += somaMeses(l.meses); });
-  const resumo = Object.values(g).map(r => Object.assign(r, {'Total':r['Mão de Obra'] + r['Locação'] + r['Despesas']}));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo.length ? resumo : [{'ZA':'(vazio)'}]), 'Resumo');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mo.length ? mo : [{'Nome':'(vazio)'}]), 'Mão de Obra');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itens('Locação').length ? itens('Locação') : [{'Item':'(vazio)'}]), 'Locação');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itens('Despesas').length ? itens('Despesas') : [{'Item':'(vazio)'}]), 'Despesas');
-  XLSX.writeFile(wb, 'Orçamento - ' + safeName(Q && Q.titulo) + '.xlsx');
+  wsP.views = [{state:'frozen', ySplit:H0}];
+
+  /* ---------- Cargos (só os usados no organograma) ---------- */
+  const wsC = WS['Cargos'];
+  titulo(wsC, 'Cargos e salários usados neste organograma', SUB);
+  cab(wsC, [['Função', 40], ['Regime', 14], ['Salário', 14], ['Adicional', 18], ['Hora extra', 11], ['Setor', 14]]);
+  const CREF = {}; r = D0;
+  [...new Set(L.filter(l => l.tipo === 'Mão de Obra').map(l => l.pessoa.cargo_id).filter(id => id && CARGO[id]))]
+    .map(id => CARGO[id]).sort((a, b) => String(a.funcao).localeCompare(String(b.funcao), 'pt-BR')).forEach(c => {
+      const row = wsC.getRow(r); row.getCell(1).value = c.funcao; row.getCell(2).value = c.regime || ''; orig(row.getCell(3), num(c.salario) || 0, MOEDA);
+      row.getCell(4).value = c.adicional || ''; row.getCell(5).value = c.hora_extra ? 'sim' : 'não'; row.getCell(6).value = c.setor_padrao || '';
+      CREF[c.id] = 'Cargos!$C$' + r; r++;
+    });
+  fim(wsC, 6, r - D0, 1);
+
+  /* ---------- Mão de Obra ---------- */
+  const mo = L.filter(l => l.tipo === 'Mão de Obra');
+  const wsM = WS['Mão de Obra'];
+  titulo(wsM, 'Mão de Obra — 1 linha por pessoa × ZA', SUB + ' · custo mensal = 100% da pessoa; os meses aplicam o rateio da ZA');
+  const MC = [['Nome', 26], ['Função', 26], ['Modalidade', 12], ['Regime', 12], ['Setor', 13], ['Fase', 13], ['ZA', 9], ['Rateio na ZA', 9], ['Apropriação', 26], ['Entrada', 9], ['Saída', 9],
+              ['Salário / NF / bolsa', 13], ['Adicional', 12], ['Hora extra', 12], ['Encargos', 12], ['13º', 12], ['Férias', 12], ['Benefícios', 12], ['Exames', 11], ['PLR', 11], ['Uniformes e EPI', 12],
+              ['Custo mensal (pessoa)', 14], ['Meses na ZA', 8], ['Total no período', 15], ['Origem do salário', 22]];
+  const MM0 = MC.length + 1; for (let i = 1; i <= N; i++) MC.push([rotCurto(i), 11]);
+  cab(wsM, MC);
+  r = D0;
+  mo.forEach(l => {
+    const p = l.pessoa, c = l.custo, row = wsM.getRow(r), R = n => colL(n) + r, pj = ['PJ','ESTAGIO'].includes(p.modalidade);
+    [p.nome, p.funcao || '', modRot(p.modalidade), pj ? '' : p.regime, setorDe(p), FASE_ROT[p.fase || 'todo'], l.za].forEach((v, i) => row.getCell(i + 1).value = v);
+    ratCel(row.getCell(8), l); row.getCell(9).value = ap(p.aprop_cod); row.getCell(10).value = rotMes(l.ini); row.getCell(11).value = rotMes(l.fim);
+    const cg = p.cargo_id && CARGO[p.cargo_id], salBase = !pj && cg && CREF[cg.id] && num(cg.salario) === num(p.salario);
+    if (pj) { orig(row.getCell(12), num(p.valor_pj) || 0, MOEDA); for (let k = 13; k <= 20; k++) { row.getCell(k).value = 0; row.getCell(k).numFmt = MOEDA; } }
+    else {
+      if (salBase) fx(row.getCell(12), CREF[cg.id], c.sal, MOEDA); else orig(row.getCell(12), c.sal, MOEDA);
+      const S = R(12);
+      if (num(p.adicional_valor) != null) orig(row.getCell(13), c.adic, MOEDA);
+      else if (/^insalubridade_\d$/.test(p.adicional || '')) fx(row.getCell(13), `${pn('salario_minimo')}*${pn('insal_' + p.adicional.slice(-1))}`, c.adic, MOEDA);
+      else if (p.adicional === 'periculosidade') fx(row.getCell(13), `${S}*${pn('periculosidade')}`, c.adic, MOEDA);
+      else { row.getCell(13).value = 0; row.getCell(13).numFmt = MOEDA; }
+      if (p.hora_extra) fx(row.getCell(14), `${S}/220*(${pn('he60_horas')}*(1+${pn('he60_pct')})+${pn('he100_horas')}*(1+${pn('he100_pct')}))`, c.he, MOEDA);
+      else { row.getCell(14).value = 0; row.getCell(14).numFmt = MOEDA; }
+      fx(row.getCell(15), `(${S}+${R(13)}+${R(14)})*${pn(p.regime === 'HORISTA' ? 'enc_horista' : 'enc_mensalista')}`, c.enc, MOEDA);
+      fx(row.getCell(16), `${S}*${pn('decimo')}`, c.dec, MOEDA);
+      fx(row.getCell(17), `${S}*${pn('ferias')}`, c.fer, MOEDA);
+      fx(row.getCell(18), ['seguro_vida','plano_saude','plano_odonto','transporte','alimentacao'].map(pn).join('+'), c.ben - pv('exames'), MOEDA);
+      fx(row.getCell(19), pn('exames'), pv('exames'), MOEDA);
+      fx(row.getCell(20), `${S}*${pn('plr_fator')}`, c.plr, MOEDA);
+    }
+    if (pj && p.recebe_epi === false) { row.getCell(21).value = 0; row.getCell(21).numFmt = MOEDA; }
+    else fx(row.getCell(21), pn(setorDe(p) === 'OBRAS' ? 'epi_operacional' : 'epi_adm'), c.epi, MOEDA);
+    fx(row.getCell(22), `SUM(${R(12)}:${R(21)})`, c.total, MOEDA); row.getCell(22).font = {bold:true};
+    fx(row.getCell(23), `COUNT(${colL(MM0)}${r}:${colL(MM0 + N - 1)}${r})`, l.nm, '0');
+    fx(row.getCell(24), `SUM(${colL(MM0)}${r}:${colL(MM0 + N - 1)}${r})`, somaMeses(l.meses), MOEDA); row.getCell(24).font = {bold:true};
+    row.getCell(25).value = pj ? (p.modalidade === 'PJ' ? 'valor da NF digitado' : 'bolsa digitada') : salBase ? 'aba Cargos (base)' : cg ? 'digitado (difere da base)' : 'digitado (cargo novo/manual)';
+    for (let i = 1; i <= N; i++) { const f = mesF('$V' + r, '$H' + r, l, i); if (f) fx(row.getCell(MM0 + i - 1), f, l.meses[i], MOEDA); }
+    r++;
+  });
+  const moFim = r - 1;
+  if (mo.length) {
+    const row = wsM.getRow(r); row.getCell(1).value = 'Total';
+    [24].concat(Array.from({length:N}, (_, i) => MM0 + i)).forEach(cn => fx(row.getCell(cn), `SUM(${colL(cn)}${D0}:${colL(cn)}${moFim})`, cn === 24 ? mo.reduce((s, l) => s + somaMeses(l.meses), 0) : mo.reduce((s, l) => s + l.meses[cn - MM0 + 1], 0), MOEDA));
+    linTot(wsM, r, MC.length);
+  } else wsM.getCell('A' + D0).value = '(sem pessoas)';
+  fim(wsM, MC.length, mo.length, 1);
+
+  /* ---------- Locação / Despesas ---------- */
+  const abaItens = (tipo, cor) => {
+    const ls = L.filter(l => l.tipo === tipo), ws = WS[tipo];
+    titulo(ws, tipo + ' — 1 linha por item ligado × ZA', SUB + ' · valor = qtd × unitário; mensal entra em todos os meses, pontual só no 1º');
+    const comps = tipo === 'Locação' ? [...new Set(ls.flatMap(l => Object.keys(l.item.componentes || {}).filter(k => num(l.item.componentes[k]) != null)))] : [];
+    const IC = [['Item', 30], ['Categoria', 12], ['Ligado a', 26], ['ZA', 9], ['Rateio na ZA', 9], ['Cobrança', 10], ['Apropriação contábil', 20], ['Apropriação de obra', 26], ['Início', 9], ['Fim', 9]];
+    const cC0 = IC.length + 1; comps.forEach(k => IC.push(['Comp. ' + (COMP_ROT[k] || k), 12]));
+    const cQ = IC.length + 1; IC.push(['Qtd', 7], ['Unitário', 13], ['Valor (qtd × unit.)', 14], ['Total no período', 15], ['Origem do preço', 24]);
+    const cU = cQ + 1, cV = cQ + 2, cT = cQ + 3, cO = cQ + 4, M0 = IC.length + 1; for (let i = 1; i <= N; i++) IC.push([rotCurto(i), 11]);
+    cab(ws, IC); let rr = D0;
+    ls.forEach(l => {
+      const row = ws.getRow(rr), it = l.item, v = l.vinc;
+      [it.descricao, it.categoria || '', (l.donoTipo === 'equipe' ? 'Equipe: ' : '') + l.dono.nome, l.za].forEach((x, i) => row.getCell(i + 1).value = x);
+      ratCel(row.getCell(5), l); row.getCell(6).value = l.cob === 'pontual' ? 'pontual' : 'mensal';
+      row.getCell(7).value = it.aprop_contabil || ''; row.getCell(8).value = ap(l.aprop); row.getCell(9).value = rotMes(l.ini); row.getCell(10).value = rotMes(l.fim);
+      const cp = it.componentes || {}; comps.forEach((k, i) => { if (num(cp[k]) != null) orig(row.getCell(cC0 + i), num(cp[k]), MOEDA); });
+      orig(row.getCell(cQ), l.qtd, '0.##');
+      const proprio = num(v.valor) != null, temComp = comps.length && Object.keys(cp).some(k => num(cp[k]) != null) && Math.abs(somaComp(cp) - (l.unit || 0)) < 0.005;
+      let origem;
+      if (l.unit == null) { row.getCell(cU).value = null; row.getCell(cU).fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF4CC'}}; origem = 'a definir (entra como zero)'; }
+      else if (proprio) { orig(row.getCell(cU), l.unit, MOEDA); origem = 'preço próprio do vínculo'; }
+      else if (temComp) { fx(row.getCell(cU), `SUM(${colL(cC0)}${rr}:${colL(cC0 + comps.length - 1)}${rr})`, l.unit, MOEDA); origem = 'soma dos componentes'; }
+      else { orig(row.getCell(cU), l.unit, MOEDA); origem = (it.composicao || []).length ? `kit: soma de ${it.composicao.length} item(ns)` : 'preço do catálogo'; }
+      row.getCell(cU).numFmt = MOEDA;
+      fx(row.getCell(cV), `${colL(cQ)}${rr}*${colL(cU)}${rr}`, (l.unit || 0) * l.qtd, MOEDA);
+      fx(row.getCell(cT), `SUM(${colL(M0)}${rr}:${colL(M0 + N - 1)}${rr})`, somaMeses(l.meses), MOEDA); row.getCell(cT).font = {bold:true};
+      row.getCell(cO).value = origem;
+      const ref = '$' + colL(cV) + rr, rat = '$E' + rr;
+      for (let i = 1; i <= N; i++) { if (l.cob === 'pontual' && i !== l.f0) continue; const f = mesF(ref, rat, l, i); if (f) fx(row.getCell(M0 + i - 1), f, l.meses[i], MOEDA); }
+      rr++;
+    });
+    const fimL = rr - 1;
+    if (ls.length) {
+      const row = ws.getRow(rr); row.getCell(1).value = 'Total';
+      [cT].concat(Array.from({length:N}, (_, i) => M0 + i)).forEach(cn => fx(row.getCell(cn), `SUM(${colL(cn)}${D0}:${colL(cn)}${fimL})`, cn === cT ? ls.reduce((s, l) => s + somaMeses(l.meses), 0) : ls.reduce((s, l) => s + l.meses[cn - M0 + 1], 0), MOEDA));
+      linTot(ws, rr, IC.length);
+    } else ws.getCell('A' + D0).value = '(sem itens)';
+    fim(ws, IC.length, ls.length, 1);
+    return {ls, fimL, colZA:'D', colT:colL(cT), M0};
+  };
+  const LOC = abaItens('Locação', 'EF6C00'), DES = abaItens('Despesas', '6A1B9A');
+  const MOI = {ls:mo, fimL:moFim, colZA:'G', colT:colL(24), M0:MM0};
+
+  /* ---------- Resumo (por ZA) e Por mês — só fórmulas sobre as abas de detalhe ---------- */
+  const ABAS = [['Mão de Obra', MOI], ['Locação', LOC], ['Despesas', DES]];
+  const somaSe = (nome, A, z) => A.ls.length ? `SUMIFS('${nome}'!$${A.colT}$${D0}:$${A.colT}$${A.fimL},'${nome}'!$${A.colZA}$${D0}:$${A.colZA}$${A.fimL},$A${'@'})` : '0';
+  const wsR = WS['Resumo'];
+  titulo(wsR, 'Orçamento — ' + (Q && Q.titulo || 'Organograma'), SUB);
+  cab(wsR, [['ZA', 10], ['Consórcio', 26], ['Mão de Obra', 17], ['Locação', 17], ['Despesas', 17], ['Total', 18], ['Meses do contrato', 11], ['Média/mês', 16]]);
+  r = D0;
+  zasUsadas.forEach(z => {
+    const row = wsR.getRow(r), zz = ZAS.find(x => x.za === z) || {}, tot = {};
+    row.getCell(1).value = z; row.getCell(2).value = zz.consorcio || '—';
+    ABAS.forEach(([nome, A], i) => { tot[nome] = A.ls.filter(l => l.za === z).reduce((s, l) => s + somaMeses(l.meses), 0); fx(row.getCell(3 + i), somaSe(nome, A).replace('@', r), tot[nome], MOEDA); });
+    const T = tot['Mão de Obra'] + tot['Locação'] + tot['Despesas'];
+    fx(row.getCell(6), `SUM(C${r}:E${r})`, T, MOEDA); row.getCell(6).font = {bold:true};
+    fx(row.getCell(7), ZAREF[z], zaMeses(z), '0'); fx(row.getCell(8), `F${r}/G${r}`, T / zaMeses(z), MOEDA); r++;
+  });
+  const rFim = r - 1;
+  { const row = wsR.getRow(r); row.getCell(1).value = 'Total'; const totG = L.reduce((s, l) => s + somaMeses(l.meses), 0);
+    ['C','D','E','F'].forEach((c, i) => fx(row.getCell(3 + i), zasUsadas.length ? `SUM(${c}${D0}:${c}${rFim})` : '0', i < 3 ? ABAS[i][1].ls.reduce((s, l) => s + somaMeses(l.meses), 0) : totG, MOEDA));
+    orig(row.getCell(7), N, '0'); fx(row.getCell(8), `F${r}/G${r}`, totG / N, MOEDA); linTot(wsR, r, 8); }
+  r += 2;
+  const sp = L.filter(l => l.semPreco).length;
+  const notas = ['Como ler: cada linha das abas de detalhe tem o custo mensal da pessoa/item (fórmulas sobre Premissas e Cargos) e, nos meses, esse valor × o rateio da ZA naquele mês.',
+    'Total no período = soma dos meses. Este resumo soma o "Total no período" por ZA (SOMASES). Mudou uma premissa ou um salário? O arquivo recalcula sozinho.',
+    'Quem está em mais de uma ZA aparece uma vez por ZA; o rateio divide igual entre as ZAs ativas no mês ("varia" = muda quando uma ZA começa ou termina).'];
+  if (sp) notas.push(`Atenção: ${sp} linha(s) com item sem preço (a definir) entram como zero — célula amarela nas abas Locação/Despesas.`);
+  notas.forEach(t => { const x = wsR.getCell('A' + r); x.value = t; x.font = {size:9, color:{argb:'FF5C717B'}}; r++; });
+  wsR.views = [{state:'frozen', ySplit:H0}];
+
+  const wsT = WS['Por mês'];
+  titulo(wsT, 'Orçamento por mês (todas as ZAs)', SUB);
+  cab(wsT, [['Mês', 10], ['Mão de Obra', 17], ['Locação', 17], ['Despesas', 17], ['Total', 18], ['Pessoas', 9]]);
+  for (let i = 1; i <= N; i++) {
+    const row = wsT.getRow(D0 + i - 1), rr = D0 + i - 1; row.getCell(1).value = rotCurto(i);
+    ABAS.forEach(([nome, A], k) => { const c = colL(A.M0 + i - 1); fx(row.getCell(2 + k), A.ls.length ? `SUM('${nome}'!${c}${D0}:${c}${A.fimL})` : '0', A.ls.reduce((s, l) => s + l.meses[i], 0), MOEDA); });
+    fx(row.getCell(5), `SUM(B${rr}:D${rr})`, L.reduce((s, l) => s + l.meses[i], 0), MOEDA); row.getCell(5).font = {bold:true};
+    row.getCell(6).value = (new Set(mo.filter(l => l.meses[i] > 0).map(l => l.pessoa.id)).size);
+  }
+  { const rr = D0 + N, row = wsT.getRow(rr); row.getCell(1).value = 'Total';
+    ['B','C','D','E'].forEach((c, k) => fx(row.getCell(2 + k), `SUM(${c}${D0}:${c}${rr - 1})`, k < 3 ? ABAS[k][1].ls.reduce((s, l) => s + somaMeses(l.meses), 0) : L.reduce((s, l) => s + somaMeses(l.meses), 0), MOEDA));
+    linTot(wsT, rr, 6); }
+  wsT.views = [{state:'frozen', ySplit:H0}];
+
+  wb.views = [{activeTab:0}];
+  return wb;
 }
 function wrapTxt(ctx, text, maxW){ const words = String(text).split(/\s+/), lines = []; let cur = ''; words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }); if (cur) lines.push(cur); return lines.length ? lines : ['']; }
 function exportPng(){
