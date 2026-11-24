@@ -5164,3 +5164,9 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   `orc_nome_norm(nome)` + `app_orc_equipe_salvar` recusa com mensagem que diz onde está a outra equipe. Tela: ao abrir a
   equipe busca `app_orc_equipe_nomes()` (título do organograma só se o usuário entra nele), avisa embaixo do nome e bloqueia
   Salvar (`conflitoNome`/`eqBloq`); equipe nova sugere o 1º "Equipe N" livre (`nomeLivre`).
+- **Código fixo do card** (v453, `docs/migracao_orcamento_pessoa_codigo.sql`, aplicado como `orc_30_pessoa_codigo`):
+  `orc_pessoa.codigo` (sequência única em todos os organogramas, índice único, default `nextval`; os existentes foram
+  numerados por organograma → posição). Mostrado como `P-001` (`codP`/`rotP`) no canto do card, no PNG, na ficha, no painel
+  lateral, na lista de membros da equipe (a busca aceita o código), no Resumo e no Excel (coluna Nome da Mão de Obra e
+  "Ligado a" de Locação/Despesas) — separa as vagas "A definir". Card copiado/duplicado ganha código novo; o código não muda
+  com nome/cargo.
