@@ -5170,3 +5170,10 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   lateral, na lista de membros da equipe (a busca aceita o código), no Resumo e no Excel (coluna Nome da Mão de Obra e
   "Ligado a" de Locação/Despesas) — separa as vagas "A definir". Card copiado/duplicado ganha código novo; o código não muda
   com nome/cargo.
+- **Nome de equipe único por organograma + colar leva as equipes** (v454, `docs/migracao_orcamento_equipe_nome_por_organograma.sql`,
+  aplicado como `orc_31_equipe_nome_por_organograma`; substitui a regra global da v452): índice único
+  `(quadro_id, orc_nome_norm(nome))`; `app_orc_equipe_salvar` só confere dentro do organograma (o Excel sai por organograma,
+  o filtro não mistura). A tela não chama mais `app_orc_equipe_nomes`. Ctrl+C guarda também as equipes das pessoas copiadas
+  (+ itens da equipe); Ctrl+V em outro organograma cria as equipes (`colarEquipes`) com nome, cor, ZAs, apropriação, fase,
+  período, itens e só os membros colados — nome que já existe ali vira "(2)", "(3)"… (`nomeLivreDe`). Equipe com o mesmo id
+  no destino só ganha os membros. Vínculos colados levam também a apropriação de obra e a obs.
