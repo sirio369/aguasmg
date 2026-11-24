@@ -480,9 +480,12 @@ function errosEquipe(e){
   const ps = membrosDe(e), out = [];
   if (new Set(ps.map(p => perKey(periodoPessoa(p)))).size > 1) out.push('datas');
   if (new Set(ps.map(nivel3De).filter(Boolean)).size > 1) out.push('cc');
+  if (new Set(ps.map(zaKey)).size > 1) out.push('za');
   return out;
 }
-function zasEquipe(e){ if (e.zas && e.zas.length) return e.zas; const s = new Set(); (e.membros || []).forEach(id => { const p = byId(PES, id); (p && p.zas || []).forEach(z => s.add(z)); }); return [...s]; }
+/* ZA da equipe = a dos membros (todos iguais, senão não salva); sem membros fica a gravada (legado) */
+const zaKey = p => (p.zas || []).slice().sort().join(',');
+function zasEquipe(e){ const ps = membrosDe(e); return ps.length ? (ps[0].zas || []).slice() : (e.zas || []); }
 function faltas(p){
   const f = [];
   if (!(p.zas && p.zas.length)) f.push('ZA');
@@ -1327,18 +1330,20 @@ function membrosHtml(d){
   const ps = membrosDe(d);
   if (!ps.length) return '<div class="small muted">Ninguém selecionado.</div>';
   const per = ps.map(p => ({p, r:periodoPessoa(p)})), cont = {}, contG = {};
-  per.forEach(x => { const k = perKey(x.r); cont[k] = (cont[k] || 0) + 1; const g = nivel3De(x.p); if (g) contG[g] = (contG[g] || 0) + 1; });
-  const maior = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0], gMaior = Object.keys(contG).sort((a, b) => contG[b] - contG[a])[0];
+  const contZ = {};
+  per.forEach(x => { const k = perKey(x.r); cont[k] = (cont[k] || 0) + 1; const g = nivel3De(x.p); if (g) contG[g] = (contG[g] || 0) + 1; const z = zaKey(x.p); contZ[z] = (contZ[z] || 0) + 1; });
+  const maior = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0], gMaior = Object.keys(contG).sort((a, b) => contG[b] - contG[a])[0], zMaior = Object.keys(contZ).sort((a, b) => contZ[b] - contZ[a])[0];
   const er = errosEquipe(d);
   let h = `<div class="tbl-wrap" style="max-height:40vh"><table><thead><tr><th>Nome</th><th>Função</th><th>Apropriação</th><th>ZA</th><th>Início</th><th>Fim</th><th></th></tr></thead><tbody>`;
   per.forEach(({p, r}) => {
-    const dif = (er.includes('datas') && perKey(r) !== maior) || (er.includes('cc') && nivel3De(p) && nivel3De(p) !== gMaior);
+    const dif = (er.includes('datas') && perKey(r) !== maior) || (er.includes('cc') && nivel3De(p) && nivel3De(p) !== gMaior) || (er.includes('za') && zaKey(p) !== zMaior);
     h += `<tr${dif ? ' class="dif"' : ''}><td>${esc(p.nome || 'A definir')}</td><td>${esc((p.funcao || '').toLowerCase())}</td><td>${esc(aprRot(p.aprop_cod))}</td><td>${esc(zasRot(p.zas))}</td><td class="n">${r ? rotMes(r.a) : '—'}</td><td class="n">${r ? rotMes(r.b) : '—'}</td><td><button type="button" data-rmem="${p.id}" aria-label="Tirar ${esc(p.nome || 'A definir')} da equipe">✕</button></td></tr>`;
   });
   h += `</tbody></table></div>`;
   if (er.includes('datas')) h += `<div class="badge warn">⚠ Os membros têm datas de entrada/saída diferentes (linhas destacadas). Todos da equipe precisam do mesmo início e fim: ajuste o período na ficha da pessoa ou tire-a da equipe. Não dá para salvar assim.</div>`;
   if (er.includes('cc')) h += `<div class="badge warn">⚠ Os membros estão em centros de custo diferentes (1º nível: ${[...new Set(ps.map(nivel3De).filter(Boolean))].map(g => esc(semCod(g))).join(', ')}). A equipe usa um só: ajuste a apropriação na ficha ou tire a pessoa. Não dá para salvar assim.</div>`;
-  if (!er.length) { const r = per[0].r; h += `<div class="badge">Período da equipe (vem dos membros): ${r ? rotMes(r.a) + ' a ' + rotMes(r.b) + ' · ' + (r.b - r.a + 1) + ' meses' : 'fora do período'}${d.aprop_grupo ? ' · centro de custo: ' + esc(semCod(d.aprop_grupo)) : ''}</div>`; }
+  if (er.includes('za')) h += `<div class="badge warn">⚠ Os membros estão em ZAs diferentes (${[...new Set(ps.map(p => zasRot(p.zas) || 'sem ZA'))].map(esc).join(' · ')}). A equipe usa as ZAs dos membros, que precisam ser as mesmas: ajuste a ZA na ficha ou tire a pessoa. Não dá para salvar assim.</div>`;
+  if (!er.length) { const r = per[0].r; h += `<div class="badge">Período da equipe (vem dos membros): ${r ? rotMes(r.a) + ' a ' + rotMes(r.b) + ' · ' + (r.b - r.a + 1) + ' meses' : 'fora do período'} · ZA: ${esc(zasRot(ps[0].zas) || 'sem ZA')}${d.aprop_grupo ? ' · centro de custo: ' + esc(semCod(d.aprop_grupo)) : ''}</div>`; }
   return h;
 }
 function mselHtml(d){
@@ -1376,14 +1381,12 @@ function renderEquipe(){
   const d = E.d, B = $('eBody');
   $('dlgETit').textContent = E.novo ? 'Nova equipe' : 'Equipe: ' + d.nome;
   let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
-  h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim e 1º nível de apropriação.</div></div>`;
-  h += `<div class="q"><span class="lab">ZA da equipe</span>${chipsZa(d.zas || [])}<div class="help">Vazio = as ZAs das pessoas da equipe. Os itens da equipe são divididos igual entre as ZAs.</div></div>`;
+  h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período, a ZA e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim, ZA(s) e 1º nível de apropriação. Com mais de uma ZA, os itens da equipe são divididos igual entre elas.</div></div>`;
   h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${d.aprop_grupo ? '' : '<div class="badge warn">Os membros ainda não têm apropriação de obra: defina na ficha para escolher o sub-CC (Equipamentos, Material, Serviços terceiro) de cada item.</div>'}${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}<div class="help">O 1º nível do centro de custo é o dos membros${d.aprop_grupo ? ' (' + esc(semCod(d.aprop_grupo)) + ')' : ''}; o sub-CC é escolhido em cada item.</div></div>`;
   B.innerHTML = h;
   $('eNome').oninput = e => d.nome = e.target.value;
   B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   if (PES.length) bindMembros(B, d);
-  d.zas = d.zas || []; bindZas(B, d.zas, prevEquipe);
   bindItens(B, E.itens, prevEquipe);
   $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = errosEquipe(d).length > 0; prevEquipe();
 }
@@ -1397,8 +1400,8 @@ $('eCancel').onclick = fecharDlgs;
 $('eSave').onclick = async () => {
   const d = E.d;
   const er = errosEquipe(d);
-  if (er.length) { toast(er.includes('datas') ? 'Membros com datas de entrada/saída diferentes: ajuste antes de salvar' : 'Membros em centros de custo diferentes: ajuste antes de salvar'); return; }
-  d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null;
+  if (er.length) { toast({datas:'Membros com datas de entrada/saída diferentes', cc:'Membros em centros de custo diferentes', za:'Membros em ZAs diferentes'}[er[0]] + ': ajuste antes de salvar'); return; }
+  d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null; d.zas = zasEquipe(d);
   $('eSave').disabled = true;
   try {
     const g = d.aprop_grupo || ''; d.aprop_cod = g ? (subPadrao({categoria:'equipamento'}, g) || '') : (d.aprop_cod || '');

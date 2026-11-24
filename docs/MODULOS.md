@@ -5137,3 +5137,6 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - Home: o card `#cardOrcamento` (ainda na categoria 🚧) usa `ME.orc_acesso` em vez de `dev_acesso`. A página `orcamento.html`
   também. O 🔐 de cada organograma oferece só quem entra no módulo.
 - Quem é membro do projeto no Supabase continua vendo tudo pelo painel — a trava é de quem está no projeto.
+- **Equipe sem ZA própria** (24/11, mesmo PR): saiu o campo "ZA da equipe". A ZA vem dos membros (`zasEquipe()` = ZAs do
+  1º membro; sem membros, a gravada — legado) e entra no impeditivo junto com datas e CC: membros com ZAs diferentes
+  (`zaKey`, conjunto de ZAs ordenado) → linha destacada, aviso e Salvar bloqueado. Ao salvar grava `zas` = a dos membros.
