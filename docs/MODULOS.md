@@ -5159,3 +5159,8 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - **Catálogo (24/11, só banco, migração `orc_26_celular_dados_unico`):** "Celular" e "Pacote de dados" viraram um item só,
   **Celular com pacote de dados** (preço = soma; id 16). Os vínculos do pacote eram pares idênticos do celular e saíram;
   o item 17 ficou inativo. Backup em `"19 - orcamento"._bkp_orc_celular_dados_20261124`.
+- **Nome de equipe único em todos os organogramas** (v452, `docs/migracao_orcamento_equipe_nome_unico.sql`, aplicado como
+  `orc_27_equipe_nome_unico`): compara sem maiúsculas e com espaços normalizados. Banco: índice único em
+  `orc_nome_norm(nome)` + `app_orc_equipe_salvar` recusa com mensagem que diz onde está a outra equipe. Tela: ao abrir a
+  equipe busca `app_orc_equipe_nomes()` (título do organograma só se o usuário entra nele), avisa embaixo do nome e bloqueia
+  Salvar (`conflitoNome`/`eqBloq`); equipe nova sugere o 1º "Equipe N" livre (`nomeLivre`).

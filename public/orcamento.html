@@ -1314,12 +1314,20 @@ async function salvarFicha(){
 
 /* ================= equipes ================= */
 let E = null;
-function abrirEquipe(id){
+/* nome de equipe é único em TODOS os organogramas (ignora maiúsculas e espaços) — o banco também trava */
+let EQN = [];
+const normNome = t => String(t || '').trim().replace(/\s+/g, ' ').toLowerCase();
+function conflitoNome(d){ const n = normNome(d.nome); if (!n) return {vazio:true}; return EQN.concat(EQ.map(e => ({id:e.id, nome:e.nome, quadro:Q && Q.titulo}))).find(e => e.id !== d.id && normNome(e.nome) === n) || null; }
+function nomeLivre(){ for (let i = 1; ; i++) { const t = 'Equipe ' + i; if (!conflitoNome({id:null, nome:t})) return t; } }
+const eqBloq = d => errosEquipe(d).length > 0 || !!conflitoNome(d);
+function avisoNome(d){ const c = conflitoNome(d), el = $('eNomeErr'); if (!el) return; el.textContent = !c ? '' : c.vazio ? 'Informe o nome da equipe.' : `Já existe uma equipe chamada "${c.nome}"${c.quadro ? ' (organograma ' + c.quadro + ')' : ' em outro organograma'} — use outro nome.`; el.hidden = !c; $('eSave').disabled = eqBloq(d); }
+async function abrirEquipe(id){
   if (!Q) return;
+  try { EQN = await rpc('app_orc_equipe_nomes') || []; } catch (e) { EQN = []; }
   if (id) { const e = byId(EQ, id); const itens = new Map(); VIN.filter(v => v.equipe_id === id).forEach(v => itens.set(v.item_id, {vid:v.id, qtd:num(v.qtd) || 1, valor:num(v.valor), cob:v.cobranca || null, sub:v.aprop_cod || null})); E = {novo:false, d:JSON.parse(JSON.stringify(e)), itens}; E.d.aprop_grupo = grupoMembros(E.d) || grupoDe(E.d); }
   else {
     const sp = selPessoas(), zs = new Set(); sp.forEach(p => (p.zas || []).forEach(z => zs.add(z)));
-    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:'Equipe ' + (EQ.length + 1), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
+    E = {novo:true, d:{id:uid(), quadro_id:Q.id, fase:(sp[0] && sp[0].fase) || 'todo', nome:nomeLivre(), cor:COLORS[(EQ.length + 3) % COLORS.length], zas:[...zs], aprop_cod:null, aprop_grupo:null, mes_ini:null, mes_fim:null, membros:sp.map(p => p.id)}, itens:new Map()};
     E.d.aprop_grupo = grupoMembros(E.d);
   }
   renderEquipe();
@@ -1374,20 +1382,20 @@ function bindMembros(B, d){
   const redesenha = foco => { $('eMemSel').innerHTML = mselHtml(d); lista(); if (foco) { const i = $('eBusca'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
   lista();
   B.querySelectorAll('[data-rmem]').forEach(b => b.onclick = () => { d.membros = (d.membros || []).filter(x => x !== b.dataset.rmem); mudouMembros(d); });
-  $('eSave').disabled = errosEquipe(d).length > 0;
+  $('eSave').disabled = eqBloq(d);
 }
 function renderEquipe(){
   const d = E.d, B = $('eBody');
   $('dlgETit').textContent = E.novo ? 'Nova equipe' : 'Equipe: ' + d.nome;
-  let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}"></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
+  let h = `<div class="row"><div class="q"><label for="eNome">Nome da equipe</label><input id="eNome" value="${esc(d.nome)}" aria-describedby="eNomeErr"><div id="eNomeErr" class="small" role="alert" style="color:var(--bad)" hidden></div></div><div class="q"><span class="lab">Cor</span><div class="chips" id="eCor">${COLORS.map(c => `<button type="button" class="sw" data-cor="${c}" style="--c:${c}" aria-pressed="${d.cor === c}" aria-label="Cor ${c}"></button>`).join('')}</div></div></div>`;
   h += `<div class="q"><span class="lab">Quem faz parte</span>${PES.length ? `<div id="eMemSel">${mselHtml(d)}</div>${membrosHtml(d)}` : '<span class="small muted">Lance pessoas no organograma primeiro.</span>'}<div class="help">O período, a ZA e o centro de custo (1º nível: VCA, HDD…) da equipe vêm dos membros, que precisam ter o mesmo início, fim, ZA(s) e 1º nível de apropriação. Com mais de uma ZA, os itens da equipe são divididos igual entre elas.</div></div>`;
   h += `<div class="q"><span class="lab">Ferramentas, equipamentos e veículos da equipe</span>${d.aprop_grupo ? '' : '<div class="badge warn">Os membros ainda não têm apropriação de obra: defina na ficha para escolher o sub-CC (Equipamentos, Material, Serviços terceiro) de cada item.</div>'}${listaItens(E.itens, () => true, avisosEquipe(d), {grupo:d.aprop_grupo})}<div class="help">O 1º nível do centro de custo é o dos membros${d.aprop_grupo ? ' (' + esc(semCod(d.aprop_grupo)) + ')' : ''}; o sub-CC é escolhido em cada item.</div></div>`;
   B.innerHTML = h;
-  $('eNome').oninput = e => d.nome = e.target.value;
+  $('eNome').oninput = e => { d.nome = e.target.value; avisoNome(d); };
   B.querySelectorAll('[data-cor]').forEach(b => b.onclick = () => { d.cor = b.dataset.cor; B.querySelectorAll('[data-cor]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   if (PES.length) bindMembros(B, d);
   bindItens(B, E.itens, prevEquipe);
-  $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = errosEquipe(d).length > 0; prevEquipe();
+  $('eDel').hidden = E.novo; $('dlgE').hidden = false; $('eSave').disabled = eqBloq(d); avisoNome(d); prevEquipe();
 }
 function avisosEquipe(d){ const av = new Map(); VIN.forEach(v => { if (!v.pessoa_id || !(d.membros || []).includes(v.pessoa_id) || !ITEM[v.item_id]) return; const p = byId(PES, v.pessoa_id), a = av.get(v.item_id) || {txt:'', nomes:[]}; a.nomes.push(p ? p.nome : '?'); a.txt = '⚠ já lançado individual para ' + a.nomes.join(', ') + ' — tire da pessoa ou não marque aqui'; av.set(v.item_id, a); }); return av; }
 function prevEquipe(){
@@ -1400,6 +1408,8 @@ $('eSave').onclick = async () => {
   const d = E.d;
   const er = errosEquipe(d);
   if (er.length) { toast({datas:'Membros com datas de entrada/saída diferentes', cc:'Membros em centros de custo diferentes', za:'Membros em ZAs diferentes'}[er[0]] + ': ajuste antes de salvar'); return; }
+  if (conflitoNome(d)) { avisoNome(d); toast('Nome de equipe repetido: use outro nome'); return; }
+  d.nome = d.nome.trim().replace(/\s+/g, ' ');
   d.aprop_grupo = grupoMembros(d) || d.aprop_grupo; d.fase = 'todo'; d.mes_ini = null; d.mes_fim = null; d.zas = zasEquipe(d);
   $('eSave').disabled = true;
   try {
