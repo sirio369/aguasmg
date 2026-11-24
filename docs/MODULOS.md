@@ -5107,3 +5107,12 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   o mesmo id. Não desfaz Parâmetros nem acesso.
 - QA (24/11): harness — 🔐 marca/desmarca e mostra 🔐 na lista; colar de outro organograma leva os itens da pessoa;
   desfazer criar, excluir, mover e editar ficha.
+
+### 24.7 Cargo novo nos Parâmetros (24/11/2026, sw v449)
+
+- ⚙️ Parâmetros › **Cargos e salários** ganhou **+ Novo cargo**: linhas novas no topo com nome, salário, regime, adicional,
+  hora extra e setor padrão. Ao salvar, cada uma vai para a base por `app_orc_cargo_salvar` (já existia; `origem='manual'`)
+  e passa a aparecer na lista de cargos da ficha.
+- Nome obrigatório, gravado em maiúsculas e sem espaço duplo; **nome igual a um cargo da base** (ou repetido entre os novos)
+  marca a linha e bloqueia salvar — o banco juntaria os dois. Para mudar um cargo que já existe, edite a linha dele.
+- Salário em branco = a definir (grava 0). Sem SQL novo.
