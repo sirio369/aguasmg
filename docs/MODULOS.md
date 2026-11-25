@@ -2918,6 +2918,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **HDD › Puxamento da tubulação: diâmetro + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** o lançamento do
+  puxamento (`pjIsPux` = intervenção `rede_hdd` + etapa com "puxamento" no nome) pede **Diâmetro da tubulação** (mm, só número — o
+  campo filtra letras; `> 0`) e **Rua** (texto livre), ambos obrigatórios no lançamento novo. A rua vem **preenchida com a última rua
+  lançada no puxamento da mesma intervenção** (`pjPuxRuaSug`, editável). Gravação: colunas novas `intervencao_avanco.diametro_mm`
+  (check `> 0`) / `rua` / `pux_editado_em` / `pux_editado_por`, pela RPC **`app_proj_avanco_pux_set(p_id,p_diametro_mm,p_rua)`**
+  (gate `proj_obras_pode`, recusa lançamento que não seja puxamento HDD) — chamada logo depois do `app_proj_avanco_registrar`
+  (assinatura deste não mudou). **Lançamentos antigos:** no histórico da etapa cada puxamento mostra `Ø … mm · 📍 rua` ou
+  "⚠️ Sem diâmetro e rua", com **✏️ Informar/Editar** (Obras) que grava pela mesma RPC. ⚠️ Se a 2ª chamada falhar o avanço fica
+  lançado sem diâmetro/rua (toast avisa; corrige pelo ✏️). Sem histórico de versões das edições (só quem/quando editou por último).
 - **Data de execução livre (2026-11-18, sw v422, `docs/migracao_proj_avanco_data_livre.sql`):** a pergunta virou **"Esse avanço foi
   realizado em outra data?"** — Sim abre um campo de **data e hora** (`datetime-local`, `max` = agora) e aceita **qualquer data**
   que não esteja no futuro (front e `app_proj_avanco_registrar`, tolerância de 5 min). O texto abaixo (só ontem) é o histórico.
@@ -4883,6 +4892,8 @@ helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lis
 `app_rh_analise` (definer, só `authenticated`; recriada com o parâmetro de área em `docs/migracao_rh_analise_area.sql`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
 inconsistência (sem intervalo 136, HE > 2h 94, falta 55, atraso 55, batida ímpar 18, descanso < 11h 13, falta após desligamento 2).
 
+**Ponto sem terceiros (2026-11-24, `docs/migracao_rh_sem_terceiros.sql`, aplicado em produção):** quem é terceiro (`perfil.modalidade = 'TERCEIRO'`, casado ao funcionário do Kairos pelo CPF em `funcionario.perfil_id`) fica fora de Análise, Horas, Validação e Gestão de pontos. Função `"18 - rh".rh_terceiro(perfil_id)`; `func_visiveis` e o join de `app_rh_analise`, `app_rh_ponto_dias` e `app_rh_val_lista` passam a filtrar. Os dados seguem gravados em `ponto_dia`. Sem perfil no app não dá para saber: continua aparecendo. Em 24/11/2026 nenhum dos 111 funcionários do ponto era terceiro (104 CLT e 7 admitidos em nov sem conta).
+
 ## 23. BI de Suprimentos + carga direta dos relatórios do SIENGE — `docs/migracao_sup_bi.sql` (2026-11-19, **PR-A: só banco**)
 
 Decisão da usuária (19/11/2026): o Power BI deixa de existir; todo BI vira tela do AcquaHub e os relatórios externos são carregados direto no app.
@@ -4988,8 +4999,7 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
   sobre o salário; benefícios fixos + exames; PLR; EPI por setor — confere com a coluna **Custo Mensal TOTAL** da aba Mão de
   Obra (testado em 23/11 com 2 linhas da planilha). Itens mensais × qtd no período; pontuais 1× no mês de início. Tudo
   dividido igual entre as ZAs.
-- **Resumo** (por ZA, por pessoa, itens, por mês) e **Excel** (abas Resumo, Mão de Obra, Locação, Despesas; colunas mês a mês
-  M1…M60 a partir de `mes_inicio`).
+- **Resumo** (por ZA, por pessoa, itens, por mês) e **Excel** (desde v451 formatado e com fórmulas — ver §24.9).
 - QA (23/11/2026): fluxo completo testado com banco simulado (premissas fictícias) — criar organograma, pessoa da base,
   subordinado PJ com cargo novo, equipe com item, resumo, Excel, excluir (subordinado sobe), recarregar. Falta QA logado
   em produção.
@@ -5031,4 +5041,150 @@ pessoa (ou vaga) = uma linha de Mão de Obra; veículos, equipamentos, celular e
   período no card, duplicar 4×, Ctrl+C/V, clicar na linha + Delete (só desliga, não exclui), Desligar com o chefe
   selecionado (aviso). Falta QA logado em produção.
 
-**Ponto sem terceiros (2026-11-24, `docs/migracao_rh_sem_terceiros.sql`, aplicado em produção):** quem é terceiro (`perfil.modalidade = 'TERCEIRO'`, casado ao funcionário do Kairos pelo CPF em `funcionario.perfil_id`) fica fora de Análise, Horas, Validação e Gestão de pontos. Função `"18 - rh".rh_terceiro(perfil_id)`; `func_visiveis` e o join de `app_rh_analise`, `app_rh_ponto_dias` e `app_rh_val_lista` passam a filtrar. Os dados seguem gravados em `ponto_dia`. Sem perfil no app não dá para saber: continua aparecendo. Em 24/11/2026 nenhum dos 111 funcionários do ponto era terceiro (104 CLT e 7 admitidos em nov sem conta).
+### 24.3 Parâmetros ⚙️, mensal/pontual por item, CC da equipe, kits (23/11/2026, sw v445)
+
+Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_parametros` + `orc_22b_cargo_aplicar`).
+- **Mensal × pontual por item ligado:** `orc_vinculo.cobranca` (null = a do catálogo). Na ficha e na equipe cada item tem o
+  seletor "Mensal recorrente / Pontual (1×)" e a linha mostra a conta com o período: "R$ x/mês × n meses do período = total"
+  (mensal) ou "uma vez, no 1º mês do período" (pontual). Grava só quando difere do catálogo, para mudar junto com ele.
+  Todo cálculo (cards, painel, resumo, Excel) usa `cobV(v)` = cobrança do vínculo ou do catálogo.
+- **Ficha mais larga** (`#dlgP`/`#dlgE` 1080 px; 1ª coluna das tabelas quebra linha): Resumo sem barra horizontal.
+- **Kits só de equipe:** `orc_item.so_equipe` (Kit de ferramentas e Kit pesquisa marcados) — somem da lista da pessoa
+  (a não ser que já estejam ligados nela) e entram pela equipe. `orc_item.composicao` = itens do kit
+  `[{descricao, qtd, valor}]`; com composição o preço do kit é a soma (qtd × unitário).
+- **Centro de custo da equipe:** `orc_equipe.aprop_grupo` = 1º nível (nivel3 da aba Auxiliar: VCA, HDD, Implantação de DMC…;
+  lista só os grupos que têm sub-CC Equipamentos/Material). Cada item da equipe escolhe o **sub-CC** (nivel4: Mão de obra,
+  Equipamentos, Material, Serviços terceiro) em `orc_vinculo.aprop_cod` — padrão Equipamentos para veículo/equipamento e
+  Material para o resto; trocar o CC da equipe mantém o mesmo sub-CC pelo nome. `orc_equipe.aprop_cod` fica com o
+  Equipamentos do grupo (fallback). Linhas usam `v.aprop_cod || dono.aprop_cod`.
+- **Datas:** item da pessoa segue a fase/datas da pessoa; item da equipe segue a fase/datas da equipe. Uma não sobrepõe a
+  outra (a pessoa da equipe tem o período dela só para a MO e os itens individuais).
+- **⚙️ Parâmetros** (botão na barra, diálogo `#dlgG`, 4 abas): *Premissas de mão de obra* (encargos/adicionais/HE em %,
+  benefícios em R$; `app_orc_premissa_set`, só admin; `mes_inicio`/`meses_contrato` ocultas — substituídas pelo contrato
+  das ZAs), *Contrato das ZAs* (rótulo, consórcio, início, meses, meses de execução → `app_orc_za_set` /
+  `app_orc_za_contrato_set`, só admin), *Cargos e salários* (busca; salário/regime/adicional/HE/setor →
+  **`app_orc_cargo_aplicar`**, que leva a mudança às pessoas de **todos** os organogramas ligadas ao cargo que ainda usam o
+  valor da base — quem foi ajustado à mão fica), *Itens, veículos e kits* (descrição, categoria, cobrança, preço, só equipe,
+  componentes da Locação → preço = soma, composição do kit → preço = soma; `app_orc_item_salvar`; "+ Novo item").
+  Salvar recarrega os catálogos e recalcula tudo; item ligado com preço próprio (digitado na ficha) não muda.
+- Notebook e periféricos ganhou preço (só no banco). Proposta do kit de ferramentas montada a partir das retiradas do
+  Almoxarifado (planilha fora do repo, para aprovação); Kit pesquisa sem base no almox (aguarda lista/preços).
+- QA (23/11): harness — mensal/pontual por item e total no período, kit fora da lista da pessoa, CC + sub-CC por item
+  (troca de CC remapeia), ⚙️ com premissa, cargo (pessoa acompanhou), componentes, composição do kit e meses de execução:
+  total recalculado bate com a conta manual. Falta QA logado em produção.
+
+### 24.4 Pessoa de equipe sem "Veículos e despesas" (24/11/2026, sw v446)
+
+- Ficha, passo **Equipe**: respondendo **Sim** ("vai fazer parte de alguma equipe de execução?") o passo **Veículos e
+  despesas** some da ficha (abas renumeram; Próximo/Voltar pulam) — veículo, equipamento e despesa dessa pessoa ficam só na
+  equipe, para não lançar duas vezes. **Não** traz o passo de volta.
+- Pessoa que já tinha itens na ficha e passa para Sim: os itens saem da prévia e aparece aviso com a lista ("ao salvar eles
+  saem da pessoa"); voltar para Não restaura. Ao abrir a ficha de quem já está numa equipe vale o mesmo (Sim marcado).
+- Catálogo (só banco, 23–24/11): composição dos kits carregada — ferramentas, EPC (novo), pesquisa (1 conjunto por equipe),
+  área de vivência (novo) — e banheiro químico como item mensal; kit de escritório ganhou preço. Valores fora do repo.
+- QA (24/11): harness — Sim esconde o passo e pula na navegação, Não volta com a lista e a coluna Cobrança; item marcado
+  some com Sim, volta com Não; salvar com Sim apaga o vínculo da pessoa.
+
+### 24.5 Equipe: membros por lista com filtro, período e CC vindos dos membros (24/11/2026, sw v447)
+
+- **Quem faz parte** virou lista suspensa de seleção múltipla (`<details class="msel">`): filtro por apropriação
+  (1º nível da apropriação de obra da pessoa, "Sem apropriação" incluso), busca por nome/função, "Marcar/Desmarcar os
+  listados". Abaixo, **tabela** só com os selecionados: nome, função, apropriação, ZA, início, fim (1º e último mês com
+  custo da ficha) e ✕ para tirar.
+- **A equipe não tem data própria**: saíram a pergunta de fase e os campos de início/fim. O período dos itens da equipe é o
+  período comum dos membros (`perEquipe()` → usado nas linhas e em "× n meses"). Gravação: `fase='todo'`, datas vazias.
+- **O 1º nível do centro de custo (VCA, HDD…) também vem dos membros** (`grupoMembros()`); saiu o seletor de CC da equipe.
+  O sub-CC (Equipamentos, Material, Serviços terceiro) continua em cada item. Trocar membros remapeia o sub-CC pelo nome.
+- **Impeditivo**: membros com início/fim diferentes ou com 1º nível de apropriação diferente → linhas destacadas, aviso e
+  **Salvar desabilitado** (e o clique é barrado com mensagem). Sem membros, o item da equipe vale o contrato todo.
+- QA (24/11): harness — filtro por apropriação, marcar listados, datas diferentes e CC diferente bloqueiam, ao tirar os
+  divergentes libera; período da equipe 07/2026–12/2027 (18 meses) vindo dos membros no Resumo › Itens.
+
+### 24.6 🔐 Acesso por organograma, colar entre organogramas e Ctrl+Z (24/11/2026, sw v448)
+
+- **🔐 ao lado do organograma** (`#boardAcc` → diálogo `#dlgA`): lista quem tem acesso ao módulo (admin + `dev_acesso`);
+  **ninguém marcado = aberto a todos do módulo** (como antes); com gente marcada, só entram os marcados, quem criou e os
+  administradores. Só admin ou quem criou muda. Organograma restrito aparece com 🔐 na lista.
+  Banco: `docs/migracao_orcamento_acesso_quadro.sql` — tabela `orc_quadro_acesso`, `orc_quadro_pode()`/`orc_quadro_config()`,
+  trigger `trg_acesso` (pessoa/equipe/membro/vínculo só gravam em organograma liberado), `app_orc_quadros`/`app_orc_quadro`
+  filtram e devolvem `restrito`/`pode_config`, RPCs novas `app_orc_quadro_acesso`/`_acesso_set`. SQL **aplicado em 24/11** (migração `orc_23_acesso_quadro`, E2E com rollback ok).
+- **Copiar e colar entre organogramas**: Ctrl+C guarda uma cópia das pessoas selecionadas (com os itens ligados); Ctrl+V
+  em outro organograma cria as pessoas lá (cargo, contratação, ZAs, apropriação, período, superior se veio junto, itens).
+  **Equipes não vêm junto** (são de cada organograma). No mesmo organograma segue como antes (duplica, com equipes).
+- **Ctrl+Z / ↶ Desfazer** (`marcaUndo()`/`desfazer()`): a cada render (e ao soltar um arrasto/desenho) guarda o estado do
+  organograma (pessoas, equipes, itens ligados, textos, desenhos); desfazer grava a diferença pelas RPCs de sempre e recarrega.
+  Até 30 passos, só na sessão e no organograma aberto (trocar de organograma zera). Pessoa recriada pelo desfazer volta com
+  o mesmo id. Não desfaz Parâmetros nem acesso.
+- QA (24/11): harness — 🔐 marca/desmarca e mostra 🔐 na lista; colar de outro organograma leva os itens da pessoa;
+  desfazer criar, excluir, mover e editar ficha.
+
+### 24.7 Cargo novo nos Parâmetros (24/11/2026, sw v449)
+
+- ⚙️ Parâmetros › **Cargos e salários** ganhou **+ Novo cargo**: linhas novas no topo com nome, salário, regime, adicional,
+  hora extra e setor padrão. Ao salvar, cada uma vai para a base por `app_orc_cargo_salvar` (já existia; `origem='manual'`)
+  e passa a aparecer na lista de cargos da ficha.
+- Nome obrigatório, gravado em maiúsculas e sem espaço duplo; **nome igual a um cargo da base** (ou repetido entre os novos)
+  marca a linha e bloqueia salvar — o banco juntaria os dois. Para mudar um cargo que já existe, edite a linha dele.
+- Salário em branco = a definir (grava 0). Sem SQL novo.
+- **Correção do colar entre organogramas** (24/11): ao trocar de organograma pela lista suspensa o foco ficava nela e o
+  Ctrl+V (e C/Z) era ignorado — nada era colado. Agora a lista perde o foco ao trocar e os atalhos Ctrl valem mesmo com
+  o foco numa lista. Colado de outro organograma **mantém o nome** (no mesmo organograma segue "A definir") e cai no canto
+  de cima/esquerda da área visível; erro ao colar aparece em mensagem.
+- **🔐 tira até os administradores** (24/11, `docs/migracao_orcamento_acesso_dono.sql`, aplicado — migração
+  `orc_24_acesso_dono`): com a lista preenchida, sempre entram só o **dono do módulo** (tabela `"19 - orcamento".orc_dono`,
+  cadastrado à parte, fora do repositório) e quem criou o organograma; os demais administradores aparecem na lista como
+  qualquer pessoa e entram só se marcados. Mudar o acesso: dono ou quem criou (`orc_quadro_config`). Candidatos trazem a flag
+  `dono` (a tela trava dono + criador). Lista vazia segue aberta a todos do módulo. Parâmetros seguem só admin.
+
+### 24.8 Acesso próprio do módulo — 👥 Acesso (24/11/2026, sw v450)
+
+- O Orçamento **saiu do acesso "Em desenvolvimento"** (`dev_acesso`): entra o **dono do módulo** (`orc_dono`) e quem estiver
+  em `"19 - orcamento".orc_usuario`. `orc_pode()` (usada por `orc_exige()` em todas as RPCs `app_orc_*`) passou a ler essa
+  tabela; `app_me` ganhou `orc_acesso` e `orc_dono`. Banco: `docs/migracao_orcamento_acesso_modulo.sql` (aplicado,
+  `orc_25_acesso_modulo`); semente = quem entrava (admin ou `dev_acesso`, ativo) no dia da aplicação.
+- Tela: botão **👥 Acesso** ao lado de ⚙️ Parâmetros, **só para o dono** (`#usrAcc` → `#dlgU`): busca, filtro Com acesso/Todos,
+  marcar/desmarcar grava na hora (`app_orc_acesso_listar`/`app_orc_acesso_set`, ambas só dono); o dono fica travado.
+- Home: o card `#cardOrcamento` (ainda na categoria 🚧) usa `ME.orc_acesso` em vez de `dev_acesso`. A página `orcamento.html`
+  também. O 🔐 de cada organograma oferece só quem entra no módulo.
+- Quem é membro do projeto no Supabase continua vendo tudo pelo painel — a trava é de quem está no projeto.
+- **Equipe sem ZA própria** (24/11, mesmo PR): saiu o campo "ZA da equipe". A ZA vem dos membros (`zasEquipe()` = ZAs do
+  1º membro; sem membros, a gravada — legado) e entra no impeditivo junto com datas e CC: membros com ZAs diferentes
+  (`zaKey`, conjunto de ZAs ordenado) → linha destacada, aviso e Salvar bloqueado. Ao salvar grava `zas` = a dos membros.
+
+### 24.9 Excel formatado e com fórmulas (24/11/2026, sw v451)
+
+- O botão **Excel** (barra e diálogo do Resumo) gera o arquivo com **ExcelJS** (cdnjs 4.4.0, carregado sob demanda —
+  mesma biblioteca do Relatório consolidado do `index.html`); o SheetJS saiu da página.
+- **Abas:** Resumo (por ZA) · Por mês · Mão de Obra · Locação · Despesas · **Premissas** (+ contrato das ZAs) · **Cargos**
+  (só os usados no organograma). Cabeçalho escuro, cabeçalho e 1ª coluna congelados, filtro, R$ com 2 casas, linha de Total.
+- **Fórmulas mostram a origem:** cada premissa vira um nome `pr_<chave>` (ex.: `=(L5+M5+N5)*pr_enc_mensalista`); o salário
+  da base aponta para a aba Cargos; adicional, HE, encargos, 13º, férias, benefícios, exames, PLR e EPI são fórmulas; custo
+  mensal = SOMA; cada mês = custo × rateio da ZA (coluna "Rateio na ZA" = `1/k`; quando varia, `/k` no próprio mês); Total =
+  SOMA dos meses; Resumo = SOMASES por ZA; Por mês = SOMA das colunas do mês. Item: unitário = SOMA dos componentes quando
+  o preço vem deles, valor = qtd × unitário, pontual só no 1º mês. Colunas "Origem do salário"/"Origem do preço" explicam o resto.
+- **Azul = valor de origem** (base/digitado), preto = fórmula. Cada fórmula leva o resultado calculado no app (cache), então
+  abre com números mesmo sem recálculo; mudar uma premissa/salário no arquivo recalcula tudo.
+- Os valores vêm do banco na hora — nada no código. QA 24/11 (banco simulado): 1.120 fórmulas recalculadas no Excel = valores do app.
+- **Coluna Equipe** (v452): na Mão de Obra (equipe(s) da pessoa) e em Locação/Despesas (a equipe do item, ou a da pessoa
+  dona do item), logo depois do Nome/Categoria — filtra e relaciona as três abas. "Ligado a" mostra a pessoa ou "a equipe".
+- **Catálogo (24/11, só banco, migração `orc_26_celular_dados_unico`):** "Celular" e "Pacote de dados" viraram um item só,
+  **Celular com pacote de dados** (preço = soma; id 16). Os vínculos do pacote eram pares idênticos do celular e saíram;
+  o item 17 ficou inativo. Backup em `"19 - orcamento"._bkp_orc_celular_dados_20261124`.
+- **Nome de equipe único em todos os organogramas** (v452, `docs/migracao_orcamento_equipe_nome_unico.sql`, aplicado como
+  `orc_27_equipe_nome_unico`): compara sem maiúsculas e com espaços normalizados. Banco: índice único em
+  `orc_nome_norm(nome)` + `app_orc_equipe_salvar` recusa com mensagem que diz onde está a outra equipe. Tela: ao abrir a
+  equipe busca `app_orc_equipe_nomes()` (título do organograma só se o usuário entra nele), avisa embaixo do nome e bloqueia
+  Salvar (`conflitoNome`/`eqBloq`); equipe nova sugere o 1º "Equipe N" livre (`nomeLivre`).
+- **Código fixo do card** (v453, `docs/migracao_orcamento_pessoa_codigo.sql`, aplicado como `orc_30_pessoa_codigo`):
+  `orc_pessoa.codigo` (sequência única em todos os organogramas, índice único, default `nextval`; os existentes foram
+  numerados por organograma → posição). Mostrado como `P-001` (`codP`/`rotP`) no canto do card, no PNG, na ficha, no painel
+  lateral, na lista de membros da equipe (a busca aceita o código), no Resumo e no Excel (coluna Nome da Mão de Obra e
+  "Ligado a" de Locação/Despesas) — separa as vagas "A definir". Card copiado/duplicado ganha código novo; o código não muda
+  com nome/cargo.
+- **Nome de equipe único por organograma + colar leva as equipes** (v454, `docs/migracao_orcamento_equipe_nome_por_organograma.sql`,
+  aplicado como `orc_31_equipe_nome_por_organograma`; substitui a regra global da v452): índice único
+  `(quadro_id, orc_nome_norm(nome))`; `app_orc_equipe_salvar` só confere dentro do organograma (o Excel sai por organograma,
+  o filtro não mistura). A tela não chama mais `app_orc_equipe_nomes`. Ctrl+C guarda também as equipes das pessoas copiadas
+  (+ itens da equipe); Ctrl+V em outro organograma cria as equipes (`colarEquipes`) com nome, cor, ZAs, apropriação, fase,
+  período, itens e só os membros colados — nome que já existe ali vira "(2)", "(3)"… (`nomeLivreDe`). Equipe com o mesmo id
+  no destino só ganha os membros. Vínculos colados levam também a apropriação de obra e a obs.
