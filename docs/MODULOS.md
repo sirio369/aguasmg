@@ -402,6 +402,9 @@
 
 ### 2.4 VRPs (levantamento de visita) — `// MÓDULO VRP` (~L1552) · telas `vrp` / `vrp_det`
 - Baseado em `"2 - infra_agua".vrps`. Situações: `pendente` / `localizada` / `nao_localizada`.
+- **Identificador exibido (2026-11-25, sw v457):** `vrpIdLabel()` troca o `label` vindo de `app_vrp_listar` pelo `cd_no_agua`
+  na carga (online e cache); o `num_vrp` aparece como nome secundário (`vrpSub`) na lista, tooltip, busca e PDF; no Excel,
+  colunas "VRP (nó)" + "Nome". Ver §15.
   Formulário dinâmico `VRP_FORM` com condicionais (`show(a)`); ao visitar, ponto visitado abre o
   **resumo read-only + PDF** (`vrpResumo`/`vrpRelatorio`), não novo formulário.
 - **RPCs:** `app_vrp_listar`, `app_vrp_visita_registrar`, `app_vrp_visita_ver`. Tabela `vrp_visita`.
@@ -3263,6 +3266,21 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
   `logo-eficiencia-hidrica.png` (usados só pela carta proposta) ficaram em `public/` e no `ASSETS` do `sw.js`.
 
 ## 15. Gestão de VRPs (`vrpman`, schema `8 - coleta_campo`)
+
+> **Identificador exibido = `cd_no_agua` (2026-11-25, sw v457, `docs/migracao_vrp_cd_no_agua.sql`):** em toda a
+> Gestão de VRPs (campo, gestão de serviços, pendências, ficha, cronograma, programar, PDFs de OS e de visita) a VRP
+> aparece pelo **código do nó COPASA** (`vrps.cd_no_agua`, ex. `VRP1435553` — 148/148 preenchidos, sem repetição);
+> o `num_vrp` (ex. `ZA 0200/VRP85`) vira **nome secundário** (sublinha/“Nome” no PDF). Helpers `vmVrpId(o)` =
+> `cd_no_agua || num_vrp` e `vmVrpSub(o)` = `num_vrp` quando há os dois — **use-os em tela nova do módulo** em vez de
+> `o.num_vrp`. Os datalists (Programar e busca da Ficha cadastral) usam `cd_no_agua` como valor e aceitam o `num_vrp`
+> digitado. `app_vrp_ficha_listar`/`_os_listar`/`_os_programaveis`/`_pendencias_listar`/`_prev_farol` passaram a
+> devolver `cd_no_agua` (lido de `vrps`, não do snapshot da OS) e ordenam por ele; `_os_listar.p_vrp` aceita os dois.
+> A chave interna continua `vrps.id` (`vrp_id`). **Estendido ao resto do app (mesmo PR, `docs/migracao_vrp_cd_no_agua_textos.sql`):**
+> Visita primária (§2.4, `vrpIdLabel`/`vrpSub`), Cadastro técnico (título do popup `cadVrpTit` + rótulo da busca em
+> `app_cadastro_buscar`), Consolidador (`fisc_execucoes.descricao`; o campo `local` segue com o `num_vrp`), RDO (`rdo_eventos`:
+> lista de OS e detalhe `vrp`) e Vitrine (`app_vitrine_feed`/`_dados`) — sempre `cd_no_agua` com fallback no `num_vrp`.
+> Dias já validados (`fisc_dia`) e RDOs fechados guardam o texto antigo. ⚠️ O `cd_no_agua` já começa com "VRP": não
+> prefixe "VRP " de novo (use `fisc_vrp()` no banco; no front, teste `/^\s*VRP/i`).
 
 > **Reorg 2026-10:** o card da home virou **"VRPs – Campo"** e o hub `vrpman` (`vmHub`) ficou **só com 🏗️ Campo**
 > (Minhas OS / Visita primária). As 3 telas de **gestão — `vrpman_serv` (Gestão de serviços), `vrpman_fichas`
