@@ -272,6 +272,9 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjhdelta{color:var(--ok);font-weight:700;flex:0 0 auto}
 .pjhacc{color:var(--mut);margin-left:auto;text-align:right;font-family:ui-monospace,monospace;font-size:11px}
 .pjhobs{font-size:11px;color:var(--mut);margin:0 0 5px 34px;font-style:italic}
+.pjhpux{font-size:11.5px;margin:0 0 5px 34px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center} .pjhpux .falta{color:var(--bad)} .pjhpux button{width:auto;margin:0;padding:2px 8px;font-size:11px}
+.pjhpuxed{margin:0 0 8px 34px;display:grid;grid-template-columns:120px 1fr;gap:6px} .pjhpuxed .btn{grid-column:1/-1;margin:0} .pjhpuxed[hidden]{display:none}
+.pjpux{display:grid;grid-template-columns:140px 1fr;gap:6px;margin:6px 0} .pjpux label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:3px} .pjpuxun{position:relative;display:block} .pjpuxun input{padding-right:38px;width:100%;box-sizing:border-box} .pjpuxun span{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--mut);pointer-events:none}
 .pjthumb.sm{width:26px;height:26px;font-size:13px;border-radius:6px}
 .pjaccum{font-size:12px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)} .pjaccum b{font-family:ui-monospace,monospace}
 .pjfotos{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
@@ -3275,6 +3278,20 @@ function pjReconcilia(iv){ if(!Array.isArray(iv.arv)) return;
 }
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
 const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
+// HDD › Puxamento da tubulação: cada lançamento guarda diâmetro (mm) + rua (2026-11-25, app_proj_avanco_pux_set)
+const pjIsPux=(iv,node)=>!!(iv&&iv.tipo==='rede_hdd'&&node&&/puxamento/i.test(node.n||''));
+const pjEsc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pjNumOk=v=>/^\d+([.,]\d+)?$/.test(String(v||'').trim());
+const pjMmFmt=v=>v==null?'':String(v).replace('.',',');
+function pjPuxHist(e){
+  const tem=e.diametro_mm!=null||!!e.rua, pode=pjPodeObras()&&e.id!=null;
+  const txt=tem?`<span>Ø <b>${e.diametro_mm!=null?pjMmFmt(e.diametro_mm):'—'}</b> mm</span><span>📍 ${e.rua?pjEsc(e.rua):'<span class="falta">rua não informada</span>'}</span>`
+    :`<span class="falta">⚠️ Sem diâmetro e rua</span>`;
+  return `<div class="pjhpux">${txt}${pode?`<button class="btn ghost pjmini" data-puxed="${e.id}">✏️ ${tem?'Editar':'Informar'}</button>`:''}</div>`
+    +(pode?`<div class="pjhpuxed" hidden><span class="pjpuxun"><input class="pjpuxd" inputmode="decimal" placeholder="Diâmetro" value="${pjMmFmt(e.diametro_mm)}"><span>mm</span></span><input class="pjpuxr" placeholder="Rua" value="${pjEsc(e.rua||'')}"><button class="btn" data-puxsave="${e.id}">Salvar diâmetro e rua</button></div>`:'');
+}
+// sugestão de rua = última rua lançada no puxamento desta intervenção (o usuário pode trocar)
+function pjPuxRuaSug(){ let best=null; Object.values(pjAvancosCur||{}).forEach(arr=>(arr||[]).forEach(e=>{ if(e&&e.rua&&/puxamento/i.test(e.sub||'')){ const t=new Date(e.pux_editado_em||e.registrado_em||e.ts).getTime(); if(!best||t>best.t) best={t,rua:e.rua}; } })); return best?best.rua:''; }
 let pjSaveT={};
 async function pjSaveNow(iv){ if(!iv||iv.gid==null||!iv.kind) return;
   try{ const {error}=await sb.rpc('app_proj_estado_set',{p_kind:iv.kind,p_gid:iv.gid,p_arv:iv.arv,p_locked:!!iv.locked,p_status:pjStatusLegacy(iv)}); if(error) throw error;
@@ -4311,15 +4328,16 @@ function pjNodeHtml(node){
   }
   if(pjMode==='campo'&&!isG&&(t==='%'||t==='m')&&!inact&&pjExecOk&&!trava){
     const cur=t==='m'?(node.exec||0):(node.p||0);
-    const _iv=pjCurIv(), ents=(_iv?pjAvancosCur[pjNodeKey(_iv,node)]:null)||[];
+    const _iv=pjCurIv(), ents=(_iv?pjAvancosCur[pjNodeKey(_iv,node)]:null)||[], pux=pjIsPux(_iv,node);
     const rows=ents.length
-      ? ents.map(e=>`<div class="pjhrow"><span class="pjthumb sm">${(e.fotos&&e.fotos.length)?`<a href="${SBASE+e.fotos[0]}" target="_blank" rel="noopener">📷</a>`:'📷'}</span><span class="pjhd" title="${e.retroativo?'Executado em '+pjDDMM(e.ts)+' '+new Date(e.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · lançado em '+pjDDMM(e.registrado_em):''}">${pjDDMM(e.ts)}${e.retroativo?' ⏪':''}</span><span class="pjhdelta">+${e.valor}${e.unidade==='m'?' m':'%'}</span><span class="pjhacc">${e.autor_nome||e.equipe||''}</span></div>${e.obs?`<div class="pjhobs">"${e.obs}"</div>`:''}`).join('')
+      ? ents.map(e=>`<div class="pjhrow"><span class="pjthumb sm">${(e.fotos&&e.fotos.length)?`<a href="${SBASE+e.fotos[0]}" target="_blank" rel="noopener">📷</a>`:'📷'}</span><span class="pjhd" title="${e.retroativo?'Executado em '+pjDDMM(e.ts)+' '+new Date(e.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · lançado em '+pjDDMM(e.registrado_em):''}">${pjDDMM(e.ts)}${e.retroativo?' ⏪':''}</span><span class="pjhdelta">+${e.valor}${e.unidade==='m'?' m':'%'}</span><span class="pjhacc">${e.autor_nome||e.equipe||''}</span></div>${pux?pjPuxHist(e):''}${e.obs?`<div class="pjhobs">"${e.obs}"</div>`:''}`).join('')
       : `<div class="pjhrow" style="color:var(--mut)">Sem lançamentos ainda.</div>`;
     const acc=cur>0?`<div class="pjaccum">Acumulado: <b>${t==='m'?`${node.exec||0}/${node.meta||0} ${node.un} · ${p}%`:`${node.p||0}%`}</b></div>`:'';
     h+=`<div class="pjlaunch" id="${rid}L">
       <div class="pjhistwrap"><div class="pjhisttit">📋 Lançamentos anteriores</div>${rows}${acc}</div>
       <div class="pjnewtit">➕ Novo avanço</div>
       <input class="pjinp" inputmode="decimal" placeholder="${t==='m'?'avanço — ex. 24 m':'avanço — ex. 15%'}">
+      ${pux?`<div class="pjpux"><label>Diâmetro da tubulação<span class="pjpuxun"><input class="pjpuxd" inputmode="decimal" placeholder="ex. 110"><span>mm</span></span></label><label>Rua<input class="pjpuxr" placeholder="Nome da rua" value="${pjEsc(pjPuxRuaSug())}"></label></div>`:''}
       <div class="pjontem"><span class="pjontq">Esse avanço foi realizado em outra data?</span>
         <label><input type="radio" name="${rid}O" value="nao"> Não (agora)</label><label><input type="radio" name="${rid}O" value="sim"> Sim</label>
         <div class="pjontem-h" hidden><span class="sub" style="margin:0;font-size:12px">Executado em</span><input type="datetime-local" class="pjonth" step="300"></div></div>
@@ -4344,6 +4362,20 @@ function pjWireTree(d,rerender){
   d.querySelectorAll('[data-leaf]').forEach(r=>r.onclick=e=>{ if(e.target.closest('.pjgo'))return; toggleLaunch(r.closest('.pjnode')); });
   d.querySelectorAll('[data-go]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); toggleLaunch(b.closest('.pjnode'),b); });
   d.querySelectorAll('.pjph2 input[type=file]').forEach(inp=>inp.onchange=()=>{const lb=inp.closest('.pjph2');if(lb){const on=inp.files&&inp.files.length;lb.classList.toggle('has',!!on);if(on)lb.querySelector('span').textContent='✓ '+inp.files[0].name.slice(0,14);}});
+  // diâmetro só aceita número (vírgula/ponto decimal)
+  d.querySelectorAll('.pjpuxd').forEach(i=>i.oninput=()=>{ const v=i.value.replace(/[^0-9.,]/g,'').replace(/([.,]\d*)[.,]/g,'$1'); if(v!==i.value) i.value=v; });
+  // ✏️ diâmetro/rua de um lançamento de puxamento já feito (antigo ou novo)
+  d.querySelectorAll('[data-puxed]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const ed=b.closest('.pjhpux').nextElementSibling; if(ed&&ed.classList.contains('pjhpuxed')){ ed.hidden=!ed.hidden; if(!ed.hidden){ const r=ed.querySelector('.pjpuxr'); if(r&&!r.value) r.value=pjPuxRuaSug(); } } });
+  d.querySelectorAll('.pjhpuxed input').forEach(i=>i.onclick=e=>e.stopPropagation());
+  d.querySelectorAll('[data-puxsave]').forEach(b=>b.onclick=async e=>{ e.stopPropagation(); const ed=b.closest('.pjhpuxed'), id=+b.dataset.puxsave;
+    const dv=((ed.querySelector('.pjpuxd')||{}).value||'').trim(), rua=((ed.querySelector('.pjpuxr')||{}).value||'').trim();
+    if(!pjNumOk(dv)||!(parseFloat(dv.replace(',','.'))>0)) return toast('Informe o diâmetro da tubulação em mm (só números)');
+    if(!rua) return toast('Informe a rua');
+    b.disabled=true;
+    try{ const {data,error}=await sb.rpc('app_proj_avanco_pux_set',{p_id:id,p_diametro_mm:parseFloat(dv.replace(',','.')),p_rua:rua}); if(error) throw error;
+      Object.values(pjAvancosCur).forEach(arr=>(arr||[]).forEach(x=>{ if(x&&x.id===id) Object.assign(x,data||{}); }));
+      toast('Diâmetro e rua salvos'); const k=pjSnapOpen(d); rerender(k); }
+    catch(err){ toast('Erro: '+(err.message||err)); b.disabled=false; } });
   d.querySelectorAll('[data-launch]').forEach(b=>b.onclick=async()=>{ const n=pjReg[b.dataset.launch]; if(!n)return;
     const wrap=b.closest('.pjlaunch'), inp=wrap&&wrap.querySelector('.pjinp');
     const val=parseFloat(((inp&&inp.value)||'').replace(',','.'));
@@ -4358,6 +4390,11 @@ function pjWireTree(d,rerender){
       if(d0.getTime()>Date.now()+5*60e3){ toast('A data de execução não pode estar no futuro'); return; }
       execEm=d0.toISOString(); }
     const iv=pjCurIv(); if(!iv||iv.gid==null){ toast('Intervenção inválida'); return; }
+    let puxD=null, puxR=null;
+    if(pjIsPux(iv,n)){ const dv=((wrap.querySelector('.pjpuxd')||{}).value||'').trim(); puxR=((wrap.querySelector('.pjpuxr')||{}).value||'').trim();
+      if(!pjNumOk(dv)||!(parseFloat(dv.replace(',','.'))>0)){ toast('Informe o diâmetro da tubulação em mm (só números)'); return; }
+      if(!puxR){ toast('Informe a rua'); return; }
+      puxD=parseFloat(dv.replace(',','.')); }
     b.disabled=true; toast('Registrando avanço…');
     try{
       // fotos do lançamento → fotos-campo (prefixo projetos/avanco/)
@@ -4369,6 +4406,8 @@ function pjWireTree(d,rerender){
       const pth=pjNodePath(iv.arv,n)||[n.n], caminho=pth.join(' › '), atividade=pth[0], sub=pth[pth.length-1];
       const {data:row,error}=await sb.rpc('app_proj_avanco_registrar',{p_kind:iv.kind,p_gid:iv.gid,p_iv_cod:iv.cod,p_iv_local:iv.local,p_consorcio:iv.cons,p_tipo:iv.tipo,p_caminho:caminho,p_atividade:atividade,p_sub:sub,p_valor:val,p_unidade:(n.k==='m'?'m':'%'),p_obs:obs||null,p_fotos:fotos,p_equipe:iv.resp||null,...(execEm?{p_executado_em:execEm}:{})});
       if(error) throw error;
+      if(puxD!=null&&row&&row.id!=null){ const r2=await sb.rpc('app_proj_avanco_pux_set',{p_id:row.id,p_diametro_mm:puxD,p_rua:puxR});
+        if(r2.error) toast('Avanço lançado, mas diâmetro/rua não gravou — use o ✏️ no lançamento: '+(r2.error.message||r2.error)); else Object.assign(row,r2.data||{}); }
       // aplica no snapshot + histórico local (sem refetch)
       if(n.k==='m') n.exec=Math.max(0,(n.exec||0)+val); else n.p=Math.max(0,Math.min(100,(n.p||0)+val));
       const ak=pjNodeKey(iv,n); (pjAvancosCur[ak]=pjAvancosCur[ak]||[]).push(row); pjAvancosCur[ak].sort((a,b)=>new Date(a.ts)-new Date(b.ts));   // avanço retroativo entra na ordem da execução

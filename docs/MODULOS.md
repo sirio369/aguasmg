@@ -150,6 +150,13 @@
   da pesquisa (§4.3.9).
 - **Mapa estático no PDF:** `relMapaCanvas(pts,W,H,desenhar,opt)` (tiles OSM num canvas → `<img>`; `desenhar(ctx,xy)`
   pinta linhas/pontos por cima). Use-o em vez de mapa Leaflet no relatório (Leaflet não imprime bem). Opções em §4.3.9.
+- **Logo do consórcio no cabeçalho** (2026-11-24, sw v456): `relLogoHtml(...cons)` devolve `<span class="relLogos">` com
+  `logo-aguas-integradas.png` (texto com "Águas"/`CAI`/`ZA1004`) e/ou `logo-eficiencia-hidrica.png` ("Efici"/`CEH`/`ZA0200`);
+  sem consórcio reconhecido, nada. `relComLogo(html,...cons)` insere antes do primeiro `<div class="relBadge"` do `.relTop`.
+  Com logo: consolidado da intervenção (`iv.cons`), logger (`p.consorcio`), visita VRP e visita primária, OS de manutenção de
+  VRP (`app_vrp_os_ver.consorcio`), relatório diário da pesquisa (`consorcios`, uma ou as duas), veículo e atividades QSMS
+  (APR/PT/PET — sem consórcio cai no texto "Águas Integradas & Eficiência Hídrica" → as duas logos). Sem logo (não têm
+  consórcio): termos de equipamento/condução, comprovante de EPI e relatório do condutor.
 
 ### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
 - **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
@@ -2918,6 +2925,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **HDD › Puxamento da tubulação: diâmetro + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** o lançamento do
+  puxamento (`pjIsPux` = intervenção `rede_hdd` + etapa com "puxamento" no nome) pede **Diâmetro da tubulação** (mm, só número — o
+  campo filtra letras; `> 0`) e **Rua** (texto livre), ambos obrigatórios no lançamento novo. A rua vem **preenchida com a última rua
+  lançada no puxamento da mesma intervenção** (`pjPuxRuaSug`, editável). Gravação: colunas novas `intervencao_avanco.diametro_mm`
+  (check `> 0`) / `rua` / `pux_editado_em` / `pux_editado_por`, pela RPC **`app_proj_avanco_pux_set(p_id,p_diametro_mm,p_rua)`**
+  (gate `proj_obras_pode`, recusa lançamento que não seja puxamento HDD) — chamada logo depois do `app_proj_avanco_registrar`
+  (assinatura deste não mudou). **Lançamentos antigos:** no histórico da etapa cada puxamento mostra `Ø … mm · 📍 rua` ou
+  "⚠️ Sem diâmetro e rua", com **✏️ Informar/Editar** (Obras) que grava pela mesma RPC. ⚠️ Se a 2ª chamada falhar o avanço fica
+  lançado sem diâmetro/rua (toast avisa; corrige pelo ✏️). Sem histórico de versões das edições (só quem/quando editou por último).
 - **Data de execução livre (2026-11-18, sw v422, `docs/migracao_proj_avanco_data_livre.sql`):** a pergunta virou **"Esse avanço foi
   realizado em outra data?"** — Sim abre um campo de **data e hora** (`datetime-local`, `max` = agora) e aceita **qualquer data**
   que não esteja no futuro (front e `app_proj_avanco_registrar`, tolerância de 5 min). O texto abaixo (só ontem) é o histórico.
@@ -5164,3 +5180,16 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   `orc_nome_norm(nome)` + `app_orc_equipe_salvar` recusa com mensagem que diz onde está a outra equipe. Tela: ao abrir a
   equipe busca `app_orc_equipe_nomes()` (título do organograma só se o usuário entra nele), avisa embaixo do nome e bloqueia
   Salvar (`conflitoNome`/`eqBloq`); equipe nova sugere o 1º "Equipe N" livre (`nomeLivre`).
+- **Código fixo do card** (v453, `docs/migracao_orcamento_pessoa_codigo.sql`, aplicado como `orc_30_pessoa_codigo`):
+  `orc_pessoa.codigo` (sequência única em todos os organogramas, índice único, default `nextval`; os existentes foram
+  numerados por organograma → posição). Mostrado como `P-001` (`codP`/`rotP`) no canto do card, no PNG, na ficha, no painel
+  lateral, na lista de membros da equipe (a busca aceita o código), no Resumo e no Excel (coluna Nome da Mão de Obra e
+  "Ligado a" de Locação/Despesas) — separa as vagas "A definir". Card copiado/duplicado ganha código novo; o código não muda
+  com nome/cargo.
+- **Nome de equipe único por organograma + colar leva as equipes** (v454, `docs/migracao_orcamento_equipe_nome_por_organograma.sql`,
+  aplicado como `orc_31_equipe_nome_por_organograma`; substitui a regra global da v452): índice único
+  `(quadro_id, orc_nome_norm(nome))`; `app_orc_equipe_salvar` só confere dentro do organograma (o Excel sai por organograma,
+  o filtro não mistura). A tela não chama mais `app_orc_equipe_nomes`. Ctrl+C guarda também as equipes das pessoas copiadas
+  (+ itens da equipe); Ctrl+V em outro organograma cria as equipes (`colarEquipes`) com nome, cor, ZAs, apropriação, fase,
+  período, itens e só os membros colados — nome que já existe ali vira "(2)", "(3)"… (`nomeLivreDe`). Equipe com o mesmo id
+  no destino só ganha os membros. Vínculos colados levam também a apropriação de obra e a obs.
