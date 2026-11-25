@@ -3201,7 +3201,20 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   - `projeto_acesso` (`pjSupAcesso()`) — **mini-cadeado da categoria Suporte**: lista de usuários (via
     `app_proj_acesso_listar`) com toggle de acesso (admin sempre ligado). Persiste no banco
     (`perfil.proj_sup_acesso` via `app_proj_acesso_set`); busca com input fixo + `#pjAcessoList`.
-  - `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
+  - **`projeto_resumo` = Resumo de execução (2026-11-25, sw v463 — substitui o resumo abaixo):** só **execução**, uma
+    linha por intervenção **em execução** (`pjRsEmExec`: algum avanço, ou `pipe.fase` ≥ 4; configuração/aprovação sem
+    avanço não aparecem). Colunas: intervenção (local, código da folha · ID, tipo · consórcio · último avanço), **% total**
+    (`pjIvPct`, igual ao card) com barra, **% no período** (= % no fim − % no início; `pjRsPctSem` reconstrói a árvore
+    desfazendo os lançamentos de `intervencao_avanco` com `ts` posterior — `ts` = data da execução, inclusive retroativo;
+    valores do log são incrementos), **m no período** (soma do log da etapa de metro) e **m acumulado / projeto**
+    (`exec`/`meta` da etapa). Metro de rede (sem dupla contagem, `PJ_RS_METRO`): HDD = `av_pullback`, VCA = `av_assentamento`.
+    Filtros: Hoje/7 dias/**Este mês (padrão)**/Tudo + De/Até, consórcio, tipo e "Mostrar também as sem avanço no período"
+    (sem marcar: só quem teve lançamento no período; em Tudo, todas com % > 0). KPIs: intervenções com avanço, m HDD e m VCA
+    no período, m de rede acumulados (todas as em execução do filtro, independente do período). Linha → `pjOpen(id,'projeto_resumo')`
+    ("‹ Resumo"). CSV `resumo_execucao_projetos.csv` com as mesmas colunas. Saíram Situação atual, Pipeline no período, filtro
+    de ator, timeline por dia, por atividade e a chamada `app_proj_eventos`. Avanço legado de valas sem "Vala N" casa com a Vala 1.
+    Card do hub renomeado "Resumo de execução".
+  - *(histórico)* `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
     (atalhos Hoje/7 dias/Este mês/Tudo + `de`/`até` custom) + consórcio + tipo. **KPIs** (nº avanços, intervenções
     com movimento, subatividades, metros executados), **timeline por dia**, **por intervenção** e **por atividade**,
     + **Exportar CSV**. Fonte de dados: **`pjRsFeed`** (RPC `app_proj_avancos`, log **real**), carregado por
