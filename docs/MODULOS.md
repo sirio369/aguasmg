@@ -2680,8 +2680,14 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pendente; `nao_aplica` = ok); fase 4 = etapas de topo da árvore (`pjPct`: 100% ok, >0 em andamento, 0 pendente).
   Card: faixa das 5 fases (ok/total, Execução em %), lista do que está em aberto por fase (ator, dias e faixa do prazo,
   motivo da reprovação), "Ver todas as etapas" e "Abrir intervenção ›" (`pjOpen(id,'projeto_pend')`, volta "‹ Pendências").
-  Filtros: consórcio, tipo, status, **pendência com** (ator), **pendência em** (fase), ordenação, busca, contar legado
-  (`pend_legado`). KPIs de etapas e painel **📉 Onde estão os gaps** (etapa × fase com ok/andamento/pendente; tocar filtra).
+  Filtros (2026-11-25, sw v459): consórcio, tipo, **status com seleção múltipla** (dropdown `.msdd` escopado, `pjPdStWire`,
+  `pjPdF.st` = Set; vazio = todos), **pendência com** (ator — filtra as intervenções, os gaps, os KPIs **e** a lista de cada
+  card: só etapas daquele ator), busca, contar legado (`pend_legado`). Saíram "Pendência em" (fase) e "Ordenar": a lista é
+  **sempre pela fase do pipeline** (depois mais pendências, depois código). Cada card tem o botão **Ver/Esconder detalhes**
+  (`.pdtog`, chevron) — fechado por padrão (`pjPdF.abre`), a faixa das 5 fases fica sempre visível. Painel **📉 Onde estão
+  os gaps** em **ordem do pipeline** (fase → ordem da etapa no modelo); tocar num gap mostra só as intervenções com aquela
+  etapa em aberto, cada card **já aberto** e listando **só aquela etapa** (fechar à mão = `pjPdF.fech`; "Ver todas as etapas"
+  continua disponível); tocar de novo ou "✕ limpar" volta ao normal.
   Banco: **`app_proj_pendencias()`** (só leitura, `authenticated`) = `proj_calc` de todas as intervenções numa chamada, com os
   campos enxutos (~0,5 s, 69 iv / 1.289 itens em 20/11/2026). **Plano B no front:** se a RPC falhar, chama `app_proj_pipeline`
   uma a uma (6 por vez) — ordem SQL/merge tanto faz. Ensaio de reaterro (natureza `ensaio`) não entra na lista.
