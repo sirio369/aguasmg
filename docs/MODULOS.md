@@ -150,6 +150,13 @@
   da pesquisa (§4.3.9).
 - **Mapa estático no PDF:** `relMapaCanvas(pts,W,H,desenhar,opt)` (tiles OSM num canvas → `<img>`; `desenhar(ctx,xy)`
   pinta linhas/pontos por cima). Use-o em vez de mapa Leaflet no relatório (Leaflet não imprime bem). Opções em §4.3.9.
+- **Logo do consórcio no cabeçalho** (2026-11-24, sw v456): `relLogoHtml(...cons)` devolve `<span class="relLogos">` com
+  `logo-aguas-integradas.png` (texto com "Águas"/`CAI`/`ZA1004`) e/ou `logo-eficiencia-hidrica.png` ("Efici"/`CEH`/`ZA0200`);
+  sem consórcio reconhecido, nada. `relComLogo(html,...cons)` insere antes do primeiro `<div class="relBadge"` do `.relTop`.
+  Com logo: consolidado da intervenção (`iv.cons`), logger (`p.consorcio`), visita VRP e visita primária, OS de manutenção de
+  VRP (`app_vrp_os_ver.consorcio`), relatório diário da pesquisa (`consorcios`, uma ou as duas), veículo e atividades QSMS
+  (APR/PT/PET — sem consórcio cai no texto "Águas Integradas & Eficiência Hídrica" → as duas logos). Sem logo (não têm
+  consórcio): termos de equipamento/condução, comprovante de EPI e relatório do condutor.
 
 ### Mapas — camada base rua/satélite (2026-09, novo) — `mapAddCamadaBase(map,tileOpts,ctlPos)`
 - **Todo mapa Leaflet do app** (9 instâncias: Estanqueidade `estMap`, Loggers `lgMap`, VRP `vrpMap`,
