@@ -4510,6 +4510,12 @@ que saíram do dia — procuradas ±45 dias pelo mesmo id ou pela mesma OS SIGOS
 Tela: bloco "Linhas validadas que saíram do dia" no fim da tabela, item "Saiu" com "→ agora em DD/MM · atividade" e a linha no aviso
 do dia. Caso que motivou: 21/10 ZA0200 "Telemetria" (OS 2807900 executada no SIGOS em 21/10) virou a instalação do Logger Id12 lançada no
 app em 22/10 — vale a data do campo. A OS SIGOS **não** move a execução do app de dia.
+**Destino no mesmo dia (2026-11-25, só banco, `docs/migracao_fisc_destino_mesmo_dia.sql`):** a busca de `destinos` passou a olhar
+também o **próprio dia** (outra linha, pela mesma OS SIGOS) — antes excluía `dia = p_dia` e a execução que só trocou de linha aparecia
+como "Não aparece mais no Consolidador". Caso: 20/10 ZA0200, 3 OS 2807900 validadas em "Telemetria" estão em "Logger fixo — instalação"
+do mesmo dia (fix de 16/11). As validações órfãs de "Telemetria" com tudo no mesmo dia e a linha de Logger fixo já revalidada
+(20/10, 22/10, 29/10 ZA0200) foram apagadas (backup `"12 - retaguarda"._bkp_fisc_linha_val_tele_20261125`); as de 21/10, 23/10,
+27/10, 28/10 e 03/11 ficaram (parte das OS está em outro dia — o aviso mostra para onde foram).
 
 **RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+
 cobertura SIGOS, `validado.desatualizado`), `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
