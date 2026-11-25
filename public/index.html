@@ -375,7 +375,23 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 #projeto_pend .pjfilt .msdd-opt input{flex:0 0 17px;width:17px;height:17px;min-width:0;padding:0;margin:0;border-radius:4px}
 .pdtog{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:8px 0 0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
 .pdtog .ch{color:var(--bad);font-size:15px;line-height:1;transition:transform .15s} .pdtog.aberto .ch{transform:rotate(180deg)}
-#projeto_resumo .pjfilt{flex-wrap:wrap;align-items:center} #projeto_resumo .pjfilt select{flex:1 1 160px;min-width:0}
+#projeto_resumo .rsf{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin:10px 0 12px}
+#projeto_resumo .rsseg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:0 0 auto}
+#projeto_resumo .rsseg button{border:0;margin:0;background:var(--card);padding:7px 12px;font:inherit;font-size:13px;color:var(--mut);cursor:pointer;white-space:nowrap}
+#projeto_resumo .rsseg button+button{border-left:1px solid var(--line)} #projeto_resumo .rsseg button.sel{background:var(--acc);color:var(--acc-ink,#fff);font-weight:600}
+#projeto_resumo .rsdt{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mut);flex:0 0 auto}
+#projeto_resumo .rsdt input{width:auto;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);margin:0}
+#projeto_resumo .rsf select{flex:1 1 150px;min-width:0;width:auto;font-size:13.5px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;margin:0}
+#projeto_resumo .rsrod{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut)}
+#projeto_resumo .rsper{font-weight:600;color:var(--ink)}
+#projeto_resumo .rsrod .chk{display:flex;align-items:center;gap:6px;cursor:pointer;margin:0} #projeto_resumo .rsrod .chk input{width:15px;height:15px;flex:0 0 15px;margin:0;padding:0}
+#projeto_resumo .rsk{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 4px}
+#projeto_resumo .rsk>div{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:8px 11px;min-width:0}
+#projeto_resumo .rsk>div.hdd{border-left-color:#0a7d5e} #projeto_resumo .rsk>div.vca{border-left-color:#6a4bb3}   /* = PJ_TIPO_COR (as vars --t-* só existem em #projetos) */
+#projeto_resumo .rsf select{outline:0} #projeto_resumo .rsf select:focus,#projeto_resumo .rsdt input:focus{outline:2px solid var(--acc);outline-offset:-1px}
+#projeto_resumo .rsk span{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--mut)}
+#projeto_resumo .rsk b{display:block;font-size:20px;line-height:1.25;font-variant-numeric:tabular-nums;color:var(--ink)}
+#projeto_resumo .rsk i{display:block;font-style:normal;font-size:11.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #projeto_pend .pjfilt{flex-wrap:wrap} #projeto_pend .pjfilt select,#projeto_pend .pjfilt input{flex:1 1 150px;min-width:0;font-size:14px;padding:9px 10px}
 .pdkpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:4px 0 12px}
 .pdkpi div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
@@ -3967,17 +3983,18 @@ function pjRsMetroIv(iv){ const ch=PJ_RS_METRO[iv.tipo]; if(!ch) return null; co
   return n?{exec:+n.exec||0,meta:+n.meta||0}:null; }
 // "em execução" = já tem algum avanço, ou o pipeline já chegou na Execução (fase ≥ 4)
 const pjRsEmExec=iv=>pjIvPct(iv)>0||(+((iv.pipe||{}).fase)||1)>=4||pjRsFeed.some(e=>e.ivId===iv.id);
+// texto do período escolhido (rodapé da barra de filtros)
+function pjRsPerTxt(){ const [f,t]=pjRsRange(), d=x=>{ const z=new Date(x); return pjFmtD(x)+'/'+z.getFullYear(); };
+  if(f==null&&t==null) return 'Todo o período'; return (f!=null?d(f):'início')+' a '+(t!=null?d(t):'hoje'); }
 function pjResumo(){
   const consOpts=[...new Set(PJ_IVS.map(i=>i.cons))].filter(Boolean);
   $('#pjRsBody').innerHTML=`
-   <div class="pjrsbar">
-     <div class="pjseg pjrsquick" id="pjRsQuickSeg"><button data-q="hoje">Hoje</button><button data-q="7d">7 dias</button><button data-q="mes">Este mês</button><button data-q="tudo">Tudo</button></div>
-     <div class="pjrsdates"><label>De <input type="date" id="pjRsDe" value="${pjRsDe}"></label><label>Até <input type="date" id="pjRsAte" value="${pjRsAte}"></label></div>
-     <div class="pjfilt">
-       <select id="pjRsCons"><option value="">Todos os consórcios</option>${consOpts.map(c=>`<option${c===pjRsCons?' selected':''}>${c}</option>`).join('')}</select>
-       <select id="pjRsTipo"><option value="">Todos os tipos</option>${Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}"${k===pjRsTipo?' selected':''}>${t.n}</option>`).join('')}</select>
-       <label class="pjrschk"><input type="checkbox" id="pjRsTodas"${pjRsTodas?' checked':''}> Mostrar também as sem avanço no período</label>
-     </div>
+   <div class="rsf">
+     <div class="rsseg" id="pjRsQuickSeg"><button data-q="hoje">Hoje</button><button data-q="7d">7 dias</button><button data-q="mes">Este mês</button><button data-q="tudo">Tudo</button></div>
+     <div class="rsdt"><input type="date" id="pjRsDe" value="${pjRsDe}" title="De"><span>até</span><input type="date" id="pjRsAte" value="${pjRsAte}" title="Até"></div>
+     <select id="pjRsCons"><option value="">Todos os consórcios</option>${consOpts.map(c=>`<option${c===pjRsCons?' selected':''}>${c}</option>`).join('')}</select>
+     <select id="pjRsTipo"><option value="">Todos os tipos</option>${Object.entries(PJ_TIPOS).map(([k,t])=>`<option value="${k}"${k===pjRsTipo?' selected':''}>${t.n}</option>`).join('')}</select>
+     <div class="rsrod"><span class="rsper">📅 ${pjRsPerTxt()}</span><label class="chk"><input type="checkbox" id="pjRsTodas"${pjRsTodas?' checked':''}> Mostrar também as sem avanço no período</label></div>
    </div>
    <div id="pjRsOut"></div>`;
   const b=$('#pjRsBody');
@@ -4020,11 +4037,12 @@ function pjRsRender(){
       <td class="c">${tudo?'—':(r.per>0?`<b class="up">+${r.per}%</b>`:'0%')}</td>
       <td class="c">${r.mPer==null?'—':(r.mPer>0?`<b>${fm(r.mPer)} m</b>`:'0 m')}</td>
       <td class="c">${mt?`${fm(mt.exec)}${mt.meta?' / '+fm(mt.meta):''} m`:'—'}</td></tr>`; }).join('');
-  const kpi=`<div class="pjrskpis">
-     <div class="pjrskpi"><b>${tudo?rows.length:comAv}</b><span>${tudo?'intervenções em execução':'intervenções com avanço'}</span></div>
-     <div class="pjrskpi"><b>${fm(hP)}</b><span>m HDD ${tudo?'executados':'no período'}<br>(puxamento)</span></div>
-     <div class="pjrskpi"><b>${fm(vP)}</b><span>m VCA ${tudo?'executados':'no período'}<br>(assentamento)</span></div>
-     <div class="pjrskpi"><b>${fm(hA+vA)}</b><span>m de rede acumulados<br>(HDD ${fm(hA)} · VCA ${fm(vA)})</span></div>
+  const per=tudo?'acumulado':'no período';
+  const kpi=`<div class="rsk">
+     <div><span>Intervenções</span><b>${tudo?rows.length:comAv}</b><i>${tudo?'em execução':'com avanço no período'}</i></div>
+     <div class="hdd"><span>HDD · puxamento</span><b>${fm(hP)} m</b><i>${per}</i></div>
+     <div class="vca"><span>VCA · assentamento</span><b>${fm(vP)} m</b><i>${per}</i></div>
+     <div><span>Rede executada</span><b>${fm(hA+vA)} m</b><i>total · HDD ${fm(hA)} · VCA ${fm(vA)}</i></div>
    </div>`;
   out.innerHTML=kpi+(rows.length?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:10px 0 6px"><span class="sub" style="margin:0">${rows.length} intervenção(ões)</span><button class="btn ghost pjmini" id="pjRsCsv">⬇️ Exportar CSV</button></div>
    <div style="overflow-x:auto"><table class="pjrstb pjrsexec"><thead><tr><th>Intervenção</th><th class="c">% total</th><th class="c">% no período</th><th class="c">m no período</th><th class="c">m acumulado / projeto</th></tr></thead>
