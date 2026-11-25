@@ -4899,6 +4899,8 @@ helpers `"18 - rh".hm`, `func_visiveis`, `inconsistencias`; RPCs `app_rh_val_lis
 `app_rh_analise` (definer, só `authenticated`; recriada com o parâmetro de área em `docs/migracao_rh_analise_area.sql`). Testado com rollback em 13/11/2026 com os relatórios de 08–13/11: 273 dias com
 inconsistência (sem intervalo 136, HE > 2h 94, falta 55, atraso 55, batida ímpar 18, descanso < 11h 13, falta após desligamento 2).
 
+**Ponto sem terceiros (2026-11-24, `docs/migracao_rh_sem_terceiros.sql`, aplicado em produção):** quem é terceiro (`perfil.modalidade = 'TERCEIRO'`, casado ao funcionário do Kairos pelo CPF em `funcionario.perfil_id`) fica fora de Análise, Horas, Validação e Gestão de pontos. Função `"18 - rh".rh_terceiro(perfil_id)`; `func_visiveis` e o join de `app_rh_analise`, `app_rh_ponto_dias` e `app_rh_val_lista` passam a filtrar. Os dados seguem gravados em `ponto_dia`. Sem perfil no app não dá para saber: continua aparecendo. Em 24/11/2026 nenhum dos 111 funcionários do ponto era terceiro (104 CLT e 7 admitidos em nov sem conta).
+
 ## 23. BI de Suprimentos + carga direta dos relatórios do SIENGE — `docs/migracao_sup_bi.sql` (2026-11-19, **PR-A: só banco**)
 
 Decisão da usuária (19/11/2026): o Power BI deixa de existir; todo BI vira tela do AcquaHub e os relatórios externos são carregados direto no app.
