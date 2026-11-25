@@ -196,6 +196,12 @@ th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-
 th{position:sticky;top:0;background:var(--surface-2);font-weight:600;font-size:11.5px;color:var(--ink-2);z-index:1}
 td.n,th.n{text-align:right;font-family:"IBM Plex Mono",monospace}
 tr.tot td{font-weight:600;background:var(--surface-2)}
+tr.rgrp td{font-weight:600;background:var(--surface-2);cursor:pointer;border-top:2px solid var(--line)}
+.rfil{display:grid;gap:8px;margin-bottom:10px}
+.rfil-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rfil-row input[type=search]{flex:1;min-width:200px;padding:6px 9px}
+.rfil-row select{padding:6px 8px;max-width:220px}
+.rfil-row label{display:flex;gap:6px;align-items:center}
 #gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
 #gate div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 26px;max-width:420px;text-align:center;line-height:1.5}
 @media (max-width:900px){
@@ -1625,19 +1631,81 @@ async function salvarParam(){
   render();
 }
 
-/* ================= resumo ================= */
-let rTab = 'za', rZa = '';
+/* ================= resumo =================
+   Filtros (ZA, busca, aba, modalidade, equipe, apropriação) valem em todas as abas; "Juntar ZAs" soma numa linha só
+   o que o rateio partiu por ZA (pessoa ou item ligado); "Agrupar por" cria blocos com subtotal (clique abre/fecha). */
+let rTab = 'za', rZa = '', rJunta = true, rFech = new Set();
+const rF = {q:'', tipo:'', mod:'', eq:'', aprop:''}, rGrp = {pes:'', itens:''};
 function abrirResumo(t){ rTab = t || rTab; renderResumo(); $('dlgR').hidden = false; }
 $('rClose').onclick = fecharDlgs;
 $('rXlsx').onclick = exportXlsx;
+const eqsDaPessoa = p => EQ.filter(e => (e.membros || []).includes(p.id));
+const pessoasDaLinha = l => l.tipo === 'Mão de Obra' ? [l.pessoa] : l.donoTipo === 'pessoa' ? [l.dono] : membrosDe(l.dono);
+const eqsDaLinha = l => l.donoTipo === 'equipe' ? [l.dono] : eqsDaPessoa(l.pessoa || l.dono);
+const normR = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function passaFiltro(l){
+  if (rZa && l.za !== rZa) return false;
+  if (rF.tipo && l.tipo !== rF.tipo) return false;
+  if (rF.mod && !pessoasDaLinha(l).some(p => p.modalidade === rF.mod)) return false;
+  if (rF.eq && !eqsDaLinha(l).some(e => e.id === rF.eq)) return false;
+  if (rF.aprop && (l.aprop || '') !== rF.aprop) return false;
+  if (rF.q) {
+    const ps = pessoasDaLinha(l), txt = normR([l.item && l.item.descricao, l.aprop, l.donoTipo === 'equipe' ? l.dono.nome : ''].concat(ps.map(p => rotP(p) + ' ' + (p.funcao || '')), eqsDaLinha(l).map(e => e.nome)).join(' '));
+    if (!normR(rF.q).split(/\s+/).filter(Boolean).every(w => txt.includes(w))) return false;
+  }
+  return true;
+}
+/* junta as linhas da mesma pessoa (MO) ou do mesmo vínculo (item) que o rateio separou por ZA */
+function juntarZAs(L){
+  const N = NM(), mapa = new Map(), out = [];
+  L.forEach(l => {
+    const k = l.tipo === 'Mão de Obra' ? 'p:' + l.pessoa.id : 'v:' + l.vinc.id;
+    let g = mapa.get(k);
+    if (!g) { g = Object.assign({}, l, {meses:new Float64Array(N + 1), zasL:[], rateio:1}); mapa.set(k, g); out.push(g); }
+    g.zasL.push(l.za); for (let i = 1; i <= N; i++) g.meses[i] += l.meses[i];
+  });
+  out.forEach(g => { let ini = 0, fim = 0, nm = 0; for (let i = 1; i <= N; i++) if (g.meses[i] > 0) { if (!ini) ini = i; fim = i; nm++; } g.za = g.zasL.sort().join(' + '); g.ini = ini || g.ini; g.fim = fim || g.fim; g.nm = nm || 1; });
+  return out;
+}
+/* blocos com subtotal: rows = [{key, rot, html, total}]; sem chave = lista corrida */
+function blocosHtml(rows, cols, totCol){
+  if (!rows.some(r => r.key != null)) return rows.map(r => r.html).join('');
+  const gs = new Map(); rows.forEach(r => { const g = gs.get(r.key) || {rot:r.rot, rows:[], t:0}; g.rows.push(r); g.t += r.total; gs.set(r.key, g); });
+  return [...gs.entries()].sort((a, b) => b[1].t - a[1].t).map(([k, g]) => {
+    const fe = rFech.has(rTab + '|' + k);
+    return `<tr class="rgrp" data-rg="${esc(k)}" title="Clique para ${fe ? 'abrir' : 'fechar'} o grupo"><td colspan="${totCol}">${fe ? '▸' : '▾'} ${esc(g.rot)} <span class="muted">· ${g.rows.length} linha(s)</span></td><td class="n">${brl(g.t)}</td>${cols > totCol + 1 ? '<td></td>'.repeat(cols - totCol - 1) : ''}</tr>` + (fe ? '' : g.rows.map(r => r.html).join(''));
+  }).join('');
+}
+function filtrosResumoHtml(L){
+  const opt = (v, t, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(t)}</option>`;
+  const zas = [...new Set(L.map(l => l.za))].sort();
+  const mods = [...new Set(PES.map(p => p.modalidade).filter(Boolean))];
+  const eqs = EQ.slice().sort((a, b) => String(a.nome).localeCompare(b.nome, 'pt-BR'));
+  const aps = [...new Set(L.map(l => l.aprop).filter(Boolean))].sort();
+  const grp = rTab === 'pes' ? [['','Sem agrupar'],['equipe','Equipe'],['funcao','Função'],['aprop','Apropriação'],['mod','Modalidade'],['sup','Superior']]
+            : rTab === 'itens' ? [['','Sem agrupar'],['pessoa','Pessoa / equipe'],['item','Item'],['tipo','Aba'],['aprop','Apropriação']] : null;
+  const nf = (rZa ? 1 : 0) + Object.values(rF).filter(Boolean).length;
+  return `<div class="rfil">
+    <div class="chips"><button type="button" data-rz="" aria-pressed="${!rZa}">Todas as ZAs</button>${zas.map(z => `<button type="button" data-rz="${esc(z)}" aria-pressed="${rZa === z}">${esc(z)}</button>`).join('')}</div>
+    <div class="rfil-row">
+      <input type="search" id="rQ" placeholder="Buscar nome, código, função, item…" value="${esc(rF.q)}">
+      ${rTab === 'pes' ? '' : `<select data-rf="tipo" aria-label="Aba">${opt('', 'Todas as abas', rF.tipo)}${['Mão de Obra','Locação','Despesas'].map(t => opt(t, t, rF.tipo)).join('')}</select>`}
+      <select data-rf="mod" aria-label="Modalidade">${opt('', 'Toda modalidade', rF.mod)}${mods.map(m => opt(m, modRot(m), rF.mod)).join('')}</select>
+      <select data-rf="eq" aria-label="Equipe">${opt('', 'Toda equipe', rF.eq)}${eqs.map(e => opt(e.id, e.nome, rF.eq)).join('')}</select>
+      <select data-rf="aprop" aria-label="Apropriação">${opt('', 'Toda apropriação', rF.aprop)}${aps.map(a => opt(a, a, rF.aprop)).join('')}</select>
+      ${nf ? '<button type="button" id="rLimpa">Limpar filtros</button>' : ''}
+    </div>
+    ${grp ? `<div class="rfil-row"><label class="small">Agrupar por <select id="rGrp">${grp.map(g => opt(g[0], g[1], rGrp[rTab])).join('')}</select></label>
+      <label class="small"><input type="checkbox" id="rJunta"${rJunta ? ' checked' : ''}> Juntar ZAs (uma linha por pessoa/item, sem o rateio)</label></div>` : ''}
+  </div>`;
+}
 function renderResumo(){
-  const L = linhas(), N = NM(), tabs = [['za','Por ZA'],['pes','Por pessoa'],['itens','Itens'],['mes','Por mês']];
+  const L0 = linhas(), N = NM(), tabs = [['za','Por ZA'],['pes','Por pessoa'],['itens','Itens'],['mes','Por mês']];
   $('rTabs').innerHTML = tabs.map(t => `<button type="button" data-rt="${t[0]}" class="${rTab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('');
   $('rTabs').querySelectorAll('[data-rt]').forEach(b => b.onclick = () => { rTab = b.dataset.rt; renderResumo(); });
-  const zas = [...new Set(L.map(l => l.za))].sort();
-  const filtro = `<div class="chips"><button type="button" data-rz="" aria-pressed="${!rZa}">Todas as ZAs</button>${zas.map(z => `<button type="button" data-rz="${esc(z)}" aria-pressed="${rZa === z}">${esc(z)}</button>`).join('')}</div>`;
-  const LL = rZa ? L.filter(l => l.za === rZa) : L;
-  let h = '';
+  const L = L0.filter(passaFiltro), junta = rJunta && (rTab === 'pes' || rTab === 'itens');
+  const LL = junta ? juntarZAs(L) : L;
+  let h = filtrosResumoHtml(L0);
   if (rTab === 'za') {
     const tipos = ['Mão de Obra','Locação','Despesas'], g = {};
     L.forEach(l => { const r = g[l.za] = g[l.za] || {'Mão de Obra':0,'Locação':0,'Despesas':0}; r[l.tipo] += somaMeses(l.meses); });
@@ -1649,32 +1717,50 @@ function renderResumo(){
     const sp = L.filter(l => l.semPreco).length;
     if (sp) h += `<div class="badge warn">${sp} linha(s) com item sem preço (a definir) entram como zero. Preencha o preço na ficha ou na equipe.</div>`;
   } else if (rTab === 'pes') {
-    h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Modalidade</th><th>ZA</th><th>Apropriação</th><th>Período</th><th class="n">MO/mês</th><th class="n">Itens/mês</th><th class="n">Total no período</th></tr></thead><tbody>`;
-    let T = 0;
+    const gk = rGrp.pes, rows = []; let T = 0;
     LL.filter(l => l.tipo === 'Mão de Obra').forEach(l => {
-      const p = l.pessoa, its = LL.filter(x => x.donoTipo === 'pessoa' && x.dono === p && x.za === l.za);
+      const p = l.pessoa, its = LL.filter(x => x.donoTipo === 'pessoa' && x.dono === p && (junta || x.za === l.za));
       const im = its.reduce((s, x) => s + (x.cob === 'pontual' ? 0 : somaMeses(x.meses) / x.nm), 0);
       const t = somaMeses(l.meses) + its.reduce((s, x) => s + somaMeses(x.meses), 0); T += t;
-      h += `<tr><td>${esc(p.nome)}</td><td>${esc(p.funcao || '—')}</td><td>${esc(modRot(p.modalidade))}</td><td>${esc(l.za)}${ratRot(l)}</td><td>${esc(p.aprop_cod || '—')}</td><td>${esc(FASE_ROT[p.fase || 'todo'])} · ${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl2(somaMeses(l.meses) / l.nm)}</td><td class="n">${brl2(im)}</td><td class="n">${brl(t)}</td></tr>`;
+      const eqs = eqsDaPessoa(p), sup = p.parent_id && byId(PES, p.parent_id);
+      const key = !gk ? null : gk === 'equipe' ? (eqs[0] ? eqs[0].id : '-') : gk === 'funcao' ? (p.funcao || '-') : gk === 'aprop' ? (p.aprop_cod || '-') : gk === 'mod' ? (p.modalidade || '-') : (sup ? sup.id : '-');
+      const rot = !gk ? '' : gk === 'equipe' ? (eqs[0] ? '👥 ' + eqs[0].nome : 'Sem equipe') : gk === 'funcao' ? (p.funcao || 'Cargo a definir') : gk === 'aprop' ? (p.aprop_cod || 'Sem apropriação') : gk === 'mod' ? modRot(p.modalidade) : (sup ? 'Abaixo de ' + rotP(sup) : 'Sem superior');
+      rows.push({key, rot, total:t, html:`<tr><td class="mono">${esc(codP(p) || '—')}</td><td>${esc(p.nome || 'A definir')}</td><td>${esc(p.funcao || '—')}</td><td>${esc(modRot(p.modalidade))}</td><td>${eqs.length ? eqs.map(e => esc(e.nome)).join(', ') : '<span class="muted">—</span>'}</td><td>${esc(l.za)}${junta ? '' : ratRot(l)}</td><td>${esc(p.aprop_cod || '—')}</td><td>${esc(FASE_ROT[p.fase || 'todo'])} · ${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl2(somaMeses(l.meses) / l.nm)}</td><td class="n">${brl2(im)}</td><td class="n">${brl(t)}</td></tr>`});
     });
-    h += `<tr class="tot"><td colspan="8">Total (sem itens das equipes)</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
+    h += `<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Nome</th><th>Função</th><th>Modalidade</th><th>Equipe</th><th>ZA</th><th>Apropriação</th><th>Período</th><th class="n">MO/mês</th><th class="n">Itens/mês</th><th class="n">Total no período</th></tr></thead><tbody>`;
+    h += blocosHtml(rows, 11, 10) + `<tr class="tot"><td colspan="10">Total · ${new Set(LL.filter(l => l.tipo === 'Mão de Obra').map(l => l.pessoa.id)).size} pessoa(s)${junta ? '' : ' em ' + rows.length + ' linha(s)'} (sem itens das equipes)</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
   } else if (rTab === 'itens') {
-    h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Aba</th><th>Ligado a</th><th>ZA</th><th class="n">Qtd</th><th class="n">Unitário</th><th>Cobrança</th><th>Período</th><th class="n">Total no período</th></tr></thead><tbody>`;
-    let T = 0;
-    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => { const t = somaMeses(l.meses); T += t; h += `<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td>${l.donoTipo === 'equipe' ? '👥 ' + esc(l.dono.nome) : esc(rotP(l.dono))}</td><td>${esc(l.za)}${ratRot(l)}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.cob === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`; });
-    h += `<tr class="tot"><td colspan="8">Total</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
+    const gk = rGrp.itens, rows = []; let T = 0;
+    LL.filter(l => l.tipo !== 'Mão de Obra').forEach(l => {
+      const t = somaMeses(l.meses); T += t;
+      const eq = l.donoTipo === 'equipe', dk = (eq ? 'e:' : 'p:') + l.dono.id, drot = eq ? '👥 ' + l.dono.nome : rotP(l.dono);
+      const key = !gk ? null : gk === 'pessoa' ? dk : gk === 'item' ? 'i:' + l.item.id : gk === 'tipo' ? l.tipo : (l.aprop || '-');
+      const rot = !gk ? '' : gk === 'pessoa' ? drot + (!eq && l.dono.funcao ? ' · ' + l.dono.funcao : '') : gk === 'item' ? l.item.descricao : gk === 'tipo' ? l.tipo : (l.aprop || 'Sem apropriação');
+      rows.push({key, rot, total:t, html:`<tr><td>${esc(l.item.descricao)}</td><td>${l.tipo}</td><td class="mono">${eq ? '—' : esc(codP(l.dono) || '—')}</td><td>${eq ? '👥 ' + esc(l.dono.nome) : esc(l.dono.nome || 'A definir')}</td><td>${esc(l.za)}${junta ? '' : ratRot(l)}</td><td class="n">${l.qtd}</td><td class="n">${l.unit == null ? 'a definir' : brl2(l.unit)}</td><td>${l.cob === 'pontual' ? '1× no início' : 'mensal'}</td><td>${rotMes(l.ini)}–${rotMes(l.fim)}</td><td class="n">${brl(t)}</td></tr>`});
+    });
+    h += `<div class="tbl-wrap"><table><thead><tr><th>Item</th><th>Aba</th><th>Código</th><th>Ligado a</th><th>ZA</th><th class="n">Qtd</th><th class="n">Unitário</th><th>Cobrança</th><th>Período</th><th class="n">Total no período</th></tr></thead><tbody>`;
+    h += blocosHtml(rows, 10, 9) + `<tr class="tot"><td colspan="9">Total · ${rows.length} linha(s)</td><td class="n">${brl(T)}</td></tr></tbody></table></div>`;
   } else {
-    h += filtro + `<div class="tbl-wrap"><table><thead><tr><th>Mês</th><th class="n">Mão de Obra</th><th class="n">Locação</th><th class="n">Despesas</th><th class="n">Total</th><th class="n">Pessoas</th></tr></thead><tbody>`;
+    h += `<div class="tbl-wrap"><table><thead><tr><th>Mês</th><th class="n">Mão de Obra</th><th class="n">Locação</th><th class="n">Despesas</th><th class="n">Total</th><th class="n">Pessoas</th></tr></thead><tbody>`;
+    const TT = {'Mão de Obra':0,'Locação':0,'Despesas':0};
     for (let i = 1; i <= N; i++) {
-      const r = {'Mão de Obra':0,'Locação':0,'Despesas':0}; LL.forEach(l => r[l.tipo] += l.meses[i]);
-      const np = new Set(LL.filter(l => l.tipo === 'Mão de Obra' && l.meses[i] > 0).map(l => l.pessoa.id)).size, t = r['Mão de Obra'] + r['Locação'] + r['Despesas'];
+      const r = {'Mão de Obra':0,'Locação':0,'Despesas':0}; L.forEach(l => r[l.tipo] += l.meses[i]);
+      Object.keys(r).forEach(k => TT[k] += r[k]);
+      const np = new Set(L.filter(l => l.tipo === 'Mão de Obra' && l.meses[i] > 0).map(l => l.pessoa.id)).size, t = r['Mão de Obra'] + r['Locação'] + r['Despesas'];
       h += `<tr><td>${rotMes(i)}</td><td class="n">${brl(r['Mão de Obra'])}</td><td class="n">${brl(r['Locação'])}</td><td class="n">${brl(r['Despesas'])}</td><td class="n">${brl(t)}</td><td class="n">${np}</td></tr>`;
     }
-    h += '</tbody></table></div>';
+    h += `<tr class="tot"><td>Total</td><td class="n">${brl(TT['Mão de Obra'])}</td><td class="n">${brl(TT['Locação'])}</td><td class="n">${brl(TT['Despesas'])}</td><td class="n">${brl(TT['Mão de Obra'] + TT['Locação'] + TT['Despesas'])}</td><td></td></tr></tbody></table></div>`;
   }
-  $('rBody').innerHTML = h;
-  $('rBody').querySelectorAll('[data-rz]').forEach(b => b.onclick = () => { rZa = b.dataset.rz; renderResumo(); });
-  $('rPrev').textContent = `${PES.length} pessoa(s) · ${EQ.length} equipe(s) · ${rotMes(1)} a ${rotMes(N)}`;
+  const B = $('rBody'); B.innerHTML = h;
+  B.querySelectorAll('[data-rz]').forEach(b => b.onclick = () => { rZa = b.dataset.rz; renderResumo(); });
+  B.querySelectorAll('[data-rf]').forEach(s => s.onchange = () => { rF[s.dataset.rf] = s.value; renderResumo(); });
+  B.querySelectorAll('[data-rg]').forEach(r => r.onclick = () => { const k = rTab + '|' + r.dataset.rg; rFech.has(k) ? rFech.delete(k) : rFech.add(k); renderResumo(); });
+  if ($('rGrp')) $('rGrp').onchange = e => { rGrp[rTab] = e.target.value; rFech.clear(); renderResumo(); };
+  if ($('rJunta')) $('rJunta').onchange = e => { rJunta = e.target.checked; renderResumo(); };
+  if ($('rLimpa')) $('rLimpa').onclick = () => { rZa = ''; Object.keys(rF).forEach(k => rF[k] = ''); renderResumo(); };
+  let tq; $('rQ').oninput = e => { clearTimeout(tq); const v = e.target.value; tq = setTimeout(() => { rF.q = v; renderResumo(); const q = $('rQ'); q.focus(); q.setSelectionRange(v.length, v.length); }, 250); };
+  const nf = (rZa ? 1 : 0) + Object.values(rF).filter(Boolean).length;
+  $('rPrev').textContent = `${PES.length} pessoa(s) · ${EQ.length} equipe(s) · ${rotMes(1)} a ${rotMes(N)}${nf ? ' · ' + nf + ' filtro(s) ativo(s)' : ''}`;
 }
 
 /* ================= exportação ================= */
