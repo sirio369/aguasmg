@@ -354,6 +354,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjqcard.f-aten{border-left-color:var(--warn)} .pjqcard.f-atraso{border-left-color:var(--bad)}
 .pjqcard h3{font-size:14.5px;margin:4px 0 2px}
 /* Pendências (projeto_pend) */
+#projeto_pend .msdd{position:relative;flex:1 1 150px;min-width:0}
+#projeto_pend .msdd-btn{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#projeto_pend .msdd-panel{position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:240px;max-height:340px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
+#projeto_pend .msdd-panel.hidden{display:none}
+#projeto_pend .msdd-opt{display:flex;align-items:center;gap:9px;padding:8px;border-radius:8px;cursor:pointer;font-size:13.5px;margin:0}
+#projeto_pend .msdd-opt:hover{background:rgba(127,127,127,.12)} #projeto_pend .msdd-opt input{width:17px;height:17px;flex:0 0 auto}
+.pdtog{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin:8px 0 0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
+.pdtog .ch{color:var(--bad);font-size:15px;line-height:1;transition:transform .15s} .pdtog.aberto .ch{transform:rotate(180deg)}
 #projeto_pend .pjfilt{flex-wrap:wrap} #projeto_pend .pjfilt select,#projeto_pend .pjfilt input{flex:1 1 150px;min-width:0;font-size:14px;padding:9px 10px}
 .pdkpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:4px 0 12px}
 .pdkpi div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
@@ -3508,7 +3516,8 @@ function pjQualRender(d){ const b=$('#pjQual'); if(!b) return; const itens=d.ite
 // Fases 1, 2, 3 e 5 = itens do proj_calc de cada intervenção (app_proj_pendencias; plano B: app_proj_pipeline uma a uma).
 // Fase 4 = etapas de topo da árvore de execução (iv.arv, % pela pjPct). Situação: ok · em andamento · pendente · fora do escopo.
 let pjPdItens=null, pjPdGapOpen=true;
-const pjPdF={cons:'',tipo:'',st:'',ator:'',fase:'',q:'',etapa:'',leg:true,ord:'pend',ver:{}};
+// st = status selecionados (vazio = todos); abre = cards abertos à mão; fech = cards fechados à mão enquanto há gap escolhido
+const pjPdF={cons:'',tipo:'',st:new Set(),ator:'',q:'',etapa:'',leg:true,ver:{},abre:{},fech:{}};
 const PJ_PD_IC={ok:'✅',and:'⏳',pend:'⭕',fora:'➖'};
 const pjPdEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 async function pjPendInit(){ const b=$('#pjPend'); if(!b) return; b.innerHTML='<p class="sub">Carregando…</p>';
@@ -3525,19 +3534,28 @@ async function pjPendInit(){ const b=$('#pjPend'); if(!b) return; b.innerHTML='<
   b.innerHTML=`<div class="pjfilt">
       <select id="pjPdCons">${o('','Todos os consórcios',F.cons)}${cons.map(c=>o(c,c,F.cons)).join('')}</select>
       <select id="pjPdTipo">${o('','Todos os tipos',F.tipo)}${Object.entries(PJ_TIPOS).map(([k,t])=>o(k,t.n,F.tipo)).join('')}</select>
-      <select id="pjPdSt">${o('','Todos os status',F.st)}${Object.entries(PJ_PST).map(([k,v])=>o(k,v[0],F.st)).join('')}</select>
+      <div class="msdd" id="pjPdStDd"><button type="button" class="msdd-btn" id="pjPdStBtn"></button><div class="msdd-panel hidden" id="pjPdStPanel"></div></div>
       <select id="pjPdAtor">${o('','Pendência com: todos',F.ator)}${Object.entries(PJ_ATOR).map(([k,v])=>o(k,'Pendência com: '+v[1],F.ator)).join('')}</select>
-      <select id="pjPdFase">${o('','Pendência em: todas as fases',F.fase)}${[1,2,3,4,5].map(f=>o(f,'Pendência em: '+f+' · '+PJ_FASE_N[f],F.fase)).join('')}</select>
-      <select id="pjPdOrd">${o('pend','Ordenar: mais pendências',F.ord)}${o('fase','Ordenar: fase do pipeline',F.ord)}${o('cod','Ordenar: código',F.ord)}</select>
       <input id="pjPdQ" type="search" placeholder="Buscar código, local ou DMC" value="${pjPdEsc(F.q)}">
     </div>
     <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 10px"><input type="checkbox" id="pjPdLeg" ${F.leg?'checked':''} style="width:auto"> Contar as pendências do legado (o que faltou antes da obra nas já liberadas)</label>
     <div id="pjPdOut"></div>`;
-  [['pjPdCons','cons'],['pjPdTipo','tipo'],['pjPdSt','st'],['pjPdAtor','ator'],['pjPdFase','fase'],['pjPdOrd','ord']].forEach(([id,k])=>{ const el=$('#'+id); el.onchange=()=>{ F[k]=el.value; pjPendRender(); }; });
+  pjPdStWire();
+  [['pjPdCons','cons'],['pjPdTipo','tipo'],['pjPdAtor','ator']].forEach(([id,k])=>{ const el=$('#'+id); el.onchange=()=>{ F[k]=el.value; pjPendRender(); }; });
   $('#pjPdQ').oninput=e=>{ F.q=e.target.value; pjPendRender(); };
   $('#pjPdLeg').onchange=e=>{ F.leg=e.target.checked; pjPendRender(); };
   pjPendRender();
 }
+// Status (seleção múltipla): dropdown com checkboxes; vazio = todos
+function pjPdStWire(){ const F=pjPdF, btn=$('#pjPdStBtn'), pn=$('#pjPdStPanel'); if(!btn||!pn) return;
+  const lbl=()=>{ const n=F.st.size; btn.textContent=(!n?'Todos os status':n===1?PJ_PST[[...F.st][0]][0]:n+' status')+' ▾'; };
+  pn.innerHTML=Object.entries(PJ_PST).map(([k,v])=>`<label class="msdd-opt"><input type="checkbox" data-pdst="${k}" ${F.st.has(k)?'checked':''}> ${v[0]}</label>`).join('')
+    +'<div class="msdd-opt" data-pdstclr style="justify-content:center;color:var(--acc);font-weight:600">Limpar seleção</div>';
+  pn.querySelectorAll('[data-pdst]').forEach(c=>c.onchange=()=>{ c.checked?F.st.add(c.dataset.pdst):F.st.delete(c.dataset.pdst); lbl(); pjPendRender(); });
+  pn.querySelector('[data-pdstclr]').onclick=()=>{ F.st.clear(); pn.querySelectorAll('[data-pdst]').forEach(c=>c.checked=false); lbl(); pjPendRender(); };
+  btn.onclick=e=>{ e.stopPropagation(); pn.classList.toggle('hidden'); };
+  if(!pjPdStWire._doc){ pjPdStWire._doc=1; document.addEventListener('click',e=>{ const p=$('#pjPdStPanel'); if(p&&!e.target.closest('#pjPdStDd')) p.classList.add('hidden'); }); }
+  lbl(); }
 // situação de um item do pipeline → [classe, texto]
 function pjPdSit(it,its){
   if(!it.ativo) return ['fora','fora do escopo'];
@@ -3562,19 +3580,21 @@ function pjPdEtapas(iv){ const its=(pjPdItens&&pjPdItens[iv.kind+'|'+iv.gid])||[
   return out.sort((a,b)=>a.fase-b.fase||a.ordem-b.ordem);
 }
 function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=F.q.trim().toLowerCase();
-  const aberta=x=>x.c==='pend'||x.c==='and', naFase=x=>(!F.ator||x.ator===F.ator)&&(!F.fase||x.fase===+F.fase);
-  const rows=PJ_IVS.filter(iv=>(!F.cons||iv.cons===F.cons)&&(!F.tipo||iv.tipo===F.tipo)&&(!F.st||pjPipeStatus(iv)===F.st)
+  // naFase = etapa do ator escolhido em "Pendência com" (vale p/ gaps, KPIs E a lista de cada intervenção)
+  const aberta=x=>x.c==='pend'||x.c==='and', naFase=x=>!F.ator||x.ator===F.ator;
+  const rows=PJ_IVS.filter(iv=>(!F.cons||iv.cons===F.cons)&&(!F.tipo||iv.tipo===F.tipo)&&(!F.st.size||F.st.has(pjPipeStatus(iv)))
       &&(!q||[iv.cod,iv.local,iv.dmc].join(' ').toLowerCase().includes(q)))
     .map(iv=>{ let e=pjPdEtapas(iv); if(!F.leg) e=e.filter(x=>!x.leg); return {iv,e}; });
-  let vis=(F.ator||F.fase)?rows.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))):rows;
+  let vis=F.ator?rows.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))):rows;
   // gaps: etapa × fase com quantas intervenções estão ok / em andamento / pendentes (antes do filtro de etapa)
   const gap={}; vis.forEach(r=>r.e.forEach(x=>{ if(x.c==='fora'||!naFase(x)) return; const k=x.fase+'|'+x.nome;
-    const g=gap[k]=gap[k]||{k,fase:x.fase,nome:x.nome,ok:0,and:0,pend:0}; g[x.c]++; }));
-  const gaps=Object.values(gap).filter(g=>g.and+g.pend>0).sort((a,c)=>(c.pend+c.and)-(a.pend+a.and)||a.fase-c.fase);
-  if(F.etapa&&!gap[F.etapa]) F.etapa='';
+    const g=gap[k]=gap[k]||{k,fase:x.fase,nome:x.nome,ordem:x.ordem,ok:0,and:0,pend:0}; g[x.c]++; if(x.ordem<g.ordem) g.ordem=x.ordem; }));
+  // ordem do pipeline (fase → ordem da etapa no modelo), igual à lista de cada intervenção
+  const gaps=Object.values(gap).filter(g=>g.and+g.pend>0).sort((a,c)=>a.fase-c.fase||a.ordem-c.ordem||String(a.nome).localeCompare(String(c.nome),'pt-BR'));
+  if(F.etapa&&!gap[F.etapa]){ F.etapa=''; F.fech={}; }
   if(F.etapa) vis=vis.filter(r=>r.e.some(x=>x.fase+'|'+x.nome===F.etapa&&aberta(x)));
   const nAb=r=>r.e.filter(aberta).length, byCod=(a,c)=>String(a.iv.cod).localeCompare(String(c.iv.cod),'pt-BR',{numeric:true});
-  vis.sort(F.ord==='cod'?byCod:F.ord==='fase'?(a,c)=>(((a.iv.pipe||{}).fase||1)-((c.iv.pipe||{}).fase||1))||nAb(c)-nAb(a):(a,c)=>nAb(c)-nAb(a)||byCod(a,c));
+  vis.sort((a,c)=>(((a.iv.pipe||{}).fase||1)-((c.iv.pipe||{}).fase||1))||nAb(c)-nAb(a)||byCod(a,c));   // sempre pela fase do pipeline
   // KPIs (etapas no escopo das intervenções visíveis)
   const all=[].concat(...vis.map(r=>r.e.filter(x=>x.c!=='fora'&&naFase(x)))), cnt=c=>all.filter(x=>x.c===c).length;
   const tot=all.length, pc=n=>tot?Math.round(n/tot*100):0, comPend=vis.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))).length;
@@ -3594,16 +3614,20 @@ function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=
       const cl=!xs.length?'na':(ok===xs.length?'ok':(ok||an?'and':'pend'));
       const v=!xs.length?'—':(f===4?Math.round(pjIvPct(iv))+'%':ok+'/'+xs.length);
       return `<div class="${cl}" title="${PJ_FASE_N[f]}: ${ok} de ${xs.length} etapa(s) ok${an?', '+an+' em andamento':''}"><b>${v}</b>${PJ_FASE_N[f]}</div>`; }).join('');
-    const lista=ver?r.e:r.e.filter(aberta);
+    // lista: gap escolhido → só aquela etapa; senão o que falta (ou tudo, em "Ver todas"); sempre só do ator do filtro
+    const lista=(F.etapa&&!ver)?r.e.filter(x=>x.fase+'|'+x.nome===F.etapa):(ver?r.e:r.e.filter(aberta)).filter(naFase);
+    const abre=F.etapa?!F.fech[iv.id]:!!F.abre[iv.id], nLis=lista.filter(x=>x.c!=='fora').length;
     return `<div class="pjcard" style="--tc:${t.c};cursor:default"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span class="pjpill ${sc}">${sl}</span></div>
       <h3>${pjPdEsc(iv.local)}</h3><div class="pjmono">${pjPdEsc(iv.cod)} · ${pjPdEsc(iv.cons)}${iv.dmc?' · DMC '+pjPdEsc(iv.dmc):''}</div>
       <div class="pdfases">${fs}</div>
-      <div style="margin-top:6px">${lista.length?porFase(lista):'<p class="sub" style="margin:6px 0">Nenhuma etapa em aberto. 🎉</p>'}</div>
-      <div class="pjet-a"><button class="btn ghost pjmini" data-pdver="${iv.id}">${ver?'Mostrar só o que falta ▴':'Ver todas as etapas ('+r.e.length+') ▾'}</button><button class="btn ghost pjmini" data-pdiv="${iv.id}">Abrir intervenção ›</button></div></div>`; };
+      <button type="button" class="pdtog${abre?' aberto':''}" data-pdtog="${iv.id}" aria-expanded="${abre}"><span>${abre?'Esconder detalhes':'Ver detalhes'} · ${F.etapa&&!ver?pjPdEsc(gap[F.etapa].nome):(ver?'todas as etapas':nLis+' etapa(s) em aberto')}</span><span class="ch">▾</span></button>
+      ${abre?`<div style="margin-top:6px">${lista.length?porFase(lista):'<p class="sub" style="margin:6px 0">Nenhuma etapa em aberto. 🎉</p>'}</div>`:''}
+      <div class="pjet-a">${abre?`<button class="btn ghost pjmini" data-pdver="${iv.id}">${ver?(F.etapa?'Mostrar só '+pjPdEsc(gap[F.etapa].nome)+' ▴':'Mostrar só o que falta ▴'):'Ver todas as etapas ('+r.e.length+') ▾'}</button>`:''}<button class="btn ghost pjmini" data-pdiv="${iv.id}">Abrir intervenção ›</button></div></div>`; };
   b.innerHTML=kpi+gapHtml+filtroEt+(vis.length?vis.map(card).join(''):'<p class="sub">Nenhuma intervenção nesse filtro.</p>');
   const gd=$('#pjPdGap'); if(gd) gd.ontoggle=()=>{ pjPdGapOpen=gd.open; };
-  b.querySelectorAll('[data-gap]').forEach(x=>x.onclick=()=>{ F.etapa=F.etapa===x.dataset.gap?'':x.dataset.gap; pjPendRender(); });
-  const ec=$('#pjPdEtClr'); if(ec) ec.onclick=()=>{ F.etapa=''; pjPendRender(); };
+  b.querySelectorAll('[data-gap]').forEach(x=>x.onclick=()=>{ F.etapa=F.etapa===x.dataset.gap?'':x.dataset.gap; F.fech={}; F.ver={}; pjPendRender(); });
+  const ec=$('#pjPdEtClr'); if(ec) ec.onclick=()=>{ F.etapa=''; F.fech={}; F.ver={}; pjPendRender(); };
+  b.querySelectorAll('[data-pdtog]').forEach(x=>x.onclick=()=>{ const id=x.dataset.pdtog; if(F.etapa) F.fech[id]=!F.fech[id]; else F.abre[id]=!F.abre[id]; pjPendRender(); });
   b.querySelectorAll('[data-pdver]').forEach(x=>x.onclick=()=>{ F.ver[x.dataset.pdver]=!F.ver[x.dataset.pdver]; pjPendRender(); });
   b.querySelectorAll('[data-pdiv]').forEach(x=>x.onclick=()=>pjOpen(x.dataset.pdiv,'projeto_pend'));
 }
