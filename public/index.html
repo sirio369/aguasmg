@@ -174,6 +174,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjleg{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:11px;color:var(--mut)}
 .pjleg span{display:inline-flex;align-items:center;gap:5px}
 .pjleg i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.pjponta{background:none;border:0}
 .pjcount{font-size:12px;color:var(--mut);margin:2px 0 10px}
 .pjcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--tc,var(--acc));border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .pjcard:active{transform:scale(.995)}
@@ -3401,7 +3402,8 @@ function pjInit(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const st=$('#'+E.ti
   if(dm){ const dmcs=[...new Set(PJ_IVS.map(iv=>iv.dmc).filter(Boolean))].sort();
     dm.innerHTML='<option value="">Todos os DMCs</option>'+dmcs.map(d=>`<option value="${d}">${d}</option>`).join('');
     dm.value=pjFdmc; dm.onchange=e=>{pjFdmc=e.target.value;pjRefresh(ctx);}; }
-  const lg=$('#'+E.leg); if(lg) lg.innerHTML=Object.entries(PJ_PST).filter(([k])=>ctx==='sup'||k!=='configuracao').map(([k,v])=>`<span><i style="background:${v[2]}"></i>${v[0]}</span>`).join('');
+  const lg=$('#'+E.leg); if(lg) lg.innerHTML=Object.entries(PJ_PST).filter(([k])=>ctx==='sup'||k!=='configuracao').map(([k,v])=>`<span><i style="background:${v[2]}"></i>${v[0]}</span>`).join('')
+    +`<span title="Aparecem ao aproximar o mapa"><i style="background:#1a7f4b"></i>Início do trecho</span><span title="Aparecem ao aproximar o mapa"><i style="background:#c62828;border-radius:2px"></i>Fim do trecho</span>`;
   pjSetView(pjView,ctx); pjRefresh(ctx);
 }
 // lista geral (Obras/todos) não mostra "Em configuração" — só a Engenharia vê; prazo = pior faixa entre quem tem pendência
@@ -3416,11 +3418,22 @@ function pjRenderPrazo(ctx){ const E=PJ_CTX[ctx], el=$('#'+E.prazo); if(!el) ret
   el.innerHTML=`<div class="pavchips" style="margin:0 0 10px">`+Object.entries(PJ_FAIXA).map(([k,v])=>`<div class="pavchip" data-pjprazo="${k}" style="${pjFprazo===k?('background:'+v[2]+';border-color:transparent;color:#fff'):''}">${v[0]} ${cnt[k]} ${v[1]}</div>`).join('')+'</div>';
   el.querySelectorAll('[data-pjprazo]').forEach(ch=>ch.onclick=()=>{ pjFprazo=pjFprazo===ch.dataset.pjprazo?'':ch.dataset.pjprazo; pjRefresh(ctx); });
 }
+// marcadores de início/fim dos trechos lineares (HDD/VCA): só aparecem de perto (zoom ≥ 14) p/ não poluir a visão geral
+const PJ_PONTA_ZOOM=14;
+function pjPontaIcon(t){ const ini=t==='I';
+  return L.divIcon({className:'pjponta',iconSize:[16,16],iconAnchor:[8,8],
+    html:`<b style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;box-sizing:border-box;border:2px solid #fff;border-radius:${ini?'50%':'3px'};background:${ini?'#1a7f4b':'#c62828'};color:#fff;font:700 9px/1 system-ui,sans-serif;box-shadow:0 0 0 1px rgba(0,0,0,.35)">${t}</b>`}); }
+// posição da ponta ~11 px p/ dentro da linha: onde dois trechos se encontram, o "F" de um e o "I" do outro ficam lado a lado
+function pjPontaPos(map,lls,ini){ const pts=(ini?lls:lls.slice().reverse()).map(ll=>map.latLngToLayerPoint(ll)); let falta=11;
+  for(let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], d=a.distanceTo(b); if(d>=falta) return map.layerPointToLatLng(a.add(b.subtract(a).multiplyBy(falta/d))); falta-=d; }
+  return L.latLng(ini?lls[0]:lls[lls.length-1]); }   // trecho mais curto que a folga: fica na própria ponta
+function pjPontasZoom(M){ const on=M.map.getZoom()>=PJ_PONTA_ZOOM; if(on&&!M.map.hasLayer(M.ends)) M.ends.addTo(M.map); else if(!on&&M.map.hasLayer(M.ends)) M.map.removeLayer(M.ends);
+  if(on) M.ends.eachLayer(m=>{ if(m._pjLls) m.setLatLng(pjPontaPos(M.map,m._pjLls,m._pjIni)); }); }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   const el=$('#'+E.mapEl); if(!el||!window.L) return;
   let M=pjMaps[ctx];
-  if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map)}; }
-  const map=M.map, layer=M.layer; layer.clearLayers();
+  if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map),ends:L.layerGroup()}; map.on('zoomend',()=>pjPontasZoom(M)); }
+  const map=M.map, layer=M.layer, ends=M.ends; layer.clearLayers(); ends.clearLayers();
   // camada de DMCs (contexto, embaixo; respeita consórcio; o DMC filtrado fica destacado). NÃO entra no fitBounds
   (PJ_DMCS||[]).forEach(f=>{ const p=f.properties||{}, za=p.consorcio, cod=p.codigo; if(pjFcons && pjFcons!==za) return;
     const sel=pjFdmc && pjFdmc===cod;
@@ -3436,8 +3449,15 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
       m.on('click',()=>E.open(iv.id)); m.bindTooltip(tip); m.addTo(layer); bounds.push(iv.ll); }
     else if(iv.lls&&iv.lls.length){
       const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.95});
-      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(tip); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p)); }
+      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(tip); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p));
+      // início (círculo verde "I") e fim (quadrado vermelho "F") de cada trecho; passar o mouse destaca o trecho inteiro
+      const ini=iv.lls[0], fim=iv.lls[iv.lls.length-1], cod=String(iv.cod).replace(/[<>&"]/g,'');
+      const mi=L.marker(ini,{icon:pjPontaIcon('I'),keyboard:false,zIndexOffset:500}).bindTooltip('Início · '+cod).on('click',()=>E.open(iv.id)).addTo(ends);
+      const mf=L.marker(fim,{icon:pjPontaIcon('F'),keyboard:false,zIndexOffset:400}).bindTooltip('Fim · '+cod).on('click',()=>E.open(iv.id)).addTo(ends);
+      const on=()=>{ pl.setStyle({weight:9,opacity:1}); pl.bringToFront(); }, off=()=>pl.setStyle({weight:5,opacity:.95});
+      [pl,mi,mf].forEach(o=>o.on('mouseover',on).on('mouseout',off)); mi._pjLls=mf._pjLls=iv.lls; mi._pjIni=true; }
   });
+  pjPontasZoom(M);
   setTimeout(()=>{ try{ map.invalidateSize(); if(bounds.length) map.fitBounds(bounds,{padding:[28,28],maxZoom:16}); }catch(e){} },80);
 }
 function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx==='sup';
