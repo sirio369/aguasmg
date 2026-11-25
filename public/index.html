@@ -6766,6 +6766,9 @@ if($('#vrpBuscaX')) $('#vrpBuscaX').addEventListener('click',vrpBuscaGo);
 
 // ---------- MANUTENÇÃO DE VRPs (execução de OS) ----------
 function vmConsLbl(c){ return c==='ZA1004'?'Contagem':(c==='ZA0200'?'Betim':(c||'—')); }
+// Identificador exibido da VRP (2026-11-25): cd_no_agua (código do nó COPASA) é o principal; num_vrp vira nome secundário.
+function vmVrpId(o){ return (o&&(o.cd_no_agua||o.num_vrp))||'VRP'; }
+function vmVrpSub(o){ return (o&&o.cd_no_agua&&o.num_vrp)?o.num_vrp:''; }
 function vmN(v){ return (v==null||v==='')?'—':String(v).replace('.',','); }
 function vmBool(b){ return b==null?'—':(b?'Sim':'Não'); }
 function vmFmtDate(s){ if(!s)return''; try{ return new Date(String(s).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}); }catch(e){ return s; } }
@@ -6812,7 +6815,7 @@ async function vmCampoInit(){
 function vmOsRowCampo(o){
   const prog=o.programada_para?(' · '+vmFmtDate(o.programada_para)):'';
   return `<button class="vmrow" data-abrir="${o.vrp_id}" data-origem="${o.origem}">
-    <div class="vt"><span class="vn">${o.os_numero}</span><span class="vv">${vEsc(o.num_vrp||'VRP')}</span><span class="vmst ${o.status}" style="margin-left:auto">${VM_STLBL[o.status]||o.status}</span></div>
+    <div class="vt"><span class="vn">${o.os_numero}</span><span class="vv">${vEsc(vmVrpId(o))}</span><span class="vmst ${o.status}" style="margin-left:auto">${VM_STLBL[o.status]||o.status}</span></div>
     <div class="vl">${vmConsLbl(o.consorcio)}${o.dmc?(' · DMC '+o.dmc):''} · ${o.origem}${prog}</div></button>`;
 }
 function vmCampoMapRender(minhas){
@@ -6822,7 +6825,7 @@ function vmCampoMapRender(minhas){
     vmCampoMap=L.map(el); mapAddCamadaBase(vmCampoMap); vmCampoLayer=L.layerGroup().addTo(vmCampoMap); const b=[];
     const clr={programada:'#3a9bde'};
     minhas.filter(o=>o.lat!=null&&o.lon!=null).forEach(o=>{ const m=L.circleMarker([o.lat,o.lon],{radius:8,color:'#fff',weight:2,fillColor:clr[o.status]||'#3a9bde',fillOpacity:.95}).addTo(vmCampoLayer);
-      m.bindPopup(`<b>${vEsc(o.num_vrp||'VRP')}</b><br>${o.os_numero} · ${VM_STLBL[o.status]||o.status}${o.programada_para?('<br>'+vmFmtDate(o.programada_para)):''}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vmcop" data-vrp="${o.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher OS ›</a>`);
+      m.bindPopup(`<b>${vEsc(vmVrpId(o))}</b><br>${o.os_numero} · ${VM_STLBL[o.status]||o.status}${o.programada_para?('<br>'+vmFmtDate(o.programada_para)):''}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vmcop" data-vrp="${o.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher OS ›</a>`);
       m.on('popupopen',()=>{ const a=document.querySelector('.vmcop[data-vrp="'+o.vrp_id+'"]'); if(a)a.onclick=()=>vmAbrir(o.vrp_id,o.origem); });
       b.push([o.lat,o.lon]); });
     if(b.length) vmCampoMap.fitBounds(b,{padding:[40,40],maxZoom:16}); else vmCampoMap.setView([-19.94,-44.1],11);
@@ -6875,7 +6878,7 @@ function vmPcNav(pc){ return pc&&pc.lat!=null?`<a href="https://www.google.com/m
 function vmHeaderHtml(){
   const H=vmExec.hdr;
   const rows=[
-    ['Código', (H.num_vrp||'VRP')+(H.cd_no_agua?(' · nó '+H.cd_no_agua):'')],
+    ['Código', vmVrpId(H)+(vmVrpSub(H)?(' · '+vmVrpSub(H)):'')],
     ['DMC', H.dmc||'—'],
     ['Diâmetro', H.diametro?('DN '+H.diametro):'—'],
     ['Modelo', H.modelo||'—'],
@@ -6884,7 +6887,7 @@ function vmHeaderHtml(){
     ['Ponto crítico', H.ponto_critico?(('nó '+(H.ponto_critico.no_modelo||'—'))+(H.ponto_critico.dist_m!=null?(' · '+H.ponto_critico.dist_m+' m da VRP'):'')):(H.ponto_critico_ref||'não cadastrado')]
   ];
   return `<div class="vmhd"><div class="os">OS ${H.os_numero}${vmExec.improd?' · improdutivo':' · em execução'}</div>
-    <h2>${vEsc(H.num_vrp||'VRP')}</h2>
+    <h2>${vEsc(vmVrpId(H))}</h2>
     <div class="r"><span>${vmConsLbl(H.consorcio)}${H.dmc?(' · DMC '+H.dmc):''}</span><b>${ME&&ME.nome?vEsc(ME.nome):''}</b></div>
     ${(()=>{ const sp=vmAlvoJus(); return `<div class="vmpb" style="margin-top:8px;${sp!=null?'background:var(--ok-bg);border-color:var(--ok);color:var(--ok)':''}">🎯 <b>Setpoint da VRP (jusante): ${sp!=null?(vmN(sp)+' mca'):(H.origem==='substituicao'?'informe o projeto da VRP nova':'não cadastrado')}</b>${H.proj_mont!=null&&H.origem!=='substituicao'?(' · montante de projeto '+vmN(H.proj_mont)+' mca'):''}</div>`; })()}
     <details><summary>▾ dados do cadastro (autofill)</summary>${rows.map(r=>`<div class="r"><span>${r[0]}</span><b>${vEsc(String(r[1]))}</b></div>`).join('')}</details>
@@ -6932,7 +6935,7 @@ function vmScrSubAnt(){ const H=vmExec.hdr, S=vmExec;
   const ref=(l,v)=>`<div class="vmdkv"><span>${l}</span><b>${vEsc(v==null||v===''?'—':String(v))}</b></div>`;
   return `<h3 style="margin:2px 0">2 · VRP anterior (remoção)</h3>
    <p class="sub" style="margin:-2px 0 8px">Cadastro atual da VRP que será removida (referência). O <b>nó de água é mantido</b>.</p>
-   <div class="vmcard"><div class="h">${vEsc(H.num_vrp||'VRP')} · nó ${vEsc(H.cd_no_agua||'—')}</div>
+   <div class="vmcard"><div class="h">${vEsc(vmVrpId(H))}${vmVrpSub(H)?(' · '+vEsc(vmVrpSub(H))):''}</div>
      ${ref('Diâmetro', H.diametro?('DN '+H.diametro):'—')}${ref('Modelo', H.modelo)}${ref('Controlador', ctl)}${ref('Atuação', H.atuacao)}
      ${ref('Proj. montante', H.proj_mont!=null?(H.proj_mont+' mca'):'—')}${ref('Proj. jusante', H.proj_jus!=null?(H.proj_jus+' mca'):'—')}${ref('Proj. mínima', H.proj_min!=null?(H.proj_min+' mca'):'—')}</div>
    <div class="vmq" style="margin-top:12px"><label>Motivo / observação da remoção</label><textarea class="vmin" data-in="sub_motivo" placeholder="Por que a VRP está sendo substituída">${vEsc(S.ans.sub_motivo||'')}</textarea></div>
@@ -7190,7 +7193,7 @@ async function vmFichaOpen(vrpId){
     ? `<div class="vmpb" style="background:var(--ok-bg);border-color:var(--ok);color:var(--ok);margin:0 0 4px">🎯 <b>Pressão de projeto — deixar a jusante no setpoint: ${vmN(c.pres_saida)} mca</b>${c.pres_max!=null?(' · montante de projeto '+vmN(c.pres_max)+' mca'):''}</div>`
     : `<div class="vmpb" style="margin:0 0 4px">🎯 <b>Pressão de projeto não cadastrada</b> para esta VRP.</div>`;
   f.innerHTML=`<div class="vmfcard">
-    <div class="vmfhd"><div><h2>${vEsc(c.num_vrp||'VRP')}</h2><div class="s">${vmConsLbl(c.consorcio)}${c.dmc?(' · DMC '+c.dmc):''}${c.cd_no_agua?(' · nó '+vEsc(c.cd_no_agua)):''}</div></div><div style="display:flex;gap:8px;align-items:center">${vmGest?'<button class="vmtbtn" id="vmFichaNovaOs">＋ Abrir OS</button>':''}<button class="vmfclose" id="vmfX">Fechar</button></div></div>
+    <div class="vmfhd"><div><h2>${vEsc(vmVrpId(c))}</h2><div class="s">${vmConsLbl(c.consorcio)}${c.dmc?(' · DMC '+c.dmc):''}${vmVrpSub(c)?(' · '+vEsc(vmVrpSub(c))):''}</div></div><div style="display:flex;gap:8px;align-items:center">${vmGest?'<button class="vmtbtn" id="vmFichaNovaOs">＋ Abrir OS</button>':''}<button class="vmfclose" id="vmfX">Fechar</button></div></div>
     <div class="vmfbody">
       ${spHtml}
       <div class="vmfsec">📇 Ficha cadastral</div><div class="vmfgrid">${cad.map(r=>`<div class="vmfkv"><span>${r[0]}</span><b>${vEsc(String(r[1]))}</b></div>`).join('')}</div>
@@ -7204,7 +7207,7 @@ async function vmFichaOpen(vrpId){
     </div></div>`;
   f.querySelector('#vmfX').onclick=()=>f.classList.remove('on');
   vmPcMapa('vmFichaMap', c.lat!=null?{lat:c.lat,lon:c.lon}:null, d.ponto_critico, 'ficha');
-  { const no=f.querySelector('#vmFichaNovaOs'); if(no) no.onclick=()=>{ f.classList.remove('on'); vmProgramar(vrpId, c.num_vrp); }; }
+  { const no=f.querySelector('#vmFichaNovaOs'); if(no) no.onclick=()=>{ f.classList.remove('on'); vmProgramar(vrpId, vmVrpId(c)); }; }
   f.onclick=e=>{ if(e.target===f) f.classList.remove('on'); };
   f.querySelectorAll('[data-os]').forEach(b=>b.onclick=()=>vmReport(b.dataset.os));
   f.querySelectorAll('[data-progpend]').forEach(b=>b.onclick=()=>vmGerarCorr(b.dataset.progpend, ()=>vmFichaOpen(vrpId)));
@@ -7218,8 +7221,8 @@ function vmVisitaReport(u, c){
   const pairs=(typeof vrpRespPairs==='function')?vrpRespPairs(u):[];
   const fotos=(typeof vrpFotoPairs==='function')?vrpFotoPairs(u):[];
   const sl=(typeof VRP_SIT!=='undefined'&&VRP_SIT[u.situacao])?VRP_SIT[u.situacao].lbl:(u.situacao||'—');
-  let h='<div class="relTop"><div><h1>Relatório de Visita Primária · VRP</h1><div class="sub">'+vmConsLbl(c.consorcio)+' · '+vEsc(c.num_vrp||'VRP')+'</div></div><div class="relBadge">'+sl+'</div></div><div class="relBody">';
-  h+='<div class="relGrid">'+relField('VRP',c.num_vrp||'—')+relField('Nó',c.cd_no_agua||'—')+relField('Situação',sl)+relField('Visitado por',u.visitado_por||'—')+relField('Visitado em',relFmtData(u.visitado_em))+relField('DN cadastro',c.diametro?('DN '+c.diametro):'—')+'</div>';
+  let h='<div class="relTop"><div><h1>Relatório de Visita Primária · VRP</h1><div class="sub">'+vmConsLbl(c.consorcio)+' · '+vEsc(vmVrpId(c))+'</div></div><div class="relBadge">'+sl+'</div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('VRP',vmVrpId(c))+relField('Nome',c.num_vrp||'—')+relField('Situação',sl)+relField('Visitado por',u.visitado_por||'—')+relField('Visitado em',relFmtData(u.visitado_em))+relField('DN cadastro',c.diametro?('DN '+c.diametro):'—')+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span>Levantamento</div>';
   h+= pairs.length?('<div class="relGrid">'+pairs.map(p=>relField(p[0],p[1])).join('')+'</div>'):'<div class="relPend">Sem respostas registradas.</div>';
   h+='<div class="relSec"><span class="relNum">2</span>Fotos</div>'+relFotos(fotos);
@@ -7243,8 +7246,8 @@ async function vmReport(osId){
 function vmReportHtml(d){
   const stL=VM_STLBL[d.status]||d.status;
   const r=(d.respostas||{}), cond=(r.condicao||{}), serv=(r.servicos||[]);
-  let h='<div class="relTop"><div><h1>Relatório de OS · Manutenção de VRP</h1><div class="sub">'+vmConsLbl(d.consorcio)+(d.dmc?(' · DMC '+d.dmc):'')+' · '+vEsc(d.num_vrp||'VRP')+'</div></div><div class="relBadge">'+stL+'</div></div><div class="relBody">';
-  h+='<div class="relGrid">'+relField('OS interna',d.os_numero)+relField('OS SIGOS',d.os_sigos||'—')+relField('VRP',d.num_vrp||'—')+relField('Origem',d.origem)+relField('Executado por',d.executor||'—')+relField('Executado em',relFmtData(d.executado_em))+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  let h='<div class="relTop"><div><h1>Relatório de OS · Manutenção de VRP</h1><div class="sub">'+vmConsLbl(d.consorcio)+(d.dmc?(' · DMC '+d.dmc):'')+' · '+vEsc(vmVrpId(d))+'</div></div><div class="relBadge">'+stL+'</div></div><div class="relBody">';
+  h+='<div class="relGrid">'+relField('OS interna',d.os_numero)+relField('OS SIGOS',d.os_sigos||'—')+relField('VRP',vmVrpId(d))+relField('Nome',vmVrpSub(d)||'—')+relField('Origem',d.origem)+relField('Executado por',d.executor||'—')+relField('Executado em',relFmtData(d.executado_em))+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span>Chegada</div><div class="relGrid">'+relField('VRP localizada',r.localizada)+relField('Caixa acessível',r.acessivel)+relField('Água / alagamento',r.agua)+'</div>';
   h+='<div class="relSec"><span class="relNum">2</span>Pressões</div><div class="relGrid">'+relField('Montante — manômetro',r.conn_mont)+relField('Montante encontrada',d.press_mont_enc!=null?(d.press_mont_enc+' mca'):(r.tom_mont?('tomada '+r.tom_mont):'—'))+relField('Jusante — manômetro',r.conn_jus)+relField('Jusante encontrada',d.press_jus_enc!=null?(d.press_jus_enc+' mca'):(r.tom_jus?('tomada '+r.tom_jus):'—'))+'</div>';
   h+='<div class="relSec"><span class="relNum">3</span>Condição</div><div class="relGrid">'+VM_COND.map(function(x){var vv=cond[x[0]]||'—';var dd=cond['d_'+x[0]];return relField(x[1], dd?(vv+' — '+dd):vv);}).join('')+'</div>';
@@ -7352,10 +7355,10 @@ async function vmFichasRender(){
   vmFichasCache=arr;
   const n=$('#vmFichasN'); if(n)n.textContent=arr.length+' VRPs';
   if(vmG.view==='mapa'){ $('#vmFichasBody').innerHTML='<div class="vmmap" id="vmFMap"></div>'; vmFichasMap(arr); return; }
-  const opts=arr.map(f=>`<option value="${vEsc(f.num_vrp||('VRP '+f.vrp_id))}">`).join('');
+  const opts=arr.map(f=>`<option value="${vEsc(f.cd_no_agua||f.num_vrp||('VRP '+f.vrp_id))}">${vEsc(vmVrpSub(f))}</option>`).join('');
   $('#vmFichasBody').innerHTML = `<input class="vmin" id="vmFSearch" list="vmFSearchList" autocomplete="off" placeholder="🔎 Buscar VRP (digite o nome/código)…" style="margin-bottom:8px;width:100%"><datalist id="vmFSearchList">${opts}</datalist><div id="vmFCards"></div>`;
   const cards=$('#vmFCards');
-  const paint=(t)=>{ const q=(t||'').trim().toLowerCase(); const fa=q?arr.filter(f=>String(f.num_vrp||'').toLowerCase().includes(q)):arr;
+  const paint=(t)=>{ const q=(t||'').trim().toLowerCase(); const fa=q?arr.filter(f=>(String(f.cd_no_agua||'').toLowerCase().includes(q)||String(f.num_vrp||'').toLowerCase().includes(q))):arr;
     cards.innerHTML = fa.length? fa.map(vmFichaCard).join('') : '<p class="sub">Nenhuma VRP encontrada.</p>';
     cards.querySelectorAll('[data-ficha]').forEach(b=>b.onclick=()=>vmFichaOpen(+b.dataset.ficha)); };
   paint('');
@@ -7365,7 +7368,7 @@ function vmFichaCard(f){
   const ult=f.ultimo?relFmtData(f.ultimo).slice(0,10):'sem serviço';
   const tot=(f.n_os||0)+(f.n_visitas||0);
   return `<button class="vmoscard" data-ficha="${f.vrp_id}">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px">${vEsc(f.num_vrp||'VRP')}</b>${f.pend>0?`<span class="vmst concluida_pendencia">${f.pend} pend.</span>`:''}<span style="margin-left:auto;font-size:11.5px;color:var(--mut)">${tot} serviço(s)</span></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px">${vEsc(vmVrpId(f))}</b>${f.pend>0?`<span class="vmst concluida_pendencia">${f.pend} pend.</span>`:''}<span style="margin-left:auto;font-size:11.5px;color:var(--mut)">${tot} serviço(s)</span></div>
     <div style="font-size:11.5px;color:var(--mut);margin-top:3px">${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''} · último: ${ult}</div></button>`;
 }
 function vmFichasMap(arr){
@@ -7375,7 +7378,7 @@ function vmFichasMap(arr){
     vmGMap=L.map(el); mapAddCamadaBase(vmGMap); vmGLayer=L.layerGroup().addTo(vmGMap); const b=[];
     arr.filter(f=>f.lat!=null&&f.lon!=null).forEach(f=>{ const c=f.pend>0?'#e6b352':((f.n_os||f.n_visitas)?'#57d08c':'#9aa4b2');
       const m=L.circleMarker([f.lat,f.lon],{radius:6,color:'#fff',weight:1.5,fillColor:c,fillOpacity:.9}).addTo(vmGLayer);
-      m.bindPopup(`<b>${vEsc(f.num_vrp||'VRP')}</b><br>${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}<br>${(f.n_os||0)+(f.n_visitas||0)} serviço(s)<br><a class="vmpf" data-ficha="${f.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Abrir ficha ›</a>`);
+      m.bindPopup(`<b>${vEsc(vmVrpId(f))}</b><br>${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}<br>${(f.n_os||0)+(f.n_visitas||0)} serviço(s)<br><a class="vmpf" data-ficha="${f.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Abrir ficha ›</a>`);
       m.on('popupopen',()=>{ const a=document.querySelector('.vmpf[data-ficha="'+f.vrp_id+'"]'); if(a)a.onclick=()=>vmFichaOpen(f.vrp_id); });
       b.push([f.lat,f.lon]); });
     if(b.length) vmGMap.fitBounds(b,{padding:[30,30],maxZoom:14}); else vmGMap.setView([-19.94,-44.1],11);
@@ -7415,7 +7418,7 @@ function vmGOsCard(o){
   const stage=vEsc(VM_STAGE[o.status]||'');
   return `<div style="border:1px solid var(--line);border-radius:12px;margin-bottom:7px;background:var(--card);overflow:hidden">
     <div class="vmosmain" data-os="${o.os_id}" title="${stage}" style="cursor:pointer;padding:10px 12px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)">${o.os_numero}</span><b style="font-size:15px">${vEsc(o.num_vrp||'VRP')}</b><span class="vmst ${o.status}" title="${stage}" style="margin-left:auto">${VM_STLBL[o.status]||o.status} ⓘ</span></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)">${o.os_numero}</span><b style="font-size:15px">${vEsc(vmVrpId(o))}</b><span class="vmst ${o.status}" title="${stage}" style="margin-left:auto">${VM_STLBL[o.status]||o.status} ⓘ</span></div>
       <div style="font-size:11.5px;color:var(--mut);margin-top:3px">${vmConsLbl(o.consorcio)}${o.dmc?(' · DMC '+o.dmc):''} · ${o.origem}${o.os_sigos?(' · SIGOS '+o.os_sigos+sgxS(o.os_sigos)):''}</div>
       <div style="font-size:11.5px;color:var(--mut);margin-top:2px">${prog?'Programado para':'Executado por'}: <b>${quem}</b>${prog&&o.programada_para?(' · '+vmFmtFullDate(o.programada_para)):''}</div>
     </div>
@@ -7433,7 +7436,7 @@ function vmGOsMap(os){
     vmGMap=L.map(el); mapAddCamadaBase(vmGMap); vmGLayer=L.layerGroup().addTo(vmGMap);
     const clr={programada:'#9aa4b2',concluida:'#57d08c',concluida_pendencia:'#e6b352',improdutiva:'#9aa4b2'}; const b=[];
     os.filter(o=>o.lat!=null&&o.lon!=null).forEach(o=>{ const m=L.circleMarker([o.lat,o.lon],{radius:7,color:'#fff',weight:1.5,fillColor:clr[o.status]||'#888',fillOpacity:.9}).addTo(vmGLayer);
-      m.bindPopup(`<b>${vEsc(o.num_vrp||'VRP')}</b><br>${o.os_numero}<br>${VM_STLBL[o.status]||o.status}<br><a class="vmpop" data-os="${o.os_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Abrir OS ›</a>`);
+      m.bindPopup(`<b>${vEsc(vmVrpId(o))}</b><br>${o.os_numero}<br>${VM_STLBL[o.status]||o.status}<br><a class="vmpop" data-os="${o.os_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Abrir OS ›</a>`);
       m.on('popupopen',()=>{ const a=document.querySelector('.vmpop[data-os="'+o.os_id+'"]'); if(a)a.onclick=()=>vmOsView(o.os_id); });
       b.push([o.lat,o.lon]); });
     if(b.length) vmGMap.fitBounds(b,{padding:[30,30],maxZoom:15}); else vmGMap.setView([-19.94,-44.1],11);
@@ -7447,7 +7450,7 @@ async function vmOsView(osId){
   const r=(d.respostas||{}), cond=(r.condicao||{}), serv=(r.servicos||[]);
   const kv=(l,v)=>`<div class="vmdkv"><span>${l}</span><b>${vEsc(String(v==null||v===''?'—':v))}</b></div>`;
   const podeEditar=!!(ME&&(ME.vrp_gestao||ME.is_admin)) && d.status!=='programada';
-  let h=`<h1 style="margin-bottom:2px">${vEsc(d.num_vrp||'VRP')} — ${d.os_numero}${podeEditar?'<button class="vmpencil" id="vmEditBtn" title="Corrigir o que foi lançado">✏️</button>':''}</h1>
+  let h=`<h1 style="margin-bottom:2px">${vEsc(vmVrpId(d))} — ${d.os_numero}${podeEditar?'<button class="vmpencil" id="vmEditBtn" title="Corrigir o que foi lançado">✏️</button>':''}</h1>
    <div class="sub" style="margin-top:0">${vmConsLbl(d.consorcio)}${d.dmc?(' · DMC '+d.dmc):''} · ${d.origem} · ${d.executor?vEsc(d.executor):'—'}</div>
    <span class="vmst ${d.status}">${VM_STLBL[d.status]||d.status}</span>
    <div class="vmsigrow"><span class="k">OS SIGOS</span><b>${d.os_sigos||'—'}</b>${sgxS(d.os_sigos)}<button class="vmtbtn" id="vmSigBtn" style="margin-left:auto">${d.os_sigos?'Editar':'＋ Adicionar'}</button></div>
@@ -7567,7 +7570,7 @@ async function vmGLoadPend(){
     const lkPai=p.os_id?`<a class="vmoslink" data-os="${p.os_id}" title="OS que originou a pendência">⬆ ${vEsc(p.os_numero||'OS pai')}</a>`:'<span class="sub">—</span>';
     const lkCorr=p.os_correcao_id?`<a class="vmoslink" data-os="${p.os_correcao_id}" title="OS corretiva em andamento">🔧 ${vEsc(p.os_correcao_numero||'corretiva')}</a>`
       :(p.resolvida_os_id?`<a class="vmoslink" data-os="${p.resolvida_os_id}" title="OS corretiva que resolveu">✅ ${vEsc(p.resolvida_numero||'resolvida')}</a>`:'<span class="sub">sem corretiva</span>');
-    return `<tr><td><b class="vmvlink" data-ficha="${p.vrp_id}">${vEsc(p.num_vrp||'VRP')}</b><div class="sub">${vmConsLbl(p.consorcio)}${p.dmc?(' · DMC '+p.dmc):''}</div></td>
+    return `<tr><td><b class="vmvlink" data-ficha="${p.vrp_id}">${vEsc(vmVrpId(p))}</b><div class="sub">${vmVrpSub(p)?vEsc(vmVrpSub(p))+' · ':''}${vmConsLbl(p.consorcio)}${p.dmc?(' · DMC '+p.dmc):''}</div></td>
       <td>${vEsc(p.tipo)}${p.lado?(' <span class="sub">('+p.lado+')</span>'):''}<div class="sub">${vEsc(p.descricao||'')}</div></td>
       <td style="white-space:nowrap">${lkPai}<br>${lkCorr}</td>
       <td><span class="vmfarol" style="color:${st[1]}"><span class="vmdot" style="background:${st[1]}"></span>${st[0]}</span>${corr}</td>
@@ -7592,12 +7595,12 @@ async function vmGLoadPrev(){
   let inner;
   if(vmG.pview==='mapa'){ inner='<div class="vmmap" id="vmPMap"></div><div class="vmleg" id="vmPLeg"></div>'; }
   else { const rows=farol.length?farol.map(f=>{ const st=VM_FAROL[f.status_farol]||['—','var(--mut)']; const can=f.status_farol==='vencida'||f.status_farol==='a_vencer'||f.status_farol==='sem_historico';
-      return `<tr><td><b class="vmvlink" data-ficha="${f.vrp_id}">${vEsc(f.num_vrp||'VRP')}</b><div class="sub">${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</div></td>
+      return `<tr><td><b class="vmvlink" data-ficha="${f.vrp_id}">${vEsc(vmVrpId(f))}</b><div class="sub">${vmVrpSub(f)?vEsc(vmVrpSub(f))+' · ':''}${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</div></td>
         <td style="font-family:ui-monospace,monospace">${f.ultima?relFmtData(f.ultima).slice(0,10):'—'}</td>
         <td style="font-family:ui-monospace,monospace">${f.intervalo}d</td>
         <td style="font-family:ui-monospace,monospace">${f.proxima?vmFmtFullDate(f.proxima):'—'}</td>
         <td><span class="vmfarol" style="color:${st[1]}"><span class="vmdot" style="background:${st[1]}"></span>${st[0]}${f.dias!=null?(' ('+f.dias+'d)'):''}</span></td>
-        <td style="text-align:right">${f.programada?'<span class="sub">programada</span>':(can?`<button class="vmtbtn" data-prog="${f.vrp_id}" data-num="${vEsc(f.num_vrp||'')}">Programar</button>`:'—')}</td></tr>`;}).join('') : '<tr><td colspan="6" class="sub" style="padding:14px">Nenhuma VRP no filtro.</td></tr>';
+        <td style="text-align:right">${f.programada?'<span class="sub">programada</span>':(can?`<button class="vmtbtn" data-prog="${f.vrp_id}" data-num="${vEsc(vmVrpId(f))}">Programar</button>`:'—')}</td></tr>`;}).join('') : '<tr><td colspan="6" class="sub" style="padding:14px">Nenhuma VRP no filtro.</td></tr>';
     inner=`<div style="overflow-x:auto"><table class="vmtbl"><thead><tr><th>VRP</th><th>Última OS</th><th>Interv.</th><th>Próxima</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   const cfgRows=(cfg.config||[]).map(c=>`<div class="vmcfgrow"><span style="flex:1;min-width:120px;font-weight:600">${vmConsLbl(c.consorcio)}</span>intervalo <input class="vmnum" data-cfgcons="${c.consorcio}" data-f="int" value="${c.intervalo_dias}"> d · avisar <input class="vmnum" data-cfgcons="${c.consorcio}" data-f="av" value="${c.aviso_dias}"> d</div>`).join('');
@@ -7618,8 +7621,8 @@ function vmPrevMap(farol){
     vmPMap=L.map(el); mapAddCamadaBase(vmPMap); vmPLayer=L.layerGroup().addTo(vmPMap);
     const clr={em_dia:'#57d08c',a_vencer:'#e6b352',vencida:'#f2887f',sem_historico:'#9aa4b2'}; const b=[];
     farol.filter(f=>f.lat!=null&&f.lon!=null).forEach(f=>{ const m=L.circleMarker([f.lat,f.lon],{radius:7,color:'#fff',weight:1.5,fillColor:clr[f.status_farol]||'#888',fillOpacity:.9}).addTo(vmPLayer);
-      m.bindPopup(`<b>${vEsc(f.num_vrp||'VRP')}</b><br>${(VM_FAROL[f.status_farol]||['—'])[0]}<br>próxima ${f.proxima?vmFmtFullDate(f.proxima):'—'}<br><a class="vmpprog" data-vrp="${f.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Programar OS ›</a>`);
-      m.on('popupopen',()=>{ const a=document.querySelector('.vmpprog[data-vrp="'+f.vrp_id+'"]'); if(a)a.onclick=()=>vmProgramar(f.vrp_id,f.num_vrp); });
+      m.bindPopup(`<b>${vEsc(vmVrpId(f))}</b><br>${(VM_FAROL[f.status_farol]||['—'])[0]}<br>próxima ${f.proxima?vmFmtFullDate(f.proxima):'—'}<br><a class="vmpprog" data-vrp="${f.vrp_id}" style="color:var(--acc);font-weight:600;cursor:pointer">Programar OS ›</a>`);
+      m.on('popupopen',()=>{ const a=document.querySelector('.vmpprog[data-vrp="'+f.vrp_id+'"]'); if(a)a.onclick=()=>vmProgramar(f.vrp_id,vmVrpId(f)); });
       b.push([f.lat,f.lon]); });
     if(b.length) vmPMap.fitBounds(b,{padding:[30,30],maxZoom:15}); else vmPMap.setView([-19.94,-44.1],11);
     vmPMap.invalidateSize();
@@ -7641,7 +7644,7 @@ async function vmProgramar(vrpId, vrpNum){
   if(vrpId){ vrpField=`<div><label>VRP</label><input class="vmin" value="${vEsc(vrpNum||('VRP '+vrpId))}" readonly></div>`; }
   else {
     try{ const r=await sb.rpc('app_vrp_os_programaveis',{p_consorcio:vmG.cons||null,p_dmc:vmG.dmc||null}); if(!r.error) elig=r.data||[]; }catch(e){}
-    const opts=elig.map(f=>`<option value="${vEsc(f.num_vrp||('VRP '+f.vrp_id))}">${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</option>`).join('');
+    const opts=elig.map(f=>`<option value="${vEsc(f.cd_no_agua||f.num_vrp||('VRP '+f.vrp_id))}">${vmVrpSub(f)?vEsc(vmVrpSub(f))+' · ':''}${vmConsLbl(f.consorcio)}${f.dmc?(' · DMC '+f.dmc):''}</option>`).join('');
     vrpField=`<div><label>VRP (digite para filtrar)</label><input class="vmin" id="vmPgVrp" list="vmPgVrpList" autocomplete="off" placeholder="${elig.length?'busque pelo nome/código…':'nenhuma VRP disponível (todas com serviço em aberto)'}" style="width:100%"><datalist id="vmPgVrpList">${opts}</datalist></div>`; }
   const m=vmModal(`<div class="vmmcard"><div class="vmmh">🗓️ Programar OS</div>
     <div class="vmmb">${vrpField}
@@ -7655,7 +7658,7 @@ async function vmProgramar(vrpId, vrpNum){
   m.querySelector('#vmPgCancel').onclick=vmModalClose;
   m.querySelector('#vmPgOk').onclick=async()=>{
     let vid=vrpId;
-    if(!vid){ const inp=m.querySelector('#vmPgVrp'); const txt=((inp&&inp.value)||'').trim(); const found=elig.find(f=>(f.num_vrp||('VRP '+f.vrp_id))===txt); vid=found?found.vrp_id:0; }
+    if(!vid){ const inp=m.querySelector('#vmPgVrp'); const txt=((inp&&inp.value)||'').trim(); const found=elig.find(f=>((f.cd_no_agua||f.num_vrp||('VRP '+f.vrp_id))===txt||f.num_vrp===txt)); vid=found?found.vrp_id:0; }
     if(!vid) return toast('Escolha uma VRP da lista');
     const sig=((m.querySelector('#vmPgSig')||{}).value||'').trim();
     if(!sig) return toast('Informe o número da OS SIGOS');

@@ -3264,6 +3264,17 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
 
 ## 15. Gestão de VRPs (`vrpman`, schema `8 - coleta_campo`)
 
+> **Identificador exibido = `cd_no_agua` (2026-11-25, sw v457, `docs/migracao_vrp_cd_no_agua.sql`):** em toda a
+> Gestão de VRPs (campo, gestão de serviços, pendências, ficha, cronograma, programar, PDFs de OS e de visita) a VRP
+> aparece pelo **código do nó COPASA** (`vrps.cd_no_agua`, ex. `VRP1435553` — 148/148 preenchidos, sem repetição);
+> o `num_vrp` (ex. `ZA 0200/VRP85`) vira **nome secundário** (sublinha/“Nome” no PDF). Helpers `vmVrpId(o)` =
+> `cd_no_agua || num_vrp` e `vmVrpSub(o)` = `num_vrp` quando há os dois — **use-os em tela nova do módulo** em vez de
+> `o.num_vrp`. Os datalists (Programar e busca da Ficha cadastral) usam `cd_no_agua` como valor e aceitam o `num_vrp`
+> digitado. `app_vrp_ficha_listar`/`_os_listar`/`_os_programaveis`/`_pendencias_listar`/`_prev_farol` passaram a
+> devolver `cd_no_agua` (lido de `vrps`, não do snapshot da OS) e ordenam por ele; `_os_listar.p_vrp` aceita os dois.
+> A chave interna continua `vrps.id` (`vrp_id`). Fora deste escopo seguem com `num_vrp`: módulo `vrp` (Visita primária
+> no campo), Cadastro técnico, Consolidador/RDO/Vitrine.
+
 > **Reorg 2026-10:** o card da home virou **"VRPs – Campo"** e o hub `vrpman` (`vmHub`) ficou **só com 🏗️ Campo**
 > (Minhas OS / Visita primária). As 3 telas de **gestão — `vrpman_serv` (Gestão de serviços), `vrpman_fichas`
 > (Ficha cadastral), `vrpman_prev` (Cronograma preventivo)** — **migraram para o Auxiliar de Programação ›
