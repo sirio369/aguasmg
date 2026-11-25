@@ -3202,7 +3202,8 @@ const pjPecas=(kids)=>({...pjG('Peças e acessórios',kids),rep:kids.length,ativ
 // valas de perfuração (HDD): bloco replicável. A QUANTIDADE é da equipe de obras (projeto_det: adiciona/remove vala sem avanço, 2026-11-13);
 // cada vala = tipo (entrada/intermediária/saída — editável a qualquer momento) + obra civil.
 const PJ_VALA_TIPOS=['Entrada','Intermediária','Saída'], PJ_VALA_SEL='Tipo (entrada/intermediária/saída)';
-const pjVala=(i,tipo)=>pjG('Vala '+i,[pjSel(PJ_VALA_SEL,tipo,PJ_VALA_TIPOS),...pjOc(0,0,0,0)]);
+// 2026-11-25: vala de perfuração (HDD) não tem Escoramento — só Escavação, Reaterro e Recomposição (Peças/Interligação/VRP seguem com o pjOc completo)
+const pjVala=(i,tipo)=>pjG('Vala '+i,[pjSel(PJ_VALA_SEL,tipo,PJ_VALA_TIPOS),...pjOc(0,0,0,0).filter(n=>n.n!=='Escoramento')]);
 const pjValas=(kids)=>({...pjG('Valas de perfuração',kids),rep:kids.length,min:1,ativo:true});
 const pjIsValaSel=n=>!!(n&&n.k==='sel'&&/^tipo \(entrada/i.test(n.n||''));
 // intervenções carregadas do banco por pjLoad() (app_proj_intervencoes + estado salvo + pipeline). Sem dados de exemplo:
@@ -3291,6 +3292,8 @@ async function pjLoad(force){
       } else if(/entrada/i.test(v.n||'')) v.n='Valas de perfuração';   // já replicável mas com nome antigo → só renomeia
       // 2026-11-13: tipo Intermediária + quantidade livre (mín. 1) — atualiza o seletor das valas já salvas (o valor escolhido fica)
       v.min=1; (v.f||[]).forEach(g=>(g.f||[]).forEach(c=>{ if(pjIsValaSel(c)){ c.n=PJ_VALA_SEL; c.opts=PJ_VALA_TIPOS.slice(); } }));
+      // 2026-11-25: Escoramento saiu das valas de perfuração (no banco: docs/migracao_hdd_valas_sem_escoramento.sql); só sai se não tiver avanço
+      const vv=iv.arv[vi]; (vv.f||[]).forEach(g=>{ if(g&&Array.isArray(g.f)) g.f=g.f.filter(c=>!(/^escoramento$/i.test((c&&c.n)||'')&&!pjHasAdv(c))); });
     }
   } });
   // pipeline (status/fase/ator/prazo de cada uma, calculado no banco) + modelo de etapas (1x por sessão)
