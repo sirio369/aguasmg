@@ -3214,6 +3214,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     ("‹ Resumo"). CSV `resumo_execucao_projetos.csv` com as mesmas colunas. Saíram Situação atual, Pipeline no período, filtro
     de ator, timeline por dia, por atividade e a chamada `app_proj_eventos`. Avanço legado de valas sem "Vala N" casa com a Vala 1.
     Card do hub renomeado "Resumo de execução".
+    **Cabeçalho compacto (2026-11-25, sw v464):** filtros numa barra única `.rsf` (segmentado `.rsseg` Hoje/7 dias/Este mês/Tudo,
+    De–até inline, consórcio, tipo; rodapé com o período resolvido `pjRsPerTxt` + checkbox) e KPIs em cartões `.rsk` (rótulo em
+    caixa alta, valor, linha de apoio; HDD/VCA com a borda na cor do tipo = `PJ_TIPO_COR`, já que as vars `--t-*` só existem em
+    `#projetos`). Os selects da barra zeram o `outline` global de `select` (a regra `input:focus, select` deixa todo select com contorno azul).
   - *(histórico)* `projeto_resumo` (`pjResumoEnter`→`pjResumo()`) — **resumo por período** p/ o gestor. Filtro de período
     (atalhos Hoje/7 dias/Este mês/Tudo + `de`/`até` custom) + consórcio + tipo. **KPIs** (nº avanços, intervenções
     com movimento, subatividades, metros executados), **timeline por dia**, **por intervenção** e **por atividade**,
