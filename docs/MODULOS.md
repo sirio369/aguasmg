@@ -2676,8 +2676,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
 - **🧭 Pendências (2026-11-20, sw v440, `docs/migracao_proj_pendencias.sql`):** card no bloco 🏗️ Obras do hub → tela
   **`projeto_pend`** (`pjPendInit`/`pjPendRender`, sem gate — todos consultam). Por intervenção, cada etapa das 5 fases com
   situação **✅ ok · ⏳ em andamento · ⭕ pendente · ➖ fora do escopo** (`pjPdSit`): fases 1/2/3/5 = itens do `proj_calc`
-  (doc enviado aguardando aprovação e aprovação aguardando = em andamento; em correção, reprovado e "aguarda o documento" =
-  pendente; `nao_aplica` = ok); fase 4 = etapas de topo da árvore (`pjPct`: 100% ok, >0 em andamento, 0 pendente).
+  (doc enviado aguardando aprovação e aprovação aguardando = em andamento; em correção e reprovado = pendente; `nao_aplica` = ok);
+  fase 4 = etapas de topo da árvore (`pjPct`: 100% ok, >0 em andamento, 0 pendente).
+  **⏸️ Aguardando etapa anterior (2026-11-25, sw v462, `pjPdEsp`):** as travas de fase saíram em 18/11, mas a tela lê o
+  pipeline **como se ainda fosse sequencial**, para não cobrar de uma área o que depende de outra. Vira `esp` (aguardando):
+  aprovação sem documento (ou com o documento reprovado) — quem deve é quem anexa; item de fase **acima** da alcançada
+  (`iv.pipe.fase`) que ninguém mexeu (não `acionavel` e não `enviado`); etapa da Execução com 0% enquanto o pipeline não
+  chegou na fase 4. `esp` **fica escondido por padrão** (só aparece em "Ver todas as etapas", esmaecido) e **não conta**:
+  fora dos gaps, dos KPIs, do "com pendência" e do filtro "pendência com"; o KPI mostra só "⏸️ N aguardando" (com dica);
+  na faixa das 5 fases, fase só com itens aguardando fica cinza. Legado (`pend_legado`) segue com o toggle de sempre.
   Card: faixa das 5 fases (ok/total, Execução em %), lista do que está em aberto por fase (ator, dias e faixa do prazo,
   motivo da reprovação), "Ver todas as etapas" e "Abrir intervenção ›" (`pjOpen(id,'projeto_pend')`, volta "‹ Pendências").
   Filtros (2026-11-25, sw v459): consórcio, tipo, **status com seleção múltipla** (dropdown `.msdd` escopado, `pjPdStWire`,
@@ -2823,8 +2830,10 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     da linha (`pjPontaPos`) p/ que, onde dois trechos se encontram, o F de um e o I do outro fiquem lado a lado; só
     aparecem com zoom ≥ 14 (`PJ_PONTA_ZOOM`, camada `pjMaps[ctx].ends`, `pjPontasZoom` no `zoomend`); passar o mouse no
     trecho ou numa ponta engrossa o trecho inteiro; legenda "Início/Fim do trecho" sob o mapa. **Popup + seleção (2026-11-25, sw v462):** tocar num trecho
-    (ou numa ponta I/F) ou num ponto não abre mais a intervenção direto: abre um popup (`pjMapSel`) com tipo, local, código,
-    status, % de execução, extensão/DN/DMC e 2 botões — **🧭 Navegar** (Google Maps até o **início do trecho**, ou até o ponto)
+    (ou numa ponta I/F) ou num ponto não abre mais a intervenção direto: abre um popup (`pjMapSel`) com tipo, local, status,
+    barra de **% executado** e tabela: **código da folha** (`codigo_do_documento`), **ID** (`id` da intervenção, ex.
+    CON-08-AL-13-F09 → `iv.ref`), fase atual do pipeline, **com quem está** (atores de `pipe.atores` e nº de itens), extensão,
+    DN/material, DMC, responsável e consórcio (linhas vazias somem) — e 2 botões — **🧭 Navegar** (Google Maps até o **início do trecho**, ou até o ponto)
     e **Abrir trecho ›** (`E.open`, igual ao clique antigo). O selecionado ganha **destaque** (halo branco com contorno escuro
     por baixo + linha mais grossa; no ponto, anel) até o popup fechar (`popupclose` → `pjMapDesel`; `M.pop` é gravado antes do
     `openOn` para o fechamento do popup anterior não apagar o destaque novo; o botão é ligado pelo `getElement()` do próprio popup). O sentido é o da

@@ -176,7 +176,12 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjleg i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .pjponta{background:none;border:0}
 .pjpop{min-width:190px;font-size:12.5px;line-height:1.4} .pjpop .tp{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--mut)}
-.pjpop h4{margin:2px 0 1px;font-size:14px} .pjpop .cd{font-family:ui-monospace,monospace;font-size:11px;color:var(--mut)}
+.pjpop h4{margin:2px 0 3px;font-size:14px}
+.pjpop .stl{display:flex;align-items:center;gap:6px;font-weight:600} .pjpop .stl span{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.pjpop .pc{display:flex;align-items:center;gap:6px;margin:6px 0 4px;color:var(--mut)} .pjpop .pc b{color:var(--ink)}
+.pjpop .pcb{flex:1;height:7px;border-radius:4px;background:#e4e9ef;overflow:hidden} .pjpop .pcb i{display:block;height:100%;background:var(--acc)}
+.pjpop table{width:100%;border-collapse:collapse;margin-top:2px} .pjpop th,.pjpop td{padding:3px 0;border-top:1px solid #eef1f4;vertical-align:top;text-align:left;font-size:12px}
+.pjpop th{color:var(--mut);font-weight:500;padding-right:10px;white-space:nowrap;width:1%} .pjpop td{color:var(--ink);word-break:break-word} .pjpop td.mono{font-family:ui-monospace,monospace;font-size:11.5px}
 .pjpop .bt{display:flex;gap:6px;margin-top:9px} .pjpop .bt a{flex:1;text-align:center;padding:7px 8px;border-radius:8px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--acc);color:var(--acc)}
 .pjpop .bt a.pri{background:var(--acc);color:#fff}
 .pjcount{font-size:12px;color:var(--mut);margin:2px 0 10px}
@@ -390,7 +395,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pdfases .pend b{color:var(--bad)} .pdfases .na{opacity:.5}
 .pdit{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;padding:5px 0;border-top:1px dashed var(--line);line-height:1.35}
 .pdit:first-child{border-top:0} .pdit .ic{flex:0 0 18px;text-align:center} .pdit .nm{flex:1;min-width:0} .pdit .mt{font-size:11px;color:var(--mut);white-space:nowrap}
-.pdit.fora{opacity:.55}
+.pdit.fora{opacity:.55} .pdit.esp{opacity:.6}
 .pdfh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--mut);margin:9px 0 2px}
 .pjregv.mut{color:var(--mut);font-style:italic}
 .pjtype{color:var(--mut);font-weight:600}
@@ -3233,14 +3238,14 @@ async function pjLoad(force){
   const ivs=[];
   pts.forEach(f=>{ const p=f.properties,[lo,la]=f.geometry.coordinates,tp=pjMapTipo(p.tipo,false);
     const _vm=String(p.projeto||p.id||'').match(/VRP-?(\d+)/i);   // nº da VRP (ex.: "VRP-29" → "29") p/ deep-link no visor 3D
-    ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),
+    ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),ref:p.id||null,
       local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,vrp:_vm?_vm[1]:null,
       ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
   lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
     // diferencia HDD × VCA pela coluna `tipo` (fallback: nome do layer_dwg). HDD = perfuração direcional; resto = VCA (vala a céu aberto)
     const tp=/HDD/i.test(String(p.tipo||'')+' '+String(p.layer_dwg||''))?'rede_hdd':'rede_vca';
-    ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:tp,cod:p.codigo||p.layer_dwg||('#'+p.gid),
+    ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:tp,cod:p.codigo||p.layer_dwg||('#'+p.gid),ref:p.id||null,
       local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
       resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,ext:p.extensao_m,tubulacao:p.tubulacao,
       lls,arv:(PJ_ARV[tp]||PJ_ARV.rede_vca)(p.extensao_m)}); });
@@ -3439,19 +3444,30 @@ function pjPontasZoom(M){ const on=M.map.getZoom()>=PJ_PONTA_ZOOM; if(on&&!M.map
 // popup do mapa de intervenções: resumo + 🧭 Navegar (Google Maps) + Abrir trecho; o selecionado ganha destaque (halo) até fechar
 function pjMapSel(M,iv,E,ll,dest,real){ const map=M.map; pjMapDesel(M);
   const st=PJ_PST[pjPipeStatus(iv)]||PJ_PST.configuracao, t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
-  const lin=!!iv.lls, info=[lin&&iv.ext?(+iv.ext).toLocaleString('pt-BR',{maximumFractionDigits:1})+' m':'',iv.dn?'DN '+esc(iv.dn):'',iv.dmc?'DMC '+esc(iv.dmc):''].filter(Boolean).join(' · ');
+  const lin=!!iv.lls, pp=iv.pipe||{}, pct=Math.round(pjIvPct(iv)), fz=+pp.fase||1;
   const nav='https://www.google.com/maps/dir/?api=1&destination='+(+dest[0]).toFixed(6)+','+(+dest[1]).toFixed(6);
-  const html=`<div class="pjpop"><div class="tp">${esc(t.n)}</div><h4>${esc(iv.local)}</h4><div class="cd">${esc(iv.cod)} · ${esc(iv.cons||'')}</div>
-    <div style="margin-top:5px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st[2]};margin-right:5px"></span>${esc(st[0])} · ${Math.round(pjIvPct(iv))}% execução</div>
-    ${info?`<div style="color:var(--mut);margin-top:2px">${info}</div>`:''}
+  const com=Object.keys(pp.atores||{}).filter(k=>PJ_ATOR[k]&&(pp.atores[k].n||0)>0).map(k=>PJ_ATOR[k][0]+' '+PJ_ATOR[k][1]+' ('+pp.atores[k].n+')').join(' · ');
+  const rows=[['Código da folha',iv.cod&&!/^#/.test(iv.cod)?iv.cod:'—',1],
+    ['ID',iv.ref&&iv.ref!==iv.cod?iv.ref:null,1],
+    ['Fase',pp.concluida?'Concluída':fz+' · '+(PJ_FASE_N[fz]||'—')],
+    ['Com quem está',com||null],
+    [lin?'Extensão':null,lin&&iv.ext?(+iv.ext).toLocaleString('pt-BR',{maximumFractionDigits:1})+' m':null],
+    ['DN / material',[iv.dn?'DN '+iv.dn:'',iv.tubulacao||''].filter(Boolean).join(' · ')||null],
+    ['DMC',iv.dmc||null],['Responsável',iv.resp&&iv.resp!=='—'?iv.resp:null],['Consórcio',iv.cons||null]]
+    .filter(r=>r[0]&&r[1]!=null&&r[1]!=='').map(r=>`<tr><th>${r[0]}</th><td${r[2]?' class="mono"':''}>${esc(r[1])}</td></tr>`).join('');
+  const html=`<div class="pjpop"><div class="tp">${esc(t.n)}</div><h4>${esc(iv.local)}</h4>
+    <div class="stl"><span style="background:${st[2]}"></span>${esc(st[0])}</div>
+    <div class="pc"><div class="pcb"><i style="width:${Math.max(0,Math.min(100,pct))}%"></i></div><b>${pct}%</b> executado</div>
+    <table>${rows}</table>
     <div class="bt"><a href="${nav}" target="_blank" rel="noopener" title="${lin?'Rota até o início do trecho (I)':'Rota até o local'}">🧭 Navegar</a><a class="pri" data-pjpopabre>${lin?'Abrir trecho ›':'Abrir ›'}</a></div></div>`;
   // destaque: halo branco largo + contorno escuro por baixo, linha mais grossa por cima
   if(lin){ M.hl=L.layerGroup([L.polyline(iv.lls,{color:'#102a43',weight:16,opacity:.55,interactive:false}),L.polyline(iv.lls,{color:'#fff',weight:12,opacity:1,interactive:false})]).addTo(map);
     real.setStyle({weight:8,opacity:1}); real.bringToFront(); }
   else { M.hl=L.circleMarker(iv.ll,{radius:14,color:'#102a43',weight:3,fillColor:'#fff',fillOpacity:.85,interactive:false}).addTo(map); real.setRadius(9); real.bringToFront(); }
   M.selId=iv.id; M.selLy=real; if(real.closeTooltip) real.closeTooltip();
-  M.pop=L.popup({maxWidth:280,autoPanPadding:[20,20]}).setLatLng(ll).setContent(html); M.pop.openOn(map);   // M.pop antes do openOn: o close do popup anterior não apaga este destaque
-  const pe=M.pop.getElement(), a=pe&&pe.querySelector('[data-pjpopabre]');   // do próprio popup (o anterior ainda pode estar sumindo no DOM) if(a) a.onclick=()=>{ map.closePopup(); E.open(iv.id); };
+  M.pop=L.popup({maxWidth:300,minWidth:230,autoPanPadding:[20,20]}).setLatLng(ll).setContent(html); M.pop.openOn(map);   // M.pop antes do openOn: o close do popup anterior não apaga este destaque
+  const pe=M.pop.getElement(), a=pe&&pe.querySelector('[data-pjpopabre]');   // do próprio popup (o anterior ainda pode estar sumindo no DOM)
+  if(a) a.onclick=()=>{ map.closePopup(); E.open(iv.id); };
 }
 function pjMapDesel(M){ M.pop=null; if(M.hl){ M.map.removeLayer(M.hl); M.hl=null; }
   if(M.selLy){ if(M.selLy.setRadius) M.selLy.setRadius(6); else M.selLy.setStyle({weight:5,opacity:.95}); }
@@ -3568,7 +3584,7 @@ function pjQualRender(d){ const b=$('#pjQual'); if(!b) return; const itens=d.ite
 let pjPdItens=null, pjPdGapOpen=true;
 // st = status selecionados (vazio = todos); abre = cards abertos à mão; fech = cards fechados à mão enquanto há gap escolhido
 const pjPdF={cons:'',tipo:'',st:new Set(),ator:'',q:'',etapa:'',leg:true,ver:{},abre:{},fech:{}};
-const PJ_PD_IC={ok:'✅',and:'⏳',pend:'⭕',fora:'➖'};
+const PJ_PD_IC={ok:'✅',and:'⏳',pend:'⭕',fora:'➖',esp:'⏸️'};
 const pjPdEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 async function pjPendInit(){ const b=$('#pjPend'); if(!b) return; b.innerHTML='<p class="sub">Carregando…</p>';
   await pjLoad(true);
@@ -3619,14 +3635,24 @@ function pjPdSit(it,its){
   return ['pend','pendente'];
 }
 // todas as etapas de uma intervenção (fases 1–5), na ordem do modelo
-function pjPdEtapas(iv){ const its=(pjPdItens&&pjPdItens[iv.kind+'|'+iv.gid])||[];
-  const out=its.filter(it=>+it.fase!==4).map(it=>{ const [c,t]=pjPdSit(it,its);
+// Ordem sequencial só NA LEITURA (as travas saíram em 2026-11-18): etapa em aberto que ainda depende de outra vira
+// "aguardando" (esp) — escondida por padrão e fora de gaps/KPIs/"Pendência com". pf = fase alcançada (proj_calc.fase; 6 = concluída).
+//  · aprovação sem documento (ou com o documento reprovado) → aguarda o documento (a pendência é de quem anexa);
+//  · etapa de fase ainda não alcançada → aguarda, salvo se alguém já mexeu nela (acionavel = aguardando aprovação/correção; ou enviado);
+//  · Execução (árvore) antes do pipeline chegar na fase 4 → aguarda, salvo o que já começou.
+function pjPdEsp(it,c,pf){ if(c!=='pend'&&c!=='and') return null;
+  if(it.natureza==='aprovacao'&&it.status!=='aguardando') return it.status==='reprovado'?'reprovado · aguarda o documento corrigido':'aguarda o documento';
+  if(+it.fase>pf&&!it.acionavel&&it.status!=='enviado') return 'aguarda '+PJ_FASE_N[+it.fase]+' (pipeline em '+(PJ_FASE_N[pf]||'—')+')';
+  return null; }
+function pjPdEtapas(iv){ const its=(pjPdItens&&pjPdItens[iv.kind+'|'+iv.gid])||[], pf=+((iv.pipe||{}).fase)||1;
+  const out=its.filter(it=>+it.fase!==4).map(it=>{ let [c,t]=pjPdSit(it,its); const w=pjPdEsp(it,c,pf); if(w){ c='esp'; t=w; }
     return {fase:+it.fase,ordem:+it.ordem||0,nome:it.nome,ator:it.ator,c,t,dias:it.acionavel?it.dias:null,faixa:it.acionavel?it.faixa:null,
       leg:!!it.pend_legado,com:(it.status==='correcao'||it.status==='reprovado')?it.comentario:null}; });
   (iv.arv||[]).forEach((n,i)=>{ if(!n) return; const m=PJ_MODELO.find(x=>x.tipo===iv.ptipo&&x.chave===n.c), ord=m?+m.ordem:300+i;
     if(n.ativo===false){ out.push({fase:4,ordem:ord,nome:n.n,ator:'obra',c:'fora',t:'fora do escopo'}); return; }
     const p=pjPct(n); if(p==null) return;
-    out.push({fase:4,ordem:ord,nome:n.n,ator:'obra',c:p>=100?'ok':(p>0?'and':'pend'),t:p>=100?'executada (100%)':(p>0?p+'% executado':'não iniciada')}); });
+    const esp=p<=0&&pf<4;   // não iniciada e o pipeline ainda não chegou na Execução
+    out.push({fase:4,ordem:ord,nome:n.n,ator:'obra',c:p>=100?'ok':(p>0?'and':(esp?'esp':'pend')),t:p>=100?'executada (100%)':(p>0?p+'% executado':(esp?'aguarda Execução (pipeline em '+(PJ_FASE_N[pf]||'—')+')':'não iniciada'))}); });
   return out.sort((a,b)=>a.fase-b.fase||a.ordem-b.ordem);
 }
 function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=F.q.trim().toLowerCase();
@@ -3637,7 +3663,7 @@ function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=
     .map(iv=>{ let e=pjPdEtapas(iv); if(!F.leg) e=e.filter(x=>!x.leg); return {iv,e}; });
   let vis=F.ator?rows.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))):rows;
   // gaps: etapa × fase com quantas intervenções estão ok / em andamento / pendentes (antes do filtro de etapa)
-  const gap={}; vis.forEach(r=>r.e.forEach(x=>{ if(x.c==='fora'||!naFase(x)) return; const k=x.fase+'|'+x.nome;
+  const gap={}; vis.forEach(r=>r.e.forEach(x=>{ if(x.c==='fora'||x.c==='esp'||!naFase(x)) return; const k=x.fase+'|'+x.nome;
     const g=gap[k]=gap[k]||{k,fase:x.fase,nome:x.nome,ordem:x.ordem,ok:0,and:0,pend:0}; g[x.c]++; if(x.ordem<g.ordem) g.ordem=x.ordem; }));
   // ordem do pipeline (fase → ordem da etapa no modelo), igual à lista de cada intervenção
   const gaps=Object.values(gap).filter(g=>g.and+g.pend>0).sort((a,c)=>a.fase-c.fase||a.ordem-c.ordem||String(a.nome).localeCompare(String(c.nome),'pt-BR'));
@@ -3646,9 +3672,10 @@ function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=
   const nAb=r=>r.e.filter(aberta).length, byCod=(a,c)=>String(a.iv.cod).localeCompare(String(c.iv.cod),'pt-BR',{numeric:true});
   vis.sort((a,c)=>(((a.iv.pipe||{}).fase||1)-((c.iv.pipe||{}).fase||1))||nAb(c)-nAb(a)||byCod(a,c));   // sempre pela fase do pipeline
   // KPIs (etapas no escopo das intervenções visíveis)
-  const all=[].concat(...vis.map(r=>r.e.filter(x=>x.c!=='fora'&&naFase(x)))), cnt=c=>all.filter(x=>x.c===c).length;
+  const all=[].concat(...vis.map(r=>r.e.filter(x=>x.c!=='fora'&&x.c!=='esp'&&naFase(x)))), cnt=c=>all.filter(x=>x.c===c).length;
+  const nEsp=[].concat(...vis.map(r=>r.e.filter(x=>x.c==='esp'&&naFase(x)))).length;
   const tot=all.length, pc=n=>tot?Math.round(n/tot*100):0, comPend=vis.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))).length;
-  const kpi=`<div class="pdkpi"><div><b>${vis.length}</b><span>intervenções · ${comPend} com pendência</span></div>
+  const kpi=`<div class="pdkpi"><div><b>${vis.length}</b><span>intervenções · ${comPend} com pendência${nEsp?` · <span title="Etapas que dependem de outra antes (ordem do pipeline). Não contam como pendência; aparecem em Ver todas as etapas.">⏸️ ${nEsp} aguardando</span>`:''}</span></div>
     <div class="ok"><b>${cnt('ok')}</b><span>etapas ok (${pc(cnt('ok'))}%)</span></div>
     <div class="and"><b>${cnt('and')}</b><span>em andamento (${pc(cnt('and'))}%)</span></div>
     <div class="pend"><b>${cnt('pend')}</b><span>pendentes (${pc(cnt('pend'))}%)</span></div></div>`;
@@ -3661,9 +3688,10 @@ function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=
   const porFase=xs=>[1,2,3,4,5].map(f=>{ const ys=xs.filter(x=>x.fase===f); return ys.length?`<div class="pdfh">${f} · ${PJ_FASE_N[f]}</div>`+ys.map(itRow).join(''):''; }).join('');
   const card=r=>{ const iv=r.iv, t=PJ_TIPOS[iv.tipo]||{n:iv.tipo,c:'var(--acc)'}, [sl,sc]=PJ_PST[pjPipeStatus(iv)]||PJ_PST.configuracao, ver=!!F.ver[iv.id];
     const fs=[1,2,3,4,5].map(f=>{ const xs=r.e.filter(x=>x.fase===f&&x.c!=='fora'), ok=xs.filter(x=>x.c==='ok').length, an=xs.filter(x=>x.c==='and').length;
-      const cl=!xs.length?'na':(ok===xs.length?'ok':(ok||an?'and':'pend'));
+      const ab=xs.filter(aberta).length, es=xs.filter(x=>x.c==='esp').length;
+      const cl=!xs.length?'na':(ok===xs.length?'ok':(!ab?'na':(ok||an?'and':'pend')));   // só aguardando → cinza
       const v=!xs.length?'—':(f===4?Math.round(pjIvPct(iv))+'%':ok+'/'+xs.length);
-      return `<div class="${cl}" title="${PJ_FASE_N[f]}: ${ok} de ${xs.length} etapa(s) ok${an?', '+an+' em andamento':''}"><b>${v}</b>${PJ_FASE_N[f]}</div>`; }).join('');
+      return `<div class="${cl}" title="${PJ_FASE_N[f]}: ${ok} de ${xs.length} etapa(s) ok${an?', '+an+' em andamento':''}${es?', '+es+' aguardando etapa anterior':''}"><b>${v}</b>${PJ_FASE_N[f]}</div>`; }).join('');
     // lista: gap escolhido → só aquela etapa; senão o que falta (ou tudo, em "Ver todas"); sempre só do ator do filtro
     const lista=(F.etapa&&!ver)?r.e.filter(x=>x.fase+'|'+x.nome===F.etapa):(ver?r.e:r.e.filter(aberta)).filter(naFase);
     const abre=F.etapa?!F.fech[iv.id]:!!F.abre[iv.id], nLis=lista.filter(x=>x.c!=='fora').length;
