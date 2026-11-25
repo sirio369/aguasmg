@@ -6470,6 +6470,9 @@ document.querySelectorAll('#ocorrencia .ocF').forEach(fi=>fi.addEventListener('c
 // ---------- MÓDULO VRP (levantamento de visita) ----------
 let vrpData=[], vrpFiltro='todos', vrpCons='todos', vrpView='lista', vrpMap=null, vrpMarkers=null;
 let vrpAtual=null, vrpAns={}, vrpFotos={}, vrpUltima=null, vrpEnviando=false, vrpDestaque=null, vrpBuscaTermo='';
+// Identificador exibido (2026-11-25): label = cd_no_agua; num_vrp vira nome secundário (vrpSub).
+function vrpIdLabel(arr){ (arr||[]).forEach(p=>{ if(p.cd_no_agua) p.label=p.cd_no_agua; }); return arr; }
+function vrpSub(p){ return (p&&p.cd_no_agua&&p.num_vrp)?p.num_vrp:''; }
 function vrpMatchT(p){ if(!vrpBuscaTermo) return true; const t=vrpBuscaTermo; return _matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t); }
 let vrpJoao=false;
 const VRP_JOAO=new Set(['VRP1435553','VRP1435554','VRP1435620','VRP1435621','VRP1435713','VRP1435714','VRP1250061','VRP1249818','VRP1249902','VRP1249682','VRP1249915','VRP1250062','VRP1250178','VRP1540126','VRP0546055','VRP0730336','VRP0730339','VRP1441995','VRP1556344','VRP0750521','VRP0001320','VRP0557308','VRP1630541','VRP0001182','VRP0575937','VRP0664054','VRP0659572','VRP0687309','VRP0000559','VRP0677817','VRP1120207','VRP1477147','VRP1526918','VRP1526919','VRP1527217','VRP1609102','VRP1634678','VRP0685753','VRP1504637','VRP1484842','VRP1520806','VRP0807757','VRP0748987','VRP0748988','VRP1520807','VRP0692467','VRP0670140','VRP0724520','VRP0749048','VRP0749049','VRP1189226','VRP1189227','VRP1428582','VRP1428583','VRP1489653','VRP1612979','VRP1612980']);
@@ -6526,8 +6529,8 @@ async function vrpCarregar(){
   vrpBuscaReset(); vrpXlsGate();
   $('#vrpLista').innerHTML='<p style="color:var(--mut);font-size:14px">Carregando…</p>';
   try{ const {data,error}=await sb.rpc('app_vrp_listar'); if(error)throw error;
-    vrpData=data||[]; localStorage.setItem('vrp_cache',JSON.stringify(vrpData));
-  }catch(e){ const c=localStorage.getItem('vrp_cache'); vrpData=c?JSON.parse(c):[];
+    vrpData=vrpIdLabel(data||[]); localStorage.setItem('vrp_cache',JSON.stringify(vrpData));
+  }catch(e){ const c=localStorage.getItem('vrp_cache'); vrpData=vrpIdLabel(c?JSON.parse(c):[]);
     if(!vrpData.length){ $('#vrpLista').innerHTML='<p style="color:var(--bad);font-size:14px">Sem conexão e sem dados salvos.</p>'; return; }
   }
   vrpRenderFiltros(); vrpRenderCons(); vrpRenderJoao(); vrpAtualizar();
@@ -6567,7 +6570,7 @@ function vrpRenderLista(){
     const s=VRP_SIT[p.situacao]||{lbl:p.situacao,bg:'--line',fg:'--mut'};
     const cUf=p.consorcio==='ZA1004'?'Contagem':(p.consorcio==='ZA0200'?'Betim':'');
     const sub=[cUf,p.diametro?('DN '+p.diametro):'',distTxt(distKm(p.lat,p.lon))].filter(Boolean).join(' · ');
-    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${vEsc(p.label)||('#'+p.id)}${p.cd_no_agua?` <span style="font-weight:400;color:var(--mut)">· nó ${vEsc(p.cd_no_agua)}</span>`:''}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span>${p.lat?`<button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button>`:''}</div>`;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0;cursor:pointer" data-open="${p.id}"><div style="font-size:14px;font-weight:600">${vEsc(p.label)||('#'+p.id)}${vrpSub(p)?` <span style="font-weight:400;color:var(--mut)">· ${vEsc(vrpSub(p))}</span>`:''}</div><div style="font-size:12px;color:var(--mut)">${sub||'—'}</div></div><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(${s.bg});color:var(${s.fg})">${s.lbl}</span>${p.lat?`<button data-nav="${p.lat},${p.lon}" style="all:unset;cursor:pointer;font-size:18px">🧭</button>`:''}</div>`;
   }).join('');
   $('#vrpLista').querySelectorAll('[data-open]').forEach(el=>el.addEventListener('click',()=>vrpAbrir(+el.dataset.open)));
   $('#vrpLista').querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();window.open('https://www.google.com/maps/dir/?api=1&destination='+el.dataset.nav,'_blank');}));
@@ -6581,7 +6584,7 @@ function vrpRenderMapa(){
   const arr=vrpData.filter(p=>(vrpFiltro==='todos'||p.situacao===vrpFiltro)&&vrpMatchC(p)&&vrpMatchT(p)&&vrpMatchJ(p)&&p.lat&&p.lon);
   const pts=[];
   arr.forEach(p=>{ const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:1.5,fillColor:VRP_COR[p.situacao]||'#888',fillOpacity:1});
-    m.on('click',()=>vrpAbrir(p.id)); m.bindTooltip((p.label||('#'+p.id))+(p.cd_no_agua?(' · nó '+p.cd_no_agua):'')+' · '+((VRP_SIT[p.situacao]||{}).lbl||''));
+    m.on('click',()=>vrpAbrir(p.id)); m.bindTooltip((p.label||('#'+p.id))+(vrpSub(p)?(' · '+vrpSub(p)):'')+' · '+((VRP_SIT[p.situacao]||{}).lbl||''));
     vrpMarkers.addLayer(m); pts.push([p.lat,p.lon]); });
   if(gps){ vrpMarkers.addLayer(L.circleMarker([gps.lat,gps.lon],{radius:6,color:'#0e639c',weight:2,fillColor:'#3a9bde',fillOpacity:.9}).bindTooltip('Você')); pts.push([gps.lat,gps.lon]); }
   if(pts.length) vrpMap.fitBounds(pts,{padding:[28,28],maxZoom:16}); else vrpMap.setView([-19.93,-44.05],12);
@@ -6618,7 +6621,7 @@ function vrpRelHtml(p,u){
   const coord=(p.lat!=null&&p.lon!=null)?(Number(p.lat).toFixed(6)+', '+Number(p.lon).toFixed(6)):'—';
   let h='<div class="relTop"><div><h1>Relatório de Visita · VRP</h1><div class="sub">'+vrpConsLbl(p.consorcio)+'</div></div><div class="relBadge">'+s.lbl+'</div></div>';
   h+='<div class="relBody">';
-  h+='<div class="relGrid">'+relField('VRP',p.label)+relField('Código do nó',p.cd_no_agua||'—')+relField('Diâmetro (cadastro)',p.diametro?('DN '+p.diametro):'—')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
+  h+='<div class="relGrid">'+relField('VRP',p.label)+relField('Nome',p.num_vrp||'—')+relField('Diâmetro (cadastro)',p.diametro?('DN '+p.diametro):'—')+relField('Emitido em',relFmtData(new Date().toISOString()))+'</div>';
   h+='<div class="relGrid">'+relField('Situação',s.lbl)+relField('Visitado por',u.visitado_por||'—')+relField('Visitado em',relFmtData(u.visitado_em))+relField('Coordenada',coord)+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span> Levantamento</div>';
   const pairs=vrpRespPairs(u);
@@ -6647,10 +6650,10 @@ async function vrpExportarXlsx(){
     await Promise.all(Array.from({length:6},worker));
     const extras=VRP_XLS_EXTRA.filter(([k])=>arr.some(p=>p[k]!=null&&p[k]!==''));
     const perg=VRP_FORM.filter(f=>f.t!=='foto');
-    const aoa=[['Consórcio','VRP','Código do nó','Diâmetro (cadastro)',...extras.map(e=>e[1]),'Observação (cadastro)','Latitude','Longitude',
+    const aoa=[['Consórcio','VRP (nó)','Nome','Diâmetro (cadastro)',...extras.map(e=>e[1]),'Observação (cadastro)','Latitude','Longitude',
       'Situação','Vistoriado por','Data da vistoria',...perg.map(f=>f.q),'Fotos (qtd)']];
     arr.forEach(p=>{ const u=vis[p.id]||{}, r=u.respostas||{}, fo=u.fotos||{}, quando=u.visitado_em||p.visitado_em;
-      aoa.push([vrpConsLbl(p.consorcio), p.label||p.num_vrp||'', p.cd_no_agua||'', p.diametro??'', ...extras.map(([k])=>p[k]??''),
+      aoa.push([vrpConsLbl(p.consorcio), p.cd_no_agua||p.num_vrp||'', p.num_vrp||'', p.diametro??'', ...extras.map(([k])=>p[k]??''),
         p.observacao||'', p.lat??'', p.lon??'', (VRP_SIT[p.situacao]||{}).lbl||p.situacao||'', u.visitado_por||p.visitado_por||'',
         quando?new Date(quando).toLocaleString('pt-BR'):'', ...perg.map(f=>r[f.k]??''), VRP_FOTO_KEYS.filter(k=>fo[k]).length||'']); });
     await exportarXlsx('vrps_cadastro_'+new Date().toISOString().slice(0,10)+'.xlsx','VRPs',aoa);
@@ -6734,7 +6737,7 @@ function vrpBuscar(){
   const arr=vrpData.filter(p=>_matNorm(p.label).includes(t)||_matNorm(p.num_vrp||'').includes(t)||_matNorm(p.cd_no_agua||'').includes(t)).slice(0,15);
   if(!arr.length){ box.textContent='Nada encontrado.'; return; }
   box.innerHTML=arr.map(p=>{ const cUf=p.consorcio==='ZA1004'?'Contagem':(p.consorcio==='ZA0200'?'Betim':''); const s=VRP_SIT[p.situacao]||{lbl:p.situacao};
-    return `<div class="vrpres" data-id="${p.id}" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--line)"><b>${vEsc(p.label)}</b> <span class="sub">· ${[cUf,p.cd_no_agua,s.lbl].filter(Boolean).join(' · ')}</span></div>`; }).join('');
+    return `<div class="vrpres" data-id="${p.id}" style="cursor:pointer;padding:8px 6px;border-bottom:1px solid var(--line)"><b>${vEsc(p.label)}</b> <span class="sub">· ${[cUf,vrpSub(p),s.lbl].filter(Boolean).join(' · ')}</span></div>`; }).join('');
   box.querySelectorAll('.vrpres').forEach(el=>el.addEventListener('click',()=>{ const p=vrpData.find(x=>x.id===+el.dataset.id); if(p) vrpIrPara(p); }));
 }
 function vrpIrPara(p){
@@ -6744,7 +6747,7 @@ function vrpIrPara(p){
     if(vrpDestaque){ try{ vrpMarkers.removeLayer(vrpDestaque); }catch(e){} }
     vrpDestaque=L.circleMarker([p.lat,p.lon],{radius:11,color:'#ff6d00',weight:3,fillColor:'#ff9800',fillOpacity:.5}).addTo(vrpMarkers);
     const s=VRP_SIT[p.situacao]||{lbl:p.situacao};
-    vrpDestaque.bindPopup(`<b>${vEsc(p.label)}</b><br>${p.cd_no_agua?('nó '+vEsc(p.cd_no_agua)+'<br>'):''}${s.lbl}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vrpAbrirPop" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher visita</a>`).openPopup();
+    vrpDestaque.bindPopup(`<b>${vEsc(p.label)}</b><br>${vrpSub(p)?(vEsc(vrpSub(p))+'<br>'):''}${s.lbl}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" style="color:var(--acc);font-weight:600">🧭 Navegar</a><br><a class="vrpAbrirPop" style="color:var(--acc);font-weight:600;cursor:pointer">📋 Preencher visita</a>`).openPopup();
     vrpDestaque.on('popupopen',()=>{ const el=document.querySelector('.vrpAbrirPop'); if(el) el.addEventListener('click',()=>vrpAbrir(p.id)); });
   },140);
 }
@@ -7717,6 +7720,8 @@ function vmCfgRender(){
 }
 
 // ---------- CADASTRO TÉCNICO ----------
+// VRP no Cadastro técnico (2026-11-25): título do popup = cd_no_agua (código do nó COPASA); num_vrp segue nos campos.
+function cadVrpTit(p){ p=p||{}; const id=p.cd_no_agua||p.num_vrp; return id?('<div style="font-weight:700;font-size:14px;margin-bottom:3px">'+vEsc(/^\s*VRP/i.test(id)?String(id).trim():'VRP '+id)+'</div>'):''; }
 let cadMap=null, cadCamadas={}, cadOn={limite_za:true,reservatorio:true,booster_bomba:true,elevatoria:true,poco:true,macromedicao:true,vrps:true,valvulas_manobra:false,hidrantes:true,rede:false,ligacoes:false,rede_gas:false}, cadCarregando=false;
 let cadRendered={}, cadMem={}, cadDeb=null;   // cache: área já renderizada por camada / geojson em memória / timer de debounce
 let cadVoce=null;                             // marcador da posição do usuário (GPS)
@@ -7795,7 +7800,7 @@ async function cadAtualizar(){
         onEachFeature:function(f,ly){var p=f.properties||{};var ll=ly.getLatLng?ly.getLatLng():(ly.getBounds?ly.getBounds().getCenter():null);var info=Object.keys(p).map(function(k){return '<b>'+k+':</b> '+(p[k]==null?'—':p[k]);}).join('<br>');var nav=ll?('<br><a href="https://www.google.com/maps/dir/?api=1&destination='+ll.lat+','+ll.lng+'" target="_blank" style="display:inline-block;margin-top:5px;color:var(--acc);font-weight:600">🧭 Navegar</a>'):'';
           // rede: botão de isolamento — usa o ponto tocado p/ escolher o lado quando há válvula no meio do trecho
           var iso=(d.k==='rede'&&p.trecho!=null)?'<br><button type="button" class="isoBtn" style="all:unset;cursor:pointer;margin-top:7px;background:var(--bad);color:#fff;padding:6px 11px;border-radius:8px;font-weight:600;font-size:13px">🚱 Isolar este trecho</button>':'';
-          ly.bindPopup(info+nav+iso);
+          ly.bindPopup((d.k==='vrps'?cadVrpTit(p):'')+info+nav+iso);
           if(iso){var clk=null; ly.on('click',function(e){clk=e.latlng;});
             ly.on('popupopen',function(e){var b=e.popup.getElement().querySelector('.isoBtn'); if(b)b.onclick=function(){cadMap.closePopup(); isoRodar(p.trecho, clk, []);};});}
         }
@@ -7841,7 +7846,7 @@ function cadIrPara(x,layer){
   const tr=layer==='rede'?(props.nu_trecho!=null?props.nu_trecho:props.trecho):null;   // busca "Rede · trecho" → mesmo botão do popup da camada
   const iso=tr!=null?'<br><button type="button" class="isoBtn" style="all:unset;cursor:pointer;margin-top:7px;background:var(--bad);color:#fff;padding:6px 11px;border-radius:8px;font-weight:600;font-size:13px">🚱 Isolar este trecho</button>':'';
   if(iso) cadDestaque.on('popupopen',function(e){var b=e.popup.getElement().querySelector('.isoBtn'); if(b)b.onclick=function(){cadMap.closePopup(); isoRodar(tr, null, []);};});
-  cadDestaque.bindPopup((info?info+'<br>':'')+nav+iso).openPopup();
+  cadDestaque.bindPopup((layer==='vrps'?cadVrpTit(props):'')+(info?info+'<br>':'')+nav+iso).openPopup();
 }
 
 // ---- ISOLAMENTO DE TRECHO (vazamento → quais válvulas fechar) ----
@@ -9959,7 +9964,7 @@ function rdoDetLinha(o){
   if(o.cod!==undefined&&o.oss!==undefined) return o.cod+': '+o.oss;   // SIGOS: código do serviço → OS separadas por vírgula
   if(o.item!=null) return o.item+': '+rdoNum(o.valor)+(o.un==='%'?'%':(o.un?' '+o.un:''));
   if(o.logger!=null||o.etapa) return j(['Logger '+(o.logger||'—')+' '+(RDO_ETAPA[o.etapa]||o.etapa||''), o.zona?'zona '+o.zona:null]);
-  if(o.vrp!=null) return j(['VRP '+o.vrp, o.os?'OS '+o.os:null, o.st||o.sit, o.sigos?'SIGOS '+o.sigos:null]);
+  if(o.vrp!=null) return j([(/^\s*VRP/i.test(String(o.vrp))?String(o.vrp).trim():'VRP '+o.vrp), o.os?'OS '+o.os:null, o.st||o.sit, o.sigos?'SIGOS '+o.sigos:null]);
   if(o.os!=null&&(o.mat!==undefined||o.end!==undefined||o.srv!==undefined)) return j(['OS '+o.os, o.srv, o.mat!=null?'matrícula '+o.mat:null, o.end, o.eqp?'equipe '+o.eqp:null, o.res||o.st]);
   if(o.gc!==undefined||o.metodo!==undefined) return j(['Ensaio '+(o.res||'—'), o.metodo, o.gc!=null?'GC '+rdoNum(o.gc)+'%':null]);
   if(o.origem!==undefined||o.tipos!==undefined) return j([o.origem, o.tipos, o.os?'OS de origem '+o.os:null]);
