@@ -2822,7 +2822,12 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     ganha um círculo verde **"I"** no 1º vértice e um quadrado vermelho **"F"** no último (`pjPontaIcon`), ~11 px p/ dentro
     da linha (`pjPontaPos`) p/ que, onde dois trechos se encontram, o F de um e o I do outro fiquem lado a lado; só
     aparecem com zoom ≥ 14 (`PJ_PONTA_ZOOM`, camada `pjMaps[ctx].ends`, `pjPontasZoom` no `zoomend`); passar o mouse no
-    trecho ou numa ponta engrossa o trecho inteiro; legenda "Início/Fim do trecho" sob o mapa. O sentido é o da
+    trecho ou numa ponta engrossa o trecho inteiro; legenda "Início/Fim do trecho" sob o mapa. **Popup + seleção (2026-11-25, sw v462):** tocar num trecho
+    (ou numa ponta I/F) ou num ponto não abre mais a intervenção direto: abre um popup (`pjMapSel`) com tipo, local, código,
+    status, % de execução, extensão/DN/DMC e 2 botões — **🧭 Navegar** (Google Maps até o **início do trecho**, ou até o ponto)
+    e **Abrir trecho ›** (`E.open`, igual ao clique antigo). O selecionado ganha **destaque** (halo branco com contorno escuro
+    por baixo + linha mais grossa; no ponto, anel) até o popup fechar (`popupclose` → `pjMapDesel`; `M.pop` é gravado antes do
+    `openOn` para o fechamento do popup anterior não apagar o destaque novo; o botão é ligado pelo `getElement()` do próprio popup). O sentido é o da
     geometria em `"7 - setorizacao".intervencoes_lineares` (ordem dos vértices do projeto importado).
   - **Etapas (`pjEtapasHtml(iv,ctx)` + `pjWireEtapas`):** fases 1–5 em acordeão (`details.pjfase`, abre a fase atual); cada
     etapa mostra ator, situação (`pjEtapaSit`), relógio/faixa, selo "pendência do legado", info (arquivo + folha, link,

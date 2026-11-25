@@ -175,6 +175,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjleg span{display:inline-flex;align-items:center;gap:5px}
 .pjleg i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .pjponta{background:none;border:0}
+.pjpop{min-width:190px;font-size:12.5px;line-height:1.4} .pjpop .tp{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--mut)}
+.pjpop h4{margin:2px 0 1px;font-size:14px} .pjpop .cd{font-family:ui-monospace,monospace;font-size:11px;color:var(--mut)}
+.pjpop .bt{display:flex;gap:6px;margin-top:9px} .pjpop .bt a{flex:1;text-align:center;padding:7px 8px;border-radius:8px;font-weight:600;text-decoration:none;cursor:pointer;border:1px solid var(--acc);color:var(--acc)}
+.pjpop .bt a.pri{background:var(--acc);color:#fff}
 .pjcount{font-size:12px;color:var(--mut);margin:2px 0 10px}
 .pjcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--tc,var(--acc));border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .pjcard:active{transform:scale(.995)}
@@ -3432,11 +3436,32 @@ function pjPontaPos(map,lls,ini){ const pts=(ini?lls:lls.slice().reverse()).map(
   return L.latLng(ini?lls[0]:lls[lls.length-1]); }   // trecho mais curto que a folga: fica na própria ponta
 function pjPontasZoom(M){ const on=M.map.getZoom()>=PJ_PONTA_ZOOM; if(on&&!M.map.hasLayer(M.ends)) M.ends.addTo(M.map); else if(!on&&M.map.hasLayer(M.ends)) M.map.removeLayer(M.ends);
   if(on) M.ends.eachLayer(m=>{ if(m._pjLls) m.setLatLng(pjPontaPos(M.map,m._pjLls,m._pjIni)); }); }
+// popup do mapa de intervenções: resumo + 🧭 Navegar (Google Maps) + Abrir trecho; o selecionado ganha destaque (halo) até fechar
+function pjMapSel(M,iv,E,ll,dest,real){ const map=M.map; pjMapDesel(M);
+  const st=PJ_PST[pjPipeStatus(iv)]||PJ_PST.configuracao, t=PJ_TIPOS[iv.tipo]||{n:iv.tipo}, esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+  const lin=!!iv.lls, info=[lin&&iv.ext?(+iv.ext).toLocaleString('pt-BR',{maximumFractionDigits:1})+' m':'',iv.dn?'DN '+esc(iv.dn):'',iv.dmc?'DMC '+esc(iv.dmc):''].filter(Boolean).join(' · ');
+  const nav='https://www.google.com/maps/dir/?api=1&destination='+(+dest[0]).toFixed(6)+','+(+dest[1]).toFixed(6);
+  const html=`<div class="pjpop"><div class="tp">${esc(t.n)}</div><h4>${esc(iv.local)}</h4><div class="cd">${esc(iv.cod)} · ${esc(iv.cons||'')}</div>
+    <div style="margin-top:5px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st[2]};margin-right:5px"></span>${esc(st[0])} · ${Math.round(pjIvPct(iv))}% execução</div>
+    ${info?`<div style="color:var(--mut);margin-top:2px">${info}</div>`:''}
+    <div class="bt"><a href="${nav}" target="_blank" rel="noopener" title="${lin?'Rota até o início do trecho (I)':'Rota até o local'}">🧭 Navegar</a><a class="pri" data-pjpopabre>${lin?'Abrir trecho ›':'Abrir ›'}</a></div></div>`;
+  // destaque: halo branco largo + contorno escuro por baixo, linha mais grossa por cima
+  if(lin){ M.hl=L.layerGroup([L.polyline(iv.lls,{color:'#102a43',weight:16,opacity:.55,interactive:false}),L.polyline(iv.lls,{color:'#fff',weight:12,opacity:1,interactive:false})]).addTo(map);
+    real.setStyle({weight:8,opacity:1}); real.bringToFront(); }
+  else { M.hl=L.circleMarker(iv.ll,{radius:14,color:'#102a43',weight:3,fillColor:'#fff',fillOpacity:.85,interactive:false}).addTo(map); real.setRadius(9); real.bringToFront(); }
+  M.selId=iv.id; M.selLy=real; if(real.closeTooltip) real.closeTooltip();
+  M.pop=L.popup({maxWidth:280,autoPanPadding:[20,20]}).setLatLng(ll).setContent(html); M.pop.openOn(map);   // M.pop antes do openOn: o close do popup anterior não apaga este destaque
+  const pe=M.pop.getElement(), a=pe&&pe.querySelector('[data-pjpopabre]');   // do próprio popup (o anterior ainda pode estar sumindo no DOM) if(a) a.onclick=()=>{ map.closePopup(); E.open(iv.id); };
+}
+function pjMapDesel(M){ M.pop=null; if(M.hl){ M.map.removeLayer(M.hl); M.hl=null; }
+  if(M.selLy){ if(M.selLy.setRadius) M.selLy.setRadius(6); else M.selLy.setStyle({weight:5,opacity:.95}); }
+  M.selId=null; M.selLy=null; }
 function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   const el=$('#'+E.mapEl); if(!el||!window.L) return;
   let M=pjMaps[ctx];
-  if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map),ends:L.layerGroup()}; map.on('zoomend',()=>pjPontasZoom(M)); }
-  const map=M.map, layer=M.layer, ends=M.ends; layer.clearLayers(); ends.clearLayers();
+  if(!M){ el.innerHTML=''; const map=L.map(el); mapAddCamadaBase(map); map.setView([-19.94,-44.1],11); M=pjMaps[ctx]={map,layer:L.layerGroup().addTo(map),ends:L.layerGroup()}; map.on('zoomend',()=>pjPontasZoom(M));
+    map.on('popupclose',e=>{ if(e.popup===M.pop) pjMapDesel(M); }); }
+  const map=M.map, layer=M.layer, ends=M.ends; map.closePopup(); pjMapDesel(M); layer.clearLayers(); ends.clearLayers();
   // camada de DMCs (contexto, embaixo; respeita consórcio; o DMC filtrado fica destacado). NÃO entra no fitBounds
   (PJ_DMCS||[]).forEach(f=>{ const p=f.properties||{}, za=p.consorcio, cod=p.codigo; if(pjFcons && pjFcons!==za) return;
     const sel=pjFdmc && pjFdmc===cod;
@@ -3449,15 +3474,17 @@ function pjRenderMap(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx];
   const arr=PJ_IVS.filter(iv=>pjOk(iv,ctx)), bounds=[];
   arr.forEach(iv=>{ const st=PJ_PST[pjPipeStatus(iv)]||PJ_PST.configuracao, col=st[2], tip=iv.cod+' · '+PJ_TIPOS[iv.tipo].n+' · '+st[0];   // cor = status do pipeline
     if(iv.ll){ const m=L.circleMarker(iv.ll,{radius:6,color:'#fff',weight:2,fillColor:col,fillOpacity:1});
-      m.on('click',()=>E.open(iv.id)); m.bindTooltip(tip); m.addTo(layer); bounds.push(iv.ll); }
+      m.on('click',e=>{ L.DomEvent.stopPropagation(e); pjMapSel(M,iv,E,iv.ll,iv.ll,m); }); m.bindTooltip(tip); m.addTo(layer); bounds.push(iv.ll); }
     else if(iv.lls&&iv.lls.length){
       const pl=L.polyline(iv.lls,{color:col,weight:5,opacity:.95});
-      pl.on('click',()=>E.open(iv.id)); pl.bindTooltip(tip); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p));
+      // clique (na linha ou numa ponta I/F) → popup no ponto clicado; Navegar leva ao início do trecho
+      const sel=e=>{ L.DomEvent.stopPropagation(e); pjMapSel(M,iv,E,e.latlng,iv.lls[0],pl); };
+      pl.on('click',sel); pl.bindTooltip(tip); pl.addTo(layer); iv.lls.forEach(p=>bounds.push(p));
       // início (círculo verde "I") e fim (quadrado vermelho "F") de cada trecho; passar o mouse destaca o trecho inteiro
       const ini=iv.lls[0], fim=iv.lls[iv.lls.length-1], cod=String(iv.cod).replace(/[<>&"]/g,'');
-      const mi=L.marker(ini,{icon:pjPontaIcon('I'),keyboard:false,zIndexOffset:500}).bindTooltip('Início · '+cod).on('click',()=>E.open(iv.id)).addTo(ends);
-      const mf=L.marker(fim,{icon:pjPontaIcon('F'),keyboard:false,zIndexOffset:400}).bindTooltip('Fim · '+cod).on('click',()=>E.open(iv.id)).addTo(ends);
-      const on=()=>{ pl.setStyle({weight:9,opacity:1}); pl.bringToFront(); }, off=()=>pl.setStyle({weight:5,opacity:.95});
+      const mi=L.marker(ini,{icon:pjPontaIcon('I'),keyboard:false,zIndexOffset:500}).bindTooltip('Início · '+cod).on('click',sel).addTo(ends);
+      const mf=L.marker(fim,{icon:pjPontaIcon('F'),keyboard:false,zIndexOffset:400}).bindTooltip('Fim · '+cod).on('click',sel).addTo(ends);
+      const on=()=>{ pl.setStyle({weight:9,opacity:1}); pl.bringToFront(); }, off=()=>pl.setStyle(M.selId===iv.id?{weight:8,opacity:1}:{weight:5,opacity:.95});
       [pl,mi,mf].forEach(o=>o.on('mouseover',on).on('mouseout',off)); mi._pjLls=mf._pjLls=iv.lls; mi._pjIni=true; }
   });
   pjPontasZoom(M);
