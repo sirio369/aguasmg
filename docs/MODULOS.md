@@ -2681,7 +2681,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   Card: faixa das 5 fases (ok/total, Execução em %), lista do que está em aberto por fase (ator, dias e faixa do prazo,
   motivo da reprovação), "Ver todas as etapas" e "Abrir intervenção ›" (`pjOpen(id,'projeto_pend')`, volta "‹ Pendências").
   Filtros (2026-11-25, sw v459): consórcio, tipo, **status com seleção múltipla** (dropdown `.msdd` escopado, `pjPdStWire`,
-  `pjPdF.st` = Set; vazio = todos), **pendência com** (ator — filtra as intervenções, os gaps, os KPIs **e** a lista de cada
+  `pjPdF.st` = Set; vazio = todos; sw v461: o checkbox fica dentro de `.pjfilt`, então a regra `#projeto_pend .pjfilt .msdd-opt input` anula o flex/padding dos inputs da barra — sem ela o checkbox estica e o texto quebra centralizado), **pendência com** (ator — filtra as intervenções, os gaps, os KPIs **e** a lista de cada
   card: só etapas daquele ator), busca, contar legado (`pend_legado`). Saíram "Pendência em" (fase) e "Ordenar": a lista é
   **sempre pela fase do pipeline** (depois mais pendências, depois código). Cada card tem o botão **Ver/Esconder detalhes**
   (`.pdtog`, chevron) — fechado por padrão (`pjPdF.abre`), a faixa das 5 fases fica sempre visível. Painel **📉 Onde estão
