@@ -2918,6 +2918,15 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **HDD › Puxamento da tubulação: diâmetro + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** o lançamento do
+  puxamento (`pjIsPux` = intervenção `rede_hdd` + etapa com "puxamento" no nome) pede **Diâmetro da tubulação** (mm, só número — o
+  campo filtra letras; `> 0`) e **Rua** (texto livre), ambos obrigatórios no lançamento novo. A rua vem **preenchida com a última rua
+  lançada no puxamento da mesma intervenção** (`pjPuxRuaSug`, editável). Gravação: colunas novas `intervencao_avanco.diametro_mm`
+  (check `> 0`) / `rua` / `pux_editado_em` / `pux_editado_por`, pela RPC **`app_proj_avanco_pux_set(p_id,p_diametro_mm,p_rua)`**
+  (gate `proj_obras_pode`, recusa lançamento que não seja puxamento HDD) — chamada logo depois do `app_proj_avanco_registrar`
+  (assinatura deste não mudou). **Lançamentos antigos:** no histórico da etapa cada puxamento mostra `Ø … mm · 📍 rua` ou
+  "⚠️ Sem diâmetro e rua", com **✏️ Informar/Editar** (Obras) que grava pela mesma RPC. ⚠️ Se a 2ª chamada falhar o avanço fica
+  lançado sem diâmetro/rua (toast avisa; corrige pelo ✏️). Sem histórico de versões das edições (só quem/quando editou por último).
 - **Data de execução livre (2026-11-18, sw v422, `docs/migracao_proj_avanco_data_livre.sql`):** a pergunta virou **"Esse avanço foi
   realizado em outra data?"** — Sim abre um campo de **data e hora** (`datetime-local`, `max` = agora) e aceita **qualquer data**
   que não esteja no futuro (front e `app_proj_avanco_registrar`, tolerância de 5 min). O texto abaixo (só ontem) é o histórico.
