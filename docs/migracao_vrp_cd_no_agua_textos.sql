@@ -9,15 +9,15 @@ declare
   trocas jsonb := jsonb_build_array(
     jsonb_build_array('app_cadastro_buscar',
       $q$'VRP '||coalesce(t.num_vrp,'?')||coalesce(' · '||t.cd_no_agua,'')$q$,
-      $q$coalesce(public.fisc_vrp(t.cd_no_agua),public.fisc_vrp(t.num_vrp),'VRP ?')||coalesce(' · '||t.num_vrp,'')$q$),  -- fisc_vrp não duplica o prefixo "VRP"
+      $q$coalesce(nullif(btrim(t.cd_no_agua),''),public.fisc_vrp(t.num_vrp),'VRP ?')||coalesce(' · '||t.num_vrp,'')$q$),  -- cd_no_agua como está (145 começam com VRP, 3 com VRR)
     jsonb_build_array('app_vitrine_feed',
       $q$concat_ws(' · ', o.num_vrp,$q$, $q$concat_ws(' · ', coalesce(o.cd_no_agua, o.num_vrp),$q$),
     jsonb_build_array('app_vitrine_dados',
       $q$concat_ws(' · ', o.num_vrp,$q$, $q$concat_ws(' · ', coalesce(o.cd_no_agua, o.num_vrp),$q$),
     jsonb_build_array('fisc_execucoes',
-      $q$coalesce(public.fisc_vrp(o.num_vrp), 'VRP —')$q$, $q$coalesce(public.fisc_vrp(o.cd_no_agua), public.fisc_vrp(o.num_vrp), 'VRP —')$q$),
+      $q$coalesce(public.fisc_vrp(o.num_vrp), 'VRP —')$q$, $q$coalesce(nullif(btrim(o.cd_no_agua), ''), public.fisc_vrp(o.num_vrp), 'VRP —')$q$),
     jsonb_build_array('fisc_execucoes',
-      $q$coalesce(public.fisc_vrp(v.num_vrp), 'VRP —')$q$, $q$coalesce(public.fisc_vrp(v.cd_no_agua), public.fisc_vrp(v.num_vrp), 'VRP —')$q$),
+      $q$coalesce(public.fisc_vrp(v.num_vrp), 'VRP —')$q$, $q$coalesce(nullif(btrim(v.cd_no_agua), ''), public.fisc_vrp(v.num_vrp), 'VRP —')$q$),
     jsonb_build_array('rdo_eventos',
       $q$string_agg(distinct case when o.num_vrp ~* 'VRP' then o.num_vrp else 'VRP ' || o.num_vrp end, ', ')$q$,
       $q$string_agg(distinct coalesce(o.cd_no_agua, case when o.num_vrp ~* 'VRP' then o.num_vrp else 'VRP ' || o.num_vrp end), ', ')$q$),

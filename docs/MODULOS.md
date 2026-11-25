@@ -3279,8 +3279,9 @@ admissão/desligamento voltam a ser pela planilha de usuários (`Usuarios_AcquaH
 > Visita primária (§2.4, `vrpIdLabel`/`vrpSub`), Cadastro técnico (título do popup `cadVrpTit` + rótulo da busca em
 > `app_cadastro_buscar`), Consolidador (`fisc_execucoes.descricao`; o campo `local` segue com o `num_vrp`), RDO (`rdo_eventos`:
 > lista de OS e detalhe `vrp`) e Vitrine (`app_vitrine_feed`/`_dados`) — sempre `cd_no_agua` com fallback no `num_vrp`.
-> Dias já validados (`fisc_dia`) e RDOs fechados guardam o texto antigo. ⚠️ O `cd_no_agua` já começa com "VRP": não
-> prefixe "VRP " de novo (use `fisc_vrp()` no banco; no front, teste `/^\s*VRP/i`).
+> Os dias validados do Consolidador que só mudaram pelo nome foram revalidados no banco (§21.6). ⚠️ O `cd_no_agua` é
+> exibido **como está**, sem prefixar "VRP ": 145 começam com `VRP`, mas 3 com `VRR` (`VRR0000892`, `VRR0000870`, `VRR1520211`).
+> Use `coalesce(nullif(btrim(cd_no_agua),''), fisc_vrp(num_vrp))` no banco.
 
 > **Reorg 2026-10:** o card da home virou **"VRPs – Campo"** e o hub `vrpman` (`vmHub`) ficou **só com 🏗️ Campo**
 > (Minhas OS / Visita primária). As 3 telas de **gestão — `vrpman_serv` (Gestão de serviços), `vrpman_fichas`
@@ -4541,6 +4542,14 @@ como "Não aparece mais no Consolidador". Caso: 20/10 ZA0200, 3 OS 2807900 valid
 do mesmo dia (fix de 16/11). As validações órfãs de "Telemetria" com tudo no mesmo dia e a linha de Logger fixo já revalidada
 (20/10, 22/10, 29/10 ZA0200) foram apagadas (backup `"12 - retaguarda"._bkp_fisc_linha_val_tele_20261125`); as de 21/10, 23/10,
 27/10, 28/10 e 03/11 ficaram (parte das OS está em outro dia — o aviso mostra para onde foram).
+**Revalidação técnica pela troca do nome da VRP (2026-11-25, só banco):** com a VRP passando a sair pelo `cd_no_agua` na
+descrição (§15), 46 linhas validadas de Manutenção/Vistoria primária de VRP viraram "mudou". As **42** em que a única diferença era o
+nome (resumo atual com `cd_no_agua → fisc_vrp(num_vrp)` idêntico ao `antes`) tiveram `hash`/`antes` atualizados, e **41 dias** tiveram
+`hash`/`snapshot` regerados — só onde o hash do dia, com o hash antigo nessas linhas, batia exatamente com o validado. Validador e data
+mantidos. Ficaram como "mudou" (mudança real, a conferir): 4 linhas de VRP com o SIGOS passado de "aguardando" para "executada"
+(17/11 e 19/11 ZA1004, 18/11 e 23/11 ZA0200) e os dias 17/11 ZA0200/ZA1004, 18/11 ZA0200, 19/11 ZA1004 e 23/11 ZA0200 (outras
+atividades também mudaram). Backups `"12 - retaguarda"._bkp_fisc_linha_val_vrp_20261125` / `_bkp_fisc_dia_vrp_20261125`; análise em
+`_wrk_vrp_reval_20261125` / `_wrk_vrp_reval_dia_20261125` (coluna `acao`).
 
 **RPCs** (leitura `sigos_pode_ver` = admin|aux_acesso): `app_fisc_mes(mes, za)`, `app_fisc_dia(dia, za)` (+
 cobertura SIGOS, `validado.desatualizado`), `app_fisc_periodo(de, ate, za)` (Excel; ≤ 3 meses; dia
