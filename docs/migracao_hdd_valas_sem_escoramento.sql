@@ -1,3 +1,4 @@
+-- APLICADO em 2026-11-25: backup de 57 linhas, 118 nós removidos, 0 restantes; proj_calc ok.
 -- 2026-11-25 · HDD: tira o "Escoramento" de dentro de cada vala de perfuração (pedido do usuário).
 -- As valas continuam (Escavação, Reaterro, Recomposição de pavimento). Só sai o Escoramento SEM avanço (p nulo ou 0).
 -- Em 25/11: 57 intervenções, 118 escoramentos, 0 com avanço e 0 lançamentos no log → nenhum avanço perdido.

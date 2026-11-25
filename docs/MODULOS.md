@@ -3021,7 +3021,7 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   renomeado; some ao regravar, igual ao bloco Ramais); (2) `pjAvancosLoad` **normaliza** o avanço legado em memória
   (`atividade`/`caminho` antigos → `Valas de perfuração › Vala 1 › …`) — faz o histórico, o bloco de avanços e o
   **Gantt** (que casa por `atividade`) baterem com a árvore renomeada. Forward-compatible com migração futura do banco.
-- **Vala de perfuração sem Escoramento (2026-11-25, sw v465, `docs/migracao_hdd_valas_sem_escoramento.sql`):** cada Vala N do
+- **Vala de perfuração sem Escoramento (2026-11-25, sw v465, `docs/migracao_hdd_valas_sem_escoramento.sql` — **aplicado em 25/11**):** cada Vala N do
   HDD passou a ter só **Escavação · Reaterro · Recomposição de pavimento** (+ o tipo). `pjVala` filtra o Escoramento do `pjOc`
   (que segue completo em Peças, Interligação/obra civil da caixa e VRP/macro); o `pjLoad` tira o Escoramento **sem avanço** das
   valas já salvas, e a migração faz o mesmo no banco (backup `_bkp_proj_estado_20261125_escoramento`; em 25/11: 57 HDD, 118
