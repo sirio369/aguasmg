@@ -2812,7 +2812,12 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
     "Todos os atores" — v318, rótulo curto p/ não cortar; os 5 filtros quebram em 2–3 linhas no celular), chips de
     **prazo** (`pjRenderPrazo`, pior faixa — reaproveita `.pavchip`), legenda de status sob o mapa. Card: pílula do status,
     chips do ator com dias (`pjAtorChips`), progresso da fase ("Pré-obra 4/6"), selo legado, % de execução. Mapa: cor do
-    marcador/traçado = status (a paleta por gid saiu).
+    marcador/traçado = status (a paleta por gid saiu). **Início/fim dos trechos (2026-11-25, sw v458):** cada rede HDD/VCA
+    ganha um círculo verde **"I"** no 1º vértice e um quadrado vermelho **"F"** no último (`pjPontaIcon`), ~11 px p/ dentro
+    da linha (`pjPontaPos`) p/ que, onde dois trechos se encontram, o F de um e o I do outro fiquem lado a lado; só
+    aparecem com zoom ≥ 14 (`PJ_PONTA_ZOOM`, camada `pjMaps[ctx].ends`, `pjPontasZoom` no `zoomend`); passar o mouse no
+    trecho ou numa ponta engrossa o trecho inteiro; legenda "Início/Fim do trecho" sob o mapa. O sentido é o da
+    geometria em `"7 - setorizacao".intervencoes_lineares` (ordem dos vértices do projeto importado).
   - **Etapas (`pjEtapasHtml(iv,ctx)` + `pjWireEtapas`):** fases 1–5 em acordeão (`details.pjfase`, abre a fase atual); cada
     etapa mostra ator, situação (`pjEtapaSit`), relógio/faixa, selo "pendência do legado", info (arquivo + folha, link,
     OS, comentário, justificativa) e histórico (eventos). Ações por permissão + etapa aberta: documento = **folha A0–A4**
