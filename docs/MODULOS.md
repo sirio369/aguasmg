@@ -5267,3 +5267,17 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   (+ itens da equipe); Ctrl+V em outro organograma cria as equipes (`colarEquipes`) com nome, cor, ZAs, apropriação, fase,
   período, itens e só os membros colados — nome que já existe ali vira "(2)", "(3)"… (`nomeLivreDe`). Equipe com o mesmo id
   no destino só ganha os membros. Vínculos colados levam também a apropriação de obra e a obs.
+
+### 24.10 Resumo com filtros, agrupamento e "Juntar ZAs" (25/11/2026, sw v466)
+
+- Barra de filtros em **todas as abas** do Resumo (`filtrosResumoHtml`/`passaFiltro`): chips de ZA (já existiam), busca
+  livre (nome, código P-xxx, função, item, equipe, apropriação; sem acento), Aba (MO/Locação/Despesas — fora da aba Por
+  pessoa), Modalidade, Equipe e Apropriação + "Limpar filtros". Item de equipe passa no filtro de modalidade se algum membro
+  passa. O rodapé conta os filtros ativos.
+- **Juntar ZAs** (padrão ligado, abas Por pessoa e Itens; `juntarZAs`): soma numa linha só o que o rateio separou por ZA
+  (mesma pessoa na MO, mesmo vínculo no item); a coluna ZA vira "ZA0200 + ZA1004…" e o "/mês" é o custo cheio. Desligado =
+  como antes (uma linha por ZA com o %).
+- **Agrupar por** com subtotal por grupo (clique abre/fecha; grupos em ordem de valor; `blocosHtml`): Por pessoa → Equipe
+  (a 1ª, se estiver em várias), Função, Apropriação, Modalidade, Superior; Itens → Pessoa/equipe, Item, Aba, Apropriação.
+- Coluna **Código** (P-001…) em Por pessoa e Itens; Por pessoa ganhou também a coluna Equipe. Por mês ganhou linha de total.
+- Só tela: o Excel não mudou. Testado com banco simulado (totais iguais com e sem juntar).
