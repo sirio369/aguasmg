@@ -16357,17 +16357,24 @@ const SST_TIPOS_OC=['Queda de pessoa de altura','Queda de pessoa no mesmo nível
   'Prensagem / aprisionamento','Corte / perfuração','Esforço excessivo / movimento inadequado','Contato com eletricidade','Contato com produto químico ou temperatura extrema',
   'Soterramento','Atropelamento / acidente de trânsito','Ataque de animal (cão, inseto, cobra)','Acidente de trajeto','Doença ocupacional','Outro'];
 const SST_PARTES=['Cabeça','Olhos','Face','Pescoço','Ombro','Tronco','Costas','Braço','Mão','Dedos da mão','Perna','Joelho','Pé','Dedos do pé','Múltiplas partes','Outra'];
-let sstD=null, sstModelo=[], sstDraftT=null;
+let sstD=null, sstModelo=[];
+const sstDraftT={};
 const sstHoje=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
 const sstData=s=>{ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):'—'; };
 const sstQid=()=>'sst-'+String(Date.now()).padStart(15,'0')+'-'+crypto.randomUUID().slice(0,8);
 const sstGpsOk=()=>!!(gps&&gps.acc<=PRECISAO_MAX);
 // preenchimento manual: só no checklist de recomposição (localização dispensada, endereço obrigatório)
 const sstManual=()=>!!(sstD&&sstD.tipo==='rec'&&sstD.manual);
-// rascunho no mesmo IndexedDB do seg (store 'draft', chave 'sst'): guarda fotos (Blob) e assinaturas
-const sstDraftGet=()=>segIdb('draft','readonly',s=>s.get('sst'));
-const sstDraftDel=()=>segIdb('draft','readwrite',s=>s.delete('sst'));
-function sstDraftSave(){ clearTimeout(sstDraftT); const snap=sstD; sstDraftT=setTimeout(()=>{ if(snap) segIdb('draft','readwrite',s=>s.put(Object.assign({},snap,{k:'sst',salvo_em:new Date().toISOString()}))).catch(()=>{}); },350); }
+// rascunhos no mesmo IndexedDB do seg (store 'draft'): um por lançamento, chave 'sst:<id>' (guarda fotos (Blob) e assinaturas)
+const sstDraftKey=id=>'sst:'+id;
+const sstDraftGravar=d=>segIdb('draft','readwrite',s=>s.put(Object.assign({},d,{k:sstDraftKey(d.id),salvo_em:new Date().toISOString()}))).catch(()=>{});
+function sstDraftSave(){ const snap=sstD; if(!snap) return; clearTimeout(sstDraftT[snap.id]); sstDraftT[snap.id]=setTimeout(()=>sstDraftGravar(snap),350); }
+const sstDraftDel=id=>{ clearTimeout(sstDraftT[id]); return segIdb('draft','readwrite',s=>s.delete(sstDraftKey(id))); };
+// todos os rascunhos, o mais recente primeiro; o rascunho único antigo (chave 'sst') passa para a chave nova
+async function sstDraftTodos(){ let L=[]; try{ L=await segIdb('draft','readonly',s=>s.getAll())||[]; }catch(e){}
+  const velho=L.find(r=>r.k==='sst'&&r.id);
+  if(velho){ const novo=Object.assign({},velho,{k:sstDraftKey(velho.id)}); try{ await segIdb('draft','readwrite',s=>{ s.put(novo); return s.delete('sst'); }); L=L.map(r=>r===velho?novo:r); }catch(e){} }
+  return L.filter(r=>/^sst(:|$)/.test(String(r.k))&&SST_TIPO[r.tipo]).sort((a,b)=>String(b.salvo_em||'').localeCompare(String(a.salvo_em||''))); }
 function sstCss(){ if(document.getElementById('sstcss'))return; const st=document.createElement('style'); st.id='sstcss'; st.textContent=`
  #sst_form .segyn button{padding:8px 3px}
  #sst_form .segyn[data-sch="interv"],#sst_form .segyn[data-sch="pav"]{flex-wrap:wrap}
@@ -16385,13 +16392,12 @@ async function sstModeloCarregar(){ try{ sstModelo=JSON.parse(localStorage.getIt
 
 // ===== Tela principal (sst): novos lançamentos + meus lançamentos =====
 async function sstInit(){ segCss(); sstCss(); segPessoasCarregar(); sstModeloCarregar(); sstRascunho(); sstListar(); }
-async function sstRascunho(){ const c=document.getElementById('sstRasc'); if(!c)return; let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(!r||!SST_TIPO[r.tipo]){ c.innerHTML=''; return; }
-  c.innerHTML=`<div class="banner warn" style="flex-wrap:wrap">📝 ${SST_TIPO[r.tipo].t} em preenchimento desde ${segFmt(r.salvo_em)}<span style="flex:1"></span><button class="btn" id="sstRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="sstRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`;
-  $('#sstRascCont').onclick=()=>{ sstD=r; delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); };
-  $('#sstRascDesc').onclick=()=>{ const b=$('#sstRascDesc'); if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } clearTimeout(sstDraftT); sstDraftDel().then(sstRascunho).catch(()=>{}); }; }
-async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(r&&SST_TIPO[r.tipo]){ toast('Há um lançamento em andamento — continue ou descarte'); const b=document.getElementById('sstRasc'); if(b) b.scrollIntoView({behavior:'smooth'}); return; }
+async function sstRascunho(){ const c=document.getElementById('sstRasc'); if(!c)return; const L=await sstDraftTodos();
+  const ref=r=>[r.os?('OS '+r.os):'',r.tema||'',r.local||'',r.area&&r.area!=='Geral'?r.area:''].filter(Boolean).slice(0,2).join(' · ');
+  c.innerHTML=L.map((r,i)=>`<div class="banner warn" style="flex-wrap:wrap">📝 ${SST_TIPO[r.tipo].t}${ref(r)?(' — '+segH(ref(r))):''} em preenchimento desde ${segFmt(r.salvo_em)}<span style="flex:1"></span><button class="btn" data-rcont="${i}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" data-rdesc="${i}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`).join('');
+  c.querySelectorAll('[data-rcont]').forEach(b=>b.onclick=()=>{ const r=L[+b.dataset.rcont]; sstD=Object.assign({},r); delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); });
+  c.querySelectorAll('[data-rdesc]').forEach(b=>b.onclick=()=>{ if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } sstDraftDel(L[+b.dataset.rdesc].id).then(sstRascunho).catch(()=>{}); }); }
+async function sstNovo(tipo){
   const d={tipo,id:crypto.randomUUID(),data:sstHoje(),area:'',observacoes:'',fotos:{}};
   if(tipo==='insp'){ if(!sstModelo.length) await sstModeloCarregar();
     Object.assign(d,{local:'',os:'',resp_uuid:null,resp_nome:'',resp_sig:null,resp_em:null,itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
@@ -16410,7 +16416,7 @@ async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)r
   (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
   (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
   (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const r=SST_CK_RES.find(z=>z[0]===x.resultado);
-    L.push({t:x.tipo==='reaterro'?'rea':'rec',data:x.data,tit:'OS '+(x.os||'—')+(x.equipe?(' · '+x.equipe):''),sub:[r?r[1]:'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
+    L.push({t:x.tipo==='reaterro'?'rea':'rec',pdf:x.id,data:x.data,tit:'OS '+(x.os||'—')+(x.equipe?(' · '+x.equipe):''),sub:[r?r[1]:'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
   fila.forEach(i=>{ const f=i.fields||{}, d=f.p_dados||{}, t=String(i.tipo||'').replace('sst_',''); if(ids.has(f.p_id)||!SST_TIPO[t]) return;
     L.push({t,data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?('OS '+(d.os||'—')):(d.area||'—'),sub:'⏳ na fila — sobe quando houver conexão'}); });
   L.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
@@ -16418,7 +16424,9 @@ async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)r
   if(!L.length){ c.innerHTML='<p class="sub">Nada lançado nos últimos 30 dias.</p>'+rod; return; }
   c.innerHTML=L.map(x=>`<div class="segcard"><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
     <div style="margin-top:3px;font-size:14px;font-weight:600">${segH(x.tit||'—')}</div><div class="sub" style="font-size:12.5px;margin-top:2px">${segH(x.sub||'')}</div>
-    ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}</div>`).join('')+rod; }
+    ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}
+    ${x.pdf?`<button type="button" class="btn ghost" data-ckpdf="${segH(x.pdf)}" style="margin:8px 0 0;width:auto;padding:7px 12px;font-size:13px">📄 PDF</button>`:''}</div>`).join('')+rod;
+  c.querySelectorAll('[data-ckpdf]').forEach(b=>b.onclick=()=>sstCkPdfId(b.dataset.ckpdf)); }
 
 // ===== Formulário (sst_form): estado único sstD, salvo como rascunho a cada mudança =====
 function sstFormInit(){ segCss(); sstCss(); if(!sstD){ irPara('sst'); return; }
@@ -16610,10 +16618,51 @@ async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const
   const item={id:sstQid(),tipo:'sst_'+d.tipo,rpc:SST_TIPO[d.tipo].rpc,pasta:'sst',anexos,anexosParam:'p_anexos',fields:{p_id:d.id,p_dados:dados}};
   const ok=await enviarOuEnfileirar(item,SST_TIPO[d.tipo].ok);
   if(!ok){ delete btn.dataset.env; sstAtualizar(); return; }
-  clearTimeout(sstDraftT); try{ await sstDraftDel(); }catch(e){}
-  sstD=null; irPara('sst'); }
+  try{ await sstDraftDel(d.id); }catch(e){}
+  sstD=null; irPara('sst');
+  if(sstEhCk(d.tipo)) sstCkPdf(sstCkDocLocal(d,dados,anexos)); }
 document.querySelectorAll('[data-sstnovo]').forEach(b=>b.addEventListener('click',()=>sstNovo(b.dataset.sstnovo)));
-if($('#sstFormBack')) $('#sstFormBack').addEventListener('click',()=>{ if(sstD) sstDraftSave(); sstD=null; irPara('sst'); });
+if($('#sstFormBack')) $('#sstFormBack').addEventListener('click',async()=>{ const d=sstD; sstD=null; if(d){ clearTimeout(sstDraftT[d.id]); await sstDraftGravar(d); } irPara('sst'); });
+
+// ===== PDF do checklist POP-022 (overlay #relatorio + REL_CSS → imprimir / salvar PDF) =====
+// doc no formato do app_sst_ck_ver; foto/assinatura = caminho do banco ou blob: (checklist recém-enviado, vale sem sinal)
+function sstCkDocLocal(d,dados,anexos){ const url=k=>{ const v=anexos[k]; return !v?null:(v instanceof Blob?URL.createObjectURL(v):v); };
+  return {tipo:dados.tipo,data:dados.data,consorcio:dados.consorcio||null,os:dados.os,tipo_intervencao:dados.tipo_intervencao,equipe:dados.equipe,local:dados.local,tipo_pavimento:dados.tipo_pavimento,
+    resultado:dados.resultado,observacoes:dados.observacoes,preenchimento_manual:dados.preenchimento_manual,lat:dados.lat,lon:dados.lon,gps_precisao:dados.precisao,
+    usuario_nome:(ME&&(ME.nome||ME.email))||'',itens:dados.itens.map(it=>Object.assign({},it,{foto:it.foto?url(it.foto):null})),fotos:{foto_antes:url('foto_antes'),foto_depois:url('foto_depois')},
+    encarregado_nome:dados.encarregado_nome,encarregado_assinatura:url('sig_enc'),encarregado_assinado_em:dados.encarregado_assinado_em,fiscal_assinatura:url('sig_fis'),fiscal_assinado_em:dados.fiscal_assinado_em}; }
+async function sstCkPdfId(id){ if(!navigator.onLine) return toast('Sem conexão — o PDF deste checklist precisa de internet');
+  try{ const {data,error}=await sb.rpc('app_sst_ck_ver',{p_id:id}); if(error)throw error; sstCkPdf(data); }catch(e){ toast('Não foi possível gerar o PDF: '+(e.message||e)); } }
+function sstCkPdf(r){ segCss();
+  if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
+  if(!document.getElementById('segRelStyle')){ const st=document.createElement('style'); st.id='segRelStyle'; st.textContent=SEG_REL_CSS; document.head.appendChild(st); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  const rec=r.tipo==='recomposicao', its=r.itens||[], n=v=>its.filter(i=>i.resultado===v).length;
+  const res=(SST_CK_RES.find(z=>z[0]===r.resultado)||[null,r.resultado||'—'])[1], cor=r.resultado==='conforme'?'#0a7d5e':r.resultado==='nao_conforme'?'#b91c1c':'#b45309';
+  const cons=REL_CONS[r.consorcio]||'Consórcios Águas Integradas & Eficiência Hídrica';
+  let num=0; const sec=t=>'<div class="relSec"><span class="relNum">'+(++num)+'</span>'+t+'</div>';
+  const fig=(src,leg)=>`<figure><img src="${segImg(src)}" alt="${segH(leg)}"/><figcaption>${segH(leg)}</figcaption></figure>`;
+  const ender=[r.endereco,r.bairro,r.municipio].filter(Boolean).join(' — ');
+  let h=`<div class="relTop"><div><h1>Checklist ${rec?'02 · Recomposição de pavimento':'01 · Reaterro'}</h1><div class="sub">${segH(cons)} · POP-022 Rev. 03</div></div>${relLogoHtml(r.consorcio)}<div class="relBadge" style="color:${cor}">${segH(res.toUpperCase())}</div></div><div class="relBody">`;
+  h+=sec('Identificação')+'<div class="relGrid">'+relField('Data',sstData(r.data))+relField('Nº da OS',segH(r.os||''))+relField('Tipo de intervenção',segH(r.tipo_intervencao||''))+relField('Equipe / contratada',segH(r.equipe||''))
+    +(rec?relField('Tipo de pavimento',segH(r.tipo_pavimento||'')):'')+relField('Coordenadas',r.lat!=null?((+r.lat).toFixed(6)+', '+(+r.lon).toFixed(6)+(r.gps_precisao!=null?(' (±'+Math.round(r.gps_precisao)+' m)'):'')):(r.preenchimento_manual?'Preenchimento manual (sem localização)':''))
+    +relWide('Endereço / local',segH([r.local,ender].filter(Boolean).join(' · ')))+relField('Fiscal responsável',segH(r.usuario_nome||''))+relField('Itens',n('C')+' conforme · '+n('NC')+' não conforme · '+n('NA')+' N/A')+'</div>';
+  const grupos=[]; its.forEach(i=>{ let g=grupos.find(x=>x.g===i.grupo); if(!g){ g={g:i.grupo,l:[]}; grupos.push(g); } g.l.push(i); });
+  h+=sec('Checklist')+grupos.map(g=>`<table class="segT"><tr><th colspan="3">${segH(g.g||'')}</th></tr>`+g.l.map(i=>`<tr><td style="width:36px">${segH(i.codigo||'')}</td><td>${segH(i.item)}${i.resultado==='NC'&&i.obs?`<div style="margin-top:3px;color:#991b1b">Observação: ${segH(i.obs)}</div>`:''}</td><td class="${i.resultado==='C'?'ok':i.resultado==='NC'?'bad':''}" style="width:42px;text-align:center">${i.resultado==='NA'?'N/A':segH(i.resultado||'—')}</td></tr>`).join('')+'</table>').join('');
+  h+=sec('Resultado da inspeção')+'<div class="relGrid">'+relField('Resultado','<span style="color:'+cor+'">'+segH(res)+'</span>')+relWide('Observações / ação corretiva',segH(r.observacoes||''))+'</div>';
+  const fotos=[]; const f=r.fotos||{}; if(f.foto_antes) fotos.push(fig(f.foto_antes,'Antes')); if(f.foto_depois) fotos.push(fig(f.foto_depois,'Depois'));
+  Object.keys(f).filter(k=>k!=='foto_antes'&&k!=='foto_depois'&&typeof f[k]==='string'&&f[k]&&!/^(sig|nc_)/.test(k)).forEach(k=>fotos.push(fig(f[k],'Foto')));
+  its.forEach(i=>{ if(i.resultado==='NC'&&i.foto) fotos.push(fig(i.foto,'Não conformidade '+(i.codigo||''))); });
+  if(fotos.length) h+=sec('Fotos')+'<div class="relPhotos">'+fotos.join('')+'</div>';
+  const ass=(tit,nome,img,em)=>`<div style="text-align:center;break-inside:avoid">${img?`<img src="${segImg(img)}" alt="Assinatura" style="max-width:100%;height:80px;object-fit:contain"/>`:'<div style="height:80px"></div>'}<div style="border-top:1px solid #444;padding-top:4px;font-size:12px"><b>${segH(nome||'—')}</b><br/>${tit}${em?(' · '+segFmt(em)):''}</div></div>`;
+  h+=sec('Assinaturas')+'<div class="relGrid">'+ass('Encarregado',r.encarregado_nome,r.encarregado_assinatura,r.encarregado_assinado_em)+ass('Fiscalização',r.usuario_nome,r.fiscal_assinatura,r.fiscal_assinado_em)+'</div>';
+  if(r.anulado_em) h+='<div class="segAlertP">Checklist ANULADO em '+segFmt(r.anulado_em)+' — '+segH(r.anulado_motivo||'')+'</div>';
+  h+='</div><div class="relFoot"><span>AcquaHub · QSMS</span><span>Gerado em '+relFmtData(new Date().toISOString())+'</span></div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+h+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  // o título da página vira o nome sugerido do arquivo PDF
+  document.getElementById('relPrint').onclick=async()=>{ const t=document.title; document.title=['Checklist',rec?'recomposicao':'reaterro','OS',r.os||'sem-numero',r.data||''].join(' ').replace(/[\\/:*?"<>|]/g,'-'); try{ await window.print(); }finally{ document.title=t; } }; }
 
 // ---------- QSMS › 📊 Indicadores SST (gestão): painel, lançamentos, ASO, treinamentos, CIPA, checklist ----------
 // Gate ME.qsms (qsmsGate). Tudo por RPC app_sst_* (gate qsms_pode no servidor). Anular no lugar de apagar.
@@ -17082,8 +17131,10 @@ async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p cla
     ${sgFotos(r.fotos)}${(r.alertas||[]).length?`<div class="segerr" style="margin-top:8px">⚠ ${segH(r.alertas.join(' · '))}</div>`:''}</div>`;
   h+=`<div class="segblk"><h3>Checklist · ${n('C')} C · ${n('NC')} NC · ${n('NA')} N/A</h3>${grupos.map(g=>`<div class="sstgr">${segH(g.g||'')}</div>`+g.l.map(lin).join('')).join('')||'<p class="sub">Sem itens.</p>'}</div>`;
   h+=`<div class="segblk"><h3>Assinaturas</h3><div class="sgrow" style="align-items:flex-start;gap:14px">${sig('Encarregado: <b>'+segH(r.encarregado_nome||'—')+'</b>',r.encarregado_assinatura,r.encarregado_assinado_em)}${sig('Fiscalização: <b>'+segH(r.usuario_nome||'—')+'</b>',r.fiscal_assinatura,r.fiscal_assinado_em)}</div></div>`;
+  h+=`<button class="btn" id="ckPdf" style="margin-top:16px">📄 Exportar PDF</button>`;
   if(!r.anulado_em) h+=`<button class="btn ghost" id="ckAnular" style="margin-top:16px;color:var(--bad)">Anular este checklist</button>`;
   v.innerHTML=h;
+  $('#ckPdf').onclick=()=>sstCkPdf(r);
   $('#ckVolta').onclick=()=>{ ck.det=null; if(ck.volta){ const tv=ck.volta; ck.volta=null; return irPara(tv); } if(ck.dados) ckRender(); else ckCarregar(); };
   if($('#ckAnular')) $('#ckAnular').onclick=()=>sgAnular('checklist',id,()=>{ ck.det=null; ck.volta=null; ckCarregar(); }); }
 
