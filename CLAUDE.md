@@ -666,7 +666,7 @@ tabela `sup_acesso_area` + RPCs `app_sup_area_listar`/`_set` + `ME.sup_areas`; f
   Insumos): Campo = **Solicitar ferramenta** + **Minhas ferramentas** (estoque atual com botão
   "Solicitar devolução" embutido + histórico); Gestão = **Aprovar solicitações** (reaproveita
   `sup_aprovar`/`sup_rejeitar`) + **Painel das equipes** (mesma função parametrizada e drill-down de
-  Insumos); Almoxarifado = **Separação e entrega** (reaproveita `supAlmoxCard`/`sup_segregar`/
+  Insumos); Almoxarifado = **Separar ferramenta** + **Entregar ferramenta (retirada)** (2 botões como Insumos/EPI desde v480; reaproveita `supAlmoxCard`/`sup_segregar`/
   `sup_entregar`) + **Recebimento** (tela nova: almoxarife confirma devolução digitando o código de
   4 dígitos que o colaborador informa, nunca mostrado nessa tela). Dois códigos simétricos: retirada
   (`codigo_retirada`, padrão já existente) e devolução (`codigo` novo, tabela `sup_ferramenta_devolucao`

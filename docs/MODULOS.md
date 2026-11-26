@@ -1249,7 +1249,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   **🏷️ Separar insumo** (act `almox` — mantido p/ o link da notificação "a separar" continuar abrindo a tela
   certa; status aprovada/em_separacao) e **📤 Entregar insumo (retirada)** (act novo `almox_entregar`; status
   segregada, pede o código). As duas são `supVAlmox(modo)` sobre a mesma RPC `sup_fila_almoxarife`,
-  filtrada no front por status (sem mudança no banco). Ferramentas segue com a tela única `ferramenta_almox`.
+  filtrada no front por status (sem mudança no banco). **Ferramentas igual** (§5.4): 🏷️ Separar ferramenta (`ferramenta_almox`) ×
+  📤 Entregar ferramenta (retirada) (`ferramenta_entregar`), `supVFerramentaAlmox(modo)` sobre `sup_ferramenta_fila_almoxarife`.
 - **Cabeçalho das telas de separação do almoxarife (2026-10-13):** todos os cards de separação
   (Insumos/Ferramentas via `supAlmoxCard`, EPI via `supEpiSegCard`) mostram agora, via o helper
   compartilhado **`supSolicHead(s)`**: **nº · badge do consórcio de origem** (`supConsBadge` →
@@ -1354,7 +1355,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
     RPCs **compartilhadas** `sup_aprovar`/`sup_rejeitar` — mesma UI de ajuste de qtd/cancelamento de
     Insumos) e `ferramenta_painel` (reaproveita `supVPainel('sup_ferramenta_painel_multi')` — mesma
     função parametrizada do Painel de Insumos, incluindo o drill-down "quem tem" do §5.1).
-  - **Almoxarifado:** `ferramenta_almox` (`supVFerramentaAlmox`, fila `sup_ferramenta_fila_almoxarife`
+  - **Almoxarifado:** `ferramenta_almox` = **Separar ferramenta** e `ferramenta_entregar` = **Entregar ferramenta
+    (retirada)** (2026-11-26, sw v480; ambos `supVFerramentaAlmox(modo)`, fila `sup_ferramenta_fila_almoxarife` filtrada por status
     + `supAlmoxCard`/`supAlmoxWire` **reaproveitados como estão** — chamam `sup_segregar`/`sup_entregar`,
     que são agnósticas de material) e **`ferramenta_recebimento`** (`supVFerramentaRecebimento`, tela
     nova sem equivalente em Insumos: lista `sup_ferramenta_devolucao_fila_recebimento`, almoxarife
@@ -1381,7 +1383,7 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   `sup_ferramenta_devolucao_confirmar`.
 - **Correção de navegação (2026-09-15) — Ferramentas reusa código de Insumos que assumia o contexto de
   Insumos:** (1) `supAlmoxWire` (fiação de segregar/entregar, compartilhada) recarregava fixo em
-  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega**, concluir uma
+  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega** (hoje Separar/Entregar ferramenta), concluir uma
   segregação ou entrega **pulava pra fila de Insumos**. Agora `supAlmoxWire(refreshFn)` recebe a função
   de refresh (default `supVAlmox`; `supVFerramentaAlmox` passa a si mesma). (2) `supGoAct` (deep-link de
   notificação) setava `supAreaId='insumos'` pra qualquer act não-`eq_`/`epi_` — os acts `ferramenta_*`
