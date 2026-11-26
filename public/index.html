@@ -12051,7 +12051,8 @@ const SUP_ACTS={
   consumo:{ic:'🛠️',lbl:'Registrar consumo',fn:()=>supVConsumo()},
   estoque:{ic:'🚐',lbl:'Estoque da equipe',fn:()=>supVEstoque()},
   aprovar:{ic:'🖊️',lbl:'Aprovar solicitações',fn:()=>supVAprovar()},
-  almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVAlmox()},
+  almox:{ic:'🏷️',lbl:'Separar insumo',fn:()=>supVAlmox('separar')},
+  almox_entregar:{ic:'📤',lbl:'Entregar insumo (retirada)',fn:()=>supVAlmox('entregar')},
   painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()},
   eq_meus:{ic:'🧰',lbl:'Meus equipamentos',fn:()=>supVEqMeus()},
   eq_solicitar:{ic:'🙋',lbl:'Solicitar equipamento',fn:()=>supVEqSolicitar()},
@@ -12089,7 +12090,8 @@ function supBlocks(){
       {id:'aprovar',on:podeAp,papel:'Encarregado'},
       {id:'painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
-      {id:'almox',on:supAreaAcesso('insumo'),papel:'Almoxarifado'}]}
+      {id:'almox',on:supAreaAcesso('insumo'),papel:'Almoxarifado'},
+      {id:'almox_entregar',on:supAreaAcesso('insumo'),papel:'Almoxarifado'}]}
   ];
 }
 function supBlocksEquip(){
@@ -12444,15 +12446,20 @@ async function supAcao(rpc,params,ok,after){
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
 
-// --- tela: Almoxarife (segregar / entregar) ---
-async function supVAlmox(){
+// --- tela: Almoxarife — Insumos em 2 telas, como no EPI (2026-11-26):
+//     'separar' = aprovada/em_separacao (segregar, gera código) · 'entregar' = segregada (retirada pelo código)
+async function supVAlmox(modo){
+  modo = modo==='entregar' ? 'entregar' : 'separar';
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_fila_almoxarife'); if(error)throw error;
-    const arr=data||[];
-    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nada na fila do almoxarifado.</p>'; return; }
-    $('#supView').innerHTML=arr.map(supAlmoxCard).join('');
-    supAlmoxWire();
+    const arr=(data||[]).filter(s=> modo==='entregar' ? s.status==='segregada' : s.status!=='segregada');
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">'+(modo==='entregar'?'Nenhum insumo separado aguardando retirada.':'Nenhum insumo aprovado aguardando separação.')+'</p>'; return; }
+    $('#supView').innerHTML=(modo==='entregar'
+      ? '<p class="sub" style="margin:2px 0 10px">Peça ao colaborador o código de 4 dígitos para registrar a retirada.</p>'
+      : '<p class="sub" style="margin:2px 0 10px">Confira cada item (existe / parcial / falta). Ao concluir, o colaborador recebe o código para retirar.</p>')
+      +arr.map(supAlmoxCard).join('');
+    supAlmoxWire(()=>supVAlmox(modo));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 function supAlmoxCard(s){

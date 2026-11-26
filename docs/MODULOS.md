@@ -1245,6 +1245,11 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
   existe/parcial/falta, gera código) → retirar (código) → consumir na OS**.
+- **Separar × Entregar em 2 botões (2026-11-26, sw v480), como no EPI:** o bloco Almoxarifado de Insumos tem
+  **🏷️ Separar insumo** (act `almox` — mantido p/ o link da notificação "a separar" continuar abrindo a tela
+  certa; status aprovada/em_separacao) e **📤 Entregar insumo (retirada)** (act novo `almox_entregar`; status
+  segregada, pede o código). As duas são `supVAlmox(modo)` sobre a mesma RPC `sup_fila_almoxarife`,
+  filtrada no front por status (sem mudança no banco). Ferramentas segue com a tela única `ferramenta_almox`.
 - **Cabeçalho das telas de separação do almoxarife (2026-10-13):** todos os cards de separação
   (Insumos/Ferramentas via `supAlmoxCard`, EPI via `supEpiSegCard`) mostram agora, via o helper
   compartilhado **`supSolicHead(s)`**: **nº · badge do consórcio de origem** (`supConsBadge` →
