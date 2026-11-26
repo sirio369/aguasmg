@@ -1374,6 +1374,14 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
 - Notificações (`sup_trg_ferramenta_devolucao`, trigger AFTER INSERT/UPDATE em
   `sup_ferramenta_devolucao`): solicitar devolução avisa `almoxarife`+`admin`
   (`link='ferramenta_recebimento'`); confirmar avisa o colaborador (`link='ferramenta_pedidos'`).
+- **Avisos da solicitação de ferramenta (corrigido 2026-11-26, `docs/migracao_sup_notif_ferramenta.sql`, só banco):**
+  ferramenta usa a mesma `sup_solicitacao`, e o `sup_trg_solicitacao` mandava tudo como insumo ("Material a separar"
+  p/ a área **insumo**, links `aprovar`/`almox`/`pedidos`). Agora, se a solicitação tem item `ferramenta`, os textos
+  são de ferramenta, "Ferramenta a separar" vai p/ `sup_uuids_por_area('ferramenta')` e os links são
+  `ferramenta_aprovar` / `ferramenta_almox` (= Separar ferramenta) / `ferramenta_pedidos`. ⚠️ O trigger virou
+  **CONSTRAINT TRIGGER DEFERRABLE INITIALLY DEFERRED** (roda no fim da transação): o cabeçalho entra antes dos itens,
+  então só no commit dá pra saber o tipo. Em teste E2E com rollback, use `set constraints all immediate` antes de
+  conferir as `sup_notificacao` geradas.
 - RPCs novas (todas `SECURITY DEFINER`, grants revisados — funções novas nascem com EXECUTE liberado
   pra `PUBLIC` por padrão do Postgres, teve que revogar+regrant `authenticated` explicitamente):
   `sup_ferramenta_catalogo`, `sup_ferramenta_solicitar`, `sup_ferramenta_minhas_solicitacoes`,
