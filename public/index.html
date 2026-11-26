@@ -16518,7 +16518,7 @@ function sstCkItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="butt
   return `<div class="segq"><div class="t"><b>${segH(it.codigo)}</b> ${segH(it.item)}</div><div class="segyn">${b('C','C')}${b('NC','NC')}${b('NA','N/A')}</div>
     ${it.auto?'<div class="sub" style="font-size:11.5px;margin-top:3px">N/A pelo tipo de pavimento</div>':''}
     ${r!=='NC'?'':`<div class="sstnc"><label>Observação / evidência *</label><textarea data-if="obs" data-i="${i}" rows="2">${segH(it.obs||'')}</textarea>
-      ${sstFotoOpc('nc_'+i,'Foto (opcional)')}</div>`}
+      ${segFotoHtml('nc_'+i,'Foto da não conformidade')}</div>`}
     ${r==='C'?sstFotoConf(i):''}</div>`; }
 function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', grupos=[];
   d.itens.forEach((it,i)=>{ let g=grupos.find(x=>x.g===it.grupo); if(!g){ g={g:it.grupo,l:[]}; grupos.push(g); } g.l.push(sstCkItemHtml(it,i)); });
@@ -16604,7 +16604,7 @@ function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
   if(sstEhCk(d.tipo)){ if(!txt(d.os)) P.push('Nº da OS'); if(!d.interv) P.push('Tipo de intervenção'); if(!txt(d.equipe)) P.push('Equipe / contratada');
     if(SST_TIPO[d.tipo].ck==='recomposicao'&&!d.pav) P.push('Tipo de pavimento');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
-    d.itens.forEach(it=>{ if(it.resultado==='NC'&&!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); });
+    d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; if(!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); if(!d.fotos['nc_'+i]) P.push('NC '+it.codigo+': foto'); });
     const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes'));
     if(!d.resultado) P.push('Resultado da inspeção');
     else if(d.resultado==='conforme'&&d.itens.some(it=>it.resultado==='NC')) P.push('Há item não conforme — o resultado não pode ser "Conforme"');
