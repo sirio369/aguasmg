@@ -16433,12 +16433,12 @@ async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)r
   (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',sit:'fin',st:fin,data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
   (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',sit:'fin',st:fin,data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
   (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const rr=SST_CK_RES.find(z=>z[0]===x.resultado);
-    L.push({t:x.tipo==='reaterro'?'rea':'rec',pdf:x.id,sit:'fin',st:fin,data:x.data,tit:'OS '+(x.os||'—')+(x.equipe?(' · '+x.equipe):''),sub:[rr?('Resultado: '+rr[1]):'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
+    L.push({t:x.tipo==='reaterro'?'rea':'rec',pdf:x.id,sit:'fin',st:fin,data:x.data,tit:(x.os?('OS '+x.os):'Sem OS')+(x.equipe?(' · '+x.equipe):''),sub:[rr?('Resultado: '+rr[1]):'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
   fila.forEach(i=>{ const f=i.fields||{}, d=f.p_dados||{}, t=String(i.tipo||'').replace('sst_',''); if(ids.has(f.p_id)||!SST_TIPO[t]) return;
-    L.push({t,sit:'pend',st:'⏳ Aguardando envio — sobe quando houver conexão',data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?('OS '+(d.os||'—')):(d.area||'—'),sub:''}); });
+    L.push({t,sit:'pend',st:'⏳ Aguardando envio — sobe quando houver conexão',data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?(d.os?('OS '+d.os):'Sem OS'):(d.area||'—'),sub:''}); });
   L.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
   L.unshift(...sstRascs.map(d=>({t:d.tipo,sit:'pend',rasc:d.id,st:'📝 Em preenchimento — salvo em '+segFmt(d.salvo_em),data:d.data,
-    tit:d.tipo==='dds'?d.tema:d.tipo==='oc'?d.natureza:sstEhCk(d.tipo)?('OS '+(d.os||'—')):(d.area||'—'),sub:''})));
+    tit:d.tipo==='dds'?d.tema:d.tipo==='oc'?d.natureza:sstEhCk(d.tipo)?(d.os?('OS '+d.os):'Sem OS'):(d.area||'—'),sub:''})));
   sstL=L; sstRod=doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>';
   sstListarRender(); }
 function sstListarRender(){ const c=document.getElementById('sstLista'), ch=document.getElementById('sstSit'); if(!c)return;
@@ -16546,7 +16546,7 @@ function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', gr
   d.itens.forEach((it,i)=>{ let g=grupos.find(x=>x.g===it.grupo); if(!g){ g={g:it.grupo,l:[]}; grupos.push(g); } g.l.push(sstCkItemHtml(it,i)); });
   const resv=d.resultado, resb=`<div class="segyn" data-ckres>${SST_CK_RES.map(([v,l])=>`<button type="button" data-v="${v}" class="${resv===v?('on'+(v==='nao_conforme'?' bad':'')):''}">${l}</button>`).join('')}</div>`;
   return `<p class="sub" style="font-size:12.5px;margin:2px 0 8px">POP-022 Rev. 03 — ${rec?'Checklist 02 · Recomposição de pavimento':'Checklist 01 · Reaterro'}. C = conforme · NC = não conforme · N/A = não se aplica.</p>`
-    +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS *</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS"/></div></div>
+    +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS (opcional)"/></div></div>
       <label>Tipo de intervenção *</label>${sstChips('interv',SST_CK_INTERV,d.interv)}
       <label>Equipe / contratada *</label><input id="sstEquipe" value="${segH(d.equipe||'')}" placeholder="Ex.: Equipe 3 — BBL"/>
       <label>Endereço / local</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="Opcional — o endereço sai também pela coordenada"/>
@@ -16622,7 +16622,7 @@ function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
       if(!txt(it.descricao)) P.push(n+': o que está errado'); if(!d.fotos['nc_'+i]) P.push(n+': foto');
       if(it.tratada_no_local){ if(!txt(it.tratativa)) P.push(n+': como foi corrigida'); } else if(!it.prazo) P.push(n+': prazo'); });
     const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes')); }
-  if(sstEhCk(d.tipo)){ if(!txt(d.os)) P.push('Nº da OS'); if(!d.interv) P.push('Tipo de intervenção'); if(!txt(d.equipe)) P.push('Equipe / contratada');
+  if(sstEhCk(d.tipo)){ if(!d.interv) P.push('Tipo de intervenção'); if(!txt(d.equipe)) P.push('Equipe / contratada');
     if(SST_TIPO[d.tipo].ck==='recomposicao'&&!d.pav) P.push('Tipo de pavimento');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
     d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; if(!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); if(!d.fotos['nc_'+i]) P.push('NC '+it.codigo+': foto'); });

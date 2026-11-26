@@ -4072,6 +4072,8 @@ continua obrigatória.
 
 **"Está na frente de serviço?" (sw v477):** no Checklist Segurança, DDS, reaterro e recomposição, a 1ª coisa do formulário é a pergunta (o resto só aparece depois de responder; `sstD.na_frente`). **Sim** = coordenada do GPS travado (≤ `PRECISAO_MAX`), como antes. **Não** = mapa (`sstMapaInit`, Leaflet + `mapAddCamadaBase`) para tocar/arrastar o ponto (`sstD.ponto`), obrigatório. O ponto do mapa vai em `lat`/`lon` com **`precisao` nula** — é a convenção que distingue "marcado no mapa" de GPS (o app sempre manda a precisão no GPS); endereço/bairro/município/consórcio continuam saindo da coordenada no servidor (`qsms_local`). Sem migração. A gestão e o PDF mostram "marcado no mapa (fora da frente de serviço)". **Substitui o "Preenchimento Manual"** dos checklists (#448/#449): a caixa saiu e o app manda `preenchimento_manual=false`; registros antigos manuais seguem aparecendo como "Manual (sem localização)". Ocorrência não muda (GPS opcional, sem a pergunta).
 
+**Nº da OS opcional nos checklists de reaterro e recomposição (sw v478) — `docs/migracao_sst_ck_os_opcional.sql` (APLICADO 26/11/2026):** o campo continua no formulário, sem `*`, e `sstPend` não cobra mais; `app_sst_ck_registrar` deixou de gerar o alerta "Sem OS". Na lista, checklist sem OS aparece como "Sem OS". (No Checklist Segurança a OS já era opcional.)
+
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
 **Aplicado em 06/11/2026** (migrações `sigos_carga` + `sigos_searchpath`; Edge Function `sigos-ingest` v1 publicada,
