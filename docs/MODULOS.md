@@ -3872,7 +3872,10 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
   **Telas (PR-B, sw v328):** `sst` (Home › 🛠️ Execução › 🦺 QSMS campo; card escondido sem `ME.qsms_campo`) com os
   lançamentos + "Meus lançamentos" (desde sw v472: **lista única abaixo dos botões, sem limite de dias** — `app_sst_minhas(p_dias:36500)`
-  + itens ainda na fila + o rascunho em preenchimento, que saiu do banner do topo e virou o 1º card com Continuar/Descartar;
+  + itens ainda na fila + os rascunhos em preenchimento, que saíram do banner do topo e viraram os 1ºs cards com Continuar/Descartar;
+  desde sw v475 **vários rascunhos ao mesmo tempo** (chave `sst:<id>` no store `draft`; a chave antiga `sst` é migrada em `sstDraftsAll`),
+  sem o bloqueio "Há um lançamento em andamento"; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques) e o "‹ QSMS campo"
+  grava o rascunho na hora (`sstDraftFlush`);
   chips de situação **Todos · Pendentes** (em preenchimento ou aguardando envio) **· Finalizados** (já no servidor), estado `sstSit`;
   cache em `localStorage.sstMinhas`)
   e `sst_form` (um formulário por vez, estado `sstD`, rascunho no IndexedDB `seg_local` store `draft` chave `sst`, com fotos
@@ -4050,7 +4053,20 @@ enganaria) e o **Endereço** passa a ser obrigatório (coluna `endereco`; sem o 
 município ficam vazios. Desmarcado, e no reaterro, nada muda. A gestão mostra "✍️ manual" na lista, no detalhe e no XLSX.
 **Migração aplicada em produção (26/11/2026)**; é compatível com o app anterior, que não envia o campo e segue como antes.
 
+**Preenchimento Manual no reaterro também (26/11/2026, sw v475) — `docs/migracao_sst_ck_manual_reaterro.sql`:**
+a caixa passa a valer nos **dois** checklists, com a mesma regra acima (onde se lê "só no checklist de recomposição"
+ou "no reaterro nada muda", vale esta nota). **A migração precisa ser aplicada**: sem ela, o reaterro manual sai com o
+alerta "Sem GPS" e o endereço fica em `local`.
+
+**Assinatura do encarregado opcional (26/11/2026, mesma migração):** nos dois checklists o **nome** do encarregado continua
+obrigatório, a assinatura não, e o servidor deixa de gravar o alerta "Encarregado sem assinatura". A da fiscalização
+continua obrigatória.
+
 ---
+
+**Vários lançamentos em preenchimento (sw v475):** acabou o bloqueio "continue ou descarte". Cada lançamento do QSMS campo tem o próprio rascunho no aparelho (`seg_local/draft`, chave `sst:<id>`, timer de gravação por lançamento; o rascunho único antigo `sst` é migrado em `sstDraftsAll`), que aparece como card **Pendente** em *Meus lançamentos* com **Continuar/Descartar**; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques).
+
+**PDF dos checklists (sw v475):** `sstCkPdf` (overlay `#relatorio` → Imprimir / Salvar PDF). Abre sozinho depois do envio (usa os dados do aparelho, vale sem sinal), e também pelo botão **📄 PDF** em *Meus lançamentos* e no detalhe da gestão (via `app_sst_ck_ver`, precisa de conexão). Sem mudança no banco.
 
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
