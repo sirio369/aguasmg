@@ -5281,3 +5281,10 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   (a 1ª, se estiver em várias), Função, Apropriação, Modalidade, Superior; Itens → Pessoa/equipe, Item, Aba, Apropriação.
 - Coluna **Código** (P-001…) em Por pessoa e Itens; Por pessoa ganhou também a coluna Equipe. Por mês ganhou linha de total.
 - Só tela: o Excel não mudou. Testado com banco simulado (totais iguais com e sem juntar).
+
+## 25. Estrutura Organizacional — tela `estrutura` (🚧 em desenvolvimento) · `docs/migracao_estrutura_organizacional.sql` (2026-11-26)
+
+- **Objetivo:** todo colaborador consultar a estrutura e saber onde está. **Por enquanto** só admin e `dev_acesso` (card no bloco 🚧 Em desenvolvimento e `estrutura_pode` no banco). Para liberar a todos: trocar a condição de `estrutura_pode` por `p.ativo` e o gate `orgPode()` no front.
+- **Fonte:** `public.perfil`; superior = **Aprovador 1**. Entram os ativos; terceiro e a conta de teste ficam fora. `app_estrutura()` devolve só nome, cargo, área, consórcio e superior.
+- **Ciclo de aprovadores** (em 26/11/2026: Heron e Sander são aprovador 1 um do outro): o front escolhe o topo (cargo com "Diretor"; senão a maior equipe direta).
+- **Tela:** "Onde estou" (caminho do topo até a pessoa, a quem responde, quantos respondem a ela), árvore recolhível e busca que abre o caminho até o nome.
