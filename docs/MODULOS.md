@@ -3861,7 +3861,10 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
   **Telas (PR-B, sw v328):** `sst` (Home › 🛠️ Execução › 🦺 QSMS campo; card escondido sem `ME.qsms_campo`) com os
   lançamentos + "Meus lançamentos" (desde sw v472: **lista única abaixo dos botões, sem limite de dias** — `app_sst_minhas(p_dias:36500)`
-  + itens ainda na fila + o rascunho em preenchimento, que saiu do banner do topo e virou o 1º card com Continuar/Descartar;
+  + itens ainda na fila + os rascunhos em preenchimento, que saíram do banner do topo e viraram os 1ºs cards com Continuar/Descartar;
+  desde sw v473 **vários rascunhos ao mesmo tempo** (chave `sst:<id>` no store `draft`; a chave antiga `sst` é migrada em `sstDraftsAll`),
+  sem o bloqueio "Há um lançamento em andamento"; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques) e o "‹ QSMS campo"
+  grava o rascunho na hora (`sstDraftFlush`);
   chips de situação **Todos · Pendentes** (em preenchimento ou aguardando envio) **· Finalizados** (já no servidor), estado `sstSit`;
   cache em `localStorage.sstMinhas`)
   e `sst_form` (um formulário por vez, estado `sstD`, rascunho no IndexedDB `seg_local` store `draft` chave `sst`, com fotos

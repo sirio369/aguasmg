@@ -16364,10 +16364,18 @@ const sstQid=()=>'sst-'+String(Date.now()).padStart(15,'0')+'-'+crypto.randomUUI
 const sstGpsOk=()=>!!(gps&&gps.acc<=PRECISAO_MAX);
 // preenchimento manual: só no checklist de recomposição (localização dispensada, endereço obrigatório)
 const sstManual=()=>!!(sstD&&sstD.tipo==='rec'&&sstD.manual);
-// rascunho no mesmo IndexedDB do seg (store 'draft', chave 'sst'): guarda fotos (Blob) e assinaturas
-const sstDraftGet=()=>segIdb('draft','readonly',s=>s.get('sst'));
-const sstDraftDel=()=>segIdb('draft','readwrite',s=>s.delete('sst'));
-function sstDraftSave(){ clearTimeout(sstDraftT); const snap=sstD; sstDraftT=setTimeout(()=>{ if(snap) segIdb('draft','readwrite',s=>s.put(Object.assign({},snap,{k:'sst',salvo_em:new Date().toISOString()}))).catch(()=>{}); },350); }
+// rascunhos no mesmo IndexedDB do seg (store 'draft', chave 'sst:<id>' — vários ao mesmo tempo): guardam fotos (Blob) e assinaturas.
+// A chave antiga 'sst' (um rascunho só, até a v472) é migrada para 'sst:<id>' na primeira leitura.
+const sstDraftK=id=>'sst:'+id;
+async function sstDraftsAll(){ let all=[]; try{ all=await segIdb('draft','readonly',s=>s.getAll())||[]; }catch(e){ return []; }
+  const old=all.find(r=>r.k==='sst');
+  if(old){ try{ const id=old.id||crypto.randomUUID(); await segIdb('draft','readwrite',s=>{ s.delete('sst'); return s.put(Object.assign({},old,{id,k:sstDraftK(id)})); }); old.id=id; old.k=sstDraftK(id); }catch(e){} }
+  return all.filter(r=>String(r.k||'').startsWith('sst:')&&SST_TIPO[r.tipo]).sort((a,b)=>String(b.salvo_em||'').localeCompare(String(a.salvo_em||''))); }
+const sstDraftDel=id=>segIdb('draft','readwrite',s=>s.delete(sstDraftK(id)));
+const sstDraftPut=snap=>segIdb('draft','readwrite',s=>s.put(Object.assign({},snap,{k:sstDraftK(snap.id),salvo_em:new Date().toISOString()})));
+function sstDraftSave(){ clearTimeout(sstDraftT); const snap=sstD; sstDraftT=setTimeout(()=>{ if(snap) sstDraftPut(snap).catch(()=>{}); },350); }
+// grava já (ao sair do formulário), sem esperar o atraso — evita perder a última mudança ao abrir outro checklist
+function sstDraftFlush(){ clearTimeout(sstDraftT); return sstD?sstDraftPut(sstD).catch(()=>{}):Promise.resolve(); }
 function sstCss(){ if(document.getElementById('sstcss'))return; const st=document.createElement('style'); st.id='sstcss'; st.textContent=`
  #sst_form .segyn button{padding:8px 3px}
  #sst_form .segyn[data-sch="interv"],#sst_form .segyn[data-sch="pav"]{flex-wrap:wrap}
@@ -16385,12 +16393,11 @@ async function sstModeloCarregar(){ try{ sstModelo=JSON.parse(localStorage.getIt
 
 // ===== Tela principal (sst): novos lançamentos + meus lançamentos =====
 async function sstInit(){ segCss(); sstCss(); segPessoasCarregar(); sstModeloCarregar(); sstListar(); }
-// rascunho em preenchimento: aparece na lista (situação Pendente) com Continuar/Descartar
-function sstRascWire(r){ const bc=document.getElementById('sstRascCont'), bd=document.getElementById('sstRascDesc'); if(!bc||!bd) return;
-  bc.onclick=()=>{ sstD=r; delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); };
-  bd.onclick=()=>{ if(bd.dataset.ok!=='1'){ bd.dataset.ok='1'; bd.textContent='Toque de novo p/ descartar'; return; } clearTimeout(sstDraftT); sstDraftDel().then(sstListar).catch(()=>{}); }; }
-async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(r&&SST_TIPO[r.tipo]){ toast('Há um lançamento em andamento — continue ou descarte'); sstSit='pend'; sstListarRender(); const b=document.getElementById('sstRascCard'); if(b) b.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+// rascunhos em preenchimento: aparecem na lista (situação Pendente), cada um com Continuar/Descartar
+function sstRascWire(){ const c=document.getElementById('sstLista'); if(!c) return;
+  c.querySelectorAll('[data-rcont]').forEach(b=>b.onclick=()=>{ const r=sstRascs.find(x=>x.id===b.dataset.rcont); if(!r) return; sstD=Object.assign({},r); delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); });
+  c.querySelectorAll('[data-rdesc]').forEach(b=>b.onclick=()=>{ if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } sstDraftDel(b.dataset.rdesc).then(sstListar).catch(()=>{}); }); }
+async function sstNovo(tipo){
   const d={tipo,id:crypto.randomUUID(),data:sstHoje(),area:'',observacoes:'',fotos:{}};
   if(tipo==='insp'){ if(!sstModelo.length) await sstModeloCarregar();
     Object.assign(d,{local:'',os:'',resp_uuid:null,resp_nome:'',resp_sig:null,resp_em:null,itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
@@ -16400,12 +16407,12 @@ async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){
     enc_uuid:null,enc_nome:'',enc_sig:null,enc_em:null,fis_sig:null,fis_em:null});
   sstD=d; irPara('sst_form'); }
 // lista única: rascunho em preenchimento + fila do aparelho (pendentes) + tudo o que já subiu (finalizados), sem limite de dias
-let sstSit='todos', sstL=[], sstRod='', sstRasc=null;
+let sstSit='todos', sstL=[], sstRod='', sstRascs=[];
 async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)return; let srv=null;
   if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_sst_minhas',{p_dias:36500}); if(error)throw error; srv=data||{}; try{ localStorage.setItem('sstMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
   const doServ=!!srv; if(!srv){ try{ srv=JSON.parse(localStorage.getItem('sstMinhas')||'null'); }catch(e){} } srv=srv||{};
   let fila=[]; try{ fila=(await filaAll()).filter(i=>String(i.id).startsWith('sst-')); }catch(e){}
-  let r=null; try{ r=await sstDraftGet(); }catch(e){} sstRasc=(r&&SST_TIPO[r.tipo])?r:null;
+  sstRascs=await sstDraftsAll();
   const ids=new Set(), L=[], pl=(n,s,p)=>n+' '+(n===1?s:p), fin='✓ Finalizado';
   (srv.inspecoes||[]).forEach(x=>{ ids.add(x.id); L.push({t:'insp',sit:'fin',st:fin,data:x.data,tit:x.area||'—',
     sub:[x.local||x.endereco,pl(x.itens||0,'item','itens')+' · '+pl(x.ncs||0,'NC','NCs')+(x.pendentes?(' · '+pl(x.pendentes,'pendente','pendentes')):'')].filter(Boolean).join(' · '),al:x.alertas}); });
@@ -16416,8 +16423,8 @@ async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)r
   fila.forEach(i=>{ const f=i.fields||{}, d=f.p_dados||{}, t=String(i.tipo||'').replace('sst_',''); if(ids.has(f.p_id)||!SST_TIPO[t]) return;
     L.push({t,sit:'pend',st:'⏳ Aguardando envio — sobe quando houver conexão',data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?('OS '+(d.os||'—')):(d.area||'—'),sub:''}); });
   L.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
-  if(sstRasc){ const d=sstRasc; L.unshift({t:d.tipo,sit:'pend',rasc:true,st:'📝 Em preenchimento — salvo em '+segFmt(d.salvo_em),data:d.data,
-    tit:d.tipo==='dds'?d.tema:d.tipo==='oc'?d.natureza:sstEhCk(d.tipo)?('OS '+(d.os||'—')):(d.area||'—'),sub:''}); }
+  L.unshift(...sstRascs.map(d=>({t:d.tipo,sit:'pend',rasc:d.id,st:'📝 Em preenchimento — salvo em '+segFmt(d.salvo_em),data:d.data,
+    tit:d.tipo==='dds'?d.tema:d.tipo==='oc'?d.natureza:sstEhCk(d.tipo)?('OS '+(d.os||'—')):(d.area||'—'),sub:''})));
   sstL=L; sstRod=doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>';
   sstListarRender(); }
 function sstListarRender(){ const c=document.getElementById('sstLista'), ch=document.getElementById('sstSit'); if(!c)return;
@@ -16426,19 +16433,20 @@ function sstListarRender(){ const c=document.getElementById('sstLista'), ch=docu
     ch.querySelectorAll('[data-ssit]').forEach(b=>b.onclick=()=>{ sstSit=b.dataset.ssit; sstListarRender(); }); }
   const L=sstSit==='todos'?sstL:sstL.filter(x=>x.sit===sstSit);
   if(!L.length){ c.innerHTML='<p class="sub">'+(sstSit==='pend'?'Nenhum lançamento pendente.':sstSit==='fin'?'Nenhum lançamento finalizado.':'Nada lançado ainda.')+'</p>'+sstRod; return; }
-  c.innerHTML=L.map(x=>`<div class="segcard"${x.rasc?' id="sstRascCard" style="border-color:var(--warn)"':''}><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
+  c.innerHTML=L.map(x=>`<div class="segcard"${x.rasc?' style="border-color:var(--warn)"':''}><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
     <div style="margin-top:3px;font-size:14px;font-weight:600">${segH(x.tit||'—')}</div>${x.sub?`<div class="sub" style="font-size:12.5px;margin-top:2px">${segH(x.sub)}</div>`:''}
     <div class="sub" style="font-size:12px;margin-top:4px;font-weight:600;color:${x.sit==='fin'?'var(--ok)':'var(--mut)'}">${segH(x.st)}</div>
     ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}
-    ${x.rasc?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="sstRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="sstRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`:''}</div>`).join('')+sstRod;
-  if(sstRasc) sstRascWire(sstRasc); }
+    ${x.rasc?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-rcont="${x.rasc}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" data-rdesc="${x.rasc}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`:''}</div>`).join('')+sstRod;
+  sstRascWire(); }
 
 // ===== Formulário (sst_form): estado único sstD, salvo como rascunho a cada mudança =====
 function sstFormInit(){ segCss(); sstCss(); if(!sstD){ irPara('sst'); return; }
   if(sstD.tipo==='dds'&&sstD.qtd==null){ sstD.qtd=(sstD.pes||[]).filter(p=>String(p.nome||'').trim()).length||''; delete sstD.pes; sstD.area='Geral'; } segPessoasDl(); $('#sstFormTit').textContent=SST_TIPO[sstD.tipo].ic+' '+SST_TIPO[sstD.tipo].t; sstRender(); }
 function sstRender(){ const body=document.getElementById('sstFormBody'); if(!body||!sstD) return; const se=document.scrollingElement||document.documentElement, y=se.scrollTop;
   body.innerHTML='<div id="sstGps" class="banner warn"></div>'+(sstD.tipo==='insp'?sstInspHtml():sstD.tipo==='dds'?sstDdsHtml():sstEhCk(sstD.tipo)?sstCkHtml():sstOcHtml())
-    +'<div id="sstErros"></div><button class="btn" id="sstEnviar" style="margin-top:12px">Enviar</button>';
+    +'<div id="sstErros"></div><button class="btn" id="sstEnviar" style="margin-top:12px">Enviar</button>'
+    +'<button class="btn ghost" id="sstDescartar" style="margin-top:8px">🗑️ Descartar este lançamento</button>';
   sstWire(); sstOnGps(); se.scrollTop=y; }
 const sstSel=(id,opts,val,ph)=>`<select id="${id}">${ph!=null?`<option value="">${ph}</option>`:''}${opts.map(o=>`<option${o===val?' selected':''}>${segH(o)}</option>`).join('')}</select>`;
 const sstChips=(campo,opts,val)=>`<div class="segyn" data-sch="${campo}">${opts.map(o=>`<button type="button" data-v="${segH(o)}" class="${o===val?'on':''}">${segH(o)}</button>`).join('')}</div>`;
@@ -16623,10 +16631,14 @@ async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const
   const item={id:sstQid(),tipo:'sst_'+d.tipo,rpc:SST_TIPO[d.tipo].rpc,pasta:'sst',anexos,anexosParam:'p_anexos',fields:{p_id:d.id,p_dados:dados}};
   const ok=await enviarOuEnfileirar(item,SST_TIPO[d.tipo].ok);
   if(!ok){ delete btn.dataset.env; sstAtualizar(); return; }
-  clearTimeout(sstDraftT); try{ await sstDraftDel(); }catch(e){}
+  clearTimeout(sstDraftT); try{ await sstDraftDel(d.id); }catch(e){}
   sstD=null; irPara('sst'); }
+// descartar no fim do formulário: 2 toques, apaga o rascunho e volta à lista
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('#sstDescartar'); if(!b||!sstD) return;
+  if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo para descartar (não dá para desfazer)'; return; }
+  const id=sstD.id; clearTimeout(sstDraftT); sstD=null; sstDraftDel(id).catch(()=>{}).then(()=>{ toast('Lançamento descartado'); irPara('sst'); }); });
 document.querySelectorAll('[data-sstnovo]').forEach(b=>b.addEventListener('click',()=>sstNovo(b.dataset.sstnovo)));
-if($('#sstFormBack')) $('#sstFormBack').addEventListener('click',()=>{ if(sstD) sstDraftSave(); sstD=null; irPara('sst'); });
+if($('#sstFormBack')) $('#sstFormBack').addEventListener('click',async()=>{ await sstDraftFlush(); sstD=null; irPara('sst'); });
 
 // ---------- QSMS › 📊 Indicadores SST (gestão): painel, lançamentos, ASO, treinamentos, CIPA, checklist ----------
 // Gate ME.qsms (qsmsGate). Tudo por RPC app_sst_* (gate qsms_pode no servidor). Anular no lugar de apagar.
