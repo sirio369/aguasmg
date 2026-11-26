@@ -1230,6 +1230,17 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   motivou: 7 autoaprovações (EPI #22/#32/#37/#99, Insumos #1061/#1158, Manutenção de frota #1).
 - ⚠️ **Cuidado:** fila/aprovação nova em Suprimentos → use `sup_e_aprovador_de`, nunca
   `sup_pode_aprovar`/`sup_epi_gestor` (esses só dizem "é aprovador de alguém", não "de quem").
+- **Aviso "já retirou este item" (2026-11-26, sw v479, `docs/migracao_sup_aprov_ja_retirou.sql`):** nas 3 telas
+  de aprovação (Insumos `supVAprovar`, Ferramentas `supVFerramentaAprovar`, EPI `supVEpiAprovar`) cada item mostra,
+  abaixo de "solicitado", quando o colaborador já retirou o **mesmo item** antes (`supAntAviso`): **⚠️ amarelo** se
+  ainda está com ele ("Já possui este item: retirou em DD/MM/AAAA · qtd — ainda com ele: N", + troca prevista no EPI)
+  e **ℹ️ neutro** se já retirou mas não tem mais. Só informa — não bloqueia a aprovação. Vem do campo novo
+  **`anterior`** em cada item das filas `sup_fila_aprovacao`/`sup_ferramenta_fila_aprovacao`/`sup_epi_fila_aprovacao`
+  (null = nunca retirou), montado pelos helpers internos (sem grant) `"9 - suprimentos".sup_ja_retirou_material(uid,
+  material, sol_atual)` — última `sup_solicitacao` **entregue** com `qt_entregue>0` (`em`=`entregue_em`, `qt`, `sol`) +
+  `posse` = saldo do kardex `sup_movimento` — e `sup_ja_retirou_epi(uid, epi, sol_atual)` — última `sup_epi_entrega`
+  tipo entrega/substituição (`em`, `qt`, `tamanho`) + `posse`/`vence_em` dos itens sem `substituido_em`/`devolvido_em`.
+  A comparação é por **material/EPI** (EPI ignora o tamanho; o tamanho anterior aparece no aviso).
 
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
