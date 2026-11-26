@@ -4029,12 +4029,12 @@ redefinidas (+ `checklists`, `checklist_itens`, `vazias.checklists`). Views **`b
 **`bi_sst_checklist_item`** (grant `bi_qsms_leitura`) — o Power BI QSMS ainda não tem essas tabelas; dá pra incluir depois
 pela mesma API. **Aplicado em 18/11/2026** (migração `sst_checklist_pop022`, E2E com rollback ok).
 
-**Preenchimento Manual (26/11/2026, sw v470) — `docs/migracao_sst_ck_preenchimento_manual.sql`:** só no checklist de
+**Preenchimento Manual (26/11/2026, sw v471) — `docs/migracao_sst_ck_preenchimento_manual.sql`:** só no checklist de
 **recomposição**. Marcado: o GPS deixa de ser exigido **e não é gravado** (coordenada de quem preenche fora do local
 enganaria) e o **Endereço** passa a ser obrigatório (coluna `endereco`; sem o alerta "Sem GPS"; coluna nova
 `preenchimento_manual`). Sem coordenada, o consórcio vem do cadastro de quem preenche (`qsms_consorcio`); bairro e
 município ficam vazios. Desmarcado, e no reaterro, nada muda. A gestão mostra "✍️ manual" na lista, no detalhe e no XLSX.
-**A migração precisa ser aplicada**: sem ela o envio funciona, mas o registro sai com "Sem GPS" e o endereço fica em `local`.
+**Migração aplicada em produção (26/11/2026)**; é compatível com o app anterior, que não envia o campo e segue como antes.
 
 ---
 
