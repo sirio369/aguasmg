@@ -188,6 +188,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--tc,var(--acc));border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .pjcard:active{transform:scale(.995)}
 .pjcard h3{font-size:15px;margin:6px 0 2px;line-height:1.25}
+.pjend{font-size:12px;color:var(--mut);margin:3px 0 2px;line-height:1.35}
 .pjcard .tp{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--tc)}
 .pjmono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--mut)}
 .pjpill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
@@ -3264,14 +3265,14 @@ async function pjLoad(force){
     const _vm=String(p.projeto||p.id||'').match(/VRP-?(\d+)/i);   // nº da VRP (ex.: "VRP-29" → "29") p/ deep-link no visor 3D
     ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),ref:p.id||null,
       local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
-      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,vrp:_vm?_vm[1]:null,
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,vrp:_vm?_vm[1]:null,end:p.endereco||null,
       ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
   lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
     // diferencia HDD × VCA pela coluna `tipo` (fallback: nome do layer_dwg). HDD = perfuração direcional; resto = VCA (vala a céu aberto)
     const tp=/HDD/i.test(String(p.tipo||'')+' '+String(p.layer_dwg||''))?'rede_hdd':'rede_vca';
     ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:tp,cod:p.codigo||p.layer_dwg||('#'+p.gid),ref:p.id||null,
       local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
-      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,ext:p.extensao_m,tubulacao:p.tubulacao,
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,ext:p.extensao_m,tubulacao:p.tubulacao,end:p.endereco||null,
       lls,arv:(PJ_ARV[tp]||PJ_ARV.rede_vca)(p.extensao_m)}); });
   // sobrepõe o estado salvo (snapshot) nos templates
   let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
@@ -3323,6 +3324,11 @@ function pjReconcilia(iv){ if(!Array.isArray(iv.arv)) return;
   const cam=iv.arv.find(n=>n.c==='av_camara');
   if(cam&&Array.isArray(cam.f)){ const i=cam.f.findIndex(x=>/^execução da câmara/i.test(x.n||'')), r=cam.f.findIndex(x=>/^reaterro/i.test(x.n||'')); if(r>=0&&i>r) cam.f.splice(r,0,cam.f.splice(i,1)[0]); }
 }
+// endereço automático (2026-11-26, proj_endereco no banco): ruas pelos eixos de logradouro — ponto = rua mais próxima;
+// trecho HDD/VCA = todas as ruas que ele percorre, na ordem do início (I) ao fim (F) — + bairro(s)
+const pjEndRuas=iv=>(iv&&iv.end&&iv.end.ruas)||[], pjEndBairros=iv=>(iv&&iv.end&&iv.end.bairros)||[];
+const pjEndTxt=iv=>{ const r=pjEndRuas(iv), b=pjEndBairros(iv); return r.join(' · ')+(r.length&&b.length?' — ':'')+b.join(', '); };
+const pjEndHtml=iv=>{ const t=pjEndTxt(iv); return t?`<div class="pjend" title="Endereço pelo mapa (eixos de logradouro)">📍 ${pjEsc(t)}</div>`:''; };
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
 const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
 // HDD › Puxamento da tubulação: cada lançamento guarda diâmetro (mm) + rua (2026-11-25, app_proj_avanco_pux_set)
@@ -3473,7 +3479,9 @@ function pjMapSel(M,iv,E,ll,dest,real){ const map=M.map; pjMapDesel(M);
   const lin=!!iv.lls, pp=iv.pipe||{}, pct=Math.round(pjIvPct(iv)), fz=+pp.fase||1;
   const nav='https://www.google.com/maps/dir/?api=1&destination='+(+dest[0]).toFixed(6)+','+(+dest[1]).toFixed(6);
   const com=Object.keys(pp.atores||{}).filter(k=>PJ_ATOR[k]&&(pp.atores[k].n||0)>0).map(k=>PJ_ATOR[k][0]+' '+PJ_ATOR[k][1]+' ('+pp.atores[k].n+')').join(' · ');
-  const rows=[['Código da folha',iv.cod&&!/^#/.test(iv.cod)?iv.cod:'—',1],
+  const ruas=pjEndRuas(iv), bai=pjEndBairros(iv);
+  const rows=[[ruas.length>1?'Ruas':'Endereço',ruas.length?ruas.join(' · '):null],[bai.length>1?'Bairros':'Bairro',bai.length?bai.join(', '):null],
+    ['Código da folha',iv.cod&&!/^#/.test(iv.cod)?iv.cod:'—',1],
     ['ID',iv.ref&&iv.ref!==iv.cod?iv.ref:null,1],
     ['Fase',pp.concluida?'Concluída':fz+' · '+(PJ_FASE_N[fz]||'—')],
     ['Com quem está',com||null],
@@ -3538,7 +3546,7 @@ function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx
     const p=Math.round(pjIvPct(iv)), cl=p>=100?'ok':'';
     const prog=(pp.prog&&pp.fase&&pp.fase!==4&&pp.fase<6)?`<span class="pjfaseprog">${PJ_FASE_N[pp.fase]} ${pp.prog.feitos}/${pp.prog.total}</span>`:'';
     return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span class="pjpill ${sc}">${sl}</span></div>
-    <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
+    <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>${pjEndHtml(iv)}
     <div class="pjchips">${pjAtorChips(iv)}${prog}${pp.legado?'<span class="pjtag off" title="Liberada antes do pipeline: sem portões de antes da obra">legado</span>':''}</div>
     <div class="pjbar ${cl}"><i style="width:${Math.min(p,100)}%"></i></div>
     <div class="pjfoot"><span>${iv.resp}</span>${sup?`<span class="pjgo det" style="pointer-events:none">${iv.locked?'Revisar':'Configurar'} ›</span>`:`<span class="pjpc">${p}% execução</span>`}</div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção nesse filtro.</p>';
@@ -3685,7 +3693,7 @@ function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=
   // naFase = etapa do ator escolhido em "Pendência com" (vale p/ gaps, KPIs E a lista de cada intervenção)
   const aberta=x=>x.c==='pend'||x.c==='and', naFase=x=>!F.ator||x.ator===F.ator;
   const rows=PJ_IVS.filter(iv=>(!F.cons||iv.cons===F.cons)&&(!F.tipo||iv.tipo===F.tipo)&&(!F.st.size||F.st.has(pjPipeStatus(iv)))
-      &&(!q||[iv.cod,iv.local,iv.dmc].join(' ').toLowerCase().includes(q)))
+      &&(!q||[iv.cod,iv.local,iv.dmc,pjEndTxt(iv)].join(' ').toLowerCase().includes(q)))
     .map(iv=>{ let e=pjPdEtapas(iv); if(!F.leg) e=e.filter(x=>!x.leg); return {iv,e}; });
   let vis=F.ator?rows.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))):rows;
   // gaps: etapa × fase com quantas intervenções estão ok / em andamento / pendentes (antes do filtro de etapa)
@@ -4304,7 +4312,7 @@ function pjRenderCfg(keep){
     ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Liberada</b> <span class="pjpill ${sc}">${sl}</span><span>Configuração congelada. Reabra só se precisar mudar etapas, escopo ou quantidades — o que já foi feito fica guardado.</span></div>${eng?'<button class="btn ghost" id="pjUnlock">Reabrir configuração</button>':''}</div>`
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b><span>${(falta.length&&!pp.legado)?'Para liberar, anexe (com o tamanho da folha): <b>'+falta.join(', ')+'</b>':'Pronta para liberar — os documentos de projeto vão para a aprovação da Qualidade.'}</span></div>${eng?`<button class="btn" id="pjLock" ${(falta.length&&!pp.legado)?'disabled':''}>🔓 Liberar</button>`:''}</div>`;
   $('#pjCfg').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
-   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
+   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>${pjEndHtml(iv)}
    ${pjSpecs(iv)}
    <div class="pjchips">${pjAtorChips(iv)}${pp.legado?'<span class="pjtag off">legado</span>':''}</div>
    ${lockCard}
@@ -4564,7 +4572,7 @@ function pjRenderDet(keep){
                :`<div class="pjbanner ok">🏗️ <b>Execução aberta</b> — só os responsáveis de obras (Supervisor de Produção, Coordenador de Serviços, Gestor de Obras) lançam avanço.${antes}</div>`)
     : `<div class="pjbanner warn">⏳ <b>Execução fechada</b> — atualize a tela para carregar o pipeline.</div>`;
   $('#pjDet').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
-   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
+   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>${pjEndHtml(iv)}
    ${pjSpecs(iv)}
    <div class="pjsum">
      <div class="pjring" style="background:conic-gradient(${ringc} ${Math.min(p,100)*3.6}deg,var(--line) 0)"><span>${p}%</span></div>

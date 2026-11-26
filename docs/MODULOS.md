@@ -2953,6 +2953,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **Endereço automático pelo mapa (2026-11-26, sw v474, `docs/migracao_proj_endereco.sql`):** `app_proj_intervencoes` devolve
+  `properties.endereco = {ruas:[…], bairros:[…]}` em pontos e linhas, calculado **ao vivo** por `public.proj_endereco(geom)` sobre
+  `"1 - suporte_geografico".logradouros` + `bairros` (acompanha edição da geometria no QGIS; ~0,5 s p/ as 116 intervenções).
+  **Ponto** (VRP/válvula/macro): rua mais próxima até 60 m + bairro que contém o ponto. **Trecho HDD/VCA:** amostra o traçado a cada
+  ~5 m, pega a rua mais próxima de cada amostra (até 40 m) e fica com as que cobrem **≥ 10% do trecho ou ≥ 20 m** (rua que só cruza
+  fica de fora; a dominante fica sempre), **na ordem do início (I) ao fim (F)**; bairros com ≥ 20 m (ou 10%) do trecho. Nome pelo
+  `public.proj_fmt_logradouro(tipo,nome)` (R → Rua, AV → Av., PR → Praça…; preposições em minúsculo; romanos/siglas em maiúsculo; sem
+  acento porque a base não tem). Front: `iv.end` (carregado em `pjLoad`), helpers `pjEndRuas`/`pjEndBairros`/`pjEndTxt`/`pjEndHtml`;
+  aparece no **card da lista** (📍 abaixo do código), no **popup do mapa** (linhas Endereço/Ruas + Bairro) e no topo do `projeto_det`/
+  `projeto_cfg`; a busca da tela Pendências também acha pelo endereço. ⚠️ Logradouro sem cadastro na base → a rua mais próxima pode
+  ser a paralela; trecho multilinha desconexo usa só a 1ª parte.
 - **HDD › Puxamento da tubulação: diâmetro + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** o lançamento do
   puxamento (`pjIsPux` = intervenção `rede_hdd` + etapa com "puxamento" no nome) pede **Diâmetro da tubulação** (mm, só número — o
   campo filtra letras; `> 0`) e **Rua** (texto livre), ambos obrigatórios no lançamento novo. A rua vem **preenchida com a última rua
@@ -3862,7 +3873,7 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   **Telas (PR-B, sw v328):** `sst` (Home › 🛠️ Execução › 🦺 QSMS campo; card escondido sem `ME.qsms_campo`) com os
   lançamentos + "Meus lançamentos" (desde sw v472: **lista única abaixo dos botões, sem limite de dias** — `app_sst_minhas(p_dias:36500)`
   + itens ainda na fila + os rascunhos em preenchimento, que saíram do banner do topo e viraram os 1ºs cards com Continuar/Descartar;
-  desde sw v473 **vários rascunhos ao mesmo tempo** (chave `sst:<id>` no store `draft`; a chave antiga `sst` é migrada em `sstDraftsAll`),
+  desde sw v475 **vários rascunhos ao mesmo tempo** (chave `sst:<id>` no store `draft`; a chave antiga `sst` é migrada em `sstDraftsAll`),
   sem o bloqueio "Há um lançamento em andamento"; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques) e o "‹ QSMS campo"
   grava o rascunho na hora (`sstDraftFlush`);
   chips de situação **Todos · Pendentes** (em preenchimento ou aguardando envio) **· Finalizados** (já no servidor), estado `sstSit`;
@@ -4042,7 +4053,7 @@ enganaria) e o **Endereço** passa a ser obrigatório (coluna `endereco`; sem o 
 município ficam vazios. Desmarcado, e no reaterro, nada muda. A gestão mostra "✍️ manual" na lista, no detalhe e no XLSX.
 **Migração aplicada em produção (26/11/2026)**; é compatível com o app anterior, que não envia o campo e segue como antes.
 
-**Preenchimento Manual no reaterro também (26/11/2026, sw v473) — `docs/migracao_sst_ck_manual_reaterro.sql`:**
+**Preenchimento Manual no reaterro também (26/11/2026, sw v475) — `docs/migracao_sst_ck_manual_reaterro.sql`:**
 a caixa passa a valer nos **dois** checklists, com a mesma regra acima (onde se lê "só no checklist de recomposição"
 ou "no reaterro nada muda", vale esta nota). **A migração precisa ser aplicada**: sem ela, o reaterro manual sai com o
 alerta "Sem GPS" e o endereço fica em `local`.
@@ -4053,9 +4064,9 @@ continua obrigatória.
 
 ---
 
-**Vários lançamentos em preenchimento (sw v473):** acabou o bloqueio "continue ou descarte". Cada lançamento do QSMS campo tem o próprio rascunho no aparelho (`seg_local/draft`, chave `sst:<id>`, timer de gravação por lançamento; o rascunho único antigo `sst` é migrado em `sstDraftsAll`), que aparece como card **Pendente** em *Meus lançamentos* com **Continuar/Descartar**; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques).
+**Vários lançamentos em preenchimento (sw v475):** acabou o bloqueio "continue ou descarte". Cada lançamento do QSMS campo tem o próprio rascunho no aparelho (`seg_local/draft`, chave `sst:<id>`, timer de gravação por lançamento; o rascunho único antigo `sst` é migrado em `sstDraftsAll`), que aparece como card **Pendente** em *Meus lançamentos* com **Continuar/Descartar**; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques).
 
-**PDF dos checklists (sw v473):** `sstCkPdf` (overlay `#relatorio` → Imprimir / Salvar PDF). Abre sozinho depois do envio (usa os dados do aparelho, vale sem sinal), e também pelo botão **📄 PDF** em *Meus lançamentos* e no detalhe da gestão (via `app_sst_ck_ver`, precisa de conexão). Sem mudança no banco.
+**PDF dos checklists (sw v475):** `sstCkPdf` (overlay `#relatorio` → Imprimir / Salvar PDF). Abre sozinho depois do envio (usa os dados do aparelho, vale sem sinal), e também pelo botão **📄 PDF** em *Meus lançamentos* e no detalhe da gestão (via `app_sst_ck_ver`, precisa de conexão). Sem mudança no banco.
 
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
