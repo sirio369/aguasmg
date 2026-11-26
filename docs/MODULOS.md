@@ -2953,6 +2953,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **Endereço automático pelo mapa (2026-11-26, sw v474, `docs/migracao_proj_endereco.sql`):** `app_proj_intervencoes` devolve
+  `properties.endereco = {ruas:[…], bairros:[…]}` em pontos e linhas, calculado **ao vivo** por `public.proj_endereco(geom)` sobre
+  `"1 - suporte_geografico".logradouros` + `bairros` (acompanha edição da geometria no QGIS; ~0,5 s p/ as 116 intervenções).
+  **Ponto** (VRP/válvula/macro): rua mais próxima até 60 m + bairro que contém o ponto. **Trecho HDD/VCA:** amostra o traçado a cada
+  ~5 m, pega a rua mais próxima de cada amostra (até 40 m) e fica com as que cobrem **≥ 10% do trecho ou ≥ 20 m** (rua que só cruza
+  fica de fora; a dominante fica sempre), **na ordem do início (I) ao fim (F)**; bairros com ≥ 20 m (ou 10%) do trecho. Nome pelo
+  `public.proj_fmt_logradouro(tipo,nome)` (R → Rua, AV → Av., PR → Praça…; preposições em minúsculo; romanos/siglas em maiúsculo; sem
+  acento porque a base não tem). Front: `iv.end` (carregado em `pjLoad`), helpers `pjEndRuas`/`pjEndBairros`/`pjEndTxt`/`pjEndHtml`;
+  aparece no **card da lista** (📍 abaixo do código), no **popup do mapa** (linhas Endereço/Ruas + Bairro) e no topo do `projeto_det`/
+  `projeto_cfg`; a busca da tela Pendências também acha pelo endereço. ⚠️ Logradouro sem cadastro na base → a rua mais próxima pode
+  ser a paralela; trecho multilinha desconexo usa só a 1ª parte.
 - **HDD › Puxamento da tubulação: diâmetro + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** o lançamento do
   puxamento (`pjIsPux` = intervenção `rede_hdd` + etapa com "puxamento" no nome) pede **Diâmetro da tubulação** (mm, só número — o
   campo filtra letras; `> 0`) e **Rua** (texto livre), ambos obrigatórios no lançamento novo. A rua vem **preenchida com a última rua
