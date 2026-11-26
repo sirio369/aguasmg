@@ -4068,6 +4068,8 @@ continua obrigatória.
 
 **PDF dos checklists (sw v475):** `sstCkPdf` (overlay `#relatorio` → Imprimir / Salvar PDF). Abre sozinho depois do envio (usa os dados do aparelho, vale sem sinal), e também pelo botão **📄 PDF** em *Meus lançamentos* e no detalhe da gestão (via `app_sst_ck_ver`, precisa de conexão). Sem mudança no banco.
 
+**Checklist Segurança + foto nos itens conformes (sw v476):** no QSMS campo o botão "Nova inspeção" virou **Checklist Segurança** (`SST_TIPO.insp.t`; na gestão continua "Inspeções"). Nos 3 checklists (segurança, reaterro e recomposição) todo item marcado **Conforme** pede **foto obrigatória** (`sstFotoConf`, mesma chave `nc_<i>` do item; `sstPend` bloqueia com "Foto em N itens conformes"). A foto vai em `foto` do item (o banco já aceitava foto em qualquer resultado — sem migração) e aparece no PDF ("Conforme 1.1"), no detalhe do checklist e da inspeção na gestão. A foto da NC também é obrigatória nos 3 (antes era opcional no reaterro/recomposição). O servidor não recusa sem foto — a trava é no app.
+
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
 **Aplicado em 06/11/2026** (migrações `sigos_carga` + `sigos_searchpath`; Edge Function `sigos-ingest` v1 publicada,

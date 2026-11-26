@@ -1839,7 +1839,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <h1>QSMS campo</h1>
     <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist e assinatura do responsável pela intervenção, DDS com foto da lista de presença, registro de acidente, quase acidente ou incidente e os checklists de reaterro e de recomposição de pavimento (POP-022). Funciona sem sinal — sobe quando houver conexão.</p>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Nova inspeção</div></button>
+      <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Checklist Segurança</div></button>
       <button class="mod" data-sstnovo="dds"><div class="ic">🗣️</div><div class="nm">Novo DDS</div></button>
       <button class="mod" data-sstnovo="oc"><div class="ic">🚨</div><div class="nm">Registrar ocorrência</div></button>
       <button class="mod" data-sstnovo="rea"><div class="ic">🧱</div><div class="nm">Checklist de reaterro</div></button>
@@ -16286,7 +16286,7 @@ if($('#segFormBack')) $('#segFormBack').addEventListener('click',()=>{ if(segD) 
 // ---------- QSMS CAMPO (Indicadores SST): inspeção, DDS e ocorrência — só equipe QSMS (ME.qsms_campo) ----------
 // Card próprio, separado do ⛑️ Segurança do Trabalho (seg = APR/PT/PET das equipes de execução). Reaproveita os
 // helpers do seg (CSS, lista de pessoas, assinatura, foto). Envio pela fila offline: pasta 'sst', p_anexos = {chave: caminho}.
-const SST_TIPO={insp:{t:'Inspeção de segurança',ic:'🔍',rpc:'app_sst_inspecao_registrar',ok:'✓ Inspeção enviada',btn:'Enviar inspeção'},
+const SST_TIPO={insp:{t:'Checklist Segurança',ic:'🔍',rpc:'app_sst_inspecao_registrar',ok:'✓ Checklist Segurança enviado',btn:'Enviar checklist'},
   dds:{t:'DDS',ic:'🗣️',rpc:'app_sst_dds_registrar',ok:'✓ DDS enviado',btn:'Enviar DDS'},
   oc:{t:'Ocorrência',ic:'🚨',rpc:'app_sst_ocorrencia_registrar',ok:'✓ Ocorrência registrada',btn:'Registrar ocorrência'},
   rea:{t:'Checklist de reaterro',ic:'🧱',rpc:'app_sst_ck_registrar',ok:'✓ Checklist enviado',btn:'Enviar checklist',ck:'reaterro'},
@@ -16472,7 +16472,11 @@ function sstItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="button
       ${segFotoHtml('nc_'+i,'Foto da não conformidade')}
       <label class="sstck"><input type="checkbox" data-if="tratada_no_local" data-i="${i}"${it.tratada_no_local?' checked':''}/> Corrigida na hora</label>
       ${it.tratada_no_local?`<label>Como foi corrigida? *</label><input data-if="tratativa" data-i="${i}" value="${segH(it.tratativa||'')}"/>`
-        :`<label>Prazo para corrigir *</label><input type="date" data-if="prazo" data-i="${i}" min="${sstHoje()}" value="${segH(it.prazo||'')}"/>`}</div>`}</div>`; }
+        :`<label>Prazo para corrigir *</label><input type="date" data-if="prazo" data-i="${i}" min="${sstHoje()}" value="${segH(it.prazo||'')}"/>`}</div>`}
+    ${r==='C'?sstFotoConf(i):''}</div>`; }
+// foto do item conforme (obrigatória nos 3 checklists: segurança, reaterro e recomposição); usa a mesma chave nc_<i> do item
+const sstFotoConf=i=>`<div style="margin-top:6px">${segFotoHtml('nc_'+i,'Foto do item conforme')}</div>`;
+const sstSemFotoConf=d=>(d.itens||[]).filter((it,i)=>it.resultado==='C'&&!d.fotos['nc_'+i]).length;
 function sstInspHtml(){ const d=sstD, grupos=[];
   d.itens.forEach((it,i)=>{ const k=it.grupo||'Geral'; let g=grupos.find(x=>x.g===k); if(!g){ g={g:k,l:[]}; grupos.push(g); } g.l.push(sstItemHtml(it,i)); });
   return segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Área / frente *</label>${sstSel('sstArea',sstAreas(),d.area,'Escolha…')}</div></div>
@@ -16514,7 +16518,8 @@ function sstCkItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="butt
   return `<div class="segq"><div class="t"><b>${segH(it.codigo)}</b> ${segH(it.item)}</div><div class="segyn">${b('C','C')}${b('NC','NC')}${b('NA','N/A')}</div>
     ${it.auto?'<div class="sub" style="font-size:11.5px;margin-top:3px">N/A pelo tipo de pavimento</div>':''}
     ${r!=='NC'?'':`<div class="sstnc"><label>Observação / evidência *</label><textarea data-if="obs" data-i="${i}" rows="2">${segH(it.obs||'')}</textarea>
-      ${sstFotoOpc('nc_'+i,'Foto (opcional)')}</div>`}</div>`; }
+      ${segFotoHtml('nc_'+i,'Foto da não conformidade')}</div>`}
+    ${r==='C'?sstFotoConf(i):''}</div>`; }
 function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', grupos=[];
   d.itens.forEach((it,i)=>{ let g=grupos.find(x=>x.g===it.grupo); if(!g){ g={g:it.grupo,l:[]}; grupos.push(g); } g.l.push(sstCkItemHtml(it,i)); });
   const resv=d.resultado, resb=`<div class="segyn" data-ckres>${SST_CK_RES.map(([v,l])=>`<button type="button" data-v="${v}" class="${resv===v?('on'+(v==='nao_conforme'?' bad':'')):''}">${l}</button>`).join('')}</div>`;
@@ -16594,11 +16599,13 @@ function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
     d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; const n='NC "'+it.item+'"';
       if(!txt(it.descricao)) P.push(n+': o que está errado'); if(!d.fotos['nc_'+i]) P.push(n+': foto');
-      if(it.tratada_no_local){ if(!txt(it.tratativa)) P.push(n+': como foi corrigida'); } else if(!it.prazo) P.push(n+': prazo'); }); }
+      if(it.tratada_no_local){ if(!txt(it.tratativa)) P.push(n+': como foi corrigida'); } else if(!it.prazo) P.push(n+': prazo'); });
+    const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes')); }
   if(sstEhCk(d.tipo)){ if(!txt(d.os)) P.push('Nº da OS'); if(!d.interv) P.push('Tipo de intervenção'); if(!txt(d.equipe)) P.push('Equipe / contratada');
     if(SST_TIPO[d.tipo].ck==='recomposicao'&&!d.pav) P.push('Tipo de pavimento');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
-    d.itens.forEach(it=>{ if(it.resultado==='NC'&&!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); });
+    d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; if(!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); if(!d.fotos['nc_'+i]) P.push('NC '+it.codigo+': foto'); });
+    const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes'));
     if(!d.resultado) P.push('Resultado da inspeção');
     else if(d.resultado==='conforme'&&d.itens.some(it=>it.resultado==='NC')) P.push('Há item não conforme — o resultado não pode ser "Conforme"');
     if(d.resultado&&d.resultado!=='conforme'&&!txt(d.observacoes)) P.push('Observações / ação corretiva');
@@ -16623,7 +16630,7 @@ async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const
   const dados={data:d.data,area:d.area,observacoes:nul(d.observacoes),lat:g?g.lat:null,lon:g?g.lon:null,precisao:g?Math.round(g.acc*10)/10:null,dispositivo:navigator.userAgent.slice(0,100)};
   if(d.tipo==='insp'){ const sig=await segSigJpeg(d.resp_sig); if(sig) anexos.sig_resp=sig;
     Object.assign(dados,{local:nul(d.local),os:nul(d.os),resp_interv_uuid:d.resp_uuid,resp_interv_nome:nul(d.resp_nome),resp_interv_sig:sig?'sig_resp':null,resp_interv_assinado_em:sig?d.resp_em:null,itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null;
-      if(nc&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
+      if((nc||it.resultado==='C')&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
       return {modelo_id:it.modelo_id||null,grupo:nul(it.grupo),item:it.item,resultado:it.resultado,descricao:nc?nul(it.descricao):null,foto,
         prazo:nc&&!it.tratada_no_local?it.prazo:null,tratada_no_local:nc&&!!it.tratada_no_local,tratativa:nc&&it.tratada_no_local?nul(it.tratativa):null}; })}); }
   else if(sstEhCk(d.tipo)){ const se=await segSigJpeg(d.enc_sig), sf=await segSigJpeg(d.fis_sig); if(se) anexos.sig_enc=se; if(sf) anexos.sig_fis=sf;
@@ -16631,7 +16638,7 @@ async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const
     Object.assign(dados,{tipo:SST_TIPO[d.tipo].ck,os:nul(d.os),tipo_intervencao:d.interv,equipe:nul(d.equipe),local:nul(d.local),preenchimento_manual:sstManual(),tipo_pavimento:SST_TIPO[d.tipo].ck==='recomposicao'?d.pav:null,
       resultado:d.resultado,encarregado_uuid:d.enc_uuid,encarregado_nome:nul(d.enc_nome),encarregado_sig:se?'sig_enc':null,encarregado_assinado_em:se?d.enc_em:null,
       fiscal_sig:sf?'sig_fis':null,fiscal_assinado_em:sf?d.fis_em:null,
-      itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null; if(nc&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
+      itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null; if((nc||it.resultado==='C')&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
         return {codigo:it.codigo,grupo:it.grupo,item:it.item,resultado:it.resultado,obs:nc?nul(it.obs):null,foto}; })}); }
   else if(d.tipo==='dds'){ anexos.foto_lista=d.fotos.foto_lista; anexos.foto_1=d.fotos.foto_1;
     Object.assign(dados,{area:'Geral',tema:d.tema.trim(),duracao_min:parseInt(d.duracao_min),participantes_qtd:parseInt(d.qtd)}); }
@@ -16681,6 +16688,7 @@ function sstCkPdf(r){ segCss();
   const fotos=[]; const f=r.fotos||{}; if(f.foto_antes) fotos.push(fig(f.foto_antes,'Antes')); if(f.foto_depois) fotos.push(fig(f.foto_depois,'Depois'));
   Object.keys(f).filter(k=>k!=='foto_antes'&&k!=='foto_depois'&&typeof f[k]==='string'&&f[k]&&!/^(sig|nc_)/.test(k)).forEach(k=>fotos.push(fig(f[k],'Foto')));
   its.forEach(i=>{ if(i.resultado==='NC'&&i.foto) fotos.push(fig(i.foto,'Não conformidade '+(i.codigo||''))); });
+  its.forEach(i=>{ if(i.resultado==='C'&&i.foto) fotos.push(fig(i.foto,'Conforme '+(i.codigo||''))); });
   if(fotos.length) h+=sec('Fotos')+'<div class="relPhotos">'+fotos.join('')+'</div>';
   const ass=(tit,nome,img,em)=>`<div style="text-align:center;break-inside:avoid">${img?`<img src="${segImg(img)}" alt="Assinatura" style="max-width:100%;height:80px;object-fit:contain"/>`:'<div style="height:80px"></div>'}<div style="border-top:1px solid #444;padding-top:4px;font-size:12px"><b>${segH(nome||'—')}</b><br/>${tit}${em?(' · '+segFmt(em)):''}</div></div>`;
   h+=sec('Assinaturas')+'<div class="relGrid">'+ass('Encarregado',r.encarregado_nome,r.encarregado_assinatura,r.encarregado_assinado_em)+ass('Fiscalização',r.usuario_nome,r.fiscal_assinatura,r.fiscal_assinado_em)+'</div>';
@@ -17147,7 +17155,8 @@ async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p cla
   const sig=(nome,img,em)=>`<div style="flex:1 1 220px;min-width:0"><div class="sub" style="font-size:12px">${nome}</div>${img?`<img class="sgsig" src="${fotoURL(img)}" loading="lazy" style="margin-top:4px"/>`:'<div class="sub" style="color:var(--bad);font-size:12px">sem assinatura</div>'}${em?`<div class="sub" style="font-size:11px">${segFmt(em)}</div>`:''}</div>`;
   const grupos=[]; its.forEach(i=>{ let g=grupos.find(x=>x.g===i.grupo); if(!g){ g={g:i.grupo,l:[]}; grupos.push(g); } g.l.push(i); });
   const lin=i=>`<div class="segq"><div class="sgrow"><span class="t" style="flex:1"><b>${segH(i.codigo||'')}</b> ${segH(i.item)}</span>${sgPill(i.resultado)}</div>
-    ${i.resultado==='NC'?`<div class="sstnc">${sgKv([['Observação',segH(i.obs||'—')]])}${i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`:''}</div>`;
+    ${i.resultado==='NC'?`<div class="sstnc">${sgKv([['Observação',segH(i.obs||'—')]])}${i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`
+      :i.resultado==='C'&&i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`;
   let h=`<button class="btn ghost" id="ckVolta" style="width:auto;margin:0 0 10px;padding:8px 13px">‹ ${ck.volta==='sst_bi'?'Voltar ao BI QSMS':'Voltar à lista'}</button>`;
   h+=`<div class="segblk"><h3>${t[0]} ${segH(t[1])} · OS ${segH(r.os||'—')} ${ckPill(r.resultado)}</h3>
     <p class="sub" style="font-size:12px;margin:0 0 6px">POP-022 Rev. 03 — Checklist ${r.tipo==='reaterro'?'01':'02'}</p>
@@ -17252,6 +17261,7 @@ function sgDetInsp(r,cab,al){ const hoje=sstHoje(), its=r.itens||[];
           :`<label>Tratativa</label><textarea data-ntobs="${x.id}" rows="2" placeholder="O que foi feito para corrigir"></textarea>
             <label>Foto da correção (opcional)</label><input type="file" accept="image/*" data-ntfoto="${x.id}"/>
             <div class="sgacts"><button class="btn" data-ntok="${x.id}">✓ Marcar como tratada</button></div>`}</div>`; }
+    else if(x.resultado==='C'&&x.foto) s+=`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(x.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(x.foto)}" loading="lazy"/></a></div>`;
     return s+'</div>'; };
   const n=v=>its.filter(x=>x.resultado===v).length;
   const rsp=(r.os||r.interv_resp_nome)?sgKv([['OS da intervenção',segH(r.os||'')],['Responsável pela intervenção',segH(r.interv_resp_nome||'')+(r.interv_resp_assinado_em?(' <span class="sub" style="font-size:11px">assinou '+segFmt(r.interv_resp_assinado_em)+'</span>'):'')]])
