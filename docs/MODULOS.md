@@ -4044,6 +4044,10 @@ município ficam vazios. Desmarcado, e no reaterro, nada muda. A gestão mostra 
 
 ---
 
+**Vários lançamentos em preenchimento (sw v473):** acabou o bloqueio "continue ou descarte". Cada lançamento do QSMS campo tem o próprio rascunho no aparelho (`seg_local/draft`, chave `sst:<id>`, timer de gravação por lançamento; o rascunho único antigo `sst` é migrado em `sstDraftsAll`), que aparece como card **Pendente** em *Meus lançamentos* com **Continuar/Descartar**; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques).
+
+**PDF dos checklists (sw v473):** `sstCkPdf` (overlay `#relatorio` → Imprimir / Salvar PDF). Abre sozinho depois do envio (usa os dados do aparelho, vale sem sinal), e também pelo botão **📄 PDF** em *Meus lançamentos* e no detalhe da gestão (via `app_sst_ck_ver`, precisa de conexão). Sem mudança no banco.
+
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
 **Aplicado em 06/11/2026** (migrações `sigos_carga` + `sigos_searchpath`; Edge Function `sigos-ingest` v1 publicada,
