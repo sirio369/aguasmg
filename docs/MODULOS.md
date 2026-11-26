@@ -1245,6 +1245,12 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
   existe/parcial/falta, gera código) → retirar (código) → consumir na OS**.
+- **Separar × Entregar em 2 botões (2026-11-26, sw v480), como no EPI:** o bloco Almoxarifado de Insumos tem
+  **🏷️ Separar insumo** (act `almox` — mantido p/ o link da notificação "a separar" continuar abrindo a tela
+  certa; status aprovada/em_separacao) e **📤 Entregar insumo (retirada)** (act novo `almox_entregar`; status
+  segregada, pede o código). As duas são `supVAlmox(modo)` sobre a mesma RPC `sup_fila_almoxarife`,
+  filtrada no front por status (sem mudança no banco). **Ferramentas igual** (§5.4): 🏷️ Separar ferramenta (`ferramenta_almox`) ×
+  📤 Entregar ferramenta (retirada) (`ferramenta_entregar`), `supVFerramentaAlmox(modo)` sobre `sup_ferramenta_fila_almoxarife`.
 - **Cabeçalho das telas de separação do almoxarife (2026-10-13):** todos os cards de separação
   (Insumos/Ferramentas via `supAlmoxCard`, EPI via `supEpiSegCard`) mostram agora, via o helper
   compartilhado **`supSolicHead(s)`**: **nº · badge do consórcio de origem** (`supConsBadge` →
@@ -1349,7 +1355,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
     RPCs **compartilhadas** `sup_aprovar`/`sup_rejeitar` — mesma UI de ajuste de qtd/cancelamento de
     Insumos) e `ferramenta_painel` (reaproveita `supVPainel('sup_ferramenta_painel_multi')` — mesma
     função parametrizada do Painel de Insumos, incluindo o drill-down "quem tem" do §5.1).
-  - **Almoxarifado:** `ferramenta_almox` (`supVFerramentaAlmox`, fila `sup_ferramenta_fila_almoxarife`
+  - **Almoxarifado:** `ferramenta_almox` = **Separar ferramenta** e `ferramenta_entregar` = **Entregar ferramenta
+    (retirada)** (2026-11-26, sw v480; ambos `supVFerramentaAlmox(modo)`, fila `sup_ferramenta_fila_almoxarife` filtrada por status
     + `supAlmoxCard`/`supAlmoxWire` **reaproveitados como estão** — chamam `sup_segregar`/`sup_entregar`,
     que são agnósticas de material) e **`ferramenta_recebimento`** (`supVFerramentaRecebimento`, tela
     nova sem equivalente em Insumos: lista `sup_ferramenta_devolucao_fila_recebimento`, almoxarife
@@ -1367,6 +1374,14 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
 - Notificações (`sup_trg_ferramenta_devolucao`, trigger AFTER INSERT/UPDATE em
   `sup_ferramenta_devolucao`): solicitar devolução avisa `almoxarife`+`admin`
   (`link='ferramenta_recebimento'`); confirmar avisa o colaborador (`link='ferramenta_pedidos'`).
+- **Avisos da solicitação de ferramenta (corrigido 2026-11-26, `docs/migracao_sup_notif_ferramenta.sql`, só banco):**
+  ferramenta usa a mesma `sup_solicitacao`, e o `sup_trg_solicitacao` mandava tudo como insumo ("Material a separar"
+  p/ a área **insumo**, links `aprovar`/`almox`/`pedidos`). Agora, se a solicitação tem item `ferramenta`, os textos
+  são de ferramenta, "Ferramenta a separar" vai p/ `sup_uuids_por_area('ferramenta')` e os links são
+  `ferramenta_aprovar` / `ferramenta_almox` (= Separar ferramenta) / `ferramenta_pedidos`. ⚠️ O trigger virou
+  **CONSTRAINT TRIGGER DEFERRABLE INITIALLY DEFERRED** (roda no fim da transação): o cabeçalho entra antes dos itens,
+  então só no commit dá pra saber o tipo. Em teste E2E com rollback, use `set constraints all immediate` antes de
+  conferir as `sup_notificacao` geradas.
 - RPCs novas (todas `SECURITY DEFINER`, grants revisados — funções novas nascem com EXECUTE liberado
   pra `PUBLIC` por padrão do Postgres, teve que revogar+regrant `authenticated` explicitamente):
   `sup_ferramenta_catalogo`, `sup_ferramenta_solicitar`, `sup_ferramenta_minhas_solicitacoes`,
@@ -1376,7 +1391,7 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   `sup_ferramenta_devolucao_confirmar`.
 - **Correção de navegação (2026-09-15) — Ferramentas reusa código de Insumos que assumia o contexto de
   Insumos:** (1) `supAlmoxWire` (fiação de segregar/entregar, compartilhada) recarregava fixo em
-  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega**, concluir uma
+  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega** (hoje Separar/Entregar ferramenta), concluir uma
   segregação ou entrega **pulava pra fila de Insumos**. Agora `supAlmoxWire(refreshFn)` recebe a função
   de refresh (default `supVAlmox`; `supVFerramentaAlmox` passa a si mesma). (2) `supGoAct` (deep-link de
   notificação) setava `supAreaId='insumos'` pra qualquer act não-`eq_`/`epi_` — os acts `ferramenta_*`
