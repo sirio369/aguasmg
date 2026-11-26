@@ -12696,6 +12696,9 @@ function fscInit(){
   if(!(ME&&(fscCons()?(ME.aux_acesso||ME.is_admin):ME.fisc_acesso))){ toast('Acesso restrito'); irPara(fscCons()?'auxiliar_programacao':'home'); return; }
   fscCss();
   if(!fscS.mes){ const h=rdoHoje(); fscS.mes=(h<FSC_MIN?FSC_MIN:h).slice(0,7)+'-01'; }
+  // Consolidador abre SEM consórcio: só carrega depois que o usuário escolhe um (as duas ZAs juntas
+  // estouravam o tempo do banco — pedido do usuário 26/11/2026). A Execução Física segue com as duas.
+  if(fscCons()){ fscS.zas=[]; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={}; }
   fscRenderZas();
   const pv=$('#fscPrev'), nx=$('#fscNext');
   if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,-1); fscS.dia=null; fscCarregarMes(); }; }
@@ -12720,6 +12723,7 @@ async function fscCarregarMes(manterDia){
   $('#fscMesTit').textContent=rdoMesNome(fscS.mes);
   $('#fscPrev').disabled=fscS.mes<=FSC_MIN.slice(0,7)+'-01';
   $('#fscNext').disabled=fscS.mes>=rdoHoje().slice(0,7)+'-01';
+  if(!fscS.zas.length){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Escolha um consórcio acima para carregar.</p>'; $('#fscDia').innerHTML=''; return; }
   if(!manterDia){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Carregando…</p>'; $('#fscDia').innerHTML=''; }
   try{
     const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].mes,{p_mes:fscS.mes,p_za:z})));
