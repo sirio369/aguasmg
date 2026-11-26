@@ -16362,6 +16362,8 @@ const sstHoje=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezon
 const sstData=s=>{ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):'—'; };
 const sstQid=()=>'sst-'+String(Date.now()).padStart(15,'0')+'-'+crypto.randomUUID().slice(0,8);
 const sstGpsOk=()=>!!(gps&&gps.acc<=PRECISAO_MAX);
+// preenchimento manual: só no checklist de recomposição (localização dispensada, endereço obrigatório)
+const sstManual=()=>!!(sstD&&sstD.tipo==='rec'&&sstD.manual);
 // rascunho no mesmo IndexedDB do seg (store 'draft', chave 'sst'): guarda fotos (Blob) e assinaturas
 const sstDraftGet=()=>segIdb('draft','readonly',s=>s.get('sst'));
 const sstDraftDel=()=>segIdb('draft','readwrite',s=>s.delete('sst'));
@@ -16488,7 +16490,9 @@ function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', gr
     +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS *</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS"/></div></div>
       <label>Tipo de intervenção *</label>${sstChips('interv',SST_CK_INTERV,d.interv)}
       <label>Equipe / contratada *</label><input id="sstEquipe" value="${segH(d.equipe||'')}" placeholder="Ex.: Equipe 3 — BBL"/>
-      <label>Endereço / local</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="Opcional — o endereço sai também pela coordenada"/>
+      ${rec?`<label class="sstck"><input type="checkbox" id="sstManual"${d.manual?' checked':''}/> Preenchimento Manual</label>
+      <div class="sub" style="font-size:12px;margin-top:2px">Marque para preencher sem a localização: o endereço passa a ser obrigatório.</div>`:''}
+      <label>${sstManual()?'Endereço *':'Endereço / local'}</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="${sstManual()?'Rua, número, bairro e cidade':'Opcional — o endereço sai também pela coordenada'}"/>
       ${rec?`<label>Tipo de pavimento *</label>${sstChips('pav',SST_CK_PAV,d.pav)}`:''}
       <div class="sub" style="font-size:12px;margin-top:8px">Fiscal responsável: <b>${segH((ME&&(ME.nome||ME.email))||'você')}</b></div>`)
     +segBlk(2,'Checklist',grupos.map(g=>`<div class="sstgr">${segH(g.g)}</div>`+g.l.join('')).join('')
@@ -16519,6 +16523,7 @@ function sstWire(){ const d=sstD, root=document.getElementById('sstFormBody');
   const ei=document.getElementById('sstEnc'); if(ei){ const upd=()=>{ const x=segPessoaPorNome(ei.value); if(x&&ei.value!==x.nome) ei.value=x.nome; d.enc_nome=ei.value; d.enc_uuid=x?x.id:null;
       $('#sstEncX').textContent=x?[x.cargo,CONSORCIO_NOME[x.consorcio]||x.consorcio].filter(Boolean).join(' · '):(ei.value.trim()?'fora da lista do app (terceiro) — vale o nome digitado':''); };
     ei.oninput=ei.onchange=()=>{ upd(); sstDraftSave(); sstAtualizar(); }; upd(); }
+  const mn=document.getElementById('sstManual'); if(mn) mn.onchange=()=>{ d.manual=mn.checked; sstDraftSave(); sstRender(); };
   sstSigWire(root,'enc','enc'); sstSigWire(root,'fis','fis');
   const vi=document.getElementById('sstVit'); if(vi){ const upd=()=>{ const x=segPessoaPorNome(vi.value); if(x&&vi.value!==x.nome) vi.value=x.nome; d.vitima_nome=vi.value; d.vitima_uuid=x?x.id:null;
       $('#sstVitX').textContent=x?[x.cargo,CONSORCIO_NOME[x.consorcio]||x.consorcio].filter(Boolean).join(' · '):(vi.value.trim()?'⚠ escolha um nome da lista':''); };
@@ -16541,6 +16546,8 @@ function sstWire(){ const d=sstD, root=document.getElementById('sstFormBody');
   sstAtualizar(); }
 function sstFotoPrev(){ document.querySelectorAll('#sstFormBody [data-sprev]').forEach(img=>{ const b=sstD&&sstD.fotos[img.dataset.sprev]; if(b){ img.src=URL.createObjectURL(b); img.classList.remove('hidden'); } else img.classList.add('hidden'); }); }
 function sstOnGps(){ const b=document.getElementById('sstGps'); if(!b||!sstD) return; const ok=sstGpsOk(), opc=sstD.tipo==='oc';
+  if(sstManual()){ b.className='banner ok'; b.textContent='✍️ Preenchimento manual — a localização não é registrada; informe o endereço';
+    const f=document.getElementById('sst_form'); if(f&&!f.classList.contains('hidden')) sstAtualizar(); return; }
   if(ok){ b.className='banner ok'; b.textContent='📍 '+gps.lat.toFixed(6)+', '+gps.lon.toFixed(6)+' · ±'+Math.round(gps.acc)+' m — no local'; }
   else { b.className='banner warn'; b.textContent=(opc?'GPS opcional na ocorrência — se estiver no local, aguarde travar':'Fique no local para registrar a coordenada')+(gps?(' — GPS ±'+Math.round(gps.acc)+' m (aguardando ≤ '+PRECISAO_MAX+' m)'):' — obtendo GPS…'); }
   const sf=document.getElementById('sst_form'); if(sf&&!sf.classList.contains('hidden')) sstAtualizar(); }
@@ -16548,7 +16555,8 @@ function sstOnGps(){ const b=document.getElementById('sstGps'); if(!b||!sstD) re
 function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
   if(!d.data) P.push('Data'); else if(d.data>sstHoje()) P.push('Data no futuro');
   if(!d.area&&!sstEhCk(d.tipo)) P.push('Área');
-  if(d.tipo!=='oc'&&!sstGpsOk()) P.push('GPS travado no local (≤ '+PRECISAO_MAX+' m)');
+  if(sstManual()&&!txt(d.local)) P.push('Endereço');
+  if(d.tipo!=='oc'&&!sstManual()&&!sstGpsOk()) P.push('GPS travado no local (≤ '+PRECISAO_MAX+' m)');
   if(d.tipo==='insp'){ if(!d.resp_uuid) P.push('Responsável pela intervenção (escolha da lista)'); else if(!d.resp_sig) P.push('Assinatura do responsável pela intervenção');
     if(!d.itens.length) P.push('Checklist (abra com conexão uma vez)');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
@@ -16579,7 +16587,7 @@ function sstAtualizar(){ if(!sstD) return; const P=sstPend(), e=document.getElem
   const r=document.getElementById('sstResumo'); if(r) r.textContent=sstEhCk(sstD.tipo)?sstCkResumo():sstResumoInsp();
 }
 async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const btn=document.getElementById('sstEnviar'); btn.disabled=true; btn.dataset.env='1'; btn.textContent='Enviando…';
-  const g=sstGpsOk()?gps:null, anexos={}, nul=v=>{ const s=String(v==null?'':v).trim(); return s||null; };
+  const g=!sstManual()&&sstGpsOk()?gps:null, anexos={}, nul=v=>{ const s=String(v==null?'':v).trim(); return s||null; };
   const dados={data:d.data,area:d.area,observacoes:nul(d.observacoes),lat:g?g.lat:null,lon:g?g.lon:null,precisao:g?Math.round(g.acc*10)/10:null,dispositivo:navigator.userAgent.slice(0,100)};
   if(d.tipo==='insp'){ const sig=await segSigJpeg(d.resp_sig); if(sig) anexos.sig_resp=sig;
     Object.assign(dados,{local:nul(d.local),os:nul(d.os),resp_interv_uuid:d.resp_uuid,resp_interv_nome:nul(d.resp_nome),resp_interv_sig:sig?'sig_resp':null,resp_interv_assinado_em:sig?d.resp_em:null,itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null;
@@ -16588,7 +16596,7 @@ async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const
         prazo:nc&&!it.tratada_no_local?it.prazo:null,tratada_no_local:nc&&!!it.tratada_no_local,tratativa:nc&&it.tratada_no_local?nul(it.tratativa):null}; })}); }
   else if(sstEhCk(d.tipo)){ const se=await segSigJpeg(d.enc_sig), sf=await segSigJpeg(d.fis_sig); if(se) anexos.sig_enc=se; if(sf) anexos.sig_fis=sf;
     ['foto_antes','foto_depois'].forEach(k=>{ if(d.fotos[k]) anexos[k]=d.fotos[k]; }); delete dados.area;
-    Object.assign(dados,{tipo:SST_TIPO[d.tipo].ck,os:nul(d.os),tipo_intervencao:d.interv,equipe:nul(d.equipe),local:nul(d.local),tipo_pavimento:SST_TIPO[d.tipo].ck==='recomposicao'?d.pav:null,
+    Object.assign(dados,{tipo:SST_TIPO[d.tipo].ck,os:nul(d.os),tipo_intervencao:d.interv,equipe:nul(d.equipe),local:nul(d.local),preenchimento_manual:sstManual(),tipo_pavimento:SST_TIPO[d.tipo].ck==='recomposicao'?d.pav:null,
       resultado:d.resultado,encarregado_uuid:d.enc_uuid,encarregado_nome:nul(d.enc_nome),encarregado_sig:se?'sig_enc':null,encarregado_assinado_em:se?d.enc_em:null,
       fiscal_sig:sf?'sig_fis':null,fiscal_assinado_em:sf?d.fis_em:null,
       itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null; if(nc&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
@@ -17045,15 +17053,15 @@ function ckLista(){ const L1=$('#ckLista'); if(!L1) return; const arr=ckFiltrado
   $('#ckResumo').textContent=arr.length+' checklist(s)';
   L1.innerHTML=arr.length?arr.slice(0,300).map(x=>{ const t=CK_TIPO[x.tipo]||['',x.tipo], al=(x.alertas||[]).length, cor=(CK_RES[x.resultado]||[,'#64748b'])[1];
     return `<div class="segcard" data-ckd="${x.id}" style="cursor:pointer;border-left:4px solid ${cor}"><div class="sgrow"><b>${t[0]} ${segH(t[1])} · OS ${segH(x.os||'—')}</b><span class="sub" style="margin-left:auto;font-size:12px">${sgDia(x.data)}</span></div>
-      <div class="sub" style="margin-top:2px">${segH([x.local,x.endereco,x.bairro].filter(Boolean).join(' · ')||'—')} · ${segH(sgCons(x.consorcio))}</div>
+      <div class="sub" style="margin-top:2px">${segH([x.local,x.endereco,x.bairro].filter(Boolean).join(' · ')||'—')} · ${segH(sgCons(x.consorcio))}${x.preenchimento_manual?' · ✍️ manual':''}</div>
       <div class="sub" style="font-size:12px;margin-top:2px">${segH(x.equipe||'—')}${x.tipo_intervencao?(' · '+segH(x.tipo_intervencao)):''}${x.tipo_pavimento?(' · '+segH(x.tipo_pavimento)):''} · fiscal ${segH(x.fiscal||'—')}</div>
       <div class="segforms">${ckPill(x.resultado)}<span class="segfm" style="cursor:inherit">${x.c} C · ${x.nc} NC · ${x.na} N/A</span>${ckConf(x)!=null?`<span class="segfm" style="cursor:inherit">${sgPct(ckConf(x))} conforme</span>`:''}${al?`<span class="segpill" style="background:var(--bad)" title="${segH(x.alertas.join(' · '))}">⚠ ${al}</span>`:''}</div></div>`; }).join('')
     +(arr.length>300?'<p class="sub">Mostrando 300 — refine os filtros ou exporte.</p>':''):'<p class="sub">Nenhum checklist com esses filtros.</p>';
   L1.querySelectorAll('[data-ckd]').forEach(el=>el.onclick=()=>{ ck.det=el.dataset.ckd; ckDetalhe(); window.scrollTo(0,0); }); }
 function ckExport(){ const arr=ckFiltrados(); if(!arr.length) return toast('Nada para exportar');
-  const aoa=[['Data','Checklist','Consórcio','OS','Tipo de intervenção','Equipe / contratada','Tipo de pavimento','Local','Endereço','Fiscal','Encarregado','Resultado','Conformes','Não conformes','N/A','% conformidade','Alertas']];
+  const aoa=[['Data','Checklist','Consórcio','OS','Tipo de intervenção','Equipe / contratada','Tipo de pavimento','Local','Endereço','Fiscal','Encarregado','Resultado','Conformes','Não conformes','N/A','% conformidade','Alertas','Preenchimento manual']];
   arr.forEach(x=>aoa.push([sgDia(x.data),(CK_TIPO[x.tipo]||[,x.tipo])[1],sgCons(x.consorcio),x.os||'',x.tipo_intervencao||'',x.equipe||'',x.tipo_pavimento||'',x.local||'',
-    [x.endereco,x.bairro,x.municipio].filter(Boolean).join(' — '),x.fiscal||'',x.encarregado||'',(CK_RES[x.resultado]||[x.resultado])[0],+x.c,+x.nc,+x.na,ckConf(x)==null?'':Math.round(ckConf(x)*1000)/10,(x.alertas||[]).join(' · ')]));
+    [x.endereco,x.bairro,x.municipio].filter(Boolean).join(' — '),x.fiscal||'',x.encarregado||'',(CK_RES[x.resultado]||[x.resultado])[0],+x.c,+x.nc,+x.na,ckConf(x)==null?'':Math.round(ckConf(x)*1000)/10,(x.alertas||[]).join(' · '),x.preenchimento_manual?'Sim':'']));
   exportarXlsx('checklists_pop022_'+qsmsDia(new Date())+'.xlsx','Checklists',aoa); }
 async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p class="sub">Carregando…</p>'; let r;
   try{ r=await sgRpc('app_sst_ck_ver',{p_id:id}); }catch(e){ return sgErr(v,e); }
@@ -17067,7 +17075,7 @@ async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p cla
   h+=`<div class="segblk"><h3>${t[0]} ${segH(t[1])} · OS ${segH(r.os||'—')} ${ckPill(r.resultado)}</h3>
     <p class="sub" style="font-size:12px;margin:0 0 6px">POP-022 Rev. 03 — Checklist ${r.tipo==='reaterro'?'01':'02'}</p>
     ${sgKv([['Data',sgDia(r.data)],['Consórcio',segH(sgCons(r.consorcio))],['Tipo de intervenção',segH(r.tipo_intervencao||'')],['Equipe / contratada',segH(r.equipe||'')],
-      ['Tipo de pavimento',segH(r.tipo_pavimento||'')],['Local',segH(r.local||'')],['Endereço',segH(loc)],
+      ['Tipo de pavimento',segH(r.tipo_pavimento||'')],['Local',segH(r.local||'')],['Endereço',segH(loc)],['Preenchimento',r.preenchimento_manual?'Manual (sem localização)':''],
       ['GPS',r.lat!=null?`<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">${(+r.lat).toFixed(6)}, ${(+r.lon).toFixed(6)}</a>${r.gps_precisao!=null?(' ±'+Math.round(r.gps_precisao)+' m'):''}`:''],
       ['Fiscal responsável',segH(r.usuario_nome||'')+(r.criado_em?(' · lançado '+segFmt(r.criado_em)):'')],['Observações / ação corretiva',segH(r.observacoes||'')],
       ['Anulado',r.anulado_em?(segFmt(r.anulado_em)+' — '+segH(r.anulado_motivo||'')):'']])}
