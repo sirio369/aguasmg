@@ -567,6 +567,7 @@ viraram uma etapa só (`alvara`) com nome pela região — **Liberação TransCo
 adicionadas/removidas (só sem avanço) pela **equipe de obras** no `projeto_det`, tipo Entrada/**Intermediária**/Saída editável
 a qualquer momento; todo lançamento de avanço pergunta **"Esse avanço foi realizado em outra data?"** (Sim = qualquer data/hora não futura,
 sw v422, `docs/migracao_proj_avanco_data_livre.sql` — antes só ontem — em `intervencao_avanco.ts`; `registrado_em`/`retroativo` guardam quando foi lançado).
+**Endereço automático (2026-11-26, sw v474, `docs/migracao_proj_endereco.sql`):** cada intervenção mostra a rua (ponto) ou todas as ruas que o trecho HDD/VCA percorre + bairro, calculados pelos eixos de logradouro (`proj_endereco`), no card da lista, no popup do mapa e no topo do detalhe.
 **Puxamento HDD com diâmetro (mm) + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** cada lançamento do puxamento grava `diametro_mm`/`rua` (`app_proj_avanco_pux_set`); a rua sugere a última da intervenção e os lançamentos antigos ganham ✏️ para informar.
 **Ensaio de reaterro opcional (2026-11-13, sw v375, `docs/migracao_proj_reaterro_decisao.sql`):** reaterro 100% → Obras responde
 "É necessário ensaio de compactação?" (Sim = Qualidade; Não = `dispensado`, recomposição liberada); ramais ganharam Reaterro +
