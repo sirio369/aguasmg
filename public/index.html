@@ -1837,7 +1837,6 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>QSMS campo</h1>
     <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist e assinatura do responsável pela intervenção, DDS com foto da lista de presença, registro de acidente, quase acidente ou incidente e os checklists de reaterro e de recomposição de pavimento (POP-022). Funciona sem sinal — sobe quando houver conexão.</p>
-    <div id="sstRasc"></div>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Nova inspeção</div></button>
       <button class="mod" data-sstnovo="dds"><div class="ic">🗣️</div><div class="nm">Novo DDS</div></button>
@@ -1845,7 +1844,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-sstnovo="rea"><div class="ic">🧱</div><div class="nm">Checklist de reaterro</div></button>
       <button class="mod" data-sstnovo="rec"><div class="ic">🛣️</div><div class="nm">Checklist de recomposição</div></button>
     </div>
-    <div class="sec">Meus lançamentos (30 dias)</div>
+    <div class="sec">Meus lançamentos</div>
+    <div class="segchips" id="sstSit" style="margin:2px 0 10px"></div>
     <div id="sstLista"><p class="sub">Carregando…</p></div>
   </main>
 
@@ -16384,14 +16384,13 @@ async function sstModeloCarregar(){ try{ sstModelo=JSON.parse(localStorage.getIt
   try{ const {data,error}=await sb.rpc('app_sst_modelo_listar'); if(error)throw error; sstModelo=(data||[]).filter(m=>m.ativo!==false); try{ localStorage.setItem('sstModelo',JSON.stringify(sstModelo)); }catch(e){} }catch(e){} }
 
 // ===== Tela principal (sst): novos lançamentos + meus lançamentos =====
-async function sstInit(){ segCss(); sstCss(); segPessoasCarregar(); sstModeloCarregar(); sstRascunho(); sstListar(); }
-async function sstRascunho(){ const c=document.getElementById('sstRasc'); if(!c)return; let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(!r||!SST_TIPO[r.tipo]){ c.innerHTML=''; return; }
-  c.innerHTML=`<div class="banner warn" style="flex-wrap:wrap">📝 ${SST_TIPO[r.tipo].t} em preenchimento desde ${segFmt(r.salvo_em)}<span style="flex:1"></span><button class="btn" id="sstRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="sstRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`;
-  $('#sstRascCont').onclick=()=>{ sstD=r; delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); };
-  $('#sstRascDesc').onclick=()=>{ const b=$('#sstRascDesc'); if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } clearTimeout(sstDraftT); sstDraftDel().then(sstRascunho).catch(()=>{}); }; }
+async function sstInit(){ segCss(); sstCss(); segPessoasCarregar(); sstModeloCarregar(); sstListar(); }
+// rascunho em preenchimento: aparece na lista (situação Pendente) com Continuar/Descartar
+function sstRascWire(r){ const bc=document.getElementById('sstRascCont'), bd=document.getElementById('sstRascDesc'); if(!bc||!bd) return;
+  bc.onclick=()=>{ sstD=r; delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); };
+  bd.onclick=()=>{ if(bd.dataset.ok!=='1'){ bd.dataset.ok='1'; bd.textContent='Toque de novo p/ descartar'; return; } clearTimeout(sstDraftT); sstDraftDel().then(sstListar).catch(()=>{}); }; }
 async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(r&&SST_TIPO[r.tipo]){ toast('Há um lançamento em andamento — continue ou descarte'); const b=document.getElementById('sstRasc'); if(b) b.scrollIntoView({behavior:'smooth'}); return; }
+  if(r&&SST_TIPO[r.tipo]){ toast('Há um lançamento em andamento — continue ou descarte'); sstSit='pend'; sstListarRender(); const b=document.getElementById('sstRascCard'); if(b) b.scrollIntoView({behavior:'smooth',block:'center'}); return; }
   const d={tipo,id:crypto.randomUUID(),data:sstHoje(),area:'',observacoes:'',fotos:{}};
   if(tipo==='insp'){ if(!sstModelo.length) await sstModeloCarregar();
     Object.assign(d,{local:'',os:'',resp_uuid:null,resp_nome:'',resp_sig:null,resp_em:null,itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
@@ -16400,25 +16399,39 @@ async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){
   if(sstEhCk(tipo)) Object.assign(d,{os:'',interv:'',equipe:'',local:'',pav:'',resultado:'',itens:sstCkItens(SST_TIPO[tipo].ck),
     enc_uuid:null,enc_nome:'',enc_sig:null,enc_em:null,fis_sig:null,fis_em:null});
   sstD=d; irPara('sst_form'); }
+// lista única: rascunho em preenchimento + fila do aparelho (pendentes) + tudo o que já subiu (finalizados), sem limite de dias
+let sstSit='todos', sstL=[], sstRod='', sstRasc=null;
 async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)return; let srv=null;
-  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_sst_minhas',{p_dias:30}); if(error)throw error; srv=data||{}; try{ localStorage.setItem('sstMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
+  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_sst_minhas',{p_dias:36500}); if(error)throw error; srv=data||{}; try{ localStorage.setItem('sstMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
   const doServ=!!srv; if(!srv){ try{ srv=JSON.parse(localStorage.getItem('sstMinhas')||'null'); }catch(e){} } srv=srv||{};
   let fila=[]; try{ fila=(await filaAll()).filter(i=>String(i.id).startsWith('sst-')); }catch(e){}
-  const ids=new Set(), L=[], pl=(n,s,p)=>n+' '+(n===1?s:p);
-  (srv.inspecoes||[]).forEach(x=>{ ids.add(x.id); L.push({t:'insp',data:x.data,tit:x.area||'—',
+  let r=null; try{ r=await sstDraftGet(); }catch(e){} sstRasc=(r&&SST_TIPO[r.tipo])?r:null;
+  const ids=new Set(), L=[], pl=(n,s,p)=>n+' '+(n===1?s:p), fin='✓ Finalizado';
+  (srv.inspecoes||[]).forEach(x=>{ ids.add(x.id); L.push({t:'insp',sit:'fin',st:fin,data:x.data,tit:x.area||'—',
     sub:[x.local||x.endereco,pl(x.itens||0,'item','itens')+' · '+pl(x.ncs||0,'NC','NCs')+(x.pendentes?(' · '+pl(x.pendentes,'pendente','pendentes')):'')].filter(Boolean).join(' · '),al:x.alertas}); });
-  (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
-  (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
-  (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const r=SST_CK_RES.find(z=>z[0]===x.resultado);
-    L.push({t:x.tipo==='reaterro'?'rea':'rec',data:x.data,tit:'OS '+(x.os||'—')+(x.equipe?(' · '+x.equipe):''),sub:[r?r[1]:'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
+  (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',sit:'fin',st:fin,data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
+  (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',sit:'fin',st:fin,data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
+  (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const rr=SST_CK_RES.find(z=>z[0]===x.resultado);
+    L.push({t:x.tipo==='reaterro'?'rea':'rec',sit:'fin',st:fin,data:x.data,tit:'OS '+(x.os||'—')+(x.equipe?(' · '+x.equipe):''),sub:[rr?('Resultado: '+rr[1]):'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
   fila.forEach(i=>{ const f=i.fields||{}, d=f.p_dados||{}, t=String(i.tipo||'').replace('sst_',''); if(ids.has(f.p_id)||!SST_TIPO[t]) return;
-    L.push({t,data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?('OS '+(d.os||'—')):(d.area||'—'),sub:'⏳ na fila — sobe quando houver conexão'}); });
+    L.push({t,sit:'pend',st:'⏳ Aguardando envio — sobe quando houver conexão',data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?('OS '+(d.os||'—')):(d.area||'—'),sub:''}); });
   L.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
-  const rod=doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>';
-  if(!L.length){ c.innerHTML='<p class="sub">Nada lançado nos últimos 30 dias.</p>'+rod; return; }
-  c.innerHTML=L.map(x=>`<div class="segcard"><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
-    <div style="margin-top:3px;font-size:14px;font-weight:600">${segH(x.tit||'—')}</div><div class="sub" style="font-size:12.5px;margin-top:2px">${segH(x.sub||'')}</div>
-    ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}</div>`).join('')+rod; }
+  if(sstRasc){ const d=sstRasc; L.unshift({t:d.tipo,sit:'pend',rasc:true,st:'📝 Em preenchimento — salvo em '+segFmt(d.salvo_em),data:d.data,
+    tit:d.tipo==='dds'?d.tema:d.tipo==='oc'?d.natureza:sstEhCk(d.tipo)?('OS '+(d.os||'—')):(d.area||'—'),sub:''}); }
+  sstL=L; sstRod=doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>';
+  sstListarRender(); }
+function sstListarRender(){ const c=document.getElementById('sstLista'), ch=document.getElementById('sstSit'); if(!c)return;
+  const n=k=>k==='todos'?sstL.length:sstL.filter(x=>x.sit===k).length;
+  if(ch){ ch.innerHTML=[['todos','Todos'],['pend','Pendentes'],['fin','Finalizados']].map(([k,l])=>`<div class="segchip ${sstSit===k?'on':''}" data-ssit="${k}">${l} (${n(k)})</div>`).join('');
+    ch.querySelectorAll('[data-ssit]').forEach(b=>b.onclick=()=>{ sstSit=b.dataset.ssit; sstListarRender(); }); }
+  const L=sstSit==='todos'?sstL:sstL.filter(x=>x.sit===sstSit);
+  if(!L.length){ c.innerHTML='<p class="sub">'+(sstSit==='pend'?'Nenhum lançamento pendente.':sstSit==='fin'?'Nenhum lançamento finalizado.':'Nada lançado ainda.')+'</p>'+sstRod; return; }
+  c.innerHTML=L.map(x=>`<div class="segcard"${x.rasc?' id="sstRascCard" style="border-color:var(--warn)"':''}><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
+    <div style="margin-top:3px;font-size:14px;font-weight:600">${segH(x.tit||'—')}</div>${x.sub?`<div class="sub" style="font-size:12.5px;margin-top:2px">${segH(x.sub)}</div>`:''}
+    <div class="sub" style="font-size:12px;margin-top:4px;font-weight:600;color:${x.sit==='fin'?'var(--ok)':'var(--mut)'}">${segH(x.st)}</div>
+    ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}
+    ${x.rasc?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="sstRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="sstRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`:''}</div>`).join('')+sstRod;
+  if(sstRasc) sstRascWire(sstRasc); }
 
 // ===== Formulário (sst_form): estado único sstD, salvo como rascunho a cada mudança =====
 function sstFormInit(){ segCss(); sstCss(); if(!sstD){ irPara('sst'); return; }
