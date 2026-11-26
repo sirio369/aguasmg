@@ -4036,6 +4036,15 @@ enganaria) e o **Endereço** passa a ser obrigatório (coluna `endereco`; sem o 
 município ficam vazios. Desmarcado, e no reaterro, nada muda. A gestão mostra "✍️ manual" na lista, no detalhe e no XLSX.
 **Migração aplicada em produção (26/11/2026)**; é compatível com o app anterior, que não envia o campo e segue como antes.
 
+**Preenchimento Manual no reaterro também (26/11/2026, sw v472) — `docs/migracao_sst_ck_manual_reaterro.sql`:**
+a caixa passa a valer nos **dois** checklists, com a mesma regra acima (onde se lê "só no checklist de recomposição"
+ou "no reaterro nada muda", vale esta nota). **A migração precisa ser aplicada**: sem ela, o reaterro manual sai com o
+alerta "Sem GPS" e o endereço fica em `local`.
+
+**Assinatura do encarregado opcional (26/11/2026, mesma migração):** nos dois checklists o **nome** do encarregado continua
+obrigatório, a assinatura não, e o servidor deixa de gravar o alerta "Encarregado sem assinatura". A da fiscalização
+continua obrigatória.
+
 ---
 
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)

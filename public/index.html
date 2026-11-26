@@ -16362,8 +16362,8 @@ const sstHoje=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezon
 const sstData=s=>{ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):'—'; };
 const sstQid=()=>'sst-'+String(Date.now()).padStart(15,'0')+'-'+crypto.randomUUID().slice(0,8);
 const sstGpsOk=()=>!!(gps&&gps.acc<=PRECISAO_MAX);
-// preenchimento manual: só no checklist de recomposição (localização dispensada, endereço obrigatório)
-const sstManual=()=>!!(sstD&&sstD.tipo==='rec'&&sstD.manual);
+// preenchimento manual nos checklists de reaterro e recomposição (localização dispensada, endereço obrigatório)
+const sstManual=()=>!!(sstD&&sstEhCk(sstD.tipo)&&sstD.manual);
 // rascunho no mesmo IndexedDB do seg (store 'draft', chave 'sst'): guarda fotos (Blob) e assinaturas
 const sstDraftGet=()=>segIdb('draft','readonly',s=>s.get('sst'));
 const sstDraftDel=()=>segIdb('draft','readwrite',s=>s.delete('sst'));
@@ -16490,8 +16490,8 @@ function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', gr
     +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS *</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS"/></div></div>
       <label>Tipo de intervenção *</label>${sstChips('interv',SST_CK_INTERV,d.interv)}
       <label>Equipe / contratada *</label><input id="sstEquipe" value="${segH(d.equipe||'')}" placeholder="Ex.: Equipe 3 — BBL"/>
-      ${rec?`<label class="sstck"><input type="checkbox" id="sstManual"${d.manual?' checked':''}/> Preenchimento Manual</label>
-      <div class="sub" style="font-size:12px;margin-top:2px">Marque para preencher sem a localização: o endereço passa a ser obrigatório.</div>`:''}
+      <label class="sstck"><input type="checkbox" id="sstManual"${d.manual?' checked':''}/> Preenchimento Manual</label>
+      <div class="sub" style="font-size:12px;margin-top:2px">Marque para preencher sem a localização: o endereço passa a ser obrigatório.</div>
       <label>${sstManual()?'Endereço *':'Endereço / local'}</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="${sstManual()?'Rua, número, bairro e cidade':'Opcional — o endereço sai também pela coordenada'}"/>
       ${rec?`<label>Tipo de pavimento *</label>${sstChips('pav',SST_CK_PAV,d.pav)}`:''}
       <div class="sub" style="font-size:12px;margin-top:8px">Fiscal responsável: <b>${segH((ME&&(ME.nome||ME.email))||'você')}</b></div>`)
@@ -16501,7 +16501,7 @@ function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', gr
       <label>Observações / não conformidades / ação corretiva${resv&&resv!=='conforme'?' *':''}</label><textarea id="sstObs" rows="3">${segH(d.observacoes||'')}</textarea>`)
     +segBlk(4,'Fotos (opcional)',sstFotoOpc('foto_antes','Antes')+sstFotoOpc('foto_depois','Depois'))
     +segBlk(5,'Assinaturas',`<label>Encarregado *</label><input id="sstEnc" list="segPessoasDl" value="${segH(d.enc_nome||'')}" placeholder="Nome do encarregado" autocomplete="off"/><div class="sub" id="sstEncX" style="font-size:12px;margin-top:2px"></div>
-      <div class="sub" style="font-size:12px;margin-top:8px">Assinatura do encarregado *</div>${segSigHtml('enc')}
+      <div class="sub" style="font-size:12px;margin-top:8px">Assinatura do encarregado (opcional)</div>${segSigHtml('enc')}
       <div class="sub" style="font-size:12px;margin-top:14px">Assinatura da fiscalização (${segH((ME&&(ME.nome||ME.email))||'você')}) *</div>${segSigHtml('fis')}`); }
 // aplica o tipo de pavimento: itens de outro tipo viram N/A (marcados auto); voltando, o auto N/A é limpo
 function sstCkPav(){ const d=sstD; (d.itens||[]).forEach(it=>{ if(!it.pav) return;
@@ -16570,7 +16570,7 @@ function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
     if(!d.resultado) P.push('Resultado da inspeção');
     else if(d.resultado==='conforme'&&d.itens.some(it=>it.resultado==='NC')) P.push('Há item não conforme — o resultado não pode ser "Conforme"');
     if(d.resultado&&d.resultado!=='conforme'&&!txt(d.observacoes)) P.push('Observações / ação corretiva');
-    if(!txt(d.enc_nome)) P.push('Nome do encarregado'); else if(!d.enc_sig) P.push('Assinatura do encarregado');
+    if(!txt(d.enc_nome)) P.push('Nome do encarregado');
     if(!d.fis_sig) P.push('Assinatura da fiscalização'); }
   if(d.tipo==='dds'){ if(!txt(d.tema)) P.push('Tema'); if(!(parseInt(d.duracao_min)>0)) P.push('Duração');
     if(!(parseInt(d.qtd)>0)) P.push('Nº de participantes'); if(!d.fotos.foto_lista) P.push('Foto da lista de presença');
