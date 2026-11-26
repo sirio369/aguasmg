@@ -3860,7 +3860,10 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   que continua sendo das equipes de execução. Gate `ME.qsms_campo` = `"16 - qsms".sst_campo_pode` = `qsms_pode` (gestão)
   **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
   **Telas (PR-B, sw v328):** `sst` (Home › 🛠️ Execução › 🦺 QSMS campo; card escondido sem `ME.qsms_campo`) com os
-  3 lançamentos + "Meus lançamentos (30 dias)" (`app_sst_minhas` + itens ainda na fila, cache em `localStorage.sstMinhas`)
+  lançamentos + "Meus lançamentos" (desde sw v472: **lista única abaixo dos botões, sem limite de dias** — `app_sst_minhas(p_dias:36500)`
+  + itens ainda na fila + o rascunho em preenchimento, que saiu do banner do topo e virou o 1º card com Continuar/Descartar;
+  chips de situação **Todos · Pendentes** (em preenchimento ou aguardando envio) **· Finalizados** (já no servidor), estado `sstSit`;
+  cache em `localStorage.sstMinhas`)
   e `sst_form` (um formulário por vez, estado `sstD`, rascunho no IndexedDB `seg_local` store `draft` chave `sst`, com fotos
   e assinaturas):
   - **Área / frente** (inspeção e ocorrência) = lista fixa `SST_AREAS`: HDD, VCA, Instalação/substituição de ramal,
