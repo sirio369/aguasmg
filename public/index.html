@@ -12591,11 +12591,8 @@ function fscModo(m){
   if(t) t.textContent=m==='cons'?'Consolidador':'Execução Física';
   const cfg=$('#fscCfg'); if(cfg){ cfg.classList.toggle('hidden',!(m==='cons'&&ME&&ME.is_admin)); if(!cfg.dataset.ready){ cfg.dataset.ready='1'; cfg.onclick=()=>irPara('fisc_val_acesso'); } }
   if(bk){ bk.dataset.go=m==='cons'?'auxiliar_programacao':'home'; bk.textContent=m==='cons'?'‹ Auxiliar de Programação':'‹ Início'; }
-  // Consolidador sem o texto explicativo (pedido do usuário 13/11); a Execução Física mantém o dela
-  if(sub) sub.classList.toggle('hidden',m==='cons');
-  if(sub&&m!=='cons') sub.innerHTML=m==='cons'
-    ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço; obra <b>sem avanço no dia não precisa de validação</b>. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
-    :'Somente os dias <b>validados</b> no Consolidador, exatamente como foram validados. Uma linha por atividade, com o acumulado desde 01/09/2026, as OS do dia e o detalhe de cada execução (fotos e mapa).';
+  // sem texto explicativo nos dois modos (Consolidador: pedido do usuário 13/11; Execução Física: 26/11/2026)
+  if(sub) sub.classList.add('hidden');
   if(lg) lg.innerHTML=m==='cons'
     ?'<span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span>'
     :'<span><i style="background:#16a34a"></i>dia validado</span><span>dias apagados ainda não foram validados</span>';
@@ -12696,9 +12693,9 @@ function fscInit(){
   if(!(ME&&(fscCons()?(ME.aux_acesso||ME.is_admin):ME.fisc_acesso))){ toast('Acesso restrito'); irPara(fscCons()?'auxiliar_programacao':'home'); return; }
   fscCss();
   if(!fscS.mes){ const h=rdoHoje(); fscS.mes=(h<FSC_MIN?FSC_MIN:h).slice(0,7)+'-01'; }
-  // Consolidador abre SEM consórcio: só carrega depois que o usuário escolhe um (as duas ZAs juntas
-  // estouravam o tempo do banco — pedido do usuário 26/11/2026). A Execução Física segue com as duas.
-  if(fscCons()){ fscS.zas=[]; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={}; }
+  // Consolidador e Execução Física abrem SEM consórcio: só carregam depois que o usuário escolhe um (as duas
+  // ZAs juntas estouravam o tempo do banco — pedido do usuário 26/11/2026, Execução Física igual no mesmo dia).
+  fscS.zas=[]; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={};
   fscRenderZas();
   const pv=$('#fscPrev'), nx=$('#fscNext');
   if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,-1); fscS.dia=null; fscCarregarMes(); }; }
@@ -13299,9 +13296,9 @@ function frlModo(m){
   const bk=document.querySelector('#fisc_rel .bar .bk'), t=$('#frlTit'), sub=$('#frlSub');
   if(bk){ bk.dataset.go=m==='fisc'?'home':'auxiliar_programacao'; bk.textContent=m==='fisc'?'‹ Início':'‹ Auxiliar de Programação'; }
   if(t) t.textContent=m==='fisc'?'Relatório consolidado · Fiscalização':'Relatório consolidado';
-  if(sub) sub.innerHTML=m==='fisc'
-    ?'Relatório em Excel somente com os dias <b>validados</b> no Consolidador: resumo por agrupamento, avanço diário com o acumulado e a base de dados com cada execução.'
-    :'Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.';
+  // versão Fiscalização sem o texto explicativo (pedido do usuário 26/11/2026); a interna mantém o dela
+  if(sub){ sub.classList.toggle('hidden',m==='fisc');
+    if(m!=='fisc') sub.innerHTML='Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.'; }
 }
 const frlFisc=()=>frlS.modo==='fisc';
 function frlInit(){

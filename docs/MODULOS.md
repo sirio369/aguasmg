@@ -4606,7 +4606,7 @@ validado sai do snapshot) · escrita: `app_fisc_linha_validar(dia, za, chave, st
 Internas (sem grant): `fisc_execucoes`, `fisc_linhas`, `fisc_projetos`, `fisc_dia_dados`, `fisc_proj_pct`, `fisc_arv_ajusta`, `fisc_arv_linhas`. Também `app_fisc_proj_detalhe(kind, gid, dia)`.
 
 **Tela (`fsc*` no index.html, uma tela `fisc` com dois modos — `fscS.modo` `cons`/`fisc`, `irPara('fiscv')` abre no modo
-fiscalização; `FSC_RPC` escolhe as RPCs):** ZAs (seleção múltipla; **o Consolidador abre sem nenhuma ZA marcada** e só carrega depois que o usuário escolhe uma — as duas juntas estouravam o limite de 8 s do banco em `app_fisc_mes`; `fscInit` zera `fscS.zas` no modo `cons`, a Execução Física segue abrindo com as duas — 2026-11-26, sw v469), calendário com cor por status (no modo fiscalização só os
+fiscalização; `FSC_RPC` escolhe as RPCs):** ZAs (seleção múltipla; **o Consolidador e a Execução Física abrem sem nenhuma ZA marcada** e só carregam depois que o usuário escolhe uma — as duas juntas estouravam o limite de 8 s do banco em `app_fisc_mes`; `fscInit` zera `fscS.zas` — 2026-11-26, sw v469 no Consolidador e v470 na Execução Física); desde 26/11 o `app_fisc_mes` calcula o hash das linhas direto de `fisc_execucoes` do mês (sem o acumulado de loggers desde jul/2026, que o calendário não usa; ~2 s por ZA em vez de ~4 s) — **se a fórmula de hash de `fisc_linhas` mudar, mudar também ali** (`docs/migracao_fisc_mes_leve.sql`), calendário com cor por status (no modo fiscalização só os
 dias validados ficam clicáveis), tabela por ZA (Atividade · No dia · Acumulado · Situação · ✔/🗺️/▾; sem Situação nem ✔ na
 fiscalização), detalhe da atividade com **"OS do dia" primeiro** (`fscOsDia`: OS SIGOS, ou a do AcquaHub sem SIGOS, sem
 repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros sem OS) e depois cada execução (OS, situação
@@ -4626,7 +4626,7 @@ laranja não executada): no detalhe os grupos e as execuções ficam sem cor (pe
 origem"** (`fscOrigemHtml`: OS + serviço + situação; **não mostra como a origem foi achada** — pedido do usuário 13/11/2026, sw v379;
 o `fonte` segue no banco só p/ auditoria) e resumo "origem: Ramal predial N · Correção de vazamento N · sem origem N" na
 linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de origem (sem a fonte). Chaves de `extra` começando com `_` não são listadas no "chave: valor". Avanços de obra **sem "equipe"** (sw v381): a coluna `intervencao_avanco.equipe` é só o responsável do cadastro da intervenção (ex.: INOVA), não quem executou — sai da tela do Consolidador/Execução Física. bloco **Obras em andamento** (% no dia, barra, avanços do
-dia, acumulado recolhível, anexos) (o botão "Excel do mês" foi removido em 13/11, sw v396; o texto explicativo do topo sai no Consolidador, sw v398 — o Excel é o Relatório consolidado, §21.6.1). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
+dia, acumulado recolhível, anexos) (o botão "Excel do mês" foi removido em 13/11, sw v396; o texto explicativo do topo sai no Consolidador, sw v398, e também na Execução Física e no Relatório consolidado · Fiscalização (`fiscv_rel`), sw v470 — o Excel é o Relatório consolidado, §21.6.1). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
 corte da Fiscalização mudar no BI, mudar `sigos_fisc_corte()` (vale aqui também). Nova fonte de execução = novo CTE em
