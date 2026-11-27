@@ -1615,7 +1615,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sup_carga" class="hidden spbmain">
     <div class="bar"><button class="bk" data-go="bi_carga">‹ Carga dos BIs</button></div>
     <h1>Cargas do SIENGE</h1>
-    <p class="sub">Envie os relatórios exportados do SIENGE em Excel. O arquivo novo <b>substitui o anterior</b> (o Mapa de Cotações, só a obra que vier no arquivo; no Estoque, a mesma obra no mesmo dia) e o antigo só sai quando o novo chega inteiro e dentro do escopo (obras 430 e 440). Arquivo no campo errado é recusado sem mexer no banco.</p>
+    <p class="sub">Envie os 4 relatórios exportados do SIENGE em Excel, cada um no seu campo. O arquivo novo <b>substitui o anterior</b> (cada Mapa de Cotações substitui só a própria obra) e o antigo só sai quando o novo chega inteiro e dentro do escopo (obras 430 e 440). Arquivo no campo errado é recusado sem mexer no banco.</p>
     <div id="spbcSlots" class="sggrid"><p class="sub">Carregando…</p></div>
     <div class="sec" style="margin-top:20px">Últimas cargas</div>
     <div id="spbcHist"><p class="sub">Carregando…</p></div>
@@ -8770,14 +8770,17 @@ const SPB_P=(()=>{
   }
   return {lerPainel, lerMapa, lerVinculados, lerEstoque, detectar};
 })();
-const SPB_TIPOS=['painel','mapa','vinculados','estoque'];
-const SPB_TIPO={painel:'Painel de Compras',mapa:'Mapa de Cotações',vinculados:'Cotações e Pedidos Vinculados',estoque:'Posições de Estoque Atual'};
-const SPB_SUB={painel:'SIENGE › Compras › Painel de Compras · todas as colunas, linhas "Todas" · substitui o anterior (as 2 obras juntas)',
-  mapa:'SIENGE › Cotações de Preços › Mapa de Cotações · um arquivo por obra (430 e/ou 440) · substitui só a obra que vier no arquivo',
-  vinculados:'SIENGE › Cotações de Preços › Cotações e Pedidos Vinculados · substitui o anterior',
-  estoque:'SIENGE › Estoque › Posições de Estoque Atual · um arquivo por obra · mesma obra no mesmo dia: vale a exportação mais recente; outros dias ficam de histórico'};
+// campos da tela de carga (o Mapa tem um campo por obra; no banco o tipo continua 'mapa')
+const SPB_TIPOS=['painel','mapa_contagem','mapa_betim','vinculados'];
+const SPB_MAPA={mapa_contagem:430,mapa_betim:440};
+const spbTipoDe=s=>SPB_MAPA[s]?'mapa':s;
+const SPB_TIPO={painel:'Painel de Compras',mapa:'Mapa de Cotações',mapa_contagem:'Mapa de Cotações — ZA1004 (Contagem)',mapa_betim:'Mapa de Cotações — ZA0200 (Betim)',vinculados:'Cotações e Pedidos Vinculados',estoque:'Posições de Estoque Atual'};
+const SPB_SUB={painel:'Painel de Compras - ZA1004+ZA0200.xlsx · SIENGE › Compras › Painel de Compras · todas as colunas, linhas "Todas" · substitui o anterior',
+  mapa_contagem:'Mapa de Cotações - ZA1004 (Contagem).xlsx · SIENGE › Cotações de Preços › Mapa de Cotações da obra 430 · substitui só Contagem',
+  mapa_betim:'Mapa de Cotações - ZA0200 (Betim).xlsx · SIENGE › Cotações de Preços › Mapa de Cotações da obra 440 · substitui só Betim',
+  vinculados:'Cotações e Pedidos Vinculados - ZA1004+ZA0200.xlsx · SIENGE › Cotações de Preços › Cotações e Pedidos Vinculados · substitui o anterior'};
 const SPB_OBRA={430:'ZA1004 · Contagem',440:'ZA0200 · Betim'};
-let SPB_AC=null, SPB_AC_T=0, spbcDados=null, spbcFila={painel:[],mapa:[],vinculados:[]}, spbcRodando={}, spbcAlvo=null;
+let SPB_AC=null, SPB_AC_T=0, spbcDados=null, spbcFila={painel:[],mapa_contagem:[],mapa_betim:[],vinculados:[]}, spbcRodando={}, spbcAlvo=null;
 async function spbAcesso(force){
   if(!force&&SPB_AC&&Date.now()-SPB_AC_T<300000) return SPB_AC;
   try{ const {data,error}=await sb.rpc('app_sup_bi_acesso'); if(error) throw error; SPB_AC=data||{}; SPB_AC_T=Date.now(); }catch(e){ SPB_AC=SPB_AC||{}; }
@@ -9106,8 +9109,9 @@ async function spbcCarregar(){
   catch(e){ $('#spbcSlots').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; $('#spbcHist').innerHTML=''; return; }
   spbcRender();
 }
-function spbcBanco(tipo){
-  const L=((spbcDados||{}).ativas||[]).filter(k=>k.tipo===tipo); if(!L.length) return '<div class="sgbanco">Nada carregado ainda.</div>';
+function spbcBanco(slot){
+  const obra=SPB_MAPA[slot];
+  const L=((spbcDados||{}).ativas||[]).filter(k=>k.tipo===spbTipoDe(slot)&&(!obra||(k.obras||[]).map(Number).includes(obra))); if(!L.length) return '<div class="sgbanco">Nada carregado ainda.</div>';
   return '<table class="sgtab"><tr><th>Obra</th><th class="n">Linhas</th><th>Carregado em</th></tr>'
     +L.map(k=>'<tr><td>'+vEsc(spbObras(k.obras))+'</td><td class="n">'+spbN(k.linhas)+'</td><td>'+spbDH(k.em)+'</td></tr>').join('')+'</table>';
 }
@@ -9122,19 +9126,19 @@ function spbcRender(){
   box.innerHTML=SPB_TIPOS.map(tipo=>{
     const fila=spbcFila[tipo], busy=!!spbcRodando[tipo];
     const st=fila.length?fila.map(it=>'<div class="sgst '+(it.r?(it.r.status==='ok'?'ok':'erro'):'wait')+'"><b>'+vEsc(it.nome)+'</b><br>'+(it.r?spbcResumo(it.r):'⏳ '+vEsc(it.msg||'Na fila…'))+'</div>').join('')
-      :'<div class="sgst">Solte aqui o arquivo .xlsx exportado do SIENGE'+((tipo==='mapa'||tipo==='estoque')?' (pode ser mais de um: uma obra por arquivo)':'')+'.</div>';
+      :'<div class="sgst">Solte aqui o arquivo .xlsx exportado do SIENGE.</div>';
     return '<div class="sgslot" data-k="'+tipo+'"><div class="sgh"><b>'+SPB_TIPO[tipo]+'</b></div><div class="sgsub">'+SPB_SUB[tipo]+'</div>'+st
-      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo'+((tipo==='mapa'||tipo==='estoque')?'s':'')+'</button>'
+      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo</button>'
       +(fila.length&&!busy?'<button class="btn ghost" data-limpa>Limpar lista</button>':'')+'</div>'
       +'<div class="sgbanco" style="margin-top:4px"><b>No banco agora</b></div>'+spbcBanco(tipo)+'</div>';
   }).join('');
   box.querySelectorAll('.sgslot').forEach(el=>{
     const tipo=el.dataset.k;
-    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ spbcAlvo=tipo; const f=$('#spbcFile'); f.multiple=(tipo==='mapa'||tipo==='estoque'); f.click(); };
+    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ spbcAlvo=tipo; const f=$('#spbcFile'); f.multiple=false; f.click(); };
     const lp=el.querySelector('[data-limpa]'); if(lp) lp.onclick=()=>{ spbcFila[tipo]=[]; spbcRender(); };
     el.ondragover=ev=>{ ev.preventDefault(); el.classList.add('drag'); };
     el.ondragleave=()=>el.classList.remove('drag');
-    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); let fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])]; if(tipo!=='mapa'&&tipo!=='estoque') fs=fs.slice(0,1); if(fs.length&&!spbcRodando[tipo]) spbcEnfileirar(tipo,fs); };
+    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); let fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])]; fs=fs.slice(0,1); if(fs.length&&!spbcRodando[tipo]) spbcEnfileirar(tipo,fs); };
   });
   const h=$('#spbcHist'), H=(spbcDados||{}).historico||[];
   h.innerHTML=H.length?H.map(f=>'<div class="sgrow"><div class="t"><span>'+vEsc(SPB_TIPO[f.tipo]||f.tipo)+' · '+vEsc(spbObras(f.obras))+'</span><span>'+spbDH(f.enviado_em)+'</span></div>'
@@ -9154,7 +9158,8 @@ async function spbcEnfileirar(tipo,files){
   toast(nok+' de '+res.length+' arquivo(s) carregado(s)'+(nok<res.length?' — veja os recusados na lista.':'.'));
   spbcCarregar();
 }
-async function spbcEnviar(it,tipo){
+async function spbcEnviar(it,slot){
+  const tipo=spbTipoDe(slot), obraMapa=SPB_MAPA[slot];
   let cargaId=null;
   try{
     it.msg='Lendo o arquivo…'; spbcRender();
@@ -9167,6 +9172,8 @@ async function spbcEnviar(it,tipo){
     const L=tipo==='painel'?SPB_P.lerPainel(rows):tipo==='mapa'?SPB_P.lerMapa(rows):tipo==='estoque'?SPB_P.lerEstoque(rows):SPB_P.lerVinculados(rows);
     if(tipo==='estoque'){ const c=L.cabecalho; if(c.obra!==430&&c.obra!==440) throw new Error('Obra '+(c.obra||'?')+' fora do escopo (só 430 e 440) — nada foi alterado.'); if(!c.exportado_em) throw new Error('Não achei a data/hora do rodapé do relatório — nada foi alterado.'); }
     if(!L.linhas.length) throw new Error(tipo==='estoque'?'Nenhum item no arquivo — nada foi alterado.':'Nenhuma linha das obras 430/440 no arquivo — nada foi alterado.');
+    if(obraMapa&&L.linhas.some(l=>l.obra!==obraMapa)){ const outras=[...new Set(L.linhas.map(l=>l.obra).filter(o=>o!==obraMapa))];
+      throw new Error('Esse mapa traz '+outras.map(o=>SPB_OBRA[o]||('a obra '+o)).join(' e ')+'; este campo é só de '+SPB_OBRA[obraMapa]+' — nada foi alterado.'); }
     it.msg='Enviando…'; spbcRender();
     const {data:ini,error:e0}=await sb.rpc('app_sup_carga_iniciar',{p_tipo:tipo,p_nome:it.file.name,p_sha256:sha}); if(e0) throw e0;
     cargaId=ini.carga_id;
