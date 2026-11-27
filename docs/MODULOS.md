@@ -5350,3 +5350,17 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   (a 1ª, se estiver em várias), Função, Apropriação, Modalidade, Superior; Itens → Pessoa/equipe, Item, Aba, Apropriação.
 - Coluna **Código** (P-001…) em Por pessoa e Itens; Por pessoa ganhou também a coluna Equipe. Por mês ganhou linha de total.
 - Só tela: o Excel não mudou. Testado com banco simulado (totais iguais com e sem juntar).
+
+## 26. Gestão de Frotas — relatórios do Ticket Log como são baixados — `docs/migracao_frota_ticket_log.sql` (2026-11-27, sw v481)
+
+- **Carga (`frota_carga`):** o campo "Abastecimentos (Abastecimentos_Base.xlsx)" saiu; entraram **Ticket Log — Águas Integradas** e
+  **Ticket Log — Eficiência Hídrica**, que aceitam vários `RelatorioParametrizado*.xls` de uma vez (tabela HTML, lida no aparelho por `FRT_TL`).
+  O relatório **não informa o consórcio**: vale o campo usado.
+- **Usados:** GERAL (abastecimentos) e CADASTRO POSTO (CNPJ → nome, tabela `frota_bi_posto`). **Cadastro de motorista e de veículo são
+  ignorados e não saem do aparelho** (o de motorista traz CPF, RG e nascimento). Nº do cartão e matrícula também não são enviados.
+- **Substituição:** cada GERAL troca só o mesmo consórcio dentro do período do arquivo (`app_frota_ticket_carga`, chamada única e atômica);
+  os outros meses e o outro consórcio continuam. Se o arquivo tiver menos lançamentos do que havia no período, o resultado avisa.
+- **Arquivo no campo errado:** recusado se já estiver carregado no outro consórcio ou se a maioria das placas for da frota do outro
+  (10 ou mais e mais que o dobro). Com poucos veículos reconhecidos a trava não alcança: conferir o campo.
+- **Alerta:** "veículo da frota de X abastecido no cartão de Y", comparando a placa com o cadastro de veículos do app.
+- **A migração precisa ser aplicada** antes do merge: sem ela os campos do Ticket Log não gravam.
