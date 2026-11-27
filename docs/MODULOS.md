@@ -5377,3 +5377,10 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
 - **Acesso:** só admin ou `perfil.fin_carga_acesso` (ninguém por padrão; ainda sem tela de ⚙️). **Nenhuma RPC devolve as linhas.**
   Quem vai **ver** o BI (decisão de 18/11: gestores) entra com as telas.
 - **A migração precisa ser aplicada** antes do merge.
+
+## 25. Estrutura Organizacional — tela `estrutura` (🚧 em desenvolvimento) · `docs/migracao_estrutura_organizacional.sql` (2026-11-26)
+
+- **Objetivo:** todo colaborador consultar a estrutura e saber onde está. **Por enquanto** só admin e `dev_acesso` (card no bloco 🚧 Em desenvolvimento e `estrutura_pode` no banco). Para liberar a todos: trocar a condição de `estrutura_pode` por `p.ativo` e o gate `orgPode()` no front.
+- **Fonte:** `public.perfil`; superior = **Aprovador 1**. Entram os ativos; terceiro e a conta de teste ficam fora. `app_estrutura()` devolve só nome, cargo, área, consórcio e superior.
+- **Ciclo de aprovadores** (em 26/11/2026: Heron e Sander são aprovador 1 um do outro): o front escolhe o topo (cargo com "Diretor"; senão a maior equipe direta).
+- **Tela:** "Onde estou" (caminho do topo até a pessoa, a quem responde, quantos respondem a ela), árvore recolhível e busca que abre o caminho até o nome.
