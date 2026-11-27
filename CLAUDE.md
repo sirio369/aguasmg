@@ -567,6 +567,7 @@ viraram uma etapa só (`alvara`) com nome pela região — **Liberação TransCo
 adicionadas/removidas (só sem avanço) pela **equipe de obras** no `projeto_det`, tipo Entrada/**Intermediária**/Saída editável
 a qualquer momento; todo lançamento de avanço pergunta **"Esse avanço foi realizado em outra data?"** (Sim = qualquer data/hora não futura,
 sw v422, `docs/migracao_proj_avanco_data_livre.sql` — antes só ontem — em `intervencao_avanco.ts`; `registrado_em`/`retroativo` guardam quando foi lançado).
+**Endereço automático (2026-11-26, sw v474, `docs/migracao_proj_endereco.sql`):** cada intervenção mostra a rua (ponto) ou todas as ruas que o trecho HDD/VCA percorre + bairro, calculados pelos eixos de logradouro (`proj_endereco`), no card da lista, no popup do mapa e no topo do detalhe.
 **Puxamento HDD com diâmetro (mm) + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** cada lançamento do puxamento grava `diametro_mm`/`rua` (`app_proj_avanco_pux_set`); a rua sugere a última da intervenção e os lançamentos antigos ganham ✏️ para informar.
 **Ensaio de reaterro opcional (2026-11-13, sw v375, `docs/migracao_proj_reaterro_decisao.sql`):** reaterro 100% → Obras responde
 "É necessário ensaio de compactação?" (Sim = Qualidade; Não = `dispensado`, recomposição liberada); ramais ganharam Reaterro +
@@ -665,7 +666,7 @@ tabela `sup_acesso_area` + RPCs `app_sup_area_listar`/`_set` + `ME.sup_areas`; f
   Insumos): Campo = **Solicitar ferramenta** + **Minhas ferramentas** (estoque atual com botão
   "Solicitar devolução" embutido + histórico); Gestão = **Aprovar solicitações** (reaproveita
   `sup_aprovar`/`sup_rejeitar`) + **Painel das equipes** (mesma função parametrizada e drill-down de
-  Insumos); Almoxarifado = **Separação e entrega** (reaproveita `supAlmoxCard`/`sup_segregar`/
+  Insumos); Almoxarifado = **Separar ferramenta** + **Entregar ferramenta (retirada)** (2 botões como Insumos/EPI desde v480; reaproveita `supAlmoxCard`/`sup_segregar`/
   `sup_entregar`) + **Recebimento** (tela nova: almoxarife confirma devolução digitando o código de
   4 dígitos que o colaborador informa, nunca mostrado nessa tela). Dois códigos simétricos: retirada
   (`codigo_retirada`, padrão já existente) e devolução (`codigo` novo, tabela `sup_ferramenta_devolucao`
