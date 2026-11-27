@@ -4100,6 +4100,8 @@ continua obrigatória.
 
 **Nº da OS opcional nos checklists de reaterro e recomposição (sw v478) — `docs/migracao_sst_ck_os_opcional.sql` (APLICADO 26/11/2026):** o campo continua no formulário, sem `*`, e `sstPend` não cobra mais; `app_sst_ck_registrar` deixou de gerar o alerta "Sem OS". Na lista, checklist sem OS aparece como "Sem OS". (No Checklist Segurança a OS já era opcional.)
 
+**Checklist HDD (sw v481) — `docs/migracao_sst_ck_hdd.sql` (APLICADO 27/11/2026):** card novo 🕳️ "Checklist HDD" no QSMS campo = Checklist de Segurança — Perfuração Direcional Horizontal (HDD/MND) — Obras COPASA (docx do QSMS), 61 itens em 7 grupos (`SST_CK.hdd`, códigos 1.1…7.9, 4º campo = referência NR/PAE mostrada no form e no PDF via `sstCkRef`). Mesma tabela `sst_checklist` (tipo `'hdd'`, check liberado), mesmo `app_sst_ck_registrar` (só aceita o tipo novo) e mesmo PDF/gestão/BI (`SST_CK_META` dá título/referência; views `bi_sst_checklist(_item)` nomeiam "HDD"). Itens com `(*)` no texto = críticos (selo "crítico"): NC em item crítico obriga resultado "Não conforme". Tipo de intervenção fixo "HDD" (chips escondidos). Foto do item conforme é **opcional** no HDD (61 itens); a foto da NC continua obrigatória. A planilha APR_Checklist_Campo_HDD.xlsx (obra SABESP/SP) não entrou.
+
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
 **Aplicado em 06/11/2026** (migrações `sigos_carga` + `sigos_searchpath`; Edge Function `sigos-ingest` v1 publicada,

@@ -1837,13 +1837,14 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="sst" class="hidden">
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>QSMS campo</h1>
-    <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist e assinatura do responsável pela intervenção, DDS com foto da lista de presença, registro de acidente, quase acidente ou incidente e os checklists de reaterro e de recomposição de pavimento (POP-022). Funciona sem sinal — sobe quando houver conexão.</p>
+    <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist e assinatura do responsável pela intervenção, DDS com foto da lista de presença, registro de acidente, quase acidente ou incidente os checklists de reaterro e de recomposição de pavimento (POP-022) e o checklist de segurança do furo direcional (HDD/MND). Funciona sem sinal — sobe quando houver conexão.</p>
     <div class="grid" style="margin-top:10px">
       <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Checklist Segurança</div></button>
       <button class="mod" data-sstnovo="dds"><div class="ic">🗣️</div><div class="nm">Novo DDS</div></button>
       <button class="mod" data-sstnovo="oc"><div class="ic">🚨</div><div class="nm">Registrar ocorrência</div></button>
       <button class="mod" data-sstnovo="rea"><div class="ic">🧱</div><div class="nm">Checklist de reaterro</div></button>
       <button class="mod" data-sstnovo="rec"><div class="ic">🛣️</div><div class="nm">Checklist de recomposição</div></button>
+      <button class="mod" data-sstnovo="hdd"><div class="ic">🕳️</div><div class="nm">Checklist HDD</div></button>
     </div>
     <div class="sec">Meus lançamentos</div>
     <div class="segchips" id="sstSit" style="margin:2px 0 10px"></div>
@@ -1882,7 +1883,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod" data-go="sst_cipa"><div class="ic">🤝</div><div class="nm">CIPA</div></button>
       <button class="mod" data-sgl="dds"><div class="ic">🗣️</div><div class="nm">DDS</div></button>
       <button class="mod" data-sgl="ocorrencia"><div class="ic">🚨</div><div class="nm">Ocorrências</div></button>
-      <button class="mod" data-go="sst_ck"><div class="ic">🧱</div><div class="nm">Checklists de reaterro e pavimento</div></button>
+      <button class="mod" data-go="sst_ck"><div class="ic">🧱</div><div class="nm">Checklists de reaterro, pavimento e HDD</div></button>
     </div>
   </main>
 
@@ -1945,8 +1946,8 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
   <main id="sst_ck" class="hidden">
     <div class="bar"><button class="bk" id="ckBack" data-go="qsms">‹ QSMS</button></div>
-    <h1>Checklists de reaterro e pavimento</h1>
-    <p class="sub">Checklists do POP-022 preenchidos em campo pelo QSMS: 01 · Reaterro e 02 · Recomposição de pavimento. Abra para ver os itens, as fotos e as assinaturas.</p>
+    <h1>Checklists de reaterro, pavimento e HDD</h1>
+    <p class="sub">Checklists preenchidos em campo pelo QSMS: 01 · Reaterro e 02 · Recomposição de pavimento (POP-022) e o checklist de segurança do HDD (perfuração direcional / MND). Abra para ver os itens, as fotos e as assinaturas.</p>
     <div class="segfil"><input type="date" id="ckDe" title="De"/><input type="date" id="ckAte" title="Até"/><select id="ckCons"><option value="">Ambos os consórcios</option><option value="ZA1004">Águas Integradas (Contagem)</option><option value="ZA0200">Eficiência Hídrica (Betim)</option></select></div>
     <div id="ckView"></div>
   </main>
@@ -16316,10 +16317,18 @@ const SST_TIPO={insp:{t:'Checklist Segurança',ic:'🔍',rpc:'app_sst_inspecao_r
   dds:{t:'DDS',ic:'🗣️',rpc:'app_sst_dds_registrar',ok:'✓ DDS enviado',btn:'Enviar DDS'},
   oc:{t:'Ocorrência',ic:'🚨',rpc:'app_sst_ocorrencia_registrar',ok:'✓ Ocorrência registrada',btn:'Registrar ocorrência'},
   rea:{t:'Checklist de reaterro',ic:'🧱',rpc:'app_sst_ck_registrar',ok:'✓ Checklist enviado',btn:'Enviar checklist',ck:'reaterro'},
-  rec:{t:'Checklist de recomposição de pavimento',ic:'🛣️',rpc:'app_sst_ck_registrar',ok:'✓ Checklist enviado',btn:'Enviar checklist',ck:'recomposicao'}};
+  rec:{t:'Checklist de recomposição de pavimento',ic:'🛣️',rpc:'app_sst_ck_registrar',ok:'✓ Checklist enviado',btn:'Enviar checklist',ck:'recomposicao'},
+  hdd:{t:'Checklist HDD',ic:'🕳️',rpc:'app_sst_ck_registrar',ok:'✓ Checklist HDD enviado',btn:'Enviar checklist',ck:'hdd'}};
+// cabeçalho de cada checklist (formulário, PDF, gestão e BI); tipo = sst_checklist.tipo
+const SST_CK_META={reaterro:{ic:'🧱',nome:'Reaterro',tit:'Checklist 01 · Reaterro',ref:'POP-022 Rev. 03',curto:'Reaterro',arq:'reaterro'},
+  recomposicao:{ic:'🛣️',nome:'Recomposição de pavimento',tit:'Checklist 02 · Recomposição de pavimento',ref:'POP-022 Rev. 03',curto:'Recomp.',arq:'recomposicao'},
+  hdd:{ic:'🕳️',nome:'HDD',tit:'Checklist de Segurança · Perfuração Direcional Horizontal (HDD/MND)',ref:'Obras COPASA',curto:'HDD',arq:'HDD'}};
+const sstCkMeta=t=>SST_CK_META[t]||{ic:'',nome:t||'—',tit:'Checklist',ref:'',curto:t||'',arq:'checklist'};
 // Checklists do POP-022 Rev. 03 (Reaterro e Recomposição de Pavimento): C/NC/NA por item, NC pede observação.
 // O texto do item é gravado junto (snapshot): mudar a lista aqui não altera o que já foi respondido.
 // pav = item que só vale para aquele tipo de pavimento (os outros viram N/A sozinhos ao escolher o tipo).
+// HDD (27/11/2026): Checklist de Segurança — Perfuração Direcional Horizontal (HDD/MND), 4º elemento = referência (NR, PAE…).
+// "(*)" no começo do item = item crítico: NC nele obriga o resultado "Não conforme" (parar e corrigir antes de seguir).
 const SST_CK_INTERV=['Implantação','Manutenção','Reparo','Ligação','HDD','Outra'];
 const SST_CK_PAV=['Asfáltico','Concreto','Intertravado','Paralelepípedo','Calçada','Outro'];
 const SST_CK_RES=[['conforme','Conforme'],['nao_conforme','Não conforme'],['pendente','Pendente']];
@@ -16380,8 +16389,83 @@ const SST_CK={
       ['3.5','Sinalização mantida durante a execução e retirada somente após liberação formal da via.'],
       ['3.6','Registro fotográfico antes/depois realizado.'],
       ['3.7','Ordem de Serviço atualizada e registros anexados.'],
-      ['3.8','Inspeção final aprovada pela fiscalização.']]]]};
-const sstCkItens=ck=>(SST_CK[ck]||[]).flatMap(([g,l])=>l.map(([codigo,item,pav])=>({codigo,grupo:g,item,pav:pav||null,resultado:''})));
+      ['3.8','Inspeção final aprovada pela fiscalização.']]]],
+  hdd:[
+    ['1. Documentação, liberação e equipe',[
+      ['1.1','(*) APR específica do furo HDD elaborada, assinada e divulgada à equipe.',null,'NR-01 / PGR'],
+      ['1.2','(*) Permissão de Trabalho emitida e válida para o turno.',null,'Procedimento COPASA / NR-01'],
+      ['1.3','Ordem de Serviço de SST assinada por todos os trabalhadores.',null,'NR-01'],
+      ['1.4','(*) Operador com capacitação NR-12 e treinamento específico na perfuratriz HDD em uso, com autorização formal (cartão).',null,'NR-12'],
+      ['1.5','Operadores de escavadeira/munck com NR-11/NR-12 e habilitação compatível.',null,'NR-11 / NR-12'],
+      ['1.6','Autorização da COPASA/fiscalização para início do furo e projeto aprovado.',null,'Contrato'],
+      ['1.7','Autorizações externas quando aplicáveis (trânsito, órgão ambiental).',null,'Legislação local'],
+      ['1.8','DDS do dia com tema do furo e lista de presença.',null,'Procedimento interno'],
+      ['1.9','Manual do fabricante e checklist pré-uso da perfuratriz disponíveis na frente.',null,'NR-12']]],
+    ['2. Interferências e planejamento do furo',[
+      ['2.1','(*) Cadastro de interferências consultado: COPASA, CEMIG, GASMIG, telecom, drenagem, iluminação pública.',null,'Projeto'],
+      ['2.2','(*) Interferências localizadas em campo (detector/georradar) e confirmadas por sondagem manual nos cruzamentos.',null,'NR-18 / boas práticas HDD'],
+      ['2.3','Interferências marcadas no piso com cor e profundidade.',null,'Plano do furo'],
+      ['2.4','Afastamento mínimo entre o furo e as redes existentes respeitado no traçado.',null,'Projeto / concessionárias'],
+      ['2.5','Estruturas próximas (muros, postes, edificações) avaliadas quanto a recalque.',null,'APR'],
+      ['2.6','Concessionárias avisadas quando o furo cruza ou corre paralelo a rede de gás ou elétrica.',null,'Concessionária'],
+      ['2.7','Moradores e comércio afetados comunicados.',null,'Procedimento COPASA']]],
+    ['3. Sinalização e isolamento',[
+      ['3.1','(*) Área da perfuratriz, poços e hastes isolada com barreira física (tela/gradil).',null,'NR-18'],
+      ['3.2','Sinalização viária de obra.',null,'CTB / órgão de trânsito'],
+      ['3.3','Sinaleiro com colete refletivo e bandeira/raquete quando houver interferência na via.',null,'CTB / APR'],
+      ['3.4','Sinalização luminosa em trabalhos noturnos ou de baixa visibilidade.',null,'NR-18'],
+      ['3.5','Passagem segura para pedestres mantida e protegida.',null,'NR-18 / prefeitura'],
+      ['3.6','Placa de identificação da obra instalada.',null,'Contrato'],
+      ['3.7','Zona de exclusão no ponto de saída da cabeça de perfuração demarcada e controlada.',null,'Fabricante / APR'],
+      ['3.8','Circulação de máquinas e caminhões separada dos trabalhadores a pé.',null,'NR-18 / NR-11']]],
+    ['4. Poços de entrada/saída e escavações',[
+      ['4.1','(*) Escavações acima de 1,25 m com escoramento, talude ou blindagem.',null,'NR-18'],
+      ['4.2','Escada de acesso a cada poço, ultrapassando 1 m a borda.',null,'NR-18'],
+      ['4.3','Material escavado afastado da borda (mínimo metade da profundidade).',null,'NR-18'],
+      ['4.4','Borda do poço protegida contra queda de pessoas e veículos.',null,'NR-18'],
+      ['4.5','Esgotamento de água/lama disponível; poço sem acúmulo.',null,'NR-18'],
+      ['4.6','Poço avaliado quanto a espaço confinado; se caracterizado: PET, medição de gases, vigia e resgate.',null,'NR-33'],
+      ['4.7','Inspeção diária das escavações e após chuva.',null,'NR-18'],
+      ['4.8','Máquinas e caminhões afastados da borda dos poços, com calço.',null,'NR-18 / NR-11']]],
+    ['5. Operação: furo piloto, alargamento e puxamento',[
+      ['5.1','(*) Comunicação por rádio testada entre operador, localizador e ajudante do poço de saída.',null,'APR'],
+      ['5.2','(*) Ninguém próximo às hastes em rotação; troca de hastes só com rotação e avanço parados.',null,'NR-12 / fabricante'],
+      ['5.3','Morsas da máquina usadas para rosquear/desrosquear; sem chave manual com máquina em movimento.',null,'Fabricante'],
+      ['5.4','Profundidade/inclinação registradas a cada haste (planilha de furo).',null,'Projeto'],
+      ['5.5','Avanço reduzido ao se aproximar de interferências marcadas.',null,'APR'],
+      ['5.6','(*) Procedimento de contato com rede elétrica conhecido: parar, não descer/tocar a máquina, afastar pessoas, acionar CEMIG.',null,'NR-10 / PAE'],
+      ['5.7','(*) Procedimento de rompimento de rede de gás conhecido: parar motores, evacuar, isolar, acionar GASMIG e Bombeiros (193).',null,'PAE'],
+      ['5.8','Ajudante só se aproxima da cabeça/alargador com máquina parada e autorização via rádio.',null,'APR'],
+      ['5.9','Tubo PEAD soldado por operador qualificado em termofusão, com registro de parâmetros.',null,'NBR 14464 / NBR 14465'],
+      ['5.10','Cabeça de puxamento e destorcedor compatíveis com diâmetro e força; fusível mecânico quando exigido.',null,'Fabricante'],
+      ['5.11','Içamento de tubos com plano de rigging, acessórios inspecionados e ninguém sob a carga.',null,'NR-11 / NR-12'],
+      ['5.12','Tubo apoiado em roletes durante o puxamento; área do tubo isolada.',null,'Boas práticas HDD'],
+      ['5.13','Pausa e reavaliação em anomalias (queda de pressão, perda de retorno, torque elevado).',null,'APR']]],
+    ['6. Fluido de perfuração e meio ambiente',[
+      ['6.1','FISPQ/FDS da bentonita e aditivos disponível na frente.',null,'NR-26'],
+      ['6.2','Preparo do fluido com PFF2 e óculos durante a mistura do pó.',null,'NR-06'],
+      ['6.3','Caixa de lama/poço de retorno com contenção, sem transbordo para via ou drenagem.',null,'Legislação ambiental'],
+      ['6.4','Kit de emergência ambiental (mantas, barreiras absorventes) disponível.',null,'PAE'],
+      ['6.5','Via e calçada limpas ao fim do turno.',null,'Prefeitura'],
+      ['6.6','Intervenção em APP ou curso d’água com autorização ambiental, quando aplicável.',null,'Legislação ambiental MG'],
+      ['6.7','Ruído e horário de trabalho compatíveis com a lei municipal.',null,'Lei municipal']]],
+    ['7. EPI, saúde, higiene e emergência',[
+      ['7.1','(*) EPIs em uso: capacete com jugular, botina, luvas, óculos, protetor auricular, uniforme refletivo.',null,'NR-06'],
+      ['7.2','Luvas de vaqueta para manuseio de hastes; botas de borracha no poço com lama.',null,'NR-06'],
+      ['7.3','Protetor solar, água potável fresca e pausas para exposição ao calor.',null,'NR-21 / NR-15 Anexo 3'],
+      ['7.4','Sanitário químico, local para refeição e lavatório na frente.',null,'NR-24 / NR-18'],
+      ['7.5','Trabalhadores sem sinais de fadiga, mal-estar ou uso de álcool/drogas.',null,'NR-01 / PCMSO'],
+      ['7.6','Kit de primeiros socorros abastecido e pessoa treinada na frente.',null,'NR-07 / NR-18'],
+      ['7.7','(*) PAE conhecido; telefones de emergência (SAMU 192, Bombeiros 193, CEMIG 116, GASMIG, COPASA 115) e hospital de referência afixados.',null,'PAE / NR-01'],
+      ['7.8','Veículo disponível para remoção e rota até o hospital conhecida.',null,'PAE'],
+      ['7.9','Ponto de encontro definido e comunicado no DDS.',null,'PAE']]]]};
+const sstCkItens=ck=>(SST_CK[ck]||[]).flatMap(([g,l])=>l.map(([codigo,item,pav,ref])=>({codigo,grupo:g,item,pav:pav||null,ref:ref||null,resultado:''})));
+const sstCkCrit=it=>/^\(\*\)/.test(String((it&&it.item)||''));
+// referência normativa do item (HDD) pelo código — vale também para checklist já enviado (o banco não grava a referência)
+const sstCkRef=(tipo,codigo)=>{ for(const [,l] of (SST_CK[tipo]||[])) for(const x of l) if(x[0]===codigo) return x[3]||null; return null; };
+// texto do item com o "(*)" trocado por um selo de item crítico (form, gestão e PDF)
+const sstCkItemTxt=(item,pdf)=>{ const t=String(item||''); if(!/^\(\*\)/.test(t)) return segH(t);
+  return (pdf?'<b style="color:#b91c1c">(*)</b> ':'<span class="segpill" style="background:var(--bad);font-size:10.5px;padding:1px 6px">crítico</span> ')+segH(t.replace(/^\(\*\)\s*/,'')); };
 const sstEhCk=t=>!!(SST_TIPO[t]&&SST_TIPO[t].ck);
 // áreas/frentes de serviço (inspeção e ocorrência)
 const SST_AREAS=['HDD','VCA','Instalação/substituição de ramal','Instalação/substituição de hidrômetro','Fiscalização de irregularidades',
@@ -16443,7 +16527,7 @@ async function sstNovo(tipo){
     Object.assign(d,{local:'',os:'',resp_uuid:null,resp_nome:'',resp_sig:null,resp_em:null,itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
   if(tipo==='dds') Object.assign(d,{area:'Geral',tema:'',duracao_min:'',qtd:''});
   if(tipo==='oc') Object.assign(d,{natureza:'Acidente',hora:'',tipo_oc:'',descricao:'',causa:'',vinculo:'',vitima_uuid:null,vitima_nome:'',empresa:'',parte_corpo:''});
-  if(sstEhCk(tipo)) Object.assign(d,{os:'',interv:'',equipe:'',local:'',pav:'',resultado:'',itens:sstCkItens(SST_TIPO[tipo].ck),
+  if(sstEhCk(tipo)) Object.assign(d,{os:'',interv:SST_TIPO[tipo].ck==='hdd'?'HDD':'',equipe:'',local:'',pav:'',resultado:'',itens:sstCkItens(SST_TIPO[tipo].ck),
     enc_uuid:null,enc_nome:'',enc_sig:null,enc_em:null,fis_sig:null,fis_em:null});
   sstD=d; irPara('sst_form'); }
 // lista única: rascunho em preenchimento + fila do aparelho (pendentes) + tudo o que já subiu (finalizados), sem limite de dias
@@ -16459,7 +16543,7 @@ async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)r
   (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',sit:'fin',st:fin,data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
   (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',sit:'fin',st:fin,data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
   (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const rr=SST_CK_RES.find(z=>z[0]===x.resultado);
-    L.push({t:x.tipo==='reaterro'?'rea':'rec',pdf:x.id,sit:'fin',st:fin,data:x.data,tit:(x.os?('OS '+x.os):'Sem OS')+(x.equipe?(' · '+x.equipe):''),sub:[rr?('Resultado: '+rr[1]):'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
+    L.push({t:x.tipo==='reaterro'?'rea':x.tipo==='hdd'?'hdd':'rec',pdf:x.id,sit:'fin',st:fin,data:x.data,tit:(x.os?('OS '+x.os):'Sem OS')+(x.equipe?(' · '+x.equipe):''),sub:[rr?('Resultado: '+rr[1]):'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
   fila.forEach(i=>{ const f=i.fields||{}, d=f.p_dados||{}, t=String(i.tipo||'').replace('sst_',''); if(ids.has(f.p_id)||!SST_TIPO[t]) return;
     L.push({t,sit:'pend',st:'⏳ Aguardando envio — sobe quando houver conexão',data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?(d.os?('OS '+d.os):'Sem OS'):(d.area||'—'),sub:''}); });
   L.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
@@ -16523,8 +16607,8 @@ function sstItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="button
         :`<label>Prazo para corrigir *</label><input type="date" data-if="prazo" data-i="${i}" min="${sstHoje()}" value="${segH(it.prazo||'')}"/>`}</div>`}
     ${r==='C'?sstFotoConf(i):''}</div>`; }
 // foto do item conforme (obrigatória nos 3 checklists: segurança, reaterro e recomposição); usa a mesma chave nc_<i> do item
-const sstFotoConf=i=>`<div style="margin-top:6px">${segFotoHtml('nc_'+i,'Foto do item conforme')}</div>`;
-const sstSemFotoConf=d=>(d.itens||[]).filter((it,i)=>it.resultado==='C'&&!d.fotos['nc_'+i]).length;
+const sstFotoConf=i=>`<div style="margin-top:6px">${sstD&&sstD.tipo==='hdd'?sstFotoOpc('nc_'+i,'Foto do item conforme (opcional)'):segFotoHtml('nc_'+i,'Foto do item conforme')}</div>`;
+const sstSemFotoConf=d=>d.tipo==='hdd'?0:(d.itens||[]).filter((it,i)=>it.resultado==='C'&&!d.fotos['nc_'+i]).length;
 function sstInspHtml(){ const d=sstD, grupos=[];
   d.itens.forEach((it,i)=>{ const k=it.grupo||'Geral'; let g=grupos.find(x=>x.g===k); if(!g){ g={g:k,l:[]}; grupos.push(g); } g.l.push(sstItemHtml(it,i)); });
   return segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Área / frente *</label>${sstSel('sstArea',sstAreas(),d.area,'Escolha…')}</div></div>
@@ -16559,21 +16643,21 @@ function sstOcHtml(){ const d=sstD, ac=d.natureza==='Acidente';
       <label>Parte do corpo atingida *</label>${sstSel('sstParte',SST_PARTES,d.parte_corpo,'Escolha…')}`):'')
     +segBlk(ac?3:2,'Fotos (opcional)',sstFotoOpc('foto_1','Foto 1')+sstFotoOpc('foto_2','Foto 2'))
     +`<p class="sub" style="font-size:12.5px">A classificação (com/sem afastamento), a gravidade, a CAT e os dias perdidos são definidos pela gestão do QSMS ao validar o registro.</p>`; }
-// --- checklists POP-022 (reaterro / recomposição) ---
+// --- checklists POP-022 (reaterro / recomposição) e HDD ---
 function sstCkResumo(){ const it=sstD.itens||[], n=v=>it.filter(x=>x.resultado===v).length; const sem=it.length-n('C')-n('NC')-n('NA');
   return `${n('C')} conforme · ${n('NC')} não conforme · ${n('NA')} N/A${sem?(' · '+sem+' sem resposta'):''}`; }
 function sstCkItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="button" data-ires="${i}" data-v="${v}" class="${r===v?('on'+(v==='NC'?' bad':'')):''}">${l}</button>`;
-  return `<div class="segq"><div class="t"><b>${segH(it.codigo)}</b> ${segH(it.item)}</div><div class="segyn">${b('C','C')}${b('NC','NC')}${b('NA','N/A')}</div>
+  return `<div class="segq"><div class="t"><b>${segH(it.codigo)}</b> ${sstCkItemTxt(it.item)}${it.ref?`<div class="sub" style="font-size:11px;margin-top:2px">Ref.: ${segH(it.ref)}</div>`:''}</div><div class="segyn">${b('C','C')}${b('NC','NC')}${b('NA','N/A')}</div>
     ${it.auto?'<div class="sub" style="font-size:11.5px;margin-top:3px">N/A pelo tipo de pavimento</div>':''}
     ${r!=='NC'?'':`<div class="sstnc"><label>Observação / evidência *</label><textarea data-if="obs" data-i="${i}" rows="2">${segH(it.obs||'')}</textarea>
       ${segFotoHtml('nc_'+i,'Foto da não conformidade')}</div>`}
     ${r==='C'?sstFotoConf(i):''}</div>`; }
-function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', grupos=[];
+function sstCkHtml(){ const d=sstD, ckt=SST_TIPO[d.tipo].ck, rec=ckt==='recomposicao', hdd=ckt==='hdd', mt=sstCkMeta(ckt), grupos=[];
   d.itens.forEach((it,i)=>{ let g=grupos.find(x=>x.g===it.grupo); if(!g){ g={g:it.grupo,l:[]}; grupos.push(g); } g.l.push(sstCkItemHtml(it,i)); });
   const resv=d.resultado, resb=`<div class="segyn" data-ckres>${SST_CK_RES.map(([v,l])=>`<button type="button" data-v="${v}" class="${resv===v?('on'+(v==='nao_conforme'?' bad':'')):''}">${l}</button>`).join('')}</div>`;
-  return `<p class="sub" style="font-size:12.5px;margin:2px 0 8px">POP-022 Rev. 03 — ${rec?'Checklist 02 · Recomposição de pavimento':'Checklist 01 · Reaterro'}. C = conforme · NC = não conforme · N/A = não se aplica.</p>`
+  return `<p class="sub" style="font-size:12.5px;margin:2px 0 8px">${segH(mt.ref)} — ${segH(mt.tit)}. C = conforme · NC = não conforme · N/A = não se aplica.${hdd?' Itens <b>crítico</b> (*): NC = PARE — não inicie ou interrompa a atividade e o resultado fica "Não conforme".':''}</p>`
     +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS (opcional)"/></div></div>
-      <label>Tipo de intervenção *</label>${sstChips('interv',SST_CK_INTERV,d.interv)}
+      ${hdd?'':`<label>Tipo de intervenção *</label>${sstChips('interv',SST_CK_INTERV,d.interv)}`}
       <label>Equipe / contratada *</label><input id="sstEquipe" value="${segH(d.equipe||'')}" placeholder="Ex.: Equipe 3 — BBL"/>
       <label>Endereço / local</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="Opcional — o endereço sai também pela coordenada"/>
       ${rec?`<label>Tipo de pavimento *</label>${sstChips('pav',SST_CK_PAV,d.pav)}`:''}
@@ -16655,6 +16739,7 @@ function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
     const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes'));
     if(!d.resultado) P.push('Resultado da inspeção');
     else if(d.resultado==='conforme'&&d.itens.some(it=>it.resultado==='NC')) P.push('Há item não conforme — o resultado não pode ser "Conforme"');
+    else if(d.resultado!=='nao_conforme'&&d.itens.some(it=>it.resultado==='NC'&&sstCkCrit(it))) P.push('Item crítico (*) não conforme — o resultado tem que ser "Não conforme"');
     if(d.resultado&&d.resultado!=='conforme'&&!txt(d.observacoes)) P.push('Observações / ação corretiva');
     if(!txt(d.enc_nome)) P.push('Nome do encarregado');
     if(!d.fis_sig) P.push('Assinatura da fiscalização'); }
@@ -16721,23 +16806,24 @@ function sstCkPdf(r){ segCss();
   if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
   if(!document.getElementById('segRelStyle')){ const st=document.createElement('style'); st.id='segRelStyle'; st.textContent=SEG_REL_CSS; document.head.appendChild(st); }
   let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
-  const rec=r.tipo==='recomposicao', its=r.itens||[], n=v=>its.filter(i=>i.resultado===v).length;
+  const rec=r.tipo==='recomposicao', mt=sstCkMeta(r.tipo), its=r.itens||[], n=v=>its.filter(i=>i.resultado===v).length;
   const res=(SST_CK_RES.find(z=>z[0]===r.resultado)||[null,r.resultado||'—'])[1], cor=r.resultado==='conforme'?'#0a7d5e':r.resultado==='nao_conforme'?'#b91c1c':'#b45309';
   const cons=REL_CONS[r.consorcio]||'Consórcios Águas Integradas & Eficiência Hídrica';
   let num=0; const sec=t=>'<div class="relSec"><span class="relNum">'+(++num)+'</span>'+t+'</div>';
   const fig=(src,leg)=>`<figure><img src="${segImg(src)}" alt="${segH(leg)}"/><figcaption>${segH(leg)}</figcaption></figure>`;
   const ender=[r.endereco,r.bairro,r.municipio].filter(Boolean).join(' — ');
-  let h=`<div class="relTop"><div><h1>Checklist ${rec?'02 · Recomposição de pavimento':'01 · Reaterro'}</h1><div class="sub">${segH(cons)} · POP-022 Rev. 03</div></div>${relLogoHtml(r.consorcio)}<div class="relBadge" style="color:${cor}">${segH(res.toUpperCase())}</div></div><div class="relBody">`;
+  let h=`<div class="relTop"><div><h1>${segH(mt.tit)}</h1><div class="sub">${segH(cons)} · ${segH(mt.ref)}</div></div>${relLogoHtml(r.consorcio)}<div class="relBadge" style="color:${cor}">${segH(res.toUpperCase())}</div></div><div class="relBody">`;
   h+=sec('Identificação')+'<div class="relGrid">'+relField('Data',sstData(r.data))+relField('Nº da OS',segH(r.os||''))+relField('Tipo de intervenção',segH(r.tipo_intervencao||''))+relField('Equipe / contratada',segH(r.equipe||''))
     +(rec?relField('Tipo de pavimento',segH(r.tipo_pavimento||'')):'')+relField('Coordenadas',r.lat!=null?((+r.lat).toFixed(6)+', '+(+r.lon).toFixed(6)+(r.gps_precisao!=null?(' (±'+Math.round(r.gps_precisao)+' m)'):' (marcado no mapa — fora da frente de serviço)')):(r.preenchimento_manual?'Preenchimento manual (sem localização)':''))
     +relWide('Endereço / local',segH([r.local,ender].filter(Boolean).join(' · ')))+relField('Fiscal responsável',segH(r.usuario_nome||''))+relField('Itens',n('C')+' conforme · '+n('NC')+' não conforme · '+n('NA')+' N/A')+'</div>';
   const grupos=[]; its.forEach(i=>{ let g=grupos.find(x=>x.g===i.grupo); if(!g){ g={g:i.grupo,l:[]}; grupos.push(g); } g.l.push(i); });
-  h+=sec('Checklist')+grupos.map(g=>`<table class="segT"><tr><th colspan="3">${segH(g.g||'')}</th></tr>`+g.l.map(i=>`<tr><td style="width:36px">${segH(i.codigo||'')}</td><td>${segH(i.item)}${i.resultado==='NC'&&i.obs?`<div style="margin-top:3px;color:#991b1b">Observação: ${segH(i.obs)}</div>`:''}</td><td class="${i.resultado==='C'?'ok':i.resultado==='NC'?'bad':''}" style="width:42px;text-align:center">${i.resultado==='NA'?'N/A':segH(i.resultado||'—')}</td></tr>`).join('')+'</table>').join('');
+  h+=sec('Checklist')+grupos.map(g=>`<table class="segT"><tr><th colspan="3">${segH(g.g||'')}</th></tr>`+g.l.map(i=>`<tr><td style="width:36px">${segH(i.codigo||'')}</td><td>${sstCkItemTxt(i.item,1)}${(x=>x?`<div style="font-size:10.5px;color:#666">Ref.: ${segH(x)}</div>`:'')(sstCkRef(r.tipo,i.codigo))}${i.resultado==='NC'&&i.obs?`<div style="margin-top:3px;color:#991b1b">Observação: ${segH(i.obs)}</div>`:''}</td><td class="${i.resultado==='C'?'ok':i.resultado==='NC'?'bad':''}" style="width:42px;text-align:center">${i.resultado==='NA'?'N/A':segH(i.resultado||'—')}</td></tr>`).join('')+'</table>').join('');
   h+=sec('Resultado da inspeção')+'<div class="relGrid">'+relField('Resultado','<span style="color:'+cor+'">'+segH(res)+'</span>')+relWide('Observações / ação corretiva',segH(r.observacoes||''))+'</div>';
   const fotos=[]; const f=r.fotos||{}; if(f.foto_antes) fotos.push(fig(f.foto_antes,'Antes')); if(f.foto_depois) fotos.push(fig(f.foto_depois,'Depois'));
   Object.keys(f).filter(k=>k!=='foto_antes'&&k!=='foto_depois'&&typeof f[k]==='string'&&f[k]&&!/^(sig|nc_)/.test(k)).forEach(k=>fotos.push(fig(f[k],'Foto')));
   its.forEach(i=>{ if(i.resultado==='NC'&&i.foto) fotos.push(fig(i.foto,'Não conformidade '+(i.codigo||''))); });
   its.forEach(i=>{ if(i.resultado==='C'&&i.foto) fotos.push(fig(i.foto,'Conforme '+(i.codigo||''))); });
+  if(r.tipo==='hdd'&&its.some(sstCkCrit)) h+='<div style="font-size:11px;color:#555;margin:4px 0 8px">(*) Item crítico — NC = PARE: não iniciar ou interromper a atividade até a correção.</div>';
   if(fotos.length) h+=sec('Fotos')+'<div class="relPhotos">'+fotos.join('')+'</div>';
   const ass=(tit,nome,img,em)=>`<div style="text-align:center;break-inside:avoid">${img?`<img src="${segImg(img)}" alt="Assinatura" style="max-width:100%;height:80px;object-fit:contain"/>`:'<div style="height:80px"></div>'}<div style="border-top:1px solid #444;padding-top:4px;font-size:12px"><b>${segH(nome||'—')}</b><br/>${tit}${em?(' · '+segFmt(em)):''}</div></div>`;
   h+=sec('Assinaturas')+'<div class="relGrid">'+ass('Encarregado',r.encarregado_nome,r.encarregado_assinatura,r.encarregado_assinado_em)+ass('Fiscalização',r.usuario_nome,r.fiscal_assinatura,r.fiscal_assinado_em)+'</div>';
@@ -16747,7 +16833,7 @@ function sstCkPdf(r){ segCss();
   ov.style.display='block'; ov.scrollTop=0;
   document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
   // o título da página vira o nome sugerido do arquivo PDF
-  document.getElementById('relPrint').onclick=async()=>{ const t=document.title; document.title=['Checklist',rec?'recomposicao':'reaterro','OS',r.os||'sem-numero',r.data||''].join(' ').replace(/[\\/:*?"<>|]/g,'-'); try{ await window.print(); }finally{ document.title=t; } }; }
+  document.getElementById('relPrint').onclick=async()=>{ const t=document.title; document.title=['Checklist',mt.arq,'OS',r.os||'sem-numero',r.data||''].join(' ').replace(/[\\/:*?"<>|]/g,'-'); try{ await window.print(); }finally{ document.title=t; } }; }
 
 // ---------- QSMS › 📊 Indicadores SST (gestão): painel, lançamentos, ASO, treinamentos, CIPA, checklist ----------
 // Gate ME.qsms (qsmsGate). Tudo por RPC app_sst_* (gate qsms_pode no servidor). Anular no lugar de apagar.
@@ -16800,7 +16886,7 @@ const sgKv=pares=>'<div class="segkv">'+pares.filter(p=>p[1]!=null&&p[1]!=='').m
 // Período = relação com o Calendário do BI (Data; Treinamentos pela Data de Realização). Saúde e CIPA Membros não têm
 // data (situação de hoje); as medidas de situação dos treinamentos e "Dias sem acidente" ignoram o período, como no BI.
 // Área filtra tudo menos a CIPA (no BI a CIPA não tem relação com Área). "Sem dados" = tabela inteira vazia (cartão do BI).
-const SB_ABAS=[['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['apr','APR'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA'],['ck','Reaterro e pavimento']];
+const SB_ABAS=[['acid','Acidentes'],['vinc','Próprios × terceiros'],['insp','Inspeções'],['apr','APR'],['saude','Saúde ocupacional'],['dds','DDS'],['trein','Treinamentos'],['cipa','CIPA'],['ck','Reaterro, pavimento e HDD']];
 // segmentações de cada página do BI: [tabela, coluna]
 const SB_SEG={acid:[['acidentes','Gravidade'],['acidentes','Tipo']],vinc:[['vinculo','Vínculo'],['vinculo','Empresa']],
   insp:[['inspecoes','Cargo'],['inspecoes','Responsável']],saude:[['saude','Cargo'],['saude','Tipo de Exame'],['saude','Situação ASO']],
@@ -17024,17 +17110,17 @@ cipa(){ const CM=sbF('cipa_membros',{periodo:false}), CR=sbF('cipa_reunioes'), c
 // Checklists do POP-022 (reaterro / recomposição): views bi_sst_checklist(_item); itens seguem os checklists filtrados
 ck(){ const C=sbF('checklists'), ids=new Set(C.map(x=>x['ID'])), Ci=((sbi.r||{}).checklist_itens||[]).filter(x=>ids.has(x['Checklist ID']));
   const cf=R=>{ const c=sbSum(R,'Conformes'), n=sbSum(R,'NCs'); return sbDiv(c,c+n); }, nc=sbSum(C,'NCs');
-  let h=sbKs([sbK('Checklists',C.length,'n','checklists',`Reaterro: ${sbCnt(C,'Checklist','Reaterro')} · recomposição: ${sbCnt(C,'Checklist','Recomposição de pavimento')}`),
+  let h=sbKs([sbK('Checklists',C.length,'n','checklists',`Reaterro: ${sbCnt(C,'Checklist','Reaterro')} · recomposição: ${sbCnt(C,'Checklist','Recomposição de pavimento')} · HDD: ${sbCnt(C,'Checklist','HDD')}`),
     sbK('% Conformidade dos itens',cf(C),'%','checklists','Conformes ÷ (conformes + NC); N/A fora'),
     sbK('Itens não conformes',nc,'n','checklists',`Em ${C.filter(x=>sbN(x['NCs'])>0).length} checklist(s)`,1),
     sbK('Resultado não conforme',sbCnt(C,'Resultado','Não conforme'),'n','checklists',`Pendentes: ${sbCnt(C,'Resultado','Pendente')}`,1)]);
   const k=sbMeses([[C,'Data']]), rs=[['Conforme',SB_OK],['Pendente',SB_AV],['Não conforme',SB_VE]];
   h+=sbBox('Checklists '+sbPorT()+' (resultado)',sbColChart(k,rs.map(([n,c])=>({nome:n,cor:c,v:sbSerie(k,C,'Data',x=>sbCnt(x,'Resultado',n))})),
     {nome:'% Conformidade dos itens',cor:SB_PR,v:sbSerie(k,C,'Data',cf)},{stack:true}),sbTempoCtl());
-  h+=sbBox('Itens com mais não conformidades',sbBarH(sbPor(Ci.filter(x=>x['Resultado']==='NC').map(x=>Object.assign({},x,{_k:(x['Checklist']==='Reaterro'?'Reaterro ':'Recomp. ')+x['Item']})),'_k',[x=>x.length]),[{nome:'NCs',cor:SB_VE}],{max:12}));
+  h+=sbBox('Itens com mais não conformidades',sbBarH(sbPor(Ci.filter(x=>x['Resultado']==='NC').map(x=>Object.assign({},x,{_k:(x['Checklist']==='Reaterro'?'Reaterro ':x['Checklist']==='HDD'?'HDD ':'Recomp. ')+x['Item']})),'_k',[x=>x.length]),[{nome:'NCs',cor:SB_VE}],{max:12}));
   h+=sbBox('Por equipe / contratada',sbBarH(sbPor(C,'Equipe',[x=>sbSum(x,'Conformes'),x=>sbSum(x,'NCs')]),[{nome:'Itens conformes',cor:SB_OK},{nome:'Itens NC',cor:SB_VE}],{stack:true,max:15}));
   h+=sbBox('Resultado por tipo de intervenção',sbBarH(sbPor(C,'Tipo de Intervenção',rs.map(([n])=>x=>sbCnt(x,'Resultado',n))),rs.map(([n,c])=>({nome:n,cor:c})),{stack:true}));
-  h+=sbBox('NCs por etapa do checklist',sbBarH(sbPor(Ci.map(x=>Object.assign({},x,{_g:(x['Checklist']==='Reaterro'?'Reaterro · ':'Recomp. · ')+String(x['Grupo']||'').replace(/^\d+\.\s*/,'')})),'_g',
+  h+=sbBox('NCs por etapa do checklist',sbBarH(sbPor(Ci.map(x=>Object.assign({},x,{_g:(x['Checklist']==='Reaterro'?'Reaterro · ':x['Checklist']==='HDD'?'HDD · ':'Recomp. · ')+String(x['Grupo']||'').replace(/^\d+\.\s*/,'')})),'_g',
     [x=>sbCnt(x,'Resultado','C'),x=>sbCnt(x,'Resultado','NC')]),[{nome:'Conformes',cor:SB_OK},{nome:'NC',cor:SB_VE}],{stack:true}));
   const pv=C.filter(x=>x['Tipo de Pavimento']);
   if(pv.length) h+=sbBox('Recomposição por tipo de pavimento',sbBarH(sbPor(pv,'Tipo de Pavimento',[x=>sbSum(x,'Conformes'),x=>sbSum(x,'NCs')]),[{nome:'Itens conformes',cor:SB_OK},{nome:'Itens NC',cor:SB_VE}],{stack:true}));
@@ -17156,7 +17242,7 @@ function sbCss(){ if(document.getElementById('sbcss'))return; const st=document.
 
 // ===== Checklists POP-022 (sst_ck): reaterro e recomposição de pavimento — lista, detalhe, XLSX e anular =====
 let ck={dados:null,det:null,tipo:'',res:'',busca:'',volta:null};
-const CK_TIPO={reaterro:['🧱','Reaterro'],recomposicao:['🛣️','Recomposição de pavimento']};
+const CK_TIPO={reaterro:['🧱','Reaterro'],recomposicao:['🛣️','Recomposição de pavimento'],hdd:['🕳️','HDD']};
 const CK_RES={conforme:['Conforme','#16a34a'],nao_conforme:['Não conforme','#dc2626'],pendente:['Pendente','#d97706']};
 const ckPill=r=>{ const x=CK_RES[r]||['—','#64748b']; return `<span class="segpill" style="background:${x[1]}">${x[0]}</span>`; };
 const ckConf=x=>{ const c=+x.c||0, n=+x.nc||0; return c+n?c/(c+n):null; };
@@ -17172,9 +17258,9 @@ function ckFiltrados(){ const q=ck.busca.trim().toLowerCase();
     &&(!q||[x.os,x.equipe,x.local,x.endereco,x.bairro,x.fiscal,x.encarregado,x.tipo_intervencao,x.tipo_pavimento].some(s=>String(s||'').toLowerCase().includes(q)))); }
 function ckRender(){ if(ck.det) return ckDetalhe(); const v=$('#ckView'); if(!ck.dados) return;
   const D=ck.dados, nc=D.reduce((s,x)=>s+(+x.nc||0),0), c=D.reduce((s,x)=>s+(+x.c||0),0);
-  v.innerHTML=sgKpis([['Checklists',D.length],['Reaterro',D.filter(x=>x.tipo==='reaterro').length],['Recomposição',D.filter(x=>x.tipo==='recomposicao').length],
+  v.innerHTML=sgKpis([['Checklists',D.length],['Reaterro',D.filter(x=>x.tipo==='reaterro').length],['Recomposição',D.filter(x=>x.tipo==='recomposicao').length],['HDD',D.filter(x=>x.tipo==='hdd').length],
       ['% itens conformes',c+nc?sgPct(c/(c+nc)):'—'],['Itens NC',nc,'alerta'],['Resultado não conforme',D.filter(x=>x.resultado==='nao_conforme').length,'alerta'],['Pendentes',D.filter(x=>x.resultado==='pendente').length,'alerta']])
-    +`<div class="segfil"><select id="ckTipo"><option value="">Os dois checklists</option><option value="reaterro"${ck.tipo==='reaterro'?' selected':''}>01 · Reaterro</option><option value="recomposicao"${ck.tipo==='recomposicao'?' selected':''}>02 · Recomposição de pavimento</option></select>
+    +`<div class="segfil"><select id="ckTipo"><option value="">Todos os checklists</option><option value="reaterro"${ck.tipo==='reaterro'?' selected':''}>01 · Reaterro</option><option value="recomposicao"${ck.tipo==='recomposicao'?' selected':''}>02 · Recomposição de pavimento</option><option value="hdd"${ck.tipo==='hdd'?' selected':''}>HDD · Perfuração direcional</option></select>
       <select id="ckRes">${[['','Todos os resultados'],['conforme','Conforme'],['nao_conforme','Não conforme'],['pendente','Pendente'],['nc','Com item NC'],['alerta','Com alerta']].map(([k,l])=>`<option value="${k}"${ck.res===k?' selected':''}>${l}</option>`).join('')}</select>
       <input id="ckBusca" placeholder="Buscar OS, equipe, local, pessoa…" value="${segH(ck.busca)}" autocomplete="off"/>
       <button type="button" class="btn ghost" id="ckXlsx" style="margin:0;width:auto;padding:9px 12px">⬇ XLSX</button></div>
@@ -17196,19 +17282,19 @@ function ckExport(){ const arr=ckFiltrados(); if(!arr.length) return toast('Nada
   const aoa=[['Data','Checklist','Consórcio','OS','Tipo de intervenção','Equipe / contratada','Tipo de pavimento','Local','Endereço','Fiscal','Encarregado','Resultado','Conformes','Não conformes','N/A','% conformidade','Alertas','Preenchimento manual']];
   arr.forEach(x=>aoa.push([sgDia(x.data),(CK_TIPO[x.tipo]||[,x.tipo])[1],sgCons(x.consorcio),x.os||'',x.tipo_intervencao||'',x.equipe||'',x.tipo_pavimento||'',x.local||'',
     [x.endereco,x.bairro,x.municipio].filter(Boolean).join(' — '),x.fiscal||'',x.encarregado||'',(CK_RES[x.resultado]||[x.resultado])[0],+x.c,+x.nc,+x.na,ckConf(x)==null?'':Math.round(ckConf(x)*1000)/10,(x.alertas||[]).join(' · '),x.preenchimento_manual?'Sim':'']));
-  exportarXlsx('checklists_pop022_'+qsmsDia(new Date())+'.xlsx','Checklists',aoa); }
+  exportarXlsx('checklists_qsms_'+qsmsDia(new Date())+'.xlsx','Checklists',aoa); }
 async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p class="sub">Carregando…</p>'; let r;
   try{ r=await sgRpc('app_sst_ck_ver',{p_id:id}); }catch(e){ return sgErr(v,e); }
   const t=CK_TIPO[r.tipo]||['',r.tipo], its=r.itens||[], n=x=>its.filter(i=>i.resultado===x).length;
   const loc=[r.endereco,r.bairro].filter(Boolean).join(' — ')+(r.municipio?(' · '+r.municipio):'');
   const sig=(nome,img,em)=>`<div style="flex:1 1 220px;min-width:0"><div class="sub" style="font-size:12px">${nome}</div>${img?`<img class="sgsig" src="${fotoURL(img)}" loading="lazy" style="margin-top:4px"/>`:'<div class="sub" style="color:var(--bad);font-size:12px">sem assinatura</div>'}${em?`<div class="sub" style="font-size:11px">${segFmt(em)}</div>`:''}</div>`;
   const grupos=[]; its.forEach(i=>{ let g=grupos.find(x=>x.g===i.grupo); if(!g){ g={g:i.grupo,l:[]}; grupos.push(g); } g.l.push(i); });
-  const lin=i=>`<div class="segq"><div class="sgrow"><span class="t" style="flex:1"><b>${segH(i.codigo||'')}</b> ${segH(i.item)}</span>${sgPill(i.resultado)}</div>
+  const lin=i=>`<div class="segq"><div class="sgrow"><span class="t" style="flex:1"><b>${segH(i.codigo||'')}</b> ${sstCkItemTxt(i.item)}</span>${sgPill(i.resultado)}</div>
     ${i.resultado==='NC'?`<div class="sstnc">${sgKv([['Observação',segH(i.obs||'—')]])}${i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`
       :i.resultado==='C'&&i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`;
   let h=`<button class="btn ghost" id="ckVolta" style="width:auto;margin:0 0 10px;padding:8px 13px">‹ ${ck.volta==='sst_bi'?'Voltar ao BI QSMS':'Voltar à lista'}</button>`;
   h+=`<div class="segblk"><h3>${t[0]} ${segH(t[1])} · OS ${segH(r.os||'—')} ${ckPill(r.resultado)}</h3>
-    <p class="sub" style="font-size:12px;margin:0 0 6px">POP-022 Rev. 03 — Checklist ${r.tipo==='reaterro'?'01':'02'}</p>
+    <p class="sub" style="font-size:12px;margin:0 0 6px">${segH(sstCkMeta(r.tipo).ref)} — ${segH(sstCkMeta(r.tipo).tit)}</p>
     ${sgKv([['Data',sgDia(r.data)],['Consórcio',segH(sgCons(r.consorcio))],['Tipo de intervenção',segH(r.tipo_intervencao||'')],['Equipe / contratada',segH(r.equipe||'')],
       ['Tipo de pavimento',segH(r.tipo_pavimento||'')],['Local',segH(r.local||'')],['Endereço',segH(loc)],['Preenchimento',r.preenchimento_manual?'Manual (sem localização)':''],
       ['GPS',r.lat!=null?`<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">${(+r.lat).toFixed(6)}, ${(+r.lon).toFixed(6)}</a>${r.gps_precisao!=null?(' ±'+Math.round(r.gps_precisao)+' m'):' · marcado no mapa (fora da frente de serviço)'}`:''],
