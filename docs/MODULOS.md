@@ -1599,6 +1599,7 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   "termo assinado"). Reaproveita a coluna `treinamento_confirmado_em` pra guardar o timestamp da
   assinatura — nome ficou desatualizado (era específico de treinamento), não valeu a pena renomear
   só por isso.
+  **27/11/2026:** saiu a frase do Manual de Instruções. Termos assinados antes continuam imprimindo a frase (`frotaTermoNormas`: sem "_termo_frota_v2" no arquivo da assinatura).
 - **Ver a foto/PDF da CNH:** `condRenderHome` mostra link "Ver foto da CNH" (`SBASE+cnh_foto`) pro
   próprio condutor quando `condData.cnh_foto` existe. **Do lado do gestor (2026-09-23):**
   `frotasRenderCondutorCadastro` ganhou o mesmo link ("ver CNH", ao lado de "ver termo") — antes
@@ -5060,7 +5061,10 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Hub `sup_bi`:** lista os relatórios que estão no banco agora (tipo · obra · linhas · quando) e abre **Cargas** (quem sobe) e **Acesso** (admin). As páginas do BI vêm no PR-C.
 - **Cargas `sup_carga`:** 3 campos (Painel de Compras · Mapa de Cotações · Cotações e Pedidos Vinculados). O .xlsx é lido no aparelho (SheetJS sob demanda, `getXLSX`), o **tipo é conferido pelo conteúdo** (`SPB_P.detectar`; arquivo no campo errado é recusado sem tocar no banco) e as linhas vão em lotes de 400 por `app_sup_carga_iniciar → _lote → _finalizar`; erro → `app_sup_carga_falha` limpa o que já tinha subido. Mapa aceita vários arquivos (um por obra), um de cada vez. Histórico em `app_sup_cargas_listar`.
 - **Leitores `SPB_P` (`lerPainel/lerMapa/lerVinculados`):** porta do Power Query (`stgPainel`, `MapaBase/MapaLinhas`, `CotPedMap`); iguais ao leitor testado contra os arquivos de 16/11/2026 (2.673 linhas do Painel nas obras 430/440 · 3.168 + 2.753 propostas do Mapa · 1.417 itens dos Vinculados).
+- **Atualizado em 27/11/2026 (sw v482, pedido da usuária):** a carga tem **4 campos, um por arquivo** — Painel, **Mapa ZA1004 (Contagem, obra 430)**, **Mapa ZA0200 (Betim, obra 440)** e Vinculados; mapa de outra obra é recusado. O campo **Estoque saiu da tela** (as páginas de Estoque do BI continuam, sem carga pela tela).
 - **Acesso `sup_acesso` (admin):** duas caixas por pessoa — **Ver** e **Subir relatórios** (`app_sup_acesso_listar/_set`; subir inclui ver; admin tem os dois sempre).
+**27/11/2026:** o **BI QSMS** (`sst_bi`) também aparece na tela BI (`gi`), para quem tem `ME.qsms`; continua no hub do QSMS.
+
 **PR-C (2026-11-19, sw v432) — módulo "Gestão Integrada" + BI de Suprimentos (6 páginas)** (telas `gi` / `sup_bi`; código `spb*`, reaproveita os componentes do BI QSMS `sb*`):
 - **Atualizado em 19/11/2026 (sw v438, decisão do Sander):** o card da Home saiu; o hub `gi` virou o botão **📊 BI** em Auxiliar de Programação › Planejamento (voltar → Auxiliar). Texto original a seguir.
 - **Decisão da usuária:** todos os BIs ficam num módulo novo, **Gestão Integrada** (card 📊 na Home, `homeGI`): **Gestão de Suprimentos** (pronto), Gestão de Frotas, Gestão de Pessoas, Gestão Financeira (cards "Em breve"; há mais áreas previstas). O hub de PR-B (`sup_bi`) virou a tela do BI; **Cargas do SIENGE** e **Acesso** passaram a ser botões no cabeçalho da Gestão de Suprimentos.
@@ -5350,3 +5354,36 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   (a 1ª, se estiver em várias), Função, Apropriação, Modalidade, Superior; Itens → Pessoa/equipe, Item, Aba, Apropriação.
 - Coluna **Código** (P-001…) em Por pessoa e Itens; Por pessoa ganhou também a coluna Equipe. Por mês ganhou linha de total.
 - Só tela: o Excel não mudou. Testado com banco simulado (totais iguais com e sem juntar).
+
+## 25. Estrutura Organizacional — tela `estrutura` (🚧 em desenvolvimento) · `docs/migracao_estrutura_organizacional.sql` (2026-11-26)
+
+- **Objetivo:** todo colaborador consultar a estrutura e saber onde está. **Por enquanto** só admin e `dev_acesso` (card no bloco 🚧 Em desenvolvimento e `estrutura_pode` no banco). Para liberar a todos: trocar a condição de `estrutura_pode` por `p.ativo` e o gate `orgPode()` no front.
+- **Fonte:** `public.perfil`; superior = **Aprovador 1**. Entram os ativos; terceiro e a conta de teste ficam fora. `app_estrutura()` devolve só nome, cargo, área, consórcio e superior.
+- **Ciclo de aprovadores** (em 26/11/2026: Heron e Sander são aprovador 1 um do outro): o front escolhe o topo (cargo com "Diretor"; senão a maior equipe direta).
+- **Tela:** "Onde estou" (caminho do topo até a pessoa, a quem responde, quantos respondem a ela), árvore recolhível e busca que abre o caminho até o nome.
+
+## 26. Gestão de Frotas — relatórios do Ticket Log como são baixados — `docs/migracao_frota_ticket_log.sql` (2026-11-27, sw v481)
+
+- **Carga (`frota_carga`):** o campo "Abastecimentos (Abastecimentos_Base.xlsx)" saiu; entraram **Ticket Log — Águas Integradas** e
+  **Ticket Log — Eficiência Hídrica**, que aceitam vários `RelatorioParametrizado*.xls` de uma vez (tabela HTML, lida no aparelho por `FRT_TL`).
+  O relatório **não informa o consórcio**: vale o campo usado.
+- **Usados:** GERAL (abastecimentos) e CADASTRO POSTO (CNPJ → nome, tabela `frota_bi_posto`). **Cadastro de motorista e de veículo são
+  ignorados e não saem do aparelho** (o de motorista traz CPF, RG e nascimento). Nº do cartão e matrícula também não são enviados.
+- **Substituição:** cada GERAL troca só o mesmo consórcio dentro do período do arquivo (`app_frota_ticket_carga`, chamada única e atômica);
+  os outros meses e o outro consórcio continuam. Se o arquivo tiver menos lançamentos do que havia no período, o resultado avisa.
+- **Arquivo no campo errado:** recusado se já estiver carregado no outro consórcio ou se a maioria das placas for da frota do outro
+  (10 ou mais e mais que o dobro). Com poucos veículos reconhecidos a trava não alcança: conferir o campo.
+- **Alerta:** "veículo da frota de X abastecido no cartão de Y", comparando a placa com o cadastro de veículos do app.
+- **A migração precisa ser aplicada** antes do merge: sem ela os campos do Ticket Log não gravam.
+
+## 27. Custos (Gestão Financeira), etapa 1: carga — `docs/migracao_fin_carga.sql` (2026-11-27, sw v483)
+
+- **Só a carga** (pedido da usuária); as telas do BI de Custos vêm depois. Auxiliar › Carga dos BIs › **Custos (Financeiro)** (`fin_carga`).
+- **6 campos:** Extrato, Consulta de Parcelas, Plano de Contas, Orçamento Consolidado, Orçamento Detalhado e Apropriações Manuais.
+- **Dados crus:** vão só as colunas que o Power Query do Custos 3.0 usa (`FIN_DEF`), sem transformação; linha sem a chave (ex.: total da
+  planilha) fica de fora. Tabelas `"20 - financeiro".fin_carga` e `fin_linha` (jsonb, RLS sem policy).
+- **Conferência:** `app_fin_carga_finalizar` compara linhas e somas com o que o aparelho leu; se diferir, nada é trocado.
+  Isso garante que o banco é igual ao arquivo; a comparação com as medidas do Custos 3.0 fica para a etapa das telas.
+- **Acesso:** só admin ou `perfil.fin_carga_acesso` (ninguém por padrão; ainda sem tela de ⚙️). **Nenhuma RPC devolve as linhas.**
+  Quem vai **ver** o BI (decisão de 18/11: gestores) entra com as telas.
+- **A migração precisa ser aplicada** antes do merge.
