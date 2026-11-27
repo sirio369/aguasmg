@@ -20664,7 +20664,7 @@ async function mcInit(){
   if(!(ME&&ME.pode_aprovar)){ $('#mcResumo').innerHTML=''; $('#mcLista').innerHTML='<p class="sub">Disponível só para aprovadores.</p>'; return; }
   $('#mcSub').textContent = ME.is_admin ? 'Todos os colaboradores ativos (visão de admin).' : 'Colaboradores ativos que têm você como Aprovador 1 ou 2.';
   $('#mcResumo').innerHTML=''; $('#mcLista').innerHTML='<p class="sub">Carregando…</p>';
-  try{ const {data,error}=await sb.rpc('app_meus_colaboradores'); if(error) throw error; mcData=data||[]; }
+  try{ const {data,error}=await sb.rpc('app_meus_colaboradores'); if(error) throw error; mcData=(data||[]).filter(u=>String(u.modalidade||'').trim().toUpperCase()!=='TERCEIRO'); }   // terceiro não entra nesta tela
   catch(e){ $('#mcLista').innerHTML='<div class="banner bad">Não foi possível carregar: '+vEsc(e.message||e)+'</div>'; return; }
   mcSel=null; if(mcArea && !mcData.some(u=>u.area===mcArea)) mcArea='';
   mcRenderFiltros(); mcRender();
@@ -20679,11 +20679,6 @@ function mcRenderFiltros(){
   const areas=[...new Set(mcData.map(u=>u.area).filter(Boolean))].sort();
   $('#mcArea').innerHTML='<option value="">Todas as áreas</option>'+areas.map(a=>`<option value="${vEsc(a)}"${a===mcArea?' selected':''}>${vEsc(a)}</option>`).join('');
 }
-function mcContagem(arr,fn){ const m={}; arr.forEach(u=>{ const k=fn(u)||'(não informado)'; m[k]=(m[k]||0)+1; }); return Object.entries(m).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])); }
-function mcBloco(titulo,pares,total){
-  return `<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px"><b style="font-size:13px">${titulo}</b>`+
-    pares.map(([k,n])=>`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px"><span style="flex:1;min-width:0">${vEsc(k)}</span><span style="width:90px;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${Math.round(n/total*100)}%;background:var(--acc)"></span></span><b style="width:28px;text-align:right">${n}</b></div>`).join('')+'</div>';
-}
 function mcFicha(u){
   const L=(k,v)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid var(--line);font-size:13px"><span class="sub">${k}</span><b style="text-align:right;word-break:break-word">${vEsc(v==null||v===''?'—':v)}</b></div>`;
   return '<div style="margin-top:8px">'+L('E-mail',u.email)+L('Cargo',u.cargo)+L('Consórcio',mcConsLbl(u.consorcio))+L('Área',[u.codigo_area,u.area].filter(Boolean).join(' · '))+
@@ -20693,10 +20688,7 @@ function mcFicha(u){
 function mcRender(){
   const arr=mcFiltrados(), tot=arr.length;
   if(!mcData.length){ $('#mcResumo').innerHTML=''; $('#mcLista').innerHTML='<p class="sub">Nenhum colaborador ativo vinculado a você como aprovador.</p>'; return; }
-  $('#mcResumo').innerHTML=`<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:28px;font-weight:700">${tot}</span><span class="sub">colaborador(es) ativo(s) no filtro</span></div>`+(tot?(
-    mcBloco('Por área',mcContagem(arr,u=>u.area),tot)+mcBloco('Por consórcio',mcContagem(arr,u=>mcConsLbl(u.consorcio)),tot)+
-    mcBloco('Por projeto',mcContagem(arr,u=>u.projeto),tot)+mcBloco('Por cargo',mcContagem(arr,u=>u.cargo),tot)+
-    mcBloco('Por modalidade',mcContagem(arr,u=>u.modalidade),tot)+mcBloco('Direto / indireto',mcContagem(arr,u=>u.custo_direto_indireto),tot)):'');
+  $('#mcResumo').innerHTML='';   // sem resumos antes da lista (as contagens ficam nos botões de consórcio)
   $('#mcLista').innerHTML = tot ? arr.map(u=>`<div class="mcItem" data-id="${vEsc(u.id)}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer">
       <div style="display:flex;gap:8px"><b style="flex:1;min-width:0">${vEsc(u.nome||'—')}</b><span class="sub" style="font-size:12px">${mcSel===String(u.id)?'▲':'▼'}</span></div>
       <div class="sub" style="margin-top:2px">${vEsc(u.cargo||'—')} · ${vEsc(u.area||'—')}</div>${mcSel===String(u.id)?mcFicha(u):''}</div>`).join('') : '<p class="sub">Ninguém neste filtro.</p>';
