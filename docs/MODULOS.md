@@ -5350,3 +5350,15 @@ Banco: `docs/migracao_orcamento_parametros.sql` (aplicado 23/11 como `orc_22_par
   (a 1ª, se estiver em várias), Função, Apropriação, Modalidade, Superior; Itens → Pessoa/equipe, Item, Aba, Apropriação.
 - Coluna **Código** (P-001…) em Por pessoa e Itens; Por pessoa ganhou também a coluna Equipe. Por mês ganhou linha de total.
 - Só tela: o Excel não mudou. Testado com banco simulado (totais iguais com e sem juntar).
+
+## 27. Custos (Gestão Financeira), etapa 1: carga — `docs/migracao_fin_carga.sql` (2026-11-27, sw v483)
+
+- **Só a carga** (pedido da usuária); as telas do BI de Custos vêm depois. Auxiliar › Carga dos BIs › **Custos (Financeiro)** (`fin_carga`).
+- **6 campos:** Extrato, Consulta de Parcelas, Plano de Contas, Orçamento Consolidado, Orçamento Detalhado e Apropriações Manuais.
+- **Dados crus:** vão só as colunas que o Power Query do Custos 3.0 usa (`FIN_DEF`), sem transformação; linha sem a chave (ex.: total da
+  planilha) fica de fora. Tabelas `"20 - financeiro".fin_carga` e `fin_linha` (jsonb, RLS sem policy).
+- **Conferência:** `app_fin_carga_finalizar` compara linhas e somas com o que o aparelho leu; se diferir, nada é trocado.
+  Isso garante que o banco é igual ao arquivo; a comparação com as medidas do Custos 3.0 fica para a etapa das telas.
+- **Acesso:** só admin ou `perfil.fin_carga_acesso` (ninguém por padrão; ainda sem tela de ⚙️). **Nenhuma RPC devolve as linhas.**
+  Quem vai **ver** o BI (decisão de 18/11: gestores) entra com as telas.
+- **A migração precisa ser aplicada** antes do merge.

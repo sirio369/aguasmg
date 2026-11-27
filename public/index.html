@@ -1530,7 +1530,18 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="bcSup" data-go="sup_carga"><div class="ic">📦</div><div class="nm">Suprimentos (SIENGE)</div></button>
       <button class="mod hidden" id="bcFrota" data-go="frota_carga"><div class="ic">🚗</div><div class="nm">Frotas</div></button>
       <button class="mod hidden" id="bcPes" data-go="pessoas_carga"><div class="ic">👥</div><div class="nm">Pessoas</div></button>
+      <button class="mod hidden" id="bcFin" data-go="fin_carga"><div class="ic">💰</div><div class="nm">Custos (Financeiro)</div></button>
     </div>
+  </main>
+
+  <main id="fin_carga" class="hidden spbmain">
+    <div class="bar"><button class="bk" data-go="bi_carga">‹ Carga dos BIs</button></div>
+    <h1>Arquivos de Custos</h1>
+    <p class="sub">Envie os 6 arquivos do BI de Custos, cada um no seu campo. O arquivo novo <b>substitui o anterior do mesmo tipo</b>, só quando chega inteiro e com a mesma quantidade de linhas e as mesmas somas do arquivo. Arquivo no campo errado é recusado sem mexer no banco. As telas do BI de Custos ainda não estão no app. <b>Dados financeiros:</b> o acesso é restrito.</p>
+    <div id="fincSlots" class="sggrid"><p class="sub">Carregando…</p></div>
+    <div class="sec" style="margin-top:20px">Últimas cargas</div>
+    <div id="fincHist"><p class="sub">Carregando…</p></div>
+    <input type="file" id="fincFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden"/>
   </main>
 
   <main id="sup_bi" class="hidden spbmain">
@@ -2804,7 +2815,7 @@ if($('#prMeuLocal')) $('#prMeuLocal').addEventListener('click',()=>{
 });
 
 // ---------- navegação ----------
-const SCREENS=['home','gi','bi_carga','pessoas_bi','pessoas_carga','pessoas_acesso','frota_bi','frota_carga','frota_acesso','sup_bi','sup_carga','sup_acesso','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','suprimentos','pr_prod','pressao_reg','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','hd_caixas','hdcx_cad','hdcx_mov','hdcx_bi','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_pend','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_bi','sst_lanc','sst_ck','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
+const SCREENS=['home','gi','bi_carga','fin_carga','pessoas_bi','pessoas_carga','pessoas_acesso','frota_bi','frota_carga','frota_acesso','sup_bi','sup_carga','sup_acesso','pressao','loggers_hub','loggers','logger_det','vrp','vrp_det','cadastro','pesquisa','ocorrencia','produtividade','captacao','suprimentos','pr_prod','pressao_reg','biblioteca','entrevistadores','ent_ocorrencia','ent_oc_gestao','auxiliar_programacao','aux_acesso','abertura_servicos','programacao_servicos','programacao_pesquisa','pp_acomp','pp_diario','sigos_carga','sigos_abertas','recad_prog','hd_caixas','hdcx_cad','hdcx_mov','hdcx_bi','sigos_vinculo','rdo','fisc','fisc_rel','fisc_val_acesso','matriculas','notificacoes','frota','condutor','frotas','pavimento','pavprog','pavqual','pavqual_ens','pavqual_acesso','projetos','projeto_campo','projeto_det','projeto_sup','projeto_cfg','projeto_acesso','projeto_resumo','projeto_rel','projeto_import','projeto_qual','projeto_pend','projeto_prazos','vrpman','vrpman_campo','vrpman_exec','vrpman_serv','vrpman_fichas','vrpman_prev','vrpman_os','vrpman_cfg','dev_acesso','fisc_acesso','rh','rh_carga','rh_acesso','rh_val','rh_analise','meus_colab','telemetria','vitrine','seg','seg_form','sst','sst_form','qsms','qsms_form','qsms_epi_col','qsms_epi_painel','qsms_cesta','qsms_acesso','sst_bi','sst_lanc','sst_ck','sst_aso','sst_trein','sst_cipa','sst_modelo','avisos'];
 const FISCAL_TELAS=['home','fisc','fiscv','fiscv_rel','cadastro','biblioteca','notificacoes'];
 function irPara(id){
   if(ME&&ME.is_fiscal){ if(!FISCAL_TELAS.includes(id)) id='home'; if(id==='fisc') id='fiscv'; }
@@ -2841,6 +2852,7 @@ function irPara(id){
   if(id==='sigos_carga') sgcInit();
   if(id==='gi') giInit();
   if(id==='bi_carga') bcInit();
+  if(id==='fin_carga') fincInit();
   if(id==='sup_bi') spbInit();
   if(id==='frota_bi') frtInit();
   if(id==='pessoas_bi') hcInit();
@@ -6199,7 +6211,7 @@ const PG_FILTROS=[['pendente','Pendentes'],['criada','OS criada'],['todas','Toda
 function apInit(){
   // acesso geral à tela (controlado pela engrenagem desta própria tela)
   if(!(ME&&(ME.aux_acesso||ME.is_admin))){ toast('Acesso restrito'); irPara('home'); return; }
-  biCargaAcessos().then(c=>{ const b=$('#apBiCarga'); if(b) b.classList.toggle('hidden',!(c.sup||c.frota||c.pes)); });
+  biCargaAcessos().then(c=>{ const b=$('#apBiCarga'); if(b) b.classList.toggle('hidden',!(c.sup||c.frota||c.pes||c.fin)); });
   const ac=$('#apAbertCom'); if(ac) ac.onclick=()=>{ pgModo='comercial'; pgBackTo='auxiliar_programacao'; irPara('programacao_servicos'); };
   const ap=$('#apAbertPesq'); if(ap) ap.onclick=()=>{ pgModo='pesquisa'; pgBackTo='auxiliar_programacao'; irPara('programacao_servicos'); };
   // Ferramentas migradas do cockpit NRW → abrem no perdas.html (fora do menu NRW)
@@ -8808,13 +8820,144 @@ function spbCss(){
 const spbDH=ts=>{ if(!ts) return '—'; try{ return new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(ts); } };
 const spbN=n=>(n==null?'—':Number(n).toLocaleString('pt-BR'));
 const spbObras=a=>(a&&a.length)?a.map(o=>SPB_OBRA[o]||('Obra '+o)).join(' + '):'—';
+// ---------- CUSTOS (Gestão Financeira), etapa 1: carga dos 6 arquivos do Custos 3.0 (docs/migracao_fin_carga.sql, MODULOS §27) ----------
+// Vão ao banco só as colunas que o Power Query do Custos 3.0 usa, sem transformar (datas viram AAAA-MM-DD e valores viram número).
+// d = data, n = número, t = texto. chave = coluna que precisa estar preenchida (linha de total da planilha fica de fora).
+const FIN_DEF={
+  extrato:{aba:'Lancamentos',chave:['Data'],somas:['Saidas','Entradas'],cols:{Empresa:'t',Conta:'t',Data:'d',Origem:'t',Historico:'t',Documento:'t',Titulo:'t',Saidas:'n',Entradas:'n',Saldo:'n',Conciliacao:'d'}},
+  parcelas:{aba:'Sheet1',chave:['Título'],somas:['Valor líquido','Valor da baixa'],cols:{'Grupo':'t','Título':'t','Parcela':'t','Cód. obra':'n','Obra':'t','Cód. Item orçamento':'t','Item orçamento':'t','% apropriação obra':'n','Cód. empresa':'n','Empresa':'t','Cód. credor':'n','Credor':'t','Documento':'t','N° documento':'t','Origem':'t','Data vencimento':'d','Valor bruto':'n','Acréscimo':'n','Valor líquido':'n','Valor da baixa':'n','Data do pagamento':'d','Data emissão':'d','Status da parcela':'t','Conta corrente':'t','Observação do título':'t'}},
+  plano:{aba:'Plano de Contas',chave:['nivel 4'],somas:[],cols:{'nivel 1':'t','Desc. Nível 1':'t','nivel 2':'t','Desc. Nível 2':'t','nivel 3':'t','Desc. Nível 3':'t','nivel 4':'t','Desc. Nível 4':'t','Categoria Interna 1':'t','Categoria Interna 2':'t','Chave':'t'}},
+  orcamento:{aba:'Planilha1',chave:['Consórcio','Mês Calendário'],somas:['Soma de Valor'],dataObrig:'Mês Calendário',cols:{'Consórcio':'t','Nível 4 - Aprop Obra':'t','Aprop Contabil':'t','Mês Calendário':'d','Soma de Valor':'n'}},
+  orcamento_det:{aba:'Detalhe',chave:['Consórcio','Mês Calendário'],somas:['Valor'],dataObrig:'Mês Calendário',cols:{'Consórcio':'t','Nível 4 - Aprop Obra':'t','Aprop Contabil':'t','Tipo de custo':'t','Descrição':'t','Atributo':'t','Mês Calendário':'d','Valor':'n'}},
+  apropriacoes:{aba:'Plan1',chave:['CREDOR'],somas:[],cols:{'CREDOR':'t','APROPRIAÇÃO':'t'}}};
+const FIN_TIPOS=['extrato','parcelas','plano','orcamento','orcamento_det','apropriacoes'];
+const FIN_TIPO={extrato:'Extrato',parcelas:'Consulta de Parcelas',plano:'Plano de Contas',orcamento:'Orçamento Consolidado',orcamento_det:'Orçamento Detalhado',apropriacoes:'Apropriações Manuais'};
+const FIN_SUB={extrato:'Extrato.xlsx · aba Lancamentos',parcelas:'consulta_de_parcelas.xlsx · exportação do SIENGE, aba Sheet1',plano:'Plano de Contas - BBL.xlsx · aba Plano de Contas',
+  orcamento:'Orçamento Consolidado.xlsx · aba Planilha1',orcamento_det:'Orçamento Detalhado.xlsx · aba Detalhe',apropriacoes:'Apropriações Manual.xlsx · aba Plan1'};
+const FIN_P=(()=>{
+  const norm=s=>String(s==null?'':s).replace(/\s+/g,' ').trim();
+  // abas = {nome: matriz}. Devolve o tipo pelo nome da aba + todas as colunas esperadas no cabeçalho
+  function achar(abas,tipo){ const D=FIN_DEF[tipo], rows=abas[D.aba]; if(!rows||!rows.length) return null;
+    const H=(rows[0]||[]).map(norm), ix={}; for(const c of Object.keys(D.cols)){ const i=H.indexOf(c); if(i<0) return {falta:c,rows}; ix[c]=i; } return {rows,ix}; }
+  function detectar(abas){ return FIN_TIPOS.find(t=>{ const a=achar(abas,t); return a&&!a.falta; })||null; }
+  const vazio=v=>v==null||(typeof v==='string'&&v.trim()==='');
+  function data(v){ if(vazio(v)) return null;
+    if(v instanceof Date){ if(isNaN(v)) return undefined; const d=new Date(v.getTime()+12*3600e3); return d.toISOString().slice(0,10); }
+    const s=String(v).trim(); let m=/^(\d{2})\/(\d{2})\/(\d{4})/.exec(s); if(m) return m[3]+'-'+m[2]+'-'+m[1];
+    m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s); return m?m[1]+'-'+m[2]+'-'+m[3]:undefined; }
+  function numero(v){ if(vazio(v)) return null; if(typeof v==='number') return Number.isFinite(v)?v:undefined;
+    const s=String(v).trim().replace(/^R\$\s*/,''); const n=Number(s.includes(',')?s.replace(/\./g,'').replace(',','.'):s); return Number.isFinite(n)?n:undefined; }
+  function ler(abas,tipo){
+    const D=FIN_DEF[tipo], a=achar(abas,tipo);
+    if(!a) throw new Error('Não achei a aba "'+D.aba+'" — nada foi alterado.');
+    if(a.falta) throw new Error('Falta a coluna "'+a.falta+'" na aba "'+D.aba+'" — nada foi alterado.');
+    const linhas=[], somas=Object.fromEntries(D.somas.map(c=>[c,0])); let fora=0;
+    for(let i=1;i<a.rows.length;i++){ const r=a.rows[i]||[];
+      if(r.every(vazio)) continue;
+      if(D.chave.some(c=>vazio(r[a.ix[c]]))||(D.dataObrig&&data(r[a.ix[D.dataObrig]])===undefined)){ fora++; continue; }
+      const o={};
+      for(const [c,t] of Object.entries(D.cols)){ const v=r[a.ix[c]];
+        const x=t==='d'?data(v):t==='n'?numero(v):(vazio(v)?null:String(v).trim());
+        if(x===undefined) throw new Error('Valor que não consegui ler na linha '+(i+1)+', coluna "'+c+'" — nada foi alterado.');
+        if(x!==null) o[c]=x; }
+      D.somas.forEach(c=>{ somas[c]+=o[c]||0; });
+      linhas.push(o); }
+    return {linhas,somas,fora};
+  }
+  return {detectar,ler};
+})();
+let FIN_AC=null, FIN_AC_T=0, fincDados=null, fincRodando={}, fincAlvo=null, fincFila=Object.fromEntries(FIN_TIPOS.map(t=>[t,[]]));
+async function finAcesso(force){
+  if(!force&&FIN_AC&&Date.now()-FIN_AC_T<300000) return FIN_AC;
+  try{ const {data,error}=await sb.rpc('app_fin_acesso'); if(error) throw error; FIN_AC=data||{}; FIN_AC_T=Date.now(); }catch(e){ FIN_AC=FIN_AC||{}; }
+  return FIN_AC;
+}
+async function fincInit(){
+  spbCss();
+  const a=await finAcesso(true);
+  if(!(a&&a.carregar)){ toast('Acesso restrito'); irPara('home'); return; }
+  const f=$('#fincFile');
+  if(f&&!f.dataset.ready){ f.dataset.ready='1'; f.onchange=()=>{ const x=(f.files||[])[0]; f.value=''; if(x&&fincAlvo) fincEnviarArquivo(fincAlvo,x); }; }
+  fincCarregar();
+}
+async function fincCarregar(){
+  try{ const {data,error}=await sb.rpc('app_fin_cargas_listar',{p_limite:40}); if(error) throw error; fincDados=data||{}; }
+  catch(e){ $('#fincSlots').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; $('#fincHist').innerHTML=''; return; }
+  fincRender();
+}
+function fincResumoDados(r){
+  if(!r) return '';
+  const p=[], T=r.totais||{};
+  if(r.de) p.push(spbDia(r.de)+' a '+spbDia(r.ate));
+  Object.keys(T).forEach(k=>p.push(k+': '+spbBRL(+T[k])));
+  Object.entries(r.por_consorcio||{}).forEach(([k,v])=>p.push(k+': '+spbBRL(+v)));
+  return p.map(vEsc).join('<br>');
+}
+function fincResumo(r){
+  if(r.status==='erro') return '⚠️ '+vEsc(r.erro||'Erro no processamento.');
+  if(r.status==='pendente') return '⏳ Enviado, ainda não concluído.';
+  return '✅ '+spbN(r.linhas)+' linhas conferidas'+(r.resumo?'<br>'+fincResumoDados(r.resumo):'')+(r.aviso?'<br>ℹ️ '+vEsc(r.aviso):'');
+}
+function fincRender(){
+  const box=$('#fincSlots'); if(!box) return;
+  box.innerHTML=FIN_TIPOS.map(tipo=>{
+    const fila=fincFila[tipo], busy=!!fincRodando[tipo], A=((fincDados||{}).ativas||[]).find(k=>k.tipo===tipo);
+    const st=fila.length?fila.map(it=>'<div class="sgst '+(it.r?(it.r.status==='ok'?'ok':'erro'):'wait')+'"><b>'+vEsc(it.nome)+'</b><br>'+(it.r?fincResumo(it.r):'⏳ '+vEsc(it.msg||'Na fila…'))+'</div>').join('')
+      :'<div class="sgst">Solte aqui o arquivo .xlsx.</div>';
+    return '<div class="sgslot" data-k="'+tipo+'"><div class="sgh"><b>'+FIN_TIPO[tipo]+'</b></div><div class="sgsub">'+FIN_SUB[tipo]+'</div>'+st
+      +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo</button></div>'
+      +'<div class="sgbanco" style="margin-top:4px"><b>No banco agora</b></div>'+(A?'<div class="sgbanco">'+vEsc(A.nome||'')+' · '+spbN(A.linhas)+' linhas · '+spbDH(A.em)+(A.resumo?'<br>'+fincResumoDados(A.resumo):'')+'</div>':'<div class="sgbanco">Nada carregado ainda.</div>')+'</div>';
+  }).join('');
+  box.querySelectorAll('.sgslot').forEach(el=>{
+    const tipo=el.dataset.k;
+    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ fincAlvo=tipo; $('#fincFile').click(); };
+    el.ondragover=ev=>{ ev.preventDefault(); el.classList.add('drag'); };
+    el.ondragleave=()=>el.classList.remove('drag');
+    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); const x=ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]; if(x&&!fincRodando[tipo]) fincEnviarArquivo(tipo,x); };
+  });
+  const h=$('#fincHist'), H=(fincDados||{}).historico||[];
+  h.innerHTML=H.length?H.map(f=>'<div class="sgrow"><div class="t"><span>'+vEsc(FIN_TIPO[f.tipo]||f.tipo)+'</span><span>'+spbDH(f.enviado_em)+'</span></div><div>'+fincResumo(f)+'</div><div class="m">'+vEsc(f.nome||'')+(f.por?' · '+vEsc(f.por):'')+'</div></div>').join(''):'<p class="sub">Nenhuma carga ainda.</p>';
+}
+async function fincEnviarArquivo(tipo,file){
+  if(!navigator.onLine){ toast('Sem internet — a carga precisa estar online.'); return; }
+  if(fincRodando[tipo]) return;
+  if(!(/\.xlsx?$/i.test(file.name||'')&&file.size<=40*1024*1024)){ toast('Só vale arquivo .xlsx de até 40 MB.'); return; }
+  const it={nome:file.name,msg:'Lendo o arquivo…',r:null}; fincFila[tipo]=[it]; fincRodando[tipo]=true; fincRender();
+  let cargaId=null;
+  try{
+    const buf=await file.arrayBuffer();
+    const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',buf))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    const X=await getXLSX(); const wb=X.read(buf,{type:'array',cellDates:true}), abas={};
+    wb.SheetNames.forEach(n=>{ abas[n]=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null}); });
+    const det=FIN_P.detectar(abas);
+    if(det&&det!==tipo) throw new Error('Esse arquivo é o de '+FIN_TIPO[det]+', não o de '+FIN_TIPO[tipo]+' — nada foi alterado.');
+    const L=FIN_P.ler(abas,tipo);
+    if(!L.linhas.length) throw new Error('Nenhuma linha no arquivo — nada foi alterado.');
+    it.msg='Enviando…'; fincRender();
+    const {data:ini,error:e0}=await sb.rpc('app_fin_carga_iniciar',{p_tipo:tipo,p_nome:file.name,p_sha256:sha}); if(e0) throw e0;
+    cargaId=ini.carga_id;
+    for(let i=0;i<L.linhas.length;i+=1000){
+      const {error}=await sb.rpc('app_fin_carga_lote',{p_carga:cargaId,p_inicio:i,p_linhas:L.linhas.slice(i,i+1000)}); if(error) throw error;
+      it.msg='Enviando… '+spbN(Math.min(i+1000,L.linhas.length))+' de '+spbN(L.linhas.length); fincRender();
+    }
+    it.msg='Conferindo linhas e somas…'; fincRender();
+    const {data:fim,error:e2}=await sb.rpc('app_fin_carga_finalizar',{p_carga:cargaId,p_conferencia:{linhas:L.linhas.length,totais:L.somas}}); if(e2) throw e2;
+    it.r={status:'ok',linhas:fim.linhas,resumo:fim.resumo,aviso:[fim.aviso,L.fora?spbN(L.fora)+' linha(s) sem os campos obrigatórios (ex.: total da planilha) ficaram de fora':''].filter(Boolean).join(' · ')};
+  }catch(e){
+    if(cargaId) try{ await sb.rpc('app_fin_carga_falha',{p_carga:cargaId,p_erro:String((e&&e.message)||e)}); }catch(_){}
+    it.r={status:'erro',erro:(e&&e.message)||String(e)};
+  }
+  fincRodando[tipo]=false;
+  toast(it.r.status==='ok'?'✓ '+FIN_TIPO[tipo]+' carregado':'Arquivo recusado — veja o motivo no campo.');
+  fincCarregar();
+}
 // ----- Carga dos BIs (Auxiliar › Planejamento; separada das telas de BI, como a Carga SIGOS) -----
-async function biCargaAcessos(force){ const [a,f,p]=await Promise.all([spbAcesso(force),frtAcesso(force),hcAcesso(force)]); return {sup:!!(a&&a.carregar),frota:!!(f&&f.carregar),pes:!!(p&&p.carregar)}; }
+async function biCargaAcessos(force){ const [a,f,p,n]=await Promise.all([spbAcesso(force),frtAcesso(force),hcAcesso(force),finAcesso(force)]); return {sup:!!(a&&a.carregar),frota:!!(f&&f.carregar),pes:!!(p&&p.carregar),fin:!!(n&&n.carregar)}; }
 async function bcInit(){
   spbCss();
   const c=await biCargaAcessos(true);
-  $('#bcSup').classList.toggle('hidden',!c.sup); $('#bcFrota').classList.toggle('hidden',!c.frota); $('#bcPes').classList.toggle('hidden',!c.pes);
-  if(!(c.sup||c.frota||c.pes)){ toast('Sem acesso para carregar arquivos'); irPara('auxiliar_programacao'); }
+  $('#bcSup').classList.toggle('hidden',!c.sup); $('#bcFrota').classList.toggle('hidden',!c.frota); $('#bcPes').classList.toggle('hidden',!c.pes); $('#bcFin').classList.toggle('hidden',!c.fin);
+  if(!(c.sup||c.frota||c.pes||c.fin)){ toast('Sem acesso para carregar arquivos'); irPara('auxiliar_programacao'); }
 }
 // ----- BI (hub em Auxiliar de Programação › Planejamento) -----
 async function giInit(){
