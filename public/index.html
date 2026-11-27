@@ -9565,7 +9565,9 @@ async function frtcEnviar(it,tipo){
     wb.SheetNames.forEach(n=>{ abas[n]=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null}); });
     const L=FRT_P.ler(abas);
     if(!L) throw new Error('Não reconheci o arquivo (esperado: '+FRT_SUB[tipo]+') — nada foi alterado.');
-    if(L.tipo!==tipo) throw new Error('Esse arquivo é do tipo "'+FRT_TIPO[L.tipo]+"\", não de \""+FRT_TIPO[tipo]+'" — nada foi alterado.');
+    // só redireciona para um tipo que tem campo na tela (um tipo sem campo, como a base antiga de abastecimentos, é recusado)
+    if(L.tipo!==tipo&&!FRT_TIPOS.includes(L.tipo)) throw new Error('Esse arquivo é do tipo "'+FRT_TIPO[L.tipo]+'", que não tem campo nesta tela — nada foi alterado.');
+    if(L.tipo!==tipo){ it.nota='Reconhecido como "'+FRT_TIPO[L.tipo]+'" e carregado no campo certo.'; tipo=L.tipo; }   // arquivo no campo errado: o tipo vem do conteúdo
     const total=Object.values(L.tabelas).reduce((s,a)=>s+a.length,0); if(!total) throw new Error('Nenhuma linha no arquivo — nada foi alterado.');
     it.msg='Enviando…'; frtcRender();
     const {data:ini,error:e0}=await sb.rpc('app_frota_carga_iniciar',{p_tipo:tipo,p_nome:it.file.name,p_sha256:sha}); if(e0) throw e0;
@@ -9578,7 +9580,7 @@ async function frtcEnviar(it,tipo){
     }
     it.msg='Conferindo e trocando o arquivo…'; frtcRender();
     const {data:fim,error:e2}=await sb.rpc('app_frota_carga_finalizar',{p_carga:cargaId}); if(e2) throw e2;
-    it.r={status:'ok',linhas:fim.linhas,aviso:fim.aviso};
+    it.r={status:'ok',linhas:fim.linhas,aviso:[fim.aviso,it.nota].filter(Boolean).join(' · ')||null};
   }catch(e){
     if(cargaId) try{ await sb.rpc('app_frota_carga_falha',{p_carga:cargaId,p_erro:String((e&&e.message)||e)}); }catch(_){}
     it.r={status:'erro',erro:(e&&e.message)||String(e)};
@@ -9825,7 +9827,7 @@ async function hccEnviar(it,tipo){
     wb.SheetNames.forEach(n=>{ abas[n]=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null}); });
     const L=HC_P.ler(abas);
     if(!L) throw new Error('Não reconheci o arquivo (esperado: '+HC_SUB[tipo]+') — nada foi alterado.');
-    if(L.tipo!==tipo) throw new Error('Esse arquivo é do tipo "'+HC_TIPO[L.tipo]+"\", não de \""+HC_TIPO[tipo]+'" — nada foi alterado.');
+    if(L.tipo!==tipo){ it.nota='Reconhecido como "'+HC_TIPO[L.tipo]+'" e carregado no campo certo.'; tipo=L.tipo; }   // arquivo no campo errado: o tipo vem do conteúdo
     const total=Object.values(L.tabelas).reduce((s,a)=>s+a.length,0); if(!total) throw new Error('Nenhuma linha no arquivo — nada foi alterado.');
     it.msg='Enviando…'; hccRender();
     const {data:ini,error:e0}=await sb.rpc('app_pes_carga_iniciar',{p_tipo:tipo,p_nome:it.file.name,p_sha256:sha}); if(e0) throw e0;
@@ -9838,7 +9840,7 @@ async function hccEnviar(it,tipo){
     }
     it.msg='Conferindo e trocando o arquivo…'; hccRender();
     const {data:fim,error:e2}=await sb.rpc('app_pes_carga_finalizar',{p_carga:cargaId}); if(e2) throw e2;
-    it.r={status:'ok',linhas:fim.linhas,aviso:fim.aviso};
+    it.r={status:'ok',linhas:fim.linhas,aviso:[fim.aviso,it.nota].filter(Boolean).join(' · ')||null};
   }catch(e){
     if(cargaId) try{ await sb.rpc('app_pes_carga_falha',{p_carga:cargaId,p_erro:String((e&&e.message)||e)}); }catch(_){}
     it.r={status:'erro',erro:(e&&e.message)||String(e)};
