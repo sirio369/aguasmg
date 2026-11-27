@@ -1599,6 +1599,7 @@ usa o próprio "‹ Voltar" contextual (ver §6.0).
   "termo assinado"). Reaproveita a coluna `treinamento_confirmado_em` pra guardar o timestamp da
   assinatura — nome ficou desatualizado (era específico de treinamento), não valeu a pena renomear
   só por isso.
+  **27/11/2026:** saiu a frase do Manual de Instruções. Termos assinados antes continuam imprimindo a frase (`frotaTermoNormas`: sem "_termo_frota_v2" no arquivo da assinatura).
 - **Ver a foto/PDF da CNH:** `condRenderHome` mostra link "Ver foto da CNH" (`SBASE+cnh_foto`) pro
   próprio condutor quando `condData.cnh_foto` existe. **Do lado do gestor (2026-09-23):**
   `frotasRenderCondutorCadastro` ganhou o mesmo link ("ver CNH", ao lado de "ver termo") — antes

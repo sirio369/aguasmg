@@ -14360,13 +14360,20 @@ const FROTA_TERMO_NORMAS=[
   'Em caso de acidentes, comunicar imediatamente a administração da empresa;',
   'Deverão sempre ser observadas as velocidades determinadas pela empresa para a obra;',
   'As multas de trânsito e administrativas decorrentes da utilização do veículo/equipamento são de responsabilidade do condutor, que autoriza expressamente o desconto em folha, observado o art. 462, §1º, da CLT, desde que comprovada sua responsabilidade. A omissão na identificação do condutor também será de sua responsabilidade.',
-  'Faz parte deste termo um Manual de Instruções, que será assinado em conjunto;',
   'O presente Termo passa a fazer parte integrante do contrato de trabalho.',
   'O empregado declara receber o veículo/equipamento em perfeitas condições de uso, comprometendo-se a devolvê-lo no mesmo estado, ressalvado o desgaste natural.',
   'A responsabilidade compreende reparos, franquia de seguro, guincho, remoção, acessórios, despesas administrativas, bem como todos e quaisquer outros prejuízos comprovadamente decorrentes de sua conduta.',
   'É vedada a condução sob efeito de álcool, drogas ou medicamentos que comprometam a capacidade de dirigir, bem como a cessão do veículo a pessoa não autorizada.',
   'O presente termo integra o contrato de trabalho e não afasta a aplicação de medidas disciplinares cabíveis, inclusive justa causa.'
 ];
+// 27/11/2026: a frase do Manual de Instruções saiu do termo. Quem assinou o texto antigo continua com ele na reimpressão
+// (o texto não é gravado com a assinatura): assinaturas do texto novo têm o arquivo "..._termo_frota_v2.png".
+const FROTA_TERMO_MANUAL='Faz parte deste termo um Manual de Instruções, que será assinado em conjunto;';
+function frotaTermoNormas(d){
+  if(!(d&&d.status==='assinado'&&!/_termo_frota_v2\./.test(String(d.assinatura_path||'')))) return FROTA_TERMO_NORMAS;
+  const i=FROTA_TERMO_NORMAS.findIndex(n=>n.startsWith('O presente Termo passa a fazer parte'));
+  return [...FROTA_TERMO_NORMAS.slice(0,i),FROTA_TERMO_MANUAL,...FROTA_TERMO_NORMAS.slice(i)];
+}
 async function frotaTermoVer(termoId, canSign){
   let d;
   try{ const {data,error}=await sb.rpc('app_frota_termo_ver',{p_termo_id:termoId}); if(error)throw error; d=data||{}; }
@@ -14385,7 +14392,7 @@ async function frotaTermoVer(termoId, canSign){
       if(!cv||!cv._drawn()) return toast('Colete sua assinatura no quadro acima');
       ab.disabled=true; ab.textContent='Registrando…';
       try{
-        const ap=await epiUpload(await epiCanvasBlob(cv),'termo_frota.png');
+        const ap=await epiUpload(await epiCanvasBlob(cv),'termo_frota_v2.png');
         const {error}=await sb.rpc('app_frota_termo_assinar',{p_termo_id:termoId,p_assinatura:ap});
         if(error) throw error;
         toast('✓ Termo assinado');
@@ -14411,7 +14418,7 @@ function frotaTermoHtml(d, canSign){
   if(d.obs) h+='<div class="sub" style="margin-top:8px">Obs: '+d.obs+'</div>';
   h+='<div class="relSec"><span class="relNum">1</span> Termo</div>';
   h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:6px">Declaro possuir Carteira Nacional de Habilitação (CNH) válida e compatível com a categoria do veículo que vier a conduzir, e comprometo-me a: (a) utilizar os veículos da empresa exclusivamente para as atividades de trabalho; (b) conduzir com atenção às normas de trânsito, zelando pela minha segurança e de terceiros; (c) comunicar imediatamente qualquer sinistro, multa, avaria ou defeito ao gestor de frotas; (d) manter minha CNH válida e informar o gestor de frotas em caso de renovação, suspensão ou cassação; e (e) responder, nos termos da legislação vigente, por infrações de trânsito cometidas sob minha condução. Estou ciente de que este termo permanece vigente enquanto eu estiver credenciado(a) como condutor(a) da empresa.</div>';
-  h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:12px"><b>Normas para utilização de veículos:</b><ol style="margin:6px 0 0;padding-left:22px">'+FROTA_TERMO_NORMAS.map(n=>'<li style="margin-bottom:5px">'+n+'</li>').join('')+'</ol></div>';
+  h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:12px"><b>Normas para utilização de veículos:</b><ol style="margin:6px 0 0;padding-left:22px">'+frotaTermoNormas(d).map(n=>'<li style="margin-bottom:5px">'+n+'</li>').join('')+'</ol></div>';
   h+='<div style="font-size:11px;color:#333;line-height:1.55;margin-top:10px">Declaro ter lido e estar de acordo com todas as normas acima, comprometendo-me a cumpri-las integralmente.</div>';
   h+='<div class="sub" style="margin-top:10px;font-size:10px">'+(assinado?('Assinatura eletrônica registrada no app em '+relFmtData(d.assinado_em)+'.'):'Termo ainda não assinado pelo condutor.')+'</div>';
   if(assinado && d.assinatura_path){
