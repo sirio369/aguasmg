@@ -1565,7 +1565,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
   <main id="frota_carga" class="hidden spbmain">
     <div class="bar"><button class="bk" data-go="bi_carga">‹ Carga dos BIs</button></div>
     <h1>Arquivos da Gestão de Frotas</h1>
-    <p class="sub">Os veículos e máquinas vêm do cadastro do app. Aqui você envia os 4 arquivos de apoio em Excel (orçamento, de-para, equipamentos leves e abastecimentos). O arquivo novo <b>substitui o anterior do mesmo tipo</b>, só quando chega inteiro. Arquivo no campo errado é recusado sem mexer no banco.</p>
+    <p class="sub">Os veículos e máquinas vêm do cadastro do app. Aqui você envia os arquivos de apoio em Excel (orçamento, de-para e equipamentos leves — o arquivo novo <b>substitui o anterior do mesmo tipo</b>) e os <b>relatórios do cartão Ticket Log, do jeito que são baixados</b>, no campo do consórcio certo.</p>
     <div id="frtcSlots" class="sggrid"><p class="sub">Carregando…</p></div>
     <div class="sec" style="margin-top:20px">Últimas cargas</div>
     <div id="frtcHist"><p class="sub">Carregando…</p></div>
@@ -9219,7 +9219,7 @@ function spbaRender(k){
 }
 
 // ---------- GESTÃO DE FROTAS: BI + cargas + acesso (docs/migracao_frota_bi.sql, MODULOS §23) ----------
-// Veículos e máquinas vêm do cadastro do app; orçado, de-para, equipamentos leves e combustível vêm de 4 arquivos carregados aqui
+// Veículos e máquinas vêm do cadastro do app; orçado, de-para, equipamentos leves e combustível vêm de arquivos carregados aqui
 // (o arquivo novo substitui o anterior do mesmo tipo). Medidas = DAX do Power BI Frota calculado no aparelho.
 const FRT_P=(()=>{
   const tx=v=>(v==null?null:(String(v).trim()===''?null:String(v).trim()));
@@ -9253,11 +9253,48 @@ const FRT_P=(()=>{
     return null; }
   return {ler};
 })();
-const FRT_TIPOS=['orcamento','depara','leves','abastecimento'];
-const FRT_TIPO={orcamento:'Orçamento de locação',depara:'De-para de equipamentos',leves:'Equipamentos leves',abastecimento:'Abastecimentos (combustível)'};
+// Relatórios do cartão Ticket Log como são baixados ("RelatorioParametrizado*.xls" = tabela HTML, números em pt-BR).
+// Só saem do aparelho: data, placa, motorista, combustível, litros, preço, valor e CNPJ do posto (+ cadastro de postos).
+// Cadastro de motorista (CPF, RG, nascimento) e de veículo são ignorados; nº do cartão e matrícula não são enviados.
+const FRT_TL=(()=>{
+  const ENT={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',aacute:'á',eacute:'é',iacute:'í',oacute:'ó',uacute:'ú',acirc:'â',ecirc:'ê',ocirc:'ô',atilde:'ã',otilde:'õ',agrave:'à',ccedil:'ç',
+    Aacute:'Á',Eacute:'É',Iacute:'Í',Oacute:'Ó',Uacute:'Ú',Acirc:'Â',Ecirc:'Ê',Ocirc:'Ô',Atilde:'Ã',Otilde:'Õ',Agrave:'À',Ccedil:'Ç'};
+  const dec=s=>s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi,(m,e)=>{ if(e[0]==='#'){ const n=e[1]==='x'||e[1]==='X'?parseInt(e.slice(2),16):parseInt(e.slice(1),10); return Number.isFinite(n)?String.fromCodePoint(n):m; } return ENT[e]!==undefined?ENT[e]:m; });
+  const linhas=t=>(t.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[]).map(r=>(r.match(/<t[dh]\b[^>]*>[\s\S]*?<\/t[dh]>/gi)||[]).map(c=>dec(c.replace(/<[^>]+>/g,'')).replace(/\u00a0/g,' ').trim()));
+  const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase();
+  const num=s=>{ const t=String(s||'').trim(); if(!t) return null; const n=Number(t.replace(/\./g,'').replace(',','.')); return Number.isFinite(n)?n:null; };
+  const iso=s=>{ const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s||'').trim()); return m?m[3]+'-'+m[2]+'-'+m[1]:null; };
+  const grupo=c=>{ const u=norm(c); return u.startsWith('GASOLINA')?'GASOLINA':u.startsWith('DIESEL')?'DIESEL':u.startsWith('ETANOL')?'ETANOL':u.startsWith('ARLA')?'ARLA':(u||null); };
+  function texto(buf){ try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ return new TextDecoder('windows-1252').decode(buf); } }
+  function ler(t){
+    if(!/^\s*</.test(t.slice(0,400))) return null;
+    const L=linhas(t); if(L.length<3) return null;
+    const tipo=norm(L[0][0]);
+    if(/^CADASTRO[ -]*(VEICULO|MOTORISTA)/.test(tipo)) return {tipo:'ignorado',nome:tipo.includes('MOTORISTA')?'cadastro de motoristas':'cadastro de veículos'};
+    if(tipo!=='GERAL'&&!/^CADASTRO[ -]*POSTO/.test(tipo)) return null;
+    const hi=L.findIndex(r=>r.map(norm).some(c=>c==='DATA'||c==='ESTABELECIMENTO')); if(hi<0) return null;
+    const H=L[hi].map(norm), col=(...n)=>{ const i=H.findIndex(h=>n.includes(h)); if(i<0) throw new Error('Falta a coluna "'+n[0]+'" no relatório — nada foi alterado.'); return i; };
+    if(tipo!=='GERAL'){
+      const n=col('ESTABELECIMENTO'), c=col('CIDADE'), u=col('UF'), j=col('CPNJ DO ESTABELECIMENTO','CNPJ DO ESTABELECIMENTO');
+      return {tipo:'postos',postos:L.slice(hi+1).filter(r=>r[j]&&r[n]).map(r=>({cnpj:r[j],nome:r[n],cidade:r[c]||null,uf:r[u]||null}))}; }
+    const per=/(\d{2}\/\d{2}\/\d{4})\s*a\s*(\d{2}\/\d{2}\/\d{4})/i.exec(L.slice(0,hi).map(r=>r.join(' ')).join(' '));
+    if(!per) throw new Error('Não achei o período do relatório — nada foi alterado.');
+    const d=col('DATA'), m=col('MOTORISTA'), v=col('VEICULO'), s=col('SERVICO'), q=col('QUANTIDADE'), pu=col('VALOR UNITARIO'), vt=col('VALOR TOTAL'), j=col('CPNJ DO ESTABELECIMENTO','CNPJ DO ESTABELECIMENTO');
+    const dados=L.slice(hi+1).filter(r=>iso(r[d])).map(r=>({data:iso(r[d]),placa:r[v]||null,motorista:r[m]||null,combustivel:grupo(r[s]),litros:num(r[q]),preco_litro:num(r[pu]),valor_total:num(r[vt]),cnpj:r[j]||null}));
+    if(dados.some(x=>x.litros==null||x.valor_total==null)) throw new Error('Há linha sem quantidade ou valor — nada foi alterado.');
+    return {tipo:'geral',ini:iso(per[1]),fim:iso(per[2]),linhas:dados};
+  }
+  return {ler,texto};
+})();
+const FRT_TL_CONS={tl_cai:'Águas Integradas',tl_ceh:'Eficiência Hídrica'};
+const FRT_TIPOS=['orcamento','depara','leves','tl_cai','tl_ceh'];
+const FRT_TIPO={orcamento:'Orçamento de locação',depara:'De-para de equipamentos',leves:'Equipamentos leves',abastecimento:'Abastecimentos (combustível)',
+  tl_cai:'Ticket Log — Águas Integradas',tl_ceh:'Ticket Log — Eficiência Hídrica'};
 const FRT_SUB={orcamento:'Orcamento_Equipamentos.xlsx · abas Orcamento e Areas (gerado do REV21, aba Locação)',depara:'De_Para_Equipamentos.xlsx · abas DePara e Itens (descrição → item do orçamento → grupo)',
-  leves:'Controle_Equipamentos_Leves.xlsx · aporte, devolução e status dos equipamentos leves',abastecimento:'Abastecimentos_Base.xlsx · gerado dos relatórios do cartão Ticket Log'};
-let FRT_AC=null, FRT_AC_T=0, frtcDados=null, frtcFila={orcamento:[],depara:[],leves:[],abastecimento:[]}, frtcRodando={}, frtcAlvo=null;
+  leves:'Controle_Equipamentos_Leves.xlsx · aporte, devolução e status dos equipamentos leves',
+  tl_cai:'Arquivos do cartão como são baixados (RelatorioParametrizado.xls): Geral e Cadastro de postos. Pode soltar vários de uma vez.',
+  tl_ceh:'Arquivos do cartão como são baixados (RelatorioParametrizado.xls): Geral e Cadastro de postos. Pode soltar vários de uma vez.'};
+let FRT_AC=null, FRT_AC_T=0, frtcDados=null, frtcFila={orcamento:[],depara:[],leves:[],tl_cai:[],tl_ceh:[]}, frtcRodando={}, frtcAlvo=null;
 async function frtAcesso(force){
   if(!force&&FRT_AC&&Date.now()-FRT_AC_T<300000) return FRT_AC;
   try{ const {data,error}=await sb.rpc('app_frota_bi_acesso'); if(error) throw error; FRT_AC=data||{}; FRT_AC_T=Date.now(); }catch(e){ FRT_AC=FRT_AC||{}; }
@@ -9273,33 +9310,42 @@ async function frtcInit(){
   frtcCarregar();
 }
 async function frtcCarregar(){
-  try{ const {data,error}=await sb.rpc('app_frota_cargas_listar',{p_limite:40}); if(error) throw error; frtcDados=data||{}; }
+  try{ const {data,error}=await sb.rpc('app_frota_cargas_listar',{p_limite:40}); if(error) throw error; frtcDados=data||{};
+    const tl=await sb.rpc('app_frota_ticket_resumo'); frtcDados.ticket=tl.error?null:tl.data; }
   catch(e){ $('#frtcSlots').innerHTML='<p class="sub">Não foi possível carregar (acesso ou rede).</p>'; $('#frtcHist').innerHTML=''; return; }
   frtcRender();
 }
 function frtcResumo(r){
   if(!r) return '';
+  if(r.status==='ignorado') return '➖ '+vEsc(r.aviso);
+  if(r.status==='postos') return '✅ '+spbN(r.linhas)+' postos atualizados';
   if(r.status==='erro') return '⚠️ '+vEsc(r.erro||'Erro no processamento.');
   if(r.status==='pendente') return '⏳ Enviado, ainda não concluído.';
   return '✅ '+spbN(r.linhas)+' linhas'+(r.aviso?'<br>ℹ️ '+vEsc(r.aviso):'');
+}
+function frtcTlBanco(tipo){
+  const T=(frtcDados||{}).ticket;
+  if(!T) return '<div class="sgbanco">Não disponível (falta aplicar docs/migracao_frota_ticket_log.sql).</div>';
+  const c=(T.consorcios||[]).find(x=>x.consorcio===FRT_TL_CONS[tipo]);
+  return '<div class="sgbanco">'+(c?spbN(c.linhas)+' abastecimentos · '+spbDia(c.de)+' a '+spbDia(c.ate)+' · '+spbBRL(+c.valor):'Nada carregado ainda.')+'</div>';
 }
 function frtcRender(){
   const box=$('#frtcSlots'); if(!box) return;
   box.innerHTML=FRT_TIPOS.map(tipo=>{
     const fila=frtcFila[tipo], busy=!!frtcRodando[tipo], A=((frtcDados||{}).ativas||[]).find(k=>k.tipo===tipo);
     const st=fila.length?fila.map(it=>'<div class="sgst '+(it.r?(it.r.status==='ok'?'ok':'erro'):'wait')+'"><b>'+vEsc(it.nome)+'</b><br>'+(it.r?frtcResumo(it.r):'⏳ '+vEsc(it.msg||'Na fila…'))+'</div>').join('')
-      :'<div class="sgst">Solte aqui o arquivo .xlsx.</div>';
+      :'<div class="sgst">'+(FRT_TL_CONS[tipo]?'Solte aqui os arquivos do Ticket Log.':'Solte aqui o arquivo .xlsx.')+'</div>';
     return '<div class="sgslot" data-k="'+tipo+'"><div class="sgh"><b>'+FRT_TIPO[tipo]+'</b></div><div class="sgsub">'+FRT_SUB[tipo]+'</div>'+st
       +'<div class="sgbtns"><button class="btn" data-up'+(busy?' disabled':'')+'>📤 Enviar arquivo</button>'+(fila.length&&!busy?'<button class="btn ghost" data-limpa>Limpar lista</button>':'')+'</div>'
-      +'<div class="sgbanco" style="margin-top:4px"><b>No banco agora</b></div>'+(A?'<div class="sgbanco">'+vEsc(A.nome||'')+' · '+spbN(A.linhas)+' linhas · '+spbDH(A.em)+'</div>':'<div class="sgbanco">Nada carregado ainda.</div>')+'</div>';
+      +'<div class="sgbanco" style="margin-top:4px"><b>No banco agora</b></div>'+(FRT_TL_CONS[tipo]?frtcTlBanco(tipo):A?'<div class="sgbanco">'+vEsc(A.nome||'')+' · '+spbN(A.linhas)+' linhas · '+spbDH(A.em)+'</div>':'<div class="sgbanco">Nada carregado ainda.</div>')+'</div>';
   }).join('');
   box.querySelectorAll('.sgslot').forEach(el=>{
     const tipo=el.dataset.k;
-    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ frtcAlvo=tipo; $('#frtcFile').click(); };
+    const up=el.querySelector('[data-up]'); if(up) up.onclick=()=>{ frtcAlvo=tipo; $('#frtcFile').multiple=!!FRT_TL_CONS[tipo]; $('#frtcFile').click(); };
     const lp=el.querySelector('[data-limpa]'); if(lp) lp.onclick=()=>{ frtcFila[tipo]=[]; frtcRender(); };
     el.ondragover=ev=>{ ev.preventDefault(); el.classList.add('drag'); };
     el.ondragleave=()=>el.classList.remove('drag');
-    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); const fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])].slice(0,1); if(fs.length&&!frtcRodando[tipo]) frtcEnfileirar(tipo,fs); };
+    el.ondrop=ev=>{ ev.preventDefault(); el.classList.remove('drag'); const fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])].slice(0,FRT_TL_CONS[tipo]?20:1); if(fs.length&&!frtcRodando[tipo]) frtcEnfileirar(tipo,fs); };
   });
   const h=$('#frtcHist'), H=(frtcDados||{}).historico||[];
   h.innerHTML=H.length?H.map(f=>'<div class="sgrow"><div class="t"><span>'+vEsc(FRT_TIPO[f.tipo]||f.tipo)+'</span><span>'+spbDH(f.enviado_em)+'</span></div><div>'+frtcResumo(f)+'</div><div class="m">'+vEsc(f.nome||'')+(f.por?' · '+vEsc(f.por):'')+'</div></div>').join(''):'<p class="sub">Nenhuma carga ainda.</p>';
@@ -9307,15 +9353,47 @@ function frtcRender(){
 async function frtcEnfileirar(tipo,files){
   if(!navigator.onLine){ toast('Sem internet — a carga precisa estar online.'); return; }
   const ok=files.filter(f=>/\.xlsx?$/i.test(f.name||'')&&f.size<=20*1024*1024);
-  if(!ok.length){ toast('Só vale arquivo .xlsx de até 20 MB.'); return; }
+  if(!ok.length){ toast('Só vale arquivo .xls/.xlsx de até 20 MB.'); return; }
   frtcFila[tipo]=frtcFila[tipo].concat(ok.map(f=>({file:f,nome:f.name||'arquivo.xlsx',msg:'Na fila…',r:null})));
   if(frtcRodando[tipo]){ frtcRender(); return; }
   frtcRodando[tipo]=true; frtcRender();
-  for(let i=0;i<frtcFila[tipo].length;i++){ const it=frtcFila[tipo][i]; if(it.r||!it.file) continue; await frtcEnviar(it,tipo); it.file=null; frtcRender(); }
+  if(FRT_TL_CONS[tipo]) await frtcEnviarTicket(tipo);
+  else for(let i=0;i<frtcFila[tipo].length;i++){ const it=frtcFila[tipo][i]; if(it.r||!it.file) continue; await frtcEnviar(it,tipo); it.file=null; frtcRender(); }
   frtcRodando[tipo]=false;
-  const res=frtcFila[tipo].filter(it=>it.r), nok=res.filter(it=>it.r.status==='ok').length;
+  const res=frtcFila[tipo].filter(it=>it.r&&it.r.status!=='ignorado'), nok=res.filter(it=>it.r.status!=='erro').length;
   toast(nok+' de '+res.length+' arquivo(s) carregado(s)'+(nok<res.length?' — veja os recusados na lista.':'.'));
   frtcCarregar();
+}
+// Ticket Log: lê todos os arquivos escolhidos; os postos vão primeiro (dão nome aos CNPJ) e cada "Geral" é uma chamada única no banco
+async function frtcEnviarTicket(tipo){
+  const cons=FRT_TL_CONS[tipo], pend=frtcFila[tipo].filter(it=>!it.r&&it.file), lidos=[];
+  const erro=(it,e)=>{ it.r={status:'erro',erro:(e&&e.message)||String(e)}; };
+  for(const it of pend){
+    it.msg='Lendo o arquivo…'; frtcRender();
+    try{
+      const buf=await it.file.arrayBuffer(); const L=FRT_TL.ler(FRT_TL.texto(buf));
+      if(!L) throw new Error('Não reconheci o arquivo como relatório do Ticket Log (envie o .xls como foi baixado, sem salvar no Excel) — nada foi alterado.');
+      if(L.tipo==='ignorado') it.r={status:'ignorado',aviso:'É o '+L.nome+': não é usado e não foi enviado.'};
+      else { L.sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',buf))].map(b=>b.toString(16).padStart(2,'0')).join(''); lidos.push({it,L}); }
+    }catch(e){ erro(it,e); }
+    it.file=null; frtcRender();
+  }
+  const chamar=async args=>{ const {data,error}=await sb.rpc('app_frota_ticket_carga',args); if(error) throw error; return data||{}; };
+  for(const {it,L} of lidos.filter(x=>x.L.tipo==='postos')){
+    try{ it.msg='Enviando…'; frtcRender(); const r=await chamar({p_consorcio:cons,p_nome:it.nome,p_postos:L.postos}); it.r={status:'postos',linhas:r.postos}; }catch(e){ erro(it,e); }
+    frtcRender(); }
+  const vistos=new Set();
+  for(const {it,L} of lidos.filter(x=>x.L.tipo==='geral').sort((a,b)=>a.L.fim.localeCompare(b.L.fim))){
+    try{
+      if(vistos.has(L.sha)){ it.r={status:'ignorado',aviso:'Cópia idêntica de outro arquivo desta lista: não foi enviado de novo.'}; frtcRender(); continue; }
+      vistos.add(L.sha);
+      if(!L.linhas.length) throw new Error('O relatório não tem abastecimentos — nada foi alterado.');
+      it.msg='Enviando '+spbN(L.linhas.length)+' abastecimentos…'; frtcRender();
+      const r=await chamar({p_consorcio:cons,p_nome:it.nome,p_sha256:L.sha,p_ini:L.ini,p_fim:L.fim,p_linhas:L.linhas});
+      it.r={status:'ok',linhas:r.linhas,aviso:r.aviso};
+    }catch(e){ erro(it,e); }
+    frtcRender();
+  }
 }
 async function frtcEnviar(it,tipo){
   let cargaId=null;
@@ -9455,7 +9533,7 @@ function frtFiltros(){ const box=$('#frtFil'); if(!box||!frt.r) return; const ne
   box.querySelectorAll('[data-frtf]').forEach(el=>el.addEventListener('change',()=>{ frt.f[el.dataset.frtf]=el.value; el.classList.toggle('on',!!el.value); frtRender(); }));
   const lp=$('#frtLimpa'); if(lp) lp.onclick=()=>{ Object.keys(frt.f).forEach(k=>frt.f[k]=''); frtFiltros(); frtRender(); }; }
 function frtRender(){ const v=$('#frtView'); if(!v||!frt.r) return;
-  v.innerHTML='<div class="sbgrid">'+((frt.r.itens.length||frt.r.orc.length||frt.r.abast.length)?FRT_PAG[frt.aba]():'<p class="sbvz">Nada carregado ainda — use Auxiliar › Planejamento › Carga dos BIs para enviar os 4 arquivos de apoio.</p>')+'</div>';
+  v.innerHTML='<div class="sbgrid">'+((frt.r.itens.length||frt.r.orc.length||frt.r.abast.length)?FRT_PAG[frt.aba]():'<p class="sbvz">Nada carregado ainda — use Auxiliar › Planejamento › Carga dos BIs para enviar os arquivos de apoio.</p>')+'</div>';
   v.querySelectorAll('[data-spbx]').forEach(b=>b.onclick=()=>spbExpDo(b.dataset.spbx));
   v.querySelectorAll('.spbexp[data-frtk]').forEach(tr=>tr.onclick=()=>{ const k=tr.dataset.frtk; frt.exp[k]=!frt.exp[k]; frtRender(); }); }
 async function frtCarregarBI(){ const v=$('#frtView'); v.innerHTML='<p class="sbvz">Carregando…</p>';
