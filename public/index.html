@@ -188,6 +188,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 .pjcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--tc,var(--acc));border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .pjcard:active{transform:scale(.995)}
 .pjcard h3{font-size:15px;margin:6px 0 2px;line-height:1.25}
+.pjend{font-size:12px;color:var(--mut);margin:3px 0 2px;line-height:1.35}
 .pjcard .tp{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--tc)}
 .pjmono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--mut)}
 .pjpill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
@@ -1838,15 +1839,15 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <div class="bar"><button class="bk" data-back>‹ Início</button></div>
     <h1>QSMS campo</h1>
     <p class="sub">Lançamentos da equipe de segurança: inspeção com checklist e assinatura do responsável pela intervenção, DDS com foto da lista de presença, registro de acidente, quase acidente ou incidente e os checklists de reaterro e de recomposição de pavimento (POP-022). Funciona sem sinal — sobe quando houver conexão.</p>
-    <div id="sstRasc"></div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Nova inspeção</div></button>
+      <button class="mod" data-sstnovo="insp"><div class="ic">🔍</div><div class="nm">Checklist Segurança</div></button>
       <button class="mod" data-sstnovo="dds"><div class="ic">🗣️</div><div class="nm">Novo DDS</div></button>
       <button class="mod" data-sstnovo="oc"><div class="ic">🚨</div><div class="nm">Registrar ocorrência</div></button>
       <button class="mod" data-sstnovo="rea"><div class="ic">🧱</div><div class="nm">Checklist de reaterro</div></button>
       <button class="mod" data-sstnovo="rec"><div class="ic">🛣️</div><div class="nm">Checklist de recomposição</div></button>
     </div>
-    <div class="sec">Meus lançamentos (30 dias)</div>
+    <div class="sec">Meus lançamentos</div>
+    <div class="segchips" id="sstSit" style="margin:2px 0 10px"></div>
     <div id="sstLista"><p class="sub">Carregando…</p></div>
   </main>
 
@@ -3274,14 +3275,14 @@ async function pjLoad(force){
     const _vm=String(p.projeto||p.id||'').match(/VRP-?(\d+)/i);   // nº da VRP (ex.: "VRP-29" → "29") p/ deep-link no visor 3D
     ivs.push({id:'pt'+p.gid,gid:p.gid,kind:'ponto',tipo:tp,cod:p.codigo||p.id||('#'+p.gid),ref:p.id||null,
       local:(p.projeto||p.id||'Intervenção')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
-      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,vrp:_vm?_vm[1]:null,
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,tubulacao:p.tubulacao,vrp:_vm?_vm[1]:null,end:p.endereco||null,
       ll:[la,lo],arv:(PJ_ARV[tp]||PJ_ARV.vrp_impl)()}); });
   lns.forEach(f=>{ const p=f.properties,lls=(f.geometry.coordinates||[]).map(c=>[+c[1],+c[0]]);
     // diferencia HDD × VCA pela coluna `tipo` (fallback: nome do layer_dwg). HDD = perfuração direcional; resto = VCA (vala a céu aberto)
     const tp=/HDD/i.test(String(p.tipo||'')+' '+String(p.layer_dwg||''))?'rede_hdd':'rede_vca';
     ivs.push({id:'ln'+p.gid,gid:p.gid,kind:'linha',tipo:tp,cod:p.codigo||p.layer_dwg||('#'+p.gid),ref:p.id||null,
       local:(p.projeto||p.layer_dwg||'Rede')+(p.cidade?(' — '+p.cidade):''),cons:pjConsName(p.consorcio),za:p.consorcio||null,
-      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,ext:p.extensao_m,tubulacao:p.tubulacao,
+      resp:p.responsavel||'—',ini:'—',status:'new',dmc:p.dmc,situacao:p.situacao,dn:p.dn,ext:p.extensao_m,tubulacao:p.tubulacao,end:p.endereco||null,
       lls,arv:(PJ_ARV[tp]||PJ_ARV.rede_vca)(p.extensao_m)}); });
   // sobrepõe o estado salvo (snapshot) nos templates
   let est=[]; try{ const e=await sb.rpc('app_proj_estados'); if(!e.error) est=e.data||[]; }catch(_){}
@@ -3333,6 +3334,11 @@ function pjReconcilia(iv){ if(!Array.isArray(iv.arv)) return;
   const cam=iv.arv.find(n=>n.c==='av_camara');
   if(cam&&Array.isArray(cam.f)){ const i=cam.f.findIndex(x=>/^execução da câmara/i.test(x.n||'')), r=cam.f.findIndex(x=>/^reaterro/i.test(x.n||'')); if(r>=0&&i>r) cam.f.splice(r,0,cam.f.splice(i,1)[0]); }
 }
+// endereço automático (2026-11-26, proj_endereco no banco): ruas pelos eixos de logradouro — ponto = rua mais próxima;
+// trecho HDD/VCA = todas as ruas que ele percorre, na ordem do início (I) ao fim (F) — + bairro(s)
+const pjEndRuas=iv=>(iv&&iv.end&&iv.end.ruas)||[], pjEndBairros=iv=>(iv&&iv.end&&iv.end.bairros)||[];
+const pjEndTxt=iv=>{ const r=pjEndRuas(iv), b=pjEndBairros(iv); return r.join(' · ')+(r.length&&b.length?' — ':'')+b.join(', '); };
+const pjEndHtml=iv=>{ const t=pjEndTxt(iv); return t?`<div class="pjend" title="Endereço pelo mapa (eixos de logradouro)">📍 ${pjEsc(t)}</div>`:''; };
 // snapshot: salva o estado (árvore/cadeado/status) da intervenção corrente
 const pjCurIv=()=>PJ_IVS.find(i=>i.id===pjCur);
 // HDD › Puxamento da tubulação: cada lançamento guarda diâmetro (mm) + rua (2026-11-25, app_proj_avanco_pux_set)
@@ -3483,7 +3489,9 @@ function pjMapSel(M,iv,E,ll,dest,real){ const map=M.map; pjMapDesel(M);
   const lin=!!iv.lls, pp=iv.pipe||{}, pct=Math.round(pjIvPct(iv)), fz=+pp.fase||1;
   const nav='https://www.google.com/maps/dir/?api=1&destination='+(+dest[0]).toFixed(6)+','+(+dest[1]).toFixed(6);
   const com=Object.keys(pp.atores||{}).filter(k=>PJ_ATOR[k]&&(pp.atores[k].n||0)>0).map(k=>PJ_ATOR[k][0]+' '+PJ_ATOR[k][1]+' ('+pp.atores[k].n+')').join(' · ');
-  const rows=[['Código da folha',iv.cod&&!/^#/.test(iv.cod)?iv.cod:'—',1],
+  const ruas=pjEndRuas(iv), bai=pjEndBairros(iv);
+  const rows=[[ruas.length>1?'Ruas':'Endereço',ruas.length?ruas.join(' · '):null],[bai.length>1?'Bairros':'Bairro',bai.length?bai.join(', '):null],
+    ['Código da folha',iv.cod&&!/^#/.test(iv.cod)?iv.cod:'—',1],
     ['ID',iv.ref&&iv.ref!==iv.cod?iv.ref:null,1],
     ['Fase',pp.concluida?'Concluída':fz+' · '+(PJ_FASE_N[fz]||'—')],
     ['Com quem está',com||null],
@@ -3548,7 +3556,7 @@ function pjRenderList(ctx){ ctx=ctx||'campo'; const E=PJ_CTX[ctx]; const sup=ctx
     const p=Math.round(pjIvPct(iv)), cl=p>=100?'ok':'';
     const prog=(pp.prog&&pp.fase&&pp.fase!==4&&pp.fase<6)?`<span class="pjfaseprog">${PJ_FASE_N[pp.fase]} ${pp.prog.feitos}/${pp.prog.total}</span>`:'';
     return `<div class="pjcard" style="--tc:${t.c}" data-id="${iv.id}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tp">${t.n}</span><span class="pjpill ${sc}">${sl}</span></div>
-    <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>
+    <h3>${iv.local}</h3><div class="pjmono">${iv.cod} · ${iv.cons}</div>${pjEndHtml(iv)}
     <div class="pjchips">${pjAtorChips(iv)}${prog}${pp.legado?'<span class="pjtag off" title="Liberada antes do pipeline: sem portões de antes da obra">legado</span>':''}</div>
     <div class="pjbar ${cl}"><i style="width:${Math.min(p,100)}%"></i></div>
     <div class="pjfoot"><span>${iv.resp}</span>${sup?`<span class="pjgo det" style="pointer-events:none">${iv.locked?'Revisar':'Configurar'} ›</span>`:`<span class="pjpc">${p}% execução</span>`}</div></div>`;}).join('')||'<p class="sub">Nenhuma intervenção nesse filtro.</p>';
@@ -3695,7 +3703,7 @@ function pjPendRender(){ const b=$('#pjPdOut'); if(!b) return; const F=pjPdF, q=
   // naFase = etapa do ator escolhido em "Pendência com" (vale p/ gaps, KPIs E a lista de cada intervenção)
   const aberta=x=>x.c==='pend'||x.c==='and', naFase=x=>!F.ator||x.ator===F.ator;
   const rows=PJ_IVS.filter(iv=>(!F.cons||iv.cons===F.cons)&&(!F.tipo||iv.tipo===F.tipo)&&(!F.st.size||F.st.has(pjPipeStatus(iv)))
-      &&(!q||[iv.cod,iv.local,iv.dmc].join(' ').toLowerCase().includes(q)))
+      &&(!q||[iv.cod,iv.local,iv.dmc,pjEndTxt(iv)].join(' ').toLowerCase().includes(q)))
     .map(iv=>{ let e=pjPdEtapas(iv); if(!F.leg) e=e.filter(x=>!x.leg); return {iv,e}; });
   let vis=F.ator?rows.filter(r=>r.e.some(x=>aberta(x)&&naFase(x))):rows;
   // gaps: etapa × fase com quantas intervenções estão ok / em andamento / pendentes (antes do filtro de etapa)
@@ -4314,7 +4322,7 @@ function pjRenderCfg(keep){
     ? `<div class="pjlockcard lib"><div class="ico">🔓</div><div class="tx"><b>Liberada</b> <span class="pjpill ${sc}">${sl}</span><span>Configuração congelada. Reabra só se precisar mudar etapas, escopo ou quantidades — o que já foi feito fica guardado.</span></div>${eng?'<button class="btn ghost" id="pjUnlock">Reabrir configuração</button>':''}</div>`
     : `<div class="pjlockcard cfg"><div class="ico">🔒</div><div class="tx"><b>Em configuração</b><span>${(falta.length&&!pp.legado)?'Para liberar, anexe (com o tamanho da folha): <b>'+falta.join(', ')+'</b>':'Pronta para liberar — os documentos de projeto vão para a aprovação da Qualidade.'}</span></div>${eng?`<button class="btn" id="pjLock" ${(falta.length&&!pp.legado)?'disabled':''}>🔓 Liberar</button>`:''}</div>`;
   $('#pjCfg').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
-   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
+   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>${pjEndHtml(iv)}
    ${pjSpecs(iv)}
    <div class="pjchips">${pjAtorChips(iv)}${pp.legado?'<span class="pjtag off">legado</span>':''}</div>
    ${lockCard}
@@ -4574,7 +4582,7 @@ function pjRenderDet(keep){
                :`<div class="pjbanner ok">🏗️ <b>Execução aberta</b> — só os responsáveis de obras (Supervisor de Produção, Coordenador de Serviços, Gestor de Obras) lançam avanço.${antes}</div>`)
     : `<div class="pjbanner warn">⏳ <b>Execução fechada</b> — atualize a tela para carregar o pipeline.</div>`;
   $('#pjDet').innerHTML=`<div class="tp" style="color:${t.c};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">${t.n}</div>
-   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>
+   <h1>${iv.local}</h1><p class="pjmono" style="margin:2px 0 0">${iv.cod} · ${iv.cons} · ${iv.resp}</p>${pjEndHtml(iv)}
    ${pjSpecs(iv)}
    <div class="pjsum">
      <div class="pjring" style="background:conic-gradient(${ringc} ${Math.min(p,100)*3.6}deg,var(--line) 0)"><span>${p}%</span></div>
@@ -12001,6 +12009,18 @@ let ME=null, supCat=[], supEquipes=[], supCurrent='home', supAreaId='insumos', s
 let ferCat=[], ferCartS=[], ferEstoqueAtual=[];
 const SUP_ST={ solicitada:{l:'Aguardando',bg:'--warn-bg',fg:'--warn'}, aprovada:{l:'Aprovada',bg:'--ok-bg',fg:'--ok'}, em_separacao:{l:'Separando',bg:'--warn-bg',fg:'--warn'}, segregada:{l:'Pronto p/ retirar',bg:'--ok-bg',fg:'--ok'}, entregue:{l:'Entregue',bg:'--line',fg:'--mut'}, em_falta:{l:'Sem estoque',bg:'--bad-bg',fg:'--bad'}, rejeitada:{l:'Rejeitada',bg:'--bad-bg',fg:'--bad'}, cancelada:{l:'Cancelada',bg:'--bad-bg',fg:'--bad'} };
 function supNum(n){ return (Math.round((+n||0)*1000)/1000).toString().replace('.',','); }
+// Aviso nas aprovações (insumo/ferramenta/EPI): o colaborador já retirou este mesmo item antes.
+// `a` = item.anterior das filas sup_*_fila_aprovacao ({em, qt, posse, tamanho?, vence_em?}); null = nunca retirou.
+function supAntAviso(a,un){
+  if(!a||!a.em) return '';
+  const dia=new Date(a.em).toLocaleDateString('pt-BR');
+  const posse=+a.posse||0, u=un?(' '+un):'';
+  const det=(a.tamanho?(' · tam. '+a.tamanho):'')+(a.qt!=null?(' · '+supNum(a.qt)+u):'');
+  const txt=posse>0
+    ? `⚠️ Já possui este item: retirou em <b>${dia}</b>${det} — ainda com ele: <b>${supNum(posse)}${u}</b>${a.vence_em?(' · troca prevista '+new Date(a.vence_em+'T00:00:00').toLocaleDateString('pt-BR')):''}`
+    : `ℹ️ Já retirou este item em <b>${dia}</b>${det}`;
+  return `<div class="supAnt" style="margin-top:4px;font-size:11.5px;line-height:1.35;padding:4px 8px;border-radius:8px;background:${posse>0?'var(--warn-bg)':'var(--bg)'};color:${posse>0?'var(--warn)':'inherit'}">${txt}</div>`;
+}
 function supData(s){ try{ return new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 // badge do consórcio (almoxarifado de origem): ZA1004 = Águas Integradas · ZA0200 = Eficiência Hídrica
 function supConsBadge(c){
@@ -12041,7 +12061,8 @@ const SUP_ACTS={
   consumo:{ic:'🛠️',lbl:'Registrar consumo',fn:()=>supVConsumo()},
   estoque:{ic:'🚐',lbl:'Estoque da equipe',fn:()=>supVEstoque()},
   aprovar:{ic:'🖊️',lbl:'Aprovar solicitações',fn:()=>supVAprovar()},
-  almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVAlmox()},
+  almox:{ic:'🏷️',lbl:'Separar insumo',fn:()=>supVAlmox('separar')},
+  almox_entregar:{ic:'📤',lbl:'Entregar insumo (retirada)',fn:()=>supVAlmox('entregar')},
   painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel()},
   eq_meus:{ic:'🧰',lbl:'Meus equipamentos',fn:()=>supVEqMeus()},
   eq_solicitar:{ic:'🙋',lbl:'Solicitar equipamento',fn:()=>supVEqSolicitar()},
@@ -12062,7 +12083,8 @@ const SUP_ACTS={
   ferramenta_pedidos:{ic:'📋',lbl:'Minhas ferramentas',fn:()=>supVFerramentaPedidos()},
   ferramenta_aprovar:{ic:'🖊️',lbl:'Aprovar solicitações',fn:()=>supVFerramentaAprovar()},
   ferramenta_painel:{ic:'📈',lbl:'Painel das equipes',fn:()=>supVPainel('sup_ferramenta_painel_multi')},
-  ferramenta_almox:{ic:'🏷️',lbl:'Separação e entrega',fn:()=>supVFerramentaAlmox()},
+  ferramenta_almox:{ic:'🏷️',lbl:'Separar ferramenta',fn:()=>supVFerramentaAlmox('separar')},
+  ferramenta_entregar:{ic:'📤',lbl:'Entregar ferramenta (retirada)',fn:()=>supVFerramentaAlmox('entregar')},
   ferramenta_recebimento:{ic:'📥',lbl:'Recebimento (devolução)',fn:()=>supVFerramentaRecebimento()}
 };
 // Acesso dinâmico por engrenagem às categorias Almoxarifado/Conferência (ME.sup_areas vem do app_me).
@@ -12079,7 +12101,8 @@ function supBlocks(){
       {id:'aprovar',on:podeAp,papel:'Encarregado'},
       {id:'painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
-      {id:'almox',on:supAreaAcesso('insumo'),papel:'Almoxarifado'}]}
+      {id:'almox',on:supAreaAcesso('insumo'),papel:'Almoxarifado'},
+      {id:'almox_entregar',on:supAreaAcesso('insumo'),papel:'Almoxarifado'}]}
   ];
 }
 function supBlocksEquip(){
@@ -12118,6 +12141,7 @@ function supBlocksFerramenta(){
       {id:'ferramenta_painel',on:gestao,papel:'Encarregado / Almoxarife'}]},
     {t:'Almoxarifado',ic:'📦',acts:[
       {id:'ferramenta_almox',on:supAreaAcesso('ferramenta'),papel:'Almoxarifado'},
+      {id:'ferramenta_entregar',on:supAreaAcesso('ferramenta'),papel:'Almoxarifado'},
       {id:'ferramenta_recebimento',on:supAreaAcesso('ferramenta'),papel:'Almoxarifado'}]}
   ];
 }
@@ -12416,7 +12440,7 @@ async function supVAprovar(){
     const arr=data||[];
     if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação aguardando aprovação.</p>'; return; }
     $('#supView').innerHTML='<div class="sec">📝 Solicitações de material</div><p class="sub" style="margin:2px 0 10px">Você pode ajustar a quantidade ou cancelar itens (✕). O que for aprovado segue para a segregação do almoxarife.</p>'+arr.map(s=>{
-      const itens=(s.itens||[]).map(i=>`<div class="inApItem" data-material="${i.material_id}" data-qs="${i.qt_solicitada}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.material}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt_solicitada)} ${i.unidade||''}</div></div><input class="inApQt" inputmode="decimal" value="${supNum(i.qt_solicitada)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="inApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
+      const itens=(s.itens||[]).map(i=>`<div class="inApItem" data-material="${i.material_id}" data-qs="${i.qt_solicitada}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.material}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt_solicitada)} ${i.unidade||''}</div>${supAntAviso(i.anterior,i.unidade)}</div><input class="inApQt" inputmode="decimal" value="${supNum(i.qt_solicitada)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="inApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
       return `<div class="inApCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:4px 0 6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
     }).join('');
     $('#supView').querySelectorAll('.inApX').forEach(b=>b.addEventListener('click',()=>{ const it=b.closest('.inApItem'); const q=it.querySelector('.inApQt'); const canc=it.classList.toggle('inCanc'); if(canc){ q.value='0'; q.disabled=true; it.style.opacity=.5; b.textContent='↩'; } else { q.value=supNum(+it.dataset.qs); q.disabled=false; it.style.opacity=1; b.textContent='✕'; } }));
@@ -12434,15 +12458,20 @@ async function supAcao(rpc,params,ok,after){
   catch(e){ toast('⚠ '+(e.message||e)); }
 }
 
-// --- tela: Almoxarife (segregar / entregar) ---
-async function supVAlmox(){
+// --- tela: Almoxarife — Insumos em 2 telas, como no EPI (2026-11-26):
+//     'separar' = aprovada/em_separacao (segregar, gera código) · 'entregar' = segregada (retirada pelo código)
+async function supVAlmox(modo){
+  modo = modo==='entregar' ? 'entregar' : 'separar';
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_fila_almoxarife'); if(error)throw error;
-    const arr=data||[];
-    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nada na fila do almoxarifado.</p>'; return; }
-    $('#supView').innerHTML=arr.map(supAlmoxCard).join('');
-    supAlmoxWire();
+    const arr=(data||[]).filter(s=> modo==='entregar' ? s.status==='segregada' : s.status!=='segregada');
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">'+(modo==='entregar'?'Nenhum insumo separado aguardando retirada.':'Nenhum insumo aprovado aguardando separação.')+'</p>'; return; }
+    $('#supView').innerHTML=(modo==='entregar'
+      ? '<p class="sub" style="margin:2px 0 10px">Peça ao colaborador o código de 4 dígitos para registrar a retirada.</p>'
+      : '<p class="sub" style="margin:2px 0 10px">Confira cada item (existe / parcial / falta). Ao concluir, o colaborador recebe o código para retirar.</p>')
+      +arr.map(supAlmoxCard).join('');
+    supAlmoxWire(()=>supVAlmox(modo));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 function supAlmoxCard(s){
@@ -12601,11 +12630,8 @@ function fscModo(m){
   if(t) t.textContent=m==='cons'?'Consolidador':'Execução Física';
   const cfg=$('#fscCfg'); if(cfg){ cfg.classList.toggle('hidden',!(m==='cons'&&ME&&ME.is_admin)); if(!cfg.dataset.ready){ cfg.dataset.ready='1'; cfg.onclick=()=>irPara('fisc_val_acesso'); } }
   if(bk){ bk.dataset.go=m==='cons'?'auxiliar_programacao':'home'; bk.textContent=m==='cons'?'‹ Auxiliar de Programação':'‹ Início'; }
-  // Consolidador sem o texto explicativo (pedido do usuário 13/11); a Execução Física mantém o dela
-  if(sub) sub.classList.toggle('hidden',m==='cons');
-  if(sub&&m!=='cons') sub.innerHTML=m==='cons'
-    ?'O que foi <b>executado</b> em cada dia, uma linha por atividade, com o <b>acumulado</b> desde 01/09/2026 e o detalhe de cada execução (OS, fotos e mapa). Cada execução aparece <b>uma vez só, na data do campo</b>; a OS do SIGOS vai ao lado dela. Obras em andamento têm linha todos os dias com o avanço; obra <b>sem avanço no dia não precisa de validação</b>. Valide as linhas e depois o dia: <b>só o dia validado vai para a Fiscalização COPASA</b>.'
-    :'Somente os dias <b>validados</b> no Consolidador, exatamente como foram validados. Uma linha por atividade, com o acumulado desde 01/09/2026, as OS do dia e o detalhe de cada execução (fotos e mapa).';
+  // sem texto explicativo nos dois modos (Consolidador: pedido do usuário 13/11; Execução Física: 26/11/2026)
+  if(sub) sub.classList.add('hidden');
   if(lg) lg.innerHTML=m==='cons'
     ?'<span><i style="background:#16a34a"></i>validado</span><span><i style="background:#2563eb"></i>pronto p/ validar</span><span><i style="background:#f59e0b"></i>pendente</span><span><i style="background:#dc2626"></i>mudou depois de validado</span><span>⏳ SIGOS ainda não chegou</span>'
     :'<span><i style="background:#16a34a"></i>dia validado</span><span>dias apagados ainda não foram validados</span>';
@@ -12706,6 +12732,9 @@ function fscInit(){
   if(!(ME&&(fscCons()?(ME.aux_acesso||ME.is_admin):ME.fisc_acesso))){ toast('Acesso restrito'); irPara(fscCons()?'auxiliar_programacao':'home'); return; }
   fscCss();
   if(!fscS.mes){ const h=rdoHoje(); fscS.mes=(h<FSC_MIN?FSC_MIN:h).slice(0,7)+'-01'; }
+  // Consolidador e Execução Física abrem SEM consórcio: só carregam depois que o usuário escolhe um (as duas
+  // ZAs juntas estouravam o tempo do banco — pedido do usuário 26/11/2026, Execução Física igual no mesmo dia).
+  fscS.zas=[]; fscS.dia=null; fscS.meses={}; fscS.dias={}; fscS.abertos.clear(); fscS.mapas={};
   fscRenderZas();
   const pv=$('#fscPrev'), nx=$('#fscNext');
   if(pv&&!pv.dataset.ready){ pv.dataset.ready='1'; pv.onclick=()=>{ fscS.mes=rdoAddMes(fscS.mes,-1); fscS.dia=null; fscCarregarMes(); }; }
@@ -12730,6 +12759,7 @@ async function fscCarregarMes(manterDia){
   $('#fscMesTit').textContent=rdoMesNome(fscS.mes);
   $('#fscPrev').disabled=fscS.mes<=FSC_MIN.slice(0,7)+'-01';
   $('#fscNext').disabled=fscS.mes>=rdoHoje().slice(0,7)+'-01';
+  if(!fscS.zas.length){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Escolha um consórcio acima para carregar.</p>'; $('#fscDia').innerHTML=''; return; }
   if(!manterDia){ $('#fscCal').innerHTML='<p class="sub" style="grid-column:1/-1">Carregando…</p>'; $('#fscDia').innerHTML=''; }
   try{
     const rs=await Promise.all(fscS.zas.map(z=>sb.rpc(FSC_RPC[fscS.modo].mes,{p_mes:fscS.mes,p_za:z})));
@@ -13305,9 +13335,9 @@ function frlModo(m){
   const bk=document.querySelector('#fisc_rel .bar .bk'), t=$('#frlTit'), sub=$('#frlSub');
   if(bk){ bk.dataset.go=m==='fisc'?'home':'auxiliar_programacao'; bk.textContent=m==='fisc'?'‹ Início':'‹ Auxiliar de Programação'; }
   if(t) t.textContent=m==='fisc'?'Relatório consolidado · Fiscalização':'Relatório consolidado';
-  if(sub) sub.innerHTML=m==='fisc'
-    ?'Relatório em Excel somente com os dias <b>validados</b> no Consolidador: resumo por agrupamento, avanço diário com o acumulado e a base de dados com cada execução.'
-    :'Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.';
+  // versão Fiscalização sem o texto explicativo (pedido do usuário 26/11/2026); a interna mantém o dela
+  if(sub){ sub.classList.toggle('hidden',m==='fisc');
+    if(m!=='fisc') sub.innerHTML='Relatório em Excel de tudo o que passou pelo Consolidador: resumo das atividades, avanço por dia (ou semana/mês) com o acumulado e a base de dados com cada execução.'; }
 }
 const frlFisc=()=>frlS.modo==='fisc';
 function frlInit(){
@@ -13935,7 +13965,7 @@ async function supVFerramentaAprovar(){
     const arr=data||[];
     if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação de ferramenta aguardando aprovação.</p>'; return; }
     $('#supView').innerHTML='<div class="sec">🔧 Solicitações de ferramenta</div><p class="sub" style="margin:2px 0 10px">Você pode ajustar a quantidade ou cancelar itens (✕). O que for aprovado segue para a separação do almoxarife.</p>'+arr.map(s=>{
-      const itens=(s.itens||[]).map(i=>`<div class="inApItem" data-material="${i.material_id}" data-qs="${i.qt_solicitada}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.material}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt_solicitada)} ${i.unidade||''}</div></div><input class="inApQt" inputmode="decimal" value="${supNum(i.qt_solicitada)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="inApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
+      const itens=(s.itens||[]).map(i=>`<div class="inApItem" data-material="${i.material_id}" data-qs="${i.qt_solicitada}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.material}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt_solicitada)} ${i.unidade||''}</div>${supAntAviso(i.anterior,i.unidade)}</div><input class="inApQt" inputmode="decimal" value="${supNum(i.qt_solicitada)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="inApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
       return `<div class="inApCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:4px 0 6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
     }).join('');
     $('#supView').querySelectorAll('.inApX').forEach(b=>b.addEventListener('click',()=>{ const it=b.closest('.inApItem'); const q=it.querySelector('.inApQt'); const canc=it.classList.toggle('inCanc'); if(canc){ q.value='0'; q.disabled=true; it.style.opacity=.5; b.textContent='↩'; } else { q.value=supNum(+it.dataset.qs); q.disabled=false; it.style.opacity=1; b.textContent='✕'; } }));
@@ -13950,14 +13980,19 @@ async function supVFerramentaAprovar(){
 }
 
 // --- tela: Almoxarife — separação e entrega de ferramenta (reaproveita supAlmoxCard/supAlmoxWire) ---
-async function supVFerramentaAlmox(){
+// 2 telas como Insumos/EPI (2026-11-26): 'separar' = aprovada/em_separacao · 'entregar' = segregada
+async function supVFerramentaAlmox(modo){
+  modo = modo==='entregar' ? 'entregar' : 'separar';
   $('#supView').innerHTML='<p class="sub">Carregando…</p>';
   try{
     const {data,error}=await sb.rpc('sup_ferramenta_fila_almoxarife'); if(error)throw error;
-    const arr=data||[];
-    if(!arr.length){ $('#supView').innerHTML='<p class="sub">Nada na fila de separação de ferramentas.</p>'; return; }
-    $('#supView').innerHTML=arr.map(supAlmoxCard).join('');
-    supAlmoxWire(supVFerramentaAlmox);
+    const arr=(data||[]).filter(s=> modo==='entregar' ? s.status==='segregada' : s.status!=='segregada');
+    if(!arr.length){ $('#supView').innerHTML='<p class="sub">'+(modo==='entregar'?'Nenhuma ferramenta separada aguardando retirada.':'Nenhuma ferramenta aprovada aguardando separação.')+'</p>'; return; }
+    $('#supView').innerHTML=(modo==='entregar'
+      ? '<p class="sub" style="margin:2px 0 10px">Peça ao colaborador o código de 4 dígitos para registrar a retirada.</p>'
+      : '<p class="sub" style="margin:2px 0 10px">Confira cada item (existe / parcial / falta). Ao concluir, o colaborador recebe o código para retirar.</p>')
+      +arr.map(supAlmoxCard).join('');
+    supAlmoxWire(()=>supVFerramentaAlmox(modo));
   }catch(e){ $('#supView').innerHTML='<div class="banner bad">Erro: '+(e.message||e)+'</div>'; }
 }
 
@@ -14697,7 +14732,7 @@ async function supVEpiAprovar(){
     if(!arr.length && !trocas.length){ $('#supView').innerHTML='<p class="sub">Nenhuma solicitação de EPI aguardando. 👍</p>'; return; }
     let h='<div class="sec">📝 Solicitações</div>';
     h+= arr.length ? arr.map(s=>{
-      const itens=(s.itens||[]).map(i=>`<div class="epApItem" data-item="${i.item_id}" data-qs="${i.qt}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.epi}${i.tamanho?(' <b>['+i.tamanho+']</b>'):''} ${epiCestaTag(i.na_cesta)}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt)}</div></div><input class="epApQt" inputmode="decimal" value="${supNum(i.qt)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="epApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
+      const itens=(s.itens||[]).map(i=>`<div class="epApItem" data-item="${i.item_id}" data-qs="${i.qt}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><div style="flex:1;min-width:0;font-size:13px">${i.epi}${i.tamanho?(' <b>['+i.tamanho+']</b>'):''} ${epiCestaTag(i.na_cesta)}<div class="sub" style="font-size:11px">solicitado: ${supNum(i.qt)}</div>${supAntAviso(i.anterior)}</div><input class="epApQt" inputmode="decimal" value="${supNum(i.qt)}" style="width:58px;text-align:center;font-size:13px"/><button type="button" class="epApX" title="Cancelar item" style="all:unset;cursor:pointer;color:var(--bad);font-size:16px">✕</button></div>`).join('');
       return `<div class="epApCard" data-id="${s.id}" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px"><div style="display:flex;gap:8px"><b>#${s.id}</b><span class="sub" style="margin-left:auto">${s.solicitante||''}</span></div><div style="margin:4px 0 6px">${itens}</div>${s.obs?('<div class="sub">Obs: '+s.obs+'</div>'):''}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-ap="${s.id}" style="margin:0">Aprovar</button><button class="btn ghost" data-rj="${s.id}" style="margin:0">Rejeitar</button></div></div>`;
     }).join('') : '<p class="sub">Nenhuma solicitação nova.</p>';
     if(trocas.length){
@@ -16287,7 +16322,7 @@ if($('#segFormBack')) $('#segFormBack').addEventListener('click',()=>{ if(segD) 
 // ---------- QSMS CAMPO (Indicadores SST): inspeção, DDS e ocorrência — só equipe QSMS (ME.qsms_campo) ----------
 // Card próprio, separado do ⛑️ Segurança do Trabalho (seg = APR/PT/PET das equipes de execução). Reaproveita os
 // helpers do seg (CSS, lista de pessoas, assinatura, foto). Envio pela fila offline: pasta 'sst', p_anexos = {chave: caminho}.
-const SST_TIPO={insp:{t:'Inspeção de segurança',ic:'🔍',rpc:'app_sst_inspecao_registrar',ok:'✓ Inspeção enviada',btn:'Enviar inspeção'},
+const SST_TIPO={insp:{t:'Checklist Segurança',ic:'🔍',rpc:'app_sst_inspecao_registrar',ok:'✓ Checklist Segurança enviado',btn:'Enviar checklist'},
   dds:{t:'DDS',ic:'🗣️',rpc:'app_sst_dds_registrar',ok:'✓ DDS enviado',btn:'Enviar DDS'},
   oc:{t:'Ocorrência',ic:'🚨',rpc:'app_sst_ocorrencia_registrar',ok:'✓ Ocorrência registrada',btn:'Registrar ocorrência'},
   rea:{t:'Checklist de reaterro',ic:'🧱',rpc:'app_sst_ck_registrar',ok:'✓ Checklist enviado',btn:'Enviar checklist',ck:'reaterro'},
@@ -16366,15 +16401,31 @@ const SST_TIPOS_OC=['Queda de pessoa de altura','Queda de pessoa no mesmo nível
   'Prensagem / aprisionamento','Corte / perfuração','Esforço excessivo / movimento inadequado','Contato com eletricidade','Contato com produto químico ou temperatura extrema',
   'Soterramento','Atropelamento / acidente de trânsito','Ataque de animal (cão, inseto, cobra)','Acidente de trajeto','Doença ocupacional','Outro'];
 const SST_PARTES=['Cabeça','Olhos','Face','Pescoço','Ombro','Tronco','Costas','Braço','Mão','Dedos da mão','Perna','Joelho','Pé','Dedos do pé','Múltiplas partes','Outra'];
-let sstD=null, sstModelo=[], sstDraftT=null;
+let sstD=null, sstModelo=[];
+const sstDraftT={};
 const sstHoje=()=>{ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
 const sstData=s=>{ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):'—'; };
 const sstQid=()=>'sst-'+String(Date.now()).padStart(15,'0')+'-'+crypto.randomUUID().slice(0,8);
 const sstGpsOk=()=>!!(gps&&gps.acc<=PRECISAO_MAX);
-// rascunho no mesmo IndexedDB do seg (store 'draft', chave 'sst'): guarda fotos (Blob) e assinaturas
-const sstDraftGet=()=>segIdb('draft','readonly',s=>s.get('sst'));
-const sstDraftDel=()=>segIdb('draft','readwrite',s=>s.delete('sst'));
-function sstDraftSave(){ clearTimeout(sstDraftT); const snap=sstD; sstDraftT=setTimeout(()=>{ if(snap) segIdb('draft','readwrite',s=>s.put(Object.assign({},snap,{k:'sst',salvo_em:new Date().toISOString()}))).catch(()=>{}); },350); }
+// Local (sw v477): antes de tudo, "Está na frente de serviço?" — Sim = coordenada do GPS (travado ≤ PRECISAO_MAX);
+// Não = ponto marcado no mapa (d.ponto), gravado em lat/lon com gps_precisao nulo. Vale para checklist de segurança, DDS,
+// reaterro e recomposição (a ocorrência segue com GPS opcional). Substitui o antigo "Preenchimento Manual" dos checklists.
+const sstManual=()=>false;
+const sstPedeLocal=d=>!!(d&&d.tipo!=='oc');
+const sstNoMapa=()=>!!(sstD&&sstPedeLocal(sstD)&&sstD.na_frente===false);
+let sstMap=null;
+// rascunhos no mesmo IndexedDB do seg (store 'draft', chave 'sst:<id>' — vários ao mesmo tempo): guardam fotos (Blob) e assinaturas.
+// A chave antiga 'sst' (um rascunho só, até a v472) é migrada para 'sst:<id>' na primeira leitura. Timer de gravação por lançamento (sstDraftT[id]).
+const sstDraftK=id=>'sst:'+id;
+async function sstDraftsAll(){ let all=[]; try{ all=await segIdb('draft','readonly',s=>s.getAll())||[]; }catch(e){ return []; }
+  const old=all.find(r=>r.k==='sst');
+  if(old){ try{ const id=old.id||crypto.randomUUID(); await segIdb('draft','readwrite',s=>{ s.delete('sst'); return s.put(Object.assign({},old,{id,k:sstDraftK(id)})); }); old.id=id; old.k=sstDraftK(id); }catch(e){} }
+  return all.filter(r=>String(r.k||'').startsWith('sst:')&&SST_TIPO[r.tipo]).sort((a,b)=>String(b.salvo_em||'').localeCompare(String(a.salvo_em||''))); }
+const sstDraftDel=id=>{ clearTimeout(sstDraftT[id]); return segIdb('draft','readwrite',s=>s.delete(sstDraftK(id))); };
+const sstDraftPut=snap=>segIdb('draft','readwrite',s=>s.put(Object.assign({},snap,{k:sstDraftK(snap.id),salvo_em:new Date().toISOString()}))).catch(()=>{});
+function sstDraftSave(){ const snap=sstD; if(!snap) return; clearTimeout(sstDraftT[snap.id]); sstDraftT[snap.id]=setTimeout(()=>sstDraftPut(snap),350); }
+// grava já (ao sair do formulário), sem esperar o atraso
+function sstDraftFlush(){ const d=sstD; if(!d) return Promise.resolve(); clearTimeout(sstDraftT[d.id]); return sstDraftPut(d); }
 function sstCss(){ if(document.getElementById('sstcss'))return; const st=document.createElement('style'); st.id='sstcss'; st.textContent=`
  #sst_form .segyn button{padding:8px 3px}
  #sst_form .segyn[data-sch="interv"],#sst_form .segyn[data-sch="pav"]{flex-wrap:wrap}
@@ -16391,14 +16442,12 @@ async function sstModeloCarregar(){ try{ sstModelo=JSON.parse(localStorage.getIt
   try{ const {data,error}=await sb.rpc('app_sst_modelo_listar'); if(error)throw error; sstModelo=(data||[]).filter(m=>m.ativo!==false); try{ localStorage.setItem('sstModelo',JSON.stringify(sstModelo)); }catch(e){} }catch(e){} }
 
 // ===== Tela principal (sst): novos lançamentos + meus lançamentos =====
-async function sstInit(){ segCss(); sstCss(); segPessoasCarregar(); sstModeloCarregar(); sstRascunho(); sstListar(); }
-async function sstRascunho(){ const c=document.getElementById('sstRasc'); if(!c)return; let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(!r||!SST_TIPO[r.tipo]){ c.innerHTML=''; return; }
-  c.innerHTML=`<div class="banner warn" style="flex-wrap:wrap">📝 ${SST_TIPO[r.tipo].t} em preenchimento desde ${segFmt(r.salvo_em)}<span style="flex:1"></span><button class="btn" id="sstRascCont" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" id="sstRascDesc" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`;
-  $('#sstRascCont').onclick=()=>{ sstD=r; delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); };
-  $('#sstRascDesc').onclick=()=>{ const b=$('#sstRascDesc'); if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } clearTimeout(sstDraftT); sstDraftDel().then(sstRascunho).catch(()=>{}); }; }
-async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){}
-  if(r&&SST_TIPO[r.tipo]){ toast('Há um lançamento em andamento — continue ou descarte'); const b=document.getElementById('sstRasc'); if(b) b.scrollIntoView({behavior:'smooth'}); return; }
+async function sstInit(){ segCss(); sstCss(); segPessoasCarregar(); sstModeloCarregar(); sstListar(); }
+// rascunhos em preenchimento: aparecem na lista (situação Pendente), cada um com Continuar/Descartar
+function sstRascWire(){ const c=document.getElementById('sstLista'); if(!c) return;
+  c.querySelectorAll('[data-rcont]').forEach(b=>b.onclick=()=>{ const r=sstRascs.find(x=>x.id===b.dataset.rcont); if(!r) return; sstD=Object.assign({},r); delete sstD.k; delete sstD.salvo_em; irPara('sst_form'); });
+  c.querySelectorAll('[data-rdesc]').forEach(b=>b.onclick=()=>{ if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo p/ descartar'; return; } sstDraftDel(b.dataset.rdesc).then(sstListar).catch(()=>{}); }); }
+async function sstNovo(tipo){
   const d={tipo,id:crypto.randomUUID(),data:sstHoje(),area:'',observacoes:'',fotos:{}};
   if(tipo==='insp'){ if(!sstModelo.length) await sstModeloCarregar();
     Object.assign(d,{local:'',os:'',resp_uuid:null,resp_nome:'',resp_sig:null,resp_em:null,itens:sstModelo.map(m=>({modelo_id:m.id,grupo:m.grupo||'',item:m.item,resultado:''}))}); }
@@ -16407,33 +16456,67 @@ async function sstNovo(tipo){ let r=null; try{ r=await sstDraftGet(); }catch(e){
   if(sstEhCk(tipo)) Object.assign(d,{os:'',interv:'',equipe:'',local:'',pav:'',resultado:'',itens:sstCkItens(SST_TIPO[tipo].ck),
     enc_uuid:null,enc_nome:'',enc_sig:null,enc_em:null,fis_sig:null,fis_em:null});
   sstD=d; irPara('sst_form'); }
+// lista única: rascunho em preenchimento + fila do aparelho (pendentes) + tudo o que já subiu (finalizados), sem limite de dias
+let sstSit='todos', sstL=[], sstRod='', sstRascs=[];
 async function sstListar(){ const c=document.getElementById('sstLista'); if(!c)return; let srv=null;
-  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_sst_minhas',{p_dias:30}); if(error)throw error; srv=data||{}; try{ localStorage.setItem('sstMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
+  if(navigator.onLine){ try{ const {data,error}=await sb.rpc('app_sst_minhas',{p_dias:36500}); if(error)throw error; srv=data||{}; try{ localStorage.setItem('sstMinhas',JSON.stringify(srv)); }catch(e){} }catch(e){} }
   const doServ=!!srv; if(!srv){ try{ srv=JSON.parse(localStorage.getItem('sstMinhas')||'null'); }catch(e){} } srv=srv||{};
   let fila=[]; try{ fila=(await filaAll()).filter(i=>String(i.id).startsWith('sst-')); }catch(e){}
-  const ids=new Set(), L=[], pl=(n,s,p)=>n+' '+(n===1?s:p);
-  (srv.inspecoes||[]).forEach(x=>{ ids.add(x.id); L.push({t:'insp',data:x.data,tit:x.area||'—',
+  sstRascs=await sstDraftsAll();
+  const ids=new Set(), L=[], pl=(n,s,p)=>n+' '+(n===1?s:p), fin='✓ Finalizado';
+  (srv.inspecoes||[]).forEach(x=>{ ids.add(x.id); L.push({t:'insp',sit:'fin',st:fin,data:x.data,tit:x.area||'—',
     sub:[x.local||x.endereco,pl(x.itens||0,'item','itens')+' · '+pl(x.ncs||0,'NC','NCs')+(x.pendentes?(' · '+pl(x.pendentes,'pendente','pendentes')):'')].filter(Boolean).join(' · '),al:x.alertas}); });
-  (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
-  (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
-  (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const r=SST_CK_RES.find(z=>z[0]===x.resultado);
-    L.push({t:x.tipo==='reaterro'?'rea':'rec',data:x.data,tit:'OS '+(x.os||'—')+(x.equipe?(' · '+x.equipe):''),sub:[r?r[1]:'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
+  (srv.dds||[]).forEach(x=>{ ids.add(x.id); L.push({t:'dds',sit:'fin',st:fin,data:x.data,tit:x.tema,sub:[x.area,pl(x.participantes||0,'participante','participantes')+(x.efetivo?(' de '+x.efetivo+' na área'):'')].filter(Boolean).join(' · '),al:x.alertas}); });
+  (srv.ocorrencias||[]).forEach(x=>{ ids.add(x.id); L.push({t:'oc',sit:'fin',st:fin,data:x.data,tit:x.natureza+(x.vitima?(' — '+x.vitima):''),sub:[x.area,x.status==='validada'?'✓ validada pelo QSMS':'aguardando validação do QSMS'].filter(Boolean).join(' · '),al:x.alertas}); });
+  (srv.checklists||[]).forEach(x=>{ ids.add(x.id); const rr=SST_CK_RES.find(z=>z[0]===x.resultado);
+    L.push({t:x.tipo==='reaterro'?'rea':'rec',pdf:x.id,sit:'fin',st:fin,data:x.data,tit:(x.os?('OS '+x.os):'Sem OS')+(x.equipe?(' · '+x.equipe):''),sub:[rr?('Resultado: '+rr[1]):'',pl(x.nc||0,'NC','NCs')].filter(Boolean).join(' · '),al:x.alertas}); });
   fila.forEach(i=>{ const f=i.fields||{}, d=f.p_dados||{}, t=String(i.tipo||'').replace('sst_',''); if(ids.has(f.p_id)||!SST_TIPO[t]) return;
-    L.push({t,data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?('OS '+(d.os||'—')):(d.area||'—'),sub:'⏳ na fila — sobe quando houver conexão'}); });
+    L.push({t,sit:'pend',st:'⏳ Aguardando envio — sobe quando houver conexão',data:d.data,tit:t==='dds'?d.tema:t==='oc'?d.natureza:sstEhCk(t)?(d.os?('OS '+d.os):'Sem OS'):(d.area||'—'),sub:''}); });
   L.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
-  const rod=doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>';
-  if(!L.length){ c.innerHTML='<p class="sub">Nada lançado nos últimos 30 dias.</p>'+rod; return; }
-  c.innerHTML=L.map(x=>`<div class="segcard"><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
-    <div style="margin-top:3px;font-size:14px;font-weight:600">${segH(x.tit||'—')}</div><div class="sub" style="font-size:12.5px;margin-top:2px">${segH(x.sub||'')}</div>
-    ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}</div>`).join('')+rod; }
+  L.unshift(...sstRascs.map(d=>({t:d.tipo,sit:'pend',rasc:d.id,st:'📝 Em preenchimento — salvo em '+segFmt(d.salvo_em),data:d.data,
+    tit:d.tipo==='dds'?d.tema:d.tipo==='oc'?d.natureza:sstEhCk(d.tipo)?(d.os?('OS '+d.os):'Sem OS'):(d.area||'—'),sub:''})));
+  sstL=L; sstRod=doServ?'':'<p class="sub" style="font-size:12px">Sem conexão — mostrando a última lista salva neste aparelho.</p>';
+  sstListarRender(); }
+function sstListarRender(){ const c=document.getElementById('sstLista'), ch=document.getElementById('sstSit'); if(!c)return;
+  const n=k=>k==='todos'?sstL.length:sstL.filter(x=>x.sit===k).length;
+  if(ch){ ch.innerHTML=[['todos','Todos'],['pend','Pendentes'],['fin','Finalizados']].map(([k,l])=>`<div class="segchip ${sstSit===k?'on':''}" data-ssit="${k}">${l} (${n(k)})</div>`).join('');
+    ch.querySelectorAll('[data-ssit]').forEach(b=>b.onclick=()=>{ sstSit=b.dataset.ssit; sstListarRender(); }); }
+  const L=sstSit==='todos'?sstL:sstL.filter(x=>x.sit===sstSit);
+  if(!L.length){ c.innerHTML='<p class="sub">'+(sstSit==='pend'?'Nenhum lançamento pendente.':sstSit==='fin'?'Nenhum lançamento finalizado.':'Nada lançado ainda.')+'</p>'+sstRod; return; }
+  c.innerHTML=L.map(x=>`<div class="segcard"${x.rasc?' style="border-color:var(--warn)"':''}><h4>${SST_TIPO[x.t].ic} ${segH(SST_TIPO[x.t].t)} · ${sstData(x.data)}</h4>
+    <div style="margin-top:3px;font-size:14px;font-weight:600">${segH(x.tit||'—')}</div>${x.sub?`<div class="sub" style="font-size:12.5px;margin-top:2px">${segH(x.sub)}</div>`:''}
+    <div class="sub" style="font-size:12px;margin-top:4px;font-weight:600;color:${x.sit==='fin'?'var(--ok)':'var(--mut)'}">${segH(x.st)}</div>
+    ${(x.al||[]).length?`<div class="sub" style="font-size:12px;color:var(--bad);margin-top:4px">⚠ ${segH(x.al.join(' · '))}</div>`:''}
+    ${x.rasc?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" data-rcont="${x.rasc}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Continuar</button><button class="btn ghost" data-rdesc="${x.rasc}" style="margin:0;width:auto;padding:7px 12px;font-size:13px">Descartar</button></div>`:''}
+    ${x.pdf?`<button type="button" class="btn ghost" data-ckpdf="${segH(x.pdf)}" style="margin:8px 0 0;width:auto;padding:7px 12px;font-size:13px">📄 PDF</button>`:''}</div>`).join('')+sstRod;
+  c.querySelectorAll('[data-ckpdf]').forEach(b=>b.onclick=()=>sstCkPdfId(b.dataset.ckpdf));
+  sstRascWire(); }
 
 // ===== Formulário (sst_form): estado único sstD, salvo como rascunho a cada mudança =====
 function sstFormInit(){ segCss(); sstCss(); if(!sstD){ irPara('sst'); return; }
   if(sstD.tipo==='dds'&&sstD.qtd==null){ sstD.qtd=(sstD.pes||[]).filter(p=>String(p.nome||'').trim()).length||''; delete sstD.pes; sstD.area='Geral'; } segPessoasDl(); $('#sstFormTit').textContent=SST_TIPO[sstD.tipo].ic+' '+SST_TIPO[sstD.tipo].t; sstRender(); }
 function sstRender(){ const body=document.getElementById('sstFormBody'); if(!body||!sstD) return; const se=document.scrollingElement||document.documentElement, y=se.scrollTop;
-  body.innerHTML='<div id="sstGps" class="banner warn"></div>'+(sstD.tipo==='insp'?sstInspHtml():sstD.tipo==='dds'?sstDdsHtml():sstEhCk(sstD.tipo)?sstCkHtml():sstOcHtml())
-    +'<div id="sstErros"></div><button class="btn" id="sstEnviar" style="margin-top:12px">Enviar</button>';
-  sstWire(); sstOnGps(); se.scrollTop=y; }
+  if(sstMap){ try{ sstMap.remove(); }catch(e){} sstMap=null; }
+  const pede=sstPedeLocal(sstD), nf=sstD.na_frente;
+  const perg=pede?`<div class="segblk"><h3>📍 Está na frente de serviço? *</h3>${sstChips('na_frente_txt',['Sim','Não'],nf===true?'Sim':nf===false?'Não':'')}
+    <div class="sub" style="font-size:12px;margin-top:6px">${nf===true?'A localização sai do GPS do aparelho — fique no local até travar.':nf===false?'Marque no mapa onde fica a frente de serviço.':'Responda para continuar.'}</div>
+    ${nf===false?`<div id="sstMapa" style="height:280px;border-radius:12px;overflow:hidden;margin-top:8px;border:1px solid var(--line)"></div><div class="sub" id="sstMapaTxt" style="font-size:12.5px;margin-top:6px"></div>`:''}</div>`:'';
+  const desc='<button class="btn ghost" id="sstDescartar" style="margin-top:8px">🗑️ Descartar este lançamento</button>';
+  if(pede&&nf==null){ body.innerHTML=perg+desc; sstWire(); se.scrollTop=y; return; }
+  body.innerHTML=perg+'<div id="sstGps" class="banner warn"></div>'+(sstD.tipo==='insp'?sstInspHtml():sstD.tipo==='dds'?sstDdsHtml():sstEhCk(sstD.tipo)?sstCkHtml():sstOcHtml())
+    +'<div id="sstErros"></div><button class="btn" id="sstEnviar" style="margin-top:12px">Enviar</button>'+desc;
+  sstWire(); if(nf===false) sstMapaInit(); sstOnGps(); se.scrollTop=y; }
+// mapa para marcar o ponto (fora da frente de serviço): toque/arraste o marcador
+function sstMapaInit(){ const el=document.getElementById('sstMapa'); if(!el||typeof L==='undefined') return; const d=sstD;
+  sstMap=L.map(el); mapAddCamadaBase(sstMap);
+  const c=d.ponto?[d.ponto.lat,d.ponto.lon]:(gps?[gps.lat,gps.lon]:[-19.94,-44.1]); sstMap.setView(c,d.ponto?17:(gps?15:11));
+  let mk=null; const marca=ll=>{ d.ponto={lat:+ll.lat.toFixed(7),lon:+ll.lng.toFixed(7)};
+    if(!mk){ mk=L.marker(ll,{draggable:true}).addTo(sstMap); mk.on('dragend',()=>{ marca(mk.getLatLng()); }); } else mk.setLatLng(ll);
+    sstDraftSave(); sstMapaTxt(); sstOnGps(); };
+  if(d.ponto){ mk=L.marker([d.ponto.lat,d.ponto.lon],{draggable:true}).addTo(sstMap); mk.on('dragend',()=>{ marca(mk.getLatLng()); }); }
+  sstMap.on('click',e=>marca(e.latlng)); sstMapaTxt(); setTimeout(()=>{ try{ sstMap&&sstMap.invalidateSize(); }catch(e){} },150); }
+function sstMapaTxt(){ const t=document.getElementById('sstMapaTxt'); if(!t) return; const p=sstD&&sstD.ponto;
+  t.innerHTML=p?('📌 '+p.lat.toFixed(6)+', '+p.lon.toFixed(6)+' — toque em outro lugar ou arraste o marcador para corrigir'):'Toque no mapa para marcar o local.'; }
 const sstSel=(id,opts,val,ph)=>`<select id="${id}">${ph!=null?`<option value="">${ph}</option>`:''}${opts.map(o=>`<option${o===val?' selected':''}>${segH(o)}</option>`).join('')}</select>`;
 const sstChips=(campo,opts,val)=>`<div class="segyn" data-sch="${campo}">${opts.map(o=>`<button type="button" data-v="${segH(o)}" class="${o===val?'on':''}">${segH(o)}</button>`).join('')}</div>`;
 const sstFotoOpc=(k,rot)=>segFotoHtml(k,rot).replace(rot+' *',rot);
@@ -16447,7 +16530,11 @@ function sstItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="button
       ${segFotoHtml('nc_'+i,'Foto da não conformidade')}
       <label class="sstck"><input type="checkbox" data-if="tratada_no_local" data-i="${i}"${it.tratada_no_local?' checked':''}/> Corrigida na hora</label>
       ${it.tratada_no_local?`<label>Como foi corrigida? *</label><input data-if="tratativa" data-i="${i}" value="${segH(it.tratativa||'')}"/>`
-        :`<label>Prazo para corrigir *</label><input type="date" data-if="prazo" data-i="${i}" min="${sstHoje()}" value="${segH(it.prazo||'')}"/>`}</div>`}</div>`; }
+        :`<label>Prazo para corrigir *</label><input type="date" data-if="prazo" data-i="${i}" min="${sstHoje()}" value="${segH(it.prazo||'')}"/>`}</div>`}
+    ${r==='C'?sstFotoConf(i):''}</div>`; }
+// foto do item conforme (obrigatória nos 3 checklists: segurança, reaterro e recomposição); usa a mesma chave nc_<i> do item
+const sstFotoConf=i=>`<div style="margin-top:6px">${segFotoHtml('nc_'+i,'Foto do item conforme')}</div>`;
+const sstSemFotoConf=d=>(d.itens||[]).filter((it,i)=>it.resultado==='C'&&!d.fotos['nc_'+i]).length;
 function sstInspHtml(){ const d=sstD, grupos=[];
   d.itens.forEach((it,i)=>{ const k=it.grupo||'Geral'; let g=grupos.find(x=>x.g===k); if(!g){ g={g:k,l:[]}; grupos.push(g); } g.l.push(sstItemHtml(it,i)); });
   return segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Área / frente *</label>${sstSel('sstArea',sstAreas(),d.area,'Escolha…')}</div></div>
@@ -16489,12 +16576,13 @@ function sstCkItemHtml(it,i){ const r=it.resultado, b=(v,l)=>`<button type="butt
   return `<div class="segq"><div class="t"><b>${segH(it.codigo)}</b> ${segH(it.item)}</div><div class="segyn">${b('C','C')}${b('NC','NC')}${b('NA','N/A')}</div>
     ${it.auto?'<div class="sub" style="font-size:11.5px;margin-top:3px">N/A pelo tipo de pavimento</div>':''}
     ${r!=='NC'?'':`<div class="sstnc"><label>Observação / evidência *</label><textarea data-if="obs" data-i="${i}" rows="2">${segH(it.obs||'')}</textarea>
-      ${sstFotoOpc('nc_'+i,'Foto (opcional)')}</div>`}</div>`; }
+      ${segFotoHtml('nc_'+i,'Foto da não conformidade')}</div>`}
+    ${r==='C'?sstFotoConf(i):''}</div>`; }
 function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', grupos=[];
   d.itens.forEach((it,i)=>{ let g=grupos.find(x=>x.g===it.grupo); if(!g){ g={g:it.grupo,l:[]}; grupos.push(g); } g.l.push(sstCkItemHtml(it,i)); });
   const resv=d.resultado, resb=`<div class="segyn" data-ckres>${SST_CK_RES.map(([v,l])=>`<button type="button" data-v="${v}" class="${resv===v?('on'+(v==='nao_conforme'?' bad':'')):''}">${l}</button>`).join('')}</div>`;
   return `<p class="sub" style="font-size:12.5px;margin:2px 0 8px">POP-022 Rev. 03 — ${rec?'Checklist 02 · Recomposição de pavimento':'Checklist 01 · Reaterro'}. C = conforme · NC = não conforme · N/A = não se aplica.</p>`
-    +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS *</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS"/></div></div>
+    +segBlk(1,'Identificação',`<div class="segrow2"><div>${sstDataHtml()}</div><div><label>Nº da OS</label><input id="sstOs" inputmode="numeric" value="${segH(d.os||'')}" placeholder="OS SIGOS (opcional)"/></div></div>
       <label>Tipo de intervenção *</label>${sstChips('interv',SST_CK_INTERV,d.interv)}
       <label>Equipe / contratada *</label><input id="sstEquipe" value="${segH(d.equipe||'')}" placeholder="Ex.: Equipe 3 — BBL"/>
       <label>Endereço / local</label><input id="sstLocal" value="${segH(d.local||'')}" placeholder="Opcional — o endereço sai também pela coordenada"/>
@@ -16506,7 +16594,7 @@ function sstCkHtml(){ const d=sstD, rec=SST_TIPO[d.tipo].ck==='recomposicao', gr
       <label>Observações / não conformidades / ação corretiva${resv&&resv!=='conforme'?' *':''}</label><textarea id="sstObs" rows="3">${segH(d.observacoes||'')}</textarea>`)
     +segBlk(4,'Fotos (opcional)',sstFotoOpc('foto_antes','Antes')+sstFotoOpc('foto_depois','Depois'))
     +segBlk(5,'Assinaturas',`<label>Encarregado *</label><input id="sstEnc" list="segPessoasDl" value="${segH(d.enc_nome||'')}" placeholder="Nome do encarregado" autocomplete="off"/><div class="sub" id="sstEncX" style="font-size:12px;margin-top:2px"></div>
-      <div class="sub" style="font-size:12px;margin-top:8px">Assinatura do encarregado *</div>${segSigHtml('enc')}
+      <div class="sub" style="font-size:12px;margin-top:8px">Assinatura do encarregado (opcional)</div>${segSigHtml('enc')}
       <div class="sub" style="font-size:12px;margin-top:14px">Assinatura da fiscalização (${segH((ME&&(ME.nome||ME.email))||'você')}) *</div>${segSigHtml('fis')}`); }
 // aplica o tipo de pavimento: itens de outro tipo viram N/A (marcados auto); voltando, o auto N/A é limpo
 function sstCkPav(){ const d=sstD; (d.itens||[]).forEach(it=>{ if(!it.pav) return;
@@ -16522,7 +16610,8 @@ function sstWire(){ const d=sstD, root=document.getElementById('sstFormBody');
   const bind=(id,k)=>{ const el=document.getElementById(id); if(el) el.oninput=el.onchange=()=>{ d[k]=el.value; sstDraftSave(); sstAtualizar(); }; };
   [['sstData','data'],['sstArea','area'],['sstLocal','local'],['sstObs','observacoes'],['sstDur','duracao_min'],['sstTema','tema'],['sstHora','hora'],['sstOs','os'],['sstQtd','qtd'],
    ['sstTipo','tipo_oc'],['sstDesc','descricao'],['sstCausa','causa'],['sstVitNome','vitima_nome'],['sstEmp','empresa'],['sstParte','parte_corpo'],['sstEquipe','equipe']].forEach(([id,k])=>bind(id,k));
-  root.querySelectorAll('[data-sch]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const k=g.dataset.sch; if(d[k]===b.dataset.v) return;
+  root.querySelectorAll('[data-sch="na_frente_txt"] button').forEach(b=>b.onclick=()=>{ const v=b.dataset.v==='Sim'; if(d.na_frente===v) return; d.na_frente=v; sstDraftSave(); sstRender(); });
+  root.querySelectorAll('[data-sch]:not([data-sch="na_frente_txt"])').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{ const k=g.dataset.sch; if(d[k]===b.dataset.v) return;
     d[k]=b.dataset.v; if(k==='vinculo'){ d.vitima_uuid=null; d.vitima_nome=''; d.empresa=''; } if(k==='pav') sstCkPav(); sstDraftSave(); sstRender(); }));
   root.querySelectorAll('[data-ckres] button').forEach(b=>b.onclick=()=>{ d.resultado=d.resultado===b.dataset.v?'':b.dataset.v; sstDraftSave(); sstRender(); });
   const ei=document.getElementById('sstEnc'); if(ei){ const upd=()=>{ const x=segPessoaPorNome(ei.value); if(x&&ei.value!==x.nome) ei.value=x.nome; d.enc_nome=ei.value; d.enc_uuid=x?x.id:null;
@@ -16550,6 +16639,8 @@ function sstWire(){ const d=sstD, root=document.getElementById('sstFormBody');
   sstAtualizar(); }
 function sstFotoPrev(){ document.querySelectorAll('#sstFormBody [data-sprev]').forEach(img=>{ const b=sstD&&sstD.fotos[img.dataset.sprev]; if(b){ img.src=URL.createObjectURL(b); img.classList.remove('hidden'); } else img.classList.add('hidden'); }); }
 function sstOnGps(){ const b=document.getElementById('sstGps'); if(!b||!sstD) return; const ok=sstGpsOk(), opc=sstD.tipo==='oc';
+  if(sstNoMapa()){ const p=sstD.ponto; b.className='banner '+(p?'ok':'warn'); b.textContent=p?('🗺️ Fora da frente de serviço — ponto marcado no mapa: '+p.lat.toFixed(6)+', '+p.lon.toFixed(6)):'🗺️ Fora da frente de serviço — marque o local no mapa acima';
+    const f=document.getElementById('sst_form'); if(f&&!f.classList.contains('hidden')) sstAtualizar(); return; }
   if(ok){ b.className='banner ok'; b.textContent='📍 '+gps.lat.toFixed(6)+', '+gps.lon.toFixed(6)+' · ±'+Math.round(gps.acc)+' m — no local'; }
   else { b.className='banner warn'; b.textContent=(opc?'GPS opcional na ocorrência — se estiver no local, aguarde travar':'Fique no local para registrar a coordenada')+(gps?(' — GPS ±'+Math.round(gps.acc)+' m (aguardando ≤ '+PRECISAO_MAX+' m)'):' — obtendo GPS…'); }
   const sf=document.getElementById('sst_form'); if(sf&&!sf.classList.contains('hidden')) sstAtualizar(); }
@@ -16557,21 +16648,25 @@ function sstOnGps(){ const b=document.getElementById('sstGps'); if(!b||!sstD) re
 function sstPend(){ const d=sstD, P=[], txt=v=>String(v||'').trim();
   if(!d.data) P.push('Data'); else if(d.data>sstHoje()) P.push('Data no futuro');
   if(!d.area&&!sstEhCk(d.tipo)) P.push('Área');
-  if(d.tipo!=='oc'&&!sstGpsOk()) P.push('GPS travado no local (≤ '+PRECISAO_MAX+' m)');
+  if(sstPedeLocal(d)){ if(d.na_frente==null) P.push('Responda: está na frente de serviço?');
+    else if(d.na_frente===false){ if(!d.ponto) P.push('Marque o local no mapa'); }
+    else if(!sstGpsOk()) P.push('GPS travado no local (≤ '+PRECISAO_MAX+' m)'); }
   if(d.tipo==='insp'){ if(!d.resp_uuid) P.push('Responsável pela intervenção (escolha da lista)'); else if(!d.resp_sig) P.push('Assinatura do responsável pela intervenção');
     if(!d.itens.length) P.push('Checklist (abra com conexão uma vez)');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
     d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; const n='NC "'+it.item+'"';
       if(!txt(it.descricao)) P.push(n+': o que está errado'); if(!d.fotos['nc_'+i]) P.push(n+': foto');
-      if(it.tratada_no_local){ if(!txt(it.tratativa)) P.push(n+': como foi corrigida'); } else if(!it.prazo) P.push(n+': prazo'); }); }
-  if(sstEhCk(d.tipo)){ if(!txt(d.os)) P.push('Nº da OS'); if(!d.interv) P.push('Tipo de intervenção'); if(!txt(d.equipe)) P.push('Equipe / contratada');
+      if(it.tratada_no_local){ if(!txt(it.tratativa)) P.push(n+': como foi corrigida'); } else if(!it.prazo) P.push(n+': prazo'); });
+    const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes')); }
+  if(sstEhCk(d.tipo)){ if(!d.interv) P.push('Tipo de intervenção'); if(!txt(d.equipe)) P.push('Equipe / contratada');
     if(SST_TIPO[d.tipo].ck==='recomposicao'&&!d.pav) P.push('Tipo de pavimento');
     const sem=d.itens.filter(it=>!it.resultado).length; if(sem) P.push(sem+(sem===1?' item':' itens')+' do checklist sem resposta');
-    d.itens.forEach(it=>{ if(it.resultado==='NC'&&!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); });
+    d.itens.forEach((it,i)=>{ if(it.resultado!=='NC') return; if(!txt(it.obs)) P.push('NC '+it.codigo+': observação / evidência'); if(!d.fotos['nc_'+i]) P.push('NC '+it.codigo+': foto'); });
+    const sf=sstSemFotoConf(d); if(sf) P.push('Foto em '+sf+(sf===1?' item conforme':' itens conformes'));
     if(!d.resultado) P.push('Resultado da inspeção');
     else if(d.resultado==='conforme'&&d.itens.some(it=>it.resultado==='NC')) P.push('Há item não conforme — o resultado não pode ser "Conforme"');
     if(d.resultado&&d.resultado!=='conforme'&&!txt(d.observacoes)) P.push('Observações / ação corretiva');
-    if(!txt(d.enc_nome)) P.push('Nome do encarregado'); else if(!d.enc_sig) P.push('Assinatura do encarregado');
+    if(!txt(d.enc_nome)) P.push('Nome do encarregado');
     if(!d.fis_sig) P.push('Assinatura da fiscalização'); }
   if(d.tipo==='dds'){ if(!txt(d.tema)) P.push('Tema'); if(!(parseInt(d.duracao_min)>0)) P.push('Duração');
     if(!(parseInt(d.qtd)>0)) P.push('Nº de participantes'); if(!d.fotos.foto_lista) P.push('Foto da lista de presença');
@@ -16588,19 +16683,21 @@ function sstAtualizar(){ if(!sstD) return; const P=sstPend(), e=document.getElem
   const r=document.getElementById('sstResumo'); if(r) r.textContent=sstEhCk(sstD.tipo)?sstCkResumo():sstResumoInsp();
 }
 async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const btn=document.getElementById('sstEnviar'); btn.disabled=true; btn.dataset.env='1'; btn.textContent='Enviando…';
-  const g=sstGpsOk()?gps:null, anexos={}, nul=v=>{ const s=String(v==null?'':v).trim(); return s||null; };
-  const dados={data:d.data,area:d.area,observacoes:nul(d.observacoes),lat:g?g.lat:null,lon:g?g.lon:null,precisao:g?Math.round(g.acc*10)/10:null,dispositivo:navigator.userAgent.slice(0,100)};
+  const mapa=sstPedeLocal(d)&&d.na_frente===false&&d.ponto, g=!mapa&&sstGpsOk()?gps:null, anexos={}, nul=v=>{ const s=String(v==null?'':v).trim(); return s||null; };
+  // ponto do mapa: lat/lon do marcador e precisão nula (é assim que a gestão sabe que foi marcado no mapa)
+  const dados={data:d.data,area:d.area,observacoes:nul(d.observacoes),lat:mapa?d.ponto.lat:g?g.lat:null,lon:mapa?d.ponto.lon:g?g.lon:null,precisao:g?Math.round(g.acc*10)/10:null,
+    dispositivo:navigator.userAgent.slice(0,100)};
   if(d.tipo==='insp'){ const sig=await segSigJpeg(d.resp_sig); if(sig) anexos.sig_resp=sig;
     Object.assign(dados,{local:nul(d.local),os:nul(d.os),resp_interv_uuid:d.resp_uuid,resp_interv_nome:nul(d.resp_nome),resp_interv_sig:sig?'sig_resp':null,resp_interv_assinado_em:sig?d.resp_em:null,itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null;
-      if(nc&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
+      if((nc||it.resultado==='C')&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
       return {modelo_id:it.modelo_id||null,grupo:nul(it.grupo),item:it.item,resultado:it.resultado,descricao:nc?nul(it.descricao):null,foto,
         prazo:nc&&!it.tratada_no_local?it.prazo:null,tratada_no_local:nc&&!!it.tratada_no_local,tratativa:nc&&it.tratada_no_local?nul(it.tratativa):null}; })}); }
   else if(sstEhCk(d.tipo)){ const se=await segSigJpeg(d.enc_sig), sf=await segSigJpeg(d.fis_sig); if(se) anexos.sig_enc=se; if(sf) anexos.sig_fis=sf;
     ['foto_antes','foto_depois'].forEach(k=>{ if(d.fotos[k]) anexos[k]=d.fotos[k]; }); delete dados.area;
-    Object.assign(dados,{tipo:SST_TIPO[d.tipo].ck,os:nul(d.os),tipo_intervencao:d.interv,equipe:nul(d.equipe),local:nul(d.local),tipo_pavimento:SST_TIPO[d.tipo].ck==='recomposicao'?d.pav:null,
+    Object.assign(dados,{tipo:SST_TIPO[d.tipo].ck,os:nul(d.os),tipo_intervencao:d.interv,equipe:nul(d.equipe),local:nul(d.local),preenchimento_manual:sstManual(),tipo_pavimento:SST_TIPO[d.tipo].ck==='recomposicao'?d.pav:null,
       resultado:d.resultado,encarregado_uuid:d.enc_uuid,encarregado_nome:nul(d.enc_nome),encarregado_sig:se?'sig_enc':null,encarregado_assinado_em:se?d.enc_em:null,
       fiscal_sig:sf?'sig_fis':null,fiscal_assinado_em:sf?d.fis_em:null,
-      itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null; if(nc&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
+      itens:d.itens.map((it,i)=>{ const nc=it.resultado==='NC', k='nc_'+i; let foto=null; if((nc||it.resultado==='C')&&d.fotos[k]){ foto=k; anexos[k]=d.fotos[k]; }
         return {codigo:it.codigo,grupo:it.grupo,item:it.item,resultado:it.resultado,obs:nc?nul(it.obs):null,foto}; })}); }
   else if(d.tipo==='dds'){ anexos.foto_lista=d.fotos.foto_lista; anexos.foto_1=d.fotos.foto_1;
     Object.assign(dados,{area:'Geral',tema:d.tema.trim(),duracao_min:parseInt(d.duracao_min),participantes_qtd:parseInt(d.qtd)}); }
@@ -16611,10 +16708,56 @@ async function sstEnviar(){ const d=sstD; if(!d||sstPend().length) return; const
   const item={id:sstQid(),tipo:'sst_'+d.tipo,rpc:SST_TIPO[d.tipo].rpc,pasta:'sst',anexos,anexosParam:'p_anexos',fields:{p_id:d.id,p_dados:dados}};
   const ok=await enviarOuEnfileirar(item,SST_TIPO[d.tipo].ok);
   if(!ok){ delete btn.dataset.env; sstAtualizar(); return; }
-  clearTimeout(sstDraftT); try{ await sstDraftDel(); }catch(e){}
-  sstD=null; irPara('sst'); }
+  try{ await sstDraftDel(d.id); }catch(e){}
+  sstD=null; irPara('sst');
+  if(sstEhCk(d.tipo)) sstCkPdf(sstCkDocLocal(d,dados,anexos)); }
+// descartar no fim do formulário: 2 toques, apaga o rascunho e volta à lista
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('#sstDescartar'); if(!b||!sstD) return;
+  if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toque de novo para descartar (não dá para desfazer)'; return; }
+  const id=sstD.id; sstD=null; sstDraftDel(id).catch(()=>{}).then(()=>{ toast('Lançamento descartado'); irPara('sst'); }); });
 document.querySelectorAll('[data-sstnovo]').forEach(b=>b.addEventListener('click',()=>sstNovo(b.dataset.sstnovo)));
-if($('#sstFormBack')) $('#sstFormBack').addEventListener('click',()=>{ if(sstD) sstDraftSave(); sstD=null; irPara('sst'); });
+if($('#sstFormBack')) $('#sstFormBack').addEventListener('click',async()=>{ await sstDraftFlush(); sstD=null; irPara('sst'); });
+
+// ===== PDF do checklist POP-022 (overlay #relatorio + REL_CSS → imprimir / salvar PDF) =====
+// doc no formato do app_sst_ck_ver; foto/assinatura = caminho do banco ou blob: (checklist recém-enviado, vale sem sinal)
+function sstCkDocLocal(d,dados,anexos){ const url=k=>{ const v=anexos[k]; return !v?null:(v instanceof Blob?URL.createObjectURL(v):v); };
+  return {tipo:dados.tipo,data:dados.data,consorcio:dados.consorcio||null,os:dados.os,tipo_intervencao:dados.tipo_intervencao,equipe:dados.equipe,local:dados.local,tipo_pavimento:dados.tipo_pavimento,
+    resultado:dados.resultado,observacoes:dados.observacoes,preenchimento_manual:dados.preenchimento_manual,lat:dados.lat,lon:dados.lon,gps_precisao:dados.precisao,
+    usuario_nome:(ME&&(ME.nome||ME.email))||'',itens:dados.itens.map(it=>Object.assign({},it,{foto:it.foto?url(it.foto):null})),fotos:{foto_antes:url('foto_antes'),foto_depois:url('foto_depois')},
+    encarregado_nome:dados.encarregado_nome,encarregado_assinatura:url('sig_enc'),encarregado_assinado_em:dados.encarregado_assinado_em,fiscal_assinatura:url('sig_fis'),fiscal_assinado_em:dados.fiscal_assinado_em}; }
+async function sstCkPdfId(id){ if(!navigator.onLine) return toast('Sem conexão — o PDF deste checklist precisa de internet');
+  try{ const {data,error}=await sb.rpc('app_sst_ck_ver',{p_id:id}); if(error)throw error; sstCkPdf(data); }catch(e){ toast('Não foi possível gerar o PDF: '+(e.message||e)); } }
+function sstCkPdf(r){ segCss();
+  if(!document.getElementById('relStyle')){ const st=document.createElement('style'); st.id='relStyle'; st.textContent=REL_CSS; document.head.appendChild(st); }
+  if(!document.getElementById('segRelStyle')){ const st=document.createElement('style'); st.id='segRelStyle'; st.textContent=SEG_REL_CSS; document.head.appendChild(st); }
+  let ov=document.getElementById('relatorio'); if(!ov){ ov=document.createElement('div'); ov.id='relatorio'; document.body.appendChild(ov); }
+  const rec=r.tipo==='recomposicao', its=r.itens||[], n=v=>its.filter(i=>i.resultado===v).length;
+  const res=(SST_CK_RES.find(z=>z[0]===r.resultado)||[null,r.resultado||'—'])[1], cor=r.resultado==='conforme'?'#0a7d5e':r.resultado==='nao_conforme'?'#b91c1c':'#b45309';
+  const cons=REL_CONS[r.consorcio]||'Consórcios Águas Integradas & Eficiência Hídrica';
+  let num=0; const sec=t=>'<div class="relSec"><span class="relNum">'+(++num)+'</span>'+t+'</div>';
+  const fig=(src,leg)=>`<figure><img src="${segImg(src)}" alt="${segH(leg)}"/><figcaption>${segH(leg)}</figcaption></figure>`;
+  const ender=[r.endereco,r.bairro,r.municipio].filter(Boolean).join(' — ');
+  let h=`<div class="relTop"><div><h1>Checklist ${rec?'02 · Recomposição de pavimento':'01 · Reaterro'}</h1><div class="sub">${segH(cons)} · POP-022 Rev. 03</div></div>${relLogoHtml(r.consorcio)}<div class="relBadge" style="color:${cor}">${segH(res.toUpperCase())}</div></div><div class="relBody">`;
+  h+=sec('Identificação')+'<div class="relGrid">'+relField('Data',sstData(r.data))+relField('Nº da OS',segH(r.os||''))+relField('Tipo de intervenção',segH(r.tipo_intervencao||''))+relField('Equipe / contratada',segH(r.equipe||''))
+    +(rec?relField('Tipo de pavimento',segH(r.tipo_pavimento||'')):'')+relField('Coordenadas',r.lat!=null?((+r.lat).toFixed(6)+', '+(+r.lon).toFixed(6)+(r.gps_precisao!=null?(' (±'+Math.round(r.gps_precisao)+' m)'):' (marcado no mapa — fora da frente de serviço)')):(r.preenchimento_manual?'Preenchimento manual (sem localização)':''))
+    +relWide('Endereço / local',segH([r.local,ender].filter(Boolean).join(' · ')))+relField('Fiscal responsável',segH(r.usuario_nome||''))+relField('Itens',n('C')+' conforme · '+n('NC')+' não conforme · '+n('NA')+' N/A')+'</div>';
+  const grupos=[]; its.forEach(i=>{ let g=grupos.find(x=>x.g===i.grupo); if(!g){ g={g:i.grupo,l:[]}; grupos.push(g); } g.l.push(i); });
+  h+=sec('Checklist')+grupos.map(g=>`<table class="segT"><tr><th colspan="3">${segH(g.g||'')}</th></tr>`+g.l.map(i=>`<tr><td style="width:36px">${segH(i.codigo||'')}</td><td>${segH(i.item)}${i.resultado==='NC'&&i.obs?`<div style="margin-top:3px;color:#991b1b">Observação: ${segH(i.obs)}</div>`:''}</td><td class="${i.resultado==='C'?'ok':i.resultado==='NC'?'bad':''}" style="width:42px;text-align:center">${i.resultado==='NA'?'N/A':segH(i.resultado||'—')}</td></tr>`).join('')+'</table>').join('');
+  h+=sec('Resultado da inspeção')+'<div class="relGrid">'+relField('Resultado','<span style="color:'+cor+'">'+segH(res)+'</span>')+relWide('Observações / ação corretiva',segH(r.observacoes||''))+'</div>';
+  const fotos=[]; const f=r.fotos||{}; if(f.foto_antes) fotos.push(fig(f.foto_antes,'Antes')); if(f.foto_depois) fotos.push(fig(f.foto_depois,'Depois'));
+  Object.keys(f).filter(k=>k!=='foto_antes'&&k!=='foto_depois'&&typeof f[k]==='string'&&f[k]&&!/^(sig|nc_)/.test(k)).forEach(k=>fotos.push(fig(f[k],'Foto')));
+  its.forEach(i=>{ if(i.resultado==='NC'&&i.foto) fotos.push(fig(i.foto,'Não conformidade '+(i.codigo||''))); });
+  its.forEach(i=>{ if(i.resultado==='C'&&i.foto) fotos.push(fig(i.foto,'Conforme '+(i.codigo||''))); });
+  if(fotos.length) h+=sec('Fotos')+'<div class="relPhotos">'+fotos.join('')+'</div>';
+  const ass=(tit,nome,img,em)=>`<div style="text-align:center;break-inside:avoid">${img?`<img src="${segImg(img)}" alt="Assinatura" style="max-width:100%;height:80px;object-fit:contain"/>`:'<div style="height:80px"></div>'}<div style="border-top:1px solid #444;padding-top:4px;font-size:12px"><b>${segH(nome||'—')}</b><br/>${tit}${em?(' · '+segFmt(em)):''}</div></div>`;
+  h+=sec('Assinaturas')+'<div class="relGrid">'+ass('Encarregado',r.encarregado_nome,r.encarregado_assinatura,r.encarregado_assinado_em)+ass('Fiscalização',r.usuario_nome,r.fiscal_assinatura,r.fiscal_assinado_em)+'</div>';
+  if(r.anulado_em) h+='<div class="segAlertP">Checklist ANULADO em '+segFmt(r.anulado_em)+' — '+segH(r.anulado_motivo||'')+'</div>';
+  h+='</div><div class="relFoot"><span>AcquaHub · QSMS</span><span>Gerado em '+relFmtData(new Date().toISOString())+'</span></div>';
+  ov.innerHTML='<div id="relToolbar"><button id="relClose" style="background:#444;color:#fff">Fechar</button><button id="relPrint" style="background:#0aa07a;color:#fff">🖨️ Imprimir / Salvar PDF</button></div><div id="relDoc">'+h+'</div>';
+  ov.style.display='block'; ov.scrollTop=0;
+  document.getElementById('relClose').onclick=()=>{ ov.style.display='none'; };
+  // o título da página vira o nome sugerido do arquivo PDF
+  document.getElementById('relPrint').onclick=async()=>{ const t=document.title; document.title=['Checklist',rec?'recomposicao':'reaterro','OS',r.os||'sem-numero',r.data||''].join(' ').replace(/[\\/:*?"<>|]/g,'-'); try{ await window.print(); }finally{ document.title=t; } }; }
 
 // ---------- QSMS › 📊 Indicadores SST (gestão): painel, lançamentos, ASO, treinamentos, CIPA, checklist ----------
 // Gate ME.qsms (qsmsGate). Tudo por RPC app_sst_* (gate qsms_pode no servidor). Anular no lugar de apagar.
@@ -17054,15 +17197,15 @@ function ckLista(){ const L1=$('#ckLista'); if(!L1) return; const arr=ckFiltrado
   $('#ckResumo').textContent=arr.length+' checklist(s)';
   L1.innerHTML=arr.length?arr.slice(0,300).map(x=>{ const t=CK_TIPO[x.tipo]||['',x.tipo], al=(x.alertas||[]).length, cor=(CK_RES[x.resultado]||[,'#64748b'])[1];
     return `<div class="segcard" data-ckd="${x.id}" style="cursor:pointer;border-left:4px solid ${cor}"><div class="sgrow"><b>${t[0]} ${segH(t[1])} · OS ${segH(x.os||'—')}</b><span class="sub" style="margin-left:auto;font-size:12px">${sgDia(x.data)}</span></div>
-      <div class="sub" style="margin-top:2px">${segH([x.local,x.endereco,x.bairro].filter(Boolean).join(' · ')||'—')} · ${segH(sgCons(x.consorcio))}</div>
+      <div class="sub" style="margin-top:2px">${segH([x.local,x.endereco,x.bairro].filter(Boolean).join(' · ')||'—')} · ${segH(sgCons(x.consorcio))}${x.preenchimento_manual?' · ✍️ manual':''}</div>
       <div class="sub" style="font-size:12px;margin-top:2px">${segH(x.equipe||'—')}${x.tipo_intervencao?(' · '+segH(x.tipo_intervencao)):''}${x.tipo_pavimento?(' · '+segH(x.tipo_pavimento)):''} · fiscal ${segH(x.fiscal||'—')}</div>
       <div class="segforms">${ckPill(x.resultado)}<span class="segfm" style="cursor:inherit">${x.c} C · ${x.nc} NC · ${x.na} N/A</span>${ckConf(x)!=null?`<span class="segfm" style="cursor:inherit">${sgPct(ckConf(x))} conforme</span>`:''}${al?`<span class="segpill" style="background:var(--bad)" title="${segH(x.alertas.join(' · '))}">⚠ ${al}</span>`:''}</div></div>`; }).join('')
     +(arr.length>300?'<p class="sub">Mostrando 300 — refine os filtros ou exporte.</p>':''):'<p class="sub">Nenhum checklist com esses filtros.</p>';
   L1.querySelectorAll('[data-ckd]').forEach(el=>el.onclick=()=>{ ck.det=el.dataset.ckd; ckDetalhe(); window.scrollTo(0,0); }); }
 function ckExport(){ const arr=ckFiltrados(); if(!arr.length) return toast('Nada para exportar');
-  const aoa=[['Data','Checklist','Consórcio','OS','Tipo de intervenção','Equipe / contratada','Tipo de pavimento','Local','Endereço','Fiscal','Encarregado','Resultado','Conformes','Não conformes','N/A','% conformidade','Alertas']];
+  const aoa=[['Data','Checklist','Consórcio','OS','Tipo de intervenção','Equipe / contratada','Tipo de pavimento','Local','Endereço','Fiscal','Encarregado','Resultado','Conformes','Não conformes','N/A','% conformidade','Alertas','Preenchimento manual']];
   arr.forEach(x=>aoa.push([sgDia(x.data),(CK_TIPO[x.tipo]||[,x.tipo])[1],sgCons(x.consorcio),x.os||'',x.tipo_intervencao||'',x.equipe||'',x.tipo_pavimento||'',x.local||'',
-    [x.endereco,x.bairro,x.municipio].filter(Boolean).join(' — '),x.fiscal||'',x.encarregado||'',(CK_RES[x.resultado]||[x.resultado])[0],+x.c,+x.nc,+x.na,ckConf(x)==null?'':Math.round(ckConf(x)*1000)/10,(x.alertas||[]).join(' · ')]));
+    [x.endereco,x.bairro,x.municipio].filter(Boolean).join(' — '),x.fiscal||'',x.encarregado||'',(CK_RES[x.resultado]||[x.resultado])[0],+x.c,+x.nc,+x.na,ckConf(x)==null?'':Math.round(ckConf(x)*1000)/10,(x.alertas||[]).join(' · '),x.preenchimento_manual?'Sim':'']));
   exportarXlsx('checklists_pop022_'+qsmsDia(new Date())+'.xlsx','Checklists',aoa); }
 async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p class="sub">Carregando…</p>'; let r;
   try{ r=await sgRpc('app_sst_ck_ver',{p_id:id}); }catch(e){ return sgErr(v,e); }
@@ -17071,20 +17214,23 @@ async function ckDetalhe(){ const v=$('#ckView'), id=ck.det; v.innerHTML='<p cla
   const sig=(nome,img,em)=>`<div style="flex:1 1 220px;min-width:0"><div class="sub" style="font-size:12px">${nome}</div>${img?`<img class="sgsig" src="${fotoURL(img)}" loading="lazy" style="margin-top:4px"/>`:'<div class="sub" style="color:var(--bad);font-size:12px">sem assinatura</div>'}${em?`<div class="sub" style="font-size:11px">${segFmt(em)}</div>`:''}</div>`;
   const grupos=[]; its.forEach(i=>{ let g=grupos.find(x=>x.g===i.grupo); if(!g){ g={g:i.grupo,l:[]}; grupos.push(g); } g.l.push(i); });
   const lin=i=>`<div class="segq"><div class="sgrow"><span class="t" style="flex:1"><b>${segH(i.codigo||'')}</b> ${segH(i.item)}</span>${sgPill(i.resultado)}</div>
-    ${i.resultado==='NC'?`<div class="sstnc">${sgKv([['Observação',segH(i.obs||'—')]])}${i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`:''}</div>`;
+    ${i.resultado==='NC'?`<div class="sstnc">${sgKv([['Observação',segH(i.obs||'—')]])}${i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`
+      :i.resultado==='C'&&i.foto?`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(i.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(i.foto)}" loading="lazy"/></a></div>`:''}</div>`;
   let h=`<button class="btn ghost" id="ckVolta" style="width:auto;margin:0 0 10px;padding:8px 13px">‹ ${ck.volta==='sst_bi'?'Voltar ao BI QSMS':'Voltar à lista'}</button>`;
   h+=`<div class="segblk"><h3>${t[0]} ${segH(t[1])} · OS ${segH(r.os||'—')} ${ckPill(r.resultado)}</h3>
     <p class="sub" style="font-size:12px;margin:0 0 6px">POP-022 Rev. 03 — Checklist ${r.tipo==='reaterro'?'01':'02'}</p>
     ${sgKv([['Data',sgDia(r.data)],['Consórcio',segH(sgCons(r.consorcio))],['Tipo de intervenção',segH(r.tipo_intervencao||'')],['Equipe / contratada',segH(r.equipe||'')],
-      ['Tipo de pavimento',segH(r.tipo_pavimento||'')],['Local',segH(r.local||'')],['Endereço',segH(loc)],
-      ['GPS',r.lat!=null?`<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">${(+r.lat).toFixed(6)}, ${(+r.lon).toFixed(6)}</a>${r.gps_precisao!=null?(' ±'+Math.round(r.gps_precisao)+' m'):''}`:''],
+      ['Tipo de pavimento',segH(r.tipo_pavimento||'')],['Local',segH(r.local||'')],['Endereço',segH(loc)],['Preenchimento',r.preenchimento_manual?'Manual (sem localização)':''],
+      ['GPS',r.lat!=null?`<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">${(+r.lat).toFixed(6)}, ${(+r.lon).toFixed(6)}</a>${r.gps_precisao!=null?(' ±'+Math.round(r.gps_precisao)+' m'):' · marcado no mapa (fora da frente de serviço)'}`:''],
       ['Fiscal responsável',segH(r.usuario_nome||'')+(r.criado_em?(' · lançado '+segFmt(r.criado_em)):'')],['Observações / ação corretiva',segH(r.observacoes||'')],
       ['Anulado',r.anulado_em?(segFmt(r.anulado_em)+' — '+segH(r.anulado_motivo||'')):'']])}
     ${sgFotos(r.fotos)}${(r.alertas||[]).length?`<div class="segerr" style="margin-top:8px">⚠ ${segH(r.alertas.join(' · '))}</div>`:''}</div>`;
   h+=`<div class="segblk"><h3>Checklist · ${n('C')} C · ${n('NC')} NC · ${n('NA')} N/A</h3>${grupos.map(g=>`<div class="sstgr">${segH(g.g||'')}</div>`+g.l.map(lin).join('')).join('')||'<p class="sub">Sem itens.</p>'}</div>`;
   h+=`<div class="segblk"><h3>Assinaturas</h3><div class="sgrow" style="align-items:flex-start;gap:14px">${sig('Encarregado: <b>'+segH(r.encarregado_nome||'—')+'</b>',r.encarregado_assinatura,r.encarregado_assinado_em)}${sig('Fiscalização: <b>'+segH(r.usuario_nome||'—')+'</b>',r.fiscal_assinatura,r.fiscal_assinado_em)}</div></div>`;
+  h+=`<button class="btn" id="ckPdf" style="margin-top:16px">📄 Exportar PDF</button>`;
   if(!r.anulado_em) h+=`<button class="btn ghost" id="ckAnular" style="margin-top:16px;color:var(--bad)">Anular este checklist</button>`;
   v.innerHTML=h;
+  $('#ckPdf').onclick=()=>sstCkPdf(r);
   $('#ckVolta').onclick=()=>{ ck.det=null; if(ck.volta){ const tv=ck.volta; ck.volta=null; return irPara(tv); } if(ck.dados) ckRender(); else ckCarregar(); };
   if($('#ckAnular')) $('#ckAnular').onclick=()=>sgAnular('checklist',id,()=>{ ck.det=null; ck.volta=null; ckCarregar(); }); }
 
@@ -17152,7 +17298,7 @@ async function sgDetalhe(){ const v=$('#slView'), {tipo,id}=sgL.det; v.innerHTML
   sgL.reg=r;
   const loc=[r.endereco,r.bairro].filter(Boolean).join(' — ')+(r.municipio?(' · '+r.municipio):'');
   const cab=sgKv([['Data',sgDia(r.data)+(r.hora?(' '+String(r.hora).slice(0,5)):'')],['Consórcio',segH(sgCons(r.consorcio))],['Área',segH(r.area||'—')],
-    ['Local',segH(r.local||r.setor_local||'')],['Endereço',segH(loc)],['GPS',r.lat!=null?`<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">${(+r.lat).toFixed(6)}, ${(+r.lon).toFixed(6)}</a>${r.gps_precisao!=null?(' ±'+Math.round(r.gps_precisao)+' m'):''}`:''],
+    ['Local',segH(r.local||r.setor_local||'')],['Endereço',segH(loc)],['GPS',r.lat!=null?`<a href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">${(+r.lat).toFixed(6)}, ${(+r.lon).toFixed(6)}</a>${r.gps_precisao!=null?(' ±'+Math.round(r.gps_precisao)+' m'):' · marcado no mapa (fora da frente de serviço)'}`:''],
     ['Lançado por',segH(r.usuario_nome||'')+(r.criado_em?(' · '+segFmt(r.criado_em)):'')],['Origem',r.origem==='planilha'?'importado da planilha':'']]);
   const al=(r.alertas||[]).length?`<div class="segerr" style="margin-top:8px">⚠ ${segH(r.alertas.join(' · '))}</div>`:'';
   let h=`<button class="btn ghost" id="sgVolta" style="width:auto;margin:0 0 10px;padding:8px 13px">‹ ${sgL.volta==='sst_bi'?'Voltar ao BI QSMS':'Voltar à lista'}</button>`;
@@ -17174,6 +17320,7 @@ function sgDetInsp(r,cab,al){ const hoje=sstHoje(), its=r.itens||[];
           :`<label>Tratativa</label><textarea data-ntobs="${x.id}" rows="2" placeholder="O que foi feito para corrigir"></textarea>
             <label>Foto da correção (opcional)</label><input type="file" accept="image/*" data-ntfoto="${x.id}"/>
             <div class="sgacts"><button class="btn" data-ntok="${x.id}">✓ Marcar como tratada</button></div>`}</div>`; }
+    else if(x.resultado==='C'&&x.foto) s+=`<div class="sgrow" style="margin-top:6px"><a href="${fotoURL(x.foto)}" target="_blank" rel="noopener"><img class="sgth" src="${fotoURL(x.foto)}" loading="lazy"/></a></div>`;
     return s+'</div>'; };
   const n=v=>its.filter(x=>x.resultado===v).length;
   const rsp=(r.os||r.interv_resp_nome)?sgKv([['OS da intervenção',segH(r.os||'')],['Responsável pela intervenção',segH(r.interv_resp_nome||'')+(r.interv_resp_assinado_em?(' <span class="sub" style="font-size:11px">assinou '+segFmt(r.interv_resp_assinado_em)+'</span>'):'')]])

@@ -1230,10 +1230,27 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   motivou: 7 autoaprovações (EPI #22/#32/#37/#99, Insumos #1061/#1158, Manutenção de frota #1).
 - ⚠️ **Cuidado:** fila/aprovação nova em Suprimentos → use `sup_e_aprovador_de`, nunca
   `sup_pode_aprovar`/`sup_epi_gestor` (esses só dizem "é aprovador de alguém", não "de quem").
+- **Aviso "já retirou este item" (2026-11-26, sw v479, `docs/migracao_sup_aprov_ja_retirou.sql`):** nas 3 telas
+  de aprovação (Insumos `supVAprovar`, Ferramentas `supVFerramentaAprovar`, EPI `supVEpiAprovar`) cada item mostra,
+  abaixo de "solicitado", quando o colaborador já retirou o **mesmo item** antes (`supAntAviso`): **⚠️ amarelo** se
+  ainda está com ele ("Já possui este item: retirou em DD/MM/AAAA · qtd — ainda com ele: N", + troca prevista no EPI)
+  e **ℹ️ neutro** se já retirou mas não tem mais. Só informa — não bloqueia a aprovação. Vem do campo novo
+  **`anterior`** em cada item das filas `sup_fila_aprovacao`/`sup_ferramenta_fila_aprovacao`/`sup_epi_fila_aprovacao`
+  (null = nunca retirou), montado pelos helpers internos (sem grant) `"9 - suprimentos".sup_ja_retirou_material(uid,
+  material, sol_atual)` — última `sup_solicitacao` **entregue** com `qt_entregue>0` (`em`=`entregue_em`, `qt`, `sol`) +
+  `posse` = saldo do kardex `sup_movimento` — e `sup_ja_retirou_epi(uid, epi, sol_atual)` — última `sup_epi_entrega`
+  tipo entrega/substituição (`em`, `qt`, `tamanho`) + `posse`/`vence_em` dos itens sem `substituido_em`/`devolvido_em`.
+  A comparação é por **material/EPI** (EPI ignora o tamanho; o tamanho anterior aparece no aviso).
 
 ### 5.1 Insumos
 - Fluxo: **solicitar → aprovar (aprovador pode editar qtd/cancelar item) → segregar (almoxarife:
   existe/parcial/falta, gera código) → retirar (código) → consumir na OS**.
+- **Separar × Entregar em 2 botões (2026-11-26, sw v480), como no EPI:** o bloco Almoxarifado de Insumos tem
+  **🏷️ Separar insumo** (act `almox` — mantido p/ o link da notificação "a separar" continuar abrindo a tela
+  certa; status aprovada/em_separacao) e **📤 Entregar insumo (retirada)** (act novo `almox_entregar`; status
+  segregada, pede o código). As duas são `supVAlmox(modo)` sobre a mesma RPC `sup_fila_almoxarife`,
+  filtrada no front por status (sem mudança no banco). **Ferramentas igual** (§5.4): 🏷️ Separar ferramenta (`ferramenta_almox`) ×
+  📤 Entregar ferramenta (retirada) (`ferramenta_entregar`), `supVFerramentaAlmox(modo)` sobre `sup_ferramenta_fila_almoxarife`.
 - **Cabeçalho das telas de separação do almoxarife (2026-10-13):** todos os cards de separação
   (Insumos/Ferramentas via `supAlmoxCard`, EPI via `supEpiSegCard`) mostram agora, via o helper
   compartilhado **`supSolicHead(s)`**: **nº · badge do consórcio de origem** (`supConsBadge` →
@@ -1338,7 +1355,8 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
     RPCs **compartilhadas** `sup_aprovar`/`sup_rejeitar` — mesma UI de ajuste de qtd/cancelamento de
     Insumos) e `ferramenta_painel` (reaproveita `supVPainel('sup_ferramenta_painel_multi')` — mesma
     função parametrizada do Painel de Insumos, incluindo o drill-down "quem tem" do §5.1).
-  - **Almoxarifado:** `ferramenta_almox` (`supVFerramentaAlmox`, fila `sup_ferramenta_fila_almoxarife`
+  - **Almoxarifado:** `ferramenta_almox` = **Separar ferramenta** e `ferramenta_entregar` = **Entregar ferramenta
+    (retirada)** (2026-11-26, sw v480; ambos `supVFerramentaAlmox(modo)`, fila `sup_ferramenta_fila_almoxarife` filtrada por status
     + `supAlmoxCard`/`supAlmoxWire` **reaproveitados como estão** — chamam `sup_segregar`/`sup_entregar`,
     que são agnósticas de material) e **`ferramenta_recebimento`** (`supVFerramentaRecebimento`, tela
     nova sem equivalente em Insumos: lista `sup_ferramenta_devolucao_fila_recebimento`, almoxarife
@@ -1356,6 +1374,14 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
 - Notificações (`sup_trg_ferramenta_devolucao`, trigger AFTER INSERT/UPDATE em
   `sup_ferramenta_devolucao`): solicitar devolução avisa `almoxarife`+`admin`
   (`link='ferramenta_recebimento'`); confirmar avisa o colaborador (`link='ferramenta_pedidos'`).
+- **Avisos da solicitação de ferramenta (corrigido 2026-11-26, `docs/migracao_sup_notif_ferramenta.sql`, só banco):**
+  ferramenta usa a mesma `sup_solicitacao`, e o `sup_trg_solicitacao` mandava tudo como insumo ("Material a separar"
+  p/ a área **insumo**, links `aprovar`/`almox`/`pedidos`). Agora, se a solicitação tem item `ferramenta`, os textos
+  são de ferramenta, "Ferramenta a separar" vai p/ `sup_uuids_por_area('ferramenta')` e os links são
+  `ferramenta_aprovar` / `ferramenta_almox` (= Separar ferramenta) / `ferramenta_pedidos`. ⚠️ O trigger virou
+  **CONSTRAINT TRIGGER DEFERRABLE INITIALLY DEFERRED** (roda no fim da transação): o cabeçalho entra antes dos itens,
+  então só no commit dá pra saber o tipo. Em teste E2E com rollback, use `set constraints all immediate` antes de
+  conferir as `sup_notificacao` geradas.
 - RPCs novas (todas `SECURITY DEFINER`, grants revisados — funções novas nascem com EXECUTE liberado
   pra `PUBLIC` por padrão do Postgres, teve que revogar+regrant `authenticated` explicitamente):
   `sup_ferramenta_catalogo`, `sup_ferramenta_solicitar`, `sup_ferramenta_minhas_solicitacoes`,
@@ -1365,7 +1391,7 @@ concedida passa em `sup_e_almox` em todas as telas de almoxarife (a visibilidade
   `sup_ferramenta_devolucao_confirmar`.
 - **Correção de navegação (2026-09-15) — Ferramentas reusa código de Insumos que assumia o contexto de
   Insumos:** (1) `supAlmoxWire` (fiação de segregar/entregar, compartilhada) recarregava fixo em
-  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega**, concluir uma
+  `supVAlmox` (fila de **Insumos**) — na tela **Ferramentas › Separação e entrega** (hoje Separar/Entregar ferramenta), concluir uma
   segregação ou entrega **pulava pra fila de Insumos**. Agora `supAlmoxWire(refreshFn)` recebe a função
   de refresh (default `supVAlmox`; `supVFerramentaAlmox` passa a si mesma). (2) `supGoAct` (deep-link de
   notificação) setava `supAreaId='insumos'` pra qualquer act não-`eq_`/`epi_` — os acts `ferramenta_*`
@@ -2953,6 +2979,17 @@ Acompanhamento diário de obra das intervenções (macromedidores, VRPs, redes V
   pergunta; os 12 com pavimento lançado seguem legado. **Ramais:** cada Ramal N ganhou `Reaterro` + `Recomposição de pavimento`
   (`pjRamal`; `pjReconcilia` acrescenta nos ramais salvos) — o banco já trata qualquer grupo com o par, então o ramal entra na mesma
   pergunta/trava (bloco `av_ramais › Ramal N`). ⚠️ O % dos ramais já lançados cai (2 etapas novas em 0%) até lançar ou tirar do escopo.
+- **Endereço automático pelo mapa (2026-11-26, sw v474, `docs/migracao_proj_endereco.sql`):** `app_proj_intervencoes` devolve
+  `properties.endereco = {ruas:[…], bairros:[…]}` em pontos e linhas, calculado **ao vivo** por `public.proj_endereco(geom)` sobre
+  `"1 - suporte_geografico".logradouros` + `bairros` (acompanha edição da geometria no QGIS; ~0,5 s p/ as 116 intervenções).
+  **Ponto** (VRP/válvula/macro): rua mais próxima até 60 m + bairro que contém o ponto. **Trecho HDD/VCA:** amostra o traçado a cada
+  ~5 m, pega a rua mais próxima de cada amostra (até 40 m) e fica com as que cobrem **≥ 10% do trecho ou ≥ 20 m** (rua que só cruza
+  fica de fora; a dominante fica sempre), **na ordem do início (I) ao fim (F)**; bairros com ≥ 20 m (ou 10%) do trecho. Nome pelo
+  `public.proj_fmt_logradouro(tipo,nome)` (R → Rua, AV → Av., PR → Praça…; preposições em minúsculo; romanos/siglas em maiúsculo; sem
+  acento porque a base não tem). Front: `iv.end` (carregado em `pjLoad`), helpers `pjEndRuas`/`pjEndBairros`/`pjEndTxt`/`pjEndHtml`;
+  aparece no **card da lista** (📍 abaixo do código), no **popup do mapa** (linhas Endereço/Ruas + Bairro) e no topo do `projeto_det`/
+  `projeto_cfg`; a busca da tela Pendências também acha pelo endereço. ⚠️ Logradouro sem cadastro na base → a rua mais próxima pode
+  ser a paralela; trecho multilinha desconexo usa só a 1ª parte.
 - **HDD › Puxamento da tubulação: diâmetro + rua (2026-11-25, sw v455, `docs/migracao_proj_hdd_puxamento.sql`):** o lançamento do
   puxamento (`pjIsPux` = intervenção `rede_hdd` + etapa com "puxamento" no nome) pede **Diâmetro da tubulação** (mm, só número — o
   campo filtra letras; `> 0`) e **Rua** (texto livre), ambos obrigatórios no lançamento novo. A rua vem **preenchida com a última rua
@@ -3860,7 +3897,13 @@ Substitui a planilha `18. QSMS\Indicadores\Base_Indicadores_SST_PowerBI.xlsx` e 
   que continua sendo das equipes de execução. Gate `ME.qsms_campo` = `"16 - qsms".sst_campo_pode` = `qsms_pode` (gestão)
   **ou** `perfil.qsms_campo` (engrenagem nova; `app_qsms_campo_set`, admin; `app_qsms_acesso_listar` devolve `campo`).
   **Telas (PR-B, sw v328):** `sst` (Home › 🛠️ Execução › 🦺 QSMS campo; card escondido sem `ME.qsms_campo`) com os
-  3 lançamentos + "Meus lançamentos (30 dias)" (`app_sst_minhas` + itens ainda na fila, cache em `localStorage.sstMinhas`)
+  lançamentos + "Meus lançamentos" (desde sw v472: **lista única abaixo dos botões, sem limite de dias** — `app_sst_minhas(p_dias:36500)`
+  + itens ainda na fila + os rascunhos em preenchimento, que saíram do banner do topo e viraram os 1ºs cards com Continuar/Descartar;
+  desde sw v475 **vários rascunhos ao mesmo tempo** (chave `sst:<id>` no store `draft`; a chave antiga `sst` é migrada em `sstDraftsAll`),
+  sem o bloqueio "Há um lançamento em andamento"; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques) e o "‹ QSMS campo"
+  grava o rascunho na hora (`sstDraftFlush`);
+  chips de situação **Todos · Pendentes** (em preenchimento ou aguardando envio) **· Finalizados** (já no servidor), estado `sstSit`;
+  cache em `localStorage.sstMinhas`)
   e `sst_form` (um formulário por vez, estado `sstD`, rascunho no IndexedDB `seg_local` store `draft` chave `sst`, com fotos
   e assinaturas):
   - **Área / frente** (inspeção e ocorrência) = lista fixa `SST_AREAS`: HDD, VCA, Instalação/substituição de ramal,
@@ -4029,7 +4072,33 @@ redefinidas (+ `checklists`, `checklist_itens`, `vazias.checklists`). Views **`b
 **`bi_sst_checklist_item`** (grant `bi_qsms_leitura`) — o Power BI QSMS ainda não tem essas tabelas; dá pra incluir depois
 pela mesma API. **Aplicado em 18/11/2026** (migração `sst_checklist_pop022`, E2E com rollback ok).
 
+**Preenchimento Manual (26/11/2026, sw v471) — `docs/migracao_sst_ck_preenchimento_manual.sql`:** só no checklist de
+**recomposição**. Marcado: o GPS deixa de ser exigido **e não é gravado** (coordenada de quem preenche fora do local
+enganaria) e o **Endereço** passa a ser obrigatório (coluna `endereco`; sem o alerta "Sem GPS"; coluna nova
+`preenchimento_manual`). Sem coordenada, o consórcio vem do cadastro de quem preenche (`qsms_consorcio`); bairro e
+município ficam vazios. Desmarcado, e no reaterro, nada muda. A gestão mostra "✍️ manual" na lista, no detalhe e no XLSX.
+**Migração aplicada em produção (26/11/2026)**; é compatível com o app anterior, que não envia o campo e segue como antes.
+
+**Preenchimento Manual no reaterro também (26/11/2026, sw v475) — `docs/migracao_sst_ck_manual_reaterro.sql`:**
+a caixa passa a valer nos **dois** checklists, com a mesma regra acima (onde se lê "só no checklist de recomposição"
+ou "no reaterro nada muda", vale esta nota). **A migração precisa ser aplicada**: sem ela, o reaterro manual sai com o
+alerta "Sem GPS" e o endereço fica em `local`.
+
+**Assinatura do encarregado opcional (26/11/2026, mesma migração):** nos dois checklists o **nome** do encarregado continua
+obrigatório, a assinatura não, e o servidor deixa de gravar o alerta "Encarregado sem assinatura". A da fiscalização
+continua obrigatória.
+
 ---
+
+**Vários lançamentos em preenchimento (sw v475):** acabou o bloqueio "continue ou descarte". Cada lançamento do QSMS campo tem o próprio rascunho no aparelho (`seg_local/draft`, chave `sst:<id>`, timer de gravação por lançamento; o rascunho único antigo `sst` é migrado em `sstDraftsAll`), que aparece como card **Pendente** em *Meus lançamentos* com **Continuar/Descartar**; o formulário tem **🗑️ Descartar este lançamento** no fim (2 toques).
+
+**PDF dos checklists (sw v475):** `sstCkPdf` (overlay `#relatorio` → Imprimir / Salvar PDF). Abre sozinho depois do envio (usa os dados do aparelho, vale sem sinal), e também pelo botão **📄 PDF** em *Meus lançamentos* e no detalhe da gestão (via `app_sst_ck_ver`, precisa de conexão). Sem mudança no banco.
+
+**Checklist Segurança + foto nos itens conformes (sw v476):** no QSMS campo o botão "Nova inspeção" virou **Checklist Segurança** (`SST_TIPO.insp.t`; na gestão continua "Inspeções"). Nos 3 checklists (segurança, reaterro e recomposição) todo item marcado **Conforme** pede **foto obrigatória** (`sstFotoConf`, mesma chave `nc_<i>` do item; `sstPend` bloqueia com "Foto em N itens conformes"). A foto vai em `foto` do item (o banco já aceitava foto em qualquer resultado — sem migração) e aparece no PDF ("Conforme 1.1"), no detalhe do checklist e da inspeção na gestão. A foto da NC também é obrigatória nos 3 (antes era opcional no reaterro/recomposição). O servidor não recusa sem foto — a trava é no app.
+
+**"Está na frente de serviço?" (sw v477):** no Checklist Segurança, DDS, reaterro e recomposição, a 1ª coisa do formulário é a pergunta (o resto só aparece depois de responder; `sstD.na_frente`). **Sim** = coordenada do GPS travado (≤ `PRECISAO_MAX`), como antes. **Não** = mapa (`sstMapaInit`, Leaflet + `mapAddCamadaBase`) para tocar/arrastar o ponto (`sstD.ponto`), obrigatório. O ponto do mapa vai em `lat`/`lon` com **`precisao` nula** — é a convenção que distingue "marcado no mapa" de GPS (o app sempre manda a precisão no GPS); endereço/bairro/município/consórcio continuam saindo da coordenada no servidor (`qsms_local`). Sem migração. A gestão e o PDF mostram "marcado no mapa (fora da frente de serviço)". **Substitui o "Preenchimento Manual"** dos checklists (#448/#449): a caixa saiu e o app manda `preenchimento_manual=false`; registros antigos manuais seguem aparecendo como "Manual (sem localização)". Ocorrência não muda (GPS opcional, sem a pergunta).
+
+**Nº da OS opcional nos checklists de reaterro e recomposição (sw v478) — `docs/migracao_sst_ck_os_opcional.sql` (APLICADO 26/11/2026):** o campo continua no formulário, sem `*`, e `sstPend` não cobra mais; `app_sst_ck_registrar` deixou de gerar o alerta "Sem OS". Na lista, checklist sem OS aparece como "Sem OS". (No Checklist Segurança a OS já era opcional.)
 
 ## 21. Carga SIGOS (relatórios de OS da COPASA) — schema `"17 - sigos"` · `docs/migracao_sigos_carga.sql` · Edge Function `sigos-ingest` (2026-11-06)
 
@@ -4599,7 +4668,7 @@ validado sai do snapshot) · escrita: `app_fisc_linha_validar(dia, za, chave, st
 Internas (sem grant): `fisc_execucoes`, `fisc_linhas`, `fisc_projetos`, `fisc_dia_dados`, `fisc_proj_pct`, `fisc_arv_ajusta`, `fisc_arv_linhas`. Também `app_fisc_proj_detalhe(kind, gid, dia)`.
 
 **Tela (`fsc*` no index.html, uma tela `fisc` com dois modos — `fscS.modo` `cons`/`fisc`, `irPara('fiscv')` abre no modo
-fiscalização; `FSC_RPC` escolhe as RPCs):** ZAs (seleção múltipla), calendário com cor por status (no modo fiscalização só os
+fiscalização; `FSC_RPC` escolhe as RPCs):** ZAs (seleção múltipla; **o Consolidador e a Execução Física abrem sem nenhuma ZA marcada** e só carregam depois que o usuário escolhe uma — as duas juntas estouravam o limite de 8 s do banco em `app_fisc_mes`; `fscInit` zera `fscS.zas` — 2026-11-26, sw v469 no Consolidador e v470 na Execução Física); desde 26/11 o `app_fisc_mes` calcula o hash das linhas direto de `fisc_execucoes` do mês (sem o acumulado de loggers desde jul/2026, que o calendário não usa; ~2 s por ZA em vez de ~4 s) — **se a fórmula de hash de `fisc_linhas` mudar, mudar também ali** (`docs/migracao_fisc_mes_leve.sql`), calendário com cor por status (no modo fiscalização só os
 dias validados ficam clicáveis), tabela por ZA (Atividade · No dia · Acumulado · Situação · ✔/🗺️/▾; sem Situação nem ✔ na
 fiscalização), detalhe da atividade com **"OS do dia" primeiro** (`fscOsDia`: OS SIGOS, ou a do AcquaHub sem SIGOS, sem
 repetir pela base de 10 dígitos, separadas por vírgula, + quantos registros sem OS) e depois cada execução (OS, situação
@@ -4619,7 +4688,7 @@ laranja não executada): no detalhe os grupos e as execuções ficam sem cor (pe
 origem"** (`fscOrigemHtml`: OS + serviço + situação; **não mostra como a origem foi achada** — pedido do usuário 13/11/2026, sw v379;
 o `fonte` segue no banco só p/ auditoria) e resumo "origem: Ramal predial N · Correção de vazamento N · sem origem N" na
 linha; Excel (aba Execuções) + colunas Status SIGOS / OS de origem / Serviço de origem (sem a fonte). Chaves de `extra` começando com `_` não são listadas no "chave: valor". Avanços de obra **sem "equipe"** (sw v381): a coluna `intervencao_avanco.equipe` é só o responsável do cadastro da intervenção (ex.: INOVA), não quem executou — sai da tela do Consolidador/Execução Física. bloco **Obras em andamento** (% no dia, barra, avanços do
-dia, acumulado recolhível, anexos) (o botão "Excel do mês" foi removido em 13/11, sw v396; o texto explicativo do topo sai no Consolidador, sw v398 — o Excel é o Relatório consolidado, §21.6.1). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
+dia, acumulado recolhível, anexos) (o botão "Excel do mês" foi removido em 13/11, sw v396; o texto explicativo do topo sai no Consolidador, sw v398, e também na Execução Física e no Relatório consolidado · Fiscalização (`fiscv_rel`), sw v470 — o Excel é o Relatório consolidado, §21.6.1). Desempenho: dia ~1,5 s, mês ~1,4 s por ZA.
 
 **Cuidados:** o feed é independente do `rdo_eventos` (RDO e Vitrine ainda têm a dupla leitura — migrar depois). Se o
 corte da Fiscalização mudar no BI, mudar `sigos_fisc_corte()` (vale aqui também). Nova fonte de execução = novo CTE em
