@@ -1519,6 +1519,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
       <button class="mod hidden" id="giSup" data-go="sup_bi"><div class="ic">📦</div><div class="nm">Gestão de Suprimentos</div></button>
       <button class="mod hidden" id="giFrota" data-go="frota_bi"><div class="ic">🚗</div><div class="nm">Gestão de Frotas</div></button>
       <button class="mod hidden" id="giPessoas" data-go="pessoas_bi"><div class="ic">👥</div><div class="nm">Gestão de Pessoas</div></button>
+      <button class="mod hidden" id="giQsms" data-go="sst_bi"><div class="ic">⛑️</div><div class="nm">BI QSMS</div></button>
       <button class="mod soon" data-soon="1"><div class="ic">💰</div><div class="nm">Gestão Financeira</div></button>
     </div>
   </main>
@@ -1877,7 +1878,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
     <p class="sub">Escolha uma área</p>
     <div class="sec" style="margin-top:14px">📊 Indicadores</div>
     <div class="grid" style="margin-top:10px">
-      <button class="mod" data-go="sst_bi"><div class="ic">📊</div><div class="nm">BI QSMS</div></button>
+      <button class="mod" id="qsmsBiBtn" data-go="sst_bi"><div class="ic">📊</div><div class="nm">BI QSMS</div></button>
     </div>
     <div class="sec" style="margin-top:20px">🦺 EPI</div>
     <div class="grid" style="margin-top:10px">
@@ -1930,7 +1931,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:16px 0}
 
 
   <main id="sst_bi" class="hidden">
-    <div class="bar"><button class="bk" data-go="qsms">‹ QSMS</button></div>
+    <div class="bar"><button class="bk" id="sbVoltar" data-go="qsms">‹ QSMS</button></div>
     <h1>BI QSMS</h1>
     <p class="sub">Indicadores de SST com as mesmas views e regras de cálculo do Power BI QSMS.</p>
     <nav id="sbNav" class="sbnav" aria-label="Páginas do BI"></nav>
@@ -2938,6 +2939,8 @@ function irPara(id){
 function entInit(){ const b=document.getElementById('entRet'); if(b) b.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); const g=document.getElementById('entOcGest'); if(g) g.classList.toggle('hidden', !(ME&&ME.pode_aprovar)); }
 function homeGate(){ const eo=document.getElementById('homeEstrutura'); if(eo){ const ok=orgPode(); eo.classList.toggle('soon',!ok); eo.querySelector('.nm').textContent=ok?'Estrutura Organizacional':'Estrutura Organizacional 🔒'; eo.onclick=ok?(()=>irPara('estrutura')):(()=>toast('Em desenvolvimento')); } const hf=document.getElementById('homeFisc'); if(hf) hf.classList.toggle('hidden', !(ME&&ME.fisc_acesso)); const hfa=document.getElementById('homeFiscAcesso'); if(hfa) hfa.classList.toggle('hidden', !(ME&&ME.is_admin)); fiscalOnly(!!(ME&&ME.is_fiscal)); const hav=document.getElementById('homeAvisos'); if(hav) hav.classList.toggle('hidden', !(ME&&ME.is_admin)); const hq=document.getElementById('homeQsms'); if(hq) hq.classList.toggle('hidden', !(ME&&ME.qsms)); const hsc=document.getElementById('homeSstCampo'); if(hsc) hsc.classList.toggle('hidden', !(ME&&ME.qsms_campo)); const hpq=document.getElementById('homePavQual'); if(hpq) hpq.classList.toggle('hidden', !(ME&&ME.qualidade)); const b=document.getElementById('homeAuxProg'); if(b) b.classList.toggle('hidden', !(ME&&ME.aux_acesso)); const hc=document.getElementById('homeCfg'); if(hc) hc.classList.toggle('hidden', !(ME&&ME.is_admin)); const gd=document.getElementById('homeDevAcesso'); if(gd) gd.classList.toggle('hidden', !(ME&&ME.is_admin)); const okDev=!!(ME&&ME.dev_acesso); const cp=document.getElementById('cardPerdas'); if(cp){ cp.classList.toggle('soon',!okDev); cp.querySelector('.nm').textContent=okDev?'Perdas (NRW)':'Perdas (NRW) 🔒'; cp.onclick=okDev?(()=>{location.href='perdas.html';}):(()=>toast('Acesso restrito')); } const co=document.getElementById('cardOrcamento'); const okOrc=!!(ME&&ME.orc_acesso); if(co){ co.classList.toggle('soon',!okOrc); co.querySelector('.nm').textContent=okOrc?'Orçamento':'Orçamento 🔒'; co.onclick=okOrc?(()=>{location.href='orcamento.html';}):(()=>toast('Acesso restrito')); } const hr=document.getElementById('homeRh'); if(hr) hr.classList.toggle('hidden', !rhTela('modulo')); const mc=document.getElementById('homeMeusColab'); if(mc) mc.classList.toggle('hidden', !(ME&&ME.pode_aprovar&&!rhTela('colab'))); const tl=document.getElementById('homeTelemetria'); if(tl) tl.classList.toggle('hidden', !(ME&&ME.is_admin)); const vt=document.getElementById('homeVitrine'); if(vt){ vt.classList.toggle('soon',!okDev); vt.querySelector('.nm').textContent=okDev?'Vitrine':'Vitrine 🔒'; vt.onclick=okDev?(()=>irPara('vitrine')):(()=>toast('Acesso restrito')); } }
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>irPara(el.dataset.go)));
+// BI QSMS abre pelo QSMS ou pela tela BI: o "Voltar" leva para onde a pessoa estava
+[['giQsms','gi','‹ BI'],['qsmsBiBtn','qsms','‹ QSMS']].forEach(([id,destino,rotulo])=>{ const el=document.getElementById(id); if(el) el.addEventListener('click',()=>{ const v=document.getElementById('sbVoltar'); if(v){ v.dataset.go=destino; v.textContent=rotulo; } }); });
 document.querySelectorAll('[data-back]').forEach(el=>el.addEventListener('click',()=>irPara('home')));
 if($('#homeCfg')) $('#homeCfg').addEventListener('click',()=>{ supCfgPending=true; supCfgFrom='home'; irPara('suprimentos'); });
 if($('#homeDevAcesso')) $('#homeDevAcesso').addEventListener('click',()=>irPara('dev_acesso'));
@@ -8980,7 +8983,8 @@ async function giInit(){
   const fr=$('#giFrota'); if(fr) fr.classList.toggle('hidden',!(fa&&fa.ver));
   const pp=$('#giPessoas'); if(pp) pp.classList.toggle('hidden',!(pa&&pa.ver));
   document.querySelectorAll('#gi [data-soon]').forEach(x=>{ x.onclick=()=>toast('Em breve'); });
-  if(!((a&&a.ver)||(fa&&fa.ver)||(pa&&pa.ver))){ toast('Acesso restrito'); irPara('auxiliar_programacao'); }
+  const qs=!!(ME&&ME.qsms), gq=$('#giQsms'); if(gq) gq.classList.toggle('hidden',!qs);   // dados do próprio app; mesmo acesso do QSMS
+  if(!((a&&a.ver)||(fa&&fa.ver)||(pa&&pa.ver)||qs)){ toast('Acesso restrito'); irPara('auxiliar_programacao'); }
 }
 // ----- Gestão de Suprimentos (BI) — 6 páginas do Power BI, calculadas no aparelho a partir das views do banco -----
 // Mesmas medidas do modelo do Power BI (DAX portado). Dados: app_sup_bi() = linhas de sup_bi_solicitacoes e sup_bi_cotacoes_itens.

@@ -5063,6 +5063,8 @@ Este é o 1º BI migrado depois do QSMS. O PR-A traz só o banco (função/tabel
 - **Leitores `SPB_P` (`lerPainel/lerMapa/lerVinculados`):** porta do Power Query (`stgPainel`, `MapaBase/MapaLinhas`, `CotPedMap`); iguais ao leitor testado contra os arquivos de 16/11/2026 (2.673 linhas do Painel nas obras 430/440 · 3.168 + 2.753 propostas do Mapa · 1.417 itens dos Vinculados).
 - **Atualizado em 27/11/2026 (sw v482, pedido da usuária):** a carga tem **4 campos, um por arquivo** — Painel, **Mapa ZA1004 (Contagem, obra 430)**, **Mapa ZA0200 (Betim, obra 440)** e Vinculados; mapa de outra obra é recusado. O campo **Estoque saiu da tela** (as páginas de Estoque do BI continuam, sem carga pela tela).
 - **Acesso `sup_acesso` (admin):** duas caixas por pessoa — **Ver** e **Subir relatórios** (`app_sup_acesso_listar/_set`; subir inclui ver; admin tem os dois sempre).
+**27/11/2026:** o **BI QSMS** (`sst_bi`) também aparece na tela BI (`gi`), para quem tem `ME.qsms`; continua no hub do QSMS.
+
 **PR-C (2026-11-19, sw v432) — módulo "Gestão Integrada" + BI de Suprimentos (6 páginas)** (telas `gi` / `sup_bi`; código `spb*`, reaproveita os componentes do BI QSMS `sb*`):
 - **Atualizado em 19/11/2026 (sw v438, decisão do Sander):** o card da Home saiu; o hub `gi` virou o botão **📊 BI** em Auxiliar de Programação › Planejamento (voltar → Auxiliar). Texto original a seguir.
 - **Decisão da usuária:** todos os BIs ficam num módulo novo, **Gestão Integrada** (card 📊 na Home, `homeGI`): **Gestão de Suprimentos** (pronto), Gestão de Frotas, Gestão de Pessoas, Gestão Financeira (cards "Em breve"; há mais áreas previstas). O hub de PR-B (`sup_bi`) virou a tela do BI; **Cargas do SIENGE** e **Acesso** passaram a ser botões no cabeçalho da Gestão de Suprimentos.
